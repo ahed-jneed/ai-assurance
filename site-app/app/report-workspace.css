@@ -1,0 +1,95 @@
+/* A quiet working surface: packages first, completion details on demand. */
+.page-head-actions{flex-wrap:wrap;justify-content:flex-end;gap:10px}
+.page-utilities{display:flex;align-items:center;gap:3px}
+.page-utilities [data-slot=button]{color:#6b7280}
+.page-utilities [data-slot=button]:hover{color:#37352f;background:#f3f4f6}
+.report-workspace{min-width:0}
+.report-handoff{border-block:1px solid #e4e6e9;margin-bottom:24px}
+.report-handoff-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;list-style:none;padding:18px 0;margin:0;border-bottom:1px solid #e4e6e9}
+.report-handoff-steps li{display:flex;gap:8px;align-items:center;min-width:0;font-size:13px;line-height:1.5;color:#6b7280}
+.report-handoff-steps li>span{flex:none;display:flex}
+.report-handoff-steps li[aria-current=step]{color:#305883;font-weight:600}
+.report-handoff-steps li.complete{color:#467154}
+.report-next-step{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:23px 0}
+.report-next-step>div:first-child{min-width:0;flex:1}
+.report-next-step h2{font-size:18px;line-height:1.45;font-weight:600;margin:10px 0 6px;overflow-wrap:anywhere;max-width:65ch}
+.report-next-step p{font-size:13px;line-height:1.65;color:#6b7280;max-width:72ch;margin:0}
+.report-next-step>.row-actions{flex-shrink:0}
+.report-workspace-tabs>[role=tablist]{display:flex;justify-content:flex-start;gap:26px;padding:0;height:auto;width:100%;background:transparent;border-radius:0;border-bottom:1px solid #e4e6e9;margin-bottom:16px;overflow-x:auto}
+.report-workspace-tabs>[role=tablist]>[role=tab]{flex:none;border-radius:0;background:transparent;box-shadow:none;border:0;border-bottom:2px solid transparent;padding:12px 0;color:#6b7280;min-height:44px;font-size:14px;gap:8px}
+.report-workspace-tabs>[role=tablist]>[role=tab][data-state=active]{color:#37352f;border-bottom-color:#37638d;font-weight:600}
+.tab-record-count{font-size:12px;line-height:1.4;padding:1px 5px;min-width:18px;border-radius:4px;background:#f1f3f5;color:#6b7280;font-variant-numeric:tabular-nums}
+.report-library .database-toolbar{gap:14px;flex-wrap:wrap;align-items:center}
+.report-library .database-tools{flex-wrap:wrap;gap:8px}
+.report-package-table td{vertical-align:middle;white-space:normal}
+.report-package-table th{white-space:nowrap}
+.report-package-table td:first-child{min-width:150px}
+.report-package-table time{white-space:nowrap;font-variant-numeric:tabular-nums;font-size:13px}
+.report-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap}
+.report-row-actions [data-slot=button]{white-space:nowrap}
+.report-row-actions .download-link{font-size:13px}
+.report-empty{padding:48px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px;border-bottom:1px solid #e4e6e9}
+.report-empty-icon{color:#84909e;background:#f5f6f8;border-radius:9px;width:48px;height:48px;display:grid;place-items:center}
+.report-empty h3{font-size:18px;font-weight:600;margin:5px 0 0}
+.report-empty p{font-size:14px;line-height:1.65;color:#6b7280;max-width:50ch;margin:0 0 6px}
+.report-workspace .report-readiness{border:0;padding:0;box-shadow:none;margin:0}
+.report-workspace .readiness-heading{display:flex;justify-content:space-between;align-items:center;gap:22px;margin:8px 0 22px}
+.report-workspace .readiness-heading h2{font-size:17px;font-weight:600}
+.report-workspace .readiness-heading p{margin:5px 0 0;font-size:13px}
+.report-workspace .readiness-opinion{display:grid;gap:6px;font-size:12px;margin:0;min-width:230px}
+.completion-search{display:flex;align-items:center;gap:10px;padding:0 10px;border:1px solid #e4e6e9;border-radius:5px;max-width:480px;margin-bottom:18px;color:#6b7280}
+.completion-search input{border:0;box-shadow:none;background:transparent;min-width:0;font-size:14px}
+.checklist-match-count{font-size:12px;color:#6b7280;margin:0 0 10px}
+.checklist-match-count:empty{display:none}
+.gate-group-label{min-width:0;display:grid;gap:4px}
+.gate-group-label small{display:none;color:#6b7280;font-size:12px;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.audit-gate-group:not([open]) .gate-group-label small{display:block}
+.audit-gate-description{min-width:0;flex:1}
+.audit-gate-action{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex:none;font-size:12px;color:#37638d;font-weight:500}
+.report-workspace .audit-gate-row{gap:20px;align-items:center;padding:14px 10px}
+.report-workspace .audit-gate-row:hover{background:#f7f9fb}
+.overview-assurance-progress{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin:0 0 26px;border-block:1px solid #e4e6e9}
+.overview-assurance-progress>button{text-align:left;background:transparent;padding:19px 20px;min-width:0;border-right:1px solid #e4e6e9}
+.overview-assurance-progress>button:last-child{border-right:0}
+.overview-assurance-progress>button:hover{background:#f7f9fb}
+.overview-assurance-progress>button>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#6b7280;font-size:13px}
+.overview-assurance-progress b{display:block;font-weight:600;font-size:26px;font-variant-numeric:tabular-nums;line-height:1.4;margin:7px 0}
+.overview-assurance-progress b small{font-size:17px;font-weight:400;color:#6b7280}
+.overview-assurance-progress p{font-size:12px;line-height:1.5;color:#6b7280;margin:5px 0 0}
+.overview-assurance-progress .overview-progress-track{max-width:240px;margin:8px 0;height:4px}
+.report-package-administration:empty{display:none}
+.report-package-administration{border-top:1px solid #e4e6e9;margin-top:24px;padding-top:18px}
+.package-integrity-tools>summary{font-size:14px;font-weight:500;padding:12px 0;cursor:pointer}
+.package-integrity-tools .release-controls{margin:8px 0 18px}
+.captured-report-tabs>[role=tablist]{display:flex;justify-content:flex-start;width:100%;max-width:100%;height:auto;overflow-x:auto;border-bottom:1px solid #e4e6e9;background:transparent;border-radius:0;padding:0;gap:18px;scroll-padding-inline:6px}
+.captured-report-tabs>[role=tablist]>[role=tab]{flex:none;min-height:44px;padding:10px 0;border-radius:0;background:transparent;box-shadow:none;border-bottom:2px solid transparent;font-size:13px}
+.captured-report-tabs>[role=tablist]>[role=tab][data-state=active]{border-bottom-color:#37638d}
+.captured-section-select{display:none}
+.report-workspace button:focus-visible,.page-utilities button:focus-visible,.overview-assurance-progress>button:focus-visible{outline:2px solid #37638d;outline-offset:3px}
+@container audit-content (max-width:850px){.report-next-step{align-items:flex-start;flex-direction:column;gap:18px}.report-handoff-steps{gap:12px}.report-handoff-steps li{font-size:12px}.report-library .database-tools{justify-content:flex-start}.report-workspace .readiness-heading{align-items:flex-start;flex-wrap:wrap}.report-workspace .audit-gate-row{align-items:flex-start;flex-wrap:wrap}.audit-gate-action{justify-content:flex-start}.report-next-step>.row-actions{max-width:100%}}
+@media(max-width:700px){.page-head .page-head-actions{margin-left:0;gap:6px}.page-utilities [data-slot=button]{width:44px;height:44px}.report-handoff-steps{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px;padding:16px 0}.report-next-step{flex-direction:column;align-items:stretch;padding:20px 0;gap:18px}.report-next-step h2{font-size:17px}.report-next-step>.row-actions>[data-slot=button]{white-space:normal;min-height:44px;height:auto;padding-block:10px}.report-workspace-tabs>[role=tablist]{gap:20px}.report-workspace-tabs>[role=tablist]>[role=tab]{font-size:13px}.report-empty{padding:34px 12px}.report-workspace .readiness-heading{align-items:stretch;flex-direction:column}.report-workspace .readiness-opinion{min-width:0}.report-workspace .readiness-opinion [data-slot=select-trigger]{min-height:44px;width:100%}.completion-search{max-width:none}.completion-search input{min-height:44px;font-size:16px}.report-workspace .audit-gate-row{gap:9px;flex-direction:column;align-items:stretch}.overview-assurance-progress{grid-template-columns:1fr}.overview-assurance-progress>button{padding-inline:12px;border-right:0;border-bottom:1px solid #e4e6e9}.overview-assurance-progress>button:last-child{border-bottom:0}.captured-report-tabs>[role=tablist]{display:none}.captured-section-select{display:grid;gap:7px;margin:10px 0;font-size:13px;color:#6b7280}.captured-section-select select{min-height:44px;background:#fff;color:#37352f;border:1px solid #e4e6e9;border-radius:5px;padding:8px 10px;font-size:16px;width:100%}}
+@media(prefers-reduced-motion:reduce){.report-workspace [data-slot=tabs-trigger],.captured-report-tabs [data-slot=tabs-trigger]{transition:none}}
+
+.report-package-table tr{border-color:#e4e6e9}
+
+.report-package-cards{display:none}
+.report-package-card{border-bottom:1px solid #e4e6e9;padding:20px 0;min-width:0}
+.report-package-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.report-package-card header .paper-link{font-size:16px;font-weight:600}
+.report-package-card>p{font-size:14px;margin:10px 0;color:#37352f}
+.report-package-card dl{display:grid;gap:6px;font-size:13px;margin:14px 0;color:#6b7280}
+.report-package-card dl>div{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.report-package-card dd{margin:0;color:#37352f;font-variant-numeric:tabular-nums}
+.report-card-actions{display:flex;align-items:center;gap:18px;margin-top:18px}
+.report-card-actions [data-slot=button],.report-card-actions a{min-height:44px;display:inline-flex;align-items:center}
+@container audit-content (max-width:650px){.report-package-table{display:none}.report-package-cards{display:block}}
+@media(max-width:700px){.report-package-table{display:none}.report-package-cards{display:block}}
+
+.overview-assurance-progress>button{display:grid;grid-template-rows:minmax(20px,auto) 42px 4px minmax(18px,auto);row-gap:8px;align-content:start}
+.overview-assurance-progress b{margin:0;align-self:center}
+.overview-assurance-progress b.progress-empty{font-size:16px;font-weight:500}
+.overview-assurance-progress .overview-progress-track{margin:0;width:100%;align-self:center}
+.overview-assurance-progress .overview-progress-track>span{background:#6084a6}
+.overview-assurance-progress p{margin:0}
+
+.audit-gate-list.compact .audit-gate-row{flex-direction:column;align-items:flex-start;gap:8px}

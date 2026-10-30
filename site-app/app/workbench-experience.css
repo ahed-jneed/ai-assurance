@@ -1,0 +1,274 @@
+/* Workbench surfaces stay quiet so audit work and its next action remain prominent. */
+.assurance-workbench {
+ container-name: assurance-workbench;
+ container-type: inline-size;
+ min-width: 0;
+ color: #37352f;
+}
+.assurance-workbench :is(.section-toolbar h2, .workbench-subhead) { color: #37352f; }
+.assurance-workbench .subtle { color: #6b7280; }
+.assurance-workbench .workbench-bar {
+ display: flex;
+ flex-wrap: nowrap;
+ align-items: center;
+ gap: 12px;
+ margin-bottom: 20px;
+ border-bottom: 1px solid #e4e6e9;
+}
+.assurance-workbench .workbench-bar > [data-slot=tabs] { min-width: 0; flex: 1 1 auto; }
+.assurance-workbench .workbench-bar [role=tablist] {
+ max-width: 100%;
+ height: auto;
+ flex-wrap: nowrap;
+ justify-content: flex-start;
+ overflow-x: auto;
+ padding: 0;
+ gap: 14px;
+ border-radius: 0;
+ background: transparent;
+ scrollbar-width: thin;
+}
+.assurance-workbench .workbench-bar [role=tab] {
+ flex: 0 0 auto;
+ min-height: 44px;
+ padding: 10px 0 12px;
+ border: 0;
+ border-bottom: 2px solid transparent;
+ border-radius: 0;
+ box-shadow: none;
+ background: transparent;
+ color: #6b7280;
+ font-size: 13px;
+ font-weight: 450;
+}
+.assurance-workbench .workbench-bar [role=tab][data-state=active] {
+ border: 0;
+ border-bottom: 2px solid #37638d;
+ background: transparent;
+ color: #37638d;
+ font-weight: 600;
+}
+.assurance-workbench .workbench-bar > [data-slot=button] { flex: none; min-width: 38px; min-height: 38px; color: #6b7280; }
+.workbench-section-picker, .workbench-detail-picker { display: none; }
+.workbench-dialog [data-slot=dialog-title] { color: #37352f; }
+.workbench-briefing-selection { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;font-size:12px;color:#6b7280; }
+.workbench-execution-status { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:12px 0 18px;font-size:13px;color:#6b7280; }
+.workbench-section-picker select, .workbench-detail-picker select {
+ min-width: 0;
+ width: 100%;
+ min-height: 44px;
+ padding: 9px 11px;
+ border: 1px solid #e4e6e9;
+ border-radius: 5px;
+ background: #fff;
+ color: #37352f;
+ font-size: 14px;
+}
+.assurance-workbench .assurance-filters { gap: 10px; flex-wrap: wrap; margin: 0 0 18px; }
+.assurance-workbench .assurance-filters .search-field {
+ min-width: 0;
+ flex: 1 1 220px;
+ max-width: 380px;
+ background: #fff;
+ border: 1px solid #e4e6e9;
+ color: #6b7280;
+}
+.assurance-workbench .assurance-filters .search-field input { min-width: 0; width: 100%; min-height: 38px; color: #37352f; }
+.assurance-workbench .assurance-filters select { min-height: 38px; max-width: 100%; border-color: #e4e6e9; color: #37352f; }
+.assurance-workbench .workbench-notice { background: #f8fafc; border-color: #e4e6e9; color: #37352f; }
+.assurance-workbench .workbench-notice p { color: #6b7280; }
+
+/* Separate review responsibility from record preparation without a dashboard of large cards. */
+.workbench-review-queue { margin: 0 0 24px; padding: 0 0 20px; border-bottom: 1px solid #e4e6e9; }
+.workbench-queue-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 12px; }
+.workbench-queue-head h2 { margin: 0; color: #37352f; font-size: 14px; font-weight: 600; }
+.workbench-queue-head :is(p, small, span) { margin: 0; color: #6b7280; font-size: 12px; }
+.workbench-queue-counts { display: flex; flex-wrap: wrap; gap: 8px; }
+.workbench-queue-counts button {
+ flex: 1 1 160px;
+ display: flex;
+ align-items: center;
+ justify-content: flex-start;
+ gap: 10px;
+ min-width: 0;
+ min-height: 48px;
+ padding: 10px 12px;
+ border: 1px solid #e4e6e9;
+ border-radius: 5px;
+ background: #fff;
+ color: #37352f;
+ text-align: left;
+ font-size: 13px;
+ line-height: 1.45;
+}
+.workbench-queue-counts button > :is(b, strong) { flex: none; min-width: 20px; font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums; }
+.workbench-queue-counts button > span { min-width: 0; overflow-wrap: anywhere; }
+.workbench-queue-counts button > svg { flex: none; margin-left: auto; color: #84909c; }
+.workbench-queue-counts button:hover { background: #f6f8fa; border-color: #d7e0e9; }
+.workbench-queue-counts button[aria-pressed=true] { color: #37638d; border-color: #b9cbde; background: #f4f7fa; }
+.workbench-queue-counts button:disabled { color: #6b7280; cursor: default; }
+.workbench-next-review { margin-top: 12px; }
+.workbench-next-review > button, button.workbench-next-review {
+ width: 100%;
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 14px;
+ min-height: 44px;
+ padding: 9px 0;
+ color: #37352f;
+ text-align: left;
+}
+.workbench-next-review > button > :is(div, span), button.workbench-next-review > :is(div, span) { min-width: 0; }
+.workbench-next-review :is(b, strong) { display: block; font-weight: 550; font-size: 13px; overflow-wrap: anywhere; }
+.workbench-next-review small { display: block; margin-top: 3px; font-size: 12px; color: #6b7280; overflow-wrap: anywhere; }
+.workbench-next-review svg { flex: none; color: #37638d; }
+.workbench-next-review > button:hover :is(b, strong), button.workbench-next-review:hover :is(b, strong) { color: #37638d; }
+.workbench-load-state, .workbench-load-error { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 24px 0; font-size: 14px; color: #6b7280; }
+.workbench-load-error { color: #7e3b38; }
+.workbench-load-error > :is(div, p) { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.workbench-load-error [data-slot=button] { min-height: 38px; }
+
+/* Restore author/date hidden by older viewport rules, then adapt to the actual content width. */
+.assurance-workbench .assurance-register { border-color: #e4e6e9; }
+.assurance-workbench .assurance-register-head, .assurance-workbench .assurance-record-row {
+ display: grid;
+ grid-template-columns: minmax(0, 1fr) 142px 138px 16px;
+ align-items: center;
+ gap: 16px;
+ border-color: #e4e6e9;
+}
+.assurance-workbench .assurance-register-head { padding: 10px 9px; background: #fafbfc; color: #6b7280; font-size: 11px; }
+.assurance-workbench .assurance-register-head > span { display: block; }
+.assurance-workbench .assurance-record-row { padding: 15px 9px; color: #37352f; }
+.assurance-workbench .assurance-record-row:hover { background: #f6f8fa; }
+.assurance-workbench .assurance-record-name { min-width: 0; align-items: flex-start; }
+.assurance-workbench .assurance-record-name > svg { color: #84909c; }
+.assurance-workbench .assurance-record-name b { color: #37352f; font-size: 13px; line-height: 1.5; }
+.assurance-workbench .assurance-record-name small { color: #6b7280; line-height: 1.5; }
+.assurance-workbench .assurance-record-person { display: block; color: #5e6672; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.assurance-workbench .assurance-record-person small { display: block; color: #6b7280; font-size: 11px; }
+.assurance-workbench .assurance-record-chevron { display: block; color: #8a929c; }
+.assurance-workbench .assurance-record-row .badge { justify-self: start; white-space: normal; max-width: 100%; }
+.assurance-workbench .assurance-register-empty { border-color: #e4e6e9; padding: 20px 9px; color: #6b7280; }
+.assurance-workbench .assurance-register-empty p { margin: 0; line-height: 1.6; }
+.assurance-workbench .assurance-register-empty button { min-height: 38px; margin-top: 8px; color: #37638d; }
+
+/* Record details put reasoning ahead of references and integrity metadata. */
+.workbench-record-details { min-width: 0; color: #37352f; }
+.workbench-record-summary { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 24px; padding: 0 0 20px; }
+.workbench-record-summary > .badge { flex: none; }
+.workbench-record-meta { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0; min-width: 0; }
+.workbench-record-meta > div { min-width: 0; }
+.workbench-record-meta dt, .workbench-integrity-meta dt { margin-bottom: 4px; color: #6b7280; font-size: 11px; font-weight: 400; }
+.workbench-record-meta dd { margin: 0; color: #37352f; font-size: 12px; overflow-wrap: anywhere; }
+.workbench-detail-tabs { gap: 0; }
+.workbench-detail-tabs > [role=tablist] { display: flex; justify-content: flex-start; max-width: 100%; width: 100%; height: auto; gap: 24px; padding: 0; border-radius: 0; border-bottom: 1px solid #e4e6e9; background: #fff; }
+.workbench-detail-tabs > [role=tablist] [role=tab] { flex: 0 0 auto; min-height: 44px; padding: 10px 0 12px; border: 0; border-radius: 0; border-bottom: 2px solid transparent; box-shadow: none; color: #6b7280; background: transparent; font-size: 13px; }
+.workbench-detail-tabs > [role=tablist] [role=tab][data-state=active] { border-bottom-color: #37638d; color: #37638d; font-weight: 600; box-shadow: none; }
+.workbench-detail-body { min-width: 0; padding-top: 8px; }
+.workbench-detail-tabs [role=tabpanel][data-state=inactive] { display: none; }
+.workbench-record-details .workbench-detail-section { margin: 18px 0; padding-bottom: 16px; border-bottom: 1px solid #edf0f3; }
+.workbench-record-details :is(.workbench-detail-section h3, .workbench-revision-history h3) { margin: 0 0 8px; color: #6b7280; font-size: 12px; font-weight: 500; text-transform: none; }
+.workbench-record-details .record-text { margin: 0; color: #37352f; font-size: 14px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workbench-record-details .subtle { color: #6b7280; font-size: 12px; line-height: 1.6; }
+.workbench-reference {
+ display: grid;
+ grid-template-columns: 15px minmax(0, 1fr) auto;
+ align-items: start;
+ gap: 10px;
+ width: 100%;
+ max-width: 100%;
+ min-height: 44px;
+ padding: 11px 12px;
+ border: 1px solid #e4e6e9;
+ border-radius: 5px;
+ background: #fafbfc;
+ color: #37352f;
+ text-align: left;
+}
+.workbench-reference svg { flex: none; color: #84909c; margin-top: 3px; }
+.workbench-reference > span { min-width: 0; }
+.workbench-reference b { display: block; font-weight: 550; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.workbench-reference small, .workbench-reference-unavailable small { display: block; margin-top: 4px; color: #6b7280; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+button.workbench-reference:hover { border-color: #bfd0e1; background: #f4f7fa; }
+button.workbench-reference:hover b, button.workbench-reference > svg:last-child { color: #37638d; }
+button.workbench-reference:disabled { cursor: default; }
+button.workbench-reference:disabled:hover { border-color: #e4e6e9; background: #fafbfc; }
+button.workbench-reference:disabled:hover b { color: #37352f; }
+.workbench-reference-unavailable { display: block; padding: 9px 12px; border-left: 2px solid #d9dfe6; color: #5e6672; font-size: 13px; overflow-wrap: anywhere; }
+.workbench-value-list { display: grid; gap: 10px; min-width: 0; }
+.workbench-value-item { min-width: 0; }
+.workbench-value-object { display: grid; gap: 12px; min-width: 0; }
+.workbench-value-list .workbench-value-object { padding: 12px; border: 1px solid #edf0f3; border-radius: 5px; }
+.workbench-value-field { min-width: 0; }
+.workbench-value-field h4 { margin: 0 0 5px; font-size: 12px; line-height: 1.5; font-weight: 500; color: #6b7280; overflow-wrap: anywhere; }
+.workbench-value-field .record-text { font-size: 13px; }
+.workbench-detail-empty { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0; color: #6b7280; font-size: 13px; }
+.workbench-detail-empty svg { flex: none; color: #84909c; }
+.workbench-detail-empty p { margin: 0; line-height: 1.6; }
+.workbench-source-integrity { margin-top: 22px; border-top: 1px solid #e4e6e9; }
+.workbench-source-integrity > summary, .workbench-stored-record > summary { min-height: 44px; padding: 13px 0; color: #5e6672; font-size: 12px; cursor: pointer; }
+.workbench-integrity-meta { display: grid; gap: 14px; margin: 8px 0 18px; }
+.workbench-integrity-meta dd { min-width: 0; margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.workbench-record-details code { display: inline; color: #5e6672; font-size: 11px; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+.workbench-stored-record { border-top: 1px solid #edf0f3; }
+.workbench-revision-history { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e4e6e9; }
+.workbench-revision-item { display: grid; gap: 6px; min-width: 0; margin: 14px 0; padding: 0 0 0 12px; border-left: 2px solid #dce2e8; }
+.workbench-revision-item > small { color: #6b7280; font-size: 11px; }
+.workbench-revision-item > b { color: #37352f; font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.workbench-revision-item > p { margin: 0; }
+.workbench-record-details .workbench-field { color: #37352f; }
+.workbench-record-details .workbench-field :is(select, textarea, input) { border-color: #e4e6e9; color: #37352f; }
+.workbench-record-details .record-item { border-left-color: #dce2e8; }
+.workbench-record-details .record-item b { color: #37352f; }
+
+.assurance-workbench :is(button, select, input, textarea, summary):focus-visible,
+.workbench-record-details :is(button, select, input, textarea, summary):focus-visible {
+ outline: 2px solid #37638d;
+ outline-offset: 3px;
+}
+.assurance-workbench .search-field:focus-within { outline: 2px solid #37638d; outline-offset: 2px; }
+.assurance-workbench .search-field input:focus-visible { outline: none; }
+
+@container assurance-workbench (max-width: 760px) {
+ .assurance-workbench .workbench-bar { align-items: flex-end; gap: 12px; padding-bottom: 14px; }
+ .assurance-workbench .workbench-bar > [data-slot=tabs] { display: none; }
+ .workbench-section-picker { display: grid; flex: 1; gap: 6px; min-width: 0; color: #6b7280; font-size: 12px; }
+ .assurance-workbench .workbench-bar > [data-slot=button] { min-height: 44px; min-width: 44px; }
+ .assurance-workbench .assurance-filters .search-field { max-width: none; }
+ .assurance-workbench .section-toolbar { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+ .assurance-workbench .section-toolbar .row-actions { flex-wrap: wrap; }
+ .assurance-workbench .assurance-register-head { display: none; }
+ .assurance-workbench .assurance-record-row { grid-template-columns: minmax(0, 1fr) minmax(90px, 138px); gap: 10px 16px; padding: 16px 4px; }
+ .assurance-workbench .assurance-record-name { grid-column: 1 / -1; }
+ .assurance-workbench .assurance-record-name :is(b, small) { white-space: normal; overflow: visible; text-overflow: clip; max-width: none; overflow-wrap: anywhere; }
+ .assurance-workbench .assurance-record-person { display: block; grid-column: 1; }
+ .assurance-workbench .assurance-record-row .badge { grid-column: 2; justify-self: end; text-align: left; }
+ .assurance-workbench .assurance-record-chevron { display: none; }
+}
+@container assurance-workbench (max-width: 430px) {
+ .assurance-workbench .assurance-filters > select { flex: 1 1 160px; }
+ .assurance-workbench .assurance-filters .search-field input { min-height: 44px; font-size: 16px; }
+ .assurance-workbench .assurance-filters select { min-height: 44px; font-size: 16px; }
+ .workbench-section-picker select { font-size: 16px; }
+ .workbench-queue-counts { display: grid; grid-template-columns: minmax(0, 1fr); }
+ .workbench-queue-counts button { min-height: 44px; }
+ .workbench-queue-head { align-items: flex-start; }
+ .assurance-workbench .assurance-record-row { grid-template-columns: minmax(0, 1fr) minmax(90px, 122px); gap: 10px; }
+}
+/* Dialogs are portalled outside the workbench content container. */
+@media (max-width: 640px) {
+ .workbench-record-summary { gap: 14px; padding-bottom: 18px; }
+ .workbench-record-meta { flex-basis: 100%; gap: 12px 20px; }
+ .workbench-detail-picker { display: grid; gap: 6px; margin-bottom: 12px; color: #6b7280; font-size: 12px; }
+ .workbench-detail-picker select { font-size: 16px; }
+ .workbench-detail-tabs > [role=tablist] { display: none; }
+ .workbench-detail-body { padding-top: 0; }
+ .workbench-reference { padding: 10px; gap: 9px; }
+ .workbench-value-list .workbench-value-object { padding: 10px; }
+ .workbench-record-details .workbench-detail-section { margin-top: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+ .assurance-workbench *, .workbench-record-details * { animation: none; transition: none; }
+}

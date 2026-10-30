@@ -1,0 +1,67 @@
+# Source runtime distribution
+
+`assurance-runtime.zip` contains the Python source modules, documentation,
+Dockerfile, dependency baselines, synthetic examples/tests and common schemas.
+It contains no Site application, installed packages, compiled runtimes, retained
+worker jobs, caches, credentials or production data. Extract it into a dedicated
+directory; keep service secrets in your environment/secret manager.
+
+`RUNTIME-MANIFEST.json` records a SHA-256 digest and byte count for every source
+entry. This detects accidental changes; it is not a signed release, attestation,
+dependency lock or approval of a native runtime. The Dockerfile's default base
+tag is for development; production requires an operator-reviewed immutable
+base/image digest and golden native inference qualification.
+
+From the extracted directory, using Python 3.12+:
+
+```powershell
+python -B -m unittest discover -s engine/tests -q
+python -m engine.worker --readiness
+python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-example-report.json
+```
+
+The core CSV computation path needs only Python's standard library. Optional
+native model/Parquet/cryptographic provider capabilities need separately reviewed
+runtimes. `requirements-optional.txt` is a baseline, not a resolved transitive
+lock. No native runtime or Docker execution was qualified in this distribution's
+local checks. Tests use synthetic fixtures, application-owned test predictors,
+dummy credentials and loopback/mocked transports.
+
+Contract versions remain distinct: engine report **1.0**, hosted configuration
+and saved-prediction run **1.1**, authenticated external compilation **1.2**,
+worker transport request/result envelope schema **1.0**. Diagnostic runner is
+**1.1.1**, worker is **1.0.1**. Earlier immutable evidence retains its versions.
+The result envelope is retained byte for byte alongside its imported projection.
+Provided/client-local predictions never establish independent model scoring;
+native inference additionally requires approved artifact hashes, typed numeric
+features, installed adapters and the no-network container execution path.
+
+The optional cited evidence assistant is a separate, permission-scoped draft
+service. No provider endpoint or production key is supplied; tests mock responses.
+See `CITED_ASSISTANT.md` before enabling any provider or forwarding excerpts.
+
+For schema verification, use a pre-existing dependency tree with Ajv 2020 and
+ajv-formats; the archive deliberately includes no node_modules:
+
+```powershell
+python schemas/.build-run-schema.py
+node schemas/validate-run-schema.mjs --ajv-package path/to/package.json
+node schemas/validate-procedure-schema.mjs --ajv-package path/to/package.json
+```
+
+The run-schema validator accepts `--external-run path/to/imported-run.json` for
+a fresh platform projection. Portable schema validity does not establish its
+custody or signature; the committed exact-byte fixture checks exercise binding
+logic independently. `python schemas/generate-external-fixtures.py` recomputes
+fictional example reports and updates timestamps, without a Site API call.
+
+Rebuild a deterministic source package from the workspace/extracted runtime:
+
+```powershell
+python -m engine.package_runtime --output tmp/assurance-runtime.zip
+```
+
+Outputs are created once; choose a new path for another archive. Packaging
+rejects symlinked source components and uses explicit source-file allowlists.
+Operators remain responsible for independent release review/signing, deployment,
+worker enrollment, access rotation, quotas and retained-evidence verification.

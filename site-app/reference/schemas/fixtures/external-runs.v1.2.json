@@ -1,0 +1,1700 @@
+[
+  {
+    "fixture": "binary",
+    "requestJSON": "{\"schemaVersion\":\"1.0\",\"executionMode\":\"provided_predictions\",\"model\":{\"name\":\"Synthetic predictor\",\"version\":\"1\",\"format\":\"Prediction file\",\"task\":\"Binary classification\",\"intendedPurpose\":\"Numerical synthetic fixture validation\",\"artifactId\":\"EV-external-binary\",\"id\":\"MODEL-external-binary\",\"familyId\":\"MODEL-external-binary\",\"status\":\"registered\",\"sourceSha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"registeredAt\":\"2026-10-07T20:42:04.207Z\",\"registeredBy\":\"fixture-owner-1791405723489\",\"sha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"size\":28,\"review\":{\"approved\":false}},\"dataset\":{\"id\":\"EV-external-binary\",\"name\":\"binary.csv\",\"sha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"size\":71},\"profile\":{\"name\":\"Binary acceptance\",\"version\":\"1.0\",\"task\":\"Binary classification\",\"suite\":[\"performance\",\"demographic_parity\",\"disparate_impact\",\"equalized_odds\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"group\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"datasetContext\":{\"split\":\"test\",\"population\":\"Synthetic full fixture population\",\"predictionProvenance\":\"Controlled synthetic predictions generated for fixture validation\",\"independence\":\"Synthetic fixture; no real holdout independence claim\",\"sensitiveDataBasis\":\"\"},\"rationale\":\"Fixture acceptance rules assess arithmetic and workflow, not legal conformity\",\"id\":\"PROTOCOL-external-binary\",\"schemaVersion\":\"1.0\",\"createdAt\":\"2026-10-07T20:42:04.380Z\",\"createdBy\":\"fixture-owner-1791405723489\"},\"seed\":42,\"procedure\":{\"id\":\"PROC-external-binary\",\"revision\":1,\"briefRevision\":1,\"programRevision\":2},\"inputHashes\":{\"dataset\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"modelArtifact\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"system\":\"3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1\",\"protocol\":\"94aa00f0dc32e2ec58b5fc4d0b8bbf7cdc047483176c23c7b7453baecdc7ca7f\"},\"engineConfig\":{\"contractVersion\":\"1.1\",\"id\":\"JOB-external-binary\",\"engagementId\":\"ENG-external-fixture\",\"modelId\":\"MODEL-external-binary\",\"datasetId\":\"EV-external-binary\",\"task\":\"Binary classification\",\"suite\":[\"performance\",\"demographic_parity\",\"disparate_impact\",\"equalized_odds\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"group\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"seed\":42},\"limitations\":[\"Synthetic engine computation and import projection fixture; no platform authentication or native inference validation.\"]}",
+    "resultJSON": "{\"externalReport\":{\"completedAt\":\"2026-10-08T17:24:43.632381+00:00\",\"configuration\":{\"calibrationBins\":10,\"columns\":{\"prediction\":\"predicted\",\"protected\":\"group\",\"target\":\"actual\"},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-binary\",\"engagementId\":\"ENG-external-fixture\",\"hostedTranslation\":{\"minimumClassCount\":2,\"selectedTests\":[\"performance\",\"demographic_parity\",\"disparate_impact\",\"equalized_odds\"],\"sourceConfiguration\":{\"groupColumn\":\"group\",\"labelColumn\":\"actual\",\"maximumOddsGap\":0.1,\"maximumParityGap\":0.2,\"maximumRmse\":1,\"minimumAccuracy\":0.8,\"minimumClassCount\":2,\"minimumGroupSize\":2,\"minimumImpactRatio\":0.7,\"minimumMacroF1\":0.6,\"minimumRecall\":0.7,\"minimumSampleSize\":2,\"positiveLabel\":\"1\",\"predictionColumn\":\"predicted\"},\"sourceContract\":\"1.1\",\"supplementalMetricPolicy\":\"descriptive; only selected named acceptance criteria determine hostedResults\",\"version\":\"hosted-1.1-to-engine-1.0/1.0.0\"},\"id\":\"JOB-external-binary\",\"minClassCount\":2,\"minGroupSize\":2,\"minSampleSize\":2,\"modelId\":\"MODEL-external-binary\",\"negativeLabel\":\"0\",\"positiveLabel\":\"1\",\"psiBins\":10,\"seed\":42,\"suite\":[\"performance\",\"fairness\"],\"task\":\"binary_classification\",\"thresholds\":{\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"demographic_parity_difference\":{\"operator\":\"<=\",\"value\":0.2},\"disparate_impact_ratio\":{\"operator\":\">=\",\"value\":0.7},\"equalized_odds_difference\":{\"operator\":\"<=\",\"value\":0.1},\"recall\":{\"operator\":\">=\",\"value\":0.7}}}},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-binary\",\"engagementId\":\"ENG-external-fixture\",\"id\":\"JOB-external-binary\",\"limitations\":[\"This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.\",\"Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody.\"],\"modelId\":\"MODEL-external-binary\",\"outcome\":\"fail\",\"overallOutcome\":\"fail\",\"paperIds\":[\"wp-aaf3d6809f3d78605c0bb225\",\"wp-0a119d578d9e85f56926e995\",\"wp-afaaa4bb789526e01703723a\",\"wp-4f2a5c4bc3e6382f3f391674\",\"wp-8c76476912a6429bf4473d4a\"],\"provenance\":{\"configSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"dependencies\":{\"adapterDeclaration\":\"not_used\",\"packages\":{},\"python\":{\"implementation\":\"CPython\",\"version\":\"3.12.14\"},\"scope\":\"Direct adapter and active connector distributions only; transitive packages and native binaries require a worker image/dependency lock.\",\"source\":\"installed_distribution_metadata for declared direct dependencies\",\"standardLibraryOnly\":true,\"status\":\"complete\",\"unresolved\":[]},\"determinism\":\"No sampling or randomized computation; seed reserved for adapter protocols\",\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"inputs\":{\"data\":{\"bytes\":71,\"columns\":[\"actual\",\"predicted\",\"group\"],\"name\":\"binary.csv\",\"rowCount\":8,\"sha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\"},\"reference\":null,\"testDefinitions\":{\"FAIR-DI\":\"1.0.0\",\"FAIR-DP\":\"1.0.0\",\"FAIR-EO\":\"1.0.0\",\"PERF-BINARY\":\"1.0.0\",\"PERF-CAL\":\"1.0.0\"}},\"policyVersion\":\"1.0\",\"runnerVersion\":\"1.1.1\"},\"reportSha256\":\"7ff60a076f0ee1139812ead1c72e298b87cbf14cded1acb3e566f4191010223c\",\"results\":[{\"article\":\"15\",\"label\":\"Binary classification performance\",\"limitations\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}],\"outcome\":\"inconclusive\",\"testId\":\"PERF-BINARY\"},{\"article\":\"15\",\"label\":\"Probability calibration\",\"limitations\":[\"No probability scores supplied; calibration was skipped.\"],\"metrics\":[],\"outcome\":\"not_applicable\",\"testId\":\"PERF-CAL\"},{\"article\":\"10\",\"label\":\"Demographic parity difference\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"maximum minus minimum group selection rate\",\"minGroupSize\":2,\"missingGroupCount\":0},\"name\":\"demographic_parity_difference\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.2},\"unit\":\"ratio\",\"value\":0.25}],\"outcome\":\"fail\",\"testId\":\"FAIR-DP\"},{\"article\":\"10\",\"label\":\"Disparate impact ratio\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"minimum divided by maximum group selection rate\",\"reference\":\"highest observed selection rate\",\"zeroDenominatorPolicy\":\"undefined; inconclusive\"},\"name\":\"disparate_impact_ratio\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.5}],\"outcome\":\"fail\",\"testId\":\"FAIR-DI\"},{\"article\":\"10\",\"label\":\"Equalized odds difference\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"maximum of TPR range and FPR range\",\"fprGap\":0.0,\"minClassCount\":2,\"tprGap\":0.5},\"name\":\"equalized_odds_difference\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.1},\"unit\":\"ratio\",\"value\":0.5}],\"outcome\":\"fail\",\"testId\":\"FAIR-EO\"}],\"seed\":42,\"startedAt\":\"2026-10-08T17:24:43.625806+00:00\",\"state\":\"succeeded\",\"suite\":[\"performance\",\"fairness\"],\"thresholds\":{\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"demographic_parity_difference\":{\"operator\":\"<=\",\"value\":0.2},\"disparate_impact_ratio\":{\"operator\":\">=\",\"value\":0.7},\"equalized_odds_difference\":{\"operator\":\"<=\",\"value\":0.1},\"recall\":{\"operator\":\">=\",\"value\":0.7}}},\"workingPapers\":[{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}]},\"exceptions\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"id\":\"wp-aaf3d6809f3d78605c0bb225\",\"modelId\":\"MODEL-external-binary\",\"objective\":\"Evaluate binary classification performance using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-BINARY\"},\"proposedConclusion\":\"inconclusive\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-binary\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Binary classification performance\",\"version\":1},{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[]},\"exceptions\":[\"No probability scores supplied; calibration was skipped.\"],\"id\":\"wp-0a119d578d9e85f56926e995\",\"modelId\":\"MODEL-external-binary\",\"objective\":\"Evaluate probability calibration using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-CAL\"},\"proposedConclusion\":\"not_applicable\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-binary\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Probability calibration\",\"version\":1},{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"maximum minus minimum group selection rate\",\"minGroupSize\":2,\"missingGroupCount\":0},\"name\":\"demographic_parity_difference\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.2},\"unit\":\"ratio\",\"value\":0.25}]},\"exceptions\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"id\":\"wp-afaaa4bb789526e01703723a\",\"modelId\":\"MODEL-external-binary\",\"objective\":\"Evaluate demographic parity difference using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"FAIR-DP\"},\"proposedConclusion\":\"fail\",\"regulatoryMapping\":{\"articleReferences\":\"10\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-binary\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Demographic parity difference\",\"version\":1},{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"minimum divided by maximum group selection rate\",\"reference\":\"highest observed selection rate\",\"zeroDenominatorPolicy\":\"undefined; inconclusive\"},\"name\":\"disparate_impact_ratio\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.5}]},\"exceptions\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"id\":\"wp-4f2a5c4bc3e6382f3f391674\",\"modelId\":\"MODEL-external-binary\",\"objective\":\"Evaluate disparate impact ratio using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"FAIR-DI\"},\"proposedConclusion\":\"fail\",\"regulatoryMapping\":{\"articleReferences\":\"10\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-binary\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Disparate impact ratio\",\"version\":1},{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"comparison\":\"maximum of TPR range and FPR range\",\"fprGap\":0.0,\"minClassCount\":2,\"tprGap\":0.5},\"name\":\"equalized_odds_difference\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.1},\"unit\":\"ratio\",\"value\":0.5}]},\"exceptions\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\"],\"id\":\"wp-8c76476912a6429bf4473d4a\",\"modelId\":\"MODEL-external-binary\",\"objective\":\"Evaluate equalized odds difference using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"29e868105f1d99926597352a88b1d32d0679710a3cb47aa6ddb1d50d7a0db24c\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"FAIR-EO\"},\"proposedConclusion\":\"fail\",\"regulatoryMapping\":{\"articleReferences\":\"10\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-binary\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Equalized odds difference\",\"version\":1}]},\"hostedResults\":[{\"article\":\"15\",\"label\":\"Classification performance\",\"limitations\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}],\"outcome\":\"pass\",\"testId\":\"performance\"},{\"article\":\"10\",\"label\":\"Demographic parity\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"criterion\",\"comparison\":\"maximum minus minimum group selection rate\",\"engineMetricName\":\"demographic_parity_difference\",\"minGroupSize\":2,\"missingGroupCount\":0},\"name\":\"maximum_selection_rate_gap\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.2},\"unit\":\"ratio\",\"value\":0.25}],\"outcome\":\"fail\",\"testId\":\"demographic_parity\"},{\"article\":\"10\",\"label\":\"Disparate impact\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"criterion\",\"comparison\":\"minimum divided by maximum group selection rate\",\"engineMetricName\":\"disparate_impact_ratio\",\"reference\":\"highest observed selection rate\",\"zeroDenominatorPolicy\":\"undefined; inconclusive\"},\"name\":\"minimum_selection_rate_ratio\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.5}],\"outcome\":\"fail\",\"testId\":\"disparate_impact\"},{\"article\":\"10\",\"label\":\"Equalized odds\",\"limitations\":[\"Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.\",\"Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.\",\"Intervals assume independent observations; clustered or repeated records require a different protocol.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"criterion\",\"comparison\":\"maximum of TPR range and FPR range\",\"engineMetricName\":\"equalized_odds_difference\",\"fprGap\":0.0,\"minClassCount\":2,\"tprGap\":0.5},\"name\":\"maximum_tpr_fpr_gap\",\"numerator\":null,\"sampleSize\":8,\"slices\":[{\"confusionMatrix\":{\"fn\":0,\"fp\":0,\"tn\":2,\"tp\":2},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.15003898915214947,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.8499610108478506},\"selectionDenominator\":4,\"selectionNumerator\":2,\"selectionRate\":0.5,\"slice\":\"A\",\"tpr\":1.0,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"tprDenominator\":2,\"tprNumerator\":2},{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":2,\"tp\":1},\"fpr\":0.0,\"fprConfidenceInterval\":{\"level\":0.95,\"lower\":0.0,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6576197724933469},\"fprDenominator\":2,\"fprNumerator\":0,\"n\":4,\"selectionConfidenceInterval\":{\"level\":0.95,\"lower\":0.04558726080970055,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.6993581574175981},\"selectionDenominator\":4,\"selectionNumerator\":1,\"selectionRate\":0.25,\"slice\":\"B\",\"tpr\":0.5,\"tprConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"tprDenominator\":2,\"tprNumerator\":1}],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-binary\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.1},\"unit\":\"ratio\",\"value\":0.5}],\"outcome\":\"fail\",\"testId\":\"equalized_odds\"}],\"provenance\":{\"execution\":{\"controller\":\"external_auditor_worker\",\"kind\":\"provided_predictions\",\"limitations\":[\"Synthetic saved predictions; no independent inference.\"],\"networkIsolation\":\"synthetic_fixture_no_network\"},\"executionMode\":\"provided_predictions\",\"externalReportSha256\":\"7ff60a076f0ee1139812ead1c72e298b87cbf14cded1acb3e566f4191010223c\",\"imageDigest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"inputHashes\":{\"dataset\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\"},\"preprocessingScope\":\"Preprocessing hashes are source declarations only; this worker scores already prepared numeric columns and does not execute preprocessing artifacts.\",\"requestSha256\":\"af24cccb0e770f21295126326aa7f59590c32a16ffe6aa02a6eafe08faf1f002\",\"translationVersion\":\"hosted-1.1-to-engine-1.0/1.0.0\",\"workerVersion\":\"1.0.0\"},\"schemaVersion\":\"1.0\"}\n",
+    "run": {
+      "externalJobId": "JOB-external-binary",
+      "contractVersion": "1.2",
+      "id": "JOB-external-binary",
+      "engagementId": "ENG-external-fixture",
+      "modelId": "MODEL-external-binary",
+      "datasetId": "EV-external-binary",
+      "task": "Binary classification",
+      "seed": 42,
+      "profileId": "PROTOCOL-external-binary",
+      "suite": [
+        "performance",
+        "demographic_parity",
+        "disparate_impact",
+        "equalized_odds"
+      ],
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "group",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "thresholds": {
+        "source": "internal_policy",
+        "policyId": "PROTOCOL-external-binary",
+        "policyVersion": "1.0",
+        "frozenAt": "2026-10-08T16:00:00.000Z",
+        "frozenBy": "fixture-owner",
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "group",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "state": "succeeded",
+      "outcome": "fail",
+      "overallOutcome": "fail",
+      "results": [
+        {
+          "testId": "performance",
+          "label": "Classification performance",
+          "article": "15",
+          "outcome": "pass",
+          "metrics": [
+            {
+              "name": "accuracy",
+              "value": 0.875,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.8,
+                "policyId": "PROTOCOL-external-binary",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 7,
+              "denominator": 8,
+              "confidenceInterval": {
+                "lower": 0.5291118177871464,
+                "upper": 0.9775825085499433,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "precision",
+              "value": 1.0,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 3,
+              "denominator": 3,
+              "confidenceInterval": {
+                "lower": 0.4385029682449546,
+                "upper": 1.0,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "recall",
+              "value": 0.75,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.7,
+                "policyId": "PROTOCOL-external-binary",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 3,
+              "denominator": 4,
+              "confidenceInterval": {
+                "lower": 0.30064184258240184,
+                "upper": 0.9544127391902995,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "f1",
+              "value": 0.8571428571428571,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "balanced_accuracy",
+              "value": 0.875,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            }
+          ],
+          "limitations": [
+            "Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.",
+            "A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        },
+        {
+          "testId": "demographic_parity",
+          "label": "Demographic parity",
+          "article": "10",
+          "outcome": "fail",
+          "metrics": [
+            {
+              "name": "maximum_selection_rate_gap",
+              "value": 0.25,
+              "threshold": {
+                "operator": "<=",
+                "value": 0.2,
+                "policyId": "PROTOCOL-external-binary",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 4,
+                  "selectionRate": 0.5,
+                  "selectionNumerator": 2,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.15003898915214947,
+                    "upper": 0.8499610108478506,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 1.0,
+                  "tprNumerator": 2,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 2,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 0
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 4,
+                  "selectionRate": 0.25,
+                  "selectionNumerator": 1,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.04558726080970055,
+                    "upper": 0.6993581574175981,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 0.5,
+                  "tprNumerator": 1,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 1,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 1
+                  }
+                }
+              ],
+              "details": {
+                "comparison": "maximum minus minimum group selection rate",
+                "minGroupSize": 2,
+                "missingGroupCount": 0,
+                "acceptanceRole": "criterion",
+                "engineMetricName": "demographic_parity_difference"
+              }
+            }
+          ],
+          "limitations": [
+            "Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.",
+            "Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.",
+            "Intervals assume independent observations; clustered or repeated records require a different protocol.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        },
+        {
+          "testId": "disparate_impact",
+          "label": "Disparate impact",
+          "article": "10",
+          "outcome": "fail",
+          "metrics": [
+            {
+              "name": "minimum_selection_rate_ratio",
+              "value": 0.5,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.7,
+                "policyId": "PROTOCOL-external-binary",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 4,
+                  "selectionRate": 0.5,
+                  "selectionNumerator": 2,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.15003898915214947,
+                    "upper": 0.8499610108478506,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 1.0,
+                  "tprNumerator": 2,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 2,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 0
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 4,
+                  "selectionRate": 0.25,
+                  "selectionNumerator": 1,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.04558726080970055,
+                    "upper": 0.6993581574175981,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 0.5,
+                  "tprNumerator": 1,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 1,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 1
+                  }
+                }
+              ],
+              "details": {
+                "comparison": "minimum divided by maximum group selection rate",
+                "reference": "highest observed selection rate",
+                "zeroDenominatorPolicy": "undefined; inconclusive",
+                "acceptanceRole": "criterion",
+                "engineMetricName": "disparate_impact_ratio"
+              }
+            }
+          ],
+          "limitations": [
+            "Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.",
+            "Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.",
+            "Intervals assume independent observations; clustered or repeated records require a different protocol.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        },
+        {
+          "testId": "equalized_odds",
+          "label": "Equalized odds",
+          "article": "10",
+          "outcome": "fail",
+          "metrics": [
+            {
+              "name": "maximum_tpr_fpr_gap",
+              "value": 0.5,
+              "threshold": {
+                "operator": "<=",
+                "value": 0.1,
+                "policyId": "PROTOCOL-external-binary",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 4,
+                  "selectionRate": 0.5,
+                  "selectionNumerator": 2,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.15003898915214947,
+                    "upper": 0.8499610108478506,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 1.0,
+                  "tprNumerator": 2,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 2,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 0
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 4,
+                  "selectionRate": 0.25,
+                  "selectionNumerator": 1,
+                  "selectionDenominator": 4,
+                  "selectionConfidenceInterval": {
+                    "lower": 0.04558726080970055,
+                    "upper": 0.6993581574175981,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "tpr": 0.5,
+                  "tprNumerator": 1,
+                  "tprDenominator": 2,
+                  "tprConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "fpr": 0.0,
+                  "fprNumerator": 0,
+                  "fprDenominator": 2,
+                  "fprConfidenceInterval": {
+                    "lower": 0.0,
+                    "upper": 0.6576197724933469,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  },
+                  "confusionMatrix": {
+                    "tp": 1,
+                    "fp": 0,
+                    "tn": 2,
+                    "fn": 1
+                  }
+                }
+              ],
+              "details": {
+                "tprGap": 0.5,
+                "fprGap": 0.0,
+                "comparison": "maximum of TPR range and FPR range",
+                "minClassCount": 2,
+                "acceptanceRole": "criterion",
+                "engineMetricName": "equalized_odds_difference"
+              }
+            }
+          ],
+          "limitations": [
+            "Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.",
+            "Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.",
+            "Intervals assume independent observations; clustered or repeated records require a different protocol.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        }
+      ],
+      "paperIds": [
+        "WP-external-JOB-external-binary"
+      ],
+      "createdAt": "2026-10-08T16:00:00.000Z",
+      "startedAt": "2026-10-08T16:00:00.000Z",
+      "completedAt": "2026-10-08T16:00:01.000Z",
+      "procedureBinding": {
+        "procedureId": "PROC-external-binary",
+        "procedureRevision": 1,
+        "briefRevision": 1,
+        "programRevision": 2
+      },
+      "provenance": {
+        "inputHashes": {
+          "dataset": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "modelArtifact": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "system": "3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1",
+          "protocol": "94aa00f0dc32e2ec58b5fc4d0b8bbf7cdc047483176c23c7b7453baecdc7ca7f",
+          "auditBinding": "705cbc914116ae99aee2f14f83c0f7533b5f30fc58d1958bad1684a328ae235d",
+          "externalRequest": "af24cccb0e770f21295126326aa7f59590c32a16ffe6aa02a6eafe08faf1f002",
+          "externalResult": "762b9834bf614a74659171a5ea4557f52097656a85b4d674ccb641fde585dbc9"
+        },
+        "runnerVersion": "1.0.0",
+        "policyVersion": "1.0"
+      },
+      "manifest": {
+        "schemaVersion": "1.0",
+        "model": {
+          "name": "Synthetic predictor",
+          "version": "1",
+          "format": "Prediction file",
+          "task": "Binary classification",
+          "intendedPurpose": "Numerical synthetic fixture validation",
+          "artifactId": "EV-external-binary",
+          "id": "MODEL-external-binary",
+          "familyId": "MODEL-external-binary",
+          "status": "registered",
+          "sourceSha256": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "registeredAt": "2026-10-07T20:42:04.207Z",
+          "registeredBy": "fixture-owner-1791405723489"
+        },
+        "dataset": {
+          "id": "EV-external-binary",
+          "name": "binary.csv",
+          "sha256": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "size": 71,
+          "rowCount": 8,
+          "columns": [
+            "actual",
+            "predicted"
+          ]
+        },
+        "profile": {
+          "name": "Binary acceptance",
+          "version": "1.0",
+          "task": "Binary classification",
+          "suite": [
+            "performance",
+            "demographic_parity",
+            "disparate_impact",
+            "equalized_odds"
+          ],
+          "config": {
+            "labelColumn": "actual",
+            "predictionColumn": "predicted",
+            "groupColumn": "group",
+            "positiveLabel": "1",
+            "minimumGroupSize": 2,
+            "maximumParityGap": 0.2,
+            "minimumImpactRatio": 0.7,
+            "minimumAccuracy": 0.8,
+            "minimumSampleSize": 2,
+            "minimumClassCount": 2,
+            "maximumOddsGap": 0.1,
+            "minimumRecall": 0.7,
+            "minimumMacroF1": 0.6,
+            "maximumRmse": 1
+          },
+          "datasetContext": {
+            "split": "test",
+            "population": "Synthetic full fixture population",
+            "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+            "independence": "Synthetic fixture; no real holdout independence claim",
+            "sensitiveDataBasis": ""
+          },
+          "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+          "id": "PROTOCOL-external-binary",
+          "schemaVersion": "1.0",
+          "createdAt": "2026-10-07T20:42:04.380Z",
+          "createdBy": "fixture-owner-1791405723489"
+        },
+        "executionMode": "provided_predictions",
+        "lineage": "authenticated_external_attempt",
+        "testDefinitionVersion": "hosted-1.1-to-engine-1.0/1.0.0",
+        "limitations": [
+          "Synthetic engine computation and import projection fixture; no platform authentication or native inference validation."
+        ]
+      }
+    }
+  },
+  {
+    "fixture": "multiclass",
+    "requestJSON": "{\"schemaVersion\":\"1.0\",\"executionMode\":\"provided_predictions\",\"model\":{\"name\":\"Synthetic predictor\",\"version\":\"1\",\"format\":\"Prediction file\",\"task\":\"Multiclass classification\",\"intendedPurpose\":\"Numerical synthetic fixture validation\",\"artifactId\":\"EV-external-multiclass\",\"id\":\"MODEL-external-multiclass\",\"familyId\":\"MODEL-external-multiclass\",\"status\":\"registered\",\"sourceSha256\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"registeredAt\":\"2026-10-07T20:42:04.207Z\",\"registeredBy\":\"fixture-owner-1791405723489\",\"sha256\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"size\":28,\"review\":{\"approved\":false}},\"dataset\":{\"id\":\"EV-external-multiclass\",\"name\":\"multiclass.csv\",\"sha256\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"size\":41},\"profile\":{\"name\":\"Binary acceptance\",\"version\":\"1.0\",\"task\":\"Multiclass classification\",\"suite\":[\"performance\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"datasetContext\":{\"split\":\"test\",\"population\":\"Synthetic full fixture population\",\"predictionProvenance\":\"Controlled synthetic predictions generated for fixture validation\",\"independence\":\"Synthetic fixture; no real holdout independence claim\",\"sensitiveDataBasis\":\"\"},\"rationale\":\"Fixture acceptance rules assess arithmetic and workflow, not legal conformity\",\"id\":\"PROTOCOL-external-multiclass\",\"schemaVersion\":\"1.0\",\"createdAt\":\"2026-10-07T20:42:04.380Z\",\"createdBy\":\"fixture-owner-1791405723489\"},\"seed\":42,\"procedure\":{\"id\":\"PROC-external-multiclass\",\"revision\":1,\"briefRevision\":1,\"programRevision\":2},\"inputHashes\":{\"dataset\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"modelArtifact\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"system\":\"3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1\",\"protocol\":\"e646e9f36d8cc9bd90db435642f489af469385e471ffadd1089f7b8fa3dc2a30\"},\"engineConfig\":{\"contractVersion\":\"1.1\",\"id\":\"JOB-external-multiclass\",\"engagementId\":\"ENG-external-fixture\",\"modelId\":\"MODEL-external-multiclass\",\"datasetId\":\"EV-external-multiclass\",\"task\":\"Multiclass classification\",\"suite\":[\"performance\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"seed\":42},\"limitations\":[\"Synthetic engine computation and import projection fixture; no platform authentication or native inference validation.\"]}",
+    "resultJSON": "{\"externalReport\":{\"completedAt\":\"2026-10-08T17:24:43.640385+00:00\",\"configuration\":{\"calibrationBins\":10,\"columns\":{\"prediction\":\"predicted\",\"target\":\"actual\"},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-multiclass\",\"engagementId\":\"ENG-external-fixture\",\"hostedTranslation\":{\"minimumClassCount\":2,\"selectedTests\":[\"performance\"],\"sourceConfiguration\":{\"groupColumn\":\"\",\"labelColumn\":\"actual\",\"maximumOddsGap\":0.1,\"maximumParityGap\":0.2,\"maximumRmse\":1,\"minimumAccuracy\":0.8,\"minimumClassCount\":2,\"minimumGroupSize\":2,\"minimumImpactRatio\":0.7,\"minimumMacroF1\":0.6,\"minimumRecall\":0.7,\"minimumSampleSize\":2,\"positiveLabel\":\"1\",\"predictionColumn\":\"predicted\"},\"sourceContract\":\"1.1\",\"supplementalMetricPolicy\":\"descriptive; only selected named acceptance criteria determine hostedResults\",\"version\":\"hosted-1.1-to-engine-1.0/1.0.0\"},\"id\":\"JOB-external-multiclass\",\"minClassCount\":2,\"minGroupSize\":2,\"minSampleSize\":2,\"modelId\":\"MODEL-external-multiclass\",\"psiBins\":10,\"seed\":42,\"suite\":[\"performance\"],\"task\":\"multiclass_classification\",\"thresholds\":{\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"macro_f1\":{\"operator\":\">=\",\"value\":0.6}}}},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-multiclass\",\"engagementId\":\"ENG-external-fixture\",\"id\":\"JOB-external-multiclass\",\"limitations\":[\"This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.\",\"Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody.\"],\"modelId\":\"MODEL-external-multiclass\",\"outcome\":\"fail\",\"overallOutcome\":\"fail\",\"paperIds\":[\"wp-043afd8aeadea7eec2cc4293\"],\"provenance\":{\"configSha256\":\"0dd5a8310c09a43a30b7d9dc182088b09562cb0b7a41a01607f41330abbca19d\",\"dependencies\":{\"adapterDeclaration\":\"not_used\",\"packages\":{},\"python\":{\"implementation\":\"CPython\",\"version\":\"3.12.14\"},\"scope\":\"Direct adapter and active connector distributions only; transitive packages and native binaries require a worker image/dependency lock.\",\"source\":\"installed_distribution_metadata for declared direct dependencies\",\"standardLibraryOnly\":true,\"status\":\"complete\",\"unresolved\":[]},\"determinism\":\"No sampling or randomized computation; seed reserved for adapter protocols\",\"inputHashes\":{\"data\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"reference\":null},\"inputs\":{\"data\":{\"bytes\":41,\"columns\":[\"actual\",\"predicted\"],\"name\":\"multiclass.csv\",\"rowCount\":6,\"sha256\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\"},\"reference\":null,\"testDefinitions\":{\"PERF-MULTI\":\"1.0.0\"}},\"policyVersion\":\"1.0\",\"runnerVersion\":\"1.1.1\"},\"reportSha256\":\"e2d7976c7b48dc5e24e24bdf86336fb2b68bc7075a0fb5698e46bd2b01792691\",\"results\":[{\"article\":\"15\",\"label\":\"Multiclass classification performance\",\"limitations\":[\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.299993315138392,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9032285888942195},\"denominator\":6,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"accuracy\",\"numerator\":4,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_precision\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.7222222222222222},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_recall\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_f1\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.6},\"unit\":\"ratio\",\"value\":0.6555555555555556}],\"outcome\":\"fail\",\"testId\":\"PERF-MULTI\"}],\"seed\":42,\"startedAt\":\"2026-10-08T17:24:43.640385+00:00\",\"state\":\"succeeded\",\"suite\":[\"performance\"],\"thresholds\":{\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"macro_f1\":{\"operator\":\">=\",\"value\":0.6}}},\"workingPapers\":[{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.299993315138392,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9032285888942195},\"denominator\":6,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"accuracy\",\"numerator\":4,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_precision\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.7222222222222222},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_recall\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_f1\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.6},\"unit\":\"ratio\",\"value\":0.6555555555555556}]},\"exceptions\":[\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"id\":\"wp-043afd8aeadea7eec2cc4293\",\"modelId\":\"MODEL-external-multiclass\",\"objective\":\"Evaluate multiclass classification performance using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"0dd5a8310c09a43a30b7d9dc182088b09562cb0b7a41a01607f41330abbca19d\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-MULTI\"},\"proposedConclusion\":\"fail\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-multiclass\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Multiclass classification performance\",\"version\":1}]},\"hostedResults\":[{\"article\":\"15\",\"label\":\"Classification performance\",\"limitations\":[\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.299993315138392,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9032285888942195},\"denominator\":6,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"accuracy\",\"numerator\":4,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_precision\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.7222222222222222},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_recall\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.6666666666666666},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":[[1,1,0],[0,2,0],[1,0,1]],\"excludedMissingTargetOrPrediction\":0,\"labels\":[\"A\",\"B\",\"C\"],\"undefinedClassPolicy\":\"Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.\"},\"name\":\"macro_f1\",\"numerator\":null,\"sampleSize\":6,\"slices\":[{\"f1\":0.5,\"n\":2,\"precision\":0.5,\"predictedCount\":2,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"A\",\"tp\":1},{\"f1\":0.8,\"n\":2,\"precision\":0.6666666666666666,\"predictedCount\":3,\"recall\":1.0,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.34238022750665303,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"slice\":\"B\",\"tp\":2},{\"f1\":0.6666666666666666,\"n\":2,\"precision\":1.0,\"predictedCount\":1,\"recall\":0.5,\"recallConfidenceInterval\":{\"level\":0.95,\"lower\":0.09453120573423074,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9054687942657693},\"slice\":\"C\",\"tp\":1}],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-multiclass\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.6},\"unit\":\"ratio\",\"value\":0.6555555555555556}],\"outcome\":\"fail\",\"testId\":\"performance\"}],\"provenance\":{\"execution\":{\"controller\":\"external_auditor_worker\",\"kind\":\"provided_predictions\",\"limitations\":[\"Synthetic saved predictions; no independent inference.\"],\"networkIsolation\":\"synthetic_fixture_no_network\"},\"executionMode\":\"provided_predictions\",\"externalReportSha256\":\"e2d7976c7b48dc5e24e24bdf86336fb2b68bc7075a0fb5698e46bd2b01792691\",\"imageDigest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"inputHashes\":{\"dataset\":\"d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4\"},\"preprocessingScope\":\"Preprocessing hashes are source declarations only; this worker scores already prepared numeric columns and does not execute preprocessing artifacts.\",\"requestSha256\":\"7c6192b952a1008ac8b7165e4021c683ad8142b89f68a0fb67223e5872e8664e\",\"translationVersion\":\"hosted-1.1-to-engine-1.0/1.0.0\",\"workerVersion\":\"1.0.0\"},\"schemaVersion\":\"1.0\"}\n",
+    "run": {
+      "externalJobId": "JOB-external-multiclass",
+      "contractVersion": "1.2",
+      "id": "JOB-external-multiclass",
+      "engagementId": "ENG-external-fixture",
+      "modelId": "MODEL-external-multiclass",
+      "datasetId": "EV-external-multiclass",
+      "task": "Multiclass classification",
+      "seed": 42,
+      "profileId": "PROTOCOL-external-multiclass",
+      "suite": [
+        "performance"
+      ],
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "thresholds": {
+        "source": "internal_policy",
+        "policyId": "PROTOCOL-external-multiclass",
+        "policyVersion": "1.0",
+        "frozenAt": "2026-10-08T16:00:00.000Z",
+        "frozenBy": "fixture-owner",
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "state": "succeeded",
+      "outcome": "fail",
+      "overallOutcome": "fail",
+      "results": [
+        {
+          "testId": "performance",
+          "label": "Classification performance",
+          "article": "15",
+          "outcome": "fail",
+          "metrics": [
+            {
+              "name": "accuracy",
+              "value": 0.6666666666666666,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.8,
+                "policyId": "PROTOCOL-external-multiclass",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 6,
+              "numerator": 4,
+              "denominator": 6,
+              "confidenceInterval": {
+                "lower": 0.299993315138392,
+                "upper": 0.9032285888942195,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 2,
+                  "precision": 0.5,
+                  "recall": 0.5,
+                  "f1": 0.5,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 2,
+                  "tp": 2,
+                  "predictedCount": 3,
+                  "precision": 0.6666666666666666,
+                  "recall": 1.0,
+                  "f1": 0.8,
+                  "recallConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "C",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 1,
+                  "precision": 1.0,
+                  "recall": 0.5,
+                  "f1": 0.6666666666666666,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                }
+              ],
+              "details": {
+                "labels": [
+                  "A",
+                  "B",
+                  "C"
+                ],
+                "confusionMatrix": [
+                  [
+                    1,
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    2,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    1
+                  ]
+                ],
+                "excludedMissingTargetOrPrediction": 0,
+                "undefinedClassPolicy": "Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.",
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "macro_precision",
+              "value": 0.7222222222222222,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 6,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 2,
+                  "precision": 0.5,
+                  "recall": 0.5,
+                  "f1": 0.5,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 2,
+                  "tp": 2,
+                  "predictedCount": 3,
+                  "precision": 0.6666666666666666,
+                  "recall": 1.0,
+                  "f1": 0.8,
+                  "recallConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "C",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 1,
+                  "precision": 1.0,
+                  "recall": 0.5,
+                  "f1": 0.6666666666666666,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                }
+              ],
+              "details": {
+                "labels": [
+                  "A",
+                  "B",
+                  "C"
+                ],
+                "confusionMatrix": [
+                  [
+                    1,
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    2,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    1
+                  ]
+                ],
+                "excludedMissingTargetOrPrediction": 0,
+                "undefinedClassPolicy": "Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.",
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "macro_recall",
+              "value": 0.6666666666666666,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 6,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 2,
+                  "precision": 0.5,
+                  "recall": 0.5,
+                  "f1": 0.5,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 2,
+                  "tp": 2,
+                  "predictedCount": 3,
+                  "precision": 0.6666666666666666,
+                  "recall": 1.0,
+                  "f1": 0.8,
+                  "recallConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "C",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 1,
+                  "precision": 1.0,
+                  "recall": 0.5,
+                  "f1": 0.6666666666666666,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                }
+              ],
+              "details": {
+                "labels": [
+                  "A",
+                  "B",
+                  "C"
+                ],
+                "confusionMatrix": [
+                  [
+                    1,
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    2,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    1
+                  ]
+                ],
+                "excludedMissingTargetOrPrediction": 0,
+                "undefinedClassPolicy": "Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.",
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "macro_f1",
+              "value": 0.6555555555555556,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.6,
+                "policyId": "PROTOCOL-external-multiclass",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 6,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [
+                {
+                  "slice": "A",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 2,
+                  "precision": 0.5,
+                  "recall": 0.5,
+                  "f1": 0.5,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "B",
+                  "n": 2,
+                  "tp": 2,
+                  "predictedCount": 3,
+                  "precision": 0.6666666666666666,
+                  "recall": 1.0,
+                  "f1": 0.8,
+                  "recallConfidenceInterval": {
+                    "lower": 0.34238022750665303,
+                    "upper": 1.0,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                },
+                {
+                  "slice": "C",
+                  "n": 2,
+                  "tp": 1,
+                  "predictedCount": 1,
+                  "precision": 1.0,
+                  "recall": 0.5,
+                  "f1": 0.6666666666666666,
+                  "recallConfidenceInterval": {
+                    "lower": 0.09453120573423074,
+                    "upper": 0.9054687942657693,
+                    "level": 0.95,
+                    "method": "Wilson score; IID binomial assumption"
+                  }
+                }
+              ],
+              "details": {
+                "labels": [
+                  "A",
+                  "B",
+                  "C"
+                ],
+                "confusionMatrix": [
+                  [
+                    1,
+                    1,
+                    0
+                  ],
+                  [
+                    0,
+                    2,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    1
+                  ]
+                ],
+                "excludedMissingTargetOrPrediction": 0,
+                "undefinedClassPolicy": "Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero.",
+                "acceptanceRole": "criterion"
+              }
+            }
+          ],
+          "limitations": [
+            "Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.",
+            "A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        }
+      ],
+      "paperIds": [
+        "WP-external-JOB-external-multiclass"
+      ],
+      "createdAt": "2026-10-08T16:00:00.000Z",
+      "startedAt": "2026-10-08T16:00:00.000Z",
+      "completedAt": "2026-10-08T16:00:01.000Z",
+      "procedureBinding": {
+        "procedureId": "PROC-external-multiclass",
+        "procedureRevision": 1,
+        "briefRevision": 1,
+        "programRevision": 2
+      },
+      "provenance": {
+        "inputHashes": {
+          "dataset": "d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4",
+          "modelArtifact": "d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4",
+          "system": "3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1",
+          "protocol": "e646e9f36d8cc9bd90db435642f489af469385e471ffadd1089f7b8fa3dc2a30",
+          "auditBinding": "a379de123cf662d59f5ded5c8b5aa105f3728e534878f242aaf878fe66d7e9dc",
+          "externalRequest": "7c6192b952a1008ac8b7165e4021c683ad8142b89f68a0fb67223e5872e8664e",
+          "externalResult": "ff999486eab0a05b70084d99759a1a6a08230df274e0f88ff1cb583e5434cc2b"
+        },
+        "runnerVersion": "1.0.0",
+        "policyVersion": "1.0"
+      },
+      "manifest": {
+        "schemaVersion": "1.0",
+        "model": {
+          "name": "Synthetic predictor",
+          "version": "1",
+          "format": "Prediction file",
+          "task": "Multiclass classification",
+          "intendedPurpose": "Numerical synthetic fixture validation",
+          "artifactId": "EV-external-multiclass",
+          "id": "MODEL-external-multiclass",
+          "familyId": "MODEL-external-multiclass",
+          "status": "registered",
+          "sourceSha256": "d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4",
+          "registeredAt": "2026-10-07T20:42:04.207Z",
+          "registeredBy": "fixture-owner-1791405723489"
+        },
+        "dataset": {
+          "id": "EV-external-multiclass",
+          "name": "multiclass.csv",
+          "sha256": "d39a95d25847daef073a42ae981989de208d035fd384091296331ee5ab564ff4",
+          "size": 41,
+          "rowCount": 6,
+          "columns": [
+            "actual",
+            "predicted"
+          ]
+        },
+        "profile": {
+          "name": "Binary acceptance",
+          "version": "1.0",
+          "task": "Multiclass classification",
+          "suite": [
+            "performance"
+          ],
+          "config": {
+            "labelColumn": "actual",
+            "predictionColumn": "predicted",
+            "groupColumn": "",
+            "positiveLabel": "1",
+            "minimumGroupSize": 2,
+            "maximumParityGap": 0.2,
+            "minimumImpactRatio": 0.7,
+            "minimumAccuracy": 0.8,
+            "minimumSampleSize": 2,
+            "minimumClassCount": 2,
+            "maximumOddsGap": 0.1,
+            "minimumRecall": 0.7,
+            "minimumMacroF1": 0.6,
+            "maximumRmse": 1
+          },
+          "datasetContext": {
+            "split": "test",
+            "population": "Synthetic full fixture population",
+            "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+            "independence": "Synthetic fixture; no real holdout independence claim",
+            "sensitiveDataBasis": ""
+          },
+          "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+          "id": "PROTOCOL-external-multiclass",
+          "schemaVersion": "1.0",
+          "createdAt": "2026-10-07T20:42:04.380Z",
+          "createdBy": "fixture-owner-1791405723489"
+        },
+        "executionMode": "provided_predictions",
+        "lineage": "authenticated_external_attempt",
+        "testDefinitionVersion": "hosted-1.1-to-engine-1.0/1.0.0",
+        "limitations": [
+          "Synthetic engine computation and import projection fixture; no platform authentication or native inference validation."
+        ]
+      }
+    }
+  },
+  {
+    "fixture": "regression",
+    "requestJSON": "{\"schemaVersion\":\"1.0\",\"executionMode\":\"provided_predictions\",\"model\":{\"name\":\"Synthetic predictor\",\"version\":\"1\",\"format\":\"Prediction file\",\"task\":\"Regression\",\"intendedPurpose\":\"Numerical synthetic fixture validation\",\"artifactId\":\"EV-external-regression\",\"id\":\"MODEL-external-regression\",\"familyId\":\"MODEL-external-regression\",\"status\":\"registered\",\"sourceSha256\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"registeredAt\":\"2026-10-07T20:42:04.207Z\",\"registeredBy\":\"fixture-owner-1791405723489\",\"sha256\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"size\":28,\"review\":{\"approved\":false}},\"dataset\":{\"id\":\"EV-external-regression\",\"name\":\"regression.csv\",\"sha256\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"size\":33},\"profile\":{\"name\":\"Binary acceptance\",\"version\":\"1.0\",\"task\":\"Regression\",\"suite\":[\"regression\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"datasetContext\":{\"split\":\"test\",\"population\":\"Synthetic full fixture population\",\"predictionProvenance\":\"Controlled synthetic predictions generated for fixture validation\",\"independence\":\"Synthetic fixture; no real holdout independence claim\",\"sensitiveDataBasis\":\"\"},\"rationale\":\"Fixture acceptance rules assess arithmetic and workflow, not legal conformity\",\"id\":\"PROTOCOL-external-regression\",\"schemaVersion\":\"1.0\",\"createdAt\":\"2026-10-07T20:42:04.380Z\",\"createdBy\":\"fixture-owner-1791405723489\"},\"seed\":42,\"procedure\":{\"id\":\"PROC-external-regression\",\"revision\":1,\"briefRevision\":1,\"programRevision\":2},\"inputHashes\":{\"dataset\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"modelArtifact\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"system\":\"3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1\",\"protocol\":\"1b15ad5edf53226fa9211fa0ba36e550d3397066d335a4aeb1ec279dfd9f41ea\"},\"engineConfig\":{\"contractVersion\":\"1.1\",\"id\":\"JOB-external-regression\",\"engagementId\":\"ENG-external-fixture\",\"modelId\":\"MODEL-external-regression\",\"datasetId\":\"EV-external-regression\",\"task\":\"Regression\",\"suite\":[\"regression\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"seed\":42},\"limitations\":[\"Synthetic engine computation and import projection fixture; no platform authentication or native inference validation.\"]}",
+    "resultJSON": "{\"externalReport\":{\"completedAt\":\"2026-10-08T17:24:43.648383+00:00\",\"configuration\":{\"calibrationBins\":10,\"columns\":{\"prediction\":\"predicted\",\"target\":\"actual\"},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-regression\",\"engagementId\":\"ENG-external-fixture\",\"hostedTranslation\":{\"minimumClassCount\":2,\"selectedTests\":[\"regression\"],\"sourceConfiguration\":{\"groupColumn\":\"\",\"labelColumn\":\"actual\",\"maximumOddsGap\":0.1,\"maximumParityGap\":0.2,\"maximumRmse\":1,\"minimumAccuracy\":0.8,\"minimumClassCount\":2,\"minimumGroupSize\":2,\"minimumImpactRatio\":0.7,\"minimumMacroF1\":0.6,\"minimumRecall\":0.7,\"minimumSampleSize\":2,\"positiveLabel\":\"1\",\"predictionColumn\":\"predicted\"},\"sourceContract\":\"1.1\",\"supplementalMetricPolicy\":\"descriptive; only selected named acceptance criteria determine hostedResults\",\"version\":\"hosted-1.1-to-engine-1.0/1.0.0\"},\"id\":\"JOB-external-regression\",\"minClassCount\":2,\"minGroupSize\":2,\"minSampleSize\":2,\"modelId\":\"MODEL-external-regression\",\"psiBins\":10,\"seed\":42,\"suite\":[\"performance\"],\"task\":\"regression\",\"thresholds\":{\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"rmse\":{\"operator\":\"<=\",\"value\":1.0}}}},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-regression\",\"engagementId\":\"ENG-external-fixture\",\"id\":\"JOB-external-regression\",\"limitations\":[\"This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.\",\"Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody.\"],\"modelId\":\"MODEL-external-regression\",\"outcome\":\"inconclusive\",\"overallOutcome\":\"inconclusive\",\"paperIds\":[\"wp-472419e76bdb0de46015a84e\"],\"provenance\":{\"configSha256\":\"d03508c0bc666f5ee2566c3b2ec0b7d6208b8bfff1b97ff0432cd951cd40b23e\",\"dependencies\":{\"adapterDeclaration\":\"not_used\",\"packages\":{},\"python\":{\"implementation\":\"CPython\",\"version\":\"3.12.14\"},\"scope\":\"Direct adapter and active connector distributions only; transitive packages and native binaries require a worker image/dependency lock.\",\"source\":\"installed_distribution_metadata for declared direct dependencies\",\"standardLibraryOnly\":true,\"status\":\"complete\",\"unresolved\":[]},\"determinism\":\"No sampling or randomized computation; seed reserved for adapter protocols\",\"inputHashes\":{\"data\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"reference\":null},\"inputs\":{\"data\":{\"bytes\":33,\"columns\":[\"actual\",\"predicted\"],\"name\":\"regression.csv\",\"rowCount\":4,\"sha256\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\"},\"reference\":null,\"testDefinitions\":{\"PERF-REG\":\"1.0.0\"}},\"policyVersion\":\"1.0\",\"runnerVersion\":\"1.1.1\"},\"reportSha256\":\"6f046d6e648eab437e47be766ccf888b7b7f84762bb3b03f69d77163f9fc32ee\",\"results\":[{\"article\":\"15\",\"label\":\"Regression performance\",\"limitations\":[\"R² is undefined for a constant target; no interval is fabricated for regression error metrics.\",\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"mae\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"target_units\",\"value\":0.5},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"rmse\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":1.0},\"unit\":\"target_units\",\"value\":0.7071067811865476},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"r2\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"dimensionless\",\"value\":null}],\"outcome\":\"inconclusive\",\"testId\":\"PERF-REG\"}],\"seed\":42,\"startedAt\":\"2026-10-08T17:24:43.648383+00:00\",\"state\":\"succeeded\",\"suite\":[\"performance\"],\"thresholds\":{\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"rmse\":{\"operator\":\"<=\",\"value\":1.0}}},\"workingPapers\":[{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"mae\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"target_units\",\"value\":0.5},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"rmse\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":1.0},\"unit\":\"target_units\",\"value\":0.7071067811865476},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{},\"name\":\"r2\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"dimensionless\",\"value\":null}]},\"exceptions\":[\"R² is undefined for a constant target; no interval is fabricated for regression error metrics.\",\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"id\":\"wp-472419e76bdb0de46015a84e\",\"modelId\":\"MODEL-external-regression\",\"objective\":\"Evaluate regression performance using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"d03508c0bc666f5ee2566c3b2ec0b7d6208b8bfff1b97ff0432cd951cd40b23e\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-REG\"},\"proposedConclusion\":\"inconclusive\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-regression\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Regression performance\",\"version\":1}]},\"hostedResults\":[{\"article\":\"15\",\"label\":\"Regression performance\",\"limitations\":[\"R² is undefined for a constant target; no interval is fabricated for regression error metrics.\",\"Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\"},\"name\":\"mae\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"target_units\",\"value\":0.5},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"criterion\"},\"name\":\"rmse\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":{\"operator\":\"<=\",\"policyId\":\"PROTOCOL-external-regression\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":1.0},\"unit\":\"target_units\",\"value\":0.7071067811865476},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\"},\"name\":\"r2\",\"numerator\":null,\"sampleSize\":4,\"slices\":[],\"threshold\":null,\"unit\":\"dimensionless\",\"value\":null}],\"outcome\":\"pass\",\"testId\":\"regression\"}],\"provenance\":{\"execution\":{\"controller\":\"external_auditor_worker\",\"kind\":\"provided_predictions\",\"limitations\":[\"Synthetic saved predictions; no independent inference.\"],\"networkIsolation\":\"synthetic_fixture_no_network\"},\"executionMode\":\"provided_predictions\",\"externalReportSha256\":\"6f046d6e648eab437e47be766ccf888b7b7f84762bb3b03f69d77163f9fc32ee\",\"imageDigest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"inputHashes\":{\"dataset\":\"818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5\"},\"preprocessingScope\":\"Preprocessing hashes are source declarations only; this worker scores already prepared numeric columns and does not execute preprocessing artifacts.\",\"requestSha256\":\"b3a2cad65ecb7552bec575d27dd28608e69a1ae982bff7fa67188420f4f4632e\",\"translationVersion\":\"hosted-1.1-to-engine-1.0/1.0.0\",\"workerVersion\":\"1.0.0\"},\"schemaVersion\":\"1.0\"}\n",
+    "run": {
+      "externalJobId": "JOB-external-regression",
+      "contractVersion": "1.2",
+      "id": "JOB-external-regression",
+      "engagementId": "ENG-external-fixture",
+      "modelId": "MODEL-external-regression",
+      "datasetId": "EV-external-regression",
+      "task": "Regression",
+      "seed": 42,
+      "profileId": "PROTOCOL-external-regression",
+      "suite": [
+        "regression"
+      ],
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "thresholds": {
+        "source": "internal_policy",
+        "policyId": "PROTOCOL-external-regression",
+        "policyVersion": "1.0",
+        "frozenAt": "2026-10-08T16:00:00.000Z",
+        "frozenBy": "fixture-owner",
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "state": "succeeded",
+      "outcome": "pass",
+      "overallOutcome": "pass",
+      "results": [
+        {
+          "testId": "regression",
+          "label": "Regression performance",
+          "article": "15",
+          "outcome": "pass",
+          "metrics": [
+            {
+              "name": "mae",
+              "value": 0.5,
+              "threshold": null,
+              "unit": "target_units",
+              "sampleSize": 4,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "rmse",
+              "value": 0.7071067811865476,
+              "threshold": {
+                "operator": "<=",
+                "value": 1.0,
+                "policyId": "PROTOCOL-external-regression",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "target_units",
+              "sampleSize": 4,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "r2",
+              "value": null,
+              "threshold": null,
+              "unit": "dimensionless",
+              "sampleSize": 4,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            }
+          ],
+          "limitations": [
+            "R² is undefined for a constant target; no interval is fabricated for regression error metrics.",
+            "Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage.",
+            "A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        }
+      ],
+      "paperIds": [
+        "WP-external-JOB-external-regression"
+      ],
+      "createdAt": "2026-10-08T16:00:00.000Z",
+      "startedAt": "2026-10-08T16:00:00.000Z",
+      "completedAt": "2026-10-08T16:00:01.000Z",
+      "procedureBinding": {
+        "procedureId": "PROC-external-regression",
+        "procedureRevision": 1,
+        "briefRevision": 1,
+        "programRevision": 2
+      },
+      "provenance": {
+        "inputHashes": {
+          "dataset": "818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5",
+          "modelArtifact": "818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5",
+          "system": "3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1",
+          "protocol": "1b15ad5edf53226fa9211fa0ba36e550d3397066d335a4aeb1ec279dfd9f41ea",
+          "auditBinding": "f5b5245bfee00035d22d70a4e771b791e72e3860a7bafbaec100027918aa4952",
+          "externalRequest": "b3a2cad65ecb7552bec575d27dd28608e69a1ae982bff7fa67188420f4f4632e",
+          "externalResult": "ffe3e3d70e964bb8ade4939325cfe6edc4d96a0884ca55ed3eb0f744183e0d6c"
+        },
+        "runnerVersion": "1.0.0",
+        "policyVersion": "1.0"
+      },
+      "manifest": {
+        "schemaVersion": "1.0",
+        "model": {
+          "name": "Synthetic predictor",
+          "version": "1",
+          "format": "Prediction file",
+          "task": "Regression",
+          "intendedPurpose": "Numerical synthetic fixture validation",
+          "artifactId": "EV-external-regression",
+          "id": "MODEL-external-regression",
+          "familyId": "MODEL-external-regression",
+          "status": "registered",
+          "sourceSha256": "818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5",
+          "registeredAt": "2026-10-07T20:42:04.207Z",
+          "registeredBy": "fixture-owner-1791405723489"
+        },
+        "dataset": {
+          "id": "EV-external-regression",
+          "name": "regression.csv",
+          "sha256": "818a6b994ff2c5997f81c68477a3fe50f4b3e5139932171ef0054914a8f572a5",
+          "size": 33,
+          "rowCount": 4,
+          "columns": [
+            "actual",
+            "predicted"
+          ]
+        },
+        "profile": {
+          "name": "Binary acceptance",
+          "version": "1.0",
+          "task": "Regression",
+          "suite": [
+            "regression"
+          ],
+          "config": {
+            "labelColumn": "actual",
+            "predictionColumn": "predicted",
+            "groupColumn": "",
+            "positiveLabel": "1",
+            "minimumGroupSize": 2,
+            "maximumParityGap": 0.2,
+            "minimumImpactRatio": 0.7,
+            "minimumAccuracy": 0.8,
+            "minimumSampleSize": 2,
+            "minimumClassCount": 2,
+            "maximumOddsGap": 0.1,
+            "minimumRecall": 0.7,
+            "minimumMacroF1": 0.6,
+            "maximumRmse": 1
+          },
+          "datasetContext": {
+            "split": "test",
+            "population": "Synthetic full fixture population",
+            "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+            "independence": "Synthetic fixture; no real holdout independence claim",
+            "sensitiveDataBasis": ""
+          },
+          "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+          "id": "PROTOCOL-external-regression",
+          "schemaVersion": "1.0",
+          "createdAt": "2026-10-07T20:42:04.380Z",
+          "createdBy": "fixture-owner-1791405723489"
+        },
+        "executionMode": "provided_predictions",
+        "lineage": "authenticated_external_attempt",
+        "testDefinitionVersion": "hosted-1.1-to-engine-1.0/1.0.0",
+        "limitations": [
+          "Synthetic engine computation and import projection fixture; no platform authentication or native inference validation."
+        ]
+      }
+    }
+  },
+  {
+    "fixture": "client-local",
+    "requestJSON": "{\"schemaVersion\":\"1.0\",\"executionMode\":\"client_local\",\"model\":{\"name\":\"Synthetic predictor\",\"version\":\"1\",\"format\":\"ONNX\",\"task\":\"Binary classification\",\"intendedPurpose\":\"Numerical synthetic fixture validation\",\"artifactId\":\"EV-model-metadata\",\"id\":\"MODEL-external-client-local\",\"familyId\":\"MODEL-external-client-local\",\"status\":\"registered\",\"sourceSha256\":\"e8729e8a1f5ad686b20eceb91f7700a0f86f2104b8b1c9c5c90e2cdc61a9382e\",\"registeredAt\":\"2026-10-07T20:42:04.207Z\",\"registeredBy\":\"fixture-owner-1791405723489\",\"sha256\":\"e8729e8a1f5ad686b20eceb91f7700a0f86f2104b8b1c9c5c90e2cdc61a9382e\",\"size\":28,\"review\":{\"approved\":false}},\"dataset\":{\"id\":\"EV-external-client-local\",\"name\":\"client-local.csv\",\"sha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"size\":71},\"profile\":{\"name\":\"Binary acceptance\",\"version\":\"1.0\",\"task\":\"Binary classification\",\"suite\":[\"performance\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"datasetContext\":{\"split\":\"test\",\"population\":\"Synthetic full fixture population\",\"predictionProvenance\":\"Controlled synthetic predictions generated for fixture validation\",\"independence\":\"Synthetic fixture; no real holdout independence claim\",\"sensitiveDataBasis\":\"\"},\"rationale\":\"Fixture acceptance rules assess arithmetic and workflow, not legal conformity\",\"id\":\"PROTOCOL-external-client-local\",\"schemaVersion\":\"1.0\",\"createdAt\":\"2026-10-07T20:42:04.380Z\",\"createdBy\":\"fixture-owner-1791405723489\"},\"seed\":42,\"procedure\":{\"id\":\"PROC-external-client-local\",\"revision\":1,\"briefRevision\":1,\"programRevision\":2},\"inputHashes\":{\"dataset\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"modelArtifact\":\"e8729e8a1f5ad686b20eceb91f7700a0f86f2104b8b1c9c5c90e2cdc61a9382e\",\"system\":\"3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1\",\"protocol\":\"5b031e2f983653529c54a1bb9eb640201fb51a331b04159b47a7b35d94870c34\"},\"engineConfig\":{\"contractVersion\":\"1.1\",\"id\":\"JOB-external-client-local\",\"engagementId\":\"ENG-external-fixture\",\"modelId\":\"MODEL-external-client-local\",\"datasetId\":\"EV-external-client-local\",\"task\":\"Binary classification\",\"suite\":[\"performance\"],\"config\":{\"labelColumn\":\"actual\",\"predictionColumn\":\"predicted\",\"groupColumn\":\"\",\"positiveLabel\":\"1\",\"minimumGroupSize\":2,\"maximumParityGap\":0.2,\"minimumImpactRatio\":0.7,\"minimumAccuracy\":0.8,\"minimumSampleSize\":2,\"minimumClassCount\":2,\"maximumOddsGap\":0.1,\"minimumRecall\":0.7,\"minimumMacroF1\":0.6,\"maximumRmse\":1},\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"seed\":42},\"limitations\":[\"Synthetic engine computation and import projection fixture; no platform authentication or native inference validation.\"]}",
+    "resultJSON": "{\"externalReport\":{\"completedAt\":\"2026-10-08T17:24:43.651203+00:00\",\"configuration\":{\"calibrationBins\":10,\"columns\":{\"prediction\":\"predicted\",\"target\":\"actual\"},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-client-local\",\"engagementId\":\"ENG-external-fixture\",\"hostedTranslation\":{\"minimumClassCount\":2,\"selectedTests\":[\"performance\"],\"sourceConfiguration\":{\"groupColumn\":\"\",\"labelColumn\":\"actual\",\"maximumOddsGap\":0.1,\"maximumParityGap\":0.2,\"maximumRmse\":1,\"minimumAccuracy\":0.8,\"minimumClassCount\":2,\"minimumGroupSize\":2,\"minimumImpactRatio\":0.7,\"minimumMacroF1\":0.6,\"minimumRecall\":0.7,\"minimumSampleSize\":2,\"positiveLabel\":\"1\",\"predictionColumn\":\"predicted\"},\"sourceContract\":\"1.1\",\"supplementalMetricPolicy\":\"descriptive; only selected named acceptance criteria determine hostedResults\",\"version\":\"hosted-1.1-to-engine-1.0/1.0.0\"},\"id\":\"JOB-external-client-local\",\"minClassCount\":2,\"minGroupSize\":2,\"minSampleSize\":2,\"modelId\":\"MODEL-external-client-local\",\"negativeLabel\":\"0\",\"positiveLabel\":\"1\",\"psiBins\":10,\"seed\":42,\"suite\":[\"performance\"],\"task\":\"binary_classification\",\"thresholds\":{\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"recall\":{\"operator\":\">=\",\"value\":0.7}}}},\"contractVersion\":\"1.0\",\"datasetId\":\"EV-external-client-local\",\"engagementId\":\"ENG-external-fixture\",\"id\":\"JOB-external-client-local\",\"limitations\":[\"This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.\",\"Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody.\"],\"modelId\":\"MODEL-external-client-local\",\"outcome\":\"inconclusive\",\"overallOutcome\":\"inconclusive\",\"paperIds\":[\"wp-1942e2a13e487dc8ed1c88e4\",\"wp-bb0fc1f37a6228c18672adfa\"],\"provenance\":{\"configSha256\":\"85d025dc4e7d61630690b883178bd67ebd7f3fb69f1749c24cd268ecd7e75316\",\"dependencies\":{\"adapterDeclaration\":\"not_used\",\"packages\":{},\"python\":{\"implementation\":\"CPython\",\"version\":\"3.12.14\"},\"scope\":\"Direct adapter and active connector distributions only; transitive packages and native binaries require a worker image/dependency lock.\",\"source\":\"installed_distribution_metadata for declared direct dependencies\",\"standardLibraryOnly\":true,\"status\":\"complete\",\"unresolved\":[]},\"determinism\":\"No sampling or randomized computation; seed reserved for adapter protocols\",\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"inputs\":{\"data\":{\"bytes\":71,\"columns\":[\"actual\",\"predicted\",\"group\"],\"name\":\"client-local.csv\",\"rowCount\":8,\"sha256\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\"},\"reference\":null,\"testDefinitions\":{\"PERF-BINARY\":\"1.0.0\",\"PERF-CAL\":\"1.0.0\"}},\"policyVersion\":\"1.0\",\"runnerVersion\":\"1.1.1\"},\"reportSha256\":\"c5850093aa7962d51cec0b1502d1fd93f45cb45f5dd91f56dd41151be12ed5e8\",\"results\":[{\"article\":\"15\",\"label\":\"Binary classification performance\",\"limitations\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}],\"outcome\":\"inconclusive\",\"testId\":\"PERF-BINARY\"},{\"article\":\"15\",\"label\":\"Probability calibration\",\"limitations\":[\"No probability scores supplied; calibration was skipped.\"],\"metrics\":[],\"outcome\":\"not_applicable\",\"testId\":\"PERF-CAL\"}],\"seed\":42,\"startedAt\":\"2026-10-08T17:24:43.651203+00:00\",\"state\":\"succeeded\",\"suite\":[\"performance\"],\"thresholds\":{\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"values\":{\"accuracy\":{\"operator\":\">=\",\"value\":0.8},\"recall\":{\"operator\":\">=\",\"value\":0.7}}},\"workingPapers\":[{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}]},\"exceptions\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\"],\"id\":\"wp-1942e2a13e487dc8ed1c88e4\",\"modelId\":\"MODEL-external-client-local\",\"objective\":\"Evaluate binary classification performance using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"85d025dc4e7d61630690b883178bd67ebd7f3fb69f1749c24cd268ecd7e75316\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-BINARY\"},\"proposedConclusion\":\"inconclusive\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-client-local\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Binary classification performance\",\"version\":1},{\"engagementId\":\"ENG-external-fixture\",\"evidence\":{\"inputHashes\":{\"data\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\",\"reference\":null},\"metrics\":[]},\"exceptions\":[\"No probability scores supplied; calibration was skipped.\"],\"id\":\"wp-bb0fc1f37a6228c18672adfa\",\"modelId\":\"MODEL-external-client-local\",\"objective\":\"Evaluate probability calibration using frozen internal policy criteria.\",\"procedure\":{\"configurationSha256\":\"85d025dc4e7d61630690b883178bd67ebd7f3fb69f1749c24cd268ecd7e75316\",\"runnerVersion\":\"1.1.1\",\"testDefinitionVersion\":\"1.0.0\",\"testId\":\"PERF-CAL\"},\"proposedConclusion\":\"not_applicable\",\"regulatoryMapping\":{\"articleReferences\":\"15\",\"mappingKind\":\"supporting evidence; reviewer must determine applicability\",\"regulation\":\"EU 2024/1689\"},\"review\":{\"preparerId\":\"diagnostic-runner\",\"required\":true,\"reviewedAt\":null,\"reviewerId\":null,\"signOffs\":[]},\"runId\":\"JOB-external-client-local\",\"schemaVersion\":\"1.0\",\"status\":\"draft\",\"templateId\":\"automated-diagnostic-v1\",\"title\":\"Probability calibration\",\"version\":1}]},\"hostedResults\":[{\"article\":\"15\",\"label\":\"Classification performance\",\"limitations\":[\"Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.\",\"A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.\",\"Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.\"],\"metrics\":[{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.5291118177871464,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9775825085499433},\"denominator\":8,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"accuracy\",\"numerator\":7,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.8},\"unit\":\"ratio\",\"value\":0.875},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.4385029682449546,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":1.0},\"denominator\":3,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"precision\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":1.0},{\"confidenceInterval\":{\"level\":0.95,\"lower\":0.30064184258240184,\"method\":\"Wilson score; IID binomial assumption\",\"upper\":0.9544127391902995},\"denominator\":4,\"details\":{\"acceptanceRole\":\"criterion\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"recall\",\"numerator\":3,\"sampleSize\":8,\"slices\":[],\"threshold\":{\"operator\":\">=\",\"policyId\":\"PROTOCOL-external-client-local\",\"policyVersion\":\"1.0\",\"source\":\"internal_policy\",\"value\":0.7},\"unit\":\"ratio\",\"value\":0.75},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"f1\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.8571428571428571},{\"confidenceInterval\":null,\"denominator\":null,\"details\":{\"acceptanceRole\":\"supplemental_descriptive\",\"confusionMatrix\":{\"fn\":1,\"fp\":0,\"tn\":4,\"tp\":3},\"excludedMissingTargetOrPrediction\":0,\"positiveLabel\":\"1\"},\"name\":\"balanced_accuracy\",\"numerator\":null,\"sampleSize\":8,\"slices\":[],\"threshold\":null,\"unit\":\"ratio\",\"value\":0.875}],\"outcome\":\"pass\",\"testId\":\"performance\"}],\"provenance\":{\"execution\":{\"controller\":\"client_local_worker\",\"kind\":\"provided_predictions\",\"limitations\":[\"Synthetic saved predictions; no independent inference.\"],\"networkIsolation\":\"synthetic_fixture_no_network\"},\"executionMode\":\"client_local\",\"externalReportSha256\":\"c5850093aa7962d51cec0b1502d1fd93f45cb45f5dd91f56dd41151be12ed5e8\",\"imageDigest\":\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"inputHashes\":{\"dataset\":\"e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0\"},\"preprocessingScope\":\"Preprocessing hashes are source declarations only; this worker scores already prepared numeric columns and does not execute preprocessing artifacts.\",\"requestSha256\":\"f65ab3f26b64eb348a38c620949540f9bd261748c9938e8ab1926cf2d9d0367d\",\"translationVersion\":\"hosted-1.1-to-engine-1.0/1.0.0\",\"workerVersion\":\"1.0.0\"},\"schemaVersion\":\"1.0\"}\n",
+    "run": {
+      "externalJobId": "JOB-external-client-local",
+      "contractVersion": "1.2",
+      "id": "JOB-external-client-local",
+      "engagementId": "ENG-external-fixture",
+      "modelId": "MODEL-external-client-local",
+      "datasetId": "EV-external-client-local",
+      "task": "Binary classification",
+      "seed": 42,
+      "profileId": "PROTOCOL-external-client-local",
+      "suite": [
+        "performance"
+      ],
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "thresholds": {
+        "source": "internal_policy",
+        "policyId": "PROTOCOL-external-client-local",
+        "policyVersion": "1.0",
+        "frozenAt": "2026-10-08T16:00:00.000Z",
+        "frozenBy": "fixture-owner",
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "1",
+        "minimumGroupSize": 2,
+        "maximumParityGap": 0.2,
+        "minimumImpactRatio": 0.7,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 2,
+        "minimumClassCount": 2,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.6,
+        "maximumRmse": 1
+      },
+      "state": "succeeded",
+      "outcome": "pass",
+      "overallOutcome": "pass",
+      "results": [
+        {
+          "testId": "performance",
+          "label": "Classification performance",
+          "article": "15",
+          "outcome": "pass",
+          "metrics": [
+            {
+              "name": "accuracy",
+              "value": 0.875,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.8,
+                "policyId": "PROTOCOL-external-client-local",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 7,
+              "denominator": 8,
+              "confidenceInterval": {
+                "lower": 0.5291118177871464,
+                "upper": 0.9775825085499433,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "precision",
+              "value": 1.0,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 3,
+              "denominator": 3,
+              "confidenceInterval": {
+                "lower": 0.4385029682449546,
+                "upper": 1.0,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "recall",
+              "value": 0.75,
+              "threshold": {
+                "operator": ">=",
+                "value": 0.7,
+                "policyId": "PROTOCOL-external-client-local",
+                "policyVersion": "1.0",
+                "source": "internal_policy"
+              },
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": 3,
+              "denominator": 4,
+              "confidenceInterval": {
+                "lower": 0.30064184258240184,
+                "upper": 0.9544127391902995,
+                "level": 0.95,
+                "method": "Wilson score; IID binomial assumption"
+              },
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "criterion"
+              }
+            },
+            {
+              "name": "f1",
+              "value": 0.8571428571428571,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            },
+            {
+              "name": "balanced_accuracy",
+              "value": 0.875,
+              "threshold": null,
+              "unit": "ratio",
+              "sampleSize": 8,
+              "numerator": null,
+              "denominator": null,
+              "confidenceInterval": null,
+              "slices": [],
+              "details": {
+                "confusionMatrix": {
+                  "tp": 3,
+                  "fp": 0,
+                  "tn": 4,
+                  "fn": 1
+                },
+                "positiveLabel": "1",
+                "excludedMissingTargetOrPrediction": 0,
+                "acceptanceRole": "supplemental_descriptive"
+              }
+            }
+          ],
+          "limitations": [
+            "Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review.",
+            "A frozen internal acceptance threshold is missing; affected metrics cannot produce a pass/fail conclusion.",
+            "Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence."
+          ]
+        }
+      ],
+      "paperIds": [
+        "WP-external-JOB-external-client-local"
+      ],
+      "createdAt": "2026-10-08T16:00:00.000Z",
+      "startedAt": "2026-10-08T16:00:00.000Z",
+      "completedAt": "2026-10-08T16:00:01.000Z",
+      "procedureBinding": {
+        "procedureId": "PROC-external-client-local",
+        "procedureRevision": 1,
+        "briefRevision": 1,
+        "programRevision": 2
+      },
+      "provenance": {
+        "inputHashes": {
+          "dataset": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "modelArtifact": "e8729e8a1f5ad686b20eceb91f7700a0f86f2104b8b1c9c5c90e2cdc61a9382e",
+          "system": "3f536af7d19326aa6577aa4ffe9e5865604cda244894f36470a214bb148344c1",
+          "protocol": "5b031e2f983653529c54a1bb9eb640201fb51a331b04159b47a7b35d94870c34",
+          "auditBinding": "25a992a1f03f465153d47b381266895aaab441c865e4186191b8981885959f1e",
+          "externalRequest": "f65ab3f26b64eb348a38c620949540f9bd261748c9938e8ab1926cf2d9d0367d",
+          "externalResult": "2a5fff3d4e7feae645320f9eae4fb18f538301ffc51ebe4f783bc2cb70540d94"
+        },
+        "runnerVersion": "1.0.0",
+        "policyVersion": "1.0"
+      },
+      "manifest": {
+        "schemaVersion": "1.0",
+        "model": {
+          "name": "Synthetic predictor",
+          "version": "1",
+          "format": "ONNX",
+          "task": "Binary classification",
+          "intendedPurpose": "Numerical synthetic fixture validation",
+          "artifactId": "EV-model-metadata",
+          "id": "MODEL-external-client-local",
+          "familyId": "MODEL-external-client-local",
+          "status": "registered",
+          "sourceSha256": "e8729e8a1f5ad686b20eceb91f7700a0f86f2104b8b1c9c5c90e2cdc61a9382e",
+          "registeredAt": "2026-10-07T20:42:04.207Z",
+          "registeredBy": "fixture-owner-1791405723489"
+        },
+        "dataset": {
+          "id": "EV-external-client-local",
+          "name": "client-local.csv",
+          "sha256": "e88bc91041ebfbd749bc207f0adac996a8639a24ff0422a073a57184c63b50d0",
+          "size": 71,
+          "rowCount": 8,
+          "columns": [
+            "actual",
+            "predicted"
+          ]
+        },
+        "profile": {
+          "name": "Binary acceptance",
+          "version": "1.0",
+          "task": "Binary classification",
+          "suite": [
+            "performance"
+          ],
+          "config": {
+            "labelColumn": "actual",
+            "predictionColumn": "predicted",
+            "groupColumn": "",
+            "positiveLabel": "1",
+            "minimumGroupSize": 2,
+            "maximumParityGap": 0.2,
+            "minimumImpactRatio": 0.7,
+            "minimumAccuracy": 0.8,
+            "minimumSampleSize": 2,
+            "minimumClassCount": 2,
+            "maximumOddsGap": 0.1,
+            "minimumRecall": 0.7,
+            "minimumMacroF1": 0.6,
+            "maximumRmse": 1
+          },
+          "datasetContext": {
+            "split": "test",
+            "population": "Synthetic full fixture population",
+            "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+            "independence": "Synthetic fixture; no real holdout independence claim",
+            "sensitiveDataBasis": ""
+          },
+          "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+          "id": "PROTOCOL-external-client-local",
+          "schemaVersion": "1.0",
+          "createdAt": "2026-10-07T20:42:04.380Z",
+          "createdBy": "fixture-owner-1791405723489"
+        },
+        "executionMode": "client_local",
+        "lineage": "authenticated_external_attempt",
+        "testDefinitionVersion": "hosted-1.1-to-engine-1.0/1.0.0",
+        "limitations": [
+          "Synthetic engine computation and import projection fixture; no platform authentication or native inference validation."
+        ]
+      }
+    }
+  }
+]

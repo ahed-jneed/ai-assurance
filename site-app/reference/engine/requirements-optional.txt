@@ -1,0 +1,10 @@
+# Optional runtime baseline; not installed or integration-tested in this environment.
+# Resolve transitive dependencies and produce a hash-locked worker image before production.
+# Versions checked against package-owner PyPI pages on 2026-10-05.
+numpy==2.3.5
+pandas==3.0.1
+onnxruntime==1.30.0
+pypmml==1.5.8
+xgboost==3.4.1
+lightgbm==4.6.0
+pyarrow==25.0.1

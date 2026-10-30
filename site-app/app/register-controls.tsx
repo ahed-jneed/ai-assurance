@@ -1,0 +1,10 @@
+"use client";
+import { useState } from 'react';
+import { Filter,ArrowDownUp,Check,X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover,PopoverTrigger,PopoverContent } from '@/components/ui/popover';
+import { Select,SelectTrigger,SelectValue,SelectContent,SelectItem } from '@/components/ui/select';
+export function RegisterControls({facetLabel,facets,facet,onFacet,sort,sorts,onSort,onClear,active}:{facetLabel?:string;facets?:string[];facet?:string;onFacet?:(value:string)=>void;sort:string;sorts:{value:string;label:string}[];onSort:(value:string)=>void;onClear:()=>void;active:boolean}){
+ const [sortOpen,setSortOpen]=useState(false);
+ return <div className="register-controls">{facetLabel&&facets&&onFacet&&<Popover><PopoverTrigger asChild><Button size="sm" variant="ghost" className={facet!=='all'?'filter-active':''}><Filter size={14}/>{facet!=='all'?facet:'Filter'}</Button></PopoverTrigger><PopoverContent className="register-popover" align="end"><label>{facetLabel}<Select value={facet} onValueChange={onFacet}><SelectTrigger aria-label={'Filter by '+facetLabel.toLowerCase()}><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{facets.map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></label></PopoverContent></Popover>}<Popover open={sortOpen} onOpenChange={setSortOpen}><PopoverTrigger asChild><Button variant="ghost" size="sm" aria-label="Sort records" title={sorts.find(s=>s.value===sort)?.label}><ArrowDownUp size={14}/>Sort</Button></PopoverTrigger><PopoverContent className="register-popover sort-options" align="end"><span className="subtle">Sort by</span>{sorts.map(s=><button key={s.value} aria-pressed={s.value===sort} onClick={()=>{onSort(s.value);setSortOpen(false);}}><span>{s.label}</span>{s.value===sort&&<Check size={15}/>}</button>)}</PopoverContent></Popover>{active&&<Button variant="ghost" size="sm" onClick={onClear} aria-label="Clear filters"><X size={14}/>Clear</Button>}</div>;
+}

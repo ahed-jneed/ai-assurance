@@ -1,0 +1,51 @@
+{
+  "performed": "Inspected synthetic risk register and corroborated source evidence",
+  "steps": [
+    {
+      "id": "WP-A09-01-P01",
+      "state": "performed",
+      "notes": "Synthetic fixture inspection documented"
+    },
+    {
+      "id": "WP-A09-01-P02",
+      "state": "performed",
+      "notes": "Synthetic fixture inspection documented"
+    },
+    {
+      "id": "WP-A09-01-P03",
+      "state": "performed",
+      "notes": "Synthetic fixture inspection documented"
+    },
+    {
+      "id": "WP-A09-01-P04",
+      "state": "performed",
+      "notes": "Synthetic fixture inspection documented"
+    }
+  ],
+  "sampling": "All 80 synthetic records inspected",
+  "results": "Source records reconcile; fixture control result supported",
+  "limitations": "Synthetic test only",
+  "evidenceIds": [
+    "EV-5e5124ba-dc3"
+  ],
+  "runIds": [
+    "RUN-eb84b458-68e"
+  ],
+  "id": "EXEC-d0932264-ba4",
+  "revision": 1,
+  "procedureRevision": 4,
+  "briefRevision": 2,
+  "programRevision": 5,
+  "actor": "fixture-owner-1791405723489",
+  "at": "2026-10-07T20:42:09.949Z",
+  "assessment": {
+    "relevance": "Evidence addresses the fixture criterion",
+    "reliability": "Hash-pinned synthetic source inspected",
+    "coverage": "Complete fixture population and period",
+    "contradictions": "No contradictions in the fixture; limitations documented",
+    "conclusion": "Synthetic fixture procedure supported",
+    "outcome": "supported",
+    "actor": "fixture-owner-1791405723489",
+    "at": "2026-10-07T20:42:09.985Z"
+  }
+}

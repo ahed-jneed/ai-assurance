@@ -1,0 +1,11 @@
+# local scratch and deploy bundles
+/tmp/
+**/.test-tmp/
+**/__pycache__/
+**/*.pyc
+.env*
+*.pem
+*.key
+.DS_Store
+node_modules/
+.openai/

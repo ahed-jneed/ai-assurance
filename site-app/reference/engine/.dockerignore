@@ -1,0 +1,6 @@
+__pycache__
+**/__pycache__
+*.pyc
+.test-tmp
+worker-jobs
+.venv

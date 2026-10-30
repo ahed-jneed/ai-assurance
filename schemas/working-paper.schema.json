@@ -1,0 +1,815 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:working-paper:1.0",
+  "title": "AI Assurance working paper or memo revision",
+  "description": "Two distinct artifacts: generated diagnostic draft or complete frozen human-evaluated audit revision. A draft is supporting evidence and cannot satisfy report issuance gates.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/frozenRevision"
+    },
+    {
+      "$ref": "#/$defs/generatedDraft"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "frozenRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "id",
+        "engagementId",
+        "revision",
+        "template",
+        "kind",
+        "title",
+        "stage",
+        "objective",
+        "criteria",
+        "scope",
+        "procedures",
+        "evidence",
+        "evaluation",
+        "conclusion",
+        "findings",
+        "limitations",
+        "preparedBy",
+        "preparedAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tenantId": {
+          "$ref": "#/$defs/id"
+        },
+        "engagementId": {
+          "$ref": "#/$defs/id"
+        },
+        "systemVersionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parentRevisionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contentHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "template": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "version"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "kind": {
+          "enum": [
+            "working_paper",
+            "memo",
+            "checklist",
+            "interview",
+            "evidence_index"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "stage": {
+          "enum": [
+            "administration",
+            "planning",
+            "fieldwork",
+            "evidence_evaluation",
+            "reporting",
+            "signoff",
+            "post_audit"
+          ]
+        },
+        "visibility": {
+          "enum": [
+            "internal",
+            "client_released"
+          ]
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "controlId",
+              "rulesetVersion",
+              "provision",
+              "actorDuty",
+              "applicability"
+            ],
+            "properties": {
+              "controlId": {
+                "$ref": "#/$defs/id"
+              },
+              "rulesetVersion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actorDuty": {
+                "type": "string",
+                "minLength": 1
+              },
+              "applicability": {
+                "enum": [
+                  "applicable",
+                  "not_applicable",
+                  "needs_information"
+                ]
+              },
+              "applicabilitySnapshotId": {
+                "$ref": "#/$defs/id"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "description",
+            "period",
+            "population",
+            "sampling"
+          ],
+          "properties": {
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "period": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            },
+            "population": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "description",
+                "size"
+              ],
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "size": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "sourceArtifactId": {
+                  "$ref": "#/$defs/id"
+                }
+              }
+            },
+            "sampling": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method",
+                "rationale",
+                "sampleSize"
+              ],
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sampleSize": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "seed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "manifestHash": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            },
+            "exclusions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "materiality": {
+              "type": "string"
+            }
+          }
+        },
+        "procedures": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description",
+              "method",
+              "status",
+              "results"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "method": {
+                "enum": [
+                  "inspection",
+                  "inquiry",
+                  "observation",
+                  "reperformance",
+                  "automated_test",
+                  "walkthrough",
+                  "analytical_review"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "planned",
+                  "completed",
+                  "blocked",
+                  "not_applicable"
+                ]
+              },
+              "performedBy": {
+                "$ref": "#/$defs/id"
+              },
+              "performedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "testRunIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "uniqueItems": true
+              },
+              "evidenceIds": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "uniqueItems": true
+              },
+              "results": {
+                "type": "string"
+              },
+              "exceptions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "designEffectiveness": {
+                "enum": [
+                  "effective",
+                  "ineffective",
+                  "unable_to_conclude",
+                  "not_applicable"
+                ]
+              },
+              "operatingEffectiveness": {
+                "enum": [
+                  "effective",
+                  "ineffective",
+                  "unable_to_conclude",
+                  "not_applicable"
+                ]
+              },
+              "limitationApprovalId": {
+                "$ref": "#/$defs/id"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": {
+                      "const": "completed"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "performedBy",
+                    "performedAt"
+                  ],
+                  "properties": {
+                    "results": {
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactId",
+              "sha256",
+              "description",
+              "relevance",
+              "reliability"
+            ],
+            "properties": {
+              "artifactId": {
+                "$ref": "#/$defs/id"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "objectVersion": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "relevance": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reliability": {
+                "enum": [
+                  "verified",
+                  "corroborated",
+                  "client_statement",
+                  "unverified"
+                ]
+              },
+              "locator": {
+                "type": "string",
+                "description": "Page/section/query window; never a secret signed URL."
+              },
+              "receivedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "evaluation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "analysis",
+            "contradictoryEvidence",
+            "sufficiency"
+          ],
+          "properties": {
+            "analysis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "contradictoryEvidence": {
+              "type": "string"
+            },
+            "sufficiency": {
+              "enum": [
+                "sufficient",
+                "insufficient",
+                "pending"
+              ]
+            },
+            "uncertainty": {
+              "type": "string"
+            },
+            "residualRisk": {
+              "type": "string"
+            }
+          }
+        },
+        "conclusion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "humanDecisionRequired"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "pending",
+                "satisfied",
+                "partially_satisfied",
+                "not_satisfied",
+                "not_applicable",
+                "unable_to_conclude"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1
+            },
+            "humanDecisionRequired": {
+              "const": true
+            },
+            "decidedBy": {
+              "$ref": "#/$defs/id"
+            },
+            "decidedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "satisfied",
+                      "partially_satisfied",
+                      "not_satisfied",
+                      "not_applicable"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "decidedBy",
+                  "decidedAt"
+                ]
+              }
+            }
+          ]
+        },
+        "memo": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "background",
+            "issue",
+            "analysis",
+            "recommendation"
+          ],
+          "properties": {
+            "background": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issue": {
+              "type": "string",
+              "minLength": 1
+            },
+            "analysis": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alternatives": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "recommendation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "managementPosition": {
+              "type": "string"
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "relatedPaperIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        },
+        "preparedBy": {
+          "$ref": "#/$defs/id"
+        },
+        "preparedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "changeReason": {
+          "type": "string"
+        },
+        "generatedFromRunIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "memo"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "memo"
+            ]
+          }
+        }
+      ]
+    },
+    "generatedDraft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "id",
+        "engagementId",
+        "modelId",
+        "runId",
+        "templateId",
+        "title",
+        "status",
+        "objective",
+        "regulatoryMapping",
+        "procedure",
+        "evidence",
+        "exceptions",
+        "proposedConclusion",
+        "review",
+        "version"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "engagementId": {
+          "$ref": "#/$defs/id"
+        },
+        "modelId": {
+          "$ref": "#/$defs/id"
+        },
+        "runId": {
+          "$ref": "#/$defs/id"
+        },
+        "templateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "draft"
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regulatoryMapping": {
+          "type": "object",
+          "required": [
+            "regulation",
+            "articleReferences",
+            "mappingKind"
+          ],
+          "properties": {
+            "regulation": {
+              "type": "string"
+            },
+            "articleReferences": {
+              "type": "string"
+            },
+            "mappingKind": {
+              "type": "string"
+            }
+          }
+        },
+        "procedure": {
+          "type": "object",
+          "required": [
+            "testId",
+            "runnerVersion",
+            "configurationSha256"
+          ],
+          "properties": {
+            "testId": {
+              "$ref": "#/$defs/id"
+            },
+            "runnerVersion": {
+              "type": "string"
+            },
+            "configurationSha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "required": [
+            "inputHashes",
+            "metrics"
+          ],
+          "properties": {
+            "inputHashes": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "value",
+                  "unit",
+                  "sampleSize"
+                ]
+              }
+            }
+          }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "proposedConclusion": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "preparerId",
+            "reviewerId",
+            "reviewedAt",
+            "signOffs"
+          ],
+          "properties": {
+            "required": {
+              "const": true
+            },
+            "preparerId": {
+              "$ref": "#/$defs/id"
+            },
+            "reviewerId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reviewedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "signOffs": {
+              "type": "array",
+              "maxItems": 0
+            }
+          }
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

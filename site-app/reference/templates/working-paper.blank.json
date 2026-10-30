@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "{{paper_id}}",
+  "tenantId": "{{tenant_id}}",
+  "clientId": "{{client_id}}",
+  "engagementId": "{{engagement_id}}",
+  "catalogId": "WP-A10-02",
+  "templateVersion": "2026.10.1",
+  "revision": 1,
+  "status": "draft",
+  "stage": "Fieldwork",
+  "title": "Fairness and potential discriminatory impacts",
+  "scope": {
+    "systemId": "{{system_id}}",
+    "modelVersionIds": [],
+    "periodStart": null,
+    "periodEnd": null,
+    "rulePackId": "eu-ai-act-20260727",
+    "operatorRoles": [],
+    "criteria": [],
+    "boundary": "",
+    "exclusions": []
+  },
+  "applicability": {
+    "state": "pending",
+    "rationale": "",
+    "regulatoryReferences": [
+      "Art.10",
+      "Art.4a"
+    ],
+    "sourceVersion": "02024R1689-20260727",
+    "approvedBy": null,
+    "approvedAt": null
+  },
+  "riskReferences": [],
+  "procedures": [
+    {
+      "id": "WP-A10-02-P01",
+      "description": "Approve task-appropriate metrics, cohorts, reference groups, evidence prerequisites and uncertainty policy before evaluation.",
+      "mode": "hybrid",
+      "criterion": {
+        "source": "",
+        "metric": null,
+        "operator": null,
+        "threshold": null,
+        "justification": "",
+        "policyVersion": null,
+        "approvedBy": null
+      },
+      "diagnosticState": "pending",
+      "observation": "",
+      "sample": null,
+      "evidenceVersionIds": [],
+      "runIds": [],
+      "findingIds": []
+    }
+  ],
+  "evidence": [],
+  "runReferences": [],
+  "evaluation": {
+    "evidenceSufficiency": "not_assessed",
+    "contradictions": [],
+    "limitations": [],
+    "auditorConclusion": "not_assessed",
+    "rationale": "",
+    "findingIds": [],
+    "managementResponseId": null,
+    "subsequentEventsThrough": null
+  },
+  "reviewComments": [],
+  "approvals": [],
+  "provenance": {
+    "createdBy": "{{preparer_id}}",
+    "createdAt": "2026-10-05T00:00:00Z",
+    "contentOrigin": "human",
+    "supersedesId": null,
+    "amendmentReason": null,
+    "contentDigest": null
+  }
+}
