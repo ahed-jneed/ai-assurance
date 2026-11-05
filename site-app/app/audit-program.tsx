@@ -30,6 +30,7 @@ import type { Engagement, Paper, Report, Role, Finding } from "@/lib/domain";
 import type {
   BriefFields,
   Procedure,
+  ProcedureChange,
   ProcedurePlan,
 } from "@/lib/workflow-types";
 import {
@@ -320,6 +321,14 @@ const programViewMemory = new Map<
 >();
 const procedureSections = ["plan", "execute", "evaluate", "review"];
 const programSections = ["brief", "program", "review", "followup"];
+// The change that replaced a procedure history entry's state.
+const procedureChanges: Record<ProcedureChange, string> = {
+  plan: "Plan changed",
+  execute: "Execution recorded",
+  evaluate: "Evaluation recorded",
+  reaffirm: "Impact reviewed",
+  return: "Returned",
+};
 const options = (items: string[]) =>
   items.map((value) => ({ value, label: label(value) }));
 const area = (
@@ -2139,6 +2148,7 @@ export function AuditProgram({
                               {h.plan.dueDate || "not set"}
                             </small>
                             <small>
+                              {h.action && procedureChanges[h.action] + " by "}
                               {name(h.actor)} ·{" "}
                               {new Date(h.at).toLocaleString()}
                             </small>

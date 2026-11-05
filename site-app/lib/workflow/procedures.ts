@@ -3,6 +3,12 @@
 // working paper its work compiles into. Work binds the procedure's plan
 // hash and the scope revision (see currentExecution), so it stays current
 // across other procedures' changes and assignment changes.
+//
+// The procedure's history limit refuses only redoing current work. The
+// first execution, the first evaluation of each execution, a new execution
+// or impact review of work that a plan or scope change made stale, and
+// returns are never refused: approved plan and scope revisions, and the
+// reviewer's decisions, bound how often those happen.
 import { z } from "zod";
 import {
   currentExecution,
@@ -94,7 +100,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
           "Link completed runs bound to this approved procedure and scope",
         );
     }
-    recordHistory(p);
+    recordHistory(p, "execute", !!p.execution && currentExecution(e, p));
     const { procedureId, ...actual } = a;
     p.execution = {
       ...actual,
@@ -134,7 +140,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     if (!p.execution || !currentExecution(e, p) || p.state === "submitted")
       fail(409, "Record current execution before evaluation");
     accepted(p.execution.evidenceIds);
-    recordHistory(p);
+    recordHistory(p, "evaluate", !!p.execution.assessment);
     const { procedureId, ...assessment } = a;
     p.execution.assessment = { ...assessment, actor: c.userId, at: c.at };
     p.state = "evaluated";
@@ -143,7 +149,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     return { procedureId: p.id };
   },
   async reaffirmExecution(
-    { c, independent, w, procedure, accepted, ready, recordHistory },
+    { e, c, independent, w, procedure, accepted, ready, recordHistory },
     data,
   ) {
     ready();
@@ -156,7 +162,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     if (!p.execution || !executionPlanCurrent(p))
       fail(409, "A changed procedure plan requires a new execution");
     accepted(p.execution.evidenceIds);
-    recordHistory(p);
+    recordHistory(p, "reaffirm", currentExecution(e, p));
     p.execution.impactReview = {
       briefRevision: w().brief!.revision,
       programRevision: w().program.revision,
@@ -310,8 +316,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     independent(p.contributors);
     if (p.reviewerId !== c.userId || p.state !== "submitted")
       fail(409, "The assigned reviewer can return submitted work");
-    // Never limited: each return follows a submission of limited work.
-    recordHistory(p, false);
+    recordHistory(p, "return", false);
     p.state = p.execution?.assessment ? "evaluated" : "executed";
     p.review = undefined;
     const q = e.papers.find((q) => q.id === p.paperId);

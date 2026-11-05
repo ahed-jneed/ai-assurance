@@ -69,17 +69,28 @@ export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
     b.briefRevision === e.workflow?.brief?.revision
   );
 }
-// History limits keep an engagement record bounded. Drafting never counts:
-// the brief and program count submissions, and a procedure counts its
-// history entries, which returns may exceed.
+// History limits keep an engagement record bounded without stopping a change
+// halfway. The scope and the program count returns only: a submission that is
+// approved or withdrawn uses none, so a scope or program in force always has a
+// submission left for a change to it. A procedure counts the work recorded on
+// it, and its limit refuses only redoing current work. Entries recorded before
+// November 2026 count towards no limit.
 export const revisionLimits = { brief: 40, program: 75, procedure: 30 };
 /** How close to a limit warnings start. */
 export const revisionWarningLevel = 5;
-/** Submitted scope revisions kept in the brief's history. */
-export const briefSubmissions = (b: Brief) =>
-  b.history.filter((h) => h.status !== "draft").length;
-export const programSubmissions = (p: Program) =>
-  p.history.filter((h) => h.status === "submitted").length;
+/** Returns of the scope: the revisions its history keeps with a reason. */
+export const briefReturns = (b: Brief) =>
+  b.history.filter((h) => h.returnReason !== undefined).length;
+export const programReturns = (p: Program) =>
+  p.history.filter((h) => h.status === "returned").length;
+/** Work recorded on a procedure: executions, evaluations and impact reviews. */
+export const procedureWorkRevisions = (p: Procedure) =>
+  p.history.filter(
+    (h) =>
+      h.action === "execute" ||
+      h.action === "evaluate" ||
+      h.action === "reaffirm",
+  ).length;
 /** The brief, program and procedures close to or at their history limit. */
 export function revisionWarnings(w: Workflow | undefined) {
   const warnings: {
@@ -110,32 +121,32 @@ export function revisionWarnings(w: Workflow | undefined) {
     check(
       "brief",
       "Engagement brief",
-      briefSubmissions(w.brief),
+      briefReturns(w.brief),
       revisionLimits.brief,
       (left) =>
         left +
-        " scope submissions left. Drafting does not use them; at the limit, continue in a follow-up engagement.",
+        " scope returns left. Drafting, approval and changes to the approved scope use none; once none are left, a returned scope cannot be submitted again, so continue in a follow-up engagement.",
     );
   check(
     "program",
     "Audit program",
-    programSubmissions(w.program),
+    programReturns(w.program),
     revisionLimits.program,
     (left) =>
       left +
-      " program submissions left. Drafting and returns do not use them; at the limit, continue in a follow-up engagement.",
+      " program returns left. Drafting, approval and changes to the approved program use none; once none are left, a returned program cannot be submitted again, so continue in a follow-up engagement.",
   );
   for (const p of w.procedures)
     check(
       p.id,
       p.title,
-      p.history.length,
+      procedureWorkRevisions(p),
       revisionLimits.procedure,
       (left) =>
         p.templateId +
         ": " +
         left +
-        " history entries left. Executions, evaluations and the first plan change after each program submission use one; returns do not.",
+        " work revisions left. Each execution, evaluation and impact review uses one; plan changes and returns do not. Once none are left, current work cannot be recorded, evaluated or reaffirmed again, while work that a plan or scope change requires is still accepted.",
       p.id,
     );
   return warnings;

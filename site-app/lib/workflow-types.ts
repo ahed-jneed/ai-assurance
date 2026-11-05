@@ -33,10 +33,11 @@ export type Brief = BriefFields & {
   returnedBy?: string;
   returnedAt?: string;
   /**
-   * Submitted revisions: each returned revision, and each approved revision
-   * once a Lead revises it. A draft that was never submitted is superseded
-   * without an entry. Engagements saved before November 2026 also hold one
-   * entry per earlier draft save.
+   * Submitted revisions: each returned revision, with its return reason, and
+   * each approved revision once a Lead revises it. A draft that was never
+   * submitted is superseded without an entry. Engagements saved before
+   * November 2026 also hold one entry per earlier draft save, and returned
+   * revisions without a return reason.
    */
   history: Omit<Brief, "history">[];
 };
@@ -57,6 +58,12 @@ export type ProcedurePlan = {
   datasetId: string;
   profileId: string;
 };
+/**
+ * What replaced a procedure's state: a plan change, a new execution, an
+ * evaluation, an independent impact review or a reviewer's return.
+ */
+export type ProcedureChange =
+  "plan" | "execute" | "evaluate" | "reaffirm" | "return";
 export type Execution = {
   id: string;
   revision: number;
@@ -142,6 +149,11 @@ export type Procedure = ProcedurePlan & {
   execution?: Execution;
   review?: Approval;
   history: {
+    /**
+     * The change this entry kept the state before. Entries recorded before
+     * November 2026 have none.
+     */
+    action?: ProcedureChange;
     plan: ProcedurePlan;
     revision: number;
     execution?: Execution;
@@ -165,8 +177,9 @@ export type Program = {
   updatedAt: string;
   approval?: Approval;
   /**
-   * Each submission ("submitted") and its outcome ("approved", or "returned"
-   * with the reviewer's reason), with the procedure plans it bound.
+   * Each submission ("submitted") and its outcome, with the procedure plans
+   * it bound: "approved", "returned" with the reviewer's reason, or
+   * "withdrawn" when a Lead's plan or scope change took it back to draft.
    * Engagements saved before November 2026 also hold one entry per earlier
    * plan save, with the status the program had before that save.
    */

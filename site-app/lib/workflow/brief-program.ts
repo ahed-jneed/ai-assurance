@@ -4,20 +4,27 @@
 //
 // Histories keep what was submitted, not drafting: a brief, program or
 // procedure plan is amended until its next submission, so saving drafts
-// never uses up a history limit, and returns never meet one. A procedure
-// plan has two parts. Its substantive plan (what is tested and how) carries
-// the plan revision and hash that bind executions and runs: changing it
-// returns the program to draft and invalidates that procedure's work only.
-// Its assignment (preparer, reviewer, due date) is versioned apart from it
-// and changes without renewed program approval or invalidating any work.
+// never uses up a history limit. The scope and program limits count returns
+// only, so a change to an approved scope or program can always be submitted
+// again, and returns are never refused. A procedure plan has two parts. Its
+// substantive plan (what is tested and how) carries the plan revision and
+// hash that bind executions and runs: changing it returns the program to
+// draft and invalidates that procedure's work only. Its assignment
+// (preparer, reviewer, due date) is versioned apart from it and changes
+// without renewed program approval or invalidating any work.
 import { z } from "zod";
 import { seedWorkflow } from "../workflow-seed";
 import {
-  briefSubmissions,
-  programSubmissions,
+  briefReturns,
+  programReturns,
   revisionLimits,
 } from "../workflow-state";
-import type { Procedure, ProcedurePlan } from "../workflow-types";
+import type {
+  Brief,
+  Procedure,
+  ProcedurePlan,
+  Program,
+} from "../workflow-types";
 import {
   assignmentKeys,
   calendarDate,
@@ -77,6 +84,25 @@ const procedureIds = z
   .refine((v) => new Set(v).size === v.length, "Choose each procedure once");
 const inScope = (p: ProcedurePlan) =>
   p.selected && ["applicable", "readiness"].includes(p.applicability);
+// A submission is refused only once returns used up the limit. A scope or
+// program in force always has one left, since its own submission passed and
+// nothing returned it, so a change to it can be submitted again. The same
+// checks guard such a change before it lands, should a record exceed a limit
+// that was lowered after it was approved.
+function scopeSubmittable(b: Brief) {
+  if (briefReturns(b) >= revisionLimits.brief)
+    fail(
+      413,
+      "The scope reached its return limit; start a follow-up engagement",
+    );
+}
+function programSubmittable(p: Program) {
+  if (programReturns(p) >= revisionLimits.program)
+    fail(
+      413,
+      "The program reached its return limit; start a follow-up engagement",
+    );
+}
 /**
  * Changes procedure plans as one decision: every change is checked before
  * any procedure changes. A procedure whose plan is unchanged is left alone.
@@ -102,16 +128,15 @@ async function revisePlans(
       revisions.push({ p, plan, next, hash, substantive, assignment });
   }
   // Only a substantive change returns a submitted or approved program to
-  // draft. Without one, the program stays as approved and must stay
-  // complete.
-  const redraft = revisions.some((r) => r.substantive),
-    settled = w().program.status !== "draft" && !redraft;
+  // draft, and only if it can be submitted again. Without one, the program
+  // stays as approved and must stay complete. A procedure's history limit
+  // never refuses a plan change: a plan entry is added only at the first
+  // change after each program submission, or when a change clears a review.
+  const program = w().program,
+    redraft = revisions.some((r) => r.substantive),
+    settled = program.status !== "draft" && !redraft;
+  if (redraft && program.status !== "draft") programSubmittable(program);
   for (const { p, next, substantive } of revisions) {
-    if (!p.planAmended && p.history.length >= revisionLimits.procedure)
-      fail(
-        413,
-        "This procedure reached its revision limit; start a follow-up engagement",
-      );
     if (!substantive && p.review && next.reviewerId !== p.reviewerId)
       fail(
         409,
@@ -131,12 +156,13 @@ async function revisePlans(
       );
   }
   if (!revisions.length) return;
-  if (redraft) programDraft();
+  if (redraft) await programDraft();
   else programEdited();
   for (const { p, plan, hash, substantive, assignment } of revisions) {
-    // The plan as submitted enters the history once, at its first change.
-    if (!p.planAmended) {
-      recordHistory(p);
+    // The plan as submitted enters the history once, at its first change,
+    // and so does a review that a substantive change clears.
+    if (!p.planAmended || (substantive && p.review)) {
+      recordHistory(p, "plan", false);
       p.planAmended = true;
     }
     Object.assign(p, plan, {
@@ -145,8 +171,13 @@ async function revisePlans(
       updatedAt: c.at,
       contributors: [...new Set([...p.contributors, c.userId])],
     });
+    // A substantive change invalidates the review. Reviewed work goes back
+    // for review, as a return sends it, so that restoring the reviewed plan
+    // makes the execution current again but not the review.
     if (substantive) {
       p.revision++;
+      if (p.state === "reviewed")
+        p.state = p.execution?.assessment ? "evaluated" : "executed";
       p.review = undefined;
     }
     if (assignment) p.assignmentRevision = (p.assignmentRevision ?? 1) + 1;
@@ -175,10 +206,13 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     }
     if (old?.status === "submitted")
       fail(409, "Return the submitted scope before revising it");
+    // A scope change needs the scope and the program submitted again.
+    if (old?.status === "approved") scopeSubmittable(old);
+    if (x.program.status !== "draft") programSubmittable(x.program);
     // An approved revision enters the history when a Lead revises it, and a
     // returned one did on its return; a draft that was never submitted is
-    // superseded without an entry. No limit applies to either. An open
-    // return stays with the draft that answers it.
+    // superseded without an entry. An open return stays with the draft that
+    // answers it.
     const returned =
       old?.returnReason === undefined
         ? {}
@@ -200,18 +234,14 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
           ? [...old.history, snapshot(old)]
           : (old?.history ?? []),
     };
-    if (x.program.status !== "draft") programDraft();
+    if (x.program.status !== "draft") await programDraft();
     return { briefRevision: String(x.brief.revision) };
   },
   async submitBrief({ writer, w }) {
     writer();
     const b = w().brief ?? fail(400, "Complete the engagement brief first");
     if (b.status !== "draft") fail(409, "Only a scope draft can be submitted");
-    if (briefSubmissions(b) >= revisionLimits.brief)
-      fail(
-        413,
-        "The scope reached its submission limit; start a follow-up engagement",
-      );
+    scopeSubmittable(b);
     b.status = "submitted";
     // The resubmission answers the return the history keeps.
     delete b.returnReason;
@@ -375,11 +405,7 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       fail(409, "Approve scope before the program");
     if (x.program.status !== "draft")
       fail(409, "Only a draft program can be submitted");
-    if (programSubmissions(x.program) >= revisionLimits.program)
-      fail(
-        413,
-        "The program reached its submission limit; start a follow-up engagement",
-      );
+    programSubmittable(x.program);
     if (!x.procedures.some(inScope))
       fail(400, "Select at least one applicable or readiness procedure");
     for (const p of x.procedures) {
@@ -470,8 +496,9 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     const a = z.object({ reason: text }).strict().parse(data),
       p = w().program;
     if (p.status !== "submitted") fail(409, "Return a submitted program");
-    // A return is never limited. Work continues on the next revision, and
-    // the reviewer does not become one of the program's preparers.
+    // A return is never refused, even the one that uses up the limit. Work
+    // continues on the next revision, and the reviewer does not become one
+    // of the program's preparers.
     p.history.push({
       revision: p.revision,
       briefRevision: p.briefRevision,

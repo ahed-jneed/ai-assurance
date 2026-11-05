@@ -16,29 +16,28 @@ const procedure = (w: Workflow) => {
   if (!p) throw new Error("Unknown procedure " + procedureId);
   return p;
 };
-/** Fills the brief, program and procedure histories to these lengths. */
-function used(
-  w: Workflow,
-  brief: number,
-  program: number,
-  entries: number,
-  status: "draft" | "submitted" = "submitted",
-) {
+/** Records this many scope and program returns and procedure work revisions. */
+function used(w: Workflow, brief: number, program: number, work: number) {
   const { history, ...revision } = w.brief!;
   w.brief!.history = Array.from({ length: brief }, () => ({
     ...revision,
-    status,
+    status: "submitted" as const,
+    returnReason: "Clarify the boundary",
+    returnedBy: "reviewer",
+    returnedAt: at,
   }));
   w.program.history = Array.from({ length: program }, () => ({
     revision: 1,
     briefRevision: 1,
-    status,
+    status: "returned",
+    reason: "Size the sample",
     procedureRevisions: [],
     at,
-    actor: "auditor",
+    actor: "reviewer",
   }));
   const p = procedure(w);
-  p.history = Array.from({ length: entries }, () => ({
+  p.history = Array.from({ length: work }, (_, i) => ({
+    action: (["execute", "evaluate", "reaffirm"] as const)[i % 3],
     plan: p,
     revision: p.revision,
     at,
@@ -47,7 +46,7 @@ function used(
 }
 
 describe("revision limit warnings", () => {
-  it("warns from five submissions or entries before each limit", () => {
+  it("warns from five returns or work revisions before each limit", () => {
     const w = workflow();
     used(w, 34, 69, 24);
     expect(revisionWarnings(w)).toEqual([]);
@@ -58,20 +57,20 @@ describe("revision limit warnings", () => {
         id: "brief",
         title: "Engagement brief",
         message:
-          "5 of 40 scope submissions left. Drafting does not use them; at the limit, continue in a follow-up engagement.",
+          "5 of 40 scope returns left. Drafting, approval and changes to the approved scope use none; once none are left, a returned scope cannot be submitted again, so continue in a follow-up engagement.",
       },
       {
         id: "program",
         title: "Audit program",
         message:
-          "4 of 75 program submissions left. Drafting and returns do not use them; at the limit, continue in a follow-up engagement.",
+          "4 of 75 program returns left. Drafting, approval and changes to the approved program use none; once none are left, a returned program cannot be submitted again, so continue in a follow-up engagement.",
       },
       {
         id: p.id,
         recordId: p.id,
         title: p.title,
         message:
-          "WP-A10-01: 5 of 30 history entries left. Executions, evaluations and the first plan change after each program submission use one; returns do not.",
+          "WP-A10-01: 5 of 30 work revisions left. Each execution, evaluation and impact review uses one; plan changes and returns do not. Once none are left, current work cannot be recorded, evaluated or reaffirmed again, while work that a plan or scope change requires is still accepted.",
       },
     ]);
   });
@@ -82,18 +81,42 @@ describe("revision limit warnings", () => {
     expect(
       revisionWarnings(w).map((warning) => warning.message.split(" left")[0]),
     ).toEqual([
-      "0 of 40 scope submissions",
-      "0 of 75 program submissions",
-      "WP-A10-01: 0 of 30 history entries",
+      "0 of 40 scope returns",
+      "0 of 75 program returns",
+      "WP-A10-01: 0 of 30 work revisions",
     ]);
   });
 
-  it("ignores the drafts and outcomes that submissions do not count", () => {
+  it("ignores submissions, approvals, withdrawals, plan changes, procedure returns and older entries", () => {
     const w = workflow();
-    // Drafts as saved before November 2026, and returns.
-    used(w, 40, 75, 0, "draft");
-    w.program.history.push(
-      ...w.program.history.map((h) => ({ ...h, status: "returned" })),
+    const { history, ...revision } = w.brief!;
+    // Approved revisions a Lead revised, and the drafts and returned
+    // revisions (without a reason) that engagements kept before November 2026.
+    w.brief!.history = (["approved", "draft", "submitted"] as const).flatMap(
+      (status) => Array.from({ length: 40 }, () => ({ ...revision, status })),
+    );
+    // Submissions and their other outcomes, and the drafts kept before
+    // November 2026.
+    w.program.history = ["submitted", "approved", "withdrawn", "draft"].flatMap(
+      (status) =>
+        Array.from({ length: 75 }, () => ({
+          revision: 1,
+          briefRevision: 1,
+          status,
+          procedureRevisions: [],
+          at,
+          actor: "auditor",
+        })),
+    );
+    const p = procedure(w);
+    p.history = ([undefined, "plan", "return"] as const).flatMap((action) =>
+      Array.from({ length: 30 }, () => ({
+        action,
+        plan: p,
+        revision: p.revision,
+        at,
+        actor: "auditor",
+      })),
     );
     expect(revisionWarnings(w)).toEqual([]);
     expect(revisionWarnings(undefined)).toEqual([]);

@@ -16,7 +16,7 @@ import type {
 } from "../domain";
 import { seedWorkflow } from "../workflow-seed";
 import { WorkflowError, workflowCommand } from "../workflow-service";
-import type { Procedure, Workflow } from "../workflow-types";
+import type { Procedure, ProcedureChange, Workflow } from "../workflow-types";
 
 export type WorkflowContext = Parameters<typeof workflowCommand>[3];
 type Member = NonNullable<Awaited<ReturnType<WorkflowContext["member"]>>>;
@@ -352,6 +352,24 @@ export function procedureOf(e: Engagement, id: string): Procedure {
   const p = workflowOf(e).procedures.find((p) => p.id === id);
   if (!p) throw new Error("Unknown procedure " + id);
   return p;
+}
+
+/**
+ * Procedure history entries kept before this kind of change, to fill a
+ * history; without one, as engagements recorded them before November 2026.
+ */
+export function procedureEntries(
+  p: Procedure,
+  length: number,
+  action?: ProcedureChange,
+): Procedure["history"] {
+  return Array.from({ length }, () => ({
+    ...(action && { action }),
+    plan: { ...p },
+    revision: p.revision,
+    at,
+    actor: "auditor",
+  }));
 }
 
 /** A workflow whose brief (revision 1) and program (bound to it) are approved. */

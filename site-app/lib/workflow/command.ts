@@ -3,8 +3,12 @@
 // guards and lookups bound to one engagement and caller.
 import { z } from "zod";
 import type { Engagement, Paper, Role } from "../domain";
-import { revisionLimits } from "../workflow-state";
-import type { Procedure, ProcedurePlan } from "../workflow-types";
+import { procedureWorkRevisions, revisionLimits } from "../workflow-state";
+import type {
+  Procedure,
+  ProcedureChange,
+  ProcedurePlan,
+} from "../workflow-types";
 export class WorkflowError extends Error {
   constructor(
     public status: number,
@@ -161,14 +165,23 @@ export function commandScope(e: Engagement, c: Context) {
       fail(409, "Approve the current scope and audit program before execution");
     return x;
   };
-  /** Keeps the procedure's current state; returns are never limited. */
-  const recordHistory = (p: Procedure, limited = true) => {
-    if (limited && p.history.length >= revisionLimits.procedure)
+  /**
+   * Keeps the procedure's state before a change. Only redoing current work
+   * is `limited`: plan changes, returns and the work that a plan or scope
+   * change requires are never refused.
+   */
+  const recordHistory = (
+    p: Procedure,
+    action: ProcedureChange,
+    limited: boolean,
+  ) => {
+    if (limited && procedureWorkRevisions(p) >= revisionLimits.procedure)
       fail(
         413,
-        "This procedure reached its revision limit; start a follow-up engagement",
+        "This procedure reached its limit for redoing work; submit its current work or continue in a follow-up engagement",
       );
     p.history.push({
+      action,
       plan: plan(p),
       revision: p.revision,
       execution: structuredClone(p.execution),
@@ -186,20 +199,6 @@ export function commandScope(e: Engagement, c: Context) {
     p.updatedBy = c.userId;
     p.updatedAt = c.at;
   };
-  /**
-   * A change to what the program tests: a submitted or approved program
-   * becomes the draft of its next revision, and a draft is amended. Neither
-   * uses a history entry; submissions and their outcomes do.
-   */
-  const programDraft = () => {
-    const p = w().program;
-    if (p.status !== "draft") {
-      p.revision++;
-      p.status = "draft";
-      p.approval = undefined;
-    }
-    programEdited();
-  };
   const planHash = (p: Parameters<typeof substantivePlan>[0]) =>
     c.sha256(JSON.stringify(substantivePlan(p)));
   /** The plan hash, kept on first use for procedures planned without one. */
@@ -214,6 +213,30 @@ export function commandScope(e: Engagement, c: Context) {
         planHash: await ensurePlanHash(p),
       })),
     );
+  /**
+   * A change to what the program tests, before any plan changes: a
+   * submitted or approved program becomes the draft of its next revision,
+   * and a draft is amended. A pending submission is recorded as withdrawn,
+   * with the plans it bound; drafting uses no history entry.
+   */
+  const programDraft = async () => {
+    const p = w().program;
+    if (p.status === "submitted")
+      p.history.push({
+        revision: p.revision,
+        briefRevision: p.briefRevision,
+        status: "withdrawn",
+        procedureRevisions: await programBindings(),
+        at: c.at,
+        actor: c.userId,
+      });
+    if (p.status !== "draft") {
+      p.revision++;
+      p.status = "draft";
+      p.approval = undefined;
+    }
+    programEdited();
+  };
   return {
     e,
     c,
