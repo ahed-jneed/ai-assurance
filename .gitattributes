@@ -1,0 +1,4 @@
+# Store text files with LF and check them out with LF on every platform, so
+# formatter output and shell scripts match between Windows checkouts and the
+# Linux CI runners. Binary files are auto-detected.
+* text=auto eol=lf

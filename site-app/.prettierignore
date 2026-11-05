@@ -1,0 +1,23 @@
+# Prettier also honours .gitignore. These entries cover files that are tracked
+# (or ignored only by the repository-root .gitignore) but must not be reformatted.
+
+# Generated output, lockfiles and checkout-local tool state
+dist/
+coverage/
+.openai/
+package-lock.json
+
+# Copies and vendored sources kept byte-identical with their upstream
+reference/
+vendor/
+public/
+drizzle/meta/
+# shadcn registry files vendored verbatim (see eslint.config.mjs)
+components/ui/
+hooks/use-mobile.ts
+
+# Data mirrored byte-for-byte from ../templates and imported as-is by the app
+lib/*.json
+
+# Markdown is outside the formatting baseline
+*.md
