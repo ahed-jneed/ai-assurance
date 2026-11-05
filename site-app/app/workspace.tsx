@@ -5,7 +5,14 @@ import {
   linkQuery,
   type WorkspaceLink,
 } from "@/lib/workspace-links";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -88,7 +95,6 @@ import type {
 } from "@/lib/domain";
 import type { WorkspaceData } from "./workspace-types";
 import { SavedViews } from "./business-workspace";
-import { WorkInbox } from "./work-inbox";
 import {
   defaultInboxQuery,
   readInboxQuery,
@@ -97,7 +103,6 @@ import {
 } from "@/lib/work-inbox";
 import { MemberOnboarding } from "./member-onboarding";
 import type { WorkItem } from "@/lib/work-items";
-import { ManagementViews } from "./management-views";
 import { RecordDetails } from "./record-details";
 import { humanLabel, readableResults } from "@/lib/presentation";
 import { WorkspaceNavigation } from "./workspace-navigation";
@@ -124,17 +129,11 @@ import {
 } from "@/lib/evidence-presentation";
 import { EngagementSwitcher } from "./engagement-switcher";
 import { EngagementOverview } from "./engagement-overview";
-import { ReportWorkspace } from "./report-workspace";
 import { AuditGateList } from "./audit-gates";
 import { EvidenceRegister, FindingRegister } from "./audit-registers";
 import { NewFindingForm, RemediationForm } from "./finding-forms";
-import { EvidenceRequests, EvidenceRequestDetails } from "./evidence-requests";
 import { EvidenceRequestForm } from "./evidence-request-form";
-import { AuditProgram, ReportRelease, FindingAssurance } from "./audit-program";
-import { ClientPortal, RequestAccess } from "./client-portal";
 import { PackageIntegrity } from "./package-integrity";
-import { TestingLab } from "./testing-lab";
-import { AssuranceWorkbench } from "./assurance-workbench";
 import {
   defaultWorkbenchQuery,
   readWorkbenchQuery,
@@ -163,6 +162,71 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
+// View-specific panels are code-split out of the initial bundle. They are
+// prefetched once the workspace has bootstrapped (see the effect in Workspace),
+// so opening a view normally does not wait for the network.
+const panelModules = [
+  () => import("./work-inbox"),
+  () => import("./management-views"),
+  () => import("./audit-program"),
+  () => import("./client-portal"),
+  () => import("./evidence-requests"),
+  () => import("./assurance-workbench"),
+  () => import("./testing-lab"),
+  () => import("./report-workspace"),
+] as const;
+const [
+  loadWorkInbox,
+  loadManagementViews,
+  loadAuditProgram,
+  loadClientPortal,
+  loadEvidenceRequests,
+  loadAssuranceWorkbench,
+  loadTestingLab,
+  loadReportWorkspace,
+] = panelModules;
+const WorkInbox = lazy(() =>
+  loadWorkInbox().then((m) => ({ default: m.WorkInbox })),
+);
+const ManagementViews = lazy(() =>
+  loadManagementViews().then((m) => ({ default: m.ManagementViews })),
+);
+const AuditProgram = lazy(() =>
+  loadAuditProgram().then((m) => ({ default: m.AuditProgram })),
+);
+const ReportRelease = lazy(() =>
+  loadAuditProgram().then((m) => ({ default: m.ReportRelease })),
+);
+const FindingAssurance = lazy(() =>
+  loadAuditProgram().then((m) => ({ default: m.FindingAssurance })),
+);
+const ClientPortal = lazy(() =>
+  loadClientPortal().then((m) => ({ default: m.ClientPortal })),
+);
+const RequestAccess = lazy(() =>
+  loadClientPortal().then((m) => ({ default: m.RequestAccess })),
+);
+const EvidenceRequests = lazy(() =>
+  loadEvidenceRequests().then((m) => ({ default: m.EvidenceRequests })),
+);
+const EvidenceRequestDetails = lazy(() =>
+  loadEvidenceRequests().then((m) => ({ default: m.EvidenceRequestDetails })),
+);
+const AssuranceWorkbench = lazy(() =>
+  loadAssuranceWorkbench().then((m) => ({ default: m.AssuranceWorkbench })),
+);
+const TestingLab = lazy(() =>
+  loadTestingLab().then((m) => ({ default: m.TestingLab })),
+);
+const ReportWorkspace = lazy(() =>
+  loadReportWorkspace().then((m) => ({ default: m.ReportWorkspace })),
+);
+const panelFallback = (
+  <div className="loading-grid" aria-label="Loading">
+    <Skeleton className="h-16" />
+    <Skeleton className="h-80" />
+  </div>
+);
 const navigation = [
   ["Overview", LayoutDashboard],
   ["Audit program", ClipboardCheck],
@@ -595,6 +659,11 @@ export default function Workspace() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstraps once per load(); applyWorkspaceLink is a plain function recreated on every render
   }, [load]);
+  useEffect(() => {
+    if (bootstrapping) return;
+    // Prefetch the code-split panels in the background once the workspace is up.
+    for (const loadPanel of panelModules) void loadPanel().catch(() => {});
+  }, [bootstrapping]);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (
@@ -2260,27 +2329,31 @@ export default function Workspace() {
             data && (
               <>
                 {view === "My work" && !viewer ? (
-                  <WorkInbox
-                    data={data}
-                    onOpen={openWork}
-                    query={inboxQuery}
-                    onQueryChange={setInboxQuery}
-                    onCopyLink={() => void copyWorkspaceLink()}
-                  />
+                  <Suspense fallback={panelFallback}>
+                    <WorkInbox
+                      data={data}
+                      onOpen={openWork}
+                      query={inboxQuery}
+                      onQueryChange={setInboxQuery}
+                      onCopyLink={() => void copyWorkspaceLink()}
+                    />
+                  </Suspense>
                 ) : management ? (
-                  <ManagementViews
-                    onBack={() => navigate("Clients")}
-                    view={view}
-                    data={data}
-                    clientId={clientId}
-                    setClientId={setClientId}
-                    onEngagement={openEngagement}
-                    open={open}
-                    onOnboard={() => setOnboarding(true)}
-                    busy={busy}
-                    search={search}
-                    setSearch={setSearch}
-                  />
+                  <Suspense fallback={panelFallback}>
+                    <ManagementViews
+                      onBack={() => navigate("Clients")}
+                      view={view}
+                      data={data}
+                      clientId={clientId}
+                      setClientId={setClientId}
+                      onEngagement={openEngagement}
+                      open={open}
+                      onOnboard={() => setOnboarding(true)}
+                      busy={busy}
+                      search={search}
+                      setSearch={setSearch}
+                    />
+                  </Suspense>
                 ) : e ? (
                   <>
                     <div className="page-head">
@@ -2437,51 +2510,55 @@ export default function Workspace() {
                         </div>
                       )}
                     {view === "Audit program" && !viewer && (
-                      <AuditProgram
-                        onLocation={(id, section) => {
-                          setProcedureContext(id);
-                          setProcedureSection(section);
-                        }}
-                        key={e.id}
-                        data={data}
-                        busy={busy}
-                        act={act}
-                        onPaper={openPaper}
-                        onRequest={requestForPaper}
-                        onNavigate={navigate}
-                        onEditing={setLabEditing}
-                        initialProcedure={procedureContext}
-                        initialSection={procedureSection}
-                        onRecord={viewDetail}
-                        onContext={setProcedureContext}
-                        onFinding={(p) =>
-                          open("finding", {
-                            procedureId: p.id,
-                            title: p.title + " — exception",
-                            condition: p.execution?.results ?? "",
-                            criteria: p.criterion,
-                            article:
-                              p.candidateRefs
-                                .join(" ")
-                                .match(/(?:Art\.?|Article)\s*(\d+)/i)?.[1] ??
-                              "10",
-                            likelihood: "3",
-                            impact: "3",
-                            visibility: "internal",
-                          })
-                        }
-                        onFollowup={(id) => openEngagement(id)}
-                      />
+                      <Suspense fallback={panelFallback}>
+                        <AuditProgram
+                          onLocation={(id, section) => {
+                            setProcedureContext(id);
+                            setProcedureSection(section);
+                          }}
+                          key={e.id}
+                          data={data}
+                          busy={busy}
+                          act={act}
+                          onPaper={openPaper}
+                          onRequest={requestForPaper}
+                          onNavigate={navigate}
+                          onEditing={setLabEditing}
+                          initialProcedure={procedureContext}
+                          initialSection={procedureSection}
+                          onRecord={viewDetail}
+                          onContext={setProcedureContext}
+                          onFinding={(p) =>
+                            open("finding", {
+                              procedureId: p.id,
+                              title: p.title + " — exception",
+                              condition: p.execution?.results ?? "",
+                              criteria: p.criterion,
+                              article:
+                                p.candidateRefs
+                                  .join(" ")
+                                  .match(/(?:Art\.?|Article)\s*(\d+)/i)?.[1] ??
+                                "10",
+                              likelihood: "3",
+                              impact: "3",
+                              visibility: "internal",
+                            })
+                          }
+                          onFollowup={(id) => openEngagement(id)}
+                        />
+                      </Suspense>
                     )}
                     {view === "Overview" &&
                       viewer &&
                       role === "Client Contributor" && (
-                        <ClientPortal
-                          data={data}
-                          busy={busy}
-                          onEditing={setLabEditing}
-                          onReload={() => load(data.tenantId, e.id)}
-                        />
+                        <Suspense fallback={panelFallback}>
+                          <ClientPortal
+                            data={data}
+                            busy={busy}
+                            onEditing={setLabEditing}
+                            onReload={() => load(data.tenantId, e.id)}
+                          />
+                        </Suspense>
                       )}
                     {view === "Overview" &&
                       (viewer ? (
@@ -2559,12 +2636,14 @@ export default function Workspace() {
                     {view === "Evidence vault" && (
                       <>
                         {role === "Client Contributor" && (
-                          <ClientPortal
-                            data={data}
-                            busy={busy}
-                            onEditing={setLabEditing}
-                            onReload={() => load(data.tenantId, e.id)}
-                          />
+                          <Suspense fallback={panelFallback}>
+                            <ClientPortal
+                              data={data}
+                              busy={busy}
+                              onEditing={setLabEditing}
+                              onReload={() => load(data.tenantId, e.id)}
+                            />
+                          </Suspense>
                         )}
                         <EvidenceReviewQueue
                           engagement={e}
@@ -2697,75 +2776,85 @@ export default function Workspace() {
                           </TabsContent>
                           {!viewer && (
                             <TabsContent value="requests">
-                              <EvidenceRequests
-                                engagement={e}
-                                role={role}
-                                busy={busy}
-                                view={requestFilter}
-                                onView={setRequestFilter}
-                                search={search}
-                                onSearch={setSearch}
-                                onOpen={(r) => viewDetail(r.subject, r)}
-                                onNew={() => requestForm("request")}
-                              />
-                              <RequestAccess
-                                data={data}
-                                busy={busy}
-                                act={act}
-                                onEditing={setLabEditing}
-                              />
+                              <Suspense fallback={panelFallback}>
+                                <EvidenceRequests
+                                  engagement={e}
+                                  role={role}
+                                  busy={busy}
+                                  view={requestFilter}
+                                  onView={setRequestFilter}
+                                  search={search}
+                                  onSearch={setSearch}
+                                  onOpen={(r) => viewDetail(r.subject, r)}
+                                  onNew={() => requestForm("request")}
+                                />
+                                <RequestAccess
+                                  data={data}
+                                  busy={busy}
+                                  act={act}
+                                  onEditing={setLabEditing}
+                                />
+                              </Suspense>
                             </TabsContent>
                           )}
                         </Tabs>
                       </>
                     )}
                     {view === "Assurance workbench" && !viewer && (
-                      <AssuranceWorkbench
-                        location={workbenchQuery}
-                        onLocation={(q) =>
-                          setWorkbenchQuery(normalizeWorkbenchQuery(q))
-                        }
-                        onEvidence={(id) => {
-                          const artifact = e.artifacts.find((a) => a.id === id);
-                          if (artifact)
-                            guarded(() => viewDetail(artifact.name, artifact));
-                        }}
-                        initialProcedure={procedureContext}
-                        onHosted={(id, cardId) =>
-                          navigate("Testing lab", {}, () => {
-                            setProcedureContext(id);
-                            setTestingDatasetCard(cardId);
-                          })
-                        }
-                        key={data.tenantId + ":" + e.id}
-                        data={data}
-                        onRefresh={() => load(data.tenantId, e.id)}
-                        onPaper={(id) => {
-                          const p = e.papers.find((p) => p.id === id);
-                          if (p) openPaper(p);
-                        }}
-                        onNavigate={navigate}
-                        onEditing={setLabEditing}
-                      />
+                      <Suspense fallback={panelFallback}>
+                        <AssuranceWorkbench
+                          location={workbenchQuery}
+                          onLocation={(q) =>
+                            setWorkbenchQuery(normalizeWorkbenchQuery(q))
+                          }
+                          onEvidence={(id) => {
+                            const artifact = e.artifacts.find(
+                              (a) => a.id === id,
+                            );
+                            if (artifact)
+                              guarded(() =>
+                                viewDetail(artifact.name, artifact),
+                              );
+                          }}
+                          initialProcedure={procedureContext}
+                          onHosted={(id, cardId) =>
+                            navigate("Testing lab", {}, () => {
+                              setProcedureContext(id);
+                              setTestingDatasetCard(cardId);
+                            })
+                          }
+                          key={data.tenantId + ":" + e.id}
+                          data={data}
+                          onRefresh={() => load(data.tenantId, e.id)}
+                          onPaper={(id) => {
+                            const p = e.papers.find((p) => p.id === id);
+                            if (p) openPaper(p);
+                          }}
+                          onNavigate={navigate}
+                          onEditing={setLabEditing}
+                        />
+                      </Suspense>
                     )}
                     {view === "Testing lab" && (
-                      <TestingLab
-                        initialProcedure={procedureContext}
-                        datasetCardRecordId={testingDatasetCard}
-                        onRefresh={() => load(data.tenantId, e.id)}
-                        key={data.tenantId + ":" + e.id}
-                        engagement={e}
-                        tenantId={data.tenantId}
-                        role={role}
-                        busy={busy}
-                        view={labView}
-                        onView={setLabView}
-                        onEditorOpen={setLabEditing}
-                        act={act}
-                        onPaper={openPaper}
-                        resolve={resolveName}
-                        onEvidence={() => navigate("Evidence vault")}
-                      />
+                      <Suspense fallback={panelFallback}>
+                        <TestingLab
+                          initialProcedure={procedureContext}
+                          datasetCardRecordId={testingDatasetCard}
+                          onRefresh={() => load(data.tenantId, e.id)}
+                          key={data.tenantId + ":" + e.id}
+                          engagement={e}
+                          tenantId={data.tenantId}
+                          role={role}
+                          busy={busy}
+                          view={labView}
+                          onView={setLabView}
+                          onEditorOpen={setLabEditing}
+                          act={act}
+                          onPaper={openPaper}
+                          resolve={resolveName}
+                          onEvidence={() => navigate("Evidence vault")}
+                        />
+                      </Suspense>
                     )}
                     {view === "Findings" && (
                       <section className="panel">
@@ -2945,41 +3034,44 @@ export default function Workspace() {
                       </>
                     )}
                     {view === "Reports & sign-off" && (
-                      <ReportWorkspace
-                        key={e.id}
-                        engagement={e}
-                        tenantId={data.tenantId}
-                        role={role}
-                        userId={data.identity.id}
-                        busy={busy}
-                        opinion={reportOpinion}
-                        onOpinion={setReportOpinion}
-                        onGate={openGate}
-                        onCreate={(kind) =>
-                          open("report", { kind, opinion: reportOpinion })
-                        }
-                        onOpen={(r) =>
-                          viewDetail(
-                            (r.kind === "final"
-                              ? "Final report"
-                              : "Draft report") +
-                              " · " +
-                              new Date(r.createdAt).toLocaleDateString(),
-                            r,
-                          )
-                        }
-                        section={reportSection}
-                        onSection={setReportSection}
-                        query={registerQuery}
-                        onQuery={(patch) => {
-                          if (patch.view !== undefined) setFilter(patch.view);
-                          if (patch.search !== undefined)
-                            setSearch(patch.search);
-                          if (patch.facet !== undefined) setFacet(patch.facet);
-                          if (patch.sort !== undefined) setSort(patch.sort);
-                        }}
-                        onReset={clearRegister}
-                      />
+                      <Suspense fallback={panelFallback}>
+                        <ReportWorkspace
+                          key={e.id}
+                          engagement={e}
+                          tenantId={data.tenantId}
+                          role={role}
+                          userId={data.identity.id}
+                          busy={busy}
+                          opinion={reportOpinion}
+                          onOpinion={setReportOpinion}
+                          onGate={openGate}
+                          onCreate={(kind) =>
+                            open("report", { kind, opinion: reportOpinion })
+                          }
+                          onOpen={(r) =>
+                            viewDetail(
+                              (r.kind === "final"
+                                ? "Final report"
+                                : "Draft report") +
+                                " · " +
+                                new Date(r.createdAt).toLocaleDateString(),
+                              r,
+                            )
+                          }
+                          section={reportSection}
+                          onSection={setReportSection}
+                          query={registerQuery}
+                          onQuery={(patch) => {
+                            if (patch.view !== undefined) setFilter(patch.view);
+                            if (patch.search !== undefined)
+                              setSearch(patch.search);
+                            if (patch.facet !== undefined)
+                              setFacet(patch.facet);
+                            if (patch.sort !== undefined) setSort(patch.sort);
+                          }}
+                          onReset={clearRegister}
+                        />
+                      </Suspense>
                     )}
                     {view === "Methodology" && (
                       <Tabs defaultValue="templates">
@@ -3993,29 +4085,31 @@ export default function Workspace() {
                   liveDetail &&
                   typeof liveDetail === "object" &&
                   "responsibleParty" in liveDetail ? (
-                  <EvidenceRequestDetails
-                    key={
-                      data?.tenantId +
-                      ":" +
-                      e.id +
-                      ":" +
-                      (liveDetail as EvidenceRequest).id
-                    }
-                    request={liveDetail as EvidenceRequest}
-                    engagement={e}
-                    role={role}
-                    busy={busy}
-                    resolve={resolveName}
-                    onForm={requestForm}
-                    onPaper={(p) => {
-                      setDetail(null);
-                      openPaper(p);
-                    }}
-                    onArtifact={(id) => {
-                      const artifact = e.artifacts.find((a) => a.id === id);
-                      if (artifact) viewDetail(artifact.name, artifact);
-                    }}
-                  />
+                  <Suspense fallback={panelFallback}>
+                    <EvidenceRequestDetails
+                      key={
+                        data?.tenantId +
+                        ":" +
+                        e.id +
+                        ":" +
+                        (liveDetail as EvidenceRequest).id
+                      }
+                      request={liveDetail as EvidenceRequest}
+                      engagement={e}
+                      role={role}
+                      busy={busy}
+                      resolve={resolveName}
+                      onForm={requestForm}
+                      onPaper={(p) => {
+                        setDetail(null);
+                        openPaper(p);
+                      }}
+                      onArtifact={(id) => {
+                        const artifact = e.artifacts.find((a) => a.id === id);
+                        if (artifact) viewDetail(artifact.name, artifact);
+                      }}
+                    />
+                  </Suspense>
                 ) : (
                   <RecordDetails
                     findingReview={
@@ -4024,15 +4118,17 @@ export default function Workspace() {
                       !!liveDetail &&
                       typeof liveDetail === "object" &&
                       "riskScore" in liveDetail ? (
-                        <FindingAssurance
-                          finding={liveDetail as Finding}
-                          engagement={e}
-                          role={role}
-                          userId={data?.identity.id ?? ""}
-                          busy={busy}
-                          act={act}
-                          onEditing={setLabEditing}
-                        />
+                        <Suspense fallback={null}>
+                          <FindingAssurance
+                            finding={liveDetail as Finding}
+                            engagement={e}
+                            role={role}
+                            userId={data?.identity.id ?? ""}
+                            busy={busy}
+                            act={act}
+                            onEditing={setLabEditing}
+                          />
+                        </Suspense>
                       ) : undefined
                     }
                     value={liveDetail}
@@ -4069,15 +4165,17 @@ export default function Workspace() {
                     !!liveDetail &&
                     typeof liveDetail === "object" &&
                     "clientSnapshot" in liveDetail && (
-                      <ReportRelease
-                        reports={e?.reports ?? []}
-                        report={liveDetail as Report}
-                        role={role}
-                        userId={data?.identity.id ?? ""}
-                        busy={busy}
-                        act={act}
-                        onEditing={setLabEditing}
-                      />
+                      <Suspense fallback={null}>
+                        <ReportRelease
+                          reports={e?.reports ?? []}
+                          report={liveDetail as Report}
+                          role={role}
+                          userId={data?.identity.id ?? ""}
+                          busy={busy}
+                          act={act}
+                          onEditing={setLabEditing}
+                        />
+                      </Suspense>
                     )}
                 </div>
                 <details className="provenance">
