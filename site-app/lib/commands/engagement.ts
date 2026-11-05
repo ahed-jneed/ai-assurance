@@ -1,13 +1,17 @@
 import { z } from "zod";
-import { stageGates } from "../domain";
+import { roles, stageGates } from "../domain";
 import { db, now, sha256 } from "../engagement-repo";
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
 import { calendarDate } from "../workflow-service";
 import { defineCommands, type CommandHandler } from "./command";
 import { short } from "./fields";
-/** Clients, engagements and memberships are created through /api/management. */
+/**
+ * Clients, engagements and memberships are created through /api/management.
+ * Every role gets this referral, not a role refusal.
+ */
 const managementOnly: CommandHandler = {
+  roles,
   handle() {
     throw new ApiError(400, "Use client and user management for this action");
   },
