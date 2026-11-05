@@ -2,7 +2,7 @@
 // template and engagements in their initial state.
 import catalog from "./catalog.json";
 import type { Engagement, Paper } from "./domain";
-import { id, now } from "./engagement-repo";
+import { id, now } from "./ids";
 import { ApiError } from "./http";
 import { seedWorkflow } from "./workflow-seed";
 export function templatePaper(templateId: string, userId: string): Paper {

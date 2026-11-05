@@ -1,34 +1,15 @@
-// Engagement persistence: the D1 and R2 bindings, identifiers and hashes, and
-// loading and saving an engagement with its snapshot and audit event.
-import { env } from "cloudflare:workers";
+// Engagement persistence: loading and saving an engagement with its snapshot
+// and audit event. The D1 and R2 bindings (bindings.ts) and the identifiers
+// and hashes (ids.ts) are re-exported for the modules that import them here.
+import { db } from "./bindings";
 import type { Engagement } from "./domain";
 import { hydrate, dehydrate } from "./engagement-storage";
 import { ApiError } from "./http";
+import { id, now, sha256 } from "./ids";
 import type { Context } from "./tenancy";
 import { isClientRole, activeGrant } from "./workflow-state";
-export function db() {
-  if (!env.DB)
-    throw new ApiError(503, "Workspace storage is unavailable. Please retry.");
-  return env.DB;
-}
-export function bucket() {
-  if (!env.BUCKET)
-    throw new ApiError(503, "Evidence storage is unavailable. Please retry.");
-  return env.BUCKET;
-}
-export async function sha256(value: string | ArrayBuffer) {
-  const bytes =
-    typeof value === "string" ? new TextEncoder().encode(value) : value;
-  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
-    .map((x) => x.toString(16).padStart(2, "0"))
-    .join("");
-}
-export function id(prefix: string) {
-  return prefix + "-" + crypto.randomUUID().slice(0, 12);
-}
-export function now() {
-  return new Date().toISOString();
-}
+export { bucket, db } from "./bindings";
+export { id, now, sha256 } from "./ids";
 export async function getEngagement(ctx: Context, engagementId: string) {
   const row = await db()
     .prepare(

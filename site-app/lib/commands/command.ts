@@ -2,7 +2,7 @@ import type { Engagement, Role } from "../domain";
 import { ApiError } from "../http";
 import { requireRole, type Context } from "../tenancy";
 
-/** The validated `data` of a workspace command. */
+/** The `data` object of a command envelope, validated by each handler. */
 export type CommandData = Record<string, unknown>;
 
 /**
@@ -19,41 +19,47 @@ export type CommandResult =
   | { saved: Engagement };
 
 /**
- * A cohesive group of ops. `dispatch` runs the module that lists the op; the
- * route has already checked `e.version` against the caller's expectedVersion.
+ * A cohesive group of ops. `dispatch` runs the module that lists the op. Each
+ * bus passes its own `Target` (for POST /api/workspace the loaded engagement,
+ * whose version the route has already checked) and expects its own `Result`.
  */
-export type CommandModule = {
+export type CommandModule<Target = Engagement, Result = CommandResult> = {
   readonly ops: readonly string[];
   run(
-    e: Engagement,
+    target: Target,
     op: string,
     data: CommandData,
     ctx: Context,
-  ): CommandResult | Promise<CommandResult>;
+  ): Result | Promise<Result>;
 };
 
-export type CommandHandler = {
-  /** The roles that may issue the op, checked before `handle` runs. */
-  roles?: Role[];
+export type CommandHandler<Target = Engagement, Result = CommandResult> = {
+  /**
+   * The roles that may issue the op, checked before `handle` runs. Required,
+   * so no op ships without an authorization decision.
+   */
+  roles: Role[];
+  /** `op` tells a handler shared by several ops which one it is running. */
   handle(
-    e: Engagement,
+    target: Target,
     data: CommandData,
     ctx: Context,
-  ): CommandResult | Promise<CommandResult>;
+    op: string,
+  ): Result | Promise<Result>;
 };
 
 /** A module with one handler per op, so adding an op means adding one entry. */
-export function defineCommands(
-  handlers: Record<string, CommandHandler>,
-): CommandModule {
+export function defineCommands<Target = Engagement, Result = CommandResult>(
+  handlers: Record<string, CommandHandler<NoInfer<Target>, NoInfer<Result>>>,
+): CommandModule<Target, Result> {
   const table = new Map(Object.entries(handlers));
   return {
     ops: [...table.keys()],
-    run(e, op, data, ctx) {
+    run(target, op, data, ctx) {
       const handler = table.get(op);
       if (!handler) throw new ApiError(400, "Unknown command");
-      if (handler.roles) requireRole(ctx, handler.roles);
-      return handler.handle(e, data, ctx);
+      requireRole(ctx, handler.roles);
+      return handler.handle(target, data, ctx, op);
     },
   };
 }
