@@ -105,7 +105,11 @@ assert.ok(complete && queued && regression && multiclass && cardFixture, 'Expect
 const legacy = copy(complete);
 legacy.contractVersion = '1.0';
 for (const key of ['task', 'profileId', 'manifest']) delete legacy[key];
-legacy.provenance = { inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
+// Contract 1.0 predates the performance positive class of test definitions
+// 2.1.0, which fresh `--fixtures` runs freeze.
+delete legacy.config.performancePositiveLabel;
+delete legacy.thresholds.performancePositiveLabel;
+legacy.provenance ={ inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
 positive('Legacy interactive completed', legacy);
 const oldConfig = copy(legacy);
 for (const key of ['minimumSampleSize', 'minimumClassCount', 'maximumOddsGap', 'minimumRecall', 'minimumMacroF1', 'maximumRmse']) {
