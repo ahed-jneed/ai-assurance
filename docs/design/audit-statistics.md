@@ -1008,7 +1008,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Bonferroni and BH, families, run aggregation, `reviewFlags` | **mirror exactly** | yes | copied; the compiled external run aggregates per section 4.6 (H4) |
 | Minimum floors; suppression; coverage; `all_pairs` and `reference` modes; group limits | **mirror exactly** | yes | `translate_config` applies `max(floor, configured)` and records both |
 | Plan normalisation, RFC 8785 hash, legacy derivation | **mirror exactly** | yes | derives the hosted plan for `engineConfig` 1.1, or carries 1.4's `statistics` |
-| Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`, else the label derived from the data (E4) |
+| Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`; without it, the other label derived from the data, or in `auditor_model` mode from `modelSpec.outputLabels` (E4) |
 | Power and MDE at plan approval | **mirror** (approval UI) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
 | LL144 computations | via #30 (same arithmetic) | via #30 | – |
@@ -1255,22 +1255,24 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 - New `engine/tests/test_statistics_end_to_end.py` runs every `endToEnd.engine` case through `run()` on expanded CSVs.
 
 **E4 file list and checks** (worker, after PR #47, which closes #10). PR #47 leaves the worker with the five platform tests only: drift, permutation, perturbation, explainability and cross-validation leave `SUITES`, `LABELS` and `_selected_sources`, and `hosted_results` loses its external-only branch. Every hosted result is therefore a criterion of the plan, and the worker copies all of them.
+
+Line numbers below are those of `main@582657f`. Of the files listed, #47 changes only `engine/worker.py`, `engine/worker_contract.py` and `engine/tests/test_worker.py`. Where it moves a cited line, the line on #47's head `37a2ea5` follows in brackets; #47 is still open, so these may move again, and the quoted identifiers locate the code.
 - `engine/worker_contract.py` `translate_config`:
   - accepts `engineConfig` 1.1 and derives the hosted plan (section 9.3; the multiclass chance baseline takes k from the rows it receives), or 1.4 and carries `statistics` after validating it;
   - maps `suite` to engine suites through `SUITES` as today, since a 1.1 profile's `suite` lists the families of its plan's criteria (section 11.2);
   - applies `max(floor, configured)` and records the configured and applied minimums in `statistics.configuredMinimums` and in `hostedTranslation`;
   - drops the `max(2, …)` class-count adjustment and the hosted defaults of 20 and 5;
   - bumps `TRANSLATION_VERSION`.
-- **Label pair** (`binary_labels()`, added by #47). #47 reads the top-level `engineConfig.negativeLabel` and, when it is absent, derives the other label from the data.
+- **Label pair** (`binary_labels()`, added by #47). #47 reads the top-level `engineConfig.negativeLabel`. When it is absent, #47 derives the other label: from the data, or in `auditor_model` mode from `modelSpec.outputLabels`, which must then be exactly the label pair.
   - `engineConfig` 1.4 carries the 1.1 profile's declared pair in `config` (`positiveLabel`, `negativeLabel`). Its top-level `negativeLabel` MUST be present and equal `config.negativeLabel`. The worker rejects a mismatch as `protocol_config_invalid` and uses that label, so data in which one label is observed is evaluated.
-  - The derivation from the data stays, for `engineConfig` 1.1 only.
+  - The derivation of a missing label stays, for `engineConfig` 1.1 only.
 - `_selected_sources` and `hosted_results` (result-id rule, section 11.2):
   - `hosted_results` builds one result per criterion of the recorded plan, in plan order, by copying the engine result with that criterion's id: its `outcome`, `metrics`, `limitations` and `decision`. The engine runs the translated plan, so its result ids are the criterion ids. The map in `_selected_sources` from suite tests to `PERF-*` and `FAIR-*` results goes.
   - It no longer selects metrics by `threshold is not None`, applies no `accepted()`, no minimums of 20 or 5 and no "minimum of one" projection, and stops writing `acceptanceRole` (replaced by `details.role`).
   - It applies `METRIC_ALIASES` to headline names and multiclass `macro_recall`, and sets the article by criterion kind.
-- `engine/worker.py` `verify_result_bytes` keeps recomputing the projection (L509), which is now a pure copy.
+- `engine/worker.py` `verify_result_bytes` keeps recomputing the projection (L509 [L817]), which is now a pure copy.
 - `engine/tests/test_worker.py`:
-  - `hosted_request` uses minimums 2/2/2 on an 8-row CSV, and L209 sets `minimumGroupSize` 5. They are migrated to data that meets the floors.
+  - `hosted_request` uses minimums 2/2/2 on an 8-row CSV, and L209 [L454] sets `minimumGroupSize` 5. They are migrated to data that meets the floors.
   - `test_minimum_one_is_explicit_separate_projection` becomes a test that 1 is raised to 10 and both values are recorded.
   - The constant-target regression case becomes inconclusive (`degenerate_interval`, and below the minimum).
 - `schemas/generate-external-fixtures.py`:
