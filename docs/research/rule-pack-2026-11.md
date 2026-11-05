@@ -328,7 +328,7 @@ Separately, new Art 42(3), added by 2026/1744 Art 1(18), deems high-risk systems
 
 ## 9. Diff against the repository: changes #18 must make
 
-The baseline is `main@74c6463`. "Before 2 Dec" marks changes that should ship before the 2 December 2026 milestones. Basis ids refer to the JSON. The machine-readable list is `repositoryDiff`.
+The baseline is `main@b15f037`, which includes the Prettier reformat from #1; locate code by the quoted identifiers, not by line numbers. The four sources named in #8 are unchanged from `74c6463` (the only README change is outside the legal snapshot). "Before 2 Dec" marks changes that should ship before the 2 December 2026 milestones. Basis ids refer to the JSON. The machine-readable list is `repositoryDiff`.
 
 **`templates/catalog.json`**
 
@@ -395,7 +395,7 @@ The baseline is `main@74c6463`. "Before 2 Dec" marks changes that should ship be
 
 | ID | Location | Finding | Change | Before 2 Dec |
 |---|---|---|---|---|
-| RD-70 | `site-app/lib/store.ts`, default classification (`version:'02024R1689-20260727'`, `asOf:'2026-10-05'`) | Stale | Read from the catalog | Yes |
+| RD-70 | `site-app/lib/store.ts`, default classification (`version: "02024R1689-20260727"`, `asOf: "2026-10-05"`) | Stale | Read from the catalog | Yes |
 | RD-71 | `site-app/app/workspace.tsx`, "Applicable dates and legal sources" panel | Stale | Render from the catalog; add the 2 Dec 2026 milestones | Yes |
 | RD-72 | `templates/annex-iv-map.json`, source block (`researchedAsOf` 2026-10-05) | Stale | Update with the snapshot | |
 | RD-73 | Generated copies in `site-app/lib/` and `site-app/reference/` (byte-identical to the canonical files today) | Stale after #18 | Regenerate through the sync check | |
