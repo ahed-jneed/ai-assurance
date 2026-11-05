@@ -17,7 +17,7 @@ Set on 5 November 2026 for the current roadmap cycle. It distils the [product-di
 - **Rigour is becoming a buying criterion.** From 1 June 2026 AICPA peer review targets SOC 2 work and checks for identical risk assessments, sample sizes and test procedures across engagements. The research found the same pressure on the first EU DSA audits and on LL144 audits.
 - **Our base already fits:** engagement-scoped roles with separation of duties, diagnostic results kept apart from auditor conclusions, immutable snapshots, hash-chained events, content-addressed evidence, signed dossiers and an external worker ([codebase map](../engineering/codebase-map.md)).
 
-**What we sell first:** AI Act readiness built on an EN 18286 + ISO/IEC 42001 management-system assessment ([#28]), and LL144 bias audits ([#30]). Art 50 and GPAI reviews, AIUC-1 and SOC 2 + AI programmes, and a certification-body mode are on the Later list. Colorado SB 26-189 and CCPA ADMT audits, whose duties start on 1 January 2027 *(secondary)*, are not yet scheduled.
+**What we sell first:** AI Act readiness built on an EN 18286 + ISO/IEC 42001 management-system assessment ([#28]), and LL144 bias audits ([#30]). Art 50 and GPAI reviews, AIUC-1 and SOC 2 + AI programmes, and a certification-body mode are on the Later list. Colorado SB 26-189 and CCPA ADMT audits, whose duties start on 1 January 2027 *(secondary)*, are also on the Later list: they will be the first new packs once [#27] to [#30] land, after their law is verified.
 
 **Packaging:** per engagement or per practitioner seat, unlimited client users, SSO and MFA in every tier, no per-framework fees. Owner-side platforms are priced for enterprises; IBM's watsonx.governance Risk & Compliance edition starts at $3,500 a month.
 
@@ -26,15 +26,15 @@ Set on 5 November 2026 for the current roadmap cycle. It distils the [product-di
 | Differentiator | What it means | This cycle | Later |
 |---|---|---|---|
 | Engagement quality built in | Acceptance, independence and competence gates, an EQR, reports that conform to ISAE 3000 | [#20], [#23], [#24] | Review notes as records; anti-templating guardrails |
-| Statistically defensible testing | Intervals, exact tests and multiplicity control decide outcomes against thresholds fixed in advance | [#9], [#21], [#22], [#30] | Multiclass and regression fairness (not yet placed) |
+| Statistically defensible testing | Intervals, exact tests and multiplicity control decide outcomes against thresholds fixed in advance | [#9], [#21], [#22], [#30] | Multiclass and regression fairness; interval-based drift decisions |
 | Evidence others can re-check | Content-addressed evidence, hash-chained events, signed dossiers whose keys are never stored in plaintext | [#25] | Run attestations, re-performance packs, RFC 3161 timestamps, public report verification |
-| Tool-neutral evidence ingestion | Per-item records from any harness, graded L0 to L3 and recomputed, never executed | [#31], [#32], [#33] | Governance-platform importers; post-market evidence |
+| Tool-neutral evidence ingestion | Per-item records from any harness, graded L0 to L3 and recomputed, never executed | [#31], [#32], [#33] | Signed L3 re-runs; governance-platform importers; post-market evidence |
 | Versioned criteria across schemes | Every conclusion cites the law and standards versions it used; typed crosswalks never overstate coverage | [#8], [#18], [#19], [#26] to [#29] | GPAI/Art 50 and AIUC-1 packs |
 
 Two rules sit under all five:
 
 - **Correctness before breadth.** Current law ([#8], [#18]), reporting that conforms to assurance standards ([#20]), independence ([#23]) and statistics where the interval decides ([#9], [#21], [#22]) are P0.
-- **Identity is verified, never asserted.** [#11] replaces today's trust in upstream identity headers with a deny-by-default adapter, and [#12] closes the access-lifecycle gaps. Per-practice SSO and MFA, which the research says audit firms expect before a pilot, are not yet scheduled.
+- **Identity is verified, never asserted.** [#11] replaces today's trust in upstream identity headers with a deny-by-default adapter, and [#12] closes the access-lifecycle gaps. Per-practice SSO and MFA, which the research says audit firms expect before a pilot, are on the Later list; they will come through the hosting identity provider, with #11's adapter as the seam.
 
 ## 3. What we will not build
 
@@ -78,7 +78,7 @@ Two rules sit under all five:
 
 - **Law and standards.** Legal content stays unverified against primary sources until [#8] lands, and [#18] labels what needs qualified legal review. EUR-Lex refused automated fetching, so the Official Journal references (Regulation (EU) 2026/1744, Implementing Decision (EU) 2026/2274) rest on secondary sources, which disagree on the EN 18286 citation date (14 or 19 October 2026). No AI Act notified body could be verified in NANDO.
 - **Unconfirmed claims the design must not lean on:** the EEOC's rescission of its Uniform Guidelines' interpretive parts (the Justice Department's 9 June 2026 opinion against those guidelines is confirmed), and whether AIUC-1's "quarterly" means retests or revisions of the standard (plan for both). AIUC-1 content licensing is unconfirmed.
-- **Scope:** per-practice SSO and MFA, Colorado and CCPA ADMT audits, the Art 4a record and the rest of [Not yet placed](../../ROADMAP.md#not-yet-placed) need a decision.
+- **Scope, decided on 5 November 2026:** the Art 4a record is [#60]; per-practice SSO and MFA, and Colorado and CCPA ADMT audits, are on the Later list; the other items once listed as not yet placed are placed as [ROADMAP.md](../../ROADMAP.md#placed-on-5-nov-2026) shows.
 
 ## Sources and verification
 
@@ -115,9 +115,11 @@ Two rules sit under all five:
 [#24]: https://github.com/ahed-jneed/ai-assurance/issues/24
 [#25]: https://github.com/ahed-jneed/ai-assurance/issues/25
 [#26]: https://github.com/ahed-jneed/ai-assurance/issues/26
+[#27]: https://github.com/ahed-jneed/ai-assurance/issues/27
 [#28]: https://github.com/ahed-jneed/ai-assurance/issues/28
 [#29]: https://github.com/ahed-jneed/ai-assurance/issues/29
 [#30]: https://github.com/ahed-jneed/ai-assurance/issues/30
 [#31]: https://github.com/ahed-jneed/ai-assurance/issues/31
 [#32]: https://github.com/ahed-jneed/ai-assurance/issues/32
 [#33]: https://github.com/ahed-jneed/ai-assurance/issues/33
+[#60]: https://github.com/ahed-jneed/ai-assurance/issues/60
