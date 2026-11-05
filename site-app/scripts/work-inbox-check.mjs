@@ -157,21 +157,21 @@ assert.equal(new Date(reminderResumeAt(new Date(2026, 9, 9, 23, 59))).getHours()
 console.log('PASS local day boundaries and tomorrow-at-08:00 reminders across spring/fall daylight saving');
 
 const workflowStateURL = asURL(await compiled('lib/workflow-state.ts'));
-const domainURL = asURL((await compiled('lib/domain.ts')).replace("from './workflow-state'", 'from ' + JSON.stringify(workflowStateURL)));
-const paperWorkflowURL = asURL((await compiled('lib/paper-workflow.ts')).replace("from './domain'", 'from ' + JSON.stringify(domainURL)));
+const domainURL = asURL((await compiled('lib/domain.ts')).replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowStateURL)));
+const paperWorkflowURL = asURL((await compiled('lib/paper-workflow.ts')).replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL)));
 const auditorWorkflowURL = asURL((await compiled('lib/auditor-workflow.ts'))
-  .replace("from './domain'", 'from ' + JSON.stringify(domainURL))
-  .replace("from './paper-workflow'", 'from ' + JSON.stringify(paperWorkflowURL)));
+  .replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL))
+  .replace(/from (['"])\.\/paper-workflow\1/, 'from ' + JSON.stringify(paperWorkflowURL)));
 const paperPresentationURL = asURL((await compiled('lib/paper-presentation.ts'))
-  .replace("from './domain'", 'from ' + JSON.stringify(domainURL))
-  .replace("from './paper-workflow'", 'from ' + JSON.stringify(paperWorkflowURL))
-  .replace("from './workflow-state'", 'from ' + JSON.stringify(workflowStateURL)));
+  .replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL))
+  .replace(/from (['"])\.\/paper-workflow\1/, 'from ' + JSON.stringify(paperWorkflowURL))
+  .replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowStateURL)));
 const workItemsURL = asURL((await compiled('lib/work-items.ts'))
-  .replace("from './workflow-state'", 'from ' + JSON.stringify(workflowStateURL))
-  .replace("from './auditor-workflow'", 'from ' + JSON.stringify(auditorWorkflowURL))
-  .replace("from './paper-workflow'", 'from ' + JSON.stringify(paperWorkflowURL))
-  .replace("from './paper-presentation'", 'from ' + JSON.stringify(paperPresentationURL))
-  .replace("from './work-inbox'", 'from ' + JSON.stringify(inboxURL)));
+  .replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowStateURL))
+  .replace(/from (['"])\.\/auditor-workflow\1/, 'from ' + JSON.stringify(auditorWorkflowURL))
+  .replace(/from (['"])\.\/paper-workflow\1/, 'from ' + JSON.stringify(paperWorkflowURL))
+  .replace(/from (['"])\.\/paper-presentation\1/, 'from ' + JSON.stringify(paperPresentationURL))
+  .replace(/from (['"])\.\/work-inbox\1/, 'from ' + JSON.stringify(inboxURL)));
 const { engagementWork } = await import(workItemsURL);
 const engagement = {
   id: 'ENG-release', title: 'Release review', stage: 'Reporting', dueDate: '2026-10-20',

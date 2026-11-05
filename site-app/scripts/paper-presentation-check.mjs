@@ -10,17 +10,17 @@ const asURL = js => 'data:text/javascript;base64,' + Buffer.from(js, 'utf8').toS
 // with the independent-review and current-execution rules used elsewhere.
 const workflowURL = asURL(await compiled('lib/workflow-state.ts'));
 const domainURL = asURL((await compiled('lib/domain.ts'))
-  .replace("from './workflow-state'", 'from ' + JSON.stringify(workflowURL)));
+  .replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowURL)));
 const paperWorkflowURL = asURL((await compiled('lib/paper-workflow.ts'))
-  .replace("from './domain'", 'from ' + JSON.stringify(domainURL)));
+  .replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL)));
 const { paperNextAction } = await import(paperWorkflowURL);
 const {
   defaultPaperQuery, normalizePaperQuery, readPaperQuery, paperQueryParams, paperSavedFilter, readPaperSavedFilter,
   paperTargets, paperViews, localToday, paperDateLabel, paperProcedureSection, paperRegisterRow, selectPaperRegister,
 } = await import(asURL((await compiled('lib/paper-presentation.ts'))
-  .replace("from './domain'", 'from ' + JSON.stringify(domainURL))
-  .replace("from './paper-workflow'", 'from ' + JSON.stringify(paperWorkflowURL))
-  .replace("from './workflow-state'", 'from ' + JSON.stringify(workflowURL))));
+  .replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL))
+  .replace(/from (['"])\.\/paper-workflow\1/, 'from ' + JSON.stringify(paperWorkflowURL))
+  .replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowURL))));
 
 const at = '2026-10-10T12:00:00.000Z';
 const freeze = value => {
