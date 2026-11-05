@@ -256,9 +256,12 @@ describe("legacy engagements (no structured workflow)", () => {
 
   it("gates Fieldwork on the classification and every Planning paper", () => {
     const gates = stageGates(fresh(), "Fieldwork");
+    const planningPapers = catalog.items.filter(
+      (t) => t.kind === "working_paper" && t.stage === "Planning",
+    ).length;
     expect(gates.map((g) => g.kind)).toEqual([
       "classification",
-      ...Array(7).fill("paper"),
+      ...Array(planningPapers).fill("paper"),
     ]);
     expect(gates[0].title).toBe("Assess and approve classification");
     expect(new Set(gates.map((g) => g.message))).toEqual(

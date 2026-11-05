@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
+import catalog from "../catalog.json";
 import type { Engagement } from "../domain";
 import type { Procedure, ProcedurePlan } from "../workflow-types";
 import {
@@ -86,7 +87,9 @@ describe("adoptWorkflow", () => {
       },
     });
     expect(w.brief).toBeUndefined();
-    expect(w.procedures).toHaveLength(33);
+    expect(w.procedures.map((p) => p.templateId)).toEqual(
+      catalog.items.filter((t) => t.kind === "working_paper").map((t) => t.id),
+    );
     expect(procedureOf(e, "PROC-WP-PL-01").paperId).toBe(planningPaper.id);
     expect(procedureOf(e, procedureId).paperId).toBe(dataPaper.id);
     expect(procedureOf(e, "PROC-WP-A12-01").paperId).toBeUndefined();
@@ -600,6 +603,12 @@ describe("bulk planning", () => {
 describe("program scoping", () => {
   it("records applicability decisions and fills a missing criterion", async () => {
     const e = structuredEngagement();
+    // The seed copies each criterion from the template's regulatory
+    // references. WP-PL-01 cites none; WP-A10-01 does.
+    const { objective, criterion } = procedureOf(e, "PROC-WP-PL-01");
+    const cited = procedureOf(e, procedureId).criterion;
+    expect(criterion).toBe("");
+    expect(cited).not.toBe("");
     expect(
       await command(
         e,
@@ -619,12 +628,11 @@ describe("program scoping", () => {
       applicability: "applicable",
       rationale: "Within the agreed scope",
       periodAnalysis: "Covers the whole period",
-      criterion:
-        "Approved engagement methodology: Establish a defensible engagement mandate, competence and independence.",
+      criterion: "Approved engagement methodology: " + objective,
       revision: 2,
       contributors: ["lead", "auditor"],
     });
-    expect(procedureOf(e, procedureId).criterion).toBe("Art.10; Art.4a");
+    expect(procedureOf(e, procedureId).criterion).toBe(cited);
     expect(workflowOf(e).program.revision).toBe(2);
   });
 
@@ -730,7 +738,10 @@ describe("program submission", () => {
 
   it("rechecks reviewer independence at submission", async () => {
     // A Lead who names themselves reviewer while editing the plan becomes
-    // one of its contributors.
+    // one of its contributors. saveProcedurePlan accepts this today: it
+    // checks independence before it adds the editor to the contributors, so
+    // only submission rejects it. Update this test once saveProcedurePlan
+    // rejects self-review.
     await expectFailure(
       submit(await prepared({ reviewerId: "second-lead" }, "second-lead")),
       400,
@@ -789,21 +800,25 @@ describe("program approval", () => {
   });
 
   it("refuses a program bound to a scope that is no longer approved", async () => {
-    const e = structuredEngagement();
-    await approveScope(e);
-    await planProgram(e);
-    await command(e, "submitProgram", {}, "auditor");
-    workflowOf(e).brief!.status = "submitted";
-    await expectFailure(
-      command(
-        e,
-        "approveProgram",
-        { revision: 3, reason: "Agreed" },
-        "reviewer",
-      ),
-      409,
-      "Review the current submitted program against approved scope",
-    );
+    // Commands cannot reach these states, since a scope change redrafts the
+    // program; approval still checks the scope the program binds.
+    for (const change of [{ status: "submitted" as const }, { revision: 2 }]) {
+      const e = structuredEngagement();
+      await approveScope(e);
+      await planProgram(e);
+      await command(e, "submitProgram", {}, "auditor");
+      Object.assign(workflowOf(e).brief!, change);
+      await expectFailure(
+        command(
+          e,
+          "approveProgram",
+          { revision: 3, reason: "Agreed" },
+          "reviewer",
+        ),
+        409,
+        "Review the current submitted program against approved scope",
+      );
+    }
   });
 
   it("returns a submitted program without making the reviewer a preparer", async () => {
