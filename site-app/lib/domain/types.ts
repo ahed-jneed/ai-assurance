@@ -1,0 +1,325 @@
+// The engagement record model: the records an engagement holds and the
+// roles people act in.
+import type { PortalRequest, Release, Workflow } from "../workflow-types";
+import type { Classification } from "./classification";
+export type Role =
+  | "Auditor"
+  | "Lead Auditor"
+  | "Client Viewer"
+  | "Client Contributor"
+  | "Reviewer";
+export const roles: Role[] = [
+  "Auditor",
+  "Lead Auditor",
+  "Client Viewer",
+  "Client Contributor",
+  "Reviewer",
+];
+export function canWrite(role: Role) {
+  return role === "Auditor" || role === "Lead Auditor";
+}
+export type Outcome = "pass" | "fail" | "inconclusive" | "not_applicable";
+export type Paper = {
+  id: string;
+  templateId: string;
+  title: string;
+  kind: string;
+  stage: string;
+  articleRefs: string[];
+  required: boolean;
+  revision: number;
+  authorId: string;
+  contributors: string[];
+  updatedAt: string;
+  status: "draft" | "in_review" | "reviewed" | "signed";
+  plannedGuidance?: string;
+  body: Record<string, string>;
+  evidenceIds: string[];
+  runIds: string[];
+  comments: {
+    id: string;
+    authorId: string;
+    text: string;
+    resolved: boolean;
+    createdAt: string;
+    responses?: { actor: string; at: string; text: string }[];
+    resolvedAt?: string;
+  }[];
+  reviews: { userId: string; revision: number; at: string }[];
+  signatures: { userId: string; revision: number; at: string; hash: string }[];
+  history: {
+    revision: number;
+    body: Record<string, string>;
+    authorId: string;
+    at: string;
+    evidenceIds: string[];
+    runIds: string[];
+    reviews: Paper["reviews"];
+    signatures: Paper["signatures"];
+    contributors: string[];
+  }[];
+};
+export type Artifact = {
+  id: string;
+  name: string;
+  category: string;
+  size: number;
+  sha256: string;
+  key: string;
+  createdAt: string;
+  uploadedBy: string;
+  visibility: "internal" | "client";
+  status: "unverified" | "accepted" | "quarantined";
+  mediaType: string;
+};
+export type EvidenceRequest = {
+  id: string;
+  subject: string;
+  description: string;
+  responsibleParty: string;
+  periodVersion: string;
+  handling: string;
+  dueDate: string;
+  paperIds: string[];
+  evidenceIds: string[];
+  required: boolean;
+  status: "open" | "submitted" | "accepted" | "returned" | "waived";
+  response: string;
+  assessment: string;
+  disposition?: "sufficient" | "unobtainable" | "no_longer_required";
+  limitationPaperId?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  revision: number;
+  deliveryComplete?: boolean;
+  remainingItems?: string;
+  history: Omit<EvidenceRequest, "history">[];
+};
+export type ModelCard = {
+  schemaVersion: "1.0";
+  owner: string;
+  framework: string;
+  license: string;
+  population: string;
+  outOfScope: string;
+  limitations: string;
+  inputSchema: string;
+  outputSemantics: string;
+  preprocessing: string;
+  source: {
+    kind: "internal" | "huggingface";
+    repoId: string;
+    revision: string;
+    filename: string;
+  };
+};
+export type Model = {
+  id: string;
+  name: string;
+  version: string;
+  format: string;
+  task: string;
+  intendedPurpose: string;
+  artifactId: string;
+  status: "registered" | "quarantined";
+  familyId?: string;
+  card?: ModelCard;
+  sourceSha256?: string;
+  registeredAt?: string;
+  registeredBy?: string;
+};
+export type EvaluationConfig = {
+  labelColumn: string;
+  predictionColumn: string;
+  groupColumn: string;
+  positiveLabel: string;
+  minimumGroupSize: number;
+  maximumParityGap: number;
+  minimumImpactRatio: number;
+  minimumAccuracy: number;
+  minimumSampleSize?: number;
+  minimumClassCount?: number;
+  maximumOddsGap?: number;
+  minimumRecall?: number;
+  minimumMacroF1?: number;
+  maximumRmse?: number;
+};
+export type EvaluationProfile = {
+  id: string;
+  schemaVersion: "1.0";
+  name: string;
+  version: string;
+  task: string;
+  suite: string[];
+  config: EvaluationConfig;
+  datasetContext: {
+    split: "test" | "validation" | "training" | "unknown";
+    population: string;
+    predictionProvenance: string;
+    independence: string;
+    sensitiveDataBasis: string;
+  };
+  rationale: string;
+  createdAt: string;
+  createdBy: string;
+};
+export type Finding = {
+  id: string;
+  title: string;
+  article: string;
+  condition: string;
+  criteria: string;
+  cause: string;
+  effect: string;
+  likelihood: number;
+  impact: number;
+  riskScore: number;
+  severity: string;
+  status: "open" | "in_progress" | "ready_for_retest" | "closed";
+  owner: string;
+  dueDate: string;
+  response: string;
+  remediation: string;
+  retestEvidenceIds: string[];
+  closedBy?: string;
+  createdBy: string;
+  remediationBy?: string;
+  remediationAt?: string;
+  support?: {
+    findingId: string;
+    procedureId: string;
+    paperIds: string[];
+    evidenceIds: string[];
+    runIds: string[];
+    actor: string;
+    at: string;
+  };
+  retest?: {
+    performed: string;
+    results: string;
+    rationale: string;
+    conclusion: "effective" | "not_effective";
+    evidenceIds: string[];
+    actor: string;
+    at: string;
+  };
+  closureHistory?: {
+    at: string;
+    actor: string;
+    reason: string;
+    retest?: Finding["retest"];
+    closedBy?: string;
+  }[];
+  visibility: "internal" | "client";
+};
+export type Metric = {
+  name: string;
+  value: number | null;
+  unit: string;
+  sampleSize: number;
+  details?: unknown;
+};
+export type Result = {
+  testId: string;
+  label: string;
+  article: string;
+  outcome: Outcome;
+  metrics: Metric[];
+  limitations: string[];
+};
+export type Run = {
+  externalJobId?: string;
+  retryOf?: string;
+  procedureBinding?: {
+    procedureId: string;
+    procedureRevision: number;
+    briefRevision: number;
+    programRevision: number;
+  };
+  contractVersion: "1.0" | "1.1" | "1.2";
+  id: string;
+  engagementId: string;
+  modelId: string;
+  datasetId: string;
+  suite: string[];
+  seed: number;
+  thresholds: Record<string, unknown>;
+  state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  outcome: Outcome | null;
+  overallOutcome?: Outcome;
+  results: Result[];
+  paperIds: string[];
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+  provenance: {
+    inputHashes: Record<string, string>;
+    runnerVersion: string;
+    policyVersion: string;
+  };
+  config: EvaluationConfig;
+  task?: string;
+  profileId?: string;
+  manifest?: {
+    schemaVersion: "1.0";
+    model: Model;
+    dataset: {
+      id: string;
+      name: string;
+      sha256: string;
+      size: number;
+      rowCount: number;
+      columns: string[];
+      cardPin?: {
+        recordId: string;
+        sha256: string;
+        card: Record<string, unknown>;
+      };
+    };
+    profile: EvaluationProfile | null;
+    executionMode:
+      | "saved_predictions"
+      | "provided_predictions"
+      | "auditor_model"
+      | "client_local";
+    lineage:
+      "registered_prediction_artifact" | "authenticated_external_attempt";
+    testDefinitionVersion: string;
+    limitations: string[];
+  };
+};
+export type Report = {
+  id: string;
+  kind: "draft" | "final";
+  createdAt: string;
+  actor: string;
+  sha256: string;
+  snapshot: Record<string, unknown>;
+  clientSnapshot?: Record<string, unknown>;
+  clientSha256?: string;
+  release?: Release;
+};
+export type Engagement = {
+  workflow?: Workflow;
+  portalRequests?: PortalRequest[];
+  id: string;
+  clientId: string;
+  title: string;
+  stage: string;
+  dueDate: string;
+  version: number;
+  classification: Classification;
+  papers: Paper[];
+  artifacts: Artifact[];
+  evidenceRequests?: EvidenceRequest[];
+  models: Model[];
+  evaluationProfiles?: EvaluationProfile[];
+  findings: Finding[];
+  runs: Run[];
+  reports: Report[];
+  eventHead: string;
+  createdAt: string;
+};

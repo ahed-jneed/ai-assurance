@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 
 const compiled = async (file) =>
   ts.transpileModule(await fs.readFile(file, "utf8"), {
@@ -439,12 +440,7 @@ console.log(
 );
 
 const workflowStateURL = asURL(await compiled("lib/workflow-state.ts"));
-const domainURL = asURL(
-  (await compiled("lib/domain.ts")).replace(
-    /from (['"])\.\/workflow-state\1/,
-    "from " + JSON.stringify(workflowStateURL),
-  ),
-);
+const domainURL = await sourceURL("lib/domain.ts");
 const paperWorkflowURL = asURL(
   (await compiled("lib/paper-workflow.ts")).replace(
     /from (['"])\.\/domain\1/,
