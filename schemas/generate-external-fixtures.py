@@ -103,6 +103,7 @@ def main(argv=None):
             fixtures.append({'fixture': name, 'requestJSON': request_text, 'resultJSON': result_text,
                 'run': project(request, packet, request_text, result_text)})
     # newline='\n' keeps the output LF on Windows too, so it matches Git and the runtime zip.
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(fixtures, indent=2, ensure_ascii=False)+'\n', encoding='utf-8', newline='\n')
     print('Created', len(fixtures), 'synthetic external fixtures in', output)
 
