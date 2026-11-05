@@ -61,14 +61,23 @@ export default defineConfig(async ({ command }) => {
   // IDENTITY_MODE names one: the development server uses the loopback persona
   // mock, the Sites build (a checkout with .openai/hosting.json) trusts Sites
   // dispatch, and any other build answers 401 until the deployment sets it.
+  // The Sites build also compiles `sites` in as the default for an unset
+  // IDENTITY_MODE, in case the Sites publisher does not apply the vars of
+  // dist/server/wrangler.json. An explicit IDENTITY_MODE still wins.
   const mockAuth = command === "serve" && !managedLinux;
+  const sitesBuild = command === "build" && sitesProject;
   const identityVars: Record<string, string> = mockAuth
     ? { IDENTITY_MODE: "dev" }
-    : command === "build" && sitesProject
+    : sitesBuild
       ? { IDENTITY_MODE: "sites" }
       : {};
 
   return {
+    define: {
+      __SITES_IDENTITY_DEFAULT__: sitesBuild
+        ? JSON.stringify("sites")
+        : "undefined",
+    },
     build: {
       // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
       // load, so it made `npm run build` output non-deterministic.

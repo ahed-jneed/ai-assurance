@@ -8,6 +8,9 @@ import {
   runWithIdentity,
 } from "../lib/identity";
 
+/** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
+declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
+
 export default {
   async fetch(
     request: Request,
@@ -38,13 +41,19 @@ export default {
       };
     }
     // The identity is settled before the app sees the request: IDENTITY_MODE
-    // picks the one trusted credential, and the oai-* headers are removed
-    // unless Sites dispatch set them (docs/security/identity.md). The `dev`
-    // mode exists only on the development server.
-    const identity = identityConfig(env, { devServer: import.meta.env.DEV });
-    const route = authRoute(request, identity);
+    // picks the one trusted credential (while it is unset, the Sites build
+    // uses `sites`), and the oai-* headers are removed unless Sites dispatch
+    // set them (docs/security/identity.md). The `dev` mode exists only on the
+    // development server. The sign-in routes are answered after
+    // authentication: behind Cloudflare Access, sign-in returns only a
+    // verified caller to the page.
+    const config = identityConfig(env, {
+      devServer: import.meta.env.DEV,
+      defaultMode: __SITES_IDENTITY_DEFAULT__,
+    });
+    const caller = await authenticate(request, config);
+    const route = authRoute(request, config, caller.identity);
     if (route) return route;
-    const caller = await authenticate(request, identity);
     return runWithIdentity(caller.identity, () =>
       runWithConnectorBinding(binding, () =>
         handler.fetch(caller.request, env, ctx),

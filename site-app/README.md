@@ -76,7 +76,7 @@ Use these helpers when the site needs optional or required sign-in:
 - Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out, normally the current location so that deep links survive. The helpers validate and safely encode it.
 - Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Outside Sites, the development server answers them in `dev` mode and the Worker entry answers them in the other modes: in `cloudflare-access` mode they redirect to the return path and to `/cdn-cgi/access/logout`; without an interactive sign-in they answer 401. Routes that do not call the helpers remain anonymous-compatible.
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Outside Sites, the development server answers them in `dev` mode and the Worker entry answers them in the other modes: in `cloudflare-access` mode sign-in returns to the return path once Access has authenticated the request (401 otherwise) and sign-out redirects to `/cdn-cgi/access/logout`; without an interactive sign-in they answer 401. Routes that do not call the helpers remain anonymous-compatible.
 
 SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
 

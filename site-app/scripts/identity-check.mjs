@@ -2,12 +2,15 @@
 // credential each IDENTITY_MODE trusts, that forged oai-* headers are refused
 // in every mode except sites, Cloudflare Access tokens checked against a stub
 // key set (no network), and that the development personas never reach a build.
-// Needs `npm run build` first.
+// Needs `npm run build` first. A Sites checkout (one with .openai/hosting.json)
+// builds a Worker that defaults to sites mode, which the checks expect there.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
+
+const sitesCheckout = existsSync(".openai/hosting.json");
 
 const modules = [
   "index.js",
@@ -78,8 +81,11 @@ async function refused(call, headers, url = local + "/api/workspace") {
 }
 
 // --- No identity is trusted unless a mode is configured ---------------------
+// The Sites build trusts dispatch headers while IDENTITY_MODE is unset (next
+// section); every explicit setting below still wins over that default.
 for (const [label, bindings] of [
-  ["no IDENTITY_MODE", {}],
+  ...(sitesCheckout ? [] : [["no IDENTITY_MODE", {}]]),
+  ["an empty IDENTITY_MODE", { IDENTITY_MODE: "" }],
   ["an unknown IDENTITY_MODE", { IDENTITY_MODE: "SITES" }],
   ["IDENTITY_MODE=dev in a build", { IDENTITY_MODE: "dev" }],
   ["trusted-headers without the opt-in", { IDENTITY_MODE: "trusted-headers" }],
@@ -105,8 +111,25 @@ for (const [label, bindings] of [
     assert.equal(signIn.status, 401, label);
   });
 console.log(
-  "PASS forged identity headers are refused with no, unknown, dev or incomplete identity configuration",
+  sitesCheckout
+    ? "PASS forged identity headers are refused with an empty, unknown, dev or incomplete IDENTITY_MODE, over the Sites build default"
+    : "PASS forged identity headers are refused with no, empty, unknown, dev or incomplete identity configuration",
 );
+
+// --- The Sites build defaults to sites while IDENTITY_MODE is unset ----------
+// The default is compiled in, so the Site does not depend on the publisher
+// applying the vars of dist/server/wrangler.json. Any other build has no
+// default ("no IDENTITY_MODE" above).
+if (sitesCheckout) {
+  await withWorker({}, async (call) => {
+    const ok = await call("https://site.example/api/workspace", forged);
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.identity.id, "forged-admin");
+  });
+  console.log(
+    "PASS the Sites build trusts dispatch headers while IDENTITY_MODE is unset",
+  );
+}
 
 // --- trusted-headers: explicit opt-in, loopback requests only ----------------
 await withWorker(trusted, async (call) => {
@@ -251,8 +274,41 @@ await withWorker(
       app +
         "/signin-with-chatgpt?return_to=" +
         encodeURIComponent("/?view=Findings"),
+      { "Cf-Access-Jwt-Assertion": await accessToken() },
     );
+    assert.equal(into.status, 302);
     assert.equal(into.headers.get("location"), "/?view=Findings");
+    // A request that bypassed or failed Access (no token, or a rejected one)
+    // gets 401 at sign-in instead of a redirect back to the page that sent it
+    // there, which would loop: /report -> sign-in -> /report -> ...
+    const page = await call(app + "/report?reportId=RPT-1");
+    assert.equal(page.status, 307, "an anonymous report is sent to sign-in");
+    const hop = new URL(page.headers.get("location"), app);
+    assert.equal(
+      hop.pathname + hop.search,
+      "/signin-with-chatgpt?return_to=" +
+        encodeURIComponent("/report?reportId=RPT-1"),
+    );
+    for (const [label, headers] of [
+      ["no token", {}],
+      [
+        "a rejected token",
+        {
+          "Cf-Access-Jwt-Assertion": await accessToken({
+            aud: ["another-app"],
+          }),
+        },
+      ],
+    ]) {
+      const back = await call(hop.href, headers);
+      assert.equal(back.status, 401, label);
+      assert.equal(back.headers.get("location"), null, label);
+      assert.equal(
+        back.body,
+        "Cloudflare Access did not authenticate this request.",
+        label,
+      );
+    }
     // The runner keeps its own bearer-token authentication.
     const runner = await call(app + "/api/runner?jobId=x", {
       Authorization: "Bearer " + "r".repeat(64),
@@ -274,6 +330,9 @@ assert.deepEqual(
 console.log(
   "PASS cloudflare-access verifies RS256 tokens and refuses forged headers, wrong audience or issuer, expiry, unknown keys, bad signatures, alg none and HS256",
 );
+console.log(
+  "PASS cloudflare-access sign-in returns only a verified caller, so an unauthenticated /report does not loop",
+);
 
 // --- The build: identity configuration and no development personas ----------
 const wrangler = JSON.parse(
@@ -281,9 +340,16 @@ const wrangler = JSON.parse(
 );
 assert.equal(
   wrangler.vars?.IDENTITY_MODE,
-  existsSync(".openai/hosting.json") ? "sites" : undefined,
+  sitesCheckout ? "sites" : undefined,
   "only the Sites build (a checkout with .openai/hosting.json) trusts dispatch headers",
 );
+for (const file of modules) {
+  const text = await fs.readFile(path.join("dist/server", file), "utf8");
+  assert(
+    !text.includes("__SITES_IDENTITY_DEFAULT__"),
+    `dist/server/${file} still references __SITES_IDENTITY_DEFAULT__, which vite.config.ts defines`,
+  );
+}
 const personas = JSON.parse(
   await fs.readFile("fixtures/dev-personas.json", "utf8"),
 );

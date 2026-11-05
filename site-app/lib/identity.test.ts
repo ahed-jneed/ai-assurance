@@ -15,6 +15,7 @@ import {
   identityConfig,
   runWithIdentity,
   TRUSTED_HEADERS_OPT_IN,
+  type Identity,
   type IdentityConfig,
   type IdentitySettings,
 } from "@/lib/identity";
@@ -106,6 +107,23 @@ describe("identityConfig", () => {
     expect(config({ ...access, CF_ACCESS_AUD: " , " })).toMatchObject({
       mode: "none",
     });
+  });
+
+  it("uses the Sites build default only while IDENTITY_MODE is unset", () => {
+    const sitesBuild = (settings: IdentitySettings) =>
+      identityConfig(settings, { devServer: false, defaultMode: "sites" });
+    expect(sitesBuild({})).toEqual({ mode: "sites" });
+    expect(sitesBuild(access)).toEqual(config(access));
+    for (const mode of [
+      "",
+      "SITES",
+      "dev",
+      "trusted-headers",
+      "cloudflare-access",
+    ])
+      expect(sitesBuild({ IDENTITY_MODE: mode })).toMatchObject({
+        mode: "none",
+      });
   });
 });
 
@@ -351,34 +369,73 @@ describe("cloudflare-access mode", () => {
       ),
     ).toHaveLength(1);
   });
+
+  it("returns only a verified caller from sign-in to the page", async () => {
+    const signIn =
+      "https://audit.example.com/signin-with-chatgpt?return_to=%2Freport";
+    for (const [headers, status] of [
+      [{ "Cf-Access-Jwt-Assertion": await jwt(claims()) }, 302],
+      [
+        {
+          "Cf-Access-Jwt-Assertion": await jwt(claims({ aud: ["other-app"] })),
+        },
+        401,
+      ],
+      [{}, 401],
+    ] as const) {
+      const caller = await authenticate(
+        request(signIn, headers),
+        config(access),
+      );
+      const route = authRoute(caller.request, config(access), caller.identity)!;
+      expect(route.status).toBe(status);
+      expect(route.headers.get("location")).toBe(
+        status === 302 ? "/report" : null,
+      );
+    }
+  });
 });
 
 describe("authRoute", () => {
   const signIn =
     "http://127.0.0.1:5173/signin-with-chatgpt?return_to=%2F%3Fview%3DFindings";
   const signOut = "http://127.0.0.1:5173/signout-with-chatgpt?return_to=%2F";
+  const lea: Identity = {
+    userId: "access-user-1",
+    email: "lea@practice.example",
+    displayName: "Lea Lead",
+    fullName: "Lea Lead",
+  };
 
   it("leaves the reserved routes to Sites dispatch and the development server", () => {
     expect(
-      authRoute(new Request(signIn), config({ IDENTITY_MODE: "sites" })),
+      authRoute(new Request(signIn), config({ IDENTITY_MODE: "sites" }), null),
     ).toBeNull();
     expect(
-      authRoute(new Request(signIn), config({ IDENTITY_MODE: "dev" }, true)),
+      authRoute(
+        new Request(signIn),
+        config({ IDENTITY_MODE: "dev" }, true),
+        null,
+      ),
     ).toBeNull();
     expect(
-      authRoute(new Request("http://127.0.0.1:5173/api/workspace"), config({})),
+      authRoute(
+        new Request("http://127.0.0.1:5173/api/workspace"),
+        config({}),
+        null,
+      ),
     ).toBeNull();
   });
 
   it("maps sign-in and sign-out onto Cloudflare Access", () => {
     const mode = config(access);
-    const out = authRoute(new Request(signOut), mode)!;
+    const out = authRoute(new Request(signOut), mode, null)!;
     expect(out.status).toBe(302);
     expect(out.headers.get("location")).toBe("/cdn-cgi/access/logout");
     expect(
-      authRoute(new Request(signOut, { method: "POST" }), mode)!.status,
+      authRoute(new Request(signOut, { method: "POST" }), mode, lea)!.status,
     ).toBe(303);
-    const into = authRoute(new Request(signIn), mode)!;
+    const into = authRoute(new Request(signIn), mode, lea)!;
     expect(into.status).toBe(302);
     expect(into.headers.get("location")).toBe("/?view=Findings");
     expect(
@@ -387,17 +444,42 @@ describe("authRoute", () => {
           "http://127.0.0.1:5173/signin-with-chatgpt?return_to=//evil.example",
         ),
         mode,
+        lea,
       )!.headers.get("location"),
     ).toBe("/");
     expect(
-      authRoute(new Request(signIn, { method: "PUT" }), mode)!.status,
+      authRoute(new Request(signIn, { method: "PUT" }), mode, lea)!.status,
     ).toBe(405);
+  });
+
+  it("refuses sign-in that Cloudflare Access did not authenticate, instead of returning to the page", async () => {
+    const refused = authRoute(
+      new Request(
+        "https://assurance.example.workers.dev/signin-with-chatgpt?return_to=%2Freport",
+      ),
+      config(access),
+      null,
+    )!;
+    expect(refused.status).toBe(401);
+    expect(refused.headers.get("location")).toBeNull();
+    expect(await refused.text()).toBe(
+      "Cloudflare Access did not authenticate this request.",
+    );
+    expect(warn).toHaveBeenCalledWith(
+      "Identity: sign-in on assurance.example.workers.dev has no verified Cloudflare Access token; check that Access covers this hostname",
+    );
   });
 
   it("answers 401 where there is no interactive sign-in", () => {
     for (const mode of [config({}), config(trusted)]) {
-      expect(authRoute(new Request(signIn), mode)!.status).toBe(401);
-      expect(authRoute(new Request(signOut), mode)!.status).toBe(401);
+      for (const identity of [null, lea]) {
+        expect(authRoute(new Request(signIn), mode, identity)!.status).toBe(
+          401,
+        );
+        expect(authRoute(new Request(signOut), mode, identity)!.status).toBe(
+          401,
+        );
+      }
     }
   });
 });

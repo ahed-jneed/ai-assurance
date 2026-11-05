@@ -47,12 +47,15 @@ export const TRUSTED_HEADERS_OPT_IN = "loopback-tests";
 /**
  * The identity mode the Worker variables select. A mode that is not fully
  * configured, or not allowed here, selects nothing and names the problem.
+ * `defaultMode` applies only while IDENTITY_MODE is unset: the Sites build
+ * compiles in "sites" (vite.config.ts), so the Site does not depend on its
+ * publisher applying the Worker variables. An explicit IDENTITY_MODE wins.
  */
 export function identityConfig(
   settings: IdentitySettings,
-  { devServer }: { devServer: boolean },
+  { devServer, defaultMode }: { devServer: boolean; defaultMode?: "sites" },
 ): IdentityConfig {
-  const mode = settings.IDENTITY_MODE ?? "";
+  const mode = settings.IDENTITY_MODE ?? defaultMode ?? "";
   switch (mode) {
     case "":
       return {
@@ -211,7 +214,9 @@ const loopbackAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 /**
  * Whether the request was addressed to and came from this machine. On
  * Cloudflare the edge sets CF-Connecting-IP to the real client and routes only
- * the Worker's own hostnames, so neither check passes there.
+ * the Worker's own hostnames, so neither check passes there. In a local
+ * runtime both headers come from the client or the local proxy, so there only
+ * the listener's bind address keeps other machines out.
  */
 function isLoopback(request: Request): boolean {
   const host = new URL(request.url).hostname.replace(/^\[|\]$/g, "");
@@ -234,13 +239,19 @@ function withoutDispatchHeaders(request: Request): Request {
 
 /**
  * The reserved sign-in routes in modes that have no dispatch or development
- * server to answer them: Cloudflare Access signs in on the way to the page and
- * signs out at its own logout URL; without an interactive sign-in they are 401.
- * Returns null where the app should handle the request.
+ * server to answer them, given the identity authenticate() resolved. Behind
+ * Cloudflare Access, which signs in on the way to the page, sign-in returns a
+ * verified caller to the page and sign-out leaves through the Access logout
+ * URL. A sign-in without a verified identity bypassed or failed Access (a
+ * hostname Access does not cover, a wrong audience or team, no signing keys);
+ * returning it to the page would loop back to sign-in, so it is 401. Without
+ * an interactive sign-in the routes are 401. Returns null where the app
+ * should handle the request.
  */
 export function authRoute(
   request: Request,
   config: IdentityConfig,
+  identity: Identity | null,
 ): Response | null {
   const url = new URL(request.url);
   const signIn = url.pathname === SIGN_IN_PATH,
@@ -256,7 +267,7 @@ export function authRoute(
       status: 405,
       headers: { ...headers, Allow: signIn ? "GET, HEAD" : "GET, HEAD, POST" },
     });
-  if (config.mode === "cloudflare-access")
+  if (config.mode === "cloudflare-access" && (signOut || identity))
     return new Response(null, {
       status: request.method === "POST" ? 303 : 302,
       headers: {
@@ -266,10 +277,18 @@ export function authRoute(
           : safeReturnPath(url.searchParams.get("return_to")),
       },
     });
+  if (config.mode === "cloudflare-access")
+    report(
+      "sign-in on " +
+        url.hostname +
+        " has no verified Cloudflare Access token; check that Access covers this hostname",
+    );
   return new Response(
-    config.mode === "trusted-headers"
-      ? "The test client sends the identity in trusted-headers mode."
-      : "Sign-in is not configured for this deployment.",
+    config.mode === "cloudflare-access"
+      ? "Cloudflare Access did not authenticate this request."
+      : config.mode === "trusted-headers"
+        ? "The test client sends the identity in trusted-headers mode."
+        : "Sign-in is not configured for this deployment.",
     {
       status: 401,
       headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
