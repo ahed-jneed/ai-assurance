@@ -248,26 +248,35 @@ describe("procedure execution", () => {
     );
     const p = procedureOf(e, procedureId),
       w = workflowOf(e);
-    const procedureBinding = {
+    const approved = {
       procedureId,
       procedureRevision: p.revision,
       briefRevision: w.brief!.revision,
       programRevision: w.program.revision,
     };
-    const bound = run({
-      id: "RUN-bound",
-      modelId: "model",
-      datasetId: "dataset",
-      profileId: "protocol",
-      procedureBinding,
-      provenance: {
-        inputHashes: {
-          auditBinding: await sha256(JSON.stringify(procedureBinding)),
+    // A succeeded run of the planned model, dataset and protocol whose
+    // provenance carries a valid hash of its own binding.
+    const boundRun = async (
+      id: string,
+      change: Partial<typeof approved> = {},
+    ) => {
+      const procedureBinding = { ...approved, ...change };
+      return run({
+        id,
+        modelId: "model",
+        datasetId: "dataset",
+        profileId: "protocol",
+        procedureBinding,
+        provenance: {
+          inputHashes: {
+            auditBinding: await sha256(JSON.stringify(procedureBinding)),
+          },
+          runnerVersion: "1.0",
+          policyVersion: "1.0",
         },
-        runnerVersion: "1.0",
-        policyVersion: "1.0",
-      },
-    });
+      });
+    };
+    const bound = await boundRun("RUN-bound");
     e.runs.push(
       bound,
       { ...bound, id: "RUN-failed", state: "failed" },
@@ -277,19 +286,33 @@ describe("procedure execution", () => {
         id: "RUN-forged",
         provenance: { ...bound.provenance, inputHashes: { auditBinding: "0" } },
       },
-      {
-        ...bound,
-        id: "RUN-stale",
-        procedureBinding: { ...procedureBinding, programRevision: 1 },
-      },
+      // Runs queued for another procedure or under an earlier revision: their
+      // hashes are valid, so only the binding comparison can reject them.
+      await boundRun("RUN-other-procedure", { procedureId: "PROC-WP-A12-01" }),
+      await boundRun("RUN-stale-procedure", {
+        procedureRevision: p.revision - 1,
+      }),
+      await boundRun("RUN-stale-program", {
+        programRevision: w.program.revision - 1,
+      }),
+      await boundRun("RUN-stale-brief", {
+        briefRevision: w.brief!.revision - 1,
+      }),
+      { ...bound, id: "RUN-other-model", modelId: "other" },
       { ...bound, id: "RUN-other-data", datasetId: "other" },
+      { ...bound, id: "RUN-other-protocol", profileId: "other" },
     );
     for (const runId of [
       "RUN-failed",
       "RUN-unbound",
       "RUN-forged",
-      "RUN-stale",
+      "RUN-other-procedure",
+      "RUN-stale-procedure",
+      "RUN-stale-program",
+      "RUN-stale-brief",
+      "RUN-other-model",
       "RUN-other-data",
+      "RUN-other-protocol",
       "RUN-missing",
     ])
       await expectFailure(
