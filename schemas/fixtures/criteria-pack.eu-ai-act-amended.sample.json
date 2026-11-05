@@ -1,0 +1,413 @@
+{
+  "documentType": "bundle",
+  "schemaVersion": "1.0.0",
+  "purpose": "fixture",
+  "title": "EU AI Act (amended) pack 2026.10.1 - three sample requirements",
+  "notes": "Draft fixture for design issue #26. Source: templates/catalog.json and docs/obligation-subitems.json at commit 74c6463. Items WP-A09-01, WP-XC-01 and WP-XC-07 are copied verbatim; requirements Art. 9 (with 9(1)), Art. 17 and Art. 50, plus Art. 16 because WP-XC-01 cites it. Not a release: no index entry and no approval.",
+  "documents": [
+    {
+      "documentType": "framework",
+      "schemaVersion": "1.0.0",
+      "id": "eu-ai-act",
+      "edition": "02024R1689-20260727",
+      "version": "2026.10.1",
+      "title": "Regulation (EU) 2024/1689 (Artificial Intelligence Act), consolidated text as amended by Regulation (EU) 2026/1744",
+      "shortTitle": "EU AI Act (amended)",
+      "kind": "legislation",
+      "publisher": "European Union",
+      "jurisdiction": "EU",
+      "status": "in_force",
+      "consolidatedAsOf": "2026-07-27",
+      "researchedAsOf": "2026-10-05",
+      "amendingActs": [
+        "(EU) 2026/1744"
+      ],
+      "sources": [
+        {
+          "role": "official_text",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727"
+        },
+        {
+          "role": "authentic_amendment",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744"
+        },
+        {
+          "role": "explorer",
+          "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act-explorer"
+        },
+        {
+          "role": "timeline",
+          "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act"
+        },
+        {
+          "role": "consolidated_html",
+          "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727"
+        }
+      ],
+      "licence": {
+        "holder": "European Union",
+        "textPolicy": "full_text",
+        "status": "confirmed",
+        "basis": "Commission Decision 2011/833/EU on the reuse of Commission documents: reuse is authorised provided the source is acknowledged. Consolidated texts are research aids; the Official Journal acts are authentic.",
+        "url": "https://eur-lex.europa.eu/eli/dec/2011/833/oj",
+        "attribution": "© European Union, https://eur-lex.europa.eu"
+      },
+      "applicationSummary": [
+        {
+          "reference": "Chapter III Sections 1–3 except Art.6(5); Art.6(2)/Annex III",
+          "date": "2027-12-02"
+        },
+        {
+          "reference": "Chapter III Sections 1–3 except Art.6(5); Art.6(1)/Annex I",
+          "date": "2028-08-02"
+        },
+        {
+          "reference": "Art.50 general transparency requirements; transitions assessed separately",
+          "date": "2026-08-02"
+        }
+      ],
+      "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law.",
+      "triggerProfiles": {
+        "provider_high_risk": {
+          "actor": "Provider",
+          "all": [
+            {
+              "fact": "highRiskConfirmed",
+              "equals": true
+            }
+          ],
+          "roleRequired": "Provider"
+        }
+      },
+      "factTypes": {
+        "highRiskConfirmed": "boolean_or_unknown"
+      },
+      "requirements": [
+        {
+          "id": "AIA-ART-9",
+          "ref": "Art. 9",
+          "title": "Risk management system",
+          "type": "group",
+          "exhaustive": false,
+          "aliases": [
+            "Art.9"
+          ],
+          "provenance": {
+            "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-9",
+            "sourceKind": "official_consolidation",
+            "verification": "verified",
+            "checkedAt": "2026-11-05",
+            "legalReview": "not_required",
+            "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+          }
+        },
+        {
+          "id": "AIA-9-1",
+          "ref": "Art. 9(1)",
+          "title": "Lifecycle risk-management system",
+          "type": "requirement",
+          "parent": "AIA-ART-9",
+          "actors": [
+            "Provider"
+          ],
+          "trigger": {
+            "profile": "provider_high_risk",
+            "conditions": []
+          },
+          "evidenceCategories": [
+            "Governance"
+          ],
+          "provenance": {
+            "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+            "sourceKind": "official_consolidation",
+            "verification": "unverified",
+            "legalReview": "required",
+            "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.10.07-proposed, status proposed_for_methodology_review)."
+          }
+        },
+        {
+          "id": "AIA-ART-16",
+          "ref": "Art. 16",
+          "title": "Obligations of providers of high-risk AI systems",
+          "type": "requirement",
+          "aliases": [
+            "Art.16"
+          ],
+          "provenance": {
+            "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-16",
+            "sourceKind": "official_consolidation",
+            "verification": "verified",
+            "checkedAt": "2026-11-05",
+            "legalReview": "not_required",
+            "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+          }
+        },
+        {
+          "id": "AIA-ART-17",
+          "ref": "Art. 17",
+          "title": "Quality management system",
+          "type": "requirement",
+          "aliases": [
+            "Art.17"
+          ],
+          "provenance": {
+            "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-17",
+            "sourceKind": "official_consolidation",
+            "verification": "verified",
+            "checkedAt": "2026-11-05",
+            "legalReview": "not_required",
+            "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+          }
+        },
+        {
+          "id": "AIA-ART-50",
+          "ref": "Art. 50",
+          "title": "Transparency obligations for providers and deployers of certain AI systems",
+          "type": "requirement",
+          "aliases": [
+            "Art.50"
+          ],
+          "provenance": {
+            "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-50",
+            "sourceKind": "official_consolidation",
+            "verification": "verified",
+            "checkedAt": "2026-11-05",
+            "legalReview": "not_required",
+            "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+          }
+        }
+      ],
+      "notes": "Design sample for issue #26: the subset of the framework needed by three catalogue items. Article nodes come from the catalogue regulatoryRefs; child requirements from docs/obligation-subitems.json; requirement-level application dates are not recorded in data version 2026.10.1 (see applicationSummary)."
+    },
+    {
+      "documentType": "pack",
+      "schemaVersion": "1.0.0",
+      "id": "eu-ai-act-amended",
+      "version": "2026.10.1",
+      "title": "EU AI Act (amended)",
+      "summary": "Audit programme for AI systems under Regulation (EU) 2024/1689 as amended by Regulation (EU) 2026/1744: the platform's existing 33 working papers and 12 memos, migrated without change.",
+      "kind": "audit_programme",
+      "methodologyVersion": "2026.10.1",
+      "criteria": [
+        {
+          "framework": "eu-ai-act",
+          "edition": "02024R1689-20260727",
+          "version": "2026.10.1",
+          "role": "primary"
+        }
+      ],
+      "defaults": {
+        "initialStatus": "draft",
+        "applicability": "pending",
+        "auditorConclusion": "not_assessed",
+        "diagnosticState": "pending",
+        "numericalThreshold": null,
+        "conclusionOwner": "human_auditor",
+        "approvalBindsTo": "revision_and_content_digest",
+        "independentReview": true,
+        "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
+        "statement": "Diagnostics support an audit assessment and do not constitute legal compliance or a conformity certificate."
+      },
+      "controlObjectives": [
+        {
+          "id": "CO-WP-A09-01",
+          "statement": "Assess documented lifecycle identification, treatment and reassessment of risks.",
+          "addresses": [
+            {
+              "requirement": "eu-ai-act:AIA-ART-9",
+              "relationship": "intersects_with",
+              "rationale": "semantic",
+              "justification": "Migrated from the catalogue regulatoryRefs of WP-A09-01 (Art.9). The catalogue does not say how much of the provision the paper tests, so the link claims partial overlap only until a methodology reviewer replaces it.",
+              "origin": "migrated"
+            }
+          ]
+        },
+        {
+          "id": "CO-WP-XC-01",
+          "statement": "Assess relevant accountable governance and quality management processes.",
+          "addresses": [
+            {
+              "requirement": "eu-ai-act:AIA-ART-16",
+              "relationship": "intersects_with",
+              "rationale": "semantic",
+              "justification": "Migrated from the catalogue regulatoryRefs of WP-XC-01 (Art.16). The catalogue does not say how much of the provision the paper tests, so the link claims partial overlap only until a methodology reviewer replaces it.",
+              "origin": "migrated"
+            },
+            {
+              "requirement": "eu-ai-act:AIA-ART-17",
+              "relationship": "intersects_with",
+              "rationale": "semantic",
+              "justification": "Migrated from the catalogue regulatoryRefs of WP-XC-01 (Art.17). The catalogue does not say how much of the provision the paper tests, so the link claims partial overlap only until a methodology reviewer replaces it.",
+              "origin": "migrated"
+            }
+          ]
+        },
+        {
+          "id": "CO-WP-XC-07",
+          "statement": "Assess applicable transparency duties separately from high-risk routing.",
+          "addresses": [
+            {
+              "requirement": "eu-ai-act:AIA-ART-50",
+              "relationship": "intersects_with",
+              "rationale": "semantic",
+              "justification": "Migrated from the catalogue regulatoryRefs of WP-XC-07 (Art.50). The catalogue does not say how much of the provision the paper tests, so the link claims partial overlap only until a methodology reviewer replaces it.",
+              "origin": "migrated"
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "id": "WP-A09-01",
+          "title": "Lifecycle risk management system",
+          "kind": "working_paper",
+          "stage": "Fieldwork",
+          "folder": "03 Fieldwork / Art.9",
+          "templatePath": "templates/article-fieldwork.md",
+          "regulatoryRefs": [
+            "Art.9"
+          ],
+          "automationMode": "hybrid",
+          "objective": "Assess documented lifecycle identification, treatment and reassessment of risks.",
+          "procedures": [
+            {
+              "id": "WP-A09-01-P01",
+              "text": "Trace sampled risks through identification, mitigation, testing and residual-risk acceptance."
+            },
+            {
+              "id": "WP-A09-01-P02",
+              "text": "Challenge misuse, vulnerable-group harms, interactions and completeness with domain specialists."
+            },
+            {
+              "id": "WP-A09-01-P03",
+              "text": "Reconcile material risks to predefined metrics, thresholds and versioned validation evidence."
+            },
+            {
+              "id": "WP-A09-01-P04",
+              "text": "Inspect monitoring/incident-driven risk updates and accountability."
+            }
+          ],
+          "evidenceRequired": [
+            "Risk register/policy",
+            "Treatment matrix",
+            "Risk-linked test plans",
+            "Residual-risk approvals",
+            "Monitoring feedback"
+          ],
+          "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+          "objectiveIds": [
+            "CO-WP-A09-01"
+          ]
+        },
+        {
+          "id": "WP-XC-01",
+          "title": "Quality management and governance",
+          "kind": "working_paper",
+          "stage": "Fieldwork",
+          "folder": "03 Fieldwork / Cross-cutting",
+          "templatePath": "templates/working-paper.md",
+          "regulatoryRefs": [
+            "Art.16",
+            "Art.17"
+          ],
+          "automationMode": "manual",
+          "objective": "Assess relevant accountable governance and quality management processes.",
+          "procedures": [
+            {
+              "id": "WP-XC-01-P01",
+              "text": "Inspect documented responsibilities, approvals, design/change controls and quality processes."
+            },
+            {
+              "id": "WP-XC-01-P02",
+              "text": "Sample control operation, supplier management, training and escalations."
+            },
+            {
+              "id": "WP-XC-01-P03",
+              "text": "Reconcile governance procedures to actual product releases and risk decisions."
+            }
+          ],
+          "evidenceRequired": [
+            "Quality manual",
+            "Organization/responsibility matrix",
+            "Release approvals",
+            "Supplier oversight",
+            "Sampled process evidence"
+          ],
+          "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+          "objectiveIds": [
+            "CO-WP-XC-01"
+          ]
+        },
+        {
+          "id": "WP-XC-07",
+          "title": "Specific transparency obligations",
+          "kind": "working_paper",
+          "stage": "Fieldwork",
+          "folder": "03 Fieldwork / Cross-cutting",
+          "templatePath": "templates/working-paper.md",
+          "regulatoryRefs": [
+            "Art.50"
+          ],
+          "automationMode": "manual",
+          "objective": "Assess applicable transparency duties separately from high-risk routing.",
+          "procedures": [
+            {
+              "id": "WP-XC-07-P01",
+              "text": "Assess provider/deployer and use-based transparency applicability and transitions."
+            },
+            {
+              "id": "WP-XC-07-P02",
+              "text": "Inspect notices, content labeling/detection solutions or other required measures within scope."
+            },
+            {
+              "id": "WP-XC-07-P03",
+              "text": "Observe user-facing behavior and approved exceptions with legal rationale."
+            }
+          ],
+          "evidenceRequired": [
+            "Applicability matrix",
+            "Notices/interface evidence",
+            "Labeling technical evidence",
+            "Exception rationale",
+            "User walkthrough"
+          ],
+          "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+          "objectiveIds": [
+            "CO-WP-XC-07"
+          ]
+        }
+      ],
+      "notes": "Design sample for issue #26: three catalogue items migrated by the converter rules of docs/design/criteria-model.md section 11.2. The full pack also declares roles and features, which reference items this sample omits.",
+      "compat": {
+        "catalog": {
+          "schemaVersion": "1.0.0",
+          "regulatorySnapshot": {
+            "celex": "02024R1689-20260727",
+            "consolidatedAsOf": "2026-07-27",
+            "researchedAsOf": "2026-10-05",
+            "amendingRegulation": "(EU) 2026/1744",
+            "officialTextUrl": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+            "authenticAmendmentUrl": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744",
+            "explorerUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act-explorer",
+            "timelineUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act",
+            "applicationDates": [
+              {
+                "reference": "Chapter III Sections 1–3 except Art.6(5); Art.6(2)/Annex III",
+                "date": "2027-12-02"
+              },
+              {
+                "reference": "Chapter III Sections 1–3 except Art.6(5); Art.6(1)/Annex I",
+                "date": "2028-08-02"
+              },
+              {
+                "reference": "Art.50 general transparency requirements; transitions assessed separately",
+                "date": "2026-08-02"
+              }
+            ],
+            "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law."
+          }
+        }
+      }
+    }
+  ]
+}
