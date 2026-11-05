@@ -1,21 +1,34 @@
 // Vendored from @openai/sites-vite-plugin 0.2.0 (openai/sites#9).
 // See sites-vite-plugin.LICENSE for the upstream MIT license.
+// Local changes: test personas (`/signin-with-chatgpt?as=<id>`) from
+// fixtures/dev-personas.json, shared return-path checks, and hosting.json
+// staying optional. The mock runs only in the development server, never in a
+// build; the Worker trusts its headers in IDENTITY_MODE=dev (lib/identity.ts).
 import { access, cp, mkdir, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { Plugin } from "vite";
+import devPersonas from "../fixtures/dev-personas.json";
+import {
+  CALLBACK_PATH,
+  SIGN_IN_PATH,
+  SIGN_OUT_PATH,
+  isAuthPath,
+  safeReturnPath,
+} from "../lib/auth-paths";
 
-const localUserId = "local_seedy";
-const localEmail = "seedy@sites.test";
-const localFullName = "Seedy";
+type LocalIdentity = { userId: string; email: string; name: string };
 const localCookieName = "__sites_local_auth";
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 const localAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-const authPaths = new Set([
-  "/signin-with-chatgpt",
-  "/signout-with-chatgpt",
-  "/callback",
-]);
+// Cookie value "1" is the default identity (as upstream); a persona id selects
+// that persona. Any other value signs nobody in.
+const personas = new Map<string, LocalIdentity>(
+  devPersonas.personas.map((persona) => [persona.id, persona]),
+);
+function localIdentity(cookie: string): LocalIdentity | undefined {
+  return cookie === "1" ? devPersonas.defaultIdentity : personas.get(cookie);
+}
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -43,7 +56,9 @@ export function sites({ mockAuth = true } = {}): Plugin {
       if (!mockAuth) return;
       const secure = Boolean(server.config.server.https);
 
-      server.config.logger.info(`Sites local sign-in: ${localEmail}`);
+      server.config.logger.info(
+        `Sites local sign-in: ${devPersonas.defaultIdentity.email}; personas: ${SIGN_IN_PATH}?as=<${[...personas.keys()].join("|")}>`,
+      );
       server.middlewares.use((request, response, next) => {
         for (const name of Object.keys(request.headers)) {
           if (name.startsWith("oai-authenticated-user-")) {
@@ -59,7 +74,7 @@ export function sites({ mockAuth = true } = {}): Plugin {
           );
           url = new URL(request.url ?? "/", authority);
         } catch {
-          if (authPaths.has((request.url ?? "/").split("?")[0])) {
+          if (isAuthPath((request.url ?? "/").split("?")[0])) {
             respond(response, 403);
           } else {
             next();
@@ -75,7 +90,7 @@ export function sites({ mockAuth = true } = {}): Plugin {
           !localAddresses.has(request.socket.remoteAddress ?? "") ||
           url.origin !== authority.origin
         ) {
-          if (authPaths.has(url.pathname)) respond(response, 403);
+          if (isAuthPath(url.pathname)) respond(response, 403);
           else next();
           return;
         }
@@ -97,21 +112,25 @@ export function sites({ mockAuth = true } = {}): Plugin {
           }
         }
 
-        if (url.pathname === "/callback") {
+        if (url.pathname === CALLBACK_PATH) {
           respond(response, 501);
           return;
         }
 
-        const signIn = url.pathname === "/signin-with-chatgpt";
-        const signOut = url.pathname === "/signout-with-chatgpt";
+        const signIn = url.pathname === SIGN_IN_PATH;
+        const signOut = url.pathname === SIGN_OUT_PATH;
         if (!signIn && !signOut) {
-          if (signInCookies.length === 1 && signInCookies[0] === "1") {
-            setHeader(request, "oai-authenticated-user-id", localUserId);
-            setHeader(request, "oai-authenticated-user-email", localEmail);
+          const identity =
+            signInCookies.length === 1
+              ? localIdentity(signInCookies[0])
+              : undefined;
+          if (identity) {
+            setHeader(request, "oai-authenticated-user-id", identity.userId);
+            setHeader(request, "oai-authenticated-user-email", identity.email);
             setHeader(
               request,
               "oai-authenticated-user-full-name",
-              localFullName,
+              encodeURIComponent(identity.name),
             );
             setHeader(
               request,
@@ -155,15 +174,27 @@ export function sites({ mockAuth = true } = {}): Plugin {
           return;
         }
 
+        // Local change: `?as=<id>` signs in as a persona from the fixture.
+        const persona = signIn ? url.searchParams.get("as") : null;
+        if (persona !== null && !personas.has(persona)) {
+          response.statusCode = 400;
+          response.setHeader("Cache-Control", "private, no-store");
+          response.setHeader("Content-Type", "text/plain; charset=utf-8");
+          response.end(
+            `Unknown persona. Choose one of: ${[...personas.keys()].join(", ")}.\n`,
+          );
+          return;
+        }
+
         response.statusCode = request.method === "POST" ? 303 : 302;
         response.setHeader("Cache-Control", "private, no-store");
         response.setHeader(
           "Location",
-          safeReturn(url.searchParams.get("return_to")),
+          safeReturnPath(url.searchParams.get("return_to")),
         );
         response.setHeader(
           "Set-Cookie",
-          `${localCookieName}=${signIn ? "1" : ""}; Path=/; ${
+          `${localCookieName}=${signIn ? (persona ?? "1") : ""}; Path=/; ${
             signOut ? "Max-Age=0; " : ""
           }HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
         );
@@ -217,18 +248,4 @@ function respond(response: ServerResponse, status: number): void {
   response.statusCode = status;
   response.setHeader("Cache-Control", "private, no-store");
   response.end();
-}
-
-function safeReturn(value: string | null): string {
-  if (!value?.startsWith("/") || value.startsWith("//")) return "/";
-
-  try {
-    const url = new URL(value, "http://localhost");
-    if (url.origin !== "http://localhost" || authPaths.has(url.pathname)) {
-      return "/";
-    }
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch {
-    return "/";
-  }
 }

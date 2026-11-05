@@ -1,7 +1,8 @@
 // The identity boundary of the built Worker (docs/security/identity.md): which
 // credential each IDENTITY_MODE trusts, that forged oai-* headers are refused
-// in every mode except sites, and Cloudflare Access tokens checked against a
-// stub key set (no network). Needs `npm run build` first.
+// in every mode except sites, Cloudflare Access tokens checked against a stub
+// key set (no network), and that the development personas never reach a build.
+// Needs `npm run build` first.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
@@ -274,7 +275,7 @@ console.log(
   "PASS cloudflare-access verifies RS256 tokens and refuses forged headers, wrong audience or issuer, expiry, unknown keys, bad signatures, alg none and HS256",
 );
 
-// --- The build: only the Sites build configures an identity mode ------------
+// --- The build: identity configuration and no development personas ----------
 const wrangler = JSON.parse(
   await fs.readFile("dist/server/wrangler.json", "utf8"),
 );
@@ -283,4 +284,21 @@ assert.equal(
   existsSync(".openai/hosting.json") ? "sites" : undefined,
   "only the Sites build (a checkout with .openai/hosting.json) trusts dispatch headers",
 );
-console.log("PASS the build configures identity only for Sites");
+const personas = JSON.parse(
+  await fs.readFile("fixtures/dev-personas.json", "utf8"),
+);
+const markers = [personas.defaultIdentity, ...personas.personas].flatMap(
+  (p) => [p.userId, p.email],
+);
+for (const file of await fs.readdir("dist", { recursive: true })) {
+  if (!/\.(m?js|json|html|css|map)$/.test(file)) continue;
+  const text = await fs.readFile(path.join("dist", file), "utf8");
+  for (const marker of markers)
+    assert(
+      !text.includes(marker),
+      `${file} contains the dev persona ${marker}`,
+    );
+}
+console.log(
+  "PASS the build configures identity only for Sites and contains no development personas",
+);

@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { canWrite } from "@/lib/domain";
 import { selectPaperRegister } from "@/lib/paper-presentation";
+import { AccountMenu, DevPersonaSignIn, signInHere } from "../account-menu";
 import { EngagementSwitcher } from "../engagement-switcher";
 import { MemberOnboarding } from "../member-onboarding";
 import { WorkspaceNavigation } from "../workspace-navigation";
@@ -76,13 +77,10 @@ function SignedOut() {
           Sign in to access your practice, client engagements and controlled
           audit evidence.
         </p>
-        <a
-          href="/signin-with-chatgpt?return_to=%2F"
-          target="_top"
-          className="signin-button"
-        >
+        <a href={signInHere()} target="_top" className="signin-button">
           Sign in with ChatGPT
         </a>
+        <DevPersonaSignIn />
         <p className="subtle">
           Access is determined by your practice membership.
         </p>
@@ -220,6 +218,7 @@ export default function Workspace() {
         onNavigate={nav.navigate}
         onSwitch={nav.switchEngagement}
         onPractice={nav.changePractice}
+        account={<AccountMenu data={data} />}
       />
       <SidebarInset>
         <WorkspaceTopbar
