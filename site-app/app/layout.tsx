@@ -19,7 +19,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "AI Assurance | Audit Workspace",
-  description: "EU AI Act assurance, evidence and audit working papers for traditional machine learning.",
+  description:
+    "EU AI Act assurance, evidence and audit working papers for traditional machine learning.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
