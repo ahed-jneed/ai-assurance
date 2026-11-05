@@ -33,9 +33,10 @@ const dateTypeLabels: Record<ApplicationDate["dateType"], string> = {
   compliance_deadline: "Compliance deadline",
   entry_into_force: "Entry into force",
 };
+// A dating aid, not an applicability decision, so no "approved" green.
 const periodLabels: Record<PeriodStatus, [string, string]> = {
-  readiness: ["Readiness", "blue"],
-  applicable: ["Applicable", "green"],
+  readiness: ["Readiness", "neutral"],
+  applicable: ["Applicable", "blue"],
   starts_in_period: ["Starts within period", "amber"],
   period_not_set: ["Set the period", "neutral"],
 };
