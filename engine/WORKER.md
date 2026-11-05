@@ -53,7 +53,7 @@ A claim response contains `{jobId,attemptId,fence,nonce,leaseUntil,requestSha256
     "contractVersion":"1.1","id":"run-001","engagementId":"eng-001",
     "modelId":"model-001","datasetId":"data-001","task":"Binary classification",
     "suite":["performance","demographic_parity"],"seed":42,
-    "policyId":"protocol-001","policyVersion":"1",
+    "policyId":"protocol-001","policyVersion":"1","negativeLabel":"0",
     "config":{
       "labelColumn":"actual","predictionColumn":"predicted","groupColumn":"group",
       "positiveLabel":"1","minimumSampleSize":20,"minimumClassCount":5,
@@ -124,6 +124,10 @@ The worker appends every job outcome (completed, failed with code and whether th
 
 The server freezes hosted `engineConfig.contractVersion:"1.1"`, human-readable task, selected individual test IDs, flat column/threshold configuration, policy identity and seed. The worker translates that snapshot into external engine `contractVersion:"1.0"`, machine task IDs, suite families, typed column roles and named metric thresholds. The source snapshot and translation version are retained in the engine configuration hash.
 
+The worker accepts exactly the five tests a platform evaluation profile can select (`suiteSchema` in `site-app/lib/evaluation.ts`): `performance`, `regression`, `demographic_parity`, `disparate_impact` and `equalized_odds`. The platform never sends any other test and its import contract accepts only these results, so any other test fails the claim with `request_contract_rejected`. A test keeps the two catalogs identical.
+
+For binary tasks the label pair is the frozen favourable `config.positiveLabel` and `engineConfig.negativeLabel`, not the labels that happen to occur in the data. A dataset with a single observed class is therefore evaluated, and its class-dependent results are inconclusive. Observed labels outside the pair fail with `label_set_mismatch`, as do model `outputLabels` that differ from it. A request frozen without `negativeLabel` derives the other label from exactly two observed labels (or the model's `outputLabels`), as earlier versions did.
+
 The completion envelope is:
 
 ```text
@@ -176,6 +180,6 @@ Transport input reads use bounded `read1` chunks, check the active lease before 
 
 `python -m unittest discover -s engine/tests -v` exercises actual local HTTP claim/download/subprocess/completion, exact-body HMAC, input/projection tampering, missing cells, task compatibility, absent class/constant target conditions, retry bounds, credential redirect rejection, heartbeat renewal/rejected fencing, ambiguous completion and workspace capacity. Golden binary/fairness/multiclass/regression expectations are checked against real engine computations. HTTP fixtures use dummy credentials and loopback only.
 
-The bundled environment contains numpy/pandas but lacks ONNX Runtime, XGBoost, LightGBM, pypmml and pyarrow; no native inference image or Docker execution was validated here. Optional tests do not claim native golden validation. The pull protocol currently provides no reference-dataset endpoint: selected numeric drift preserves an explicit missing-baseline inconclusive result. Permutation and approved-range perturbation use the existing genuine model-backed algorithms only after eligible native inference is available. SHAP/LIME, training/cross-validation, adversarial robustness, raw-text NLP and executable preprocessing remain unavailable. A preprocessing hash can be retained as a source declaration; this worker does not verify or execute that transformation. Add a pinned prepared-dataset/source-transformation custody record before making stronger lineage claims.
+The bundled environment contains numpy/pandas but lacks ONNX Runtime, XGBoost, LightGBM, pypmml and pyarrow; no native inference image or Docker execution was validated here. Optional tests do not claim native golden validation. Drift, permutation importance, perturbation, SHAP/LIME and cross-validation are not hosted tests: the platform cannot select them and the pull protocol has no reference-dataset endpoint. They remain available through the engine CLI (`python -m engine`). Raw-text NLP and executable preprocessing remain unavailable. A preprocessing hash can be retained as a source declaration; this worker does not verify or execute that transformation. Add a pinned prepared-dataset/source-transformation custody record before making stronger lineage claims.
 
 HMAC proves possession of the enrolled application credential and binds exact request/result bytes. It does not establish metric correctness, complete source records, a measured worker image, model artifact safety or external auditor independence. Preserve human working-paper review, evidence acceptance, finding decisions and report release controls in the platform. Production rollout still requires actual server integration tests, lease crash/recovery and cancellation tests, native golden fixtures, secure service enrollment/rotation, filesystem quotas, container-runtime verification and retained evidence verification.

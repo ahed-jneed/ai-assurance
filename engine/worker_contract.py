@@ -19,15 +19,18 @@ from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, vali
 from .errors import EngineError
 
 WORKER_VERSION = "1.0.1"
-TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.0.0"
+TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.1.0"
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
 MAX_COMPLETION_BYTES = 10 * 1024 * 1024
 TASKS = {"Binary classification": "binary_classification", "Multiclass classification": "multiclass_classification", "Regression": "regression"}
 FORMAT_ALIASES = {"onnx": "onnx", "ONNX": "onnx", "pmml": "pmml", "PMML": "pmml", "xgboost_json": "xgboost_json", "XGBoost": "xgboost_json", "lightgbm_text": "lightgbm_text", "LightGBM": "lightgbm_text"}
 FAIRNESS = {"demographic_parity": "FAIR-DP", "disparate_impact": "FAIR-DI", "equalized_odds": "FAIR-EO"}
-SUITES = {"performance": ["performance"], "regression": ["performance"], **{name: ["fairness"] for name in FAIRNESS}, "drift": ["drift"], "permutation": ["permutation_importance"], "perturbation": ["perturbation"], "explainability": ["shap", "lime"], "cross_validation": ["cross_validation", "adversarial"]}
-LABELS = {"performance": "Classification performance", "regression": "Regression performance", "demographic_parity": "Demographic parity", "disparate_impact": "Disparate impact", "equalized_odds": "Equalized odds", "drift": "Numeric distribution drift", "permutation": "Permutation importance", "perturbation": "Approved-range perturbation", "explainability": "SHAP / LIME", "cross_validation": "Cross-validation / adversarial robustness"}
+# The hosted tests a platform profile can select (site-app/lib/evaluation.ts
+# suiteSchema). The platform never sends any other test and can import only
+# these results, so the worker accepts exactly this catalog.
+SUITES = {"performance": ["performance"], "regression": ["performance"], **{name: ["fairness"] for name in FAIRNESS}}
+LABELS = {"performance": "Classification performance", "regression": "Regression performance", "demographic_parity": "Demographic parity", "disparate_impact": "Disparate impact", "equalized_odds": "Equalized odds"}
 METRIC_ALIASES = {"demographic_parity_difference": "maximum_selection_rate_gap", "disparate_impact_ratio": "minimum_selection_rate_ratio", "equalized_odds_difference": "maximum_tpr_fpr_gap"}
 
 # Sanitized failure codes: the only `error` values posted with op:"fail",
@@ -195,7 +198,7 @@ def validate_request(request):
         if declared != model_hash:
             raise ValueError("Model artifact hash differs from request")
     suite = config.get("suite")
-    if not isinstance(suite, list) or not suite or len(suite) > 10 or any(not isinstance(s, str) or s not in SUITES for s in suite) or len(set(suite)) != len(suite):
+    if not isinstance(suite, list) or not suite or len(suite) > len(SUITES) or any(not isinstance(s, str) or s not in SUITES for s in suite) or len(set(suite)) != len(suite):
         raise ValueError("Invalid hosted suite selection")
     if any(s in FAIRNESS for s in suite) and config["task"] != "Binary classification":
         raise ValueError("Binary fairness is incompatible with this task")
@@ -293,26 +296,44 @@ def translate_config(request, rows):
         criterion("maximumOddsGap", "equalized_odds_difference", "<=", c.get("maximumParityGap", .1))
     native = {"contractVersion": "1.0", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "minSampleSize": integer(c, "minimumSampleSize", 20), "minClassCount": max(2, integer(c, "minimumClassCount", 5, minimum=1)), "minGroupSize": integer(c, "minimumGroupSize", 30), "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": values}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": "1.1", "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimumClassCount": c.get("minimumClassCount", 5), "supplementalMetricPolicy": "descriptive; only selected named acceptance criteria determine hostedResults"}}
     if task == "binary_classification":
-        positive = c.get("positiveLabel")
-        if not isinstance(positive, str) or not positive:
-            raise EngineError("protocol_config_invalid", "A favourable binary class label is required")
-        names = set(hosted.get("modelSpec", {}).get("outputLabels", [])) if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
-        if len(names) != 2 or positive not in names:
-            raise EngineError("label_set_mismatch", "Binary class order/observations require two labels and the favourable label")
-        native.update(positiveLabel=positive, negativeLabel=next(label for label in names if label != positive))
-    if "drift" in suites:
-        native["driftFeatures"] = c.get("driftFeatures", hosted.get("modelSpec", {}).get("featureColumns"))
-        if not native["driftFeatures"]:
-            raise ValueError("Drift requires frozen numeric driftFeatures")
-    for key in ("modelSpec", "permutation", "perturbation"):
-        if key in hosted:
-            native[key] = copy.deepcopy(hosted[key])
+        native.update(binary_labels(hosted, rows, columns, inference))
+    if "modelSpec" in hosted:
+        native["modelSpec"] = copy.deepcopy(hosted["modelSpec"])
     return validate_config(native)
 
 
+def binary_labels(hosted, rows, columns, inference):
+    """The frozen favourable and other binary labels.
+
+    The platform freezes engineConfig.negativeLabel, so the label pair never
+    depends on which labels happen to occur: a dataset with a single
+    observed class is evaluated and reported as inconclusive. A model's
+    outputLabels must be exactly that pair, and observed labels outside it
+    are rejected when predictions are read.
+    """
+    positive = hosted["config"].get("positiveLabel")
+    if not isinstance(positive, str) or not positive.strip():
+        raise EngineError("protocol_config_invalid", "A favourable binary class label is required")
+    declared = set(hosted.get("modelSpec", {}).get("outputLabels", [])) if inference else None
+    negative = hosted.get("negativeLabel")
+    if negative is None:
+        # Requests frozen without negativeLabel: derive the other label.
+        names = declared if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
+        others = names-{positive}
+        if len(others) != 1 or inference and positive not in names:
+            raise EngineError("label_set_mismatch", "Freeze engineConfig.negativeLabel; the other binary label cannot be derived from these labels")
+        negative = others.pop()
+    if not isinstance(negative, str) or not negative.strip() or negative.strip() == positive:
+        raise EngineError("protocol_config_invalid", "negativeLabel must be a nonempty label that differs from positiveLabel")
+    negative = negative.strip()
+    if inference and declared != {positive, negative}:
+        raise EngineError("label_set_mismatch", "Model outputLabels differ from the frozen positive and negative labels")
+    return {"positiveLabel": positive, "negativeLabel": negative}
+
+
 def _selected_sources(report, test, task):
-    ids = {"performance": ["PERF-BINARY" if task == "binary_classification" else "PERF-MULTI"], "regression": ["PERF-REG"], **{name: [result_id] for name, result_id in FAIRNESS.items()}, "permutation": ["EXPL-PERM"], "perturbation": ["ROB-PERT"], "explainability": ["EXPL-SHAP", "EXPL-LIME"], "cross_validation": ["ROB-CV", "ROB-ADV"]}
-    return [result for result in report["results"] if result["testId"].startswith("DRIFT-")] if test == "drift" else [result for result in report["results"] if result["testId"] in ids[test]]
+    ids = {"performance": ["PERF-BINARY" if task == "binary_classification" else "PERF-MULTI"], "regression": ["PERF-REG"], **{name: [result_id] for name, result_id in FAIRNESS.items()}}
+    return [result for result in report["results"] if result["testId"] in ids[test]]
 
 
 def hosted_results(report, request):
@@ -348,9 +369,6 @@ def hosted_results(report, request):
             eligible &= len(slices) >= 2 and all(s["n"] >= c["minimumGroupSize"] for s in slices)
             if test == "equalized_odds":
                 eligible &= all(min(s["tprDenominator"], s["fprDenominator"]) >= minimum_class for s in slices)
-        else:
-            # External-only protocols retain original engine conclusions.
-            eligible &= all(source["outcome"] not in {"inconclusive", "not_applicable"} for source in sources) if test != "regression" else True
         if not eligible or not selected_metrics or any(m["value"] is None for m in selected_metrics):
             outcome = "inconclusive"
             limitations.append("Selected acceptance is inconclusive because evidence, eligibility, or a frozen criterion is unavailable.")
@@ -368,7 +386,7 @@ def hosted_results(report, request):
         limitations.append("Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.")
         if minimum_class == 1:
             limitations.append("The engine's full report applies a conservative minimum class count of two; this hosted projection separately applies the frozen minimum of one.")
-        result_list.append({"testId": test, "label": LABELS[test], "article": "10" if test in FAIRNESS or test == "drift" else "15", "outcome": outcome, "metrics": metrics, "limitations": list(dict.fromkeys(limitations))})
+        result_list.append({"testId": test, "label": LABELS[test], "article": "10" if test in FAIRNESS else "15", "outcome": outcome, "metrics": metrics, "limitations": list(dict.fromkeys(limitations))})
     return result_list
 
 

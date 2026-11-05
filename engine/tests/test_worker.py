@@ -28,7 +28,7 @@ CSV = b"actual,predicted,group\n1,1,A\n1,1,A\n0,0,A\n0,0,A\n1,1,B\n1,0,B\n0,0,B\
 
 def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     c = {"labelColumn": "actual", "predictionColumn": "predicted", "groupColumn": "group", "positiveLabel": "1", "minimumGroupSize": 2, "maximumParityGap": .15, "minimumImpactRatio": .8, "minimumAccuracy": .8, "minimumSampleSize": 2, "minimumClassCount": 2, "maximumOddsGap": .1, "minimumRecall": .7, "minimumMacroF1": .6, "maximumRmse": .8}
-    return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": None, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite or ["performance", "demographic_parity", "disparate_impact", "equalized_odds"], "config": c, "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
+    return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": None, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite or ["performance", "demographic_parity", "disparate_impact", "equalized_odds"], "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
 
 
 def claim_body(request=None):
@@ -232,6 +232,64 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(report["results"][0]["outcome"], "inconclusive")
         self.assertEqual(results[0]["outcome"], "pass")
         self.assertTrue(any("minimum of one" in note for note in results[0]["limitations"]))
+
+    def test_single_observed_label_is_inconclusive_not_rejected(self):
+        data = b"actual,predicted,group\n1,1,A\n1,1,A\n1,1,B\n1,1,B\n"
+        request = hosted_request(data, suite=["performance", "equalized_odds"])
+        report, results = self.evaluate(request, data)
+        self.assertEqual((report["configuration"]["positiveLabel"], report["configuration"]["negativeLabel"]), ("1", "0"))
+        self.assertEqual([r["outcome"] for r in results], ["inconclusive", "inconclusive"])
+        with RunnerServer(request, data) as server:
+            self.assertEqual(self.worker(server.transport()).once()["state"], "completed")
+
+    def test_frozen_negative_label_defines_the_binary_label_pair(self):
+        data = b"actual,predicted\n1,1\n0,0\n0,1\n"
+        request = hosted_request(data, suite=["performance"])
+        request["engineConfig"]["negativeLabel"] = " 0 "
+        self.assertEqual(self.evaluate(request, data)[0]["configuration"]["negativeLabel"], "0")
+        for negative, code in (("", "protocol_config_invalid"), ("1", "protocol_config_invalid"), (7, "protocol_config_invalid"), ("no", "label_set_mismatch")):
+            request["engineConfig"]["negativeLabel"] = negative
+            with self.assertRaises(EngineError) as error:
+                self.evaluate(request, data)
+            self.assertEqual(error.exception.code, code, negative)
+        # Requests frozen without negativeLabel still derive it from two observed labels.
+        del request["engineConfig"]["negativeLabel"]
+        self.assertEqual(self.evaluate(request, data)[0]["configuration"]["negativeLabel"], "0")
+        single = b"actual,predicted\n1,1\n1,1\n"
+        legacy = hosted_request(single, suite=["performance"])
+        del legacy["engineConfig"]["negativeLabel"]
+        with self.assertRaises(EngineError) as error:
+            self.evaluate(legacy, single)
+        self.assertEqual(error.exception.code, "label_set_mismatch")
+
+    def test_model_output_labels_must_equal_the_frozen_label_pair(self):
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["no", "yes"], "decisionThreshold": .5, "predictionOutput": "label", "predictionKind": "label"}
+        request = hosted_request(suite=["performance"])
+        request["executionMode"] = "auditor_model"
+        request["model"].update(format="ONNX", sha256="b"*64, sourceSha256="b"*64)
+        request["inputHashes"]["modelArtifact"] = "b"*64
+        request["engineConfig"]["modelSpec"] = spec
+        request["engineConfig"]["config"]["positiveLabel"] = "yes"
+        rows = [{"actual": "yes", "x": "1"}]
+        with self.assertRaises(EngineError) as error:
+            translate_config(request, rows)
+        self.assertEqual(error.exception.code, "label_set_mismatch")
+        request["engineConfig"]["negativeLabel"] = "no"
+        native = translate_config(request, rows)
+        self.assertEqual((native["positiveLabel"], native["negativeLabel"]), ("yes", "no"))
+
+    def test_worker_accepts_exactly_the_platform_test_catalog(self):
+        for test in ("drift", "permutation", "perturbation", "explainability", "cross_validation"):
+            with self.assertRaises(ValueError):
+                validate_request(hosted_request(suite=[test]))
+        evaluation = Path(__file__).resolve().parents[2]/"site-app"/"lib"/"evaluation.ts"
+        if not evaluation.is_file():
+            self.skipTest("site-app is not part of this checkout")
+        enum = re.search(r"suiteSchema = z\s*\.array\(\s*z\.enum\(\[(.*?)\]", evaluation.read_text(encoding="utf-8"), re.S)
+        self.assertIsNotNone(enum, "site-app suiteSchema changed shape; update this catalog check")
+        from engine.worker_contract import LABELS, SUITES
+        self.assertEqual(set(re.findall(r'"([a-z_]+)"', enum.group(1))), set(SUITES))
+        self.assertEqual(set(LABELS), set(SUITES))
 
     def test_missing_cells_incompatible_tasks_and_unsafe_formats_fail(self):
         data = b"actual,predicted\n1,1\n0,\n"
