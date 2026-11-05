@@ -4,10 +4,10 @@ import { commandModules, dispatch } from "@/lib/commands";
 import { roles, type Engagement, type Role, type Run } from "@/lib/domain";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { evidenceRequestOps } from "@/lib/evidence-requests";
-import { freshEngagement } from "@/lib/factories";
 import { ApiError } from "@/lib/http";
-import { context, type Context } from "@/lib/tenancy";
+import { context } from "@/lib/tenancy";
 import { workflowOps } from "@/lib/workflow-service";
+import { caller, postRequest, stored } from "./test-fixtures";
 
 // Identity and persistence are faked per test.
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
@@ -20,24 +20,6 @@ vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
   save: vi.fn(),
 }));
 
-function caller(role: Role = "Lead Auditor"): Context {
-  return {
-    user: {
-      userId: "user-lead",
-      displayName: "Lead",
-      email: "lead@fixture.invalid",
-    },
-    tenantId: "tenant-1",
-    role,
-    clientId: null,
-    practiceAdmin: true,
-  };
-}
-function stored(version = 3): Engagement {
-  const e = freshEngagement("CL-1", "Model risk audit", "user-lead");
-  e.version = version;
-  return e;
-}
 function envelope(
   e: Engagement,
   op: string,
@@ -53,16 +35,7 @@ function envelope(
   };
 }
 function post(body: Record<string, unknown>) {
-  return POST(
-    new Request("https://workspace.test/api/workspace", {
-      method: "POST",
-      headers: {
-        origin: "https://workspace.test",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }),
-  );
+  return POST(postRequest("/api/workspace", body));
 }
 function load(e: Engagement, ctx = caller()) {
   vi.mocked(context).mockResolvedValue(ctx);
