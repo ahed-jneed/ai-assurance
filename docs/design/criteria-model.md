@@ -34,13 +34,15 @@ The audit criteria stop being one fixed catalogue and become versioned data. The
 
 ## 2. Context: what exists today
 
+Code paths in this document are those of `main@68ec79a` (under `site-app/`), after the splits of `lib/store.ts` and the `/api/workspace` commands (#4), `app/workspace.tsx` (#5), and `lib/domain.ts` and `lib/workflow-service.ts` (#6). The methodology files are read at `main@74c6463` (section 11.1); they are unchanged on `main@68ec79a`.
+
 | Asset | Content | Consumers |
 |---|---|---|
-| `templates/catalog.json` (copied to `site-app/lib/catalog.json`) | Methodology 2026.10.1: 45 items (33 working papers, 12 memos), 168 procedure steps, 38 distinct `regulatoryRefs` strings such as `Art.9` and `Annex IV`, a `regulatorySnapshot` with three coarse application dates, and `defaults` | `templatePaper` and `freshEngagement` (`lib/store.ts`, `lib/factories.ts` after #4); `seedWorkflow` (`lib/workflow-seed.ts`); `GET /api/workspace`, which returns the whole catalogue to internal roles; the Methodology view, the paper modal and `lib/workspace-search.ts` in the client |
-| `templates/annex-iv-map.json` | Nine Annex IV sections, each with the catalogue `paperIds` that feed it | `createReport` in `app/api/workspace/route.ts` compiles an Annex IV index into every report snapshot |
-| `docs/obligation-subitems.json` | 68 selective obligation prompts (Arts 9–15, 23–26, Annex IV) with actor, trigger profile and evidence categories; 8 trigger profiles; 16 fact types | The `obligation` assurance records in `app/api/assurance/route.ts` and the assurance workbench |
-| Hard-coded criteria in code | `articleNames` (Arts 9–15) and an article regex in the "Article-to-evidence mapping" panel, which shows signed papers per article as a percentage; template ids `MEM-EX-01`, `WP-A10-02` and `WP-A15-01` in the workspace and assurance routes; legal snapshot strings in `lib/store.ts` and `app/workspace.tsx` (#18 removes these) | |
-| AI Act behaviour that applies to every engagement | `freshEngagement` creates an AI Act `classification` (version `02024R1689-20260727`). `completionGates` blocks every report until it is approved, and `stageGates` blocks the move from Planning to Fieldwork on it. `createReport` writes a fixed `regulatorySource` (the AI Act ELI) and a limitations sentence about notified bodies, and always compiles the Annex IV index. `assurance-workbench.tsx` and the assurance route import `obligation-subitems.json` directly | Section 7.1 makes each of them pack data |
+| `templates/catalog.json` (copied to `site-app/lib/catalog.json`) | Methodology 2026.10.1: 45 items (33 working papers, 12 memos), 168 procedure steps, 38 distinct `regulatoryRefs` strings such as `Art.9` and `Annex IV`, a `regulatorySnapshot` with three coarse application dates, and `defaults` | `templatePaper` and `freshEngagement` (`lib/factories.ts`); `seedWorkflow` (`lib/workflow-seed.ts`); `GET /api/workspace` (`lib/read-models/workspace-view.ts`), which returns the whole catalogue to internal roles; the Methodology view (`app/workspace/views/methodology.tsx`), the paper modal (`app/workspace/modals/paper.tsx`) and `lib/workspace-search.ts` in the client |
+| `templates/annex-iv-map.json` | Nine Annex IV sections, each with the catalogue `paperIds` that feed it | `createReport` (`lib/commands/reports.ts`) compiles an Annex IV index and the map's version into every report snapshot |
+| `docs/obligation-subitems.json` | 68 selective obligation prompts (Arts 9–15, 23–26, Annex IV) with actor, trigger profile and evidence categories; 8 trigger profiles; 16 fact types | The `obligation` assurance records in `app/api/assurance/route.ts` and the assurance workbench (`app/assurance-workbench.tsx`) |
+| Hard-coded criteria in code | `articleNames` (Arts 9–15, `lib/domain/classification.ts`) and the article regex of `articleCoverage` (`app/workspace/coverage.ts`), which the "Article-to-evidence mapping" panel of the Regulatory mapping view shows as signed papers per article in percent; template ids `MEM-EX-01`, `WP-A10-02` and `WP-A15-01` in `lib/commands/evidence-requests.ts`, `lib/commands/runs.ts` and the assurance route; legal snapshot strings in `lib/factories.ts` and `app/workspace/views/regulatory-mapping.tsx` (#18 removes these) | |
+| AI Act behaviour that applies to every engagement | `freshEngagement` creates an AI Act `classification` (version `02024R1689-20260727`). `completionGates` blocks every report until it is approved, and `stageGates` blocks the move from Planning to Fieldwork on it (`lib/domain/gates.ts`). `createReport` writes a fixed `regulatorySource` (the AI Act ELI) and a limitations sentence about notified bodies, and always compiles the Annex IV index. The assurance workbench and the assurance route import `obligation-subitems.json` directly | Section 7.1 makes each of them pack data |
 
 How engagements use the catalogue today, which constrains the design:
 
@@ -523,7 +525,7 @@ This is deliberately conservative: the data does not support more. Replacing mig
 ## 10. Persistence on D1
 
 ```ts
-// lib/domain types (lib/domain/types.ts after #6). The only stored addition.
+// lib/domain/types.ts. The only stored addition.
 export type CriteriaPin = { packId: string; packVersion: string; packSha256: string };
 export type EngagementCriteria = {
   pin: CriteriaPin;
@@ -538,17 +540,17 @@ export type EngagementCriteria = {
 - **Size.** The pin is about 300 bytes in `engagements.body` and in each snapshot row. Packs, frameworks and crosswalks ship with the build, are not tenant data and are never written to D1 or R2.
 - **No schema change.** Phase 1 needs no Drizzle migration and changes nothing in R2.
 - **Writes.**
-  - Phase 1 writes `criteria` only when an engagement is created: `createEngagement`, `openFollowup`, and the auto-provisioned `ENG-default`.
+  - Phase 1 writes `criteria` only when an engagement is created: `createEngagement` (`app/api/management/route.ts`), `openFollowup` (`lib/commands/engagement.ts`) and the auto-provisioned `ENG-default` (`lib/tenancy.ts`).
   - A follow-up engagement inherits the predecessor's pack id and takes that pack's current version. If every version of that pack is withdrawn, it answers 409 "Choose a criteria pack for the follow-up engagement".
 - **Read models.**
-  - `GET /api/workspace` adds `criteria` (pin, origin, pack title and kind, `features`, frameworks with short titles, and a `withdrawn` flag). It adds `selectablePacks` for practice administrators. The client shows or hides the classification and obligation panels from `features`.
+  - `GET /api/workspace` (`lib/read-models/workspace-view.ts`) adds `criteria` (pin, origin, pack title and kind, `features`, frameworks with short titles, and a `withdrawn` flag). It adds `selectablePacks` for practice administrators. The client shows or hides the classification and obligation panels from `features`.
   - Its `catalog` field becomes `legacyCatalog(pinned pack)`, or the default pack's projection when no engagement is selected. The client type `WorkspaceData.catalog` and every client use of it stay unchanged. For a pack without `compat.catalog`, `legacyCatalog` returns `schemaVersion: "1.0.0"` and `regulatorySnapshot: {}`, which the type already allows; the client hides the regulatory-basis panel when the snapshot is empty.
   - New `GET /api/coverage?tenantId&engagementId` returns the views offered (section 9.6). With `&framework=<id>@<edition>` it returns `{pin, framework, versions, programApproved, summary, groups, cells, crosswalks, unusableEntries, notes}`. Each cell lists its contributions with the evidence chain (source id, template, paper id and revision, reviewer, conclusion, applicability, linked findings) and the link path (objective, relationship, rationale, inherited-from group or cap, crosswalk entry). `notes` counts unusable obligation records and unplaced unresolved findings.
   - The coverage endpoint is computed on demand from one aggregate (findings included), the pinned documents and at most 1,000 assurance records, all of which the route already loads for gates. Internal roles with engagement access may call it. Client roles get 403 in phase 1.
 - **Commands.**
   - `createEngagement` accepts optional `packId` and `packVersion`. The version must be released, selectable, not withdrawn and backed by confirmed licences; otherwise it answers 400 "Choose a released criteria pack".
   - The management event details record the pack.
-- **Report snapshots** gain `criteria: {packId, packVersion, packSha256}` (phase 1), and `releaseReport` adds the pin to the source records it compares with the capture, so that a pin moved between capture and release (M2), even one that changes only links, forces a new capture. Phase 2 adds framework and crosswalk stamps and, with #20, coverage by criterion.
+- **Report snapshots** gain `criteria: {packId, packVersion, packSha256}` (phase 1), and `assertReleasable` (`lib/commands/reports.ts`), which the `releaseReport` op runs first, adds the pin to the source records it compares with the capture, so that a pin moved between capture and release (M2), even one that changes only links, forces a new capture. Phase 2 adds framework and crosswalk stamps and, with #20, coverage by criterion.
 
 ## 11. Migration of the existing catalogue (pack #1)
 
@@ -1118,7 +1120,7 @@ primaryCoverage(args): Coverage; crosswalkCoverage(args): Coverage   // pure fun
 
 ### 15.1 Pack selection at engagement creation
 
-The existing "New engagement" dialog (`modal === 'engagement'`) gains a required choice, which defaults to `index.defaults.pack`:
+The existing "New engagement" dialog (`app/workspace/modals/engagement.tsx`) gains a required choice, which defaults to `index.defaults.pack`:
 
 ```text
 +- New engagement -------------------------------------------------------------+
@@ -1146,7 +1148,7 @@ The existing "New engagement" dialog (`modal === 'engagement'`) gains a required
 
 ### 15.2 Coverage heatmap
 
-It replaces the "Article-to-evidence mapping" panel of the Regulatory mapping view and keeps the classification panel (on packs with `features.aiActClassification`) and the regulatory-basis panel. It is a lazily loaded component (`app/criteria-coverage.tsx`), following the code splitting of #1.
+It replaces the "Article-to-evidence mapping" panel of the Regulatory mapping view and keeps the classification panel (on packs with `features.aiActClassification`) and the regulatory-basis panel. It is a lazily loaded component (`app/workspace/views/criteria-coverage.tsx`), following the code splitting of #1 and the view layout of #5.
 
 ```text
 Criteria coverage   EU AI Act (amended) 2026.10.1 (pinned)   Program approved r3
@@ -1239,7 +1241,7 @@ Commit order for phase 1:
 6. pack selection;
 7. coverage engine and view.
 
-The refactor commit uses the module layout of #4 and #6 (`lib/factories.ts`, `lib/commands/*`, `lib/domain/*`), which merge before #27.
+The refactor commit uses the module layout that #4, #5 and #6 put on `main` (`lib/factories.ts`, `lib/commands/*`, `lib/domain/*`, `lib/workflow/*` and `app/workspace/**`).
 
 ## 18. Open questions and risks
 
@@ -1295,11 +1297,12 @@ Checked on 5 November 2026 unless stated otherwise.
 - CSA AICM licensing FAQ: [cloudsecurityalliance.org](https://cloudsecurityalliance.org/artifacts/ccm-aicm-licensing-faq). Search result only; not read.
 - NIST AI Resource Center crosswalks: [airc.nist.gov](https://airc.nist.gov/airmf-resources/crosswalks/). Search result only; not read.
 
-**Repository** (`main@74c6463`, with Prettier-formatted `site-app` code from #1; the review revision re-read the code at `main@b15f037`)
+**Repository** (methodology files at `main@74c6463`; code re-read at `main@68ec79a`, where those files are unchanged)
 - `templates/catalog.json`, `templates/annex-iv-map.json`, `docs/obligation-subitems.json`, `docs/audit-methodology.md`;
-- `site-app/lib/domain.ts` (`completionGates`, `stageGates`, `Finding`), `site-app/lib/workflow-types.ts`, `site-app/lib/workflow-state.ts`, `site-app/lib/workflow-seed.ts`, `site-app/lib/workflow-service.ts` (`recordHistory`, `linkFindingSupport`, the plan fields);
-- `site-app/lib/store.ts` (`freshEngagement`, `templatePaper`), `site-app/lib/engagement-storage.ts`, `site-app/db/schema.ts`;
-- `site-app/app/api/workspace/route.ts` (`createReport`, `releaseReport`, `createFinding`, `classify`), `site-app/app/api/management/route.ts`, `site-app/app/api/assurance/route.ts` (`obligationDecision`), `site-app/lib/assurance-store.ts` (`assuranceGates`), `site-app/app/workspace.tsx`, `site-app/app/assurance-workbench.tsx`, `site-app/app/engagement-overview.tsx`, `site-app/app/workspace-types.ts`;
+- domain and workflow: `site-app/lib/domain/gates.ts` (`completionGates`, `stageGates`), `site-app/lib/domain/types.ts` (`Finding`), `site-app/lib/workflow-types.ts`, `site-app/lib/workflow-state.ts` (`currentExecution`), `site-app/lib/workflow-seed.ts`, `site-app/lib/workflow/command.ts` (`recordHistory`, `programDraft`), `site-app/lib/workflow/brief-program.ts` (`planFields`), `site-app/lib/workflow/procedures.ts` (`recordProcedureExecution`), `site-app/lib/workflow/finding-assurance.ts` (`linkFindingSupport`), `site-app/lib/workflow/report-release.ts` (`releaseReport`);
+- commands and storage: `site-app/lib/factories.ts` (`freshEngagement`, `templatePaper`), `site-app/lib/commands/reports.ts` (`createReport`, `assertReleasable`), `site-app/lib/commands/findings.ts` (`createFinding`), `site-app/lib/commands/classification.ts` (`classify`, `approveClassification`), `site-app/lib/engagement-storage.ts` (`dehydrate`), `site-app/db/schema.ts`;
+- routes and stores: `site-app/app/api/management/route.ts`, `site-app/app/api/assurance/route.ts` (`obligationDecision`), `site-app/lib/assurance-store.ts` (`assuranceGates`);
+- client: `site-app/app/workspace/**` (the shell, modals and views split out of `app/workspace.tsx` by #5), `site-app/app/assurance-workbench.tsx`, `site-app/app/engagement-overview.tsx`, `site-app/app/workspace-types.ts`;
 - `.github/workflows/ci.yml` (`actions/checkout@v7` at the default depth, for rule 13).
 - Internal planning documents of 5 November 2026 (not in the repository; #7 records them): the product direction brief, sections 1.5 and 2.3 and Theme 4 (R4.1 to R4.7); the codebase review, decisions D2 (stay on D1) and D5 (qualified legal review of legal content) and findings F-50 and F-51.
 
