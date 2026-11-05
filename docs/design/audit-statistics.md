@@ -7,7 +7,7 @@
 | Date | 5 November 2026 |
 | Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`) |
 | Consumed by | #30 (NYC Local Law 144 pack), #15 (binary performance fixes) |
-| Contract files | `schemas/fixtures/statistics-golden.json` (49 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
+| Contract files | `schemas/fixtures/statistics-golden.json` (51 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
 
 The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Python engine, the external worker's projection of an engine report, or the hosted TypeScript runner. Anything not marked as engine-only applies to all of them, and the golden fixture is the arbiter when this text and an implementation disagree.
 
@@ -26,6 +26,7 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
    - MOVER-Wilson for balanced accuracy.
    - Wilson on the Jaccard index for F1; Bonferroni-combined per-class intervals for macro F1 and macro precision.
    - **Fisher's exact test** as the small-cell rule. When any cell of a 2×2 comparison is under 5, a *fail* also needs Fisher's p to clear the same threshold.
+   - **Fisher's exact test, one-sided, as the chance gate.** A pass of balanced accuracy or macro recall at or above chance also needs it to reject independence of prediction and truth (section 5.2).
    - The seeded percentile bootstrap is engine-only (section 5).
 5. **One set of minimums, as floors that a plan cannot lower:** at least 30 evaluated rows, at least 30 rows per compared group, and at least 10 in every class-conditional denominator. They apply to the engine, the hosted runner and the worker alike. A legacy configuration with lower values is raised to the floors, and both values are recorded (section 7).
 6. **Group criteria compare every pair of groups by default.** This is exactly equivalent to today's "max − min" gap and "min/max" ratio, so legacy thresholds keep their meaning.
@@ -35,7 +36,10 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
 7. **Metrics without a band are descriptive.** They are reported with an interval but never decide, and they do not count in any multiplicity adjustment. A criterion with no band at all is inconclusive (`no_threshold`).
    - This changes behaviour: an engine result no longer needs a threshold on every metric to pass.
    - Three derivation rules keep the change from letting a degenerate model pass, meaning one whose output does not depend on the truth (section 4.8):
-     - Every derived classification criterion carries a **chance baseline**: balanced accuracy ≥ 0.5 for binary data, and macro recall ≥ 1/k for k classes, or the policy's own bound when it is higher. A degenerate model's population value is exactly chance, so it passes with probability at most about α/2, and a constant model, whose estimate is exactly chance, never passes.
+     - Every derived classification criterion carries a **chance baseline**: balanced accuracy ≥ 0.5 for binary data, and macro recall ≥ 1/k for k classes, or the policy's own bound when it is higher. A degenerate model's population value is exactly chance.
+       - The interval alone does not keep such a model out. When a class is predicted only a few times, exact enumeration shows passes up to 12% of the time (section 5.2).
+       - So the baseline also needs Fisher's exact test of independence to reject (the chance gate). A degenerate model then passes with probability at most α/2, at any sample size and however rarely it predicts a class (at most 0.022 in the enumerated designs).
+       - A constant model, whose estimate is exactly chance, never passes.
      - R² and ECE, which 1.0.0 cannot decide, **block a pass** in criteria derived from engine thresholds, as today's rule makes a pass depend on them.
      - A policy with no threshold that 1.0.0 can decide still never passes.
 8. **Power is checked when the plan is approved.**
@@ -56,10 +60,10 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
     - The external worker copies the engine's decisions instead of re-deciding (sections 11 and 12).
 12. **What the hosted runner mirrors.** It mirrors every analytic part exactly: intervals, p-values, Fisher, the family adjustments, minimums, plan normalisation and hashing, legacy derivation, power and the library. Bootstrap, clustered data and score-based calibration stay engine-only (section 12).
 13. **Verification.**
-    - All 49 golden cases are recomputed by a standard-library reference.
-    - They are then recomputed again, independently, with scipy, statsmodels, jsonschema and Node.js: 1,610 checks with 0 discrepancies, including a second, separately written legacy derivation.
-    - A mutation test confirms that the cross-check catches each of 29 deliberately corrupted values.
-    - Monte Carlo runs confirm interval coverage and the power formulas (section 13.3).
+    - All 51 golden cases are recomputed by a standard-library reference.
+    - They are then recomputed again, independently, with scipy, statsmodels, jsonschema and Node.js: 1,911 checks with 0 discrepancies, including a second, separately written legacy derivation and the chance gate.
+    - A mutation test confirms that the cross-check catches each of 32 deliberately corrupted values.
+    - Exact enumeration confirms the false-fail figures of section 6 and the chance gate of section 5.2. Monte Carlo runs confirm interval coverage and the power formulas (section 13.3).
 
 **Where this design departs from the issue text** (each departure is also a question decided in section 15):
 
@@ -177,7 +181,7 @@ Let the **pool** be the members that are not `suppressed`, and **E** the pool me
 1. **No usable evidence.** If the criterion is gated (`sampleSize` below `minimums.sampleSize`), has no members, or E is empty: direction `none`, P = 1.
 2. **Fail evidence.** Otherwise, if any member of E has direction `fail`: direction is `fail`, and `P = min(1, m · min p_fail)`. This is Bonferroni within the criterion. "Some comparison is outside the band" is a union claim, and the false-claim rate needs union control.
 3. **Pass evidence.** Otherwise, direction is `pass` if any member of E points to pass, and `none` if every member of E sits on a bound.
-   - P = max p_pass over the pool, but only if every pool member is evaluated and points to pass, and no pass gate applies (section 4.4). Otherwise P = 1.
+   - P = max p_pass over the pool, but only if every pool member is evaluated and points to pass, and no pass gate applies (section 4.4). Otherwise P = 1. A chance-gated member's p_pass already includes its exact test (section 5.2).
    - "Every comparison is inside the band" is an intersection–union test. It has size α when each component test has size α, so no adjustment is needed or applied ([Berger 1982](https://doi.org/10.2307/1267823)).
 4. `unadjustedOutcome` = direction when P ≤ α, otherwise `inconclusive`.
 5. `decidingMemberId`:
@@ -203,6 +207,7 @@ A `performance` criterion uses the same rule on heterogeneous members. "Accuracy
 | `insufficient_groups` | criterion | Fewer than two eligible groups, or the reference group is ineligible. A pass is blocked, and no member can fail. |
 | `too_many_groups` | criterion | More than 50 groups in `all_pairs` mode, or more than 1,000 in `reference` mode. No members are formed, and the criterion is inconclusive. Per-group rates are still reported. |
 | `small_cell_exact_test_not_significant` | criterion | When any 2×2 cell is under 5 and the direction is fail, p_fail = max(p_interval, p_Fisher). The code is recorded when this alone prevents the fail. |
+| `chance_exact_test_not_significant` | criterion | A balanced-accuracy member under the chance gate points to pass, and p_pass = max(p_interval, `chanceExactP`) (section 5.2). The code is recorded when the gate alone prevents the pass: every pool member's interval lies inside its band, yet P > α. |
 | `interval_straddles_band` | criterion | No claim: the interval straddles the band. |
 | `within_criterion_multiplicity` | criterion | A member's own p ≤ α, but m·p > α. |
 | `multiplicity_adjustment` | criterion | The family adjustment removes a claim. |
@@ -214,7 +219,7 @@ A `performance` criterion uses the same rule on heterogeneous members. "Accuracy
 | `interval_requires_engine`, `clustered_design_requires_engine` | criterion (hosted) | The hosted runner cannot compute the required interval (score columns, cluster designs) and returns inconclusive. |
 | `bootstrap_insufficient_valid_replicates`, `bootstrap_budget_exceeded`, `small_cell_clustered` | member (engine) | See section 5.11. |
 
-No golden case produces `too_many_groups`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine` or the bootstrap codes. They appear only in runner output. `no_threshold` is pinned by GC-45 and `undecidable_metric` by GC-48. The power reason codes are listed in section 8.
+No golden case produces `too_many_groups`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine` or the bootstrap codes. They appear only in runner output. `no_threshold` is pinned by GC-45, `undecidable_metric` by GC-48, and `chance_exact_test_not_significant` by GC-50 and GC-51. The power reason codes are listed in section 8.
 
 Gates never hide numbers. Every member whose estimate is defined still reports its estimate and interval, including suppressed and insufficiently supported members, so the auditor can see how uncertain the evidence is.
 
@@ -273,16 +278,17 @@ Each criterion kind has a standard metric set, shown in the table below. Every m
    - multiclass data: `max(1/k, b)`, where k is the number of labels that occur in the target column of the evaluated rows, and at least 2;
    - a policy upper bound on the metric is kept as the member's upper bound.
 
-   This suffices. For a degenerate model, the recall of class c is P(ŷ = c | y = c) = P(ŷ = c), so its population balanced accuracy is Σ_c P(ŷ = c) / k = 1/k when it predicts only labels that occur in the target, and 0.5 for binary data. A prediction outside those labels leaves a class without support, which makes macro recall undefined (`single_class`) and blocks a pass.
-   - The baseline member's population value therefore lies on its bound, or below it when the policy's bound is higher. The member passes only when its interval lies wholly above that value, which has probability at most about α/2, the one-sided non-coverage of the interval.
+   For a degenerate model, the recall of class c is P(ŷ = c | y = c) = P(ŷ = c), so its population balanced accuracy is Σ_c P(ŷ = c) / k = 1/k when it predicts only labels that occur in the target, and 0.5 for binary data. A prediction outside those labels leaves a class without support, which makes macro recall undefined (`single_class`) and blocks a pass. The baseline member's population value therefore lies on its bound, or below it when the policy's bound is higher.
+   - **The interval alone is not enough.** Its one-sided non-coverage is near α/2 only when every class is predicted often. When a class is predicted only a few times, Wilson's lower limit is anti-conservative, and exact enumeration shows a degenerate model passing up to 12% of the time (section 5.2).
+   - **So the member carries the chance gate** (section 5.2). It passes only if Fisher's exact test also rejects independence of prediction and truth. That test is exact at every sample size, so a degenerate model passes the member with probability at most α/2, whatever the design and however rarely it predicts a class. Exact enumeration gives at most 0.022 over the designs of section 5.2.
    - A constant model's estimate is exactly chance, 1/k or 0.5, so it sits on the bound (`estimate_on_band_boundary`), or below it, and never passes.
-   - A criterion passes only if every member passes, so these bounds hold for the criterion (GC-06, GC-46, GC-47).
+   - A criterion passes only if every member passes, so these bounds hold for the criterion (GC-06, GC-46, GC-47, GC-50, GC-51).
 2. **Metrics that cannot be decided.** R² and ECE have no interval that decides in 1.0.0, yet today's rule makes a pass depend on them. So a criterion derived from engine thresholds lists them in `passBlockedBy`, whether or not the policy sets their threshold: `PERF-REG` gets `["r2"]` and `PERF-CAL` `["expected_calibration_error"]`. Such a criterion never passes (`undecidable_metric`), and it can still fail on its MAE, RMSE or Brier members (GC-48). An explicit 1.3 plan has no `passBlockedBy`, because the auditor then chooses the members.
 3. **No threshold.** A criterion whose policy sets no threshold that 1.0.0 can decide has no members and is inconclusive with `no_threshold`. So such a policy still never passes, as today (GC-45).
 
 The consequences for performance and calibration criteria, compared with today's rules on the same data:
 - **Hosted-derived criteria** pass only where today's hosted rule would also pass. Their members are today's criteria, decided by the interval instead of the point estimate, plus the chance baseline, at higher minimums.
-- **Engine-derived classification criteria** can now pass without a threshold on every metric. This is the intended change, and the chance baseline keeps degenerate models out.
+- **Engine-derived classification criteria** can now pass without a threshold on every metric. This is the intended change, and the chance baseline with its gate keeps degenerate models out.
 - **Engine-derived regression and calibration criteria** never pass in 1.0.0. Today they pass only when R² or ECE meets its threshold by point estimate, and 1.0.0 never decides by point estimate.
 
 Explicit plans are taken as written. Whether they must also carry a baseline is a product decision for #15 (F-06).
@@ -300,7 +306,7 @@ Notation: TP, FP, FN, TN are counts; positives P = TP + FN; negatives N = FP + T
 | recall (TPR) | TP/P | Wilson | closed | – | P ≥ 10 | P = 0 (`single_class`) |
 | specificity (TNR) | TN/N | Wilson | closed | – | N ≥ 10 | N = 0 (`single_class`) |
 | false_positive_rate | FP/N | Wilson | closed | – | N ≥ 10 | N = 0 (`single_class`) |
-| balanced_accuracy | (TP/P + TN/N)/2 | MOVER-Wilson | bisection | – | P ≥ 10 and N ≥ 10 | P = 0 or N = 0 |
+| balanced_accuracy | (TP/P + TN/N)/2 | MOVER-Wilson | bisection | chance gate on a pass when the lower bound is ≥ 0.5 (section 5.2) | P ≥ 10 and N ≥ 10 | P = 0 or N = 0 |
 | f1 | 2TP/(2TP+FP+FN) | Wilson on J = TP/(TP+FP+FN), mapped by F1 = 2J/(1+J) | closed | – | P ≥ 10 | P = 0 |
 | selection rate (per group) | (TP+FP)/n_g | Wilson (reported in slices, not a criterion) | – | – | n_g ≥ 30 | n_g = 0 |
 | selection_rate_difference (demographic-parity difference) | SR_subject − SR_comparator | Newcombe hybrid score | bisection | Fisher gate | both groups ≥ 30 | a group with no rows |
@@ -311,7 +317,7 @@ Notation: TP, FP, FN, TN are counts; positives P = TP + FN; negatives N = FP + T
 | brier_score (engine) | mean (s − y)² | normal approximation | closed | – | n ≥ 30 | zero variance (`degenerate_interval`) |
 | macro_f1 (multiclass) | mean of per-class F1 | per-class Jaccard–Wilson at α/k, averaged (Bonferroni) | bisection | – | every class support ≥ 10 | a class has no support, or fewer than two classes (`single_class`) |
 | macro_precision (multiclass) | mean of per-class precision | per-class Wilson at α/k, averaged (Bonferroni) | bisection | – | every class predicted ≥ 10 times | fewer than two classes (`single_class`); a class is never predicted (`undefined_zero_denominator`) |
-| balanced_accuracy (multiclass macro recall) | mean of per-class recall | MOVER-Wilson over k classes | bisection | – | every class support ≥ 10 | a class has no support, or fewer than two classes (`single_class`) |
+| balanced_accuracy (multiclass macro recall) | mean of per-class recall | MOVER-Wilson over k classes | bisection | chance gate on a pass when the lower bound is ≥ 1/k (section 5.2) | every class support ≥ 10 | a class has no support, or fewer than two classes (`single_class`) |
 | mae, rmse | mean \|e\|; sqrt(mean e²) | normal approximation (RMSE via MSE) | closed | – | n ≥ 30 | zero variance (`degenerate_interval`) |
 | r2 (descriptive) | 1 − SSE/SST | engine percentile bootstrap; hosted: none | – | – | n ≥ 30 | SST = 0 (`undefined_zero_denominator`) |
 
@@ -326,7 +332,7 @@ L = 0 if x = 0 else max(0, c − h);   U = 1 if x = n else min(1, c + h)
 
 This is exactly today's `engine/diagnostics.py` `wilson()` generalized to any z ([Wilson 1927](https://doi.org/10.1080/01621459.1927.10502953)). [Brown, Cai & DasGupta (2001)](https://doi.org/10.1214/ss/1009213286) recommend Wilson for small n. Golden examples: GC-01 (40/50 → [0.6696, 0.8876]), GC-04 (0/40 → [0, 0.0876]), GC-05 (30/30 → [0.8865, 1]).
 
-### 5.2 Balanced accuracy and macro recall (MOVER)
+### 5.2 Balanced accuracy and macro recall (MOVER), and the chance gate
 
 TPR and TNR are estimated on disjoint rows and are independent given the class counts. For the mean of k independent proportions p_i with Wilson limits (l_i, u_i), the MOVER interval ([Zou & Donner 2008](https://doi.org/10.1002/sim.3095)) is:
 
@@ -334,7 +340,44 @@ TPR and TNR are estimated on disjoint rows and are independent given the class c
 L = mean − sqrt(Σ (p_i − l_i)²)/k,   U = mean + sqrt(Σ (u_i − p_i)²)/k
 ```
 
-Use k = 2 for binary balanced accuracy and k = number of classes for multiclass macro recall. Simulated coverage is 0.9509 (section 13.3). The majority-baseline check of #15 is the member `balanced_accuracy ≥ 0.50`, and its multiclass form is macro recall ≥ 1/k. A constant predictor has balanced accuracy exactly 0.5, or macro recall exactly 1/k, so it sits on the bound and can never pass (GC-06, GC-46). Derived plans always carry this chance baseline (section 4.8).
+Use k = 2 for binary balanced accuracy and k = number of classes for multiclass macro recall. Simulated coverage is 0.9509 with 60 positives at a TPR of 0.7 and 340 negatives at a TNR of 0.9 (section 13.3). When a class's count is 1 to 3 the interval is anti-conservative, as shown below.
+
+**The chance baseline.** The majority-baseline check of #15 is the member `balanced_accuracy ≥ 0.50`, and its multiclass form is macro recall ≥ 1/k. Derived plans always carry this chance baseline (section 4.8). A model whose predictions do not depend on the truth has balanced accuracy exactly 0.5, or macro recall exactly 1/k.
+- A constant predictor sits exactly on the bound and can never pass (GC-06, GC-46).
+- A predictor that draws its predictions at random must not pass more often than α/2. The interval alone lets it pass more often when a class is predicted only a few times.
+  - A pass of `balanced_accuracy ≥ 0.5` is exactly "Newcombe's lower bound for TPR − FPR is at least 0".
+  - A rarely predicted class puts its recall at 1 to 3 successes, where Wilson's lower limit is anti-conservative. For 1/100 it is 0.00177, while P(X ≥ 1 | n = 100, p = 0.00177) = 0.16.
+
+Exact enumeration (`--enumerate`, section 13.3) takes a binary predictor that says "positive" with probability q whatever the label. The table gives the largest pass probability over q of the member `balanced_accuracy ≥ 0.5` alone, and the q where it occurs:
+
+| Positives / negatives | Interval only | With the chance gate |
+|---|---|---|
+| 100 / 1,900 | 0.0708 (q = 0.0013) | 0.0199 (q = 0.48) |
+| 50 / 950 | 0.0708 (q = 0.0025) | 0.0181 (q = 0.29) |
+| 10 / 1,000 | 0.1107 (q = 0.014) | 0.0165 (q = 0.67) |
+| 20 / 5,000 | 0.1215 (q = 0.0070) | 0.0190 (q = 0.50) |
+| 30 / 30 | 0.0260 (q = 0.50) | 0.0137 (q = 0.50) |
+| 100 / 100 | 0.0280 (q = 0.50) | 0.0200 (q = 0.50) |
+| 300 / 700 | 0.0281 (q = 0.026) | 0.0216 (q = 0.49) |
+
+- **GC-47's derived plan** (accuracy ≥ 0.90 and balanced accuracy ≥ 0.5), at 100/1,900 and q = 0.00125: the pass probability is 0.0708 with the interval alone and 0.0057 with the gate. GC-50 is one of the tables that pass the interval: TP 1, FP 0, FN 99, TN 1,900 passes it at p = 0.0041, although Fisher's exact test of that table gives 0.05.
+- **GC-46's derived plan**, for three classes with supports 40/1,900/60 and predictions drawn with probabilities 0.001/0.998/0.001: 0.0757 with the interval alone and 0.0036 with the gate. GC-51 is one of its passing tables, [[1, 39, 0], [0, 1900, 0], [0, 60, 0]].
+
+**The chance gate.** A balanced-accuracy member whose band has a lower bound at or above chance carries an exact test of independence of prediction and truth. Chance is 0.5 for binary data and 1/k for k classes.
+- **Binary.** p_one = P(X ≥ TP) for X ~ Hypergeometric(n, P, TP + FP). This is the one-sided Fisher exact p for positive association in the 2×2 table of truth against prediction, given its margins.
+- **Multiclass.** Each class c has a one-vs-rest table with p_c = P(X_c ≥ TP_c) for X_c ~ Hypergeometric(n, support_c, predicted_c), where predicted_c counts the rows predicted as c.
+  - With k ≥ 3 classes, p_one = k · min_c p_c, Bonferroni over the classes.
+  - With k = 2 the two tables are the same table, and p_one is its p.
+- **`chanceExactP`** = min(1, 2·p_one). This puts the test on the two-sided scale of section 4.2, so p ≤ α means p_one ≤ α/2.
+- **Use.** When the member points to pass, its p_pass is max(p_interval, `chanceExactP`). Fails are not gated (section 6).
+- **Reporting.** `chanceExactP` is reported on every such member whose estimate is defined, including one that is not evaluated or sits on its bound. It is null on every other metric and descriptive entry. The criterion records `chance_exact_test_not_significant` when the gate alone prevents a pass (section 4.4; GC-50, GC-51).
+- **Scope.** Explicit plans get the gate too, because it depends only on the member's metric and bound.
+
+**Why it holds.** If predictions are independent of the truth, each table is hypergeometric given its margins. Fisher's one-sided test is then valid at every sample size: P(p_one ≤ α/2) ≤ α/2 for binary data, and for k classes at most k · α/(2k) = α/2 by the union bound. Since p_pass ≥ `chanceExactP`, the member passes with probability at most α/2, whatever the design, the prediction rates or how rarely a class is predicted. The gate tests only what a pass claims anyway:
+- balanced accuracy above 0.5 means TPR > FPR;
+- macro recall above 1/k means Σ_c TPR_c > 1 ≥ Σ_c P(ŷ = c), so for some class c, P(ŷ = c | y = c) > P(ŷ = c), which is positive association in that class's table.
+
+**Cost.** The gate binds only near chance. In every golden case whose balanced-accuracy member points to pass, `chanceExactP` is below 1e−112, except in GC-50 (0.10) and GC-51 (0.12). In GC-06, GC-46 and GC-47, whose estimates sit on the bound, it is 1. The power formulas of section 8 ignore the gate.
 
 ### 5.3 F1 (Jaccard–Wilson)
 
@@ -481,16 +524,18 @@ The criterion `equalized_odds` has two members per pair of groups: `tpr_differen
 - Probabilities within a relative 1e−7 of the observed one count as "≤". This absorbs floating-point noise in symmetric tables.
 - The reference implementation uses exact integers. GC-36 gives seven reference tables, including the issue's 6/20 vs 10/20 → 0.3332.
 
-**Use.** Fisher's test only gates fails: `p_fail = max(p_interval, p_Fisher)`.
+**Use.** The two-sided test gates only fails of pairwise members: `p_fail = max(p_interval, p_Fisher)`.
 - A claim that the band is violated implies that parity is excluded, because every group band contains parity. If an exact test cannot even reject parity, the asymptotic fail is not trusted.
 - This mirrors the Uniform Guidelines' pairing of practical and statistical significance ([29 CFR 1607.4(D)](https://www.law.cornell.edu/cfr/text/29/1607.4)).
 - GC-14 shows the gate binding: the Koopman interval [0, 0.7143] lies below 0.8, but Fisher's p = 0.0522, so the outcome is inconclusive.
-- Passes are not gated. Wilson and Newcombe behave well with small and zero counts, and a ratio pass is impossible when a count is zero.
+- Pairwise passes are not gated. A pass needs the whole interval inside a band around parity, which small counts make wide, and a ratio pass is impossible when a count is zero.
+
+**One-sided use: the chance gate.** A balanced-accuracy member at or above chance uses the upper tail P(X ≥ TP) of the same hypergeometric distribution, for its own 2×2 table or for each class's one-vs-rest table (section 5.2). It is computed from the same weights: the sum over the tables with at least the observed count, divided by the sum of all weights. No tolerance is needed, and the reference implementation again uses exact integers. Unlike the two-sided test, it gates passes.
 
 **Why Fisher rather than Boschloo.**
 - Boschloo's test is more powerful, as the [scipy documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.fisher_exact.html) notes.
 - But it maximises over a nuisance parameter numerically (scipy evaluates a grid), so two implementations can differ at the fourth decimal.
-- Fisher is exact, deterministic and identical in both runners. Since it only gates fails, its conservatism errs on the safe side.
+- Fisher is exact, deterministic and identical in both runners. Its conservatism errs on the safe side: it can only make a fail or a chance-baseline pass harder.
 - Boschloo may later be reported by the engine as a sensitivity statistic (Q8; on the Later list).
 
 ### 5.13 Numerical requirements (all runners)
@@ -520,6 +565,8 @@ Defaults:
   - Exact binomial enumeration with this specification's Newcombe rule shows this. Take one member, 100 per group, a band of ±0.02 and the true difference on the band edge (0.51 vs 0.49), with no multiplicity: P(false fail) = 0.0345, of which 0.0279 is above the band and 0.0066 below.
   - With 300 per group and ±0.01 it is 0.0354. The part below the band is structural, not interval approximation error.
 - So the bound per claim is **at most α**, up to the approximation error of the interval methods.
+  - That error is largest when a count is 1 to 3, where Wilson's lower limit is anti-conservative. It matters most for the chance baseline. There the interval alone would let a model that ignores the truth pass up to 12% of the time, so that pass carries an exact gate (section 5.2).
+  - The gate guards only passes. Mirroring the predictions (TP ↔ FN and FP ↔ TN) turns a pass of `balanced_accuracy ≥ 0.5` into a fail. So a model that ignores the truth is failed on a baseline at chance as often as its mirror image passes without the gate: up to 0.12 in the designs of section 5.2. A fail never lets it pass.
 
 **Why Bonferroni and not Holm across criteria.** Bonferroni bounds the probability of any wrong claim among the F confirmatory criteria at F·(α/F) = α, under any dependence between criteria. Holm's step-down would give more power, but its standard proof needs a fixed set of true null hypotheses. Here it has none:
 - Each criterion has two complementary hypotheses, "outside the band" (the null of a pass claim) and "inside the band" (the null of a fail claim). Exactly one is true, and the data choose which one is tested.
@@ -649,6 +696,7 @@ The failMde fields follow these rules:
   - GC-40: 0.429 in [0.081, 0.609]; GC-41: 0.654 in [0.352, 0.745].
   - GC-44: 0.461, which is 0.003 above its upper bound of 0.4585, the MAE formula. A 200,000-run simulation puts the MAE member at 0.469 and the criterion at 0.462, both ±0.001.
 - The lower bound is loose when members share groups, as in GC-40. That is the price of holding under any dependence. The approval display shows the range, and the required sizes are conservative.
+- The balanced-accuracy formulas ignore the chance gate (section 5.2). It binds only near chance, where a member's pass probability is already small. GC-41's simulation applies it, and its rates are the same as without it.
 
 **Approval behaviour.**
 - If any confirmatory criterion's `passProbability` is below the target, or its power is `not_computed`, approval shows the numbers in plain language. For example: "With 388 people per group, a system with identical selection rates would pass this screen only 3 times in 4."
@@ -733,7 +781,7 @@ The derivation reads one fact from the data: for a multiclass task, k, the numbe
   - `equalized_odds`: ±`maximumOddsGap`, falling back to `maximumParityGap`.
   - Group criteria use `all_pairs` mode, `minimumCoverage` 1.0 and the profile's group column.
   - The configured minimums are `minimumSampleSize` (default 20), `minimumGroupSize` and `minimumClassCount` (default 5).
-- **Engine 1.0 configuration** (GC-39, GC-45 to GC-48). The criteria take today's test ids, and `thresholds.values` supply the bands: `>=` gives a lower bound and `<=` an upper bound.
+- **Engine 1.0 configuration** (GC-39, GC-45 to GC-48, GC-50, GC-51). The criteria take today's test ids, and `thresholds.values` supply the bands: `>=` gives a lower bound and `<=` an upper bound.
   - `PERF-BINARY` takes members from accuracy, precision, recall, specificity, false_positive_rate, balanced_accuracy and f1, in that order, when the policy sets at least one of them. Balanced accuracy is then always a member, the chance baseline: lower bound `max(0.5, b)` for a policy `balanced_accuracy >= b`, and 0.5 otherwise. A policy `balanced_accuracy <= u` gives the band [0.5, u].
   - `PERF-MULTI` takes accuracy, `macro_recall` (as balanced_accuracy), macro_precision and macro_f1 in the same way. Its chance baseline is `max(1/k, b)` for a policy `macro_recall >= b`, and 1/k otherwise.
   - `PERF-REG` takes mae and rmse, and has `passBlockedBy: ["r2"]`.
@@ -851,7 +899,7 @@ All three share one result shape: `{testId, label, article, outcome, metrics, li
 A **metric** has the shape the external 1.2 projection already uses (`externalMetric`): `{name, value, unit, sampleSize, numerator, denominator, threshold, confidenceInterval, slices, details, pValue}`.
 - **Order.** `metrics` lists the headline first (group and calibration criteria), then the members in formation order, then the descriptive entries in standard order (section 4.8).
 - **`threshold`** is the legacy policy rule for the metric's name, or null. That is exactly `threshold_for` today, so a member such as `selection_rate_difference:A|B` has null.
-- **`details`** is `{role, metric, subject, comparator, counts, band, status, direction, smallCell, fisherExactP, reasons}`, with role `headline`, `member` or `descriptive`.
+- **`details`** is `{role, metric, subject, comparator, counts, band, status, direction, smallCell, fisherExactP, chanceExactP, reasons}`, with role `headline`, `member` or `descriptive`. `chanceExactP` is the chance gate's p (section 5.2), and null on every metric that has no gate.
 - **`confidenceInterval`** is `{lower, upper, level, method}`, or null when undefined. The method values are `wilson`, `newcombe_hybrid_score`, `katz_log`, `koopman_score`, `mover_wilson`, `jaccard_wilson`, `jaccard_wilson_bonferroni`, `wilson_bonferroni_mean`, `normal_approximation`, `normal_approximation_mse`, `percentile_bootstrap`, `cluster_percentile_bootstrap` and `worst_member_bounds`.
 
 The **decision** object is:
@@ -912,7 +960,7 @@ In 1.4 the value range of `maximum_selection_rate_gap` widens to [−1, 1], beca
 | `interval` | `confidenceInterval` |
 | `pValue` | `pValue` (null for descriptive entries) |
 | `counts.x`, `counts.n` (single proportions) | `numerator`, `denominator`, which are null for every other method |
-| `metric`, `subject`, `comparator`, `counts`, `band`, `status`, `direction`, `smallCell`, `fisherExactP`, `reasons` | `details.*` with the same names |
+| `metric`, `subject`, `comparator`, `counts`, `band`, `status`, `direction`, `smallCell`, `fisherExactP`, `chanceExactP`, `reasons` | `details.*` with the same names |
 | (member or descriptive) | `unit` (today's units), `sampleSize` (= `decision.sampleSize`), `threshold`, `slices` [] |
 | `criteria[i].groups[k]` | the headline metric's `slices[k]` |
 | `group`, `n`, `declared`, `suppressed` | `slice`, `n`, `declared`, `suppressed` |
@@ -948,6 +996,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 8. **Plan.** The recorded plan validates against the plan schema, is normalised, and hashes to the recorded `planSha256`. Every `decision.statisticsVersion` equals the plan's.
 9. **Limits.** Section 11.5.
 10. **Result ids and `suite`.** The results' test ids equal the recorded plan's criterion ids, in plan order, apart from engine results without a `decision`. Each result's article and metric names follow its criterion's kind (section 11.2). For a hosted profile with a stored plan, and the 1.4 and 1.5 runs made from it, `suite` equals the families of the plan's criteria.
+11. **Chance gate.** A balanced-accuracy member whose band's lower bound is at or above chance (0.5 for binary data; 1/k for multiclass data, with k the number of classes in `details.counts.perClass`) has a non-null `details.chanceExactP` when its value is defined. When its direction is pass, its `pValue` is at least `details.chanceExactP`. Every other metric has `details.chanceExactP` null (section 5.2).
 
 ## 12. What each runner mirrors
 
@@ -955,7 +1004,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 |---|---|---|---|
 | Normal quantile and `erfc`; Wilson, Newcombe, Katz-log, Koopman, MOVER, Jaccard–Wilson, Bonferroni macro intervals, normal approximation | **mirror exactly** (golden, 1e−6) | yes | not computed: copied from the engine |
 | Decision p-values (closed forms and bisection), gates, criterion combination, headline bounds, descriptive entries | **mirror exactly** | yes | copied |
-| Fisher's exact test | **mirror exactly** | yes | copied |
+| Fisher's exact test: two-sided (small-cell gate on fails) and one-sided (chance gate on passes) | **mirror exactly** | yes | copied |
 | Bonferroni and BH, families, run aggregation, `reviewFlags` | **mirror exactly** | yes | copied; the compiled external run aggregates per section 4.6 (H4) |
 | Minimum floors; suppression; coverage; `all_pairs` and `reference` modes; group limits | **mirror exactly** | yes | `translate_config` applies `max(floor, configured)` and records both |
 | Plan normalisation, RFC 8785 hash, legacy derivation | **mirror exactly** | yes | derives the hosted plan for `engineConfig` 1.1, or carries 1.4's `statistics` |
@@ -1003,7 +1052,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 - Stored numbers have 12 significant digits, except in `normalizedPlan`, which is stored exactly. The tables below round to 4 decimal places.
 - Section 11.4 maps every fixture field to the emitted output.
 
-### 13.2 The 49 cases
+### 13.2 The 51 cases
 
 Inputs are counts (x/n means x selected out of n). The key member is the deciding member. "Decision p" is the criterion P before family adjustment, and "adjusted p" is after Bonferroni (confirmatory) or BH (exploratory). Every performance-kind case also carries its descriptive entries, and every group case its per-group rates.
 
@@ -1066,8 +1115,10 @@ Inputs are counts (x/n means x selected out of n). The key member is the decidin
 | GC-47 | chance baseline (binary) | engine 1.0 policy accuracy ≥ .90, BA ≥ .40; TP 0, FP 0, FN 100, TN 1,900 | derived: BA ≥ max(0.5, 0.40) = 0.5; accuracy 0.9500 [0.9396, 0.9587]; BA 0.5000 [0.4990, 0.5185] on the bound; descriptive recall 0, specificity 1, precision undefined | 1 | 1 | **inconclusive**; estimate_on_band_boundary |
 | GC-48 | undecidable metric | engine 1.0 policy MAE ≤ 1, RMSE ≤ 1.2, R² ≥ .5; 400 targets symmetric about 5, mean predictor | MAE 0.5000 [0.4637, 0.5363]; RMSE 0.6220 [0.5779, 0.6632]; R² 0.0000 descriptive; `passBlockedBy` R² | 1 | 1 | **inconclusive**; undecidable_metric |
 | GC-49 | chance baseline (hosted multiclass) | today's hosted profile, multiclass (accuracy ≥ .75, macro F1 ≥ .7); data as GC-34 | derived: + macro recall ≥ 1/3 between them; accuracy 0.8313 [0.8037, 0.8556]; macro recall 0.8222 [0.7925, 0.8468]; macro F1 0.8243 [0.7770, 0.8634] | 1.1e−07 | 1.1e−07 | **pass** |
+| GC-50 | chance gate (binary) | GC-47's policy; TP 1, FP 0, FN 99, TN 1,900, a predictor that rarely says positive | BA 0.5050 [0.5008, 0.5272], interval p 0.0041; `chanceExactP` 0.1000 (one-sided Fisher 0.05, doubled) | 0.1000 | 0.1000 | **inconclusive**; chance_exact_test_not_significant |
+| GC-51 | chance gate (multiclass) | GC-46's policy; matrix [[1, 39, 0], [0, 1,900, 0], [0, 60, 0]], a predictor that rarely predicts high or medium | macro recall 0.3417 [0.3348, 0.3817], interval p 6.9e−05; `chanceExactP` 0.1200 (3 classes × 2 × 0.02, from high) | 0.1200 | 0.1200 | **inconclusive**; chance_exact_test_not_significant |
 
-GC-46 to GC-48 follow the re-review's three examples of a degenerate model that would pass without the rules of section 4.8: each would pass on its other members, and today's engine rule does not pass it.
+GC-46 to GC-48 follow the first re-review's three examples of a degenerate model that would pass without the rules of section 4.8: each would pass on its other members, and today's engine rule does not pass it. GC-50 and GC-51 follow the second re-review's predictors that ignore the truth and rarely predict a class: each passes the interval of its chance baseline and is stopped by the chance gate (section 5.2).
 
 All categories the issue asks for are covered:
 - small sample: GC-01, 08, 11;
@@ -1078,16 +1129,16 @@ All categories the issue asks for are covered:
 - extreme imbalance: GC-12;
 - intersectional suppression: GC-22, 23.
 
-The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation, a policy with no thresholds, the chance baselines and a metric that blocks a pass because 1.0.0 cannot decide it.
+The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation, a policy with no thresholds, the chance baselines and their gate, and a metric that blocks a pass because 1.0.0 cannot decide it.
 
 ### 13.3 Verification method
 
 **1. Reference computation (stdlib only).** `docs/design/audit-statistics-verify.py` implements sections 4–10 with the Python standard library.
-- Fisher's test uses exact integer binomials, and plan hashes use its RFC 8785 `jcs()`.
+- Fisher's test, two-sided and one-sided, uses exact integer binomials, and plan hashes use its RFC 8785 `jcs()`.
 - The script asserts that every closed-form z\* equals bisection within 1e−8, and it regenerates the fixture.
 
 Commands, from the repository root:
-- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 49 cases.
+- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 51 cases.
 - `--write` regenerates the fixture.
 - `--show-plan GC-38` prints a case's normalised plan, its canonical bytes and its hash.
 
@@ -1097,30 +1148,32 @@ Commands, from the repository root:
 
 | Category | Checks | What is recomputed |
 |---|---|---|
-| intervals | 278 | Every member and descriptive interval:<br>• Wilson: `proportion_confint(method="wilson")`<br>• Newcombe: `confint_proportions_2indep(method="newcomb")`<br>• Katz: statsmodels `method="log"` and `scipy.stats.contingency.relative_risk`<br>• Koopman: `method="score"`, or a constrained-MLE root-finder where statsmodels is degenerate<br>• MOVER, Jaccard–Wilson and the Bonferroni macro intervals: rebuilt from statsmodels Wilson limits<br>• Normal approximations: `scipy.stats.norm` |
-| decision_p_values, directions | 83, 101 | Each member's interval at level 1 − p touches the band edge, and each direction follows from estimate and band |
+| intervals | 288 | Every member and descriptive interval:<br>• Wilson: `proportion_confint(method="wilson")`<br>• Newcombe: `confint_proportions_2indep(method="newcomb")`<br>• Katz: statsmodels `method="log"` and `scipy.stats.contingency.relative_risk`<br>• Koopman: `method="score"`, or a constrained-MLE root-finder where statsmodels is degenerate<br>• MOVER, Jaccard–Wilson and the Bonferroni macro intervals: rebuilt from statsmodels Wilson limits<br>• Normal approximations: `scipy.stats.norm` |
+| decision_p_values, directions | 83, 105 | Each member's interval at level 1 − p touches the band edge, and each direction follows from estimate and band |
 | fisher | 14 | `scipy.stats.fisher_exact` on every member with a small cell, and on every GC-36 table |
-| member_status | 208 | Member status (suppressed, undefined, insufficient_support or evaluated) from the counts and minimums; `smallCell` flags; `suppressedGroups` lists |
+| chance_gate | 247 | `chanceExactP` on every member and descriptive entry: null without a gate; on each balanced-accuracy member at or above chance, `scipy.stats.fisher_exact(alternative="greater")` for binary data or `scipy.stats.hypergeom.sf` per one-vs-rest table with the Bonferroni factor for multiclass data, doubled. Where the gate decides a pass p, the library interval at level 1 − `chanceExactP` lies inside the band; elsewhere the pass p is at least `chanceExactP`. `chance_exact_test_not_significant` on exactly the criteria where the gate alone prevents a pass |
+| member_status | 210 | Member status (suppressed, undefined, insufficient_support or evaluated) from the counts and minimums; `smallCell` flags; `suppressedGroups` lists |
 | group_rates | 155 | Per-group Wilson intervals and suppression flags |
 | headlines | 26 | Worst-member bounds rebuilt from library intervals at the nominal and Bonferroni levels |
-| coverage, sample_sizes, ece_r2 | 26, 43, 3 | From the raw case data |
-| criterion_p, outcomes | 86, 154 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni), with the pass blocked where `passBlockedBy` is set; unadjusted, adjusted and run outcomes; `reviewFlags` |
-| family_adjustment | 45 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
+| coverage, sample_sizes, ece_r2 | 26, 45, 3 | From the raw case data |
+| criterion_p, outcomes | 90, 162 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni), with the pass blocked where `passBlockedBy` is set; unadjusted, adjusted and run outcomes; `reviewFlags` |
+| family_adjustment | 47 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
 | power, sample_size_search, minimum_detectable_effects | 29, 7, 5 | Member and criterion probabilities from scipy formulas; each required size is the smallest passing integer; MDEs by `scipy.optimize.brentq` (the ratio peak by `minimize_scalar`); equality-test sizes by `samplesize_proportions_2indep_onetail` |
 | ll144 | 22 | Totals, reference category, shares, eligibility, Wilson and Katz intervals |
-| derivation | 7 | Every derived plan (GC-38, GC-39, GC-45 to GC-49), rebuilt by a second, separately written implementation of section 9.3 and compared field by field: criteria, member order, the chance baselines (k counted from the data with numpy), `passBlockedBy`, applied and configured minimums |
-| plan_schema, plan_hashes | 116, 35 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 10 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5, `passBlockedBy` in a plan that was not derived, naming another kind's metric, or on a binary criterion); Node.js JCS hashes |
-| descriptive_entries, numerics | 153, 14 | Descriptive shape; `undecidable_metric` on exactly the criteria with a non-empty `passBlockedBy` and on their R² or ECE entries; normal quantiles and `erfc` against scipy |
+| derivation | 9 | Every derived plan (GC-38, GC-39, GC-45 to GC-51), rebuilt by a second, separately written implementation of section 9.3 and compared field by field: criteria, member order, the chance baselines (k counted from the data with numpy), `passBlockedBy`, applied and configured minimums |
+| plan_schema, plan_hashes | 120, 37 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 10 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5, `passBlockedBy` in a plan that was not derived, naming another kind's metric, or on a binary criterion); Node.js JCS hashes |
+| descriptive_entries, numerics | 167, 14 | Descriptive shape; `undecidable_metric` on exactly the criteria with a non-empty `passBlockedBy` and on their R² or ECE entries; normal quantiles and `erfc` against scipy |
 
-Result: **1,610 checks, 0 problems.** Ajv 8.20.0 (Draft 2020-12, the validator the repository's schema checks use, from `site-app/node_modules`) gives the same verdicts on the 71 fixture plans and the 10 invalid ones.
+Result: **1,911 checks, 0 problems.** Ajv 8.20.0 (Draft 2020-12, the validator the repository's schema checks use, from `site-app/node_modules`, with the options of `schemas/validate-run-schema.mjs`) gives the same verdicts on the 73 fixture plans and the 10 invalid ones.
 
 What the cross-check does not recompute: the library view in `decision.libraryEntry` and the text fields.
 
-`--mutation-test` corrupts 29 fixture values one at a time and the cross-check reports all 29. The corrupted values span:
+`--mutation-test` corrupts 32 fixture values one at a time and the cross-check reports all 32. The corrupted values span:
 - headlines, coverage, ECE, R², criterion and adjusted P, the deciding member, member status, outcomes, descriptive and per-group intervals, directions;
 - the plan hash, a plan below the floors, required sizes, MDEs and power probabilities;
 - a binary chance baseline lowered to the policy bound, a dropped multiclass chance baseline and an emptied `passBlockedBy`, each with the plan hash recomputed so that only the derivation check can notice;
-- a pass P despite an undecidable metric.
+- a pass P despite an undecidable metric;
+- the chance gate's p, its Bonferroni factor for three classes, and GC-50 recomputed consistently without the gate, as a runner that omits it would report it.
 
 **3. Monte Carlo (`--simulate`, 20,000 replications, seed 20261105).**
 - Power formulas against the actual decision rules, at the family-adjusted level:
@@ -1131,7 +1184,7 @@ What the cross-check does not recompute: the library view in `decision.libraryEn
 | GC-28 | 0 | 0 |
 | GC-29 | 0.3164 | 0.3297 (random class counts; the formula holds them at 50) |
 | GC-40 | range [0.0812, 0.6087]; members 0.8639, 0.6087, 0.6087 | 0.4292; members 0.8673, 0.6160, 0.6176 |
-| GC-41 | range [0.3518, 0.7447] | 0.6541 |
+| GC-41 | range [0.3518, 0.7447] | 0.6541 (with the chance gate on its balanced-accuracy member) |
 | GC-42 | 0 | 0 |
 | GC-44 | range [0.1632, 0.4585]; members 0.4585, 0.7047 | 0.4612; members 0.4677, 0.6847 |
 
@@ -1140,7 +1193,7 @@ What the cross-check does not recompute: the library view in `decision.libraryEn
   - `--simulate` checks both distances against 0.02 and exits non-zero if either is exceeded.
 - Coverage of the derived intervals:
   - F1 Jaccard–Wilson: 0.9513.
-  - Balanced-accuracy MOVER: 0.9509.
+  - Balanced-accuracy MOVER: 0.9509, with 60 positives at TPR 0.7 and 340 negatives at TNR 0.9. It undercovers when a class's count is 1 to 3, which the enumeration below quantifies for the chance baseline.
   - Koopman with frequent zero counts: 0.9628.
   - Macro-F1 Bonferroni: 0.9989, and macro-precision Bonferroni: 1.000 (both conservative).
   - Headline worst-member bounds for 3 groups at rates 0.50, 0.45 and 0.40: 0.9833.
@@ -1148,7 +1201,15 @@ What the cross-check does not recompute: the library view in `decision.libraryEn
 
   All are at or above the nominal 0.95 within Monte Carlo error, except where the member interval itself undercovers, as Newcombe does at d = 0 with 100 per group.
 
-**4. Exact enumeration (`--enumerate`, stdlib).** This reproduces the section 6 false-fail figures for a two-sided band by summing binomial probabilities over every table: 0.0345 (0.0279 above the band, 0.0066 below) and 0.0354.
+**4. Exact enumeration (`--enumerate`, stdlib, about 6 seconds).** It sums binomial or multinomial probabilities over every table.
+- **False fails under a two-sided band** (section 6): 0.0345 (0.0279 above the band, 0.0066 below) and 0.0354.
+- **The chance baseline** (section 5.2), for predictors that ignore the truth:
+  - the member `balanced_accuracy ≥ 0.5` alone, over seven binary designs, maximised over q on a logit grid of 242 values refined around the maximum. With the interval alone the largest value is 0.1215, and with the chance gate 0.0216, below α/2;
+  - GC-47's derived plan at q = 0.00125, computed by `evaluate_plan` itself: 0.0708, and 0.0057 with the gate;
+  - GC-46's derived plan for 40/1,900/60 and predictions 0.001/0.998/0.001: 0.0757, and 0.0036 with the gate. The rows are truncated at 4, 20 and 5 predictions outside the majority class, which omits a probability of 2.4e−8;
+  - the interval p and `chanceExactP` of GC-50 and GC-51.
+- **Fails of the baseline** (section 6): at 1 − q the member fails a predictor exactly as often as it passes at q without the gate, to within 5e−14.
+- The fast pass predicates of the enumeration are checked against `evaluate_plan` on 480 binary and 3,544 three-class tables. `--enumerate` exits non-zero on a mismatch, if the gated maximum exceeds α/2, or if the mirrored fail probabilities differ.
 
 The original revision's runs, with scipy 1.17.1 and statsmodels 0.15.0 in a throwaway virtualenv, also found the statsmodels Koopman defect described in section 5.6. Reproduce everything with the commands below. Put `<temp>` outside the repository; on Windows use `Scripts\` instead of `bin/`.
 
@@ -1161,11 +1222,11 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 | PR | Issue | Scope | Size | Depends on | Done when |
 |---|---|---|---|---|---|
-| E1 | #21 | `engine/statistics.py` (stdlib only): numerics, every interval in section 5, inversion, Fisher, Bonferroni/BH, criterion combination, power and MDE (section 8), plan normalisation, RFC 8785 hash and legacy derivation (section 9). `engine/tests/test_statistics_golden.py` loads the fixture: every case at core level, including `normalizedPlan` and `planSha256`. | M | #10 merged | all core golden values match; no new runtime dependencies |
+| E1 | #21 | `engine/statistics.py` (stdlib only): numerics, every interval in section 5, inversion, Fisher (two-sided, and one-sided for the chance gate), Bonferroni/BH, criterion combination, power and MDE (section 8), plan normalisation, RFC 8785 hash and legacy derivation (section 9). `engine/tests/test_statistics_golden.py` loads the fixture: every case at core level, including `normalizedPlan` and `planSha256`. | M | #10 merged | all core golden values match; no new runtime dependencies |
 | E2 | #21 | The decision engine in `engine/diagnostics.py`, the 1.3 contract and the validators (list below) | L | E1 | engine end-to-end golden cases pass; migrated tests and schema validators pass |
 | E3 | #21 | `intersectional_slices` rebuilt on the same machinery (suppression, coverage, exploratory BH); calibration criterion with bins and a Brier member; ECE/R² descriptive bootstrap; cluster-bootstrap decisions with the section 5.11 budget; `_bootstrap_protocol(purpose=…)`; `python -m engine.assurance power` | M | E2 | GC-22, 23, 24 pass end to end; cluster determinism test; budget test |
 | E4 | #21 | The external worker's projection (list below) | M | E2 and #10 merged | `verify_result_bytes` accepts only copied decisions; worker and schema validators pass |
-| H1 | #22 | `site-app/lib/statistics.ts`: port of E1 (AS241, `erfc`, Koopman bisection, Fisher in log space, JCS with explicit key sorting); a Vitest suite over the fixture at core level for every case with `"hosted"` in `runners` | M | E1 (the roadmap makes #22 depend on #21; H1 can be developed in parallel because the fixture is final, but it merges after E1) | Vitest golden suite green in CI |
+| H1 | #22 | `site-app/lib/statistics.ts`: port of E1 (AS241, `erfc`, Koopman bisection, two- and one-sided Fisher in log space, JCS with explicit key sorting); a Vitest suite over the fixture at core level for every case with `"hosted"` in `runners` | M | E1 (the roadmap makes #22 depend on #21; H1 can be developed in parallel because the fixture is final, but it merges after E1) | Vitest golden suite green in CI |
 | H2 | #22 | The hosted decision path, the 1.4 contract and the validators (list below) | L | H1, #15 | cross-runner agreement in CI; schema validators pass |
 | H3 | #22 | Plan step in `testing-lab.tsx`: bands, role, mode, reference group, coverage, confidence level, power assumptions; threshold-library data file with status notes; power/MDE panel showing the range, with acknowledgement; frozen plan and hash in the manifest; plain-language reason messages | M | H2 | changing an approved plan creates a new profile version (test) |
 | H4 | #22 | External intake of 1.5 results (list below) | S | E4, H2 | the 1.5 external fixtures validate; aggregation and intake-limit tests |
@@ -1173,7 +1234,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 **E2 file list and checks.**
 - `engine/diagnostics.py`:
-  - `validate_config` accepts configuration 1.0 and derives the plan (section 9.3), raising minimums to the floors and recording both. The derivation adds the chance baselines, taking k for multiclass data from the evaluated rows, and sets `passBlockedBy` on `PERF-REG` and `PERF-CAL`. It accepts 1.3 and rejects minimums below the floors, `thresholds.values` beside `statistics`, or a non-empty `passBlockedBy`.
+  - `validate_config` accepts configuration 1.0 and derives the plan (section 9.3), raising minimums to the floors and recording both. The derivation adds the chance baselines, taking k for multiclass data from the evaluated rows, and sets `passBlockedBy` on `PERF-REG` and `PERF-CAL`. The chance gate applies at evaluation (section 5.2). It accepts 1.3 and rejects minimums below the floors, `thresholds.values` beside `statistics`, or a non-empty `passBlockedBy`.
   - `result()`, `evaluate()` and `fairness()` produce criterion results with `decision`, descriptive entries and the kept headline names.
   - `run()` aggregates per section 4.6, emits contractVersion 1.3 and records the plan and its hash.
 - `engine/contract.py` `validate_report`:
@@ -1220,7 +1281,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 **H2 file list and checks.**
 - `site-app/lib/diagnostics.ts`:
-  - `evaluate()` produces one result per plan criterion, keyed by criterion id (section 11.2), with intervals, `decision`, descriptive entries and per-group slices. It derives the plan for legacy profiles, with the multiclass chance baseline 1/k taken from the rows (GC-49), and removes the "No confidence intervals" text.
+  - `evaluate()` produces one result per plan criterion, keyed by criterion id (section 11.2), with intervals, `decision`, descriptive entries, per-group slices and the chance gate (section 5.2). It derives the plan for legacy profiles, with the multiclass chance baseline 1/k taken from the rows (GC-49), and removes the "No confidence intervals" text.
   - `validateEvaluation` evaluates binary data with one observed label when `negativeLabel` is declared, and keeps today's two-label check otherwise.
 - `site-app/lib/evaluation.ts`:
   - `configSchema` gets floors 30/30/10 and `negativeLabel` for profiles with `schemaVersion` 1.1; the plan schema and `statistics` are added.

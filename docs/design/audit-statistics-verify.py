@@ -17,7 +17,9 @@ It regenerates and checks schemas/fixtures/statistics-golden.json.
   the repository; they must never become runtime dependencies.
 * --mutation-test corrupts fixture values one at a time and confirms --cross-check reports each.
 * --simulate runs Monte Carlo checks of the power formulas and of interval coverage.
-* --enumerate computes exact binomial false-fail probabilities for a two-sided band (stdlib).
+* --enumerate computes exact binomial false-fail probabilities for a two-sided band, and the exact pass
+  probabilities of the chance baseline for predictors that ignore the truth, with and without the chance
+  gate (stdlib).
 
 Usage (from the repository root):
   python docs/design/audit-statistics-verify.py --check --enumerate
@@ -321,6 +323,29 @@ def fisher_two_sided(x1, n1, x2, n2):
     return min(1.0, sum(w for w in weights if w <= observed) / sum(weights))
 
 
+def fisher_greater(x, successes, draws, total):
+    """One-sided Fisher exact p for positive association: P(X >= x) for X ~ Hypergeometric(total, successes, draws)
+    (exact integers). It is the upper tail of the observed cell of a 2x2 table given both margins."""
+    lo, hi = max(0, draws - (total - successes)), min(successes, draws)
+    if x <= lo:
+        return 1.0
+    weights = [math.comb(successes, k) * math.comb(total - successes, draws - k) for k in range(lo, hi + 1)]
+    return min(1.0, sum(weights[x - lo:]) / sum(weights))
+
+
+def chance_exact_p(tables):
+    """The chance gate of section 5.2: the one-sided Fisher p of each one-vs-rest table (tp, support, predicted, n),
+    Bonferroni over the k tables when k >= 3 (binary data, and k = 2, have one table), on the two-sided scale."""
+    tests = 1 if len(tables) <= 2 else len(tables)
+    return min(1.0, 2.0 * tests * min(fisher_greater(tp, support, predicted, n) for tp, support, predicted, n in tables))
+
+
+def chance_gated(band, chance):
+    """Section 5.2: a balanced-accuracy member whose lower bound is at or above chance carries the chance gate."""
+    lower = None if band is None else band.get("lower")
+    return chance is not None and lower is not None and (lower > chance[0] or on_boundary(lower, chance[0]))
+
+
 def bonferroni(pvalues):
     m = len(pvalues)
     return [min(1.0, m * p) for p in pvalues]
@@ -586,10 +611,12 @@ def member_id(metric, subject=None, comparator=None):
     return metric if subject is None else f"{metric}:{escape_label(subject)}|{escape_label(comparator)}"
 
 
-def member(metric, band, estimate, method, ci_at, zstar_closed=None, *, subject=None, comparator=None, counts=None, status="evaluated", reasons=(), small_cell=False, fisher=None, level=0.95, descriptive=False):
-    out = {"memberId": member_id(metric, subject, comparator), "metric": metric, "subject": subject, "comparator": comparator, "counts": counts, "estimate": estimate, "interval": None, "band": None if descriptive else band, "status": status, "direction": "none", "pValue": None if descriptive else 1.0, "smallCell": small_cell, "fisherExactP": fisher, "reasons": list(reasons)}
+def member(metric, band, estimate, method, ci_at, zstar_closed=None, *, subject=None, comparator=None, counts=None, status="evaluated", reasons=(), small_cell=False, fisher=None, chance=None, level=0.95, descriptive=False):
+    out = {"memberId": member_id(metric, subject, comparator), "metric": metric, "subject": subject, "comparator": comparator, "counts": counts, "estimate": estimate, "interval": None, "band": None if descriptive else band, "status": status, "direction": "none", "pValue": None if descriptive else 1.0, "smallCell": small_cell, "fisherExactP": fisher, "chanceExactP": None, "reasons": list(reasons)}
     if estimate is None or ci_at is None:
         return out
+    if not descriptive and chance_gated(band, chance):
+        out["chanceExactP"] = chance_exact_p(chance[1])
     lo, hi = ci_at(zcrit(level))
     out["interval"] = {"lower": lo, "upper": hi, "level": level, "method": method}
     out["_ci_at"] = ci_at
@@ -609,13 +636,16 @@ def member(metric, band, estimate, method, ci_at, zstar_closed=None, *, subject=
     out["_pInterval"] = out["pValue"]
     if small_cell and direction == "fail" and fisher is not None:
         out["pValue"] = max(out["pValue"], fisher)
+    if direction == "pass" and out["chanceExactP"] is not None:  # the chance gate (section 5.2) gates passes only
+        out["pValue"] = max(out["pValue"], out["chanceExactP"])
     return out
 
 
 class Stat:
-    """Estimate, interval method and support status of one single-sample metric."""
-    def __init__(self, estimate, method, ci_at, closed, counts, status="evaluated", reasons=()):
-        self.estimate, self.method, self.ci_at, self.closed, self.counts, self.status, self.reasons = estimate, method, ci_at, closed, counts, status, list(reasons)
+    """Estimate, interval method and support status of one single-sample metric. `chance` is (chance level,
+    one-vs-rest tables) for balanced accuracy and macro recall, which the chance gate needs (section 5.2)."""
+    def __init__(self, estimate, method, ci_at, closed, counts, status="evaluated", reasons=(), chance=None):
+        self.estimate, self.method, self.ci_at, self.closed, self.counts, self.status, self.reasons, self.chance = estimate, method, ci_at, closed, counts, status, list(reasons), chance
 
 
 def support(n, minimum, reason="below_minimum_class_count"):
@@ -624,7 +654,7 @@ def support(n, minimum, reason="below_minimum_class_count"):
 
 def stat_entry(metric, band, stat, level, descriptive=False):
     closed = None if descriptive or stat.closed is None else stat.closed(band)
-    return member(metric, band, stat.estimate, stat.method, stat.ci_at, closed, counts=stat.counts, status=stat.status, reasons=stat.reasons, level=level, descriptive=descriptive)
+    return member(metric, band, stat.estimate, stat.method, stat.ci_at, closed, counts=stat.counts, status=stat.status, reasons=stat.reasons, chance=stat.chance, level=level, descriptive=descriptive)
 
 
 def wilson_stat(x, n, minimum, zero_reason, short_reason="below_minimum_class_count"):
@@ -652,7 +682,7 @@ def binary_stat(metric, cm, mins):
         counts = {"tp": tp, "positives": pos, "tn": tn, "negatives": neg}
         if pos == 0 or neg == 0:
             return Stat(None, "mover_wilson", None, None, counts, "undefined", ["single_class"])
-        return Stat((tp / pos + tn / neg) / 2.0, "mover_wilson", lambda z: mover_mean([(tp, pos), (tn, neg)], z), None, counts, *support(min(pos, neg), cls))
+        return Stat((tp / pos + tn / neg) / 2.0, "mover_wilson", lambda z: mover_mean([(tp, pos), (tn, neg)], z), None, counts, *support(min(pos, neg), cls), chance=(0.5, [(tp, pos, tp + fp, total)]))
     if metric == "f1":
         m = tp + fp + fn
         counts = {"tp": tp, "tpPlusFpPlusFn": m, "positives": pos}
@@ -673,10 +703,11 @@ def multiclass_stat(metric, data, mins):
         return wilson_stat(sum(tps), total, mins["sampleSize"], "undefined_zero_denominator", "below_minimum_sample_size")
     if metric == "balanced_accuracy":
         parts = list(zip(tps, supports))
-        counts = {"perClass": [{"label": label, "tp": x, "support": n} for label, (x, n) in zip(labels, parts)]}
+        counts = {"perClass": [{"label": label, "tp": x, "support": n, "predicted": m} for label, (x, n), m in zip(labels, parts, predicted)]}
         if min(supports) == 0 or k < 2:
             return Stat(None, "mover_wilson", None, None, counts, "undefined", ["single_class"])
-        return Stat(sum(x / n for x, n in parts) / k, "mover_wilson", lambda z: mover_mean(parts, z), None, counts, *support(min(supports), cls))
+        tables = [(tps[i], supports[i], predicted[i], total) for i in range(k)]
+        return Stat(sum(x / n for x, n in parts) / k, "mover_wilson", lambda z: mover_mean(parts, z), None, counts, *support(min(supports), cls), chance=(1.0 / k, tables))
     if metric == "macro_f1":
         classes = [(tps[i], supports[i] + predicted[i] - tps[i]) for i in range(k)]
         counts = {"perClass": [{"label": label, "tp": x, "tpPlusFpPlusFn": m} for label, (x, m) in zip(labels, classes)]}
@@ -969,7 +1000,8 @@ def evaluate_criterion(spec, data, level, mins):
             deciding = min(pool, key=lambda m: (-m["pValue"], code_point_key(m["memberId"])))
             p = deciding["pValue"]
             if p > alpha + EPS:
-                reasons.append("interval_straddles_band")
+                ungated = max(m["_pInterval"] for m in pool)  # without the chance gate of section 5.2
+                reasons.append("chance_exact_test_not_significant" if ungated <= alpha + EPS else "interval_straddles_band")
         else:
             p = 1.0
     for m in pool:
@@ -1484,6 +1516,12 @@ CASES = [
     {"id": "GC-49", "category": "chance_baseline", "title": "Legacy hosted multiclass profile: the derived criterion adds the macro-recall chance baseline 1/3 between accuracy and macro F1, and the GC-34 model passes all three", "type": "plan",
      "data": MULTICLASS_3X3,
      "legacy": {"source": "hosted_config", "task": "Multiclass classification", "suite": ["performance"], "config": {**LEGACY_HOSTED_CONFIG, "minimumAccuracy": 0.75}}},
+    {"id": "GC-50", "category": "chance_baseline", "title": "GC-47's policy and a predictor that rarely says positive: one lucky positive (TP 1 of 100) puts the balanced-accuracy interval above 0.5, but the exact chance gate does not reject, so the criterion is inconclusive", "type": "plan",
+     "data": {"groups": [cm("all", 1, 0, 99, 1900)]},
+     "legacy": engine_legacy("binary_classification", {"accuracy": {"operator": ">=", "value": 0.9}, "balanced_accuracy": {"operator": ">=", "value": 0.4}})},
+    {"id": "GC-51", "category": "chance_baseline", "title": "GC-46's policy and a predictor that rarely predicts two of three classes: one correct 'high' puts the macro-recall interval above 1/3, but the exact chance gate (Bonferroni over the classes) does not reject, so the criterion is inconclusive", "type": "plan",
+     "data": {"kind": "multiclass", "labels": ["high", "low", "medium"], "matrix": [[1, 39, 0], [0, 1900, 0], [0, 60, 0]]},
+     "legacy": engine_legacy("multiclass_classification", {"accuracy": {"operator": ">=", "value": 0.9}})},
 ]
 
 
@@ -1705,11 +1743,35 @@ def cross_check(fixture):
             return (lo, hi) if method == "normal_approximation" else (math.sqrt(lo), math.sqrt(hi))
         raise ValueError(method)
 
+    def independent_chance_p(m):
+        """The chance gate (section 5.2), written again: None unless a balanced-accuracy member's lower bound is at or
+        above chance (0.5, or 1/k for k classes); else the one-sided Fisher p (scipy), Bonferroni over k >= 3 classes, doubled."""
+        b, c = m["band"], m["counts"] or {}
+        if m["metric"] != "balanced_accuracy" or b is None or b["lower"] is None or m["estimate"] is None:
+            return None
+        if "positives" in c:
+            if b["lower"] < 0.5 - 1e-12:
+                return None
+            tp, fp, tn = c["tp"], c["negatives"] - c["tn"], c["tn"]
+            return min(1.0, 2 * float(stats.fisher_exact([[tp, c["positives"] - tp], [fp, tn]], alternative="greater").pvalue))
+        k = len(c["perClass"])
+        if b["lower"] < 1.0 / k - 1e-12:
+            return None
+        n = sum(p["support"] for p in c["perClass"])
+        tails = [float(stats.hypergeom.sf(p["tp"] - 1, n, p["support"], p["predicted"])) for p in c["perClass"]]
+        return min(1.0, 2 * (1 if k <= 2 else k) * min(tails))
+
+    def inside(interval, b):
+        lo, hi = interval
+        return (b["lower"] is None or lo >= b["lower"]) and (b["upper"] is None or hi <= b["upper"])
+
     def check_entry(m, case_id, descriptive=False):
         if m["interval"] is not None:
             alpha = 1 - m["interval"]["level"]
             lo, hi = independent_interval(m, alpha)
             expect(near(lo, m["interval"]["lower"], 1e-6) and near(hi, m["interval"]["upper"], 1e-6), "intervals", f"{case_id} {m['memberId']} interval {lo, hi} vs {m['interval']}")
+        want_chance, got_chance = None if descriptive else independent_chance_p(m), m.get("chanceExactP", "missing")
+        expect(got_chance != "missing" and ((want_chance is None and got_chance is None) or (want_chance is not None and got_chance is not None and abs(got_chance - want_chance) <= 1e-9 + 1e-6 * want_chance)), "chance_gate", f"{case_id} {m['memberId']} chanceExactP {got_chance} vs {want_chance}")
         if descriptive:
             expect(m["band"] is None and m["direction"] == "none" and m["pValue"] is None, "descriptive_entries", f"{case_id} {m['memberId']} descriptive shape")
             return
@@ -1728,6 +1790,12 @@ def cross_check(fixture):
             p_scipy = stats.fisher_exact([[s["x"], s["n"] - s["x"]], [k["x"], k["n"] - k["x"]]]).pvalue
             expect(near(p_scipy, m["fisherExactP"], 1e-9), "fisher", f"{case_id} {m['memberId']} fisher {p_scipy} vs {m['fisherExactP']}")
             if m["pValue"] == m["fisherExactP"]:
+                return
+        if m["direction"] == "pass" and m.get("chanceExactP") is not None:
+            expect(m["pValue"] >= m["chanceExactP"] * (1 - 1e-12), "chance_gate", f"{case_id} {m['memberId']} pass p {m['pValue']} below its chanceExactP {m['chanceExactP']}")
+            if m["pValue"] == m["chanceExactP"]:  # the gate binds: the interval alone would decide at level 1 - chanceExactP
+                if m["chanceExactP"] < 1.0:
+                    expect(inside(independent_interval(m, m["chanceExactP"]), b), "chance_gate", f"{case_id} {m['memberId']} the interval p exceeds chanceExactP, so the gate cannot bind")
                 return
         if p_interval < 1e-12:
             return
@@ -1872,7 +1940,7 @@ def cross_check(fixture):
             pool = [m for m in crit["members"] if m["status"] != "suppressed"]
             ev = [m for m in pool if m["status"] == "evaluated"]
             fails = [m["pValue"] for m in ev if m["direction"] == "fail"]
-            deciding = None
+            deciding, complete = None, False
             if sample < mins["sampleSize"] or not ev:
                 p, direction = 1.0, "none"
             elif fails:
@@ -1886,6 +1954,9 @@ def cross_check(fixture):
                     deciding = min(pool, key=lambda m: (-m["pValue"], m["memberId"]))["memberId"]
             expect(near(p, d["pValue"], 1e-9) and direction == d["direction"], "criterion_p", f"{case['id']} {crit['id']} P {p} {direction} vs {d['pValue']} {d['direction']}")
             expect(deciding == d["decidingMemberId"], "criterion_p", f"{case['id']} {crit['id']} decidingMemberId {deciding} vs {d['decidingMemberId']}")
+            # the chance gate alone prevents a pass: every pool interval decides at the nominal level, yet P > alpha
+            gate_alone = direction == "pass" and complete and not blocked and p > alpha + 1e-12 and all(inside(independent_interval(m, alpha), m["band"]) for m in pool)
+            expect(("chance_exact_test_not_significant" in d["reasons"]) == gate_alone, "chance_gate", f"{case['id']} {crit['id']} chance_exact_test_not_significant should be {'present' if gate_alone else 'absent'}")
             expect(d["unadjustedOutcome"] == (direction if direction in ("pass", "fail") and p <= alpha + 1e-12 else "inconclusive"), "outcomes", f"{case['id']} {crit['id']} unadjusted outcome")
         # family adjustment, outcomes, run outcome and review flags
         for role, method in (("confirmatory", "bonferroni"), ("exploratory", "fdr_bh")):
@@ -2272,6 +2343,18 @@ def mutation_test(fixture):
         change(expected["normalizedPlan"]["criteria"][0])
         expected["planSha256"] = plan_sha256(expected["normalizedPlan"])
 
+    def skip_chance_gate(f, cid):
+        """A runner without the chance gate: the member keeps its interval p, and the criterion and run pass consistently."""
+        expected, c = case(f, cid)["expected"], crit(f, cid)
+        source = next(item for item in CASES if item["id"] == cid)
+        reference = next(m for m in evaluate_plan(plan_for(source), source["data"])["criteria"][0]["members"] if m["chanceExactP"] is not None)
+        gated = next(m for m in c["members"] if m["memberId"] == reference["memberId"])
+        gated["chanceExactP"] = None
+        gated["pValue"] = reference["_pInterval"]  # the member's interval p, without the gate
+        d = c["decision"]
+        d.update(pValue=gated["pValue"], adjustedPValue=gated["pValue"], unadjustedOutcome="pass", reasons=[])
+        c["outcome"] = expected["overallOutcome"] = "pass"
+
     mutations = {
         "headline upper bound": lambda f: bump(crit(f, "GC-22")["headline"]["interval"], "upper", 1e-4),
         "one-sided headline estimate": lambda f: crit(f, "GC-30")["headline"].__setitem__("estimate", 0.76),
@@ -2302,6 +2385,9 @@ def mutation_test(fixture):
         "multiclass chance baseline dropped": lambda f: replan(f, "GC-46", lambda c: c["members"].pop(1)),
         "R2 no longer blocking the derived regression criterion": lambda f: replan(f, "GC-48", lambda c: c.__setitem__("passBlockedBy", [])),
         "pass P despite an undecidable metric": lambda f: crit(f, "GC-48")["decision"].__setitem__("pValue", crit(f, "GC-48")["members"][0]["pValue"]),
+        "chance gate p-value": lambda f: crit(f, "GC-50")["members"][1].__setitem__("chanceExactP", 0.05),
+        "multiclass chance gate without its Bonferroni factor": lambda f: crit(f, "GC-51")["members"][1].__setitem__("chanceExactP", 0.04),
+        "chance gate skipped, the pass recomputed without it": lambda f: skip_chance_gate(f, "GC-50"),
     }
     missed = []
     for name, mutate in mutations.items():
@@ -2331,6 +2417,180 @@ def false_fail_enumeration():
                     below += a[x1] * b[x2]
         lines.append(f"exact false-fail probability, {n} per group, band +/-{delta}, true difference {delta} ({p1:.2f} vs {p2:.2f}): {above + below:.4f} (above the band {above:.4f}, below {below:.4f})")
     return lines
+
+
+CHANCE_DESIGNS = ((100, 1900), (50, 950), (10, 1000), (20, 5000), (30, 30), (100, 100), (300, 700))
+
+
+def _runs(values):
+    """Sorted integers as [first, last] runs."""
+    runs = []
+    for value in values:
+        if runs and value == runs[-1][1] + 1:
+            runs[-1][1] = value
+        else:
+            runs.append([value, value])
+    return runs
+
+
+def _gate_thresholds(positives, total, alpha):
+    """For each predicted-positive count m, the smallest TP that passes the binary chance gate (None if none does).
+    Tails in log space; a tail too close to alpha to call in floating point is recomputed with exact integers."""
+    logf = [math.lgamma(k + 1) for k in range(total + 1)]
+    negatives, out = total - positives, []
+    for m in range(total + 1):
+        lo, hi = max(0, m - negatives), min(positives, m)
+        logs = [logf[positives] - logf[x] - logf[positives - x] + logf[negatives] - logf[m - x] - logf[negatives - m + x] for x in range(lo, hi + 1)]
+        top = max(logs)
+        weights = [math.exp(v - top) for v in logs]
+        whole, tail, threshold = math.fsum(weights), 0.0, None
+        for x in range(hi, lo - 1, -1):
+            tail += weights[x - lo]
+            p = min(1.0, 2.0 * tail / whole)
+            if abs(p - alpha) < 1e-9:
+                p = chance_exact_p([(x, positives, m, total)])
+            if p > alpha + EPS:
+                break
+            threshold = x
+        out.append(threshold)
+    return out
+
+
+def chance_baseline_enumeration():
+    """Exact pass probabilities of the chance baseline for predictors that ignore the truth (section 5.2), stdlib only.
+
+    * Binary: the balanced_accuracy >= 0.5 member alone, for a predictor that says positive with probability q whatever
+      the label, maximised over a logit grid of q, with the interval rule only and with the chance gate.
+    * GC-47's derived plan at 100 positives / 1,900 negatives and q = 0.00125, by evaluate_plan itself.
+    * GC-46's derived plan for three classes with supports 40/1,900/60 and predictions drawn with probabilities
+      0.001/0.998/0.001, enumerated over every table in which each row has at most 4, 20 and 5 predictions outside
+      the majority class (the omitted probability is printed).
+    The fast predicates are checked against evaluate_plan on the likeliest tables. Returns (lines, ok)."""
+    alpha, z = 0.05, zcrit(0.95)
+    ok, lines = True, []
+    grid = sorted({1.0 / (1.0 + math.exp(-t / 10.0)) for t in range(-120, 121)} | {0.00125})
+    lines.append(f"chance baseline (section 5.2): exact pass probability of the member balanced_accuracy >= 0.5 alone, for a binary predictor that says positive with probability q whatever the label (largest over a logit grid of {len(grid)} values of q, refined around the maximum):")
+    worst = mirror_gap = 0.0
+    for positives, negatives in CHANCE_DESIGNS:
+        total = positives + negatives
+        thresholds = _gate_thresholds(positives, total, alpha)
+        interval_runs, gated_runs, fail_runs = [], [], []
+        for tp in range(positives + 1):
+            limit = -(-negatives * tp // positives)  # FP < limit exactly when the estimate is above 0.5
+            passing = [fp for fp in range(min(limit, negatives + 1)) if mover_mean([(tp, positives), (negatives - fp, negatives)], z)[0] >= 0.5]
+            interval_runs.append(_runs(passing))
+            gated_runs.append(_runs([fp for fp in passing if thresholds[tp + fp] is not None and tp >= thresholds[tp + fp]]))
+            start = negatives * tp // positives + 1  # FP >= start exactly when the estimate is below 0.5
+            fail_runs.append(_runs([fp for fp in range(start, negatives + 1) if mover_mean([(tp, positives), (negatives - fp, negatives)], z)[1] < 0.5]))
+        log_c_pos = [math.lgamma(positives + 1) - math.lgamma(k + 1) - math.lgamma(positives - k + 1) for k in range(positives + 1)]
+        log_c_neg = [math.lgamma(negatives + 1) - math.lgamma(k + 1) - math.lgamma(negatives - k + 1) for k in range(negatives + 1)]
+
+        def pass_probability(runs, q):
+            lq, l1q = math.log(q), math.log1p(-q)
+            p_tp = [math.exp(c + k * lq + (positives - k) * l1q) for k, c in enumerate(log_c_pos)]
+            prefix = [0.0]
+            for k, c in enumerate(log_c_neg):
+                prefix.append(prefix[-1] + math.exp(c + k * lq + (negatives - k) * l1q))
+            return math.fsum(p_tp[tp] * (prefix[b + 1] - prefix[a]) for tp, row in enumerate(runs) for a, b in row)
+
+        best = {}
+        for name, runs in (("interval", interval_runs), ("gated", gated_runs)):
+            top = max((pass_probability(runs, q), q) for q in grid)
+            t0 = math.log(top[1] / (1.0 - top[1]))  # refine on a 40 times finer logit grid around the coarse maximum
+            best[name] = max([top] + [(pass_probability(runs, q), q) for q in (1.0 / (1.0 + math.exp(-(t0 + i / 400.0))) for i in range(-40, 41))])
+        worst = max(worst, best["gated"][0])
+        # Fails are not gated (section 6): at 1 - q the member is failed exactly as often as it passes at q without the gate.
+        mirror_gap = max(mirror_gap, abs(pass_probability(fail_runs, 1.0 - best["interval"][1]) - best["interval"][0]))
+        lines.append(f"  {positives} positives / {negatives} negatives: interval only {best['interval'][0]:.4f} (q = {best['interval'][1]:.3g}); with the chance gate {best['gated'][0]:.4f} (q = {best['gated'][1]:.3g})")
+        if (positives, negatives) == (100, 1900):  # the fast predicate must agree with the normative rule
+            member_plan = normalize_plan({"criteria": [perf("baseline", [("balanced_accuracy", band(0.5))])]})
+            q = 0.00125
+            for tp in range(12):
+                for fp in range(40):
+                    result = evaluate_plan(member_plan, {"groups": [cm("all", tp, fp, positives - tp, negatives - fp)]})["criteria"][0]
+                    fast_interval = any(a <= fp <= b for a, b in interval_runs[tp])
+                    fast_gated = any(a <= fp <= b for a, b in gated_runs[tp])
+                    m = result["members"][0]
+                    rule_interval = m["status"] == "evaluated" and m["direction"] == "pass" and m["_pInterval"] <= alpha + EPS
+                    if fast_interval != rule_interval or fast_gated != (result["outcome"] == "pass"):
+                        ok = False
+                        lines.append(f"  MISMATCH with evaluate_plan at TP {tp}, FP {fp}")
+    within = worst <= alpha / 2.0
+    ok = ok and within and mirror_gap <= 1e-9
+    lines.append(f"  largest pass probability with the chance gate: {worst:.4f} ({'at most' if within else 'ABOVE'} alpha/2 = {alpha / 2})")
+    lines.append(f"  fails are not gated: at 1 - q the member fails a predictor with its interval-only pass probability at q (largest difference {mirror_gap:.1e})")
+
+    # GC-47's derived plan, by evaluate_plan itself.
+    source = next(c for c in CASES if c["id"] == "GC-47")
+    plan, positives, negatives, q = plan_for(source), 100, 1900, 0.00125
+    interval = gated = mass = 0.0
+    for tp in range(16):
+        for fp in range(40):
+            probability = math.comb(positives, tp) * q ** tp * (1 - q) ** (positives - tp) * math.comb(negatives, fp) * q ** fp * (1 - q) ** (negatives - fp)
+            mass += probability
+            result = evaluate_plan(plan, {"groups": [cm("all", tp, fp, positives - tp, negatives - fp)]})["criteria"][0]
+            members = result["members"]
+            interval += probability * (all(m["status"] == "evaluated" and m["direction"] == "pass" for m in members) and max(m["_pInterval"] for m in members) <= alpha + EPS)
+            gated += probability * (result["outcome"] == "pass")
+    lines.append(f"GC-47's derived plan (accuracy >= 0.90, balanced accuracy >= 0.5), 100 positives / 1900 negatives, q = 0.00125: interval only {interval:.4f}; with the chance gate {gated:.4f} (omitted probability {max(0.0, 1 - mass):.1e})")
+
+    # GC-46's derived plan for three classes, rows truncated.
+    source = next(c for c in CASES if c["id"] == "GC-46")
+    plan, labels, supports, probs, limits = plan_for(source), ["high", "low", "medium"], (40, 1900, 60), (0.001, 0.998, 0.001), (4, 20, 5)
+    bound = plan["criteria"][0]["members"][1]["band"]["lower"]
+    total, majority = sum(supports), 1
+    rows = []
+    for r, size in enumerate(supports):
+        outcomes = []
+        for first in range(limits[r] + 1):
+            for third in range(limits[r] + 1 - first):
+                counts = [first, size - first - third, third]
+                log_p = math.lgamma(size + 1) - sum(math.lgamma(c + 1) for c in counts) + sum(c * math.log(p) for c, p in zip(counts, probs) if c)
+                outcomes.append((counts, math.exp(log_p)))
+        rows.append(outcomes)
+    tails = {}
+
+    def tail(x, support, predicted):
+        key = (x, support, predicted)
+        if key not in tails:
+            tails[key] = fisher_greater(x, support, predicted, total)
+        return tails[key]
+
+    def fast(matrix):
+        correct = sum(matrix[c][c] for c in range(3))
+        passes = wilson(correct, total, z)[0] >= 0.9 and mover_mean([(matrix[c][c], supports[c]) for c in range(3)], z)[0] >= bound
+        if not passes:
+            return False, False
+        predicted = [sum(matrix[r][c] for r in range(3)) for c in range(3)]
+        return True, min(1.0, 6.0 * min(tail(matrix[c][c], supports[c], predicted[c]) for c in range(3))) <= alpha + EPS
+
+    interval = gated = mass = 0.0
+    likeliest = []
+    for (high, p_high) in rows[0]:
+        for (low, p_low) in rows[1]:
+            for (medium, p_medium) in rows[2]:
+                probability = p_high * p_low * p_medium
+                mass += probability
+                matrix = [high, low, medium]
+                by_interval, by_gate = fast(matrix)
+                interval += probability * by_interval
+                gated += probability * by_gate
+                if probability > 1e-5 or by_interval and probability > 1e-9:
+                    likeliest.append((matrix, by_interval, by_gate))
+    for matrix, by_interval, by_gate in likeliest:
+        data = {"kind": "multiclass", "labels": labels, "matrix": matrix}
+        result = evaluate_plan(plan, data)["criteria"][0]
+        members = result["members"]
+        rule_interval = all(m["status"] == "evaluated" and m["direction"] == "pass" for m in members) and max(m["_pInterval"] for m in members) <= alpha + EPS
+        if rule_interval != by_interval or (result["outcome"] == "pass") != by_gate:
+            ok = False
+            lines.append(f"  MISMATCH with evaluate_plan at {matrix}")
+    lines.append(f"GC-46's derived plan (accuracy >= 0.90, macro recall >= 1/3), supports 40/1900/60, predictions 0.001/0.998/0.001 whatever the label: interval only {interval:.4f}; with the chance gate {gated:.4f} (omitted probability {max(0.0, 1 - mass):.1e}; {len(likeliest)} tables checked against evaluate_plan)")
+    for cid in ("GC-50", "GC-51"):
+        source = next(c for c in CASES if c["id"] == cid)
+        m = next(m for m in evaluate_plan(plan_for(source), source["data"])["criteria"][0]["members"] if m["chanceExactP"] is not None)
+        lines.append(f"{cid}: the {m['memberId']} member's interval alone gives p = {m['_pInterval']:.2g}; its chanceExactP is {m['chanceExactP']:.4f}, so its decision p is {m['pValue']:.4f}")
+    return lines, ok
 
 
 def simulate(fixture, sims=20000):
@@ -2388,12 +2648,15 @@ def simulate(fixture, sims=20000):
                 hits += tpr_ok and fpr_ok
         elif crit["kind"] == "performance":
             pi, tpr, tnr, n = a["prevalence"], a["truePositiveRate"], a["trueNegativeRate"], a["n"]
+            alpha_member = (1 - inp["confidenceLevel"]) / inp["familySize"]
             for tp, fn, fp, tn in rng.multinomial(n, [pi * tpr, pi * (1 - tpr), (1 - pi) * (1 - tnr), (1 - pi) * tnr], sims):
                 cmx = {"tp": int(tp), "fp": int(fp), "fn": int(fn), "tn": int(tn)}
                 ok = True
                 for item in crit["members"]:
                     stat = binary_stat(item["metric"], cmx, FLOORS)
                     passed = stat.status == "evaluated" and interval_pass(*stat.ci_at(z), item["band"])
+                    if passed and chance_gated(item["band"], stat.chance):  # the chance gate of section 5.2
+                        passed = chance_exact_p(stat.chance[1]) <= alpha_member + EPS
                     member_hits[item["metric"]] += passed
                     ok = ok and passed
                 hits += ok
@@ -2516,7 +2779,7 @@ def main():
     parser.add_argument("--cross-check", action="store_true")
     parser.add_argument("--simulate", action="store_true")
     parser.add_argument("--mutation-test", action="store_true", help="corrupt fixture values one at a time and confirm --cross-check reports each")
-    parser.add_argument("--enumerate", action="store_true", help="exact binomial false-fail probabilities for a two-sided band (section 6); stdlib only")
+    parser.add_argument("--enumerate", action="store_true", help="exact false-fail probabilities for a two-sided band (section 6) and exact chance-baseline pass probabilities (section 5.2); stdlib only")
     parser.add_argument("--markdown", action="store_true")
     parser.add_argument("--show-plan", metavar="CASE", help="print a case's normalised plan, its RFC 8785 bytes and its SHA-256")
     args = parser.parse_args()
@@ -2529,6 +2792,10 @@ def main():
     if args.enumerate:
         for line in false_fail_enumeration():
             print(line)
+        lines, ok = chance_baseline_enumeration()
+        for line in lines:
+            print(line)
+        status |= not ok
     if args.show_plan:
         case = next(c for c in CASES if c["id"] == args.show_plan)
         plan = plan_for(case)

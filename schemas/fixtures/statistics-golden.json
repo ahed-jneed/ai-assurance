@@ -209,6 +209,7 @@
         "pValue": 0.122822648101,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -235,6 +236,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -259,6 +261,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -283,6 +286,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -309,6 +313,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -334,6 +339,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -482,6 +488,7 @@
         "pValue": 6.33424836662e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -508,6 +515,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -532,6 +540,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -556,6 +565,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -582,6 +592,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -607,6 +618,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -753,6 +765,7 @@
         "pValue": 0.000858120666394,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -779,6 +792,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -803,6 +817,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -827,6 +842,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -853,6 +869,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -878,6 +895,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1024,6 +1042,7 @@
         "pValue": 0.0350149810197,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1050,6 +1069,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1074,6 +1094,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1098,6 +1119,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1122,6 +1144,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1148,6 +1171,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1173,6 +1197,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1319,6 +1344,7 @@
         "pValue": 0.0213975686969,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1345,6 +1371,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1369,6 +1396,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1393,6 +1421,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1419,6 +1448,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1444,6 +1474,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1646,6 +1677,7 @@
         "pValue": 2.48266063388e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1673,6 +1705,7 @@
         "pValue": 2.66203489046e-32,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1702,6 +1735,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 1.0,
         "reasons": [
          "estimate_on_band_boundary"
         ]
@@ -1726,6 +1760,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "undefined_zero_denominator"
         ]
@@ -1756,6 +1791,7 @@
         "pValue": 4.32046305783e-08,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1782,6 +1818,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -1959,6 +1996,7 @@
         "pValue": 0.0770998717435,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -1983,6 +2021,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "single_class"
         ]
@@ -2007,6 +2046,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "single_class"
         ]
@@ -2035,6 +2075,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -2059,6 +2100,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -2084,6 +2126,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -2244,6 +2287,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -2509,6 +2553,7 @@
         "pValue": 7.46909027122e-70,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -2626,6 +2671,7 @@
         "pValue": 2.11926499372e-21,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -2876,6 +2922,7 @@
         "pValue": 0.0133475759268,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -2993,6 +3040,7 @@
         "pValue": 0.00627719184932,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -3209,6 +3257,7 @@
         "pValue": 0.433943816298,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -3461,6 +3510,7 @@
         "pValue": 0.234052616952,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -3580,6 +3630,7 @@
         "pValue": 0.197697125555,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -3798,6 +3849,7 @@
         "pValue": 0.00267606920279,
         "smallCell": true,
         "fisherExactP": 0.00102965634975,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -4014,6 +4066,7 @@
         "pValue": 0.0521855486173,
         "smallCell": true,
         "fisherExactP": 0.0521855486173,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -4266,6 +4319,7 @@
         "pValue": 0.0184221254541,
         "smallCell": true,
         "fisherExactP": 1.0,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -4362,6 +4416,7 @@
         "pValue": 1.0,
         "smallCell": true,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "undefined_zero_denominator"
         ]
@@ -4591,6 +4646,7 @@
         "pValue": 0.0101686257694,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -4832,6 +4888,7 @@
         "pValue": 0.247182997136,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -4865,6 +4922,7 @@
         "pValue": 0.0364495940008,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -4898,6 +4956,7 @@
         "pValue": 0.129990348929,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -5225,6 +5284,7 @@
         "pValue": 2.71605435699e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5258,6 +5318,7 @@
         "pValue": 0.000561879343605,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -5510,6 +5571,7 @@
         "pValue": 0.001565402258,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5537,6 +5599,7 @@
         "pValue": 0.00109083517613,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5563,9 +5626,10 @@
         },
         "status": "evaluated",
         "direction": "pass",
-        "pValue": 1.03679525246e-134,
+        "pValue": 9.98889855387e-119,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 9.98889855387e-119,
         "reasons": []
        },
        {
@@ -5594,6 +5658,7 @@
         "pValue": 0.000612989768973,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -5620,6 +5685,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5644,6 +5710,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -5838,6 +5905,7 @@
         "pValue": 0.0116399893882,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5871,6 +5939,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -5906,6 +5975,7 @@
         "pValue": 0.00892512359559,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5939,6 +6009,7 @@
         "pValue": 0.00479797438284,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -5972,6 +6043,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6007,6 +6079,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6042,6 +6115,7 @@
         "pValue": 0.0223695394538,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6075,6 +6149,7 @@
         "pValue": 0.0126925919025,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6108,6 +6183,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6143,6 +6219,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6178,6 +6255,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6213,6 +6291,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6248,6 +6327,7 @@
         "pValue": 0.00987214803681,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6281,6 +6361,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6316,6 +6397,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6633,6 +6715,7 @@
         "pValue": 0.00520008835796,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6666,6 +6749,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6701,6 +6785,7 @@
         "pValue": 0.00892512359559,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6734,6 +6819,7 @@
         "pValue": 0.00479797438284,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6767,6 +6853,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6802,6 +6889,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6837,6 +6925,7 @@
         "pValue": 0.00201840992417,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6870,6 +6959,7 @@
         "pValue": 0.00576470792764,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -6903,6 +6993,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6938,6 +7029,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -6973,6 +7065,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -7008,6 +7101,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -7043,6 +7137,7 @@
         "pValue": 0.00987214803681,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7076,6 +7171,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -7111,6 +7207,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "group_below_minimum_size"
         ]
@@ -7445,6 +7542,7 @@
         "pValue": 3.07374853721e-20,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7473,6 +7571,7 @@
         "pValue": 7.7003927457e-08,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7501,6 +7600,7 @@
         "pValue": 2.75120324962e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7529,6 +7629,7 @@
         "pValue": 0.00172795077417,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7557,6 +7658,7 @@
         "pValue": 0.00118788681393,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7585,6 +7687,7 @@
         "pValue": 0.0028499909025,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7613,6 +7716,7 @@
         "pValue": 0.00423123289976,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7641,6 +7745,7 @@
         "pValue": 0.00110825607873,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -7669,6 +7774,7 @@
         "pValue": 0.00186284629798,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -7690,6 +7796,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -8308,6 +8415,7 @@
         "pValue": 0.42927538718,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -8341,6 +8449,7 @@
         "pValue": 0.0178462713711,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -8685,6 +8794,7 @@
         "pValue": 6.11695819865e-14,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -8712,6 +8822,7 @@
         "pValue": 5.96891375608e-13,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -8738,9 +8849,10 @@
         },
         "status": "evaluated",
         "direction": "pass",
-        "pValue": 3.52628462531e-161,
+        "pValue": 2.74026956991e-157,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 2.74026956991e-157,
         "reasons": []
        }
       ],
@@ -8767,6 +8879,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -8791,6 +8904,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -8816,6 +8930,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -8891,6 +9006,7 @@
         "pValue": 0.00353805285656,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -9008,6 +9124,7 @@
         "pValue": 0.0313102830269,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -9127,6 +9244,7 @@
         "pValue": 0.379163690615,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9160,6 +9278,7 @@
         "pValue": 2.39559943847e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -9658,6 +9777,7 @@
         "pValue": 0.135513281257,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9691,6 +9811,7 @@
         "pValue": 0.00156299294969,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9724,6 +9845,7 @@
         "pValue": 0.533858829816,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9757,6 +9879,7 @@
         "pValue": 0.333974374245,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9790,6 +9913,7 @@
         "pValue": 0.106308612995,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9823,6 +9947,7 @@
         "pValue": 0.00146506376188,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9856,6 +9981,7 @@
         "pValue": 0.257851154045,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9889,6 +10015,7 @@
         "pValue": 0.244765351737,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9922,6 +10049,7 @@
         "pValue": 0.0635366591984,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9955,6 +10083,7 @@
         "pValue": 0.0459787539851,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -9988,6 +10117,7 @@
         "pValue": 0.432265949786,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10021,6 +10151,7 @@
         "pValue": 0.611644941035,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10054,6 +10185,7 @@
         "pValue": 0.442936550771,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10087,6 +10219,7 @@
         "pValue": 0.186783311448,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10120,6 +10253,7 @@
         "pValue": 0.00161305032802,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10153,6 +10287,7 @@
         "pValue": 0.286383868403,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10186,6 +10321,7 @@
         "pValue": 0.305300661379,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10219,6 +10355,7 @@
         "pValue": 0.739587073917,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10252,6 +10389,7 @@
         "pValue": 0.135147488883,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10285,6 +10423,7 @@
         "pValue": 0.61499972725,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10318,6 +10457,7 @@
         "pValue": 0.300147243528,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -10640,6 +10780,7 @@
         "pValue": 1.1130505569e-07,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -10652,17 +10793,20 @@
           {
            "label": "high",
            "tp": 150,
-           "support": 200
+           "support": 200,
+           "predicted": 188
           },
           {
            "label": "low",
            "tp": 270,
-           "support": 300
+           "support": 300,
+           "predicted": 305
           },
           {
            "label": "medium",
            "tp": 245,
-           "support": 300
+           "support": 300,
+           "predicted": 307
           }
          ]
         },
@@ -10682,6 +10826,7 @@
         "pValue": 1.14305767385e-05,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 3.5243388543e-134,
         "reasons": []
        },
        {
@@ -10724,6 +10869,7 @@
         "pValue": 0.000896751395328,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -10765,6 +10911,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11003,6 +11150,7 @@
         "pValue": 0.00103829542049,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -11031,6 +11179,7 @@
         "pValue": 7.97235938431e-07,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11051,6 +11200,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11358,6 +11508,7 @@
         "pValue": 0.00309602054996,
         "smallCell": true,
         "fisherExactP": 1.0,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11475,6 +11626,7 @@
         "pValue": 0.0486065706735,
         "smallCell": true,
         "fisherExactP": 1.0,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11719,6 +11871,7 @@
         "pValue": 0.00193748070925,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -11746,6 +11899,7 @@
         "pValue": 0.0117433823012,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -11772,9 +11926,10 @@
         },
         "status": "evaluated",
         "direction": "pass",
-        "pValue": 2.95221301645e-118,
+        "pValue": 1.82942264827e-113,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 1.82942264827e-113,
         "reasons": []
        }
       ],
@@ -11801,6 +11956,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -11825,6 +11981,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -11850,6 +12007,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -11925,6 +12083,7 @@
         "pValue": 0.00134021626232,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -12877,6 +13036,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -12901,6 +13061,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -12925,6 +13086,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -12949,6 +13111,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -12975,6 +13138,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -13000,6 +13164,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -13191,6 +13356,7 @@
         "pValue": 9.08547022401e-14,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -13203,17 +13369,20 @@
           {
            "label": "high",
            "tp": 0,
-           "support": 40
+           "support": 40,
+           "predicted": 0
           },
           {
            "label": "low",
            "tp": 1900,
-           "support": 1900
+           "support": 1900,
+           "predicted": 2000
           },
           {
            "label": "medium",
            "tp": 0,
-           "support": 60
+           "support": 60,
+           "predicted": 0
           }
          ]
         },
@@ -13233,6 +13402,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 1.0,
         "reasons": [
          "estimate_on_band_boundary"
         ]
@@ -13271,6 +13441,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "undefined_zero_denominator"
         ]
@@ -13312,6 +13483,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -13495,6 +13667,7 @@
         "pValue": 9.08547022401e-14,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -13524,6 +13697,7 @@
         "pValue": 1.0,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 1.0,
         "reasons": [
          "estimate_on_band_boundary"
         ]
@@ -13547,6 +13721,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "undefined_zero_denominator"
         ]
@@ -13573,6 +13748,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -13597,6 +13773,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -13622,6 +13799,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -14607,6 +14785,7 @@
         "pValue": 1.66066356537e-160,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -14635,6 +14814,7 @@
         "pValue": 1.14511424451e-299,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -14655,6 +14835,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": [
          "undecidable_metric"
         ]
@@ -14845,6 +15026,7 @@
         "pValue": 1.1130505569e-07,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        },
        {
@@ -14857,17 +15039,20 @@
           {
            "label": "high",
            "tp": 150,
-           "support": 200
+           "support": 200,
+           "predicted": 188
           },
           {
            "label": "low",
            "tp": 270,
-           "support": 300
+           "support": 300,
+           "predicted": 305
           },
           {
            "label": "medium",
            "tp": 245,
-           "support": 300
+           "support": 300,
+           "predicted": 307
           }
          ]
         },
@@ -14884,9 +15069,10 @@
         },
         "status": "evaluated",
         "direction": "pass",
-        "pValue": 1.14511424451e-299,
+        "pValue": 3.5243388543e-134,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": 3.5243388543e-134,
         "reasons": []
        },
        {
@@ -14929,6 +15115,7 @@
         "pValue": 3.11870442094e-08,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -14970,6 +15157,7 @@
         "pValue": null,
         "smallCell": false,
         "fisherExactP": null,
+        "chanceExactP": null,
         "reasons": []
        }
       ],
@@ -14995,6 +15183,642 @@
      }
     ],
     "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-50",
+   "category": "chance_baseline",
+   "title": "GC-47's policy and a predictor that rarely says positive: one lucky positive (TP 1 of 100) puts the balanced-accuracy interval above 0.5, but the exact chance gate does not reject, so the criterion is inconclusive",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 1,
+      "fp": 0,
+      "fn": 99,
+      "tn": 1900
+     }
+    ]
+   },
+   "legacy": {
+    "source": "engine_thresholds",
+    "config": {
+     "contractVersion": "1.0",
+     "id": "run-legacy-derivation",
+     "engagementId": "eng-fixture",
+     "modelId": "model-fixture",
+     "datasetId": "data-fixture",
+     "task": "binary_classification",
+     "suite": [
+      "performance"
+     ],
+     "seed": 1729,
+     "columns": {
+      "target": "actual",
+      "prediction": "predicted"
+     },
+     "positiveLabel": "1",
+     "negativeLabel": "0",
+     "minGroupSize": 30,
+     "minClassCount": 10,
+     "minSampleSize": 30,
+     "thresholds": {
+      "policyId": "fixture-policy",
+      "policyVersion": "1",
+      "source": "internal_policy",
+      "values": {
+       "accuracy": {
+        "operator": ">=",
+        "value": 0.9
+       },
+       "balanced_accuracy": {
+        "operator": ">=",
+        "value": 0.4
+       }
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "8fb29641607593f2a543acae06e760627ffe2ae946aa6166446bc9004211b1c0",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "engine_thresholds",
+      "contractVersion": "1.0"
+     },
+     "criteria": [
+      {
+       "id": "PERF-BINARY",
+       "kind": "performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.9,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.5,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "PERF-BINARY",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1901,
+         "n": 2000
+        },
+        "estimate": 0.9505,
+        "interval": {
+         "lower": 0.94009999501,
+         "upper": 0.959172745389,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 5.14857222212e-14,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 1,
+         "positives": 100,
+         "tn": 1900,
+         "negatives": 1900
+        },
+        "estimate": 0.505,
+        "interval": {
+         "lower": 0.500761885642,
+         "upper": 0.527243098089,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.1,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": 0.1,
+        "reasons": []
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "precision",
+        "metric": "precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1,
+         "n": 1
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.206549314377,
+         "upper": 1.0,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": null,
+        "status": "insufficient_support",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [
+         "below_minimum_class_count"
+        ]
+       },
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1,
+         "n": 100
+        },
+        "estimate": 0.01,
+        "interval": {
+         "lower": 0.00176743206414,
+         "upper": 0.0544861961787,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "specificity",
+        "metric": "specificity",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1900,
+         "n": 1900
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.997982259078,
+         "upper": 1.0,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "f1",
+        "metric": "f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 1,
+         "tpPlusFpPlusFn": 100,
+         "positives": 100
+        },
+        "estimate": 0.019801980198,
+        "interval": {
+         "lower": 0.00352862751886,
+         "upper": 0.103341696413,
+         "level": 0.95,
+         "method": "jaccard_wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "performance",
+       "direction": "pass",
+       "pValue": 0.1,
+       "adjustedPValue": 0.1,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": "balanced_accuracy",
+       "sampleSize": 2000,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "chance_exact_test_not_significant"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-51",
+   "category": "chance_baseline",
+   "title": "GC-46's policy and a predictor that rarely predicts two of three classes: one correct 'high' puts the macro-recall interval above 1/3, but the exact chance gate (Bonferroni over the classes) does not reject, so the criterion is inconclusive",
+   "type": "plan",
+   "data": {
+    "kind": "multiclass",
+    "labels": [
+     "high",
+     "low",
+     "medium"
+    ],
+    "matrix": [
+     [
+      1,
+      39,
+      0
+     ],
+     [
+      0,
+      1900,
+      0
+     ],
+     [
+      0,
+      60,
+      0
+     ]
+    ]
+   },
+   "legacy": {
+    "source": "engine_thresholds",
+    "config": {
+     "contractVersion": "1.0",
+     "id": "run-legacy-derivation",
+     "engagementId": "eng-fixture",
+     "modelId": "model-fixture",
+     "datasetId": "data-fixture",
+     "task": "multiclass_classification",
+     "suite": [
+      "performance"
+     ],
+     "seed": 1729,
+     "columns": {
+      "target": "actual",
+      "prediction": "predicted"
+     },
+     "minGroupSize": 30,
+     "minClassCount": 10,
+     "minSampleSize": 30,
+     "thresholds": {
+      "policyId": "fixture-policy",
+      "policyVersion": "1",
+      "source": "internal_policy",
+      "values": {
+       "accuracy": {
+        "operator": ">=",
+        "value": 0.9
+       }
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "3642ef196d41ac7f1f5ee246bb86dd5faca2e402ed5508752e7db6ec0a559a9f",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "engine_thresholds",
+      "contractVersion": "1.0"
+     },
+     "criteria": [
+      {
+       "id": "PERF-MULTI",
+       "kind": "multiclass_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.9,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.3333333333333333,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "PERF-MULTI",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1901,
+         "n": 2000
+        },
+        "estimate": 0.9505,
+        "interval": {
+         "lower": 0.94009999501,
+         "upper": 0.959172745389,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 5.14857222212e-14,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 1,
+           "support": 40,
+           "predicted": 1
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "support": 1900,
+           "predicted": 1999
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "support": 60,
+           "predicted": 0
+          }
+         ]
+        },
+        "estimate": 0.341666666667,
+        "interval": {
+         "lower": 0.334776040663,
+         "upper": 0.381663797044,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.333333333333,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.12,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": 0.12,
+        "reasons": []
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "macro_precision",
+        "metric": "macro_precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 1,
+           "predicted": 1
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "predicted": 1999
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "predicted": 0
+          }
+         ]
+        },
+        "estimate": null,
+        "interval": null,
+        "band": null,
+        "status": "undefined",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [
+         "undefined_zero_denominator"
+        ]
+       },
+       {
+        "memberId": "macro_f1",
+        "metric": "macro_f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 1,
+           "tpPlusFpPlusFn": 40
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "tpPlusFpPlusFn": 1999
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "tpPlusFpPlusFn": 60
+          }
+         ]
+        },
+        "estimate": 0.341129787292,
+        "interval": {
+         "lower": 0.324774886632,
+         "upper": 0.474937887868,
+         "level": 0.95,
+         "method": "jaccard_wilson_bonferroni"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "multiclass_performance",
+       "direction": "pass",
+       "pValue": 0.12,
+       "adjustedPValue": 0.12,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": "balanced_accuracy",
+       "sampleSize": 2000,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "chance_exact_test_not_significant"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
     "reviewFlags": []
    }
   }
