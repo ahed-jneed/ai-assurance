@@ -263,7 +263,10 @@ export const execution: AssuranceModule = defineCommands({
           log.guarded(cmd),
         ],
       );
-      return Response.json({ jobId, requestSha256: hash });
+      return Response.json(
+        { jobId, requestSha256: hash },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     },
   },
   cancelJob: {

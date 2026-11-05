@@ -15,7 +15,14 @@ import {
   assuranceTarget,
   dispatchAssurance,
 } from "@/lib/commands/assurance";
-import { roles, type Artifact, type Engagement, type Role } from "@/lib/domain";
+import {
+  roles,
+  type Artifact,
+  type Engagement,
+  type EvaluationProfile,
+  type Model,
+  type Role,
+} from "@/lib/domain";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
@@ -268,6 +275,99 @@ describe("POST /api/assurance", () => {
       3,
       "enrollWorker",
       { workerId: reply.workerId },
+    ]);
+  });
+
+  it("freezes an external job and answers it uncached", async () => {
+    const e = stored();
+    const model: Model = {
+        id: "MODEL-1",
+        name: "Scorer",
+        version: "1",
+        format: "Prediction file",
+        task: "Binary classification",
+        intendedPurpose: "Credit decisions",
+        artifactId: "EV-2",
+        status: "registered",
+        sourceSha256: "c".repeat(64),
+      },
+      profile = {
+        id: "PROFILE-1",
+        version: "1",
+        task: "Binary classification",
+        suite: ["performance"],
+        config: { positiveLabel: "1" },
+      } as EvaluationProfile;
+    e.artifacts.push(dataset, {
+      ...dataset,
+      id: "EV-2",
+      name: "scores.csv",
+      sha256: model.sourceSha256!,
+    });
+    e.models.push(model);
+    e.evaluationProfiles = [profile];
+    e.workflow = {
+      brief: { status: "approved", revision: 2 },
+      program: { status: "approved", revision: 3 },
+      procedures: [
+        {
+          id: "PROC-1",
+          revision: 1,
+          selected: true,
+          applicability: "applicable",
+          modelId: model.id,
+          datasetId: dataset.id,
+          profileId: profile.id,
+        },
+      ],
+    } as unknown as Engagement["workflow"];
+    const ctx = caller("Auditor");
+    load(e, ctx);
+    statements();
+    const system = written(
+        "system",
+        {
+          modelIds: [model.id],
+          modelPins: [{ id: model.id, sha256: model.sourceSha256 }],
+          features: [],
+          outputs: { classOrder: ["0", "1"], threshold: 0.5 },
+        },
+        "AS-SYSTEM",
+      ),
+      prediction = written(
+        "prediction",
+        {
+          modelId: model.id,
+          systemId: system.id,
+          datasetId: dataset.id,
+          datasetSha256: dataset.sha256,
+        },
+        "AS-PREDICTION",
+      );
+    vi.mocked(recordsById).mockImplementation(async (_ctx, _id, ids) =>
+      [system, prediction].filter((r) => ids.includes(r.id)),
+    );
+    const response = await post(e, "queueExternal", {
+      systemId: system.id,
+      modelId: model.id,
+      datasetId: dataset.id,
+      profileId: profile.id,
+      procedureId: "PROC-1",
+      mode: "provided_predictions",
+      predictionId: prediction.id,
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const reply = (await response.json()) as Record<string, string>;
+    expect(reply.jobId).toMatch(/^JOB-/);
+    expect(reply.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(vi.mocked(recordsById).mock.calls.map((c) => c[2])).toEqual([
+      [system.id],
+      [prediction.id],
+    ]);
+    expect(vi.mocked(save).mock.calls[0].slice(3, 5)).toEqual([
+      "freezeExternalExecution",
+      { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
   });
 });
