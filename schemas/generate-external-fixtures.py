@@ -4,6 +4,7 @@ No Site API, native runtime, production data or service credential is used.
 The native model registration in one fixture is metadata only; inference is
 never claimed for those provided-prediction computations.
 """
+import argparse
 import copy
 import json
 import sys
@@ -56,7 +57,11 @@ def project(request, packet, request_text, result_text):
             'testDefinitionVersion': packet['provenance']['translationVersion'], 'limitations': request['limitations']}}
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Regenerate the synthetic external 1.2 fixtures.')
+    parser.add_argument('--output', type=Path, default=ROOT/'schemas/fixtures/external-runs.v1.2.json',
+        help='Destination; defaults to the committed fixture file.')
+    output = parser.parse_args(argv).output
     fixtures = []
     with tempfile.TemporaryDirectory() as temp:
         for name, task, data, suite, mode in CASES:
@@ -97,9 +102,9 @@ def main():
             result_text = json_bytes(packet).decode()+'\n'
             fixtures.append({'fixture': name, 'requestJSON': request_text, 'resultJSON': result_text,
                 'run': project(request, packet, request_text, result_text)})
-    output = ROOT/'schemas/fixtures/external-runs.v1.2.json'
-    output.write_text(json.dumps(fixtures, indent=2, ensure_ascii=False)+'\n', encoding='utf-8')
-    print('Created', len(fixtures), 'synthetic external fixtures')
+    # newline='\n' keeps the output LF on Windows too, so it matches Git and the runtime zip.
+    output.write_text(json.dumps(fixtures, indent=2, ensure_ascii=False)+'\n', encoding='utf-8', newline='\n')
+    print('Created', len(fixtures), 'synthetic external fixtures in', output)
 
 
 if __name__ == '__main__':
