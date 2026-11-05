@@ -41,9 +41,11 @@ export function PaperEvidence({
     [category, setCategory] = useState("all"),
     [view, setView] = useState("all");
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the filters after another paper opens (post-commit reset is the current behaviour)
     setQuery("");
     setCategory("all");
     setView(paper.evidenceIds.length ? "linked" : "all");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the initial view is chosen only when another paper opens, not when its evidence links change
   }, [paper.id]);
   const accepted = artifacts.filter((a) => a.status === "accepted"),
     linked = paperEvidenceReferences(paper, artifacts),

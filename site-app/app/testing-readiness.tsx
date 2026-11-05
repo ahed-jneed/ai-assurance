@@ -23,7 +23,7 @@ export function ExecutionPlanner({
   engagement: Engagement;
   role: Role;
   records: AssuranceRecord[];
-  workers: any[];
+  workers: { active: number; capabilities: string }[];
   onPlan: (v: Record<string, string>) => void;
   onHosted: (procedureId: string, datasetCardRecordId: string) => void;
   initialProcedure?: string;

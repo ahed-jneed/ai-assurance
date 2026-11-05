@@ -9,19 +9,20 @@ export type DraftScope = {
   recordId: string;
   baseRevision: string;
 };
+type StoredDraft = {
+  content: Record<string, unknown>;
+  baseRevision: string;
+  version: number;
+  updatedAt: string;
+  current: boolean;
+};
 export function useRecoverableDraft(
   scope: DraftScope | undefined,
   content: Record<string, unknown>,
   dirty: boolean,
   enabled = true,
 ) {
-  const [recovery, setRecovery] = useState<{
-      content: Record<string, unknown>;
-      baseRevision: string;
-      version: number;
-      updatedAt: string;
-      current: boolean;
-    } | null>(null),
+  const [recovery, setRecovery] = useState<StoredDraft | null>(null),
     [status, setStatus] = useState(""),
     [loaded, setLoaded] = useState(false);
   const version = useRef(0),
@@ -42,6 +43,7 @@ export function useRecoverableDraft(
     const g = ++generation.current;
     active.current = true;
     version.current = 0;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the recovery state for the new draft scope before fetching it
     setLoaded(false);
     setRecovery(null);
     setStatus("");
@@ -53,7 +55,10 @@ export function useRecoverableDraft(
       signal: controller.signal,
     })
       .then(async (r) => {
-        const v = (await r.json()) as any;
+        const v = (await r.json()) as {
+          error?: string;
+          draft?: StoredDraft | null;
+        };
         if (!r.ok) throw Error(v.error);
         if (g !== generation.current) return;
         version.current = v.draft?.version ?? 0;
@@ -73,6 +78,7 @@ export function useRecoverableDraft(
       active.current = false;
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key encodes scope; content is compared only once, when the stored draft arrives
   }, [key, enabled]);
   const encoded = JSON.stringify(content);
   useEffect(() => {
@@ -100,7 +106,7 @@ export function useRecoverableDraft(
           }),
         })
           .then(async (r) => {
-            const v = (await r.json()) as any;
+            const v = (await r.json()) as { error?: string; version: number };
             if (!r.ok) throw Error(v.error);
             if (g === generation.current) {
               version.current = v.version;
@@ -117,6 +123,7 @@ export function useRecoverableDraft(
           });
       }, 1000);
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- key and encoded are the serialised forms of scope and content
   }, [key, enabled, loaded, dirty, recovery, encoded, status]);
   return {
     recovery,

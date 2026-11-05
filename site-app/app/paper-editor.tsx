@@ -186,6 +186,7 @@ export function PaperEditor({
     errorRef = useRef<HTMLDivElement>(null),
     targetChangeRef = useRef(onTargetChange),
     jumpFrame = useRef<number | undefined>(undefined);
+  // eslint-disable-next-line react-hooks/refs -- latest-callback ref that keeps jump() stable; writing it during render is the current behaviour
   targetChangeRef.current = onTargetChange;
   const sectionSelectId = useId();
   const jump = useCallback((target: PaperTarget) => {
@@ -213,6 +214,7 @@ export function PaperEditor({
     [],
   );
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the review panel after another paper opens or a comment is sent
     setExpanded(false);
     setComment("");
     setReply({ id: "", text: "" });
@@ -221,7 +223,9 @@ export function PaperEditor({
     setSectionTarget("objective");
   }, [draft?.id, commentReset]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- jumps to the requested section when a paper opens
     if (draft && initialTarget) jump(initialTarget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by the paper id so that editing the draft does not jump again
   }, [draft?.id, initialTarget, jump]);
   const pendingComment = !!comment.trim() || !!reply.text.trim(),
     locked = busy || sending !== null;

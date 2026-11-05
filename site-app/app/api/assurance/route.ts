@@ -4,7 +4,6 @@ import {
   context,
   getEngagement,
   requireRole,
-  requireAdmin,
   db,
   bucket,
   checkOrigin,
@@ -36,7 +35,7 @@ import { datasetCSV } from "@/lib/evaluation-service";
 import { parseCSV } from "@/lib/diagnostics";
 import { isClientRole } from "@/lib/workflow-state";
 import { packetSummary } from "@/lib/assurance-packet";
-import type { Run } from "@/lib/domain";
+import type { Result, Run } from "@/lib/domain";
 import obligations from "@/lib/obligation-subitems.json";
 import { canonical } from "@/lib/assurance-core";
 import { signingKey, base64, unbase64 } from "@/lib/dossier";
@@ -44,6 +43,19 @@ import { datasetCardSchema } from "@/lib/dataset-card";
 export const dynamic = "force-dynamic";
 const short = z.string().trim().min(1).max(300),
   note = z.string().trim().min(1).max(10000);
+// Columns of a succeeded execution_jobs row as importJob reads them.
+type SucceededJobRow = {
+  id: string;
+  request: string;
+  request_sha256: string;
+  created_by: string;
+  created_at: string;
+  attempt_id: string;
+  fence: number;
+  result_key: string;
+  result_sha256: string;
+  completed_at: string;
+};
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url),
@@ -837,7 +849,7 @@ export async function POST(request: Request) {
         draft.retrievedPins.some(
           (p) =>
             !exported.body.sourcePins.some(
-              (s: any) =>
+              (s: typeof p) =>
                 s.id === p.id &&
                 s.sha256 === p.sha256 &&
                 s.excerptSha256 === p.excerptSha256 &&
@@ -924,7 +936,9 @@ export async function POST(request: Request) {
             all
               .filter((x) => v.sourceIds.includes(x.id))
               .some((x) =>
-                x.body.relations?.some((rel: any) => rel.locationId === r.id),
+                x.body.relations?.some(
+                  (rel: { locationId: string }) => rel.locationId === r.id,
+                ),
               )),
       );
       for (const loc of locations) {
@@ -991,7 +1005,10 @@ export async function POST(request: Request) {
         v.editedText +
         "\nSources: " +
         draft.body.citations
-          .map((x: any) => x.recordId + " @ " + x.sha256)
+          .map(
+            (x: { recordId: string; sha256: string }) =>
+              x.recordId + " @ " + x.sha256,
+          )
           .join("; ");
       p.contributors = [...new Set([...p.contributors, ctx.user.userId])];
       p.revision++;
@@ -1074,7 +1091,8 @@ export async function POST(request: Request) {
         );
       if (
         !system.body.modelPins?.some(
-          (pin: any) => pin.id === m.id && pin.sha256 === m.sourceSha256,
+          (pin: { id: string; sha256: string }) =>
+            pin.id === m.id && pin.sha256 === m.sourceSha256,
         ) ||
         e.artifacts.find((x) => x.id === m.artifactId)?.sha256 !==
           m.sourceSha256
@@ -1108,7 +1126,8 @@ export async function POST(request: Request) {
           );
         if (
           system.body.features.some(
-            (f: any) => !["number", "integer"].includes(f.type) || f.nullable,
+            (f: { type: string; nullable: boolean }) =>
+              !["number", "integer"].includes(f.type) || f.nullable,
           ) ||
           system.body.pipelineArtifactId
         )
@@ -1192,7 +1211,7 @@ export async function POST(request: Request) {
                           ? "binary_classification"
                           : "multiclass_classification",
                     featureColumns: system.body.features.map(
-                      (f: any) => f.name,
+                      (f: { name: string }) => f.name,
                     ),
                     outputLabels: system.body.outputs.classOrder,
                     decisionThreshold: system.body.outputs.threshold ?? 0.5,
@@ -1296,7 +1315,7 @@ export async function POST(request: Request) {
             "SELECT * FROM execution_jobs WHERE id=? AND tenant_id=? AND engagement_id=? AND state='succeeded'",
           )
           .bind(v.jobId, ctx.tenantId, e.id)
-          .first<any>();
+          .first<SucceededJobRow>();
       if (!job)
         throw new ApiError(
           409,
@@ -1316,13 +1335,13 @@ export async function POST(request: Request) {
       p.title = "External execution — " + v.jobId;
       p.body.results = packet.hostedResults
         .map(
-          (r: any) =>
+          (r: Result) =>
             r.label +
             ": " +
             r.outcome +
             "\n" +
             r.metrics
-              .map((m: any) => m.name + ": " + (m.value ?? "not estimable"))
+              .map((m) => m.name + ": " + (m.value ?? "not estimable"))
               .join("\n") +
             "\n" +
             r.limitations.join("\n"),
@@ -1345,11 +1364,13 @@ export async function POST(request: Request) {
           briefRevision: frozen.procedure.briefRevision,
           programRevision: frozen.procedure.programRevision,
         },
-        outcome = packet.hostedResults.some((r: any) => r.outcome === "fail")
+        outcome = packet.hostedResults.some((r: Result) => r.outcome === "fail")
           ? "fail"
-          : packet.hostedResults.some((r: any) => r.outcome === "inconclusive")
+          : packet.hostedResults.some(
+                (r: Result) => r.outcome === "inconclusive",
+              )
             ? "inconclusive"
-            : packet.hostedResults.some((r: any) => r.outcome === "pass")
+            : packet.hostedResults.some((r: Result) => r.outcome === "pass")
               ? "pass"
               : "not_applicable";
       const {
@@ -1410,8 +1431,8 @@ export async function POST(request: Request) {
             ...frozen.dataset,
             rowCount: Math.max(
               0,
-              ...packet.hostedResults.flatMap((r: any) =>
-                r.metrics.map((m: any) => m.sampleSize),
+              ...packet.hostedResults.flatMap((r: Result) =>
+                r.metrics.map((m) => m.sampleSize),
               ),
             ),
             columns: [

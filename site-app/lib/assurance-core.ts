@@ -154,8 +154,13 @@ export type AssuranceRecord = {
   sha256: string;
   createdAt: string;
   actor: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- body is kind-specific JSON with no per-kind types yet; consumers across app/ and lib/ index it freely, so tightening it is a separate typed-schema change
   body: Record<string, any>;
 };
+// Assertion relations as stored: the submitted relation plus the pinned location hash.
+type AssertionRelation = z.infer<
+  typeof assertionSchema
+>["relations"][number] & { locationSha256: string };
 export async function sampleRecords(
   rows: Record<string, string>[],
   options: z.infer<typeof sampleSchema>,
@@ -252,7 +257,7 @@ export function assist(
   const dependencies = sources.flatMap((r) =>
     r.kind === "assertion"
       ? r.body.relations
-          .map((x: any) =>
+          .map((x: AssertionRelation) =>
             records.find(
               (loc) =>
                 loc.id === x.locationId &&
@@ -299,15 +304,17 @@ export function assist(
           : []
       : action === "contradictions"
         ? r.body.relations
-            .filter((x: any) => x.relation === "contradicts")
-            .map((x: any) => ({
+            .filter((x: AssertionRelation) => x.relation === "contradicts")
+            .map((x: AssertionRelation) => ({
               text:
                 r.body.statement + " — contradiction recorded: " + x.rationale,
               citationIds: [r.id, x.locationId],
               type: "recorded_contradiction",
             }))
         : action === "unsupported" &&
-            (!r.body.relations.some((x: any) => x.relation === "supports") ||
+            (!r.body.relations.some(
+              (x: AssertionRelation) => x.relation === "supports",
+            ) ||
               r.body.missingEvidence)
           ? [
               {

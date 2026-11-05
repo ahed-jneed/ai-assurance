@@ -21,16 +21,12 @@ import {
   LockKeyhole,
   Building2,
   Download,
-  Play,
-  Check,
-  MessageSquare,
   History,
   RefreshCw,
   Search,
   Upload,
   XCircle,
   Users,
-  ChevronDown,
   Link2,
 } from "lucide-react";
 import {
@@ -85,8 +81,6 @@ import {
 import type {
   Engagement,
   Paper,
-  Run,
-  Role,
   Finding,
   Report,
   AuditGate,
@@ -158,7 +152,6 @@ import type { SearchItem } from "@/lib/workspace-search";
 import {
   evidenceRows as selectEvidence,
   findingRows as selectFindings,
-  reportRows as selectReports,
 } from "@/lib/register-views";
 import {
   AlertDialog,
@@ -354,9 +347,11 @@ export default function Workspace() {
     modalBaselineRef = useRef(""),
     modalSubmitting = useRef(false),
     modalDirtyRef = useRef(false);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by closeModal(); writing it during render is the current behaviour
   modalDirtyRef.current = modalDirty;
   useEffect(() => {
     if (!modal) modalBaselineRef.current = "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the modal state after another modal opens or it closes
     setModalDirty(false);
     setModalError("");
     setDiscardModal(false);
@@ -374,6 +369,7 @@ export default function Workspace() {
     else setModal("");
   }
   const dataRef = useRef(data);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by callbacks and async handlers; writing it during render is the current behaviour
   dataRef.current = data;
   const loadFailure = useRef<
       "access" | "missing" | "signed_out" | "transient" | null
@@ -417,7 +413,9 @@ export default function Workspace() {
     }>({ generation: 0, controller: null }),
     retrySelection = useRef<{ tenantId?: string; engagementId?: string }>({}),
     navigateRef = useRef<(view: string) => string>(() => "busy");
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by callbacks and async handlers; writing it during render is the current behaviour
   draftRef.current = paperDraft;
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- React Compiler is not enabled; this useCallback, which reads latest-value refs, is the memoization in effect
   const load = useCallback(async (tenantId?: string, engagementId?: string) => {
     loadFailure.current = null;
     const generation = ++loadRequest.current.generation;
@@ -592,8 +590,10 @@ export default function Workspace() {
     })();
     return () => {
       active = false;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
       loadRequest.current.controller?.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstraps once per load(); applyWorkspaceLink is a plain function recreated on every render
   }, [load]);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
@@ -674,6 +674,7 @@ export default function Workspace() {
     [load],
   );
   const act = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- React Compiler is not enabled; this useCallback, which reads latest-value refs, is the memoization in effect
     async (
       op: string,
       values: Record<string, unknown>,
@@ -859,6 +860,7 @@ export default function Workspace() {
   const displayedEvidenceTab = viewer ? "files" : evidenceTab;
   useEffect(() => {
     if (data)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-normalises the inbox query after the account or the engagement list changes
       setInboxQuery((q) =>
         normalizeInboxQuery(
           q,
@@ -866,6 +868,7 @@ export default function Workspace() {
           data.engagements.map((e) => e.id),
         ),
       );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depends on the listed fields of data, not on its identity, which changes on every refresh
   }, [
     data?.tenantId,
     data?.identity.id,
@@ -891,6 +894,7 @@ export default function Workspace() {
         }),
       );
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- persists only when the engagement id, view or role changes, not on every engagement refresh
   }, [
     data?.identity.id,
     data?.tenantId,
@@ -906,6 +910,7 @@ export default function Workspace() {
       required: p.required,
       evidenceIds: [...p.evidenceIds].sort(),
     });
+  /* eslint-disable react-hooks/refs -- the saved-paper baseline and the dirty flags live in refs that the navigation guards read; reading and writing them during render is the current behaviour */
   const paperBaseline =
     savedPaperRef.current?.id === paperDraft?.id
       ? savedPaperRef.current
@@ -917,6 +922,7 @@ export default function Workspace() {
   dirtyRef.current = paperDirty;
   const navigationDirty = paperDirty || hasPendingComment;
   navigationDirtyRef.current = navigationDirty;
+  /* eslint-enable react-hooks/refs */
   useEffect(() => {
     if (!selectedPaper) return;
     const previous = savedPaperRef.current;
@@ -1085,6 +1091,7 @@ export default function Workspace() {
       afterOpen?.();
     });
   }
+  // eslint-disable-next-line react-hooks/refs -- latest-function ref read by the navigation tool registered with navigator.modelContext; writing it during render is the current behaviour
   navigateRef.current = navigate;
   function applyWorkspaceLink(current: WorkspaceData, link: WorkspaceLink) {
     if (!authorizedLink(link, current.identity.role, !!current.engagement)) {
@@ -1318,6 +1325,7 @@ export default function Workspace() {
       window.history.replaceState(null, "", url);
     else window.history.pushState(null, "", url);
     lastLink.current = url;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncs the URL from the listed fields of data, not from its identity, which changes on every refresh
   }, [
     data?.tenantId,
     data?.engagement?.id,
@@ -1363,6 +1371,7 @@ export default function Workspace() {
     };
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-registers when the guarding state changes; applyWorkspaceLink and guarded are plain functions recreated on every render
   }, [busy, loading, bootstrapping, modal, labEditing, load]);
   async function copyWorkspaceLink() {
     try {
@@ -1933,13 +1942,6 @@ export default function Workspace() {
               )
             : undefined) ?? detail.value)
       : detail?.value;
-  function metricValue(value: number | null) {
-    return value === null
-      ? "—"
-      : Number.isInteger(value)
-        ? String(value)
-        : value.toFixed(4);
-  }
   const controls = Object.entries(articleNames).map(([article, title]) => {
     const papers =
       e?.papers.filter(
@@ -1974,8 +1976,7 @@ export default function Workspace() {
       : { rows: [], counts: { all: 0, mine: 0, review: 0, blocked: 0 } },
     paperRows = paperRegister.rows.map((r) => r.paper),
     evidenceRows = selectEvidence(e?.artifacts ?? [], registerQuery),
-    findingRows = selectFindings(e?.findings ?? [], registerQuery),
-    reportRows = selectReports(e?.reports ?? [], registerQuery);
+    findingRows = selectFindings(e?.findings ?? [], registerQuery);
   const templateRows =
     data?.catalog?.items
       .filter(
@@ -2358,6 +2359,7 @@ export default function Workspace() {
                             </Button>
                           </>
                         )}
+                        {/* eslint-disable-next-line react-hooks/refs -- currentAction.action is a click handler; the refs it reaches are read only when it runs */}
                         {currentAction &&
                           ![
                             "Working papers",
@@ -3534,7 +3536,7 @@ export default function Workspace() {
                 )}
                 {modal === "memberRevoke" && (
                   <p>
-                    Revoke <b>{choices.displayName}</b>'s access to this
+                    Revoke <b>{choices.displayName}</b>&apos;s access to this
                     practice? Their prior audit contributions and approvals will
                     remain in the history.
                   </p>
@@ -3616,7 +3618,7 @@ export default function Workspace() {
                     <div className="note">
                       Limit 50 MB. Where Article 4a restricts access by other
                       parties, process sensitive-category records in the
-                      client's controlled environment and upload permitted
+                      client&apos;s controlled environment and upload permitted
                       aggregate evidence. Review privacy and confidentiality
                       before upload.
                     </div>

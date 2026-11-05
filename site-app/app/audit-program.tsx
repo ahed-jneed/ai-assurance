@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
-  CheckCircle2,
   ClipboardList,
   FileText,
   Plus,
@@ -100,6 +99,7 @@ export function WorkflowDialog({
     !!form?.draft,
   );
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialises the editor fields each time another form opens
     setError("");
     setDirty(false);
     setConfirm(false);
@@ -424,6 +424,7 @@ export function AuditProgram({
       section: string;
     } | null>(null),
     onLocationRef = useRef(onLocation);
+  // eslint-disable-next-line react-hooks/refs -- latest-callback ref read by the URL-sync effects; writing it during render is the current behaviour
   onLocationRef.current = onLocation;
   useEffect(() => {
     programViewMemory.set(memoryKey, { tab, query, filter, section });
@@ -435,9 +436,11 @@ export function AuditProgram({
       id: availableInitialProcedure,
       section: requestedProcedureSection ?? section,
     };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- applies an incoming procedure deep link
     setSelected(availableInitialProcedure);
     if (requestedProcedureSection) setSection(requestedProcedureSection);
     if (requestedProgramTab) setTab(requestedProgramTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-applied only when the linked procedure, section or open form changes; the tab and current section are read at that moment
   }, [availableInitialProcedure, initialSection, form]);
   useEffect(() => {
     if (form) return;

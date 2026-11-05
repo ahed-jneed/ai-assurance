@@ -371,6 +371,7 @@ export function RequestAccess({
         <span className="subtle">
           {
             e.workflow.clientGrants.filter(
+              // eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render
               (g) => g.active && Date.parse(g.expiresAt) > Date.now(),
             ).length
           }{" "}
@@ -475,11 +476,13 @@ export function RequestAccess({
             · {g.prompt}
           </b>
           <p>
+            {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
             {g.active && Date.parse(g.expiresAt) > Date.now()
               ? "Active"
               : "Inactive"}{" "}
             · expires {new Date(g.expiresAt).toLocaleDateString()}
           </p>
+          {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
           {g.active && Date.parse(g.expiresAt) > Date.now() && (
             <Button
               variant="outline"
@@ -525,6 +528,7 @@ export function RequestAccess({
               ))}
             </div>
           )}
+          {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
           {g.active && Date.parse(g.expiresAt) > Date.now() && (
             <Button
               variant="outline"

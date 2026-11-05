@@ -1661,7 +1661,7 @@ try {
     await refresh();
     return receipt.artifactId;
   }
-  const partial = await clientUpload("partial", "One fixture record remains");
+  await clientUpload("partial", "One fixture record remains");
   const delivered = e.workflow.submissions.at(-1);
   assert.equal(delivered.evidenceIds.length, 2);
   await command("acknowledgeClientSubmission", {

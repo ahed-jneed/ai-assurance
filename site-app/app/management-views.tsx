@@ -524,6 +524,7 @@ export function ManagementViews({
             </Button>
           )}
         </DatabaseToolbar>
+        {/* eslint-disable-next-line react-hooks/static-components -- EngagementTable closes over this render's filters; hoisting it would also end its per-render remount, a behaviour change */}
         <EngagementTable />
       </section>
     </>

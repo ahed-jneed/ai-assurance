@@ -10,8 +10,29 @@ import {
 } from "@/lib/store";
 import { activeJobGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
+import type { Artifact } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
+type WorkerRow = {
+  id: string;
+  tenant_id: string;
+  engagement_id: string;
+  image_digest: string;
+  capabilities: string;
+  created_by: string;
+};
+type JobRow = {
+  id: string;
+  state: string;
+  request: string;
+  request_sha256: string;
+  worker_id: string | null;
+  attempt_id: string | null;
+  fence: number;
+  nonce: string | null;
+  lease_until: string | null;
+  result_sha256: string | null;
+};
 const short = z.string().min(1).max(300),
   pins = z.object({
     jobId: short,
@@ -31,7 +52,7 @@ async function worker(request: Request) {
     w = await db()
       .prepare("SELECT * FROM runner_workers WHERE token_hash=? AND active=1")
       .bind(tokenHash)
-      .first<any>();
+      .first<WorkerRow>();
   if (!w) throw new ApiError(401, "Runner credential invalid or revoked");
   if (
     !(await db()
@@ -44,14 +65,14 @@ async function worker(request: Request) {
     throw new ApiError(403, "Worker sponsor access has been revoked");
   return { w, tokenHash };
 }
-async function live(w: any, p: any) {
+async function live(w: WorkerRow, p: z.infer<typeof pins>) {
   const j = await db()
     .prepare(
       "SELECT * FROM execution_jobs WHERE id=? AND tenant_id=? AND engagement_id=? AND " +
         activeJobGuard,
     )
     .bind(p.jobId, w.tenant_id, w.engagement_id)
-    .first<any>();
+    .first<JobRow>();
   if (
     !j ||
     j.worker_id !== w.id ||
@@ -63,7 +84,7 @@ async function live(w: any, p: any) {
     throw new ApiError(409, "Attempt identity or frozen request mismatch");
   return j;
 }
-const lease = (j: any) => {
+const lease = (j: JobRow) => {
   if (
     j.state !== "running" ||
     !j.lease_until ||
@@ -119,7 +140,7 @@ export async function POST(request: Request) {
               " ORDER BY created_at LIMIT 20",
           )
           .bind(w.tenant_id, w.engagement_id, now())
-          .all<any>()
+          .all<JobRow>()
       ).results;
       const j = candidates.find((j) => {
         const r = JSON.parse(j.request);
@@ -374,7 +395,7 @@ export async function POST(request: Request) {
       const accepted = await db()
         .prepare("SELECT state,result_sha256 FROM execution_jobs WHERE id=?")
         .bind(j.id)
-        .first<any>();
+        .first<{ state: string; result_sha256: string | null }>();
       if (
         p.op === "complete" &&
         accepted?.state === "succeeded" &&
@@ -418,7 +439,7 @@ export async function GET(request: Request) {
             activeJobGuard,
         )
         .bind(u.searchParams.get("jobId"), w.tenant_id, w.engagement_id)
-        .first<any>();
+        .first<JobRow>();
     if (
       !j ||
       j.worker_id !== w.id ||
@@ -441,7 +462,7 @@ export async function GET(request: Request) {
         .bind(w.tenant_id, w.engagement_id)
         .first<{ body: string }>(),
       a = JSON.parse(body!.body).artifacts.find(
-        (a: any) =>
+        (a: Artifact) =>
           a.id === (input === "dataset" ? r.dataset.id : r.model.artifactId),
       );
     if (

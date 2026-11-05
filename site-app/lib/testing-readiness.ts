@@ -94,7 +94,7 @@ export function testingReadiness(
           !!system &&
           !!model &&
           system.body.modelPins?.some(
-            (pin: any) =>
+            (pin: { id: string; sha256: string }) =>
               pin.id === model.id && pin.sha256 === model.sourceSha256,
           ),
       },
@@ -125,7 +125,8 @@ export function testingReadiness(
             !system.body.pipelineArtifactId &&
             system.body.features?.length > 0 &&
             system.body.features.every(
-              (f: any) => ["number", "integer"].includes(f.type) && !f.nullable,
+              (f: { type: string; nullable: boolean }) =>
+                ["number", "integer"].includes(f.type) && !f.nullable,
             ),
         },
         {

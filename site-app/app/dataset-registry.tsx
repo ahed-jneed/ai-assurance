@@ -44,6 +44,7 @@ export function DatasetRegistry({
     }
   }, [tenantId, e.id, onCards]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the dataset cards from the API whenever the engagement version changes
     void load();
   }, [load, e.version]);
   function register(previous?: AssuranceRecord) {

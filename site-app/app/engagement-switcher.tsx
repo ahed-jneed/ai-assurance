@@ -52,11 +52,13 @@ export function EngagementSwitcher({
     try {
       ids = parseRecentEngagements(localStorage.getItem(key));
     } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the recent list from browser-only storage after hydration
     setRecentIds(ids);
     setRestoredKey(key);
   }, [key]);
   useEffect(() => {
     if (restoredKey !== key || !currentId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- records the opened engagement once the stored list has been restored
     setRecentIds((ids) =>
       ids[0] === currentId
         ? ids
@@ -70,6 +72,7 @@ export function EngagementSwitcher({
     } catch {}
   }, [recentIds, key, restoredKey]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets paging after the search, sort or account changes (post-commit reset is the current behaviour)
     setLimit(50);
   }, [query, sort, key]);
   const matches = data.engagements
