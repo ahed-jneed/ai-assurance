@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { assuranceRecords } from "@/lib/assurance-store-client";
 import {
   Table,
   TableHeader,
@@ -265,16 +266,11 @@ export function TestingLab({
     [boundProcedure, setBoundProcedure] = useState("");
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(
-      "/api/assurance?" + new URLSearchParams({ tenantId, engagementId: e.id }),
-      { signal: controller.signal, cache: "no-store" },
+    void assuranceRecords(
+      { tenantId, engagementId: e.id, kind: "dataset" },
+      { signal: controller.signal },
     )
-      .then(async (r) => {
-        if (r.ok) {
-          const v = (await r.json()) as { records: AssuranceRecord[] };
-          setCards(v.records.filter((c) => c.kind === "dataset"));
-        }
-      })
+      .then(setCards)
       .catch(() => {});
     return () => controller.abort();
   }, [tenantId, e.id, e.version]);

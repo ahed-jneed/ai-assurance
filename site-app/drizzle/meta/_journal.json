@@ -36,6 +36,13 @@
       "when": 1791539841707,
       "tag": "0004_ambiguous_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793912120205,
+      "tag": "0006_assurance_record_order",
+      "breakpoints": true
     }
   ]
 }

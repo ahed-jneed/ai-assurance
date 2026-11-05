@@ -39,6 +39,8 @@ import type { WorkspaceData } from "./workspace-types";
 
 import type { AssuranceRecord } from "@/lib/assurance-core";
 
+import { assuranceRecords } from "@/lib/assurance-store-client";
+
 import obligations from "@/lib/obligation-subitems.json";
 
 import {
@@ -54,8 +56,8 @@ import { ExecutionPlanner } from "./testing-readiness";
 
 import { AssuranceRegister, recordTitle } from "./assurance-register";
 
-// Rows of GET /api/assurance, as selected in app/api/assurance/route.ts and
-// lib/assurance-store.ts (jobs).
+// Rows of GET /api/assurance, as selected in lib/read-models/assurance-view.ts
+// and lib/assurance-store.ts (jobs).
 type ExecutionJob = {
   id: string;
   state: string;
@@ -82,7 +84,10 @@ type EngagementAccess = {
 };
 
 type Snapshot = {
+  // Every record of the engagement: the view answers the first page and the
+  // total, and load() follows the cursor through the rest.
   records: AssuranceRecord[];
+  total: number;
   jobs: ExecutionJob[];
   workers: RunnerWorker[];
   access: EngagementAccess[];
@@ -163,6 +168,10 @@ export function AssuranceWorkbench({
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false),
     [refreshing, setRefreshing] = useState(true),
+    [progress, setProgress] = useState<{
+      loaded: number;
+      total: number;
+    } | null>(null),
     [form, setForm] = useState(""),
     [dirty, setDirty] = useState(false),
     [sourceIds, setSourceIds] = useState<string[]>([]),
@@ -192,15 +201,31 @@ export function AssuranceWorkbench({
     requestRef.current.controller = controller;
     setRefreshing(true);
     try {
-      const response = await fetch(
-        "/api/assurance?" +
-          new URLSearchParams({ tenantId: data.tenantId, engagementId: e.id }),
-        { cache: "no-store", signal: controller.signal },
-      );
-      const value = (await response.json()) as Snapshot & { error?: string };
+      const scope = { tenantId: data.tenantId, engagementId: e.id },
+        response = await fetch("/api/assurance?" + new URLSearchParams(scope), {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+      const value = (await response.json()) as Snapshot & {
+        nextCursor: string | null;
+        error?: string;
+      };
       if (generation !== requestRef.current.generation) return;
       if (!response.ok) throw Error(value.error ?? "Workbench unavailable");
-      setSnapshot(value);
+      // The view holds the first page of records. The review queue, the
+      // registers and the form options need every record, so the remaining
+      // pages load before the snapshot replaces the previous one.
+      const records = await assuranceRecords(scope, {
+        from: value,
+        signal: controller.signal,
+        onProgress: (loaded) => {
+          // Records added while the pages load can pass the first total.
+          if (generation === requestRef.current.generation)
+            setProgress({ loaded, total: Math.max(value.total, loaded) });
+        },
+      });
+      if (generation !== requestRef.current.generation) return;
+      setSnapshot({ ...value, records });
       setLoadError("");
     } catch (x) {
       if (
@@ -209,7 +234,10 @@ export function AssuranceWorkbench({
       )
         setLoadError(x instanceof Error ? x.message : "Workbench unavailable");
     } finally {
-      if (generation === requestRef.current.generation) setRefreshing(false);
+      if (generation === requestRef.current.generation) {
+        setRefreshing(false);
+        setProgress(null);
+      }
     }
   }, [data.tenantId, e.id]);
   useEffect(() => {
@@ -1440,8 +1468,21 @@ export function AssuranceWorkbench({
       {!snapshot && refreshing && (
         <div className="workbench-load-state" role="status">
           <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
-          <p>Loading assurance records…</p>
+          <p>
+            Loading assurance records…
+            {progress &&
+              " " +
+                progress.loaded.toLocaleString() +
+                " of " +
+                progress.total.toLocaleString()}
+          </p>
         </div>
+      )}
+      {snapshot && progress && (
+        <p className="subtle" role="status">
+          Refreshing records: {progress.loaded.toLocaleString()} of{" "}
+          {progress.total.toLocaleString()} loaded
+        </p>
       )}
       {snapshot && !loadError && location.recordId && !selected && (
         <div className="workbench-load-error" role="alert">
