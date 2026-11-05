@@ -10,8 +10,9 @@ It regenerates and checks schemas/fixtures/statistics-golden.json.
   and statsmodels primitives, every decision p-value is checked by inverting the library
   interval, and every derived number (headline bounds, coverage, ECE, R2, criterion P,
   family adjustment, outcomes, power, sample sizes, minimum detectable effects and LL144
-  shares) is recomputed by separately written code. Plan hashes are recomputed with
-  Node.js, and every plan is validated against the draft plan schema with jsonschema.
+  shares) is recomputed by separately written code, as is every plan derived from a
+  legacy configuration. Plan hashes are recomputed with Node.js, and every plan is
+  validated against the draft plan schema with jsonschema.
   Install scipy, statsmodels, numpy and jsonschema only in a throwaway virtualenv OUTSIDE
   the repository; they must never become runtime dependencies.
 * --mutation-test corrupts fixture values one at a time and confirms --cross-check reports each.
@@ -53,6 +54,8 @@ MULTICLASS_METRICS = ("accuracy", "balanced_accuracy", "macro_precision", "macro
 REGRESSION_METRICS = ("mae", "rmse")
 REGRESSION_DESCRIPTIVE = ("mae", "rmse", "r2")
 PERFORMANCE_KINDS = ("performance", "multiclass_performance", "regression_performance")
+# Metrics that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval (section 4.8).
+UNDECIDABLE = {"regression_performance": "r2", "calibration": "expected_calibration_error"}
 RATE_KEYS = {"selection_rate_difference": "selection", "selection_rate_ratio": "selection", "tpr_difference": "tpr", "fpr_difference": "fpr"}
 # Headline names keep each runner's existing metric names (section 11).
 HEADLINE_NAMES = {
@@ -446,6 +449,9 @@ def normalize_criterion(c):
         out.update(band=band_norm(c.get("band")), members=[{"metric": m["metric"], "band": band_norm(m["band"])} for m in c.get("members", [])], minimumCoverage=c.get("minimumCoverage", 1.0), subgroup=c.get("subgroup"))
     else:
         raise ValueError(kind)
+    if kind in UNDECIDABLE:
+        out["passBlockedBy"] = list(c.get("passBlockedBy", []))
+        assert set(out["passBlockedBy"]) <= {UNDECIDABLE[kind]} and len(set(out["passBlockedBy"])) == len(out["passBlockedBy"]), "passBlockedBy names this kind's undecidable metric at most once"
     out["libraryEntry"] = normalize_library(c.get("libraryEntry"), out)
     if out["libraryEntry"] is not None and kind in ("group_comparison", "calibration"):
         expected = library_band(out["libraryEntry"]["id"], out["libraryEntry"]["parameters"])
@@ -478,6 +484,7 @@ def normalize_plan(p):
     assert plan["statisticsVersion"] == SPEC_VERSION and plan["confidenceLevel"] in (0.90, 0.95, 0.99)
     ids = [c["id"] for c in plan["criteria"]]
     assert len(set(ids)) == len(ids), "criterion ids must be unique"
+    assert plan["derivedFrom"] is not None or not any(c.get("passBlockedBy") for c in plan["criteria"]), "passBlockedBy occurs only in derived plans"
     return plan
 
 
@@ -485,7 +492,18 @@ def legacy_ratio_band(tau):
     return {"lower": tau, "upper": (1.0 / tau) if tau > 0 else None}
 
 
-def derive_hosted(legacy):
+def target_label_count(data):
+    """k for the multiclass chance baseline: the labels that occur in the target column (section 4.8)."""
+    if data is None or "matrix" not in data:
+        raise ValueError("a multiclass derivation reads the number of target labels from the data")
+    return sum(1 for row in data["matrix"] if sum(row) > 0)
+
+
+def chance_level(data):
+    return 1.0 / max(2, target_label_count(data))
+
+
+def derive_hosted(legacy, data=None):
     """Section 9: a hosted 1.1 profile (task, suite, config) without a stored plan."""
     task, suite, c = legacy["task"], legacy["suite"], legacy["config"]
     criteria = []
@@ -493,7 +511,7 @@ def derive_hosted(legacy):
         if test == "performance" and task == "Binary classification":
             criteria.append({"id": "performance", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": c["minimumAccuracy"]}}, {"metric": "recall", "band": {"lower": c.get("minimumRecall", 0.7)}}, {"metric": "balanced_accuracy", "band": {"lower": 0.5}}]})
         elif test == "performance":
-            criteria.append({"id": "performance", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": {"lower": c["minimumAccuracy"]}}, {"metric": "macro_f1", "band": {"lower": c.get("minimumMacroF1", 0.7)}}]})
+            criteria.append({"id": "performance", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": {"lower": c["minimumAccuracy"]}}, {"metric": "balanced_accuracy", "band": {"lower": chance_level(data)}}, {"metric": "macro_f1", "band": {"lower": c.get("minimumMacroF1", 0.7)}}]})
         elif test == "regression":
             criteria.append({"id": "regression", "kind": "regression_performance", "members": [{"metric": "rmse", "band": {"upper": c.get("maximumRmse", 1.0)}}]})
         elif test == "demographic_parity":
@@ -507,7 +525,7 @@ def derive_hosted(legacy):
     return {"minimums": {key: max(FLOORS[key], configured[key]) for key in FLOORS}, "configuredMinimums": configured, "derivedFrom": {"source": "hosted_config", "contractVersion": "1.1"}, "criteria": criteria}
 
 
-def derive_engine(legacy):
+def derive_engine(legacy, data=None):
     """Section 9: an engine 1.0 configuration whose thresholds.values define the criteria."""
     c = legacy["config"]
     task, suites, values = c["task"], c["suite"], c["thresholds"]["values"]
@@ -516,24 +534,33 @@ def derive_engine(legacy):
         rule = values[name]
         return {"lower": rule["value"], "upper": None} if rule["operator"] == ">=" else {"lower": None, "upper": rule["value"]}
 
-    def members_for(order, aliases=None):
+    def baseline(name, chance):
+        """The chance baseline: lower bound max(chance, the policy's own lower bound); a policy upper bound is kept."""
+        rule = values.get(name)
+        if rule is None:
+            return {"lower": chance, "upper": None}
+        return {"lower": max(chance, rule["value"]), "upper": None} if rule["operator"] == ">=" else {"lower": chance, "upper": rule["value"]}
+
+    def classification_members(order, chance, aliases=None):
+        """Members in standard order; the balanced-accuracy baseline joins whenever the policy sets any of them."""
         aliases = aliases or {}
-        return [{"metric": metric, "band": band_of(aliases.get(metric, metric))} for metric in order if aliases.get(metric, metric) in values]
+        if not any(aliases.get(metric, metric) in values for metric in order):
+            return []
+        return [{"metric": metric, "band": baseline(aliases.get(metric, metric), chance) if metric == "balanced_accuracy" else band_of(aliases.get(metric, metric))} for metric in order if metric == "balanced_accuracy" or aliases.get(metric, metric) in values]
+
+    def members_for(order):
+        return [{"metric": metric, "band": band_of(metric)} for metric in order if metric in values]
 
     criteria = []
     if "performance" in suites:
         if task == "binary_classification":
-            members = members_for(BINARY_METRICS)
-            if members and "balanced_accuracy" not in values:
-                position = sum(1 for m in members if BINARY_METRICS.index(m["metric"]) < BINARY_METRICS.index("balanced_accuracy"))
-                members.insert(position, {"metric": "balanced_accuracy", "band": {"lower": 0.5, "upper": None}})
-            criteria.append({"id": "PERF-BINARY", "kind": "performance", "members": members})
+            criteria.append({"id": "PERF-BINARY", "kind": "performance", "members": classification_members(BINARY_METRICS, 0.5)})
             if c.get("columns", {}).get("score"):
-                criteria.append({"id": "PERF-CAL", "kind": "calibration", "band": None, "members": members_for(("brier_score",))})
+                criteria.append({"id": "PERF-CAL", "kind": "calibration", "band": None, "members": members_for(("brier_score",)), "passBlockedBy": [UNDECIDABLE["calibration"]]})
         elif task == "multiclass_classification":
-            criteria.append({"id": "PERF-MULTI", "kind": "multiclass_performance", "members": members_for(MULTICLASS_METRICS, {"balanced_accuracy": "macro_recall"})})
+            criteria.append({"id": "PERF-MULTI", "kind": "multiclass_performance", "members": classification_members(MULTICLASS_METRICS, chance_level(data), {"balanced_accuracy": "macro_recall"})})
         else:
-            criteria.append({"id": "PERF-REG", "kind": "regression_performance", "members": members_for(REGRESSION_METRICS)})
+            criteria.append({"id": "PERF-REG", "kind": "regression_performance", "members": members_for(REGRESSION_METRICS), "passBlockedBy": [UNDECIDABLE["regression_performance"]]})
     if "fairness" in suites and task == "binary_classification":
         for cid, metric, key in (("FAIR-DP", "selection_rate_difference", "demographic_parity_difference"), ("FAIR-DI", "selection_rate_ratio", "disparate_impact_ratio"), ("FAIR-EO", "equalized_odds", "equalized_odds_difference")):
             rule = values.get(key)
@@ -547,7 +574,7 @@ def plan_for(case):
     if "legacy" not in case:
         return normalize_plan(case["plan"])
     legacy = case["legacy"]
-    return normalize_plan(derive_hosted(legacy) if legacy["source"] == "hosted_config" else derive_engine(legacy))
+    return normalize_plan((derive_hosted if legacy["source"] == "hosted_config" else derive_engine)(legacy, case.get("data")))
 
 
 # ---------------------------------------------------------------- members
@@ -647,19 +674,21 @@ def multiclass_stat(metric, data, mins):
     if metric == "balanced_accuracy":
         parts = list(zip(tps, supports))
         counts = {"perClass": [{"label": label, "tp": x, "support": n} for label, (x, n) in zip(labels, parts)]}
-        if min(supports) == 0:
+        if min(supports) == 0 or k < 2:
             return Stat(None, "mover_wilson", None, None, counts, "undefined", ["single_class"])
         return Stat(sum(x / n for x, n in parts) / k, "mover_wilson", lambda z: mover_mean(parts, z), None, counts, *support(min(supports), cls))
     if metric == "macro_f1":
         classes = [(tps[i], supports[i] + predicted[i] - tps[i]) for i in range(k)]
         counts = {"perClass": [{"label": label, "tp": x, "tpPlusFpPlusFn": m} for label, (x, m) in zip(labels, classes)]}
-        if min(supports) == 0:
+        if min(supports) == 0 or k < 2:
             return Stat(None, "jaccard_wilson_bonferroni", None, None, counts, "undefined", ["single_class"])
         estimate = sum(2 * tps[i] / (supports[i] + predicted[i]) for i in range(k)) / k
         return Stat(estimate, "jaccard_wilson_bonferroni", lambda z: macro_f1_interval(classes, z), None, counts, *support(min(supports), cls))
     if metric == "macro_precision":
         parts = list(zip(tps, predicted))
         counts = {"perClass": [{"label": label, "tp": x, "predicted": n} for label, (x, n) in zip(labels, parts)]}
+        if k < 2:
+            return Stat(None, "wilson_bonferroni_mean", None, None, counts, "undefined", ["single_class"])
         if min(predicted) == 0:
             return Stat(None, "wilson_bonferroni_mean", None, None, counts, "undefined", ["undefined_zero_denominator"])
         return Stat(sum(x / n for x, n in parts) / k, "wilson_bonferroni_mean", lambda z: mean_bonferroni_wilson(parts, z), None, counts, *support(min(predicted), cls))
@@ -907,6 +936,12 @@ def evaluate_criterion(spec, data, level, mins):
     reasons = list(context["reasons"])
     if (kind in PERFORMANCE_KINDS and not spec["members"]) or (kind in ("group_comparison", "calibration") and spec["band"] is None and not spec.get("members")):
         reasons.append("no_threshold")
+    if spec.get("passBlockedBy"):  # section 4.8: a metric today's rule needs and 1.0.0 cannot decide blocks a pass
+        context["passBlocked"] = True
+        reasons.append("undecidable_metric")
+        for entry in descriptive:
+            if entry["metric"] in spec["passBlockedBy"]:
+                entry["reasons"].append("undecidable_metric")
     gated = context["sampleSize"] < mins["sampleSize"]
     if gated:
         reasons.insert(0, "below_minimum_sample_size")
@@ -1237,9 +1272,11 @@ def criterion_power(crit, level, target, family, mins):
         m = len(crit["members"])
         z_pass, z_fail = zcrit(1.0 - alpha / family), zcrit(1.0 - alpha / (family * max(1, m)))
 
+        undecidable = bool(crit.get("passBlockedBy"))
+
         def at(n):
             blocked = n < mins["sampleSize"]
-            return summarize(performance_models(crit, a, n, mins), z_pass, z_fail, blocked, blocked)
+            return summarize(performance_models(crit, a, n, mins), z_pass, z_fail, blocked or undecidable, blocked)
 
         members, lower, upper, fail = at(a["n"])
         if lower is None:
@@ -1247,6 +1284,8 @@ def criterion_power(crit, level, target, family, mins):
         out = {"status": "computed", "passProbability": lower, "passProbabilityUpperBound": upper, "failProbability": fail, "requiredNForPass": smallest_n(lambda n: at(n)[1], target), "members": members, "reasons": []}
         if a["n"] < mins["sampleSize"]:
             out["reasons"].append("below_minimum_sample_size")
+        if undecidable:
+            out["reasons"].append("undecidable_metric")
         if any("planned_below_minimum" in e["reasons"] for e in members):
             out["reasons"].append("planned_below_minimum")
         if out["requiredNForPass"] is None:
@@ -1323,6 +1362,18 @@ def sel(group, selected, n):
 DP10, IR45, EO10 = band(-0.1, 0.1), band(0.8, 1.25), band(-0.1, 0.1)
 LEGACY_HOSTED_CONFIG = {"labelColumn": "actual", "predictionColumn": "predicted", "groupColumn": "group", "positiveLabel": "1", "minimumGroupSize": 2, "maximumParityGap": 0.1, "minimumImpactRatio": 0.8, "minimumAccuracy": 0.85, "minimumSampleSize": 20, "minimumClassCount": 5, "maximumOddsGap": 0.1, "minimumRecall": 0.7, "minimumMacroF1": 0.7, "maximumRmse": 1}
 LEGACY_ENGINE_CONFIG = {"contractVersion": "1.0", "id": "run-legacy-derivation", "engagementId": "eng-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": "binary_classification", "suite": ["performance", "fairness"], "seed": 1729, "columns": {"target": "actual", "prediction": "predicted", "protected": "group", "score": "score"}, "positiveLabel": "1", "negativeLabel": "0", "minGroupSize": 20, "minClassCount": 5, "minSampleSize": 30, "thresholds": {"policyId": "fixture-policy", "policyVersion": "1", "source": "internal_policy", "values": {"accuracy": {"operator": ">=", "value": 0.8}, "precision": {"operator": ">=", "value": 0.6}, "recall": {"operator": ">=", "value": 0.7}, "f1": {"operator": ">=", "value": 0.65}, "brier_score": {"operator": "<=", "value": 0.2}, "expected_calibration_error": {"operator": "<=", "value": 0.05}, "demographic_parity_difference": {"operator": "<=", "value": 0.1}, "disparate_impact_ratio": {"operator": ">=", "value": 0.8}, "equalized_odds_difference": {"operator": "<=", "value": 0.15}}}}
+MULTICLASS_3X3 = {"kind": "multiclass", "labels": ["high", "low", "medium"], "matrix": [[150, 10, 40], [8, 270, 22], [30, 25, 245]]}
+# GC-48: dyadic targets symmetric about 5 (so every runner gets R2 = 0 exactly) and the mean predictor 5.
+MEAN_PREDICTOR_DEVIATIONS = ((0.125, 63), (0.375, 53), (0.625, 39), (0.875, 24), (1.125, 12), (1.375, 6), (1.625, 2), (1.875, 1))
+MEAN_PREDICTOR_TARGETS = [5.0 + sign * d for d, count in MEAN_PREDICTOR_DEVIATIONS for _ in range(count) for sign in (1.0, -1.0)]
+
+
+def engine_legacy(task, values):
+    """An engine 1.0 performance-only configuration with the floors as its minimums and the given policy values."""
+    config = {**LEGACY_ENGINE_CONFIG, "task": task, "suite": ["performance"], "columns": {"target": "actual", "prediction": "predicted"}, "minGroupSize": 30, "minClassCount": 10, "minSampleSize": 30, "thresholds": {**LEGACY_ENGINE_CONFIG["thresholds"], "values": values}}
+    if task != "binary_classification":
+        del config["positiveLabel"], config["negativeLabel"]
+    return {"source": "engine_thresholds", "config": config}
 
 CASES = [
     {"id": "GC-01", "category": "small_sample", "title": "Recall 40/50 = 0.80 against a 0.70 minimum: the point estimate passes, the interval does not", "type": "plan",
@@ -1396,7 +1447,7 @@ CASES = [
      "data": {"groups": [sel("Hispanic or Latino", 204, 408), sel("White", 412, 797), sel("Black or African American", 170, 390), sel("Native Hawaiian or Pacific Islander", 52, 119), sel("Asian", 302, 616), sel("Native American or Alaska Native", 18, 41), sel("Two or More Races", 96, 213)], "unknownGroupRows": 250},
      "plan": {"criteria": [grp("four-fifths-screen", "selection_rate_ratio", IR45, minimum_coverage=0.9, library={"id": "screen.us.four-fifths", "version": 1, "parameters": {"tau": 0.8}})]}},
     {"id": "GC-34", "category": "multiclass", "title": "Three-class confusion matrix: accuracy, macro recall (balanced accuracy) and macro F1; macro precision descriptive", "type": "plan",
-     "data": {"kind": "multiclass", "labels": ["high", "low", "medium"], "matrix": [[150, 10, 40], [8, 270, 22], [30, 25, 245]]},
+     "data": MULTICLASS_3X3,
      "plan": {"criteria": [{"id": "multiclass-performance", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": band(0.75)}, {"metric": "balanced_accuracy", "band": band(0.75)}, {"metric": "macro_f1", "band": band(0.75)}]}]}},
     {"id": "GC-36", "category": "small_cell", "title": "Fisher's exact test reference values (two-sided; tables with probability <= the observed one)", "type": "fisher",
      "input": {"tables": [{"subject": {"x": 6, "n": 20}, "comparator": {"x": 10, "n": 20}}, {"subject": {"x": 0, "n": 30}, "comparator": {"x": 5, "n": 30}}, {"subject": {"x": 0, "n": 40}, "comparator": {"x": 10, "n": 40}}, {"subject": {"x": 2, "n": 40}, "comparator": {"x": 4500, "n": 9000}}, {"subject": {"x": 1, "n": 10}, "comparator": {"x": 1, "n": 10}}, {"subject": {"x": 3, "n": 8}, "comparator": {"x": 7, "n": 9}}, {"subject": {"x": 0, "n": 50}, "comparator": {"x": 0, "n": 50}}]}},
@@ -1421,6 +1472,18 @@ CASES = [
     {"id": "GC-45", "category": "no_threshold", "title": "Engine policy with no performance threshold: every metric is descriptive and the criterion stays inconclusive (no_threshold), as today", "type": "plan",
      "data": {"groups": [cm("all", 170, 40, 30, 760)]},
      "legacy": {"source": "engine_thresholds", "config": {**LEGACY_ENGINE_CONFIG, "suite": ["performance"], "columns": {"target": "actual", "prediction": "predicted"}, "minGroupSize": 30, "minClassCount": 10, "thresholds": {**LEGACY_ENGINE_CONFIG["thresholds"], "values": {}}}}},
+    {"id": "GC-46", "category": "chance_baseline", "title": "Engine multiclass policy with only an accuracy minimum: the derived criterion adds the macro-recall chance baseline 1/k, on which a constant majority-class predictor sits, so it cannot pass", "type": "plan",
+     "data": {"kind": "multiclass", "labels": ["high", "low", "medium"], "matrix": [[0, 40, 0], [0, 1900, 0], [0, 60, 0]]},
+     "legacy": engine_legacy("multiclass_classification", {"accuracy": {"operator": ">=", "value": 0.9}})},
+    {"id": "GC-47", "category": "chance_baseline", "title": "Engine binary policy with a balanced-accuracy minimum below chance: the baseline is max(0.5, 0.40), on which a constant negative predictor sits, so it cannot pass", "type": "plan",
+     "data": {"groups": [cm("all", 0, 0, 100, 1900)]},
+     "legacy": engine_legacy("binary_classification", {"accuracy": {"operator": ">=", "value": 0.9}, "balanced_accuracy": {"operator": ">=", "value": 0.4}})},
+    {"id": "GC-48", "category": "undecidable_metric", "title": "Engine regression policy with an R2 minimum and a mean predictor (R2 = 0): MAE and RMSE pass, but R2, which 1.0.0 cannot decide, blocks the pass", "type": "plan",
+     "data": {"kind": "regression", "targets": MEAN_PREDICTOR_TARGETS, "errors": [5.0 - t for t in MEAN_PREDICTOR_TARGETS]},
+     "legacy": engine_legacy("regression", {"mae": {"operator": "<=", "value": 1.0}, "rmse": {"operator": "<=", "value": 1.2}, "r2": {"operator": ">=", "value": 0.5}})},
+    {"id": "GC-49", "category": "chance_baseline", "title": "Legacy hosted multiclass profile: the derived criterion adds the macro-recall chance baseline 1/3 between accuracy and macro F1, and the GC-34 model passes all three", "type": "plan",
+     "data": MULTICLASS_3X3,
+     "legacy": {"source": "hosted_config", "task": "Multiclass classification", "suite": ["performance"], "config": {**LEGACY_HOSTED_CONFIG, "minimumAccuracy": 0.75}}},
 ]
 
 
@@ -1473,7 +1536,7 @@ def end_to_end(case):
         return {"engine": rows <= 1_000_000, "hosted": hosted}
     if "bins" in data:
         return {"engine": True, "hosted": False}
-    return {"engine": True, "hosted": True}
+    return {"engine": True, "hosted": not engine_policy}
 
 
 def build():
@@ -1490,7 +1553,7 @@ def build():
         "specificationVersion": SPEC_VERSION,
         "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
         "howToUse": {
-            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
+            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
             "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
             "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
             "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine.",
@@ -1770,6 +1833,12 @@ def cross_check(fixture):
                     sst = float(np.sum((y - y.mean()) ** 2))
                     expect((sst == 0 and r2["estimate"] is None) or near(1 - float(np.sum(e * e)) / sst, r2["estimate"], 1e-9), "ece_r2", f"{case['id']} R2")
             expect(d["sampleSize"] == sample, "sample_sizes", f"{case['id']} {crit['id']} sampleSize {d['sampleSize']} vs {sample}")
+            # an undecidable metric that today's rule needs (R2, ECE) blocks a pass and is flagged on its descriptive entry
+            undecidable = spec.get("passBlockedBy") or []
+            blocked = blocked or bool(undecidable)
+            expect(("undecidable_metric" in d["reasons"]) == bool(undecidable), "descriptive_entries", f"{case['id']} {crit['id']} undecidable_metric on the criterion")
+            for m in crit["descriptive"]:
+                expect(("undecidable_metric" in m["reasons"]) == (m["metric"] in undecidable), "descriptive_entries", f"{case['id']} {m['memberId']} undecidable_metric on the descriptive entry")
             # member status, small-cell flags, Fisher on every small-cell member, and the suppressed-group list
             if spec["kind"] == "group_comparison":
                 sizes = sizes_of(data)
@@ -2048,6 +2117,88 @@ def cross_check(fixture):
                 check_difference("failMdeTprDifference", get(a["truePositiveRate"], comparator), sizes[subject] * ps, sizes[comparator] * pc, -1)
                 check_difference("failMdeFprDifference", get(a["falsePositiveRate"], comparator), sizes[subject] * (1 - ps), sizes[comparator] * (1 - pc), 1)
 
+    # ---- legacy derivation (section 9.3), written again from the text and compared with every derived plan
+    def ind_derivation(legacy, data):
+        def criterion(id_, kind, **fields):
+            return {"id": id_, "kind": kind, "role": "confirmatory", "rationale": None, **fields, "libraryEntry": None, "powerAssumptions": None}
+
+        def at_least(v):
+            return {"lower": v, "upper": None}
+
+        def at_most(v):
+            return {"lower": None, "upper": v}
+
+        def group(id_, metric, b):
+            return criterion(id_, "group_comparison", metric=metric, band=b, comparison={"mode": "all_pairs", "referenceGroup": None}, groupFields=None, declaredGroups=None, minimumCoverage=1.0)
+
+        def chance():  # 1/k, k = labels occurring in the target column (at least 2)
+            return 1.0 / max(2, int(np.count_nonzero(np.asarray(data["matrix"]).sum(axis=1))))
+
+        criteria = []
+        if legacy["source"] == "hosted_config":
+            c, task = legacy["config"], legacy["task"]
+            configured = {"sampleSize": c.get("minimumSampleSize", 20), "groupSize": c["minimumGroupSize"], "classCount": c.get("minimumClassCount", 5)}
+            source = {"source": "hosted_config", "contractVersion": "1.1"}
+            for test in legacy["suite"]:
+                if test == "performance" and task == "Binary classification":
+                    criteria.append(criterion(test, "performance", members=[{"metric": "accuracy", "band": at_least(c["minimumAccuracy"])}, {"metric": "recall", "band": at_least(c.get("minimumRecall", 0.7))}, {"metric": "balanced_accuracy", "band": at_least(0.5)}]))
+                elif test == "performance":
+                    criteria.append(criterion(test, "multiclass_performance", members=[{"metric": "accuracy", "band": at_least(c["minimumAccuracy"])}, {"metric": "balanced_accuracy", "band": at_least(chance())}, {"metric": "macro_f1", "band": at_least(c.get("minimumMacroF1", 0.7))}]))
+                elif test == "regression":
+                    criteria.append(criterion(test, "regression_performance", members=[{"metric": "rmse", "band": at_most(c.get("maximumRmse", 1.0))}], passBlockedBy=[]))
+                elif test == "demographic_parity":
+                    criteria.append(group(test, "selection_rate_difference", {"lower": -c["maximumParityGap"], "upper": c["maximumParityGap"]}))
+                elif test == "disparate_impact":
+                    tau = c["minimumImpactRatio"]
+                    criteria.append(group(test, "selection_rate_ratio", {"lower": tau, "upper": 1 / tau if tau > 0 else None}))
+                else:
+                    delta = c.get("maximumOddsGap", c["maximumParityGap"])
+                    criteria.append(group(test, "equalized_odds", {"lower": -delta, "upper": delta}))
+        else:
+            c = legacy["config"]
+            values = c["thresholds"]["values"]
+            configured = {"sampleSize": c.get("minSampleSize", 30), "groupSize": c.get("minGroupSize", 30), "classCount": c.get("minClassCount", 10)}
+            source = {"source": "engine_thresholds", "contractVersion": c["contractVersion"]}
+
+            def rule(key):
+                r = values[key]
+                return at_least(r["value"]) if r["operator"] == ">=" else at_most(r["value"])
+
+            def classification(keys, base):
+                """keys: plan metric -> policy key, in standard order; balanced accuracy is the chance baseline."""
+                if not any(key in values for key in keys.values()):
+                    return []
+                members = []
+                for metric, key in keys.items():
+                    if metric == "balanced_accuracy":
+                        r = values.get(key)
+                        members.append({"metric": metric, "band": at_least(base) if r is None else at_least(max(base, r["value"])) if r["operator"] == ">=" else {"lower": base, "upper": r["value"]}})
+                    elif key in values:
+                        members.append({"metric": metric, "band": rule(key)})
+                return members
+
+            if "performance" in c["suite"]:
+                if c["task"] == "binary_classification":
+                    names = ("accuracy", "precision", "recall", "specificity", "false_positive_rate", "balanced_accuracy", "f1")
+                    criteria.append(criterion("PERF-BINARY", "performance", members=classification({n: n for n in names}, 0.5)))
+                    if c.get("columns", {}).get("score"):
+                        criteria.append(criterion("PERF-CAL", "calibration", band=None, members=[{"metric": "brier_score", "band": rule("brier_score")}] if "brier_score" in values else [], minimumCoverage=1.0, subgroup=None, passBlockedBy=["expected_calibration_error"]))
+                elif c["task"] == "multiclass_classification":
+                    criteria.append(criterion("PERF-MULTI", "multiclass_performance", members=classification({"accuracy": "accuracy", "balanced_accuracy": "macro_recall", "macro_precision": "macro_precision", "macro_f1": "macro_f1"}, chance())))
+                else:
+                    criteria.append(criterion("PERF-REG", "regression_performance", members=[{"metric": n, "band": rule(n)} for n in ("mae", "rmse") if n in values], passBlockedBy=["r2"]))
+            if "fairness" in c["suite"] and c["task"] == "binary_classification":
+                for cid, metric, key in (("FAIR-DP", "selection_rate_difference", "demographic_parity_difference"), ("FAIR-DI", "selection_rate_ratio", "disparate_impact_ratio"), ("FAIR-EO", "equalized_odds", "equalized_odds_difference")):
+                    r = values.get(key)
+                    v = None if r is None else r["value"]
+                    criteria.append(group(cid, metric, None if r is None else {"lower": v, "upper": 1 / v if v > 0 else None} if metric == "selection_rate_ratio" else {"lower": -v, "upper": v}))
+        floors = {"sampleSize": 30, "groupSize": 30, "classCount": 10}
+        return {"statisticsVersion": "1.0.0", "confidenceLevel": 0.95, "minimums": {k: max(floors[k], configured[k]) for k in floors}, "configuredMinimums": configured, "multiplicity": {"confirmatory": "bonferroni", "exploratory": "benjamini_hochberg"}, "clusterField": None, "bootstrap": {"replicates": 2000}, "calibrationBins": 10, "power": {"targetPower": 0.8, "acknowledgement": None}, "derivedFrom": source, "criteria": criteria}
+
+    for case in fixture["cases"]:
+        if "legacy" in case:
+            expect(ind_derivation(case["legacy"], case.get("data")) == case["expected"]["normalizedPlan"], "derivation", f"{case['id']} derived plan differs from the section 9.3 rules")
+
     # ---- plan schema (jsonschema, Draft 2020-12) and plan hashes (Node.js)
     schema = json.loads(PLAN_SCHEMA.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
@@ -2087,6 +2238,11 @@ def cross_check(fixture):
         plan = json.loads(json.dumps(base))
         mutate(plan)
         expect(not plan_validator.is_valid(plan), "plan_schema", f"schema accepts an invalid plan: {label}")
+    # passBlockedBy is set only by derivation, and only to the kind's own undecidable metric.
+    for label, case_id, blocked in (("passBlockedBy in a plan that was not derived", "GC-35", ["r2"]), ("passBlockedBy naming another kind's metric", "GC-48", ["expected_calibration_error"]), ("passBlockedBy on a binary criterion", "GC-47", [])):
+        plan = json.loads(json.dumps(next(c for c in fixture["cases"] if c["id"] == case_id)["expected"]["normalizedPlan"]))
+        plan["criteria"][0]["passBlockedBy"] = blocked
+        expect(not plan_validator.is_valid(plan), "plan_schema", f"schema accepts an invalid plan: {label}")
     node = shutil.which("node")
     if node is None:
         problems.append("[plan_hashes] Node.js is not on PATH, so the plan hashes were not cross-checked")
@@ -2109,6 +2265,12 @@ def mutation_test(fixture):
 
     def bump(obj, key, delta):
         obj[key] = obj[key] + delta
+
+    def replan(f, cid, change):
+        """Change a derived plan and recompute its hash, so that only the derivation check can notice."""
+        expected = case(f, cid)["expected"]
+        change(expected["normalizedPlan"]["criteria"][0])
+        expected["planSha256"] = plan_sha256(expected["normalizedPlan"])
 
     mutations = {
         "headline upper bound": lambda f: bump(crit(f, "GC-22")["headline"]["interval"], "upper", 1e-4),
@@ -2136,6 +2298,10 @@ def mutation_test(fixture):
         "sample size": lambda f: crit(f, "GC-33")["decision"].__setitem__("sampleSize", 2834),
         "deciding member": lambda f: crit(f, "GC-31")["decision"].__setitem__("decidingMemberId", "accuracy"),
         "suppressed member marked evaluated": lambda f: next(m for m in crit(f, "GC-22")["members"] if m["status"] == "suppressed").__setitem__("status", "evaluated"),
+        "binary chance baseline lowered to the policy bound": lambda f: replan(f, "GC-47", lambda c: c["members"][1]["band"].__setitem__("lower", 0.4)),
+        "multiclass chance baseline dropped": lambda f: replan(f, "GC-46", lambda c: c["members"].pop(1)),
+        "R2 no longer blocking the derived regression criterion": lambda f: replan(f, "GC-48", lambda c: c.__setitem__("passBlockedBy", [])),
+        "pass P despite an undecidable metric": lambda f: crit(f, "GC-48")["decision"].__setitem__("pValue", crit(f, "GC-48")["members"][0]["pValue"]),
     }
     missed = []
     for name, mutate in mutations.items():

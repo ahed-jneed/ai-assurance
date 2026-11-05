@@ -4,7 +4,7 @@
  "specificationVersion": "1.0.0",
  "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
  "howToUse": {
-  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
+  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
   "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
   "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
   "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine."
@@ -7354,7 +7354,7 @@
     "hosted": false
    },
    "expected": {
-    "planSha256": "f3f6ee60183f0d0e8b0145a51eed8e9857ab931da6d9c7315eaee06847381ea0",
+    "planSha256": "8cae2353e7f76b62d9e1a490b5b12d89edef2e914614a9c8f9b58f79aa7814d5",
     "normalizedPlan": {
      "statisticsVersion": "1.0.0",
      "confidenceLevel": 0.95,
@@ -7391,6 +7391,7 @@
        "members": [],
        "minimumCoverage": 0.95,
        "subgroup": null,
+       "passBlockedBy": [],
        "libraryEntry": null,
        "powerAssumptions": null
       }
@@ -10918,7 +10919,7 @@
     "hosted": true
    },
    "expected": {
-    "planSha256": "ab40cf3d0fc3340c59e7a658f446fc8a113cd237880662416f91729dae5a3e88",
+    "planSha256": "3656ca8dab21ad684cfa4e535be837863f16062ec71fa1ab9395b37885e0ce79",
     "normalizedPlan": {
      "statisticsVersion": "1.0.0",
      "confidenceLevel": 0.95,
@@ -10964,6 +10965,7 @@
          }
         }
        ],
+       "passBlockedBy": [],
        "libraryEntry": null,
        "powerAssumptions": null
       }
@@ -12077,7 +12079,7 @@
     "hosted": false
    },
    "expected": {
-    "planSha256": "2e1089f0b80b4f7a1b9d71c634b566c6600b612a93d12656f5e94eb0e0fffe05",
+    "planSha256": "47531e418bf8883f69ff6daa37ea8e2f1d49185ed52f4314264c98e9c17f873b",
     "normalizedPlan": {
      "statisticsVersion": "1.0.0",
      "confidenceLevel": 0.95,
@@ -12171,6 +12173,9 @@
        ],
        "minimumCoverage": 1.0,
        "subgroup": null,
+       "passBlockedBy": [
+        "expected_calibration_error"
+       ],
        "libraryEntry": null,
        "powerAssumptions": null
       },
@@ -13022,6 +13027,1974 @@
      }
     ],
     "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-46",
+   "category": "chance_baseline",
+   "title": "Engine multiclass policy with only an accuracy minimum: the derived criterion adds the macro-recall chance baseline 1/k, on which a constant majority-class predictor sits, so it cannot pass",
+   "type": "plan",
+   "data": {
+    "kind": "multiclass",
+    "labels": [
+     "high",
+     "low",
+     "medium"
+    ],
+    "matrix": [
+     [
+      0,
+      40,
+      0
+     ],
+     [
+      0,
+      1900,
+      0
+     ],
+     [
+      0,
+      60,
+      0
+     ]
+    ]
+   },
+   "legacy": {
+    "source": "engine_thresholds",
+    "config": {
+     "contractVersion": "1.0",
+     "id": "run-legacy-derivation",
+     "engagementId": "eng-fixture",
+     "modelId": "model-fixture",
+     "datasetId": "data-fixture",
+     "task": "multiclass_classification",
+     "suite": [
+      "performance"
+     ],
+     "seed": 1729,
+     "columns": {
+      "target": "actual",
+      "prediction": "predicted"
+     },
+     "minGroupSize": 30,
+     "minClassCount": 10,
+     "minSampleSize": 30,
+     "thresholds": {
+      "policyId": "fixture-policy",
+      "policyVersion": "1",
+      "source": "internal_policy",
+      "values": {
+       "accuracy": {
+        "operator": ">=",
+        "value": 0.9
+       }
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "3642ef196d41ac7f1f5ee246bb86dd5faca2e402ed5508752e7db6ec0a559a9f",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "engine_thresholds",
+      "contractVersion": "1.0"
+     },
+     "criteria": [
+      {
+       "id": "PERF-MULTI",
+       "kind": "multiclass_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.9,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.3333333333333333,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "PERF-MULTI",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1900,
+         "n": 2000
+        },
+        "estimate": 0.95,
+        "interval": {
+         "lower": 0.939555891066,
+         "upper": 0.958718766381,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 9.08547022401e-14,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 0,
+           "support": 40
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "support": 1900
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "support": 60
+          }
+         ]
+        },
+        "estimate": 0.333333333333,
+        "interval": {
+         "lower": 0.332660753026,
+         "upper": 0.368764325396,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.333333333333,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "estimate_on_band_boundary"
+        ]
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "macro_precision",
+        "metric": "macro_precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 0,
+           "predicted": 0
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "predicted": 2000
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "predicted": 0
+          }
+         ]
+        },
+        "estimate": null,
+        "interval": null,
+        "band": null,
+        "status": "undefined",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "undefined_zero_denominator"
+        ]
+       },
+       {
+        "memberId": "macro_f1",
+        "metric": "macro_f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 0,
+           "tpPlusFpPlusFn": 40
+          },
+          {
+           "label": "low",
+           "tp": 1900,
+           "tpPlusFpPlusFn": 2000
+          },
+          {
+           "label": "medium",
+           "tp": 0,
+           "tpPlusFpPlusFn": 60
+          }
+         ]
+        },
+        "estimate": 0.324786324786,
+        "interval": {
+         "lower": 0.322490635534,
+         "upper": 0.454315383069,
+         "level": 0.95,
+         "method": "jaccard_wilson_bonferroni"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "multiclass_performance",
+       "direction": "pass",
+       "pValue": 1.0,
+       "adjustedPValue": 1.0,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": null,
+       "sampleSize": 2000,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "estimate_on_band_boundary"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-47",
+   "category": "chance_baseline",
+   "title": "Engine binary policy with a balanced-accuracy minimum below chance: the baseline is max(0.5, 0.40), on which a constant negative predictor sits, so it cannot pass",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 0,
+      "fp": 0,
+      "fn": 100,
+      "tn": 1900
+     }
+    ]
+   },
+   "legacy": {
+    "source": "engine_thresholds",
+    "config": {
+     "contractVersion": "1.0",
+     "id": "run-legacy-derivation",
+     "engagementId": "eng-fixture",
+     "modelId": "model-fixture",
+     "datasetId": "data-fixture",
+     "task": "binary_classification",
+     "suite": [
+      "performance"
+     ],
+     "seed": 1729,
+     "columns": {
+      "target": "actual",
+      "prediction": "predicted"
+     },
+     "positiveLabel": "1",
+     "negativeLabel": "0",
+     "minGroupSize": 30,
+     "minClassCount": 10,
+     "minSampleSize": 30,
+     "thresholds": {
+      "policyId": "fixture-policy",
+      "policyVersion": "1",
+      "source": "internal_policy",
+      "values": {
+       "accuracy": {
+        "operator": ">=",
+        "value": 0.9
+       },
+       "balanced_accuracy": {
+        "operator": ">=",
+        "value": 0.4
+       }
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "8fb29641607593f2a543acae06e760627ffe2ae946aa6166446bc9004211b1c0",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "engine_thresholds",
+      "contractVersion": "1.0"
+     },
+     "criteria": [
+      {
+       "id": "PERF-BINARY",
+       "kind": "performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.9,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.5,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "PERF-BINARY",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1900,
+         "n": 2000
+        },
+        "estimate": 0.95,
+        "interval": {
+         "lower": 0.939555891066,
+         "upper": 0.958718766381,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 9.08547022401e-14,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 0,
+         "positives": 100,
+         "tn": 1900,
+         "negatives": 1900
+        },
+        "estimate": 0.5,
+        "interval": {
+         "lower": 0.498991129539,
+         "upper": 0.518496749103,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "estimate_on_band_boundary"
+        ]
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "precision",
+        "metric": "precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 0
+        },
+        "estimate": null,
+        "interval": null,
+        "band": null,
+        "status": "undefined",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "undefined_zero_denominator"
+        ]
+       },
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 100
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.036993498207,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "specificity",
+        "metric": "specificity",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1900,
+         "n": 1900
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.997982259078,
+         "upper": 1.0,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "f1",
+        "metric": "f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 0,
+         "tpPlusFpPlusFn": 100,
+         "positives": 100
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.0713475991334,
+         "level": 0.95,
+         "method": "jaccard_wilson"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "performance",
+       "direction": "pass",
+       "pValue": 1.0,
+       "adjustedPValue": 1.0,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": null,
+       "sampleSize": 2000,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "estimate_on_band_boundary"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-48",
+   "category": "undecidable_metric",
+   "title": "Engine regression policy with an R2 minimum and a mean predictor (R2 = 0): MAE and RMSE pass, but R2, which 1.0.0 cannot decide, blocks the pass",
+   "type": "plan",
+   "data": {
+    "kind": "regression",
+    "targets": [
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.125,
+     4.875,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.375,
+     4.625,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.625,
+     4.375,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     5.875,
+     4.125,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.125,
+     3.875,
+     6.375,
+     3.625,
+     6.375,
+     3.625,
+     6.375,
+     3.625,
+     6.375,
+     3.625,
+     6.375,
+     3.625,
+     6.375,
+     3.625,
+     6.625,
+     3.375,
+     6.625,
+     3.375,
+     6.875,
+     3.125
+    ],
+    "errors": [
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.125,
+     0.125,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.375,
+     0.375,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.625,
+     0.625,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -0.875,
+     0.875,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.125,
+     1.125,
+     -1.375,
+     1.375,
+     -1.375,
+     1.375,
+     -1.375,
+     1.375,
+     -1.375,
+     1.375,
+     -1.375,
+     1.375,
+     -1.375,
+     1.375,
+     -1.625,
+     1.625,
+     -1.625,
+     1.625,
+     -1.875,
+     1.875
+    ]
+   },
+   "legacy": {
+    "source": "engine_thresholds",
+    "config": {
+     "contractVersion": "1.0",
+     "id": "run-legacy-derivation",
+     "engagementId": "eng-fixture",
+     "modelId": "model-fixture",
+     "datasetId": "data-fixture",
+     "task": "regression",
+     "suite": [
+      "performance"
+     ],
+     "seed": 1729,
+     "columns": {
+      "target": "actual",
+      "prediction": "predicted"
+     },
+     "minGroupSize": 30,
+     "minClassCount": 10,
+     "minSampleSize": 30,
+     "thresholds": {
+      "policyId": "fixture-policy",
+      "policyVersion": "1",
+      "source": "internal_policy",
+      "values": {
+       "mae": {
+        "operator": "<=",
+        "value": 1.0
+       },
+       "rmse": {
+        "operator": "<=",
+        "value": 1.2
+       },
+       "r2": {
+        "operator": ">=",
+        "value": 0.5
+       }
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "d2540ba9d6efc1a1b25fca477da9f47b0d721e646eb219ed8fb5c598a8b699e8",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "engine_thresholds",
+      "contractVersion": "1.0"
+     },
+     "criteria": [
+      {
+       "id": "PERF-REG",
+       "kind": "regression_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "mae",
+         "band": {
+          "lower": null,
+          "upper": 1.0
+         }
+        },
+        {
+         "metric": "rmse",
+         "band": {
+          "lower": null,
+          "upper": 1.2
+         }
+        }
+       ],
+       "passBlockedBy": [
+        "r2"
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "PERF-REG",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "mae",
+        "metric": "mae",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 400,
+         "meanAbsoluteError": 0.5,
+         "sdAbsoluteError": 0.370429541361
+        },
+        "estimate": 0.5,
+        "interval": {
+         "lower": 0.463698572006,
+         "upper": 0.536301427994,
+         "level": 0.95,
+         "method": "normal_approximation"
+        },
+        "band": {
+         "lower": null,
+         "upper": 1.0
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.66066356537e-160,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "rmse",
+        "metric": "rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 400,
+         "meanSquaredError": 0.386875,
+         "sdSquaredError": 0.539758543901
+        },
+        "estimate": 0.621992765231,
+        "interval": {
+         "lower": 0.57790971153,
+         "upper": 0.663151841828,
+         "level": 0.95,
+         "method": "normal_approximation_mse"
+        },
+        "band": {
+         "lower": null,
+         "upper": 1.2
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.14511424451e-299,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "r2",
+        "metric": "r2",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 400
+        },
+        "estimate": 0.0,
+        "interval": null,
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "undecidable_metric"
+        ]
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "regression_performance",
+       "direction": "pass",
+       "pValue": 1.0,
+       "adjustedPValue": 1.0,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": null,
+       "sampleSize": 400,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "undecidable_metric"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-49",
+   "category": "chance_baseline",
+   "title": "Legacy hosted multiclass profile: the derived criterion adds the macro-recall chance baseline 1/3 between accuracy and macro F1, and the GC-34 model passes all three",
+   "type": "plan",
+   "data": {
+    "kind": "multiclass",
+    "labels": [
+     "high",
+     "low",
+     "medium"
+    ],
+    "matrix": [
+     [
+      150,
+      10,
+      40
+     ],
+     [
+      8,
+      270,
+      22
+     ],
+     [
+      30,
+      25,
+      245
+     ]
+    ]
+   },
+   "legacy": {
+    "source": "hosted_config",
+    "task": "Multiclass classification",
+    "suite": [
+     "performance"
+    ],
+    "config": {
+     "labelColumn": "actual",
+     "predictionColumn": "predicted",
+     "groupColumn": "group",
+     "positiveLabel": "1",
+     "minimumGroupSize": 2,
+     "maximumParityGap": 0.1,
+     "minimumImpactRatio": 0.8,
+     "minimumAccuracy": 0.75,
+     "minimumSampleSize": 20,
+     "minimumClassCount": 5,
+     "maximumOddsGap": 0.1,
+     "minimumRecall": 0.7,
+     "minimumMacroF1": 0.7,
+     "maximumRmse": 1
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "planSha256": "1d677c1f2865f313b551b3b3449125390b0ca52cc39966bbbbdd14ea3fc44347",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": {
+      "sampleSize": 20,
+      "groupSize": 2,
+      "classCount": 5
+     },
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": {
+      "source": "hosted_config",
+      "contractVersion": "1.1"
+     },
+     "criteria": [
+      {
+       "id": "performance",
+       "kind": "multiclass_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.75,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.3333333333333333,
+          "upper": null
+         }
+        },
+        {
+         "metric": "macro_f1",
+         "band": {
+          "lower": 0.7,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "performance",
+      "outcome": "pass",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 665,
+         "n": 800
+        },
+        "estimate": 0.83125,
+        "interval": {
+         "lower": 0.803727542936,
+         "upper": 0.855606451577,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.1130505569e-07,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 150,
+           "support": 200
+          },
+          {
+           "label": "low",
+           "tp": 270,
+           "support": 300
+          },
+          {
+           "label": "medium",
+           "tp": 245,
+           "support": 300
+          }
+         ]
+        },
+        "estimate": 0.822222222222,
+        "interval": {
+         "lower": 0.792503888873,
+         "upper": 0.8467967989,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.333333333333,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.14511424451e-299,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "macro_f1",
+        "metric": "macro_f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 150,
+           "tpPlusFpPlusFn": 238
+          },
+          {
+           "label": "low",
+           "tp": 270,
+           "tpPlusFpPlusFn": 335
+          },
+          {
+           "label": "medium",
+           "tp": 245,
+           "tpPlusFpPlusFn": 362
+          }
+         ]
+        },
+        "estimate": 0.824335541392,
+        "interval": {
+         "lower": 0.776995384747,
+         "upper": 0.86343597038,
+         "level": 0.95,
+         "method": "jaccard_wilson_bonferroni"
+        },
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 3.11870442094e-08,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "macro_precision",
+        "metric": "macro_precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 150,
+           "predicted": 188
+          },
+          {
+           "label": "low",
+           "tp": 270,
+           "predicted": 305
+          },
+          {
+           "label": "medium",
+           "tp": 245,
+           "predicted": 307
+          }
+         ]
+        },
+        "estimate": 0.82705461489,
+        "interval": {
+         "lower": 0.76388902655,
+         "upper": 0.875967238334,
+         "level": 0.95,
+         "method": "wilson_bonferroni_mean"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "multiclass_performance",
+       "direction": "pass",
+       "pValue": 1.1130505569e-07,
+       "adjustedPValue": 1.1130505569e-07,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "pass",
+       "decidingMemberId": "accuracy",
+       "sampleSize": 800,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": []
+      }
+     }
+    ],
+    "overallOutcome": "pass",
     "reviewFlags": []
    }
   }

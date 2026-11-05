@@ -6,6 +6,11 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["criteria"],
+  "if": {"properties": {"derivedFrom": {"type": "null"}}},
+  "then": {
+    "description": "passBlockedBy is set only by legacy derivation (section 9.3).",
+    "properties": {"criteria": {"items": {"properties": {"passBlockedBy": {"maxItems": 0}}}}}
+  },
   "properties": {
     "statisticsVersion": {"const": "1.0.0", "default": "1.0.0"},
     "confidenceLevel": {"enum": [0.9, 0.95, 0.99], "default": 0.95},
@@ -261,6 +266,13 @@
             }
           }
         },
+        "passBlockedBy": {
+          "description": "Derived plans only (section 4.8): R2, which today's engine rule requires to meet a threshold and which 1.0.0 cannot decide, blocks a pass (undecidable_metric).",
+          "type": "array",
+          "maxItems": 1,
+          "items": {"const": "r2"},
+          "default": []
+        },
         "powerAssumptions": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/regressionAssumptions"}], "default": null}
       }
     },
@@ -335,6 +347,13 @@
           "description": "Per-group calibration: restrict the criterion to rows whose field equals value.",
           "default": null,
           "anyOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["field", "value"], "properties": {"field": {"type": "string", "minLength": 1, "maxLength": 300}, "value": {"type": "string", "minLength": 1, "maxLength": 5000}}}]
+        },
+        "passBlockedBy": {
+          "description": "Derived plans only (section 4.8): the expected calibration error, which today's engine rule requires to meet a threshold and which 1.0.0 cannot decide, blocks a pass (undecidable_metric).",
+          "type": "array",
+          "maxItems": 1,
+          "items": {"const": "expected_calibration_error"},
+          "default": []
         },
         "powerAssumptions": {"type": "null", "default": null}
       }

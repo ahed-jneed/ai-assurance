@@ -7,7 +7,7 @@
 | Date | 5 November 2026 |
 | Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`) |
 | Consumed by | #30 (NYC Local Law 144 pack), #15 (binary performance fixes) |
-| Contract files | `schemas/fixtures/statistics-golden.json` (45 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
+| Contract files | `schemas/fixtures/statistics-golden.json` (49 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
 
 The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Python engine, the external worker's projection of an engine report, or the hosted TypeScript runner. Anything not marked as engine-only applies to all of them, and the golden fixture is the arbiter when this text and an implementation disagree.
 
@@ -34,7 +34,10 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
    - All-pairs mode allows at most 50 groups (section 5.10).
 7. **Metrics without a band are descriptive.** They are reported with an interval but never decide, and they do not count in any multiplicity adjustment. A criterion with no band at all is inconclusive (`no_threshold`).
    - This changes behaviour: an engine result no longer needs a threshold on every metric to pass.
-   - The balanced-accuracy baseline of #15 keeps degenerate predictors from benefiting from the change (section 4.8).
+   - Three derivation rules keep the change from letting a degenerate model pass, meaning one whose output does not depend on the truth (section 4.8):
+     - Every derived classification criterion carries a **chance baseline**: balanced accuracy ≥ 0.5 for binary data, and macro recall ≥ 1/k for k classes, or the policy's own bound when it is higher. A degenerate model's population value is exactly chance, and a constant model's estimate sits exactly on the bound, so it never passes.
+     - R² and ECE, which 1.0.0 cannot decide, **block a pass** in criteria derived from engine thresholds, as today's rule makes a pass depend on them.
+     - A policy with no threshold that 1.0.0 can decide still never passes.
 8. **Power is checked when the plan is approved.**
    - Each member's pass probability comes from a normal approximation at the family-adjusted level.
    - The members are combined into a range whose lower bound holds under any dependence. Required sizes and the smallest detectable disparity are derived from it.
@@ -53,9 +56,9 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
     - The external worker copies the engine's decisions instead of re-deciding (sections 11 and 12).
 12. **What the hosted runner mirrors.** It mirrors every analytic part exactly: intervals, p-values, Fisher, the family adjustments, minimums, plan normalisation and hashing, legacy derivation, power and the library. Bootstrap, clustered data and score-based calibration stay engine-only (section 12).
 13. **Verification.**
-    - All 45 golden cases are recomputed by a standard-library reference.
-    - They are then recomputed again, independently, with scipy, statsmodels, jsonschema and Node.js: 1,421 checks with 0 discrepancies.
-    - A mutation test confirms that the cross-check catches each of 25 deliberately corrupted values.
+    - All 49 golden cases are recomputed by a standard-library reference.
+    - They are then recomputed again, independently, with scipy, statsmodels, jsonschema and Node.js: 1,610 checks with 0 discrepancies, including a second, separately written legacy derivation.
+    - A mutation test confirms that the cross-check catches each of 29 deliberately corrupted values.
     - Monte Carlo runs confirm interval coverage and the power formulas (section 13.3).
 
 **Where this design departs from the issue text** (each departure is also a question decided in section 15):
@@ -112,14 +115,14 @@ The three paths report different evidence for the same test, and all three decid
 
 | Metric type | Allowed band | Validation |
 |---|---|---|
-| Proportions and scores in [0, 1]: accuracy, precision, recall, specificity, FPR, balanced accuracy, F1, macro F1, macro precision | `{lower: t}` or `{upper: t}` or both | each bound strictly inside (0, 1) |
+| Proportions and scores in [0, 1]: accuracy, precision, recall, specificity, FPR, balanced accuracy, F1, macro F1, macro precision | `{lower: t}` or `{upper: t}` or both | each bound strictly inside (0, 1); with both, lower < upper |
 | Difference of rates in `all_pairs` mode: selection rate, TPR, FPR; calibration gap | `{lower: −δ, upper: δ}` | 0 < δ < 1 |
 | Difference of rates in `reference` mode | symmetric, or `{lower: −δ}`, or `{upper: δ}` | 0 < δ < 1 |
 | Ratio of selection rates in `all_pairs` mode | `{lower: τ, upper: 1/τ}` | 0 < τ < 1 |
 | Ratio in `reference` mode | `{lower: τ, upper: 1/τ}` or `{lower: τ}` | 0 < τ < 1. A ratio cannot have an upper bound only. |
 | Error metrics: MAE, RMSE, Brier | `{upper: t}` | t > 0 |
 
-New plans with an invalid band MUST be rejected. A plan derived from a frozen legacy configuration keeps the mapped band, and that criterion evaluates as inconclusive with reason `invalid_band`. One example is `minimumImpactRatio: 1`, which maps to the zero-width band [1, 1].
+New plans with an invalid band MUST be rejected. A plan derived from a frozen legacy configuration keeps the mapped band, and that criterion evaluates as inconclusive with reason `invalid_band`. Two examples: `minimumImpactRatio: 1` maps to the zero-width band [1, 1], and an engine policy `balanced_accuracy <= 0.4` maps, beside the chance baseline, to [0.5, 0.4] (section 9.3).
 
 - **Family.** The set of criteria in one plan run that share a role. The confirmatory family is adjusted with Bonferroni, the exploratory family with BH.
 
@@ -191,7 +194,7 @@ A `performance` criterion uses the same rule on heterogeneous members. "Accuracy
 |---|---|---|
 | `below_minimum_sample_size` | criterion; also accuracy and regression members | `sampleSize` < `minimums.sampleSize`: P = 1, no claim either way. A member whose denominator is the row count is `insufficient_support`. |
 | `undefined_zero_denominator` | member | A zero denominator that is not a class count: precision with no predicted positives, a ratio whose comparator count is 0, R² with a constant target, macro precision with a class never predicted. The member is `undefined`, p = 1, and it blocks a pass. |
-| `single_class` | member | The zero denominator is a class count: recall, specificity, FPR, balanced accuracy or F1 with a class absent; a TPR or FPR member whose group has no positives or no negatives; a multiclass class with no support. The member is `undefined` and blocks a pass. |
+| `single_class` | member | The zero denominator is a class count: recall, specificity, FPR, balanced accuracy or F1 with a class absent; a TPR or FPR member whose group has no positives or no negatives; a multiclass class with no support; multiclass data with fewer than two classes (macro recall, macro F1 and macro precision). The member is `undefined` and blocks a pass. |
 | `below_minimum_class_count` | member | A class-conditional denominator is below `minimums.classCount`. The member is `insufficient_support`, p = 1, and it blocks a pass. |
 | `group_suppressed_below_minimum` | criterion | A group (or calibration bin) has fewer than `minimums.groupSize` rows. It is listed in `suppressedGroups`, and coverage falls. |
 | `group_below_minimum_size` | member | A member of a suppressed group. It is reported descriptively and never decides. |
@@ -205,13 +208,13 @@ A `performance` criterion uses the same rule on heterogeneous members. "Accuracy
 | `multiplicity_adjustment` | criterion | The family adjustment removes a claim. |
 | `estimate_on_band_boundary` | member | The estimate is exactly on a bound; member p = 1. |
 | `degenerate_interval` | member | Zero-variance errors (MAE, RMSE). The member is `undefined`. |
-| `no_threshold` | criterion | The plan gives this criterion no member and no band, because its derived legacy policy sets no threshold. The criterion is inconclusive, and all its metrics are descriptive. |
-| `descriptive_metric` | descriptive entry | The legacy policy sets a threshold for this metric (ECE, R²), but it never decides in 1.0.0. The threshold is shown and not applied. |
+| `no_threshold` | criterion | The plan gives this criterion no member and no band, because its derived legacy policy sets no threshold that 1.0.0 can decide. The criterion is inconclusive, and all its metrics are descriptive. |
+| `undecidable_metric` | criterion; descriptive entry | The criterion's `passBlockedBy` names a metric that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval: R² for `PERF-REG` or ECE for `PERF-CAL`, in a plan derived from engine thresholds (section 4.8). That metric is reported as a descriptive entry carrying the code, with its legacy threshold, if any, shown and not applied. A pass is blocked; a fail stays possible through the members. |
 | `invalid_band` | criterion | A derived legacy band violates section 3. The criterion is inconclusive. |
 | `interval_requires_engine`, `clustered_design_requires_engine` | criterion (hosted) | The hosted runner cannot compute the required interval (score columns, cluster designs) and returns inconclusive. |
 | `bootstrap_insufficient_valid_replicates`, `bootstrap_budget_exceeded`, `small_cell_clustered` | member (engine) | See section 5.11. |
 
-No golden case produces `too_many_groups`, `descriptive_metric`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine` or the bootstrap codes. They appear only in runner output. `no_threshold` is pinned by GC-45. The power reason codes are listed in section 8.
+No golden case produces `too_many_groups`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine` or the bootstrap codes. They appear only in runner output. `no_threshold` is pinned by GC-45 and `undecidable_metric` by GC-48. The power reason codes are listed in section 8.
 
 Gates never hide numbers. Every member whose estimate is defined still reports its estimate and interval, including suppressed and insufficiently supported members, so the auditor can see how uncertain the evidence is.
 
@@ -255,15 +258,32 @@ Each criterion kind has a standard metric set, shown in the table below. Every m
 |---|---|
 | `performance` (binary) | accuracy, precision, recall, specificity, balanced accuracy, F1. FPR is available as a member only, since it equals 1 − specificity. |
 | `multiclass_performance` | accuracy, balanced accuracy (macro recall), macro precision, macro F1 |
-| `regression_performance` | MAE, RMSE, R². R² is always descriptive: the engine gives a bootstrap interval, and the hosted runner gives no interval. |
-| `calibration` (engine) | Brier score and expected calibration error (ECE), descriptive unless the plan makes Brier a member. ECE always gets a bootstrap interval (section 5.11). |
+| `regression_performance` | MAE, RMSE, R². R² is always descriptive: the engine gives a bootstrap interval, and the hosted runner gives no interval. In a criterion derived from engine thresholds, R² also blocks a pass (rule 2 below). |
+| `calibration` (engine) | Brier score and expected calibration error (ECE), descriptive unless the plan makes Brier a member. ECE always gets a bootstrap interval (section 5.11). In a criterion derived from engine thresholds, ECE also blocks a pass (rule 2 below). |
 | `group_comparison` | none. Per-group rates with Wilson intervals are reported in the headline's `slices` (section 11). |
 
-**Legacy rule.** Today the engine's `result()` cannot pass while any of its metrics lacks a threshold. Under 1.0.0, a metric without a band is descriptive and does not block a pass. Two rules keep this from creating new passes for degenerate models:
-- Every derived binary performance criterion includes the #15 baseline `balanced_accuracy ≥ 0.50`, unless the policy sets its own balanced-accuracy threshold. A constant predictor has balanced accuracy exactly 0.5, sits on the bound and can never pass (GC-06).
-- A criterion whose policy sets no threshold at all has no members and is inconclusive with `no_threshold`. So a policy with no values still never passes, as today (GC-45).
+**Legacy rule.** Today the engine's `result()` cannot pass while any of its metrics lacks a threshold. Under 1.0.0, a metric without a band is descriptive and does not block a pass. A **degenerate model** here is one whose output does not depend on the truth: a constant prediction, or predictions drawn independently of the label. Three derivation rules (section 9.3) keep the change from letting such a model pass.
 
-GC-38 pins descriptive entries and the derived plan of a legacy hosted profile. Every performance-kind golden case also carries its descriptive entries.
+1. **Chance baselines.** Every derived classification criterion that has a member includes a balanced-accuracy member. Its lower bound is the larger of chance and the policy's own lower bound b on that metric (engine `balanced_accuracy`, or `macro_recall` for multiclass):
+   - binary data: `max(0.5, b)`;
+   - multiclass data: `max(1/k, b)`, where k is the number of labels that occur in the target column of the evaluated rows, and at least 2;
+   - a policy upper bound on the metric is kept as the member's upper bound.
+
+   This suffices. For a degenerate model, the recall of class c is P(ŷ = c | y = c) = P(ŷ = c), so its population balanced accuracy is Σ_c P(ŷ = c) / k = 1/k when it predicts only labels that occur in the target, and 0.5 for binary data. A prediction outside those labels leaves a class without support, which makes macro recall undefined (`single_class`) and blocks a pass.
+   - The baseline member's population value therefore lies on its bound, or below it when the policy's bound is higher. The member passes only when its interval lies wholly above that value, which has probability at most about α/2, the one-sided non-coverage of the interval.
+   - A constant model's estimate is exactly chance, 1/k or 0.5, so it sits on the bound (`estimate_on_band_boundary`), or below it, and never passes.
+   - A criterion passes only if every member passes, so these bounds hold for the criterion (GC-06, GC-46, GC-47).
+2. **Metrics that cannot be decided.** R² and ECE have no interval that decides in 1.0.0, yet today's rule makes a pass depend on them. So a criterion derived from engine thresholds lists them in `passBlockedBy`, whether or not the policy sets their threshold: `PERF-REG` gets `["r2"]` and `PERF-CAL` `["expected_calibration_error"]`. Such a criterion never passes (`undecidable_metric`), and it can still fail on its MAE, RMSE or Brier members (GC-48). An explicit 1.3 plan has no `passBlockedBy`, because the auditor then chooses the members.
+3. **No threshold.** A criterion whose policy sets no threshold that 1.0.0 can decide has no members and is inconclusive with `no_threshold`. So such a policy still never passes, as today (GC-45).
+
+The consequences for performance and calibration criteria, compared with today's rules on the same data:
+- **Hosted-derived criteria** pass only where today's hosted rule would also pass. Their members are today's criteria, decided by the interval instead of the point estimate, plus the chance baseline, at higher minimums.
+- **Engine-derived classification criteria** can now pass without a threshold on every metric. This is the intended change, and the chance baseline keeps degenerate models out.
+- **Engine-derived regression and calibration criteria** never pass in 1.0.0. Today they pass only when R² or ECE meets its threshold by point estimate, and 1.0.0 never decides by point estimate.
+
+Explicit plans are taken as written. Whether they must also carry a baseline is a product decision for #15 (F-06).
+
+GC-38 and GC-49 pin descriptive entries and the derived plans of legacy hosted profiles. Every performance-kind golden case also carries its descriptive entries.
 
 ## 5. Per-metric specification
 
@@ -285,9 +305,9 @@ Notation: TP, FP, FN, TN are counts; positives P = TP + FN; negatives N = FP + T
 | calibration_gap (engine) | ȳ_b − s̄_b per probability bin | Wilson on ȳ_b, shifted by s̄_b | closed | – | n_b ≥ 30 (bins under 30 suppressed) | n_b = 0 |
 | expected_calibration_error (engine, descriptive) | Σ (n_b/n)·\|ȳ_b − s̄_b\| | percentile bootstrap | – (never decides) | – | – | no scored rows |
 | brier_score (engine) | mean (s − y)² | normal approximation | closed | – | n ≥ 30 | zero variance (`degenerate_interval`) |
-| macro_f1 (multiclass) | mean of per-class F1 | per-class Jaccard–Wilson at α/k, averaged (Bonferroni) | bisection | – | every class support ≥ 10 | a class has no support (`single_class`) |
-| macro_precision (multiclass) | mean of per-class precision | per-class Wilson at α/k, averaged (Bonferroni) | bisection | – | every class predicted ≥ 10 times | a class is never predicted |
-| balanced_accuracy (multiclass macro recall) | mean of per-class recall | MOVER-Wilson over k classes | bisection | – | every class support ≥ 10 | a class has no support (`single_class`) |
+| macro_f1 (multiclass) | mean of per-class F1 | per-class Jaccard–Wilson at α/k, averaged (Bonferroni) | bisection | – | every class support ≥ 10 | a class has no support, or fewer than two classes (`single_class`) |
+| macro_precision (multiclass) | mean of per-class precision | per-class Wilson at α/k, averaged (Bonferroni) | bisection | – | every class predicted ≥ 10 times | fewer than two classes (`single_class`); a class is never predicted (`undefined_zero_denominator`) |
+| balanced_accuracy (multiclass macro recall) | mean of per-class recall | MOVER-Wilson over k classes | bisection | – | every class support ≥ 10 | a class has no support, or fewer than two classes (`single_class`) |
 | mae, rmse | mean \|e\|; sqrt(mean e²) | normal approximation (RMSE via MSE) | closed | – | n ≥ 30 | zero variance (`degenerate_interval`) |
 | r2 (descriptive) | 1 − SSE/SST | engine percentile bootstrap; hosted: none | – | – | n ≥ 30 | SST = 0 (`undefined_zero_denominator`) |
 
@@ -310,7 +330,7 @@ TPR and TNR are estimated on disjoint rows and are independent given the class c
 L = mean − sqrt(Σ (p_i − l_i)²)/k,   U = mean + sqrt(Σ (u_i − p_i)²)/k
 ```
 
-Use k = 2 for binary balanced accuracy and k = number of classes for multiclass macro recall. Simulated coverage is 0.9509 (section 13.3). The majority-baseline check of #15 is the member `balanced_accuracy ≥ 0.50`. A constant predictor has balanced accuracy exactly 0.5, sits on the bound and can never pass (GC-06).
+Use k = 2 for binary balanced accuracy and k = number of classes for multiclass macro recall. Simulated coverage is 0.9509 (section 13.3). The majority-baseline check of #15 is the member `balanced_accuracy ≥ 0.50`, and its multiclass form is macro recall ≥ 1/k. A constant predictor has balanced accuracy exactly 0.5, or macro recall exactly 1/k, so it sits on the bound and can never pass (GC-06, GC-46). Derived plans always carry this chance baseline (section 4.8).
 
 ### 5.3 F1 (Jaccard–Wilson)
 
@@ -579,6 +599,7 @@ The members' true values and standard errors are:
 **Gates.** The approval check applies the section 4.4 gates to the planned sizes. Denominators are expected counts and need not be integers.
 - **Member below its minimum.** A member whose planned denominator is below its minimum has P_i = Q_i = 0, with reason `planned_below_minimum`.
 - **Too few rows.** If the planned total rows are below `minimums.sampleSize`, the criterion's pass and fail probabilities are 0 (`below_minimum_sample_size`).
+- **Undecidable metric.** A criterion with a non-empty `passBlockedBy` has pass probability 0 (`undecidable_metric`). Only derived plans have one, and they carry no power assumptions.
 - **Group criteria.**
   - Groups below `minimums.groupSize` are treated as suppressed.
   - If the planned coverage is below `minimumCoverage`, the pass probability is 0 (`insufficient_planned_coverage`).
@@ -658,9 +679,11 @@ Every criterion has `id`, `kind`, `role` (default `confirmatory`), `rationale` (
 
 | Kind | Fields (defaults) |
 |---|---|
-| `performance`, `multiclass_performance`, `regression_performance` | `members`: an array of `{metric, band}`. Metrics: binary accuracy, precision, recall, specificity, false_positive_rate, balanced_accuracy, f1; multiclass accuracy, balanced_accuracy, macro_precision, macro_f1; regression mae, rmse. |
+| `performance`, `multiclass_performance`, `regression_performance` | `members`: an array of `{metric, band}`. Metrics: binary accuracy, precision, recall, specificity, false_positive_rate, balanced_accuracy, f1; multiclass accuracy, balanced_accuracy, macro_precision, macro_f1; regression mae, rmse. Regression criteria also have `passBlockedBy` (`[]`; derived plans only, at most `["r2"]`). |
 | `group_comparison` | `metric` (selection_rate_difference, selection_rate_ratio or equalized_odds); `band`; `comparison` (`{mode: "all_pairs", referenceGroup: null}`); `groupFields` (null, meaning the configuration's protected column; else 1–5 columns); `declaredGroups` (null); `minimumCoverage` (1.0) |
-| `calibration` (engine) | `band`, the per-bin gap band (null in a derived plan); `members` (`[]`; at most one `{metric: "brier_score", band: {upper: t}}`); `minimumCoverage` (1.0); `subgroup` (null, else `{field, value}`) |
+| `calibration` (engine) | `band`, the per-bin gap band (null in a derived plan); `members` (`[]`; at most one `{metric: "brier_score", band: {upper: t}}`); `minimumCoverage` (1.0); `subgroup` (null, else `{field, value}`); `passBlockedBy` (`[]`; derived plans only, at most `["expected_calibration_error"]`) |
+
+`passBlockedBy` lists the metrics that block a pass because 1.0.0 cannot decide them (section 4.8). A plan whose `derivedFrom` is null MUST have it empty, and the schema rejects anything else.
 
 A band is `{lower, upper}`. After normalisation both keys are present, with null for an absent bound.
 
@@ -693,23 +716,25 @@ A band is `{lower, upper}`. After normalisation both keys are present, with null
 
 Every runner MUST derive the plan deterministically, so existing profiles keep their meaning. The derived plan sets `derivedFrom` and `configuredMinimums`, and its minimums are `max(floor, configured)`.
 
-- **Today's hosted profile** (`schemaVersion` 1.0, with the configuration of hosted 1.1 runs, so `derivedFrom.contractVersion` is "1.1"; the worker uses the same rules for `engineConfig` 1.1; GC-38). Each selected test becomes a confirmatory criterion with the test's id:
+The derivation reads one fact from the data: for a multiclass task, k, the number of labels that occur in the target column of the evaluated rows, which sets the chance baseline 1/max(k, 2). Everything else comes from the configuration. Both runners already list the labels when they evaluate (the sorted union of target and prediction labels, `labels` in the engine and `names` in the hosted runner), and the worker's `translate_config` receives the rows. The recorded plan therefore carries the baseline as a number; for three classes it is 1/3 = 0.3333333333333333 in IEEE double.
+
+- **Today's hosted profile** (`schemaVersion` 1.0, with the configuration of hosted 1.1 runs, so `derivedFrom.contractVersion` is "1.1"; the worker uses the same rules for `engineConfig` 1.1; GC-38, GC-49). Each selected test becomes a confirmatory criterion with the test's id:
   - `performance` (binary): accuracy ≥ `minimumAccuracy`, recall ≥ `minimumRecall` (default 0.7), and balanced accuracy ≥ 0.50.
-  - `performance` (multiclass): accuracy ≥ `minimumAccuracy` and macro F1 ≥ `minimumMacroF1` (default 0.7).
-  - `regression`: RMSE ≤ `maximumRmse` (default 1).
+  - `performance` (multiclass): accuracy ≥ `minimumAccuracy`, the chance baseline balanced accuracy (macro recall) ≥ 1/k, and macro F1 ≥ `minimumMacroF1` (default 0.7), in that order.
+  - `regression`: RMSE ≤ `maximumRmse` (default 1), with `passBlockedBy` empty, because today's hosted rule decides on RMSE alone.
   - `demographic_parity`: selection-rate difference within ±`maximumParityGap`.
   - `disparate_impact`: selection-rate ratio within [`minimumImpactRatio`, 1/`minimumImpactRatio`]. A ratio of 0 maps to `{lower: 0}`, which is an invalid band.
   - `equalized_odds`: ±`maximumOddsGap`, falling back to `maximumParityGap`.
   - Group criteria use `all_pairs` mode, `minimumCoverage` 1.0 and the profile's group column.
   - The configured minimums are `minimumSampleSize` (default 20), `minimumGroupSize` and `minimumClassCount` (default 5).
-- **Engine 1.0 configuration** (GC-39). The criteria take today's test ids, and `thresholds.values` supply the bands: `>=` gives a lower bound and `<=` an upper bound.
-  - `PERF-BINARY` takes members from accuracy, precision, recall, specificity, false_positive_rate, balanced_accuracy and f1, in that order. The balanced-accuracy ≥ 0.50 baseline is inserted when the policy has at least one of them but not balanced accuracy.
-  - `PERF-MULTI` takes accuracy, `macro_recall` (as balanced_accuracy), macro_precision and macro_f1.
-  - `PERF-REG` takes mae and rmse.
-  - `PERF-CAL` exists when a score column is mapped. It has gap band null and a Brier member from `brier_score`.
+- **Engine 1.0 configuration** (GC-39, GC-45 to GC-48). The criteria take today's test ids, and `thresholds.values` supply the bands: `>=` gives a lower bound and `<=` an upper bound.
+  - `PERF-BINARY` takes members from accuracy, precision, recall, specificity, false_positive_rate, balanced_accuracy and f1, in that order, when the policy sets at least one of them. Balanced accuracy is then always a member, the chance baseline: lower bound `max(0.5, b)` for a policy `balanced_accuracy >= b`, and 0.5 otherwise. A policy `balanced_accuracy <= u` gives the band [0.5, u].
+  - `PERF-MULTI` takes accuracy, `macro_recall` (as balanced_accuracy), macro_precision and macro_f1 in the same way. Its chance baseline is `max(1/k, b)` for a policy `macro_recall >= b`, and 1/k otherwise.
+  - `PERF-REG` takes mae and rmse, and has `passBlockedBy: ["r2"]`.
+  - `PERF-CAL` exists when a score column is mapped. It has gap band null, a Brier member from `brier_score`, and `passBlockedBy: ["expected_calibration_error"]`.
   - `FAIR-DP`, `FAIR-DI` and `FAIR-EO` get the bands ±δ, [τ, 1/τ] and ±δ from `demographic_parity_difference`, `disparate_impact_ratio` and `equalized_odds_difference`.
-  - A criterion whose policy has no value gets no member or band (`no_threshold`).
-  - Thresholds on `expected_calibration_error` and `r2` no longer decide; those metrics are reported with `descriptive_metric`.
+  - A criterion whose policy has no value it can decide gets no member or band (`no_threshold`).
+  - Thresholds on `expected_calibration_error` and `r2` are never applied: those metrics are descriptive entries, and `passBlockedBy` makes them block a pass whether or not the policy sets a threshold (section 4.8).
 - **Freezing.** Changing any field after approval MUST create a new profile version (#22 acceptance criterion).
 
 ## 10. Threshold library
@@ -886,7 +911,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 1. **Outcome agrees with the decision.** `outcome` is pass or fail exactly when `decision.direction` has that value and `decision.adjustedPValue ≤ α + 1e−12`, with α = 1 − `decision.confidenceLevel`. Otherwise it is inconclusive. `unadjustedOutcome` is the same function of `decision.pValue`.
 2. **A pass** needs four things:
    - every role-`member` metric whose status is not `suppressed` is `evaluated` with direction pass;
-   - `decision.reasons` contains no pass-blocking code (`below_minimum_sample_size`, `insufficient_coverage`, `empty_declared_group`, `insufficient_groups`, `too_many_groups`, `no_threshold`, `invalid_band`);
+   - `decision.reasons` contains no pass-blocking code (`below_minimum_sample_size`, `insufficient_coverage`, `empty_declared_group`, `insufficient_groups`, `too_many_groups`, `no_threshold`, `undecidable_metric`, `invalid_band`), and the plan criterion's `passBlockedBy` is empty;
    - `decision.pValue` equals the largest of those members' pValues;
    - `decidingMemberId` names that member.
 3. **A fail** needs an evaluated member with direction fail, `decision.pValue = min(1, m · its pValue)` with m the number of evaluated members, and `decidingMemberId` naming it.
@@ -923,7 +948,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 **Top level.** The fixture has `specificationVersion`, `howToUse`, `defaults`, `tolerances`, `numerics` and `cases[]`. The `numerics` section holds normal quantiles and `erfc` reference values for validating special functions.
 
 **Case types:**
-- `plan`: data and a plan (`plan`, or `legacy` to be derived) in; out come `planSha256`, `normalizedPlan`, the criteria (each with `id`, `outcome`, `headline`, `members`, `descriptive`, `groups` and `decision`), `overallOutcome` and `reviewFlags`.
+- `plan`: data and a plan (`plan`, or `legacy` to be derived; a multiclass derivation takes k from the data) in; out come `planSha256`, `normalizedPlan`, the criteria (each with `id`, `outcome`, `headline`, `members`, `descriptive`, `groups` and `decision`), `overallOutcome` and `reviewFlags`.
 - `derivation`: a legacy configuration in; `planSha256` and `normalizedPlan` out.
 - `multiplicity`: raw p-values in, adjusted values out.
 - `power`: kind `equality_test`, or kind `criterion`, which takes a criterion with `powerAssumptions`, the confidence level, the target power and the family size.
@@ -951,7 +976,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 - Stored numbers have 12 significant digits, except in `normalizedPlan`, which is stored exactly. The tables below round to 4 decimal places.
 - Section 11.4 maps every fixture field to the emitted output.
 
-### 13.2 The 45 cases
+### 13.2 The 49 cases
 
 Inputs are counts (x/n means x selected out of n). The key member is the deciding member. "Decision p" is the criterion P before family adjustment, and "adjusted p" is after Bonferroni (confirmatory) or BH (exploratory). Every performance-kind case also carries its descriptive entries, and every group case its per-group rates.
 
@@ -1003,13 +1028,19 @@ Inputs are counts (x/n means x selected out of n). The key member is the decidin
 | GC-37 | all events; one observed label | four-fifths; A 40/40, B 35/35 | ratio 1.0000 [0.9124, 1.1098] Koopman | 0.0031 | 0.0062 | **pass** |
 | GC-37 | | parity ±0.10, same data | difference 0.0000 [−0.0876, 0.0989] | 0.0486 | 0.0972 | **inconclusive**; multiplicity_adjustment |
 | GC-38 | descriptive metrics; legacy derivation | today's hosted profile (accuracy ≥ .85, recall ≥ .7, parity ±0.10, minimums 20/2/5); A TP 120, FP 20, FN 30, TN 330; B TP 110, FP 25, FN 40, TN 325 | derived: + BA ≥ .5, minimums 30/30/10 (configured recorded); recall 0.7667 [0.7156, 0.8110]; descriptive precision 0.8364 [0.7881, 0.8754], specificity 0.9357, F1 0.8000 | 0.0117; 0.0013 | 0.0235; 0.0027 | **pass**; **pass** |
-| GC-39 | derivation | engine 1.0 thresholds (accuracy, precision, recall, F1, Brier, ECE, DP, DI, EO), minimums 30/20/5 | plan: PERF-BINARY with the BA baseline, PERF-CAL with a Brier member, FAIR-DP ±0.10, FAIR-DI [0.8, 1.25], FAIR-EO ±0.15; ECE not a criterion | | | plan hash pinned |
+| GC-39 | derivation | engine 1.0 thresholds (accuracy, precision, recall, F1, Brier, ECE, DP, DI, EO), minimums 30/20/5 | plan: PERF-BINARY with the BA baseline, PERF-CAL with a Brier member and `passBlockedBy` ECE, FAIR-DP ±0.10, FAIR-DI [0.8, 1.25], FAIR-EO ±0.15 | | | plan hash pinned |
 | GC-40 | power | parity ±0.10 over A 500, B 500, C 250 at p₀ 0.3 | pairs 0.864, 0.609, 0.609; range [0.0812, 0.6087]; 605 per group; fail MDE 0.1918 (C vs A, α/3) | | | |
 | GC-41 | power | accuracy ≥ .85, recall ≥ .7, BA ≥ .5, F1 ≥ .7, FPR ≤ .15; n 400, prevalence 0.25, TPR 0.85, TNR 0.92; family of 3 | members 0.745, 0.870, 1.000, 0.830, 0.906; range [0.3518, 0.7447]; 558 rows | | | |
 | GC-42 | power | EO ±0.10; A 600, B 300; prevalence 0.3/0.2; TPR 0.75/0.65; FPR 0.10 | TPR member on the band edge: pass 0; target unreachable; fail MDEs TPR 0.3207, FPR 0.2019 | | | target_unreachable |
 | GC-43 | power | multiclass accuracy ≥ .75, BA ≥ .7, macro F1 ≥ .7; n 600 | accuracy 0.9984 and BA 0.9998 computed; macro F1 not computed | | | not_computed |
 | GC-44 | power | MAE ≤ 0.9, RMSE ≤ 1.15; n 120, error SD 1 | members 0.4585, 0.7047; range [0.1632, 0.4585]; 293 rows | | | |
 | GC-45 | no threshold | engine 1.0 policy with no values; data as GC-21 | all six metrics descriptive, e.g. accuracy 0.9300 [0.9125, 0.9442]; no members | 1 | 1 | **inconclusive**; no_threshold |
+| GC-46 | chance baseline (multiclass) | engine 1.0 policy accuracy ≥ .90 only; supports 40/1,900/60, constant majority-class predictor | derived: + macro recall ≥ 1/3; accuracy 0.9500 [0.9396, 0.9587] (p 9.1e−14); macro recall 0.3333 [0.3327, 0.3688] on the bound; descriptive macro F1 0.3248, macro precision undefined | 1 | 1 | **inconclusive**; estimate_on_band_boundary |
+| GC-47 | chance baseline (binary) | engine 1.0 policy accuracy ≥ .90, BA ≥ .40; TP 0, FP 0, FN 100, TN 1,900 | derived: BA ≥ max(0.5, 0.40) = 0.5; accuracy 0.9500 [0.9396, 0.9587]; BA 0.5000 [0.4990, 0.5185] on the bound; descriptive recall 0, specificity 1, precision undefined | 1 | 1 | **inconclusive**; estimate_on_band_boundary |
+| GC-48 | undecidable metric | engine 1.0 policy MAE ≤ 1, RMSE ≤ 1.2, R² ≥ .5; 400 targets symmetric about 5, mean predictor | MAE 0.5000 [0.4637, 0.5363]; RMSE 0.6220 [0.5779, 0.6632]; R² 0.0000 descriptive; `passBlockedBy` R² | 1 | 1 | **inconclusive**; undecidable_metric |
+| GC-49 | chance baseline (hosted multiclass) | today's hosted profile, multiclass (accuracy ≥ .75, macro F1 ≥ .7); data as GC-34 | derived: + macro recall ≥ 1/3 between them; accuracy 0.8313 [0.8037, 0.8556]; macro recall 0.8222 [0.7925, 0.8468]; macro F1 0.8243 [0.7770, 0.8634] | 1.1e−07 | 1.1e−07 | **pass** |
+
+GC-46 to GC-48 follow the re-review's three examples of a degenerate model that would pass without the rules of section 4.8: each would pass on its other members, and today's engine rule does not pass it.
 
 All categories the issue asks for are covered:
 - small sample: GC-01, 08, 11;
@@ -1020,7 +1051,7 @@ All categories the issue asks for are covered:
 - extreme imbalance: GC-12;
 - intersectional suppression: GC-22, 23.
 
-The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation and a policy with no thresholds.
+The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation, a policy with no thresholds, the chance baselines and a metric that blocks a pass because 1.0.0 cannot decide it.
 
 ### 13.3 Verification method
 
@@ -1029,7 +1060,7 @@ The remaining cases cover zero numerators, all events, empty groups, small cells
 - The script asserts that every closed-form z\* equals bisection within 1e−8, and it regenerates the fixture.
 
 Commands, from the repository root:
-- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 45 cases.
+- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 49 cases.
 - `--write` regenerates the fixture.
 - `--show-plan GC-38` prints a case's normalised plan, its canonical bytes and its hash.
 
@@ -1039,25 +1070,30 @@ Commands, from the repository root:
 
 | Category | Checks | What is recomputed |
 |---|---|---|
-| intervals | 264 | Every member and descriptive interval:<br>• Wilson: `proportion_confint(method="wilson")`<br>• Newcombe: `confint_proportions_2indep(method="newcomb")`<br>• Katz: statsmodels `method="log"` and `scipy.stats.contingency.relative_risk`<br>• Koopman: `method="score"`, or a constrained-MLE root-finder where statsmodels is degenerate<br>• MOVER, Jaccard–Wilson and the Bonferroni macro intervals: rebuilt from statsmodels Wilson limits<br>• Normal approximations: `scipy.stats.norm` |
-| decision_p_values, directions | 81, 92 | Each member's interval at level 1 − p touches the band edge, and each direction follows from estimate and band |
+| intervals | 278 | Every member and descriptive interval:<br>• Wilson: `proportion_confint(method="wilson")`<br>• Newcombe: `confint_proportions_2indep(method="newcomb")`<br>• Katz: statsmodels `method="log"` and `scipy.stats.contingency.relative_risk`<br>• Koopman: `method="score"`, or a constrained-MLE root-finder where statsmodels is degenerate<br>• MOVER, Jaccard–Wilson and the Bonferroni macro intervals: rebuilt from statsmodels Wilson limits<br>• Normal approximations: `scipy.stats.norm` |
+| decision_p_values, directions | 83, 101 | Each member's interval at level 1 − p touches the band edge, and each direction follows from estimate and band |
 | fisher | 14 | `scipy.stats.fisher_exact` on every member with a small cell, and on every GC-36 table |
-| member_status | 205 | Member status (suppressed, undefined, insufficient_support or evaluated) from the counts and minimums; `smallCell` flags; `suppressedGroups` lists |
+| member_status | 208 | Member status (suppressed, undefined, insufficient_support or evaluated) from the counts and minimums; `smallCell` flags; `suppressedGroups` lists |
 | group_rates | 155 | Per-group Wilson intervals and suppression flags |
 | headlines | 26 | Worst-member bounds rebuilt from library intervals at the nominal and Bonferroni levels |
-| coverage, sample_sizes, ece_r2 | 26, 39, 2 | From the raw case data |
-| criterion_p, outcomes | 78, 138 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni); unadjusted, adjusted and run outcomes; `reviewFlags` |
-| family_adjustment | 41 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
+| coverage, sample_sizes, ece_r2 | 26, 43, 3 | From the raw case data |
+| criterion_p, outcomes | 86, 154 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni), with the pass blocked where `passBlockedBy` is set; unadjusted, adjusted and run outcomes; `reviewFlags` |
+| family_adjustment | 45 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
 | power, sample_size_search, minimum_detectable_effects | 29, 7, 5 | Member and criterion probabilities from scipy formulas; each required size is the smallest passing integer; MDEs by `scipy.optimize.brentq` (the ratio peak by `minimize_scalar`); equality-test sizes by `samplesize_proportions_2indep_onetail` |
 | ll144 | 22 | Totals, reference category, shares, eligibility, Wilson and Katz intervals |
-| plan_schema, plan_hashes | 105, 31 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 7 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5); Node.js JCS hashes |
-| descriptive_entries, numerics | 47, 14 | Descriptive shape; normal quantiles and `erfc` against scipy |
+| derivation | 7 | Every derived plan (GC-38, GC-39, GC-45 to GC-49), rebuilt by a second, separately written implementation of section 9.3 and compared field by field: criteria, member order, the chance baselines (k counted from the data with numpy), `passBlockedBy`, applied and configured minimums |
+| plan_schema, plan_hashes | 116, 35 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 10 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5, `passBlockedBy` in a plan that was not derived, naming another kind's metric, or on a binary criterion); Node.js JCS hashes |
+| descriptive_entries, numerics | 153, 14 | Descriptive shape; `undecidable_metric` on exactly the criteria with a non-empty `passBlockedBy` and on their R² or ECE entries; normal quantiles and `erfc` against scipy |
 
-Result: **1,421 checks, 0 problems.** Ajv (Draft 2020-12, the validator the repository's schema checks use) gives the same verdicts on the 67 fixture plans and the 7 invalid ones.
+Result: **1,610 checks, 0 problems.** Ajv 8.20.0 (Draft 2020-12, the validator the repository's schema checks use, from `site-app/node_modules`) gives the same verdicts on the 71 fixture plans and the 10 invalid ones.
 
-What the cross-check does not recompute independently: the legacy-derivation mapping (GC-38, GC-39, GC-45). It is checked through the schema, idempotent normalisation and the Node.js hash, but its rules are applied only by the reference. It also does not recompute the library view in `decision.libraryEntry` or the text fields.
+What the cross-check does not recompute: the library view in `decision.libraryEntry` and the text fields.
 
-`--mutation-test` corrupts 25 fixture values one at a time and the cross-check reports all 25. The corrupted values span headlines, coverage, ECE, R², criterion and adjusted P, the deciding member, member status, outcomes, descriptive and per-group intervals, directions, the plan hash, a plan below the floors, required sizes, MDEs and power probabilities.
+`--mutation-test` corrupts 29 fixture values one at a time and the cross-check reports all 29. The corrupted values span:
+- headlines, coverage, ECE, R², criterion and adjusted P, the deciding member, member status, outcomes, descriptive and per-group intervals, directions;
+- the plan hash, a plan below the floors, required sizes, MDEs and power probabilities;
+- a binary chance baseline lowered to the policy bound, a dropped multiclass chance baseline and an emptied `passBlockedBy`, each with the plan hash recomputed so that only the derivation check can notice;
+- a pass P despite an undecidable metric.
 
 **3. Monte Carlo (`--simulate`, 20,000 replications, seed 20261105).**
 - Power formulas against the actual decision rules, at the family-adjusted level:
@@ -1107,7 +1143,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 **E2 file list and checks.**
 - `engine/diagnostics.py`:
-  - `validate_config` accepts configuration 1.0 and derives the plan, raising minimums to the floors and recording both. It accepts 1.3 and rejects minimums below the floors, or `thresholds.values` beside `statistics`.
+  - `validate_config` accepts configuration 1.0 and derives the plan (section 9.3), raising minimums to the floors and recording both. The derivation adds the chance baselines, taking k for multiclass data from the evaluated rows, and sets `passBlockedBy` on `PERF-REG` and `PERF-CAL`. It accepts 1.3 and rejects minimums below the floors, `thresholds.values` beside `statistics`, or a non-empty `passBlockedBy`.
   - `result()`, `evaluate()` and `fairness()` produce criterion results with `decision`, descriptive entries and the kept headline names.
   - `run()` aggregates per section 4.6, emits contractVersion 1.3 and records the plan and its hash.
 - `engine/contract.py` `validate_report`:
@@ -1124,7 +1160,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
   - Under the floors these runs are gated, so the tests get datasets with ≥ 30 per group and ≥ 10 per class.
   - Two new assertions cover raising-and-recording for 1.0 and rejection for 1.3.
   - `test_missing_policy_does_not_pass` keeps its meaning through `no_threshold`.
-  - The R² threshold in `test_regression_known_values_and_constant_target` no longer decides.
+  - In `test_regression_known_values_and_constant_target`, the R² threshold blocks a pass (`undecidable_metric`) instead of failing the result, so the expected outcome is inconclusive; its 3-row data is also below the minimum.
 - New `engine/tests/test_statistics_end_to_end.py` runs every `endToEnd.engine` case through `run()` on expanded CSVs.
 
 **E4 file list and checks** (worker, after #10 lands its F-67 fix).
@@ -1152,7 +1188,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 **H2 file list and checks.**
 - `site-app/lib/diagnostics.ts`:
-  - `evaluate()` produces criterion results with intervals, `decision`, descriptive entries and per-group slices. It derives the plan for legacy profiles and removes the "No confidence intervals" text.
+  - `evaluate()` produces criterion results with intervals, `decision`, descriptive entries and per-group slices. It derives the plan for legacy profiles, with the multiclass chance baseline 1/k taken from the rows (GC-49), and removes the "No confidence intervals" text.
   - `validateEvaluation` evaluates binary data with one observed label when `negativeLabel` is declared, and keeps today's two-label check otherwise.
 - `site-app/lib/evaluation.ts`: `configSchema` gets floors 30/30/10 and `negativeLabel` for profiles with `schemaVersion` 1.1; the plan schema and `statistics` are added.
 - `site-app/lib/commands/runs.ts` `executeRun` (L180) aggregates per section 4.6, writes `reviewFlags` and emits contractVersion 1.4 with `manifest.statistics`.
