@@ -90,7 +90,7 @@ Each step holds the issues whose longest chain of prerequisites has that many li
 | 8 | [#38] | Everything else |
 
 - **Longest chain:** [#1] → [#3] and [#5] (with [#8]) → [#18] → [#19] → [#27] → [#28] → [#29], then [#37] → [#38].
-- **Date-critical:** the obligations that start on 2 Dec 2026 (new Art 5 prohibitions and the end of the Art 50(2) transition) reach the product through [#8] → [#18] → [#19], and [#18] also waits for [#3] and [#5]. The brief asks for that content to ship before the date ([synthesis](docs/research/2026-11/synthesis.md) section 4).
+- **Date-critical:** the obligations that start on 2 Dec 2026 (new Art 5 prohibitions and the end of the Art 50(2) transition) reach the product through [#8] → [#18] → [#19]; [#18] also waits for [#3] and [#5], and [#19] for [#6]. The brief asks for that content to ship before the date ([synthesis](docs/research/2026-11/synthesis.md) section 4).
 - **Lanes** (an arrow means "unblocks"):
   - content: #8 → #18 → #19 → #27 → #28 → #29;
   - workflow and reporting: #6 → #13; #4 and #6 → #14 → #20 and #23; #20 → #24 and #28;
