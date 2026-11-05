@@ -75,7 +75,7 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
 - **The law asks for thresholds set in advance.** Article 9(8) of the AI Act requires testing "against prior defined metrics and probabilistic thresholds" ([Art. 9](https://artificialintelligenceact.eu/article/9/)).
 - **US guidance says the same about small numbers.** The Uniform Guidelines warn that large differences "based on small numbers" may not constitute adverse impact if not statistically significant ([29 CFR 1607.4(D)](https://www.law.cornell.edu/cfr/text/29/1607.4)).
 
-### 2.2 What the code does today (checked on `main@b15f037`; locate code by the quoted identifiers)
+### 2.2 What the code does today (checked on `main@68ec79a`; locate code by the quoted identifiers)
 
 | Topic | Hosted runner (`site-app/lib/diagnostics.ts`, `evaluation.ts`) | Engine (`engine/diagnostics.py`, `engine/assurance.py`) | External worker projection (`engine/worker_contract.py`) |
 |---|---|---|---|
@@ -86,7 +86,8 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
 | Small groups | Any group under the minimum makes the test inconclusive | The same, in `fairness()`. In `intersectional_slices`, one small stratum voids the whole result. | Any group under `minimumGroupSize` makes the test inconclusive |
 | Bootstrap | None | `bootstrap_interval` and `intersectional_slices`: seeded percentile bootstrap (`random.Random(seed)`). `_bootstrap_protocol` accepts 100–2000 replicates and requires rows × replicates ≤ `MAX_BOOTSTRAP_WORK` (5,000,000). The bootstrap does not feed the outcome; there, "pass" means only that an interval could be estimated. | None |
 | Multiplicity and power | None | None. The drift details state this. | None |
-| Run outcome | `executeRun` in `site-app/app/api/workspace/route.ts` aggregates every result | `run()` and `engine/contract.py` `validate_report` aggregate every result | `importJob` in `site-app/app/api/assurance/route.ts` aggregates every `hostedResults` entry into the compiled 1.2 run, as do `schemas/generate-external-fixtures.py` `project()` and `schemas/validate-run-schema.mjs` |
+| Run outcome | `executeRun` in `site-app/lib/commands/runs.ts` aggregates every result | `run()` and `engine/contract.py` `validate_report` aggregate every result | `importJob` in `site-app/app/api/assurance/route.ts` aggregates every `hostedResults` entry into the compiled 1.2 run, as do `schemas/generate-external-fixtures.py` `project()` and `schemas/validate-run-schema.mjs` |
+| Worker result intake | – | – | `resultEnvelope` in `site-app/lib/assurance-core.ts` allows at most 100 metrics per result and metric names of at most 300 characters. On completion, `site-app/app/api/runner/route.ts` requires the `hostedResults` test ids to equal the profile's suite. |
 
 The three paths report different evidence for the same test, and all three decide from point estimates. This specification replaces them with one decision path:
 
@@ -873,14 +874,14 @@ In 1.4 the value range of `maximum_selection_rate_gap` widens to [−1, 1], beca
 
 ### 11.5 Limits
 
-- **Metrics per result:** at most 2,451, that is, one headline plus 2 × C(50, 2) all-pairs equalized-odds members. Reference mode with 1,000 groups needs at most 1,999. This replaces `hostedResult.metrics` `maxItems` 20 and the external `maxItems` 100.
+- **Metrics per result:** at most 2,451, that is, one headline plus 2 × C(50, 2) all-pairs equalized-odds members. Reference mode with 1,000 groups needs at most 1,999. This replaces three limits: `hostedResult.metrics` `maxItems` 20, the external `maxItems` 100, and the 100 metrics that `resultEnvelope` in `site-app/lib/assurance-core.ts` allows.
 - **Slices:** at most 1,000 per metric in the engine and 50 in the hosted runner.
-- **Names:** metric names may have up to 20,480 characters (two escaped group labels of up to 5,000 characters, plus the metric prefix).
+- **Names:** metric names may have up to 20,480 characters (two escaped group labels of up to 5,000 characters, plus the metric prefix). This replaces the 300-character limits of `externalMetric.name` and of `resultEnvelope`.
 - **Results:** a hosted run holds up to 20 results, one per plan criterion, up from 5.
 
 ### 11.6 Validation rules for 1.3, 1.4 and 1.5
 
-These rules replace today's point-estimate checks: `validate_report`'s contractVersion check (L34), its pass rule (L99–100) and its aggregation (L104–106), and the aggregations in `schemas/validate-run-schema.mjs` (L80, L238), `site-app/app/api/workspace/route.ts` (L982), `site-app/app/api/assurance/route.ts` (L1367) and `schemas/generate-external-fixtures.py` (`project()`). Frozen 1.0–1.2 documents keep today's rules.
+These rules replace today's point-estimate checks: `validate_report`'s contractVersion check (L34), its pass rule (L99–100) and its aggregation (L104–106), and the aggregations in `schemas/validate-run-schema.mjs` (L80, L238), `site-app/lib/commands/runs.ts` (`executeRun`, L180; it was `site-app/app/api/workspace/route.ts` L982 before the command split), `site-app/app/api/assurance/route.ts` (L1367) and `schemas/generate-external-fixtures.py` (`project()`). Frozen 1.0–1.2 documents keep today's rules.
 
 1. **Outcome agrees with the decision.** `outcome` is pass or fail exactly when `decision.direction` has that value and `decision.adjustedPValue ≤ α + 1e−12`, with α = 1 − `decision.confidenceLevel`. Otherwise it is inconclusive. `unadjustedOutcome` is the same function of `decision.pValue`.
 2. **A pass** needs four things:
@@ -1101,7 +1102,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 | H1 | #22 | `site-app/lib/statistics.ts`: port of E1 (AS241, `erfc`, Koopman bisection, Fisher in log space, JCS with explicit key sorting); a Vitest suite over the fixture at core level for every case with `"hosted"` in `runners` | M | E1 (the roadmap makes #22 depend on #21; H1 can be developed in parallel because the fixture is final, but it merges after E1) | Vitest golden suite green in CI |
 | H2 | #22 | The hosted decision path, the 1.4 contract and the validators (list below) | L | H1, #15 | cross-runner agreement in CI; schema validators pass |
 | H3 | #22 | Plan step in `testing-lab.tsx`: bands, role, mode, reference group, coverage, confidence level, power assumptions; threshold-library data file with status notes; power/MDE panel showing the range, with acknowledgement; frozen plan and hash in the manifest; plain-language reason messages | M | H2 | changing an approved plan creates a new profile version (test) |
-| H4 | #22 | `importJob` in `site-app/app/api/assurance/route.ts` compiles 1.5 runs. It aggregates per section 4.6 (L1367), adds `reviewFlags` and `manifest.statistics`, and writes paper text from the decisions. | S | E4, H2 | the 1.5 external fixtures validate; aggregation test |
+| H4 | #22 | External intake of 1.5 results (list below) | S | E4, H2 | the 1.5 external fixtures validate; aggregation and intake-limit tests |
 | L1 | #30 | LL144 computations (section 10.2), scoring-rate path with the full-sample median, publishable summary | M | H2, #27 | GC-32 and new scoring-rate cases match |
 
 **E2 file list and checks.**
@@ -1154,10 +1155,19 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
   - `evaluate()` produces criterion results with intervals, `decision`, descriptive entries and per-group slices. It derives the plan for legacy profiles and removes the "No confidence intervals" text.
   - `validateEvaluation` evaluates binary data with one observed label when `negativeLabel` is declared, and keeps today's two-label check otherwise.
 - `site-app/lib/evaluation.ts`: `configSchema` gets floors 30/30/10 and `negativeLabel` for profiles with `schemaVersion` 1.1; the plan schema and `statistics` are added.
-- `site-app/app/api/workspace/route.ts` `executeRun` (L982) aggregates per section 4.6, writes `reviewFlags` and emits contractVersion 1.4 with `manifest.statistics`.
+- `site-app/lib/commands/runs.ts` `executeRun` (L180) aggregates per section 4.6, writes `reviewFlags` and emits contractVersion 1.4 with `manifest.statistics`.
 - Schema generator: a hosted 1.4 branch, with `hostedMetric` replaced by the shared metric shape, `hostedResult` with `decision`, results ≤ 20, profile `schemaVersion` 1.1 and the section 11.5 limits.
 - `schemas/validate-run-schema.mjs` `hostedBindings` (L80) gets the 1.4 aggregation and the section 11.6 rules, with new `schemas/fixtures/hosted-runs.v1.4.json`. `hosted-runs.v1.1.json` stays frozen.
 - End-to-end Vitest over `endToEnd.hosted` cases, and `ml-evaluation-check` updated.
+
+**H4 file list and checks.**
+- `site-app/app/api/assurance/route.ts` `importJob` compiles 1.5 runs. It aggregates per section 4.6 (L1367), adds `reviewFlags` and `manifest.statistics`, and writes paper text from the decisions.
+- `site-app/lib/assurance-core.ts` `resultEnvelope`:
+  - raises the per-result metric limit from 100 to 2,451 and the metric name limit from 300 to 20,480 characters (section 11.5);
+  - admits `decision` and the full metric shape. The route checks the parsed envelope, but `importJob` stores the exact result bytes, so the parse must not reject them.
+- `site-app/app/api/runner/route.ts` completion check:
+  - `hostedResults` test ids must equal the plan's criterion ids rather than the profile's suite (they coincide for derived plans);
+  - the article follows the criterion kind: 15 for performance kinds, 10 for group criteria.
 
 Each PR adds its tests with the code. Nothing here changes runner code before #21 and #22.
 
