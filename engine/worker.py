@@ -730,7 +730,9 @@ class Worker:
             # on the server and the job becomes claimable again.
             self.record({"event": "claim_rejected", "code": "claim_pins_invalid", "detail": exception_detail(error)})
             return {"state": "claim_rejected", "error": "claim_pins_invalid"}
-        code = "lease_expired_on_receipt" if isinstance(error, EngineError) and error.code == "lease_expired_on_receipt" else "request_contract_rejected"
+        # A coded problem keeps its code, such as an ended lease or a model
+        # whose labels are not the frozen pair; anything else breaks the contract.
+        code = failure_code(error.code) if isinstance(error, EngineError) else "request_contract_rejected"
         attempt = {"jobId": pins["jobId"], "attemptId": pins["attemptId"]}
         posted = self.post_failure(pins, code)
         self.record({"event": "failed", **attempt, "code": code, "failPosted": posted, "detail": exception_detail(error)})

@@ -42,7 +42,7 @@ CLI/runtime model formats are normalized `onnx`, `xgboost_json`, `lightgbm_text`
 
 A claim response is `{"idle":true}` when there is nothing to run, otherwise `{jobId,attemptId,fence,nonce,leaseUntil,requestSha256,request,requestJSON}`. `requestJSON` is the **exact original server JSON string**; its UTF-8 hash must equal `requestSha256`, and its parsed contents must equal `request`. This avoids JavaScript/Python serialization disagreements.
 
-The platform accepts some jobs that this worker cannot run, for example a binary system with more or fewer than two classes, or more than 100 features. If a claim's pins (`jobId`, `attemptId`, `fence`, `nonce`, `requestSha256`) are valid but the rest of the claim is not, the worker fails that attempt with `request_contract_rejected`, or `lease_expired_on_receipt` when the lease is already past, and continues with the next poll. A claim without valid pins cannot be failed; the worker logs it as `claim_rejected` and the server-side lease expires. The request contains:
+The platform accepts some jobs that this worker cannot run, for example a binary system with more or fewer than two classes, or more than 100 features. If a claim's pins (`jobId`, `attemptId`, `fence`, `nonce`, `requestSha256`) are valid but the rest of the claim is not, the worker fails that attempt before downloading anything and continues with the next poll. The code is `request_contract_rejected` unless a more specific one applies: `lease_expired_on_receipt` when the lease has already ended, or `label_set_mismatch` (`protocol_config_invalid` for an unusable label) when a binary `auditor_model` request's `modelSpec.outputLabels` are not exactly the frozen `positiveLabel` and `negativeLabel`. A claim without valid pins cannot be failed; the worker logs it as `claim_rejected` and the server-side lease expires. The request contains:
 
 ```json
 {
@@ -103,9 +103,9 @@ Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the 
 | `missing_column` | Compute | A mapped column (label, prediction, group, score) or a model feature column is absent. |
 | `missing_value` | Compute | A mapped cell or model feature is empty; the worker never silently drops rows on this path. |
 | `invalid_numeric_value` | Compute | A numeric cell is not a finite number, a score lies outside [0, 1], or a metric overflowed. |
-| `label_set_mismatch` | Compute | Observed labels, the frozen positive and negative labels, and the model's `outputLabels` do not agree. |
+| `label_set_mismatch` | Claim or compute | Observed labels, the frozen positive and negative labels, and the model's `outputLabels` do not agree. A binary model whose `outputLabels` are not the frozen pair fails at claim, before any download; the operator log names both sets. |
 | `cardinality_limit_exceeded` | Compute | More than 1,000 protected groups or 100 classes. |
-| `protocol_config_invalid` | Compute | The frozen column mapping, acceptance criteria or minimum counts cannot be applied. |
+| `protocol_config_invalid` | Claim or compute | The frozen column mapping, acceptance criteria, minimum counts, or binary `positiveLabel`/`negativeLabel` cannot be applied. |
 | `model_artifact_invalid` | Compute | The model bytes are not a valid artifact of the declared format, or the runtime could not load them. |
 | `model_runtime_unavailable` | Compute | The compute image lacks the runtime for the declared format. |
 | `model_objective_mismatch` | Compute | The native objective is outside the reviewed protocol or differs from the declared task. |
@@ -133,7 +133,7 @@ The server freezes hosted `engineConfig.contractVersion:"1.1"`, human-readable t
 
 The worker accepts exactly the five tests a platform evaluation profile can select (`suiteSchema` in `site-app/lib/evaluation.ts`): `performance`, `regression`, `demographic_parity`, `disparate_impact` and `equalized_odds`. The platform never sends any other test and its import contract accepts only these results, so any other test fails the claim with `request_contract_rejected`. A test keeps the two catalogs identical.
 
-For binary tasks the label pair is the frozen favourable `config.positiveLabel` and `engineConfig.negativeLabel`, not the labels that happen to occur in the data. A dataset with a single observed class is therefore evaluated, and its class-dependent results are inconclusive. Observed labels outside the pair fail with `label_set_mismatch`, as do model `outputLabels` that differ from it. A request frozen without `negativeLabel` derives the other label from exactly two observed labels (or the model's `outputLabels`), as earlier versions did.
+For binary tasks the label pair is the frozen favourable `config.positiveLabel` and `engineConfig.negativeLabel`, not the labels that happen to occur in the data. A dataset with a single observed class is therefore evaluated, and its class-dependent results are inconclusive. Observed labels outside the pair fail with `label_set_mismatch`, as do model `outputLabels` that differ from it; the worker checks those when the claim arrives, before downloading the dataset or model. A request frozen without `negativeLabel` derives the other label from exactly two observed labels (or the model's `outputLabels`), as earlier versions did.
 
 The completion envelope is:
 

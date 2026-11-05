@@ -226,6 +226,10 @@ def validate_request(request):
             raise ValueError("Named frozen internal policy is required")
     if "modelSpec" in config:
         validate_model_spec(config["modelSpec"], TASKS[config["task"]])
+        if request["executionMode"] == "auditor_model" and config["task"] == "Binary classification":
+            # The same check compute makes, here so that a model whose labels
+            # are not the frozen pair fails at claim time, before any download.
+            binary_labels(config, inference=True)
 
 
 def validate_model_spec(spec, task):
@@ -313,25 +317,27 @@ def translate_config(request, rows):
         criterion("maximumOddsGap", "equalized_odds_difference", "<=", c.get("maximumParityGap", .1))
     native = {"contractVersion": "1.0", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "minSampleSize": integer(c, "minimumSampleSize", 20), "minClassCount": max(2, integer(c, "minimumClassCount", 5, minimum=1)), "minGroupSize": integer(c, "minimumGroupSize", 30), "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": values}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": "1.1", "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimumClassCount": c.get("minimumClassCount", 5), "supplementalMetricPolicy": "descriptive; only selected named acceptance criteria determine hostedResults"}}
     if task == "binary_classification":
-        native.update(binary_labels(hosted, rows, columns, inference))
+        native.update(binary_labels(hosted, rows, columns, inference=inference))
     if "modelSpec" in hosted:
         native["modelSpec"] = copy.deepcopy(hosted["modelSpec"])
     return validate_config(native)
 
 
-def binary_labels(hosted, rows, columns, inference):
+def binary_labels(hosted, rows=None, columns=None, *, inference):
     """The frozen favourable and other binary labels.
 
     The platform freezes engineConfig.negativeLabel, so the label pair never
     depends on which labels happen to occur: a dataset with a single
     observed class is evaluated and reported as inconclusive. A model's
     outputLabels must be exactly that pair, and observed labels outside it
-    are rejected when predictions are read.
+    are rejected when predictions are read. Only a request frozen without
+    negativeLabel and without a model reads `rows` (the `columns` roles).
     """
     positive = hosted["config"].get("positiveLabel")
     if not isinstance(positive, str) or not positive.strip():
         raise EngineError("protocol_config_invalid", "A favourable binary class label is required")
-    declared = set(hosted.get("modelSpec", {}).get("outputLabels", [])) if inference else None
+    labels = hosted.get("modelSpec", {}).get("outputLabels", []) if inference else None
+    declared = set(labels) if inference else None
     negative = hosted.get("negativeLabel")
     if negative is None:
         # Requests frozen without negativeLabel: derive the other label.
@@ -344,7 +350,7 @@ def binary_labels(hosted, rows, columns, inference):
         raise EngineError("protocol_config_invalid", "negativeLabel must be a nonempty label that differs from positiveLabel")
     negative = negative.strip()
     if inference and declared != {positive, negative}:
-        raise EngineError("label_set_mismatch", "Model outputLabels differ from the frozen positive and negative labels")
+        raise EngineError("label_set_mismatch", f"Model outputLabels {labels!r} differ from the frozen positiveLabel and negativeLabel {[positive, negative]!r}")
     return {"positiveLabel": positive, "negativeLabel": negative}
 
 

@@ -777,6 +777,31 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["request_contract_rejected"])
                 self.assertEqual(server.gets, [])
 
+    def test_model_labels_outside_the_frozen_pair_fail_at_claim_before_any_download(self):
+        # The platform freezes negativeLabel "0" by default; this model labels "no"/"yes".
+        request = self.model_request(outputLabels=["no", "yes"])
+        request["engineConfig"]["config"]["positiveLabel"] = "yes"
+        with self.assertRaises(EngineError) as error:
+            validate_request(request)
+        self.assertEqual(error.exception.code, "label_set_mismatch")
+        self.assertEqual(str(error.exception), "Model outputLabels ['no', 'yes'] differ from the frozen positiveLabel and negativeLabel ['yes', '0']")
+        with RunnerServer(claims=[claim_body(request)], capabilities=("provided_predictions", "ONNX")) as server:
+            result = self.model_worker(server.transport()).once()
+            self.assertEqual((result["state"], result["error"]), ("failed", "label_set_mismatch"))
+            self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["label_set_mismatch"])
+            self.assertEqual(server.gets, [])
+        self.assertEqual(self.operator_log()[-1]["detail"]["message"], str(error.exception))
+        # A request frozen without negativeLabel still needs positiveLabel among the model's labels.
+        del request["engineConfig"]["negativeLabel"]
+        validate_request(request)
+        request["engineConfig"]["config"]["positiveLabel"] = "approved"
+        with self.assertRaises(EngineError) as error:
+            validate_request(request)
+        self.assertEqual(error.exception.code, "label_set_mismatch")
+        request["engineConfig"]["config"]["positiveLabel"] = "yes"
+        request["engineConfig"]["negativeLabel"] = "no"
+        validate_request(request)
+
     def test_lease_expired_on_receipt_is_failed_with_its_own_code(self):
         with RunnerServer(claims=[claim_body(lease_seconds=-30)]) as server:
             result = self.worker(server.transport()).once()
