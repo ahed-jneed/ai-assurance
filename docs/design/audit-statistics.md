@@ -1228,7 +1228,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 | E4 | #21 | The external worker's projection (list below) | M | E2 and #10 merged | `verify_result_bytes` accepts only copied decisions; worker and schema validators pass |
 | H1 | #22 | `site-app/lib/statistics.ts`: port of E1 (AS241, `erfc`, Koopman bisection, two- and one-sided Fisher in log space, JCS with explicit key sorting); a Vitest suite over the fixture at core level for every case with `"hosted"` in `runners` | M | E1 (the roadmap makes #22 depend on #21; H1 can be developed in parallel because the fixture is final, but it merges after E1) | Vitest golden suite green in CI |
 | H2 | #22 | The hosted decision path, the 1.4 contract and the validators (list below) | L | H1, #15 | cross-runner agreement in CI; schema validators pass |
-| H3 | #22 | Plan step in `testing-lab.tsx`: bands, role, mode, reference group, coverage, confidence level, power assumptions; threshold-library data file with status notes; power/MDE panel showing the range, with acknowledgement; frozen plan and hash in the manifest; plain-language reason messages | M | H2 | changing an approved plan creates a new profile version (test) |
+| H3 | #22 | Plan step in `testing-lab.tsx`: bands, role, mode, reference group, coverage, confidence level, power assumptions; its profile summary `criterionSummary` (L2148–2179) lists the plan's criteria and bands instead of reading thresholds from `config`; threshold-library data file with status notes; power/MDE panel showing the range, with acknowledgement; frozen plan and hash in the manifest; plain-language reason messages | M | H2 | changing an approved plan creates a new profile version (test) |
 | H4 | #22 | External intake of 1.5 results (list below) | S | E4, H2 | the 1.5 external fixtures validate; aggregation and intake-limit tests |
 | L1 | #30 | LL144 computations (section 10.2), scoring-rate path with the full-sample median, publishable summary | M | H2, #27 | GC-32 and new scoring-rate cases match |
 
@@ -1288,6 +1288,12 @@ Line numbers below are those of `main@582657f`. Of the files listed, #47 changes
 - `site-app/lib/evaluation.ts`:
   - `configSchema` gets floors 30/30/10 and `negativeLabel` for profiles with `schemaVersion` 1.1; the plan schema and `statistics` are added.
   - A 1.1 profile with a plan has `suite` equal to the families of its criteria and no calibration criterion (section 11.2). `assertSuite` and `protocolConfigKeys` apply to that `suite`.
+- `site-app/lib/domain/types.ts`:
+  - `EvaluationConfig` (L133–148) requires the legacy `minimumGroupSize`, `maximumParityGap`, `minimumImpactRatio` and `minimumAccuracy` (L138–141), and `EvaluationProfile.schemaVersion` is `"1.0"` (L151).
+  - A 1.1 profile with a plan keeps only the column mappings and the declared labels in `config` (section 9.1). So the profile type admits `schemaVersion` 1.1 with `statistics`, and the config type gains a variant without the thresholds and minimums, with `negativeLabel`. A 1.4 run's `Run.config` (L263) takes the same variant.
+- `site-app/app/record-details.tsx` `Criterion` (L373–400):
+  - Today it renders each result's criterion text from `run.config` by test id. For a 1.4 run from a 1.1 profile with a plan, whose `config` has no thresholds, it would print "Accuracy ≥ NaN%" or "Maximum gap ≤ NaN pp".
+  - For 1.4 and 1.5 results it renders the bands from the members' `details.band`, and the role, adjusted p and outcome reasons from `decision`. Frozen 1.1 and 1.2 runs keep today's text.
 - `site-app/lib/commands/runs.ts` `executeRun` (L180) aggregates per section 4.6, writes `reviewFlags` and emits contractVersion 1.4 with `manifest.statistics`; the run's `suite` is the profile's.
 - `schemas/.build-run-schema.py`, a hosted 1.4 branch:
   - `hostedMetric` is replaced by the shared metric shape, `hostedResult` gains `decision`, and results may number up to 20; profile `schemaVersion` 1.1; the section 11.5 limits.
