@@ -1012,7 +1012,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Power and MDE at plan approval | **mirror** (approval UI) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
 | LL144 computations | via #30 (same arithmetic) | via #30 | – |
-| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns; until then one column | yes (`intersectional_slices`) | – |
+| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns, which #30 adds (section 15); until then one column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
 | Cluster bootstrap and descriptive bootstrap (ECE, R²) | not available; `clustered_design_requires_engine` | engine-only | copied |
 | Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |
@@ -1230,7 +1230,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 | H2 | #22 | The hosted decision path, the 1.4 contract and the validators (list below) | L | H1, #15 | cross-runner agreement in CI; schema validators pass |
 | H3 | #22 | Plan step in `testing-lab.tsx`: bands, role, mode, reference group, coverage, confidence level, power assumptions; its profile summary `criterionSummary` (L2148–2179) lists the plan's criteria and bands instead of reading thresholds from `config`; threshold-library data file with status notes; power/MDE panel showing the range, with acknowledgement; frozen plan and hash in the manifest; plain-language reason messages | M | H2 | changing an approved plan creates a new profile version (test) |
 | H4 | #22 | External intake of 1.5 results (list below) | S | E4, H2 | the 1.5 external fixtures validate; aggregation and intake-limit tests |
-| L1 | #30 | LL144 computations (section 10.2), scoring-rate path with the full-sample median, publishable summary | M | H2, #27 | GC-32 and new scoring-rate cases match |
+| L1 | #30 | LL144 computations (section 10.2), scoring-rate path with the full-sample median, publishable summary; hosted profiles accept up to five group columns, so intersectional strata run in the hosted runner (section 5.10; decided on #22, section 15) | M | H2, #27 | GC-32 and new scoring-rate cases match |
 
 **E2 file list and checks.**
 - `engine/diagnostics.py`:
@@ -1325,6 +1325,8 @@ Every question below was decided on 5 November 2026, in the decision comments on
 - For Q2, Q3, Q5, Q6, Q7, Q8, Q9 and Q10, the default of this specification is accepted.
 
 The decisions apply to the engine and the hosted runner alike, and none of them changes a method or a fixture value. The work they defer, interval-based drift decisions (Q6) and the methods of Q7 and Q8, is on the Later list in [`ROADMAP.md`](../../ROADMAP.md#later).
+
+The decision comment on #22 also places intersectional strata in hosted profiles, meaning several group columns, under #30, which needs them for LL144. Section 12 and step L1 record this.
 
 | # | Question | Decision (5 Nov 2026) |
 |---|---|---|
