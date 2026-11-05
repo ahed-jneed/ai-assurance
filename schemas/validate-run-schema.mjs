@@ -132,6 +132,14 @@ const undefinedR2 = copy(regression);
 undefinedR2.results[0].metrics.find(metric => metric.name === 'r2').value = null;
 undefinedR2.results[0].limitations.push('R² is undefined for this target population.');
 positive('Hosted null R² evidence', undefinedR2);
+// Rule-pack stamp (#18): optional, because older runs lack it, and strict when present.
+const stamped = copy(complete);
+stamped.rulePack = { version: '2026.11.1', legalVersion: '02024R1689-20260727', researchedAsOf: '2026-11-05', legalReview: 'pending' };
+stamped.methodologyVersion = '2026.11.1';
+positive('Hosted run with rule-pack stamp', stamped);
+negative('rule-pack stamp with unknown field', stamped, run => { run.rulePack.approvedBy = 'counsel'; });
+negative('rule-pack stamp without legal-review status', stamped, run => { delete run.rulePack.legalReview; });
+negative('malformed methodology version', stamped, run => { run.methodologyVersion = 'latest'; });
 
 const mutations = [
   ['unknown contract', complete, run => { run.contractVersion = '2.0'; }],
@@ -271,6 +279,7 @@ const notApplicableExternal = copy(emptyExternal);
 notApplicableExternal.results.forEach(result => { result.outcome = 'not_applicable'; });
 notApplicableExternal.outcome = notApplicableExternal.overallOutcome = 'not_applicable';
 positive('External all-not-applicable shape', notApplicableExternal);
+positive('External run with rule-pack stamp', { ...copy(ext), rulePack: copy(stamped.rulePack), methodologyVersion: stamped.methodologyVersion });
 const externalMutations = [
   ['external missing job ID', run => { delete run.externalJobId; }],
   ['external queued result projection', run => { run.state = 'queued'; }],

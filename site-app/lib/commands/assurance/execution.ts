@@ -6,6 +6,7 @@ import { save } from "../../engagement-repo";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
+import { recordVersions } from "../../rule-pack-current";
 import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -417,6 +418,7 @@ export const execution: AssuranceModule = defineCommands({
         createdAt: job.created_at,
         startedAt: attempt?.started_at ?? job.created_at,
         completedAt: job.completed_at,
+        ...recordVersions(),
         procedureBinding: binding,
         provenance: {
           inputHashes: {

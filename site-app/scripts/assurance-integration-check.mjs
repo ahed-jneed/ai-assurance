@@ -736,6 +736,8 @@ try {
   assert.equal(run.results.length, 4);
   assert.equal(run.manifest.dataset.cardPin.recordId, datasetCard.id);
   assert.equal(run.manifest.dataset.cardPin.sha256, datasetCard.sha256);
+  assert.deepEqual(run.rulePack, e.rulePack);
+  assert.equal(run.methodologyVersion, e.rulePack.version);
   await fs.mkdir(path.resolve("../tmp/assurance-worker-fixture"), {
     recursive: true,
   });

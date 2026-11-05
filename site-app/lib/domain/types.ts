@@ -19,6 +19,23 @@ export function canWrite(role: Role) {
   return role === "Auditor" || role === "Lead Auditor";
 }
 export type Outcome = "pass" | "fail" | "inconclusive" | "not_applicable";
+/**
+ * A rule-pack stamp (#18): the EU AI Act rule pack of templates/catalog.json
+ * (`regulatorySnapshot`) a record was made under. An engagement carries the
+ * pack it was created with, written once and never rewritten; engagements
+ * created before rule pack 2026.11.1 have none. Captured report snapshots and
+ * runs carry the pack the build applied, next to its methodology version.
+ */
+export type RulePackStamp = {
+  /** Rule-pack revision: the catalog's methodology version, e.g. "2026.11.1". */
+  version: string;
+  /** Consolidated legal text the pack interprets (CELEX), e.g. "02024R1689-20260727". */
+  legalVersion: string;
+  /** Date the pack's legal research was verified, e.g. "2026-11-05". */
+  researchedAsOf: string;
+  /** "pending" until qualified legal review approves the pack (D-02). */
+  legalReview: "pending" | "approved";
+};
 export type Paper = {
   id: string;
   templateId: string;
@@ -260,6 +277,9 @@ export type Run = {
     runnerVersion: string;
     policyVersion: string;
   };
+  /** The rule pack and methodology the run was made under; absent on older runs. */
+  rulePack?: RulePackStamp;
+  methodologyVersion?: string;
   config: EvaluationConfig;
   task?: string;
   profileId?: string;
@@ -312,6 +332,8 @@ export type Engagement = {
   dueDate: string;
   version: number;
   classification: Classification;
+  /** Written once at creation; absent on engagements created before stamps. */
+  rulePack?: RulePackStamp;
   papers: Paper[];
   artifacts: Artifact[];
   evidenceRequests?: EvidenceRequest[];

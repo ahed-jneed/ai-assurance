@@ -4,6 +4,7 @@ import catalog from "./catalog.json";
 import type { Engagement, Paper } from "./domain";
 import { id, now } from "./ids";
 import { ApiError } from "./http";
+import { currentRulePack } from "./rule-pack-current";
 import { seedWorkflow } from "./workflow-seed";
 export function templatePaper(templateId: string, userId: string): Paper {
   const t = catalog.items.find((t) => t.id === templateId);
@@ -66,9 +67,10 @@ export function freshEngagement(
       intendedPurpose: "",
       rationale: "",
       status: "provisional",
-      version: "02024R1689-20260727",
-      asOf: "2026-10-05",
+      version: currentRulePack.legalVersion,
+      asOf: currentRulePack.researchedAsOf,
     },
+    rulePack: { ...currentRulePack },
     papers: structured
       ? []
       : catalog.items
