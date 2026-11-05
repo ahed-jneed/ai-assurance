@@ -136,7 +136,13 @@ The research and the codebase review also recommend the items below. No issue co
   - Art 50 content-marking checks, such as C2PA manifests and watermark-detector output (R6.5, which builds on the Art 50 pack);
   - verification of OpenSSF Model Signing signatures on supplied models (part of R7.5; [#25] covers key wrapping, rotation and published keys);
   - a client assurance-summary page (R8.4), and a client evidence API with a read-only MCP server (R9.4).
-- **From the codebase review:** F-16 (test harnesses that are not portable, which CI works around); the idempotent local migration script from F-15 (the README itself was corrected in [PR #2]); and the splits of `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` and `scripts/integration-check.mjs` ([codebase map](docs/engineering/codebase-map.md) section 3.2).
+- **From the codebase review** (F-16, the parts of F-15, F-17, F-18 and F-47 that [PR #2] left open, and five hot-file splits):
+  - F-15: the idempotent local migration script (the README itself was corrected in [PR #2]);
+  - F-16: test harnesses that are not portable, which CI works around;
+  - F-17: a CI switch that makes the three signature tests fail, not skip, when `cryptography` is missing, and `cryptography` declared wherever an image must verify signatures (CI installs it from `engine/requirements-dev.txt`, so the tests run there today);
+  - F-18: porting the standalone `scripts/*-check.mjs` harnesses to colocated Vitest tests, one area at a time ([#6] ports the matching `workflow-ux-check.mjs` and `work-items-check.mjs` assertions where that is straightforward);
+  - F-47: a cached query layer keyed by tenant, engagement and version, with role and report passed down as props, so that five components (assurance workbench, dataset registry, dossier controls, procedure context, testing lab) no longer each refetch `/api/assurance` after every save and `DossierControls` no longer refetches the whole workspace; and a CI step that fails on build warnings, which [PR #2] removed but does not gate ([#16] covers the `/api/workspace` hydration and reload, F-08);
+  - the splits of `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` and `scripts/integration-check.mjs` ([codebase map](docs/engineering/codebase-map.md) section 3.2).
 - **Frameworks the brief itself puts later** (synthesis section 2.3): the JTC 21 standards once cited, a model-risk pack for SR 26-2 and PRA SS1/23, an MDR/IVDR and FDA PCCP overlay, the Korea AI Basic Act, China's GB 45438-2025, and OSCAL exchange.
 
 [PR #2]: https://github.com/ahed-jneed/ai-assurance/pull/2
