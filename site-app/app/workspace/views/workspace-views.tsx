@@ -15,6 +15,7 @@ import {
 } from "../modals/finding";
 import { uploadDefaults } from "../modals/upload";
 import { isManagementView } from "../modules";
+import type { EditingReporter, EditingSource } from "../navigation-guards";
 import {
   AssuranceWorkbench,
   AuditProgram,
@@ -64,7 +65,7 @@ export function WorkspaceViews({
   load,
   displayedEvidenceTab,
   paperRows,
-  onEditing,
+  reporters,
   resolve,
   labIntent,
   onModal,
@@ -81,8 +82,7 @@ export function WorkspaceViews({
   load: WorkspaceLoad;
   displayedEvidenceTab: string;
   paperRows: PaperRegisterRow[];
-  /** Panels report an unfinished editor. */
-  onEditing: (editing: boolean) => void;
+  reporters: Record<EditingSource, EditingReporter>;
   resolve: (id: string) => string;
   labIntent: PendingLabIntent;
   onModal: OpenModal;
@@ -187,7 +187,7 @@ export function WorkspaceViews({
             onPaper={nav.openPaper}
             onRequest={nav.requestForPaper}
             onNavigate={nav.navigate}
-            onEditing={onEditing}
+            onEditing={reporters["audit-program"]}
             initialProcedure={url.procedureContext}
             initialSection={url.procedureSection}
             onRecord={onDetail}
@@ -204,7 +204,7 @@ export function WorkspaceViews({
           role={role}
           viewer={viewer}
           busy={busy}
-          onEditing={onEditing}
+          onEditing={reporters["client-portal"]}
           onReload={reload}
           onNavigate={nav.navigate}
           onWork={nav.openWork}
@@ -241,7 +241,10 @@ export function WorkspaceViews({
           displayedEvidenceTab={displayedEvidenceTab}
           resolve={resolve}
           act={act}
-          onEditing={onEditing}
+          onEditing={{
+            clientPortal: reporters["client-portal"],
+            requestAccess: reporters["request-access"],
+          }}
           onReload={reload}
           onOpenArtifact={(a) => onDetail(a.name, a)}
           onOpenRequest={(r) => onDetail(r.subject, r)}
@@ -270,7 +273,7 @@ export function WorkspaceViews({
               if (p) nav.openPaper(p);
             }}
             onNavigate={nav.navigate}
-            onEditing={onEditing}
+            onEditing={reporters["assurance-workbench"]}
           />
         </Suspense>
       )}
@@ -287,7 +290,7 @@ export function WorkspaceViews({
             busy={busy}
             view={url.labView}
             onView={url.setLabView}
-            onEditorOpen={onEditing}
+            onEditorOpen={reporters["testing-lab"]}
             act={act}
             onPaper={nav.openPaper}
             resolve={resolve}

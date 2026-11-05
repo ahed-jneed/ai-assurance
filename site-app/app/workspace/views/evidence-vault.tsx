@@ -10,6 +10,7 @@ import { DatabaseToolbar } from "../../database-toolbar";
 import { EvidenceReviewQueue } from "../../evidence-workspace";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
+import type { EditingReporter } from "../navigation-guards";
 import {
   ClientPortal,
   EvidenceRequests,
@@ -50,7 +51,7 @@ export function EvidenceVault({
   displayedEvidenceTab: string;
   resolve: (id: string) => string;
   act: WorkspaceAct;
-  onEditing: (editing: boolean) => void;
+  onEditing: { clientPortal: EditingReporter; requestAccess: EditingReporter };
   onReload: () => Promise<unknown>;
   onOpenArtifact: (artifact: Artifact) => void;
   onOpenRequest: (request: EvidenceRequest) => void;
@@ -73,7 +74,7 @@ export function EvidenceVault({
           <ClientPortal
             data={data}
             busy={busy}
-            onEditing={onEditing}
+            onEditing={onEditing.clientPortal}
             onReload={onReload}
           />
         </Suspense>
@@ -220,7 +221,7 @@ export function EvidenceVault({
                 data={data}
                 busy={busy}
                 act={act}
-                onEditing={onEditing}
+                onEditing={onEditing.requestAccess}
               />
             </Suspense>
           </TabsContent>

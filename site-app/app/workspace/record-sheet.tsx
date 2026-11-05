@@ -24,6 +24,7 @@ import { EvidenceDetails } from "../evidence-details";
 import { PackageIntegrity } from "../package-integrity";
 import { RecordDetails } from "../record-details";
 import type { WorkspaceData } from "../workspace-types";
+import type { EditingSource, EditingReporter } from "./navigation-guards";
 import {
   EvidenceRequestDetails,
   FindingAssurance,
@@ -47,7 +48,7 @@ export function RecordSheet({
   act,
   safeAct,
   load,
-  onEditing,
+  reporters,
   onPaper,
   onModal,
   onRequestForm,
@@ -65,8 +66,7 @@ export function RecordSheet({
   act: WorkspaceAct;
   safeAct: (op: string, values: Record<string, unknown>) => void;
   load: WorkspaceLoad;
-  /** Panels in the sheet report an unfinished editor. */
-  onEditing: (editing: boolean) => void;
+  reporters: Record<EditingSource, EditingReporter>;
   onPaper: (paper: Paper) => void;
   onModal: OpenModal;
   onRequestForm: (form: string, request?: EvidenceRequest) => void;
@@ -181,7 +181,7 @@ export function RecordSheet({
                           userId={data?.identity.id ?? ""}
                           busy={busy}
                           act={act}
-                          onEditing={onEditing}
+                          onEditing={reporters["finding-assurance"]}
                         />
                       </Suspense>
                     ) : undefined
@@ -225,7 +225,7 @@ export function RecordSheet({
                         userId={data?.identity.id ?? ""}
                         busy={busy}
                         act={act}
-                        onEditing={onEditing}
+                        onEditing={reporters["report-release"]}
                       />
                     </Suspense>
                   )}
