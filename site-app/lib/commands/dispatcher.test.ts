@@ -165,13 +165,16 @@ describe("POST /api/workspace", () => {
   it.each(["createClient", "createEngagement", "grantMember"])(
     "refers %s to client and user management for every role",
     async (op) => {
-      const e = stored();
-      load(e, caller("Client Viewer"));
-      const response = await post(envelope(e, op));
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
-        error: "Use client and user management for this action",
-      });
+      for (const role of roles) {
+        const e = stored();
+        load(e, caller(role));
+        const response = await post(envelope(e, op));
+        expect(response.status, role).toBe(400);
+        expect(await response.json(), role).toEqual({
+          error: "Use client and user management for this action",
+        });
+      }
+      expect(save).not.toHaveBeenCalled();
     },
   );
 
