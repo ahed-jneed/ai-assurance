@@ -47,7 +47,7 @@ COMPUTE_FAILURE_CODES = frozenset({
     "evidence_too_large", "compute_timeout", "compute_resource_exhausted", "compute_internal_error",
 })
 FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
-    "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
+    "lease_expired_on_receipt", "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
     "transport_unavailable", "transport_idle_timeout", "response_deadline_exceeded", "response_truncated", "response_size_rejected", "model_input_size_mismatch",
     "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
 })
@@ -117,6 +117,25 @@ def timestamp(value):
         raise ValueError("Invalid leaseUntil timestamp") from exc
 
 
+def claim_pins(body):
+    """Validate only the attempt pins that every later operation echoes.
+
+    A claim whose request is unusable can still be failed by these pins.
+    """
+    if not isinstance(body, dict):
+        raise ValueError("Claim must be an object")
+    job = valid_id(body.get("jobId"), "jobId")
+    attempt = valid_id(body.get("attemptId"), "attemptId")
+    fence = body.get("fence")
+    if isinstance(fence, bool) or not isinstance(fence, int) or not 1 <= fence <= 2**53-1:
+        raise ValueError("Invalid fence")
+    nonce = body.get("nonce")
+    if not isinstance(nonce, str) or not 16 <= len(nonce) <= 256 or any(ord(c) < 32 for c in nonce):
+        raise ValueError("Invalid attempt nonce")
+    digest = valid_hash(body.get("requestSha256"), "request")
+    return {"jobId": job, "attemptId": attempt, "fence": fence, "nonce": nonce, "requestSha256": digest}
+
+
 @dataclass(frozen=True)
 class Claim:
     job_id: str
@@ -130,29 +149,21 @@ class Claim:
 
     @classmethod
     def parse(cls, body, *, check_expiry=True):
-        if not isinstance(body, dict):
-            raise ValueError("Claim must be an object")
-        job = valid_id(body.get("jobId"), "jobId")
-        attempt = valid_id(body.get("attemptId"), "attemptId")
-        fence = body.get("fence")
-        if isinstance(fence, bool) or not isinstance(fence, int) or not 1 <= fence <= 2**53-1:
-            raise ValueError("Invalid fence")
-        nonce = body.get("nonce")
-        if not isinstance(nonce, str) or not 16 <= len(nonce) <= 256 or any(ord(c) < 32 for c in nonce):
-            raise ValueError("Invalid attempt nonce")
+        pins = claim_pins(body)
         lease = timestamp(body.get("leaseUntil"))
         if check_expiry and lease <= datetime.now(timezone.utc):
-            raise ValueError("Attempt lease has expired")
-        digest = valid_hash(body.get("requestSha256"), "request")
+            # The server granted this lease moments ago, so a lease already
+            # past on arrival usually means this host's clock runs ahead.
+            raise EngineError("lease_expired_on_receipt", "Attempt lease has already expired by this worker's clock")
         request_json = body.get("requestJSON")
         # Exact server bytes remove JavaScript/Python number serialization ambiguity.
         if not isinstance(request_json, str):
             raise ValueError("Claim requires exact requestJSON bytes")
         request = strict_json(request_json)
-        if not isinstance(request, dict) or request != body.get("request") or sha256(request_json.encode("utf-8")) != digest:
+        if not isinstance(request, dict) or request != body.get("request") or sha256(request_json.encode("utf-8")) != pins["requestSha256"]:
             raise ValueError("Request JSON/hash mismatch")
         validate_request(request)
-        return cls(job, attempt, fence, nonce, body["leaseUntil"], digest, request, request_json)
+        return cls(pins["jobId"], pins["attemptId"], pins["fence"], pins["nonce"], body["leaseUntil"], pins["requestSha256"], request, request_json)
 
     def pins(self):
         return {"jobId": self.job_id, "attemptId": self.attempt_id, "fence": self.fence, "nonce": self.nonce, "requestSha256": self.request_sha256}

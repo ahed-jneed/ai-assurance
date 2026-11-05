@@ -30,7 +30,7 @@ from pathlib import Path
 from .contract import validate_report
 from .diagnostics import MAX_BYTES, read_csv, run, sha256
 from .errors import EngineError
-from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
+from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, claim_pins, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
 
 # Compute writes the sanitized code to ERROR_FILE and a local-only message to
 # DETAIL_FILE; the control plane appends every job outcome to OPERATOR_LOG.
@@ -575,12 +575,16 @@ class Worker:
         self.wire_formats = ["provided_predictions", *(WIRE_FORMATS[name] for name in sorted(requested))]
         self.heartbeat, self.compute_timeout, self.maximum_jobs = heartbeat, compute_timeout, maximum_jobs
 
-    def claim(self):
+    def request_claim(self):
+        """Ask for one attempt: the raw claim body, or None when idle.
+
+        The platform answers {"idle": true} when it has nothing to run.
+        """
         # No transport retry: an ambiguous claim can have acquired a lease.
         body = self.transport.post({"op": "claim", "workerId": self.worker_id, "imageDigest": self.image_digest, "formats": self.wire_formats})
-        if body is None or body == {} or isinstance(body, dict) and body.get("job") is None and "jobId" not in body:
+        if isinstance(body, dict) and body.get("idle") is True:
             return None
-        return Claim.parse(body.get("job", body) if isinstance(body, dict) else body)
+        return body
 
     def at_capacity(self):
         return sum(1 for _ in self.workspace.glob("job-*")) >= self.maximum_jobs
@@ -651,9 +655,33 @@ class Worker:
     def once(self):
         if self.at_capacity():
             return {"state": "workspace_capacity_reached", "error": "archive_job_evidence_before_claiming_more_work"}
-        claim = self.claim()
-        if claim is None:
+        body = self.request_claim()
+        if body is None:
             return {"state": "idle"}
+        try:
+            claim = Claim.parse(body)
+        except Exception as error:
+            # The claim body is untrusted input: any parse failure is a
+            # per-claim problem, never a reason to stop the worker.
+            return self.reject_claim(body, error)
+        return self.run_claim(claim)
+
+    def reject_claim(self, body, error):
+        """Fail a claimed attempt this worker cannot run, if its pins allow."""
+        try:
+            pins = claim_pins(body)
+        except ValueError:
+            # A fail must echo valid pins. Without them the lease expires
+            # on the server and the job becomes claimable again.
+            self.record({"event": "claim_rejected", "code": "claim_pins_invalid", "detail": exception_detail(error)})
+            return {"state": "claim_rejected", "error": "claim_pins_invalid"}
+        code = "lease_expired_on_receipt" if isinstance(error, EngineError) and error.code == "lease_expired_on_receipt" else "request_contract_rejected"
+        attempt = {"jobId": pins["jobId"], "attemptId": pins["attemptId"]}
+        posted = self.post_failure(pins, code)
+        self.record({"event": "failed", **attempt, "code": code, "failPosted": posted, "detail": exception_detail(error)})
+        return {"state": "failed", **attempt, "error": code}
+
+    def run_claim(self, claim):
         attempt = {"jobId": claim.job_id, "attemptId": claim.attempt_id}
         try:
             outcome = {"state": "completed", **self.execute(claim)}
@@ -770,7 +798,12 @@ def main(argv=None):
             try:
                 result = worker.once()
             except ProtocolError as error:
-                result = {"state": "transport_failed", "error": error.code}
+                result = {"state": "transport_failed", "error": failure_code(error.code)}
+            except Exception as error:
+                # once() reports every per-job failure itself; this keeps an
+                # unexpected defect from ending the daemon too.
+                worker.record({"event": "worker_error", "detail": exception_detail(error)})
+                result = {"state": "worker_error", "error": "worker_internal_error"}
             print(json.dumps(result, ensure_ascii=False, allow_nan=False), flush=True)
             if args.once:
                 return 0 if result["state"] in {"completed", "idle"} else 2

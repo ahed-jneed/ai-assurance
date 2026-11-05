@@ -1,13 +1,16 @@
 import copy
 import hashlib
 import hmac
+import io
 import json
 import os
 import re
 import sys
 import tempfile
 import threading
+import time
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -16,7 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
-from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, runtime_readiness, stripped_compute_env, verify_result_bytes
+from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, runtime_readiness, stripped_compute_env, verify_result_bytes
 from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_request
 from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, fake_onnxruntime, requires_numpy
 
@@ -31,18 +34,23 @@ def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": None, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite or ["performance", "demographic_parity", "disparate_impact", "equalized_odds"], "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
 
 
-def claim_body(request=None):
+def claim_body(request=None, *, job="job-fixture", attempt="attempt-fixture", lease_seconds=60):
     request = request or hosted_request()
     # Deliberately use the server's original insertion order, not canonical
     # object sorting: requestJSON is authoritative for the transport hash.
     text = json.dumps(request, separators=(",", ":"), ensure_ascii=False)
-    return {"jobId": "job-fixture", "attemptId": "attempt-fixture", "fence": 7, "nonce": "nonce-fixture-at-least-16-characters", "leaseUntil": (datetime.now(timezone.utc)+timedelta(seconds=60)).isoformat(), "requestSha256": sha256(text.encode("utf-8")), "request": request, "requestJSON": text}
+    return {"jobId": job, "attemptId": attempt, "fence": 7, "nonce": "nonce-fixture-at-least-16-characters", "leaseUntil": (datetime.now(timezone.utc)+timedelta(seconds=lease_seconds)).isoformat(), "requestSha256": sha256(text.encode("utf-8")), "request": request, "requestJSON": text}
+
+
+PIN_KEYS = ("jobId", "attemptId", "fence", "nonce", "requestSha256")
 
 
 class RunnerServer:
     """Real loopback HTTP fixture; no platform or native runtime assumed."""
-    def __init__(self, request=None, data=CSV, *, altered_input=False, swapped_input=False, redirect=False, transient_get=0, truncated_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
-        self.claim = claim_body(request)
+    def __init__(self, request=None, data=CSV, *, claims=None, altered_input=False, swapped_input=False, redirect=False, transient_get=0, truncated_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
+        # Claims are served once each, in order; then the queue is idle.
+        self.queue = list(claims) if claims is not None else [claim_body(request)]
+        self.claim, self.issued = self.queue[0] if self.queue else None, []
         # altered_input appends bytes; swapped_input keeps the size but not the hash.
         self.data = data+b"tampered" if altered_input else data[:-2]+(b"1\n" if data[-2:] != b"1\n" else b"0\n") if swapped_input else data
         self.truncated_get = truncated_get
@@ -82,8 +90,11 @@ class RunnerServer:
                     if fixture.transient_claim:
                         fixture.transient_claim -= 1
                         return self.respond({"error": "temporary"}, 503)
-                    return self.respond(fixture.claim)
-                if any(body.get(key) != fixture.claim[key] for key in ("jobId", "attemptId", "fence", "nonce", "requestSha256")):
+                    if not fixture.queue:
+                        return self.respond({"idle": True})
+                    fixture.issued.append(fixture.queue.pop(0))
+                    return self.respond(fixture.issued[-1])
+                if not any(all(body.get(key) == claim.get(key) for key in PIN_KEYS) for claim in fixture.issued or [fixture.claim]):
                     fixture.errors.append("attempt pin mismatch")
                     return self.respond({"error": "fence"}, 409)
                 if body["op"] == "heartbeat":
@@ -504,6 +515,81 @@ class WorkerTests(unittest.TestCase):
         destination = self.root/"dataset.csv"
         return destination, transport.download(claim, "dataset", destination, maximum=maximum, **kwargs)
 
+    def model_request(self, **spec):
+        """An auditor_model request the platform can queue (its classOrder/features limits are wider)."""
+        request = hosted_request(suite=["performance"])
+        request["executionMode"] = "auditor_model"
+        request["model"].update(format="ONNX", sha256="b"*64, sourceSha256="b"*64)
+        request["inputHashes"]["modelArtifact"] = "b"*64
+        request["engineConfig"]["modelSpec"] = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"], **spec}
+        return request
+
+    def run_daemon(self, server, polls, *arguments):
+        """Run the long-running CLI loop against the loopback fixture for `polls` polls."""
+        real_sleep, seen = time.sleep, []
+        def sleep(seconds):
+            if seconds == 1.5:  # The poll interval below; backoff and compute polling differ.
+                seen.append(seconds)
+                if len(seen) >= polls:
+                    raise KeyboardInterrupt
+                return
+            real_sleep(seconds)
+        def loopback(site, token, platform, *, timeout):
+            # The public CLI refuses plain HTTP; only this fixture may use it.
+            self.assertEqual(site, server.origin)
+            return Transport(site, token, platform, timeout=timeout, allow_local_http=True)
+        argv = ["--site", server.origin, "--worker-id", "worker-fixture", "--image-digest", IMAGE, "--workspace", str(self.root/"daemon"), "--poll-seconds", "1.5", "--heartbeat-seconds", "1", *arguments]
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM}), patch("engine.worker.Transport", side_effect=loopback), patch("engine.worker.time.sleep", side_effect=sleep), redirect_stdout(stdout), redirect_stderr(stderr):
+            code = worker_main(argv)
+        return code, [json.loads(line) for line in stdout.getvalue().splitlines()], stderr.getvalue()
+
+    def test_malformed_claim_is_failed_and_the_daemon_continues(self):
+        claims = [claim_body(self.model_request(outputLabels=["0", "1", "2"]), job="job-malformed", attempt="attempt-malformed"), claim_body(job="job-next", attempt="attempt-next")]
+        with RunnerServer(claims=claims) as server:
+            code, results, errors = self.run_daemon(server, 3)
+            self.assertEqual(code, 130, errors)
+            self.assertEqual([result["state"] for result in results], ["failed", "completed", "idle"])
+            self.assertEqual(results[0], {"state": "failed", "jobId": "job-malformed", "attemptId": "attempt-malformed", "error": "request_contract_rejected"})
+            fails = [body for body, _ in server.posts if body["op"] == "fail"]
+            self.assertEqual(fails, [{"op": "fail", **{key: claims[0][key] for key in PIN_KEYS}, "error": "request_contract_rejected"}])
+            self.assertEqual([body["jobId"] for body, _ in server.posts if body["op"] == "complete"], ["job-next"])
+            self.assertEqual(server.errors, [])
+
+    def test_claims_the_platform_accepts_but_the_worker_cannot_run_are_failed(self):
+        unhashable = hosted_request()
+        unhashable["executionMode"] = ["provided_predictions"]
+        mismatched = claim_body()
+        mismatched["request"] = {**mismatched["request"], "seed": 43}
+        for index, body in enumerate((
+            claim_body(self.model_request(outputLabels=["0", "1", "2"])),
+            claim_body(self.model_request(featureColumns=[f"feature-{n}" for n in range(101)])),
+            claim_body(unhashable),
+            mismatched,
+        )):
+            with RunnerServer(claims=[body]) as server:
+                result = self.worker(server.transport(), workspace=f"jobs-{index}").once()
+                self.assertEqual((result["state"], result["error"]), ("failed", "request_contract_rejected"), index)
+                self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["request_contract_rejected"])
+                self.assertEqual(server.gets, [])
+
+    def test_lease_expired_on_receipt_is_failed_with_its_own_code(self):
+        with RunnerServer(claims=[claim_body(lease_seconds=-30)]) as server:
+            result = self.worker(server.transport()).once()
+            self.assertEqual(result["error"], "lease_expired_on_receipt")
+            self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["lease_expired_on_receipt"])
+            self.assertEqual(server.gets, [])
+
+    def test_claim_without_valid_pins_is_logged_and_never_failed(self):
+        unaddressable = {**claim_body(), "jobId": "../../etc/passwd"}
+        with RunnerServer(claims=[unaddressable, claim_body(job="job-next", attempt="attempt-next")]) as server:
+            worker = self.worker(server.transport())
+            self.assertEqual(worker.once(), {"state": "claim_rejected", "error": "claim_pins_invalid"})
+            self.assertFalse(any(body["op"] == "fail" for body, _ in server.posts))
+            self.assertEqual(worker.once()["state"], "completed")
+            self.assertEqual(worker.once(), {"state": "idle"})
+        self.assertEqual([(entry["event"], entry.get("code")) for entry in self.operator_log()], [("claim_rejected", "claim_pins_invalid"), ("completed", None)])
+
     def test_get_retries_are_bounded_and_claim_is_not_retried(self):
         with RunnerServer(transient_get=2) as server:
             destination, (partial, size, digest) = self.download(server.transport(), Claim.parse(server.claim))
@@ -518,7 +604,7 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(list(self.root.glob("dataset.csv*")), [])
         with RunnerServer(transient_claim=1) as server:
             with self.assertRaises(ProtocolError):
-                self.worker(server.transport()).claim()
+                self.worker(server.transport()).request_claim()
             self.assertEqual(len(server.posts), 1)
 
     def test_credentials_are_not_forwarded_on_redirects(self):

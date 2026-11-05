@@ -40,7 +40,9 @@ Application authorization uses `Authorization: Bearer <application token>`. The 
 
 CLI/runtime model formats are normalized `onnx`, `xgboost_json`, `lightgbm_text`, `pmml`. Their corresponding enrollment/claim wire names are `ONNX`, `XGBoost`, `LightGBM`, `PMML`. They appear only when explicitly selected with `--formats`, the selected executor provides no-network model isolation, the runtime probe succeeds, and the local model-hash allowlist is nonempty. Package imports establish availability, not successful native inference or artifact safety. Validate golden native fixtures before approving enrollment. `--readiness` reports absent distributions and Java separately.
 
-A claim response contains `{jobId,attemptId,fence,nonce,leaseUntil,requestSha256,request,requestJSON}`. `requestJSON` is the **exact original server JSON string**; its UTF-8 hash must equal `requestSha256`, and its parsed contents must equal `request`. This avoids JavaScript/Python serialization disagreements. The request contains:
+A claim response is `{"idle":true}` when there is nothing to run, otherwise `{jobId,attemptId,fence,nonce,leaseUntil,requestSha256,request,requestJSON}`. `requestJSON` is the **exact original server JSON string**; its UTF-8 hash must equal `requestSha256`, and its parsed contents must equal `request`. This avoids JavaScript/Python serialization disagreements.
+
+The platform accepts some jobs that this worker cannot run, for example a binary system with more or fewer than two classes, or more than 100 features. If a claim's pins (`jobId`, `attemptId`, `fence`, `nonce`, `requestSha256`) are valid but the rest of the claim is not, the worker fails that attempt with `request_contract_rejected`, or `lease_expired_on_receipt` when the lease is already past, and continues with the next poll. A claim without valid pins cannot be failed; the worker logs it as `claim_rejected` and the server-side lease expires. The request contains:
 
 ```json
 {
@@ -80,6 +82,7 @@ Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the 
 | Code | Stage | Meaning |
 | --- | --- | --- |
 | `request_contract_rejected` | Claim or compute | The frozen request breaks the worker contract, for example a binary `modelSpec` without exactly two `outputLabels`, more than 100 features, or an unsupported test or model format. Fix the protocol or system definition and queue a new job. |
+| `lease_expired_on_receipt` | Claim | The lease had already expired by the worker's clock when the claim arrived. The platform grants two minutes, so this usually means the worker host's clock runs ahead: synchronize it (NTP). |
 | `model_not_locally_approved_or_runtime_unavailable` | Local eligibility | The model format is not enabled on this worker, its SHA-256 is not in the local allowlist, or the executor has no network-isolated model runtime. |
 | `executable_preprocessing_unsupported` | Local eligibility | The request declares preprocessing that this worker would have to execute. Supply already prepared columns. |
 | `workspace_job_limit` | Local eligibility | The retained job directories reached `--maximum-jobs` while the attempt was being prepared. Archive evidence. |
@@ -116,7 +119,7 @@ Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the 
 | `result_verification_failed` | Result | The produced result failed the control plane's independent verification and was not submitted. |
 | `worker_internal_error` | Any | An unexpected control-plane error. Report it as a worker defect. |
 
-Local states that are never posted: `lease_lost` (a stale worker never publishes, not even a failure), `completion_uncertain` (see retries above), `workspace_capacity_reached` and `idle`.
+Local states that are never posted: `lease_lost` (a stale worker never publishes, not even a failure), `completion_uncertain` (see retries above), `claim_rejected` with `claim_pins_invalid` (a claim without valid pins cannot be addressed; its lease expires on the server), `transport_failed` (the claim request itself failed), `worker_error` (a defect outside any job), `workspace_capacity_reached` and `idle`. None of these stops the long-running worker; it logs the state and polls again.
 
 On a compute failure the compute process writes `outputs/error.json` (`{"schemaVersion":"1.0","code":...}`). The control plane accepts only a compute code from the table and otherwise posts `compute_rejected`, because compute may run a native parser on client bytes. The compute process also writes `outputs/operator-detail.json` with the exception type and, for engine validation errors only, the engine's message (for example which column is missing). Native-library messages are reduced to their type.
 
