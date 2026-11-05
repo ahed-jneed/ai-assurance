@@ -40,6 +40,7 @@ import obligations from "@/lib/obligation-subitems.json";
 import { canonical } from "@/lib/assurance-core";
 import { signingKey, base64, unbase64 } from "@/lib/dossier";
 import { datasetCardSchema } from "@/lib/dataset-card";
+import { assuranceView } from "@/lib/read-models/assurance-view";
 export const dynamic = "force-dynamic";
 const short = z.string().trim().min(1).max(300),
   note = z.string().trim().min(1).max(10000);
@@ -59,65 +60,9 @@ type SucceededJobRow = {
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url),
-      ctx = await context(u.searchParams.get("tenantId") ?? ""),
-      e = await getEngagement(ctx, u.searchParams.get("engagementId") ?? "");
-    if (isClientRole(ctx.role))
-      throw new ApiError(403, "The assurance workbench is internal");
-    const all = await records(ctx, e.id),
-      workers = (
-        await db()
-          .prepare(
-            "SELECT id,name,image_digest,capabilities,active,created_at,last_seen FROM runner_workers WHERE tenant_id=? AND engagement_id=?",
-          )
-          .bind(ctx.tenantId, e.id)
-          .all()
-      ).results,
-      access = (
-        await db()
-          .prepare(
-            "SELECT a.user_id,a.active,a.updated_at,m.display_name,m.role,m.status FROM engagement_access a JOIN memberships m ON m.tenant_id=a.tenant_id AND m.user_id=a.user_id WHERE a.tenant_id=? AND a.engagement_id=?",
-          )
-          .bind(ctx.tenantId, e.id)
-          .all()
-      ).results;
+      ctx = await context(u.searchParams.get("tenantId") ?? "");
     return Response.json(
-      {
-        records: all,
-        jobs: await jobs(ctx, e.id),
-        workers,
-        access,
-        eligibleMembers:
-          ctx.role === "Lead Auditor"
-            ? (
-                await db()
-                  .prepare(
-                    "SELECT user_id,display_name,role FROM memberships WHERE tenant_id=? AND status='active' AND role IN ('Lead Auditor','Auditor','Reviewer')",
-                  )
-                  .bind(ctx.tenantId)
-                  .all()
-              ).results
-            : [],
-        practiceAdmin: ctx.practiceAdmin,
-        capabilities: {
-          hosted:
-            "Saved predictions, exact source citations and deterministic sampling ≤1 MB / 10,000 rows",
-          external: "Requires an enrolled worker with validated local adapters",
-          assistant:
-            "Cited source assistant available; generative provider not configured",
-          signing:
-            "Application Ed25519 signing; server-held practice keys, independent trust pin required",
-          anchor: "External timestamp anchor not configured",
-        },
-        telemetry: {
-          queued: (await jobs(ctx, e.id)).filter((j) => j.state === "queued")
-            .length,
-          stalled: (await jobs(ctx, e.id)).filter(
-            (j) =>
-              j.state === "running" &&
-              Date.parse(String(j.lease_until)) < Date.now(),
-          ).length,
-        },
-      },
+      await assuranceView(ctx, u.searchParams.get("engagementId") ?? ""),
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (e) {
