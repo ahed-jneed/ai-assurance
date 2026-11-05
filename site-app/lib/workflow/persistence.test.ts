@@ -1,7 +1,8 @@
 // What the workspace routes store for the workflow: recovery drafts of
-// procedure forms (app/api/workspace-state) after workspace commands
-// (app/api/workspace). Identity is faked; D1 is an in-memory stand-in for
-// one engagement row and the recovery drafts.
+// procedure forms (app/api/workspace-state) and engagement writes at the
+// 1.5 MB metadata limit (app/api/workspace through lib/engagement-repo.ts).
+// Identity is faked; D1 is an in-memory stand-in for one engagement row and
+// the recovery drafts.
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST as workspace } from "@/app/api/workspace/route";
@@ -11,6 +12,7 @@ import {
 } from "@/app/api/workspace-state/route";
 import type { Engagement } from "@/lib/domain";
 import { getEngagement } from "@/lib/engagement-repo";
+import { dehydrate } from "@/lib/engagement-storage";
 import { context, type Context } from "@/lib/tenancy";
 import { procedureDraftRevision } from "@/lib/workflow-state";
 import type { DraftKind } from "@/lib/workspace-state";
@@ -19,6 +21,7 @@ import {
   approveProgram,
   artifact,
   people,
+  planSave,
   procedureId,
   procedureOf,
   structuredEngagement,
@@ -235,5 +238,80 @@ describe("recovery drafts of procedure forms", () => {
       (await write(reopened, 1, { ...unsaved, dueDate: "2026-12-15" })).status,
     ).toBe(200);
     expect(await read(reopened)).toMatchObject({ current: true, version: 2 });
+  });
+});
+
+describe("the engagement metadata limit", () => {
+  const limit = 1_500_000;
+  const tooLarge =
+    "The active engagement metadata exceeds its 1.5 MB limit. Archive supplementary active records or split this engagement before adding more content.";
+  /** The bytes save() would store for the engagement as it is now. */
+  const size = async (e: Engagement) =>
+    new TextEncoder().encode(JSON.stringify(await dehydrate(signIn("lead"), e)))
+      .byteLength;
+
+  it("refuses the write that would exceed it, stores nothing and keeps the approved program in force", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    // Approval cycles count towards no history limit. Earlier ones fill the
+    // record to within a few kilobytes of the limit: each submission and
+    // approval binds the plan revision and hash of every procedure.
+    const program = workflowOf(e).program,
+      cycle = program.history,
+      padding: typeof cycle = [];
+    for (let bytes = await size(e), i = 0; ; i++) {
+      const entry = { ...cycle[i % 2], revision: Math.floor(i / 2) + 1 },
+        added = JSON.stringify(entry).length + 1;
+      if (bytes + added > limit - 2_000) break;
+      padding.push(entry);
+      bytes += added;
+    }
+    const revision = padding.at(-1)!.revision + 1;
+    program.history = [...padding, ...cycle.map((h) => ({ ...h, revision }))];
+    program.revision = revision;
+    program.approval = { ...program.approval!, revision };
+    expect(padding.length).toBeGreaterThan(300);
+    expect(limit - (await size(e))).toBeGreaterThan(1_000);
+    expect(limit - (await size(e))).toBeLessThan(8_000);
+    const d1 = storage(e);
+    // A due-date change still fits and is stored with its snapshot and
+    // audit event in one batch.
+    const moved = await act(e, "lead", "saveProcedurePlan", {
+      ...planSave(e, { dueDate: "2026-12-15" }),
+    });
+    expect(moved.status).toBe(200);
+    expect(d1.batches).toEqual([
+      ["engagements", "engagement_snapshots", "audit_events"],
+    ]);
+    const before = { ...d1.row },
+      approved = await stored(e);
+    // A sampling change would return the approved program to draft, and
+    // its longer plan takes the record over the limit: it is refused before
+    // anything is written.
+    const resampled = await act(e, "lead", "saveProcedurePlan", {
+      ...planSave(approved, {
+        dueDate: "2026-12-15",
+        population: "Every 2026 training and validation dataset. ".repeat(170),
+        sampling: "Stratified by data source and month. ".repeat(200),
+      }),
+    });
+    expect(resampled.status).toBe(413);
+    expect(await resampled.json()).toEqual({ error: tooLarge });
+    expect(d1.batches).toHaveLength(1);
+    expect(d1.row).toEqual(before);
+    // The approved scope, program and plan stay in force as they were.
+    const kept = await stored(e);
+    expect(kept.workflow).toEqual(approved.workflow);
+    expect(workflowOf(kept).brief?.status).toBe("approved");
+    expect(workflowOf(kept).program).toMatchObject({
+      status: "approved",
+      revision,
+      approval: program.approval,
+    });
+    expect(procedureOf(kept, procedureId)).toMatchObject({
+      dueDate: "2026-12-15",
+      sampling: procedureOf(e, procedureId).sampling,
+      planHash: procedureOf(e, procedureId).planHash,
+    });
   });
 });
