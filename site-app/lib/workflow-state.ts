@@ -2,6 +2,7 @@
 // scripts/work-inbox-check.mjs load this module without resolving imports.
 import type { Engagement, Report, Role, Run } from "./domain";
 import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
+import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
   role === "Client Viewer" || role === "Client Contributor";
 export const isInternalRole = (role: Role | string) =>
@@ -68,6 +69,32 @@ export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
     b.procedureRevision === p.revision &&
     b.briefRevision === e.workflow?.brief?.revision
   );
+}
+/**
+ * The revision a recovery draft of a procedure form is based on. A saved
+ * draft can be restored only while this is unchanged, so restoring it cannot
+ * revert a change saved since. Every procedure form depends on the plan, the
+ * execution, the program and the scope revisions. The plan form also holds
+ * the preparer, reviewer and due date, which change the assignment revision
+ * instead of the plan revision. The audit program and the workspace-state
+ * route both use this, so the client and the server always agree.
+ */
+export function procedureDraftRevision(
+  w: Workflow,
+  p: Procedure,
+  kind: DraftKind,
+) {
+  const revisions = [
+    p.revision,
+    p.execution?.revision ?? 0,
+    w.program.revision,
+    w.brief?.revision ?? 0,
+  ];
+  // Absent until the first assignment change, so a plan draft saved before
+  // assignment revisions existed keeps its base until the assignment changes.
+  if (kind === "procedure-plan" && p.assignmentRevision !== undefined)
+    revisions.push(p.assignmentRevision);
+  return revisions.join(":");
 }
 // History limits keep an engagement record bounded without stopping a change
 // halfway. The scope and the program count returns only: a submission that is

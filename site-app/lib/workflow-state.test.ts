@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
+import type { Engagement } from "./domain";
 import { seedWorkflow } from "./workflow-seed";
-import { revisionWarnings, runBindsProcedure } from "./workflow-state";
+import {
+  procedureDraftRevision,
+  revisionWarnings,
+  runBindsProcedure,
+} from "./workflow-state";
 import type { Workflow } from "./workflow-types";
 import {
+  approveProgram,
   approvedWorkflow,
   at,
+  command,
+  planSave,
   procedureId,
+  procedureOf,
   run,
   structuredEngagement,
+  workflowOf,
 } from "./workflow/test-fixtures";
 
 const workflow = () => approvedWorkflow(seedWorkflow("lead", at).procedures);
@@ -145,5 +155,63 @@ describe("run bindings", () => {
     ])
       expect(runBindsProcedure(e, p, bound(change))).toBe(false);
     expect(runBindsProcedure(e, p, run())).toBe(false);
+  });
+});
+
+describe("recovery draft revisions", () => {
+  const kinds = [
+    "procedure-plan",
+    "procedure-execution",
+    "procedure-assessment",
+  ] as const;
+  const bases = (e: Engagement) =>
+    kinds.map((kind) =>
+      procedureDraftRevision(workflowOf(e), procedureOf(e, procedureId), kind),
+    );
+
+  it("dates a plan draft by its assignment, and every procedure draft by the plan, execution, program and scope", async () => {
+    const e = structuredEngagement();
+    await approveProgram(e);
+    const p = procedureOf(e, procedureId),
+      [plan, execution, assessment] = bases(e),
+      shared = [p.revision, 0, workflowOf(e).program.revision, 1].join(":");
+    expect([plan, execution, assessment]).toEqual([
+      shared + ":" + p.assignmentRevision,
+      shared,
+      shared,
+    ]);
+    // Another Lead moves the due date: only a saved plan draft, which holds
+    // the earlier one, is out of date.
+    await command(
+      e,
+      "bulkPlanProcedures",
+      { procedureIds: [procedureId], patch: { dueDate: "2026-12-15" } },
+      "second-lead",
+    );
+    const reassigned = bases(e);
+    expect(reassigned[0]).not.toBe(plan);
+    expect(reassigned.slice(1)).toEqual([execution, assessment]);
+    // A change to what the procedure tests dates every procedure draft.
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, {
+        sampling: "Stratified sample of 40",
+        dueDate: "2026-12-15",
+      }),
+      "lead",
+    );
+    bases(e).forEach((base, i) => expect(base).not.toBe(reassigned[i]));
+  });
+
+  it("keeps the base of drafts saved before assignment revisions", () => {
+    // Saved before assignment revisions, a draft's base had four parts.
+    const w = workflow(),
+      p = procedure(w);
+    expect(p.assignmentRevision).toBeUndefined();
+    for (const kind of kinds)
+      expect(procedureDraftRevision(w, p, kind)).toBe(
+        [p.revision, 0, w.program.revision, w.brief!.revision].join(":"),
+      );
   });
 });

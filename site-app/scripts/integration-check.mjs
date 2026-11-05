@@ -1379,7 +1379,14 @@ try {
     datasetId: uploaded.artifactId,
     profileId,
   };
-  await command("saveProcedurePlan", { procedureId: proc.id, plan });
+  await command("saveProcedurePlan", {
+    procedureId: proc.id,
+    assignmentRevision: proc.assignmentRevision ?? 1,
+    plan,
+  });
+  const currentPlan = () => e.workflow.procedures.find((p) => p.id === proc.id);
+  // The assignment revision a plan form opened now would send.
+  const openedAt = currentPlan().assignmentRevision;
   const beforeBulk = e.workflow.program.revision;
   await command(
     "bulkPlanProcedures",
@@ -1413,13 +1420,24 @@ try {
     reviewer,
   );
   assert(!e.workflow.program.contributors.includes(reviewer));
+  const resampled = {
+    ...plan,
+    sampling: "All 80 synthetic records, checked against source manifest",
+  };
+  // A plan opened before the bulk due-date change would revert it.
+  await command(
+    "saveProcedurePlan",
+    { procedureId: proc.id, assignmentRevision: openedAt, plan: resampled },
+    owner,
+    409,
+  );
+  assert.equal(currentPlan().dueDate, "2026-12-30");
   await command("saveProcedurePlan", {
     procedureId: proc.id,
-    plan: {
-      ...plan,
-      sampling: "All 80 synthetic records, checked against source manifest",
-    },
+    assignmentRevision: currentPlan().assignmentRevision,
+    plan: { ...resampled, dueDate: currentPlan().dueDate },
   });
+  assert.equal(currentPlan().dueDate, "2026-12-30");
   await command("submitProgram", {});
   await command(
     "approveProgram",

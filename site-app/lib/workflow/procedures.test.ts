@@ -16,8 +16,8 @@ import {
   executionInput,
   expectFailure,
   model,
-  planInput,
   planProgram,
+  planSave,
   procedureEntries,
   procedureId,
   procedureOf,
@@ -62,12 +62,7 @@ const paperOf = (e: Engagement) => {
 describe("procedure working papers", () => {
   it("creates a supplementary paper once and then reuses it", async () => {
     const e = structuredEngagement();
-    await command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput() },
-      "auditor",
-    );
+    await command(e, "saveProcedurePlan", planSave(e), "auditor");
     await expectFailure(
       command(e, "ensureProcedurePaper", { procedureId }, "reviewer"),
       403,
@@ -230,15 +225,12 @@ describe("procedure execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      {
-        procedureId,
-        plan: planInput({
-          method: "automated",
-          modelId: "model",
-          datasetId: "dataset",
-          profileId: "protocol",
-        }),
-      },
+      planSave(e, {
+        method: "automated",
+        modelId: "model",
+        datasetId: "dataset",
+        profileId: "protocol",
+      }),
       "auditor",
     );
     await command(e, "submitProgram", {}, "auditor");
@@ -455,7 +447,7 @@ describe("scope change impact review", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId, plan: planInput({ sampling: "Stratified sample of 40" }) },
+      planSave(e, { sampling: "Stratified sample of 40" }),
       "lead",
     );
     await expectFailure(reaffirm(e, "reviewer"), 409, notReady);
@@ -812,7 +804,7 @@ describe("procedure history limit", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId, plan: planInput({ sampling: "Stratified sample of 40" }) },
+      planSave(e, { sampling: "Stratified sample of 40" }),
       "lead",
     );
     await command(e, "submitProgram", {}, "auditor");
@@ -887,14 +879,18 @@ describe("structured engagement completion", () => {
 
 describe("plan changes after execution", () => {
   const other = "PROC-WP-A12-01";
-  const plan = (id: string, change: Record<string, unknown> = {}) => ({
-    procedureId: id,
-    plan: planInput(
+  const plan = (
+    e: Engagement,
+    id: string,
+    change: Record<string, unknown> = {},
+  ) =>
+    planSave(
+      e,
       id === other
         ? { criterion: "Art. 12", population: "2026 event logs", ...change }
         : change,
-    ),
-  });
+      id,
+    );
   const workOn = (e: Engagement, id: string) =>
     executionInput(e, {
       procedureId: id,
@@ -912,7 +908,7 @@ describe("plan changes after execution", () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveScope(e);
     await planProgram(e);
-    await command(e, "saveProcedurePlan", plan(other), "auditor");
+    await command(e, "saveProcedurePlan", plan(e, other), "auditor");
     await command(e, "submitProgram", {}, "auditor");
     await command(
       e,
@@ -959,7 +955,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(procedureId, { dueDate: "2026-12-15" }),
+      plan(e, procedureId, { dueDate: "2026-12-15" }),
       "lead",
     );
     await command(
@@ -1013,7 +1009,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(other, { sampling: "Stratified sample of 40 days" }),
+      plan(e, other, { sampling: "Stratified sample of 40 days" }),
       "lead",
     );
     expect(workflowOf(e).program).toMatchObject({
@@ -1049,7 +1045,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(procedureId, { population: "Training datasets only" }),
+      plan(e, procedureId, { population: "Training datasets only" }),
       "lead",
     );
     expect(current(e).map((p) => p.id)).toEqual([other]);
@@ -1062,7 +1058,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(procedureId, { sampling: "Stratified sample of 40" }),
+      plan(e, procedureId, { sampling: "Stratified sample of 40" }),
       "lead",
     );
     expect(p.state).toBe("evaluated");
@@ -1073,7 +1069,7 @@ describe("plan changes after execution", () => {
     });
     // Restoring the reviewed plan makes its execution current again, but
     // not the review it lost.
-    await command(e, "saveProcedurePlan", plan(procedureId), "lead");
+    await command(e, "saveProcedurePlan", plan(e, procedureId), "lead");
     expect(current(e).map((q) => q.id)).toEqual([procedureId, other]);
     expect(procedureLabel(e, p)).toBe("Ready for review");
     await command(e, "submitProgram", {}, "auditor");
@@ -1107,7 +1103,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(procedureId, { dueDate: "2026-12-15" }),
+      plan(e, procedureId, { dueDate: "2026-12-15" }),
       "lead",
     );
     await record(e);
@@ -1124,7 +1120,7 @@ describe("plan changes after execution", () => {
     await command(
       e,
       "saveProcedurePlan",
-      plan(procedureId, {
+      plan(e, procedureId, {
         dueDate: "2026-12-15",
         sampling: "Stratified sample of 40",
       }),
@@ -1203,7 +1199,7 @@ describe("plan changes after execution", () => {
       await command(
         e,
         "saveProcedurePlan",
-        plan(other, { sampling: "Stratified sample of 40 days" }),
+        plan(e, other, { sampling: "Stratified sample of 40 days" }),
         "lead",
       );
       expect(current(e).map((p) => p.id)).toEqual([procedureId]);
@@ -1236,7 +1232,7 @@ describe("plan changes after execution", () => {
       await command(
         e,
         "saveProcedurePlan",
-        plan(procedureId, { population: "Training datasets only" }),
+        plan(e, procedureId, { population: "Training datasets only" }),
         "lead",
       );
       expect(current(e)).toEqual([]);

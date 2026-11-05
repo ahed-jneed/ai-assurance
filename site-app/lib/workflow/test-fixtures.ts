@@ -446,6 +446,22 @@ export function planInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * A saveProcedurePlan payload read at the procedure's current assignment
+ * revision, as the audit program's plan form sends it.
+ */
+export function planSave(
+  e: Engagement,
+  overrides: Record<string, unknown> = {},
+  id = procedureId,
+) {
+  return {
+    procedureId: id,
+    assignmentRevision: procedureOf(e, id).assignmentRevision ?? 1,
+    plan: planInput(overrides),
+  };
+}
+
 /** Saves, submits and independently approves the engagement brief. */
 export async function approveScope(e: Engagement) {
   await command(e, "saveBrief", briefInput, "auditor");
@@ -472,12 +488,7 @@ export async function planProgram(e: Engagement) {
     },
     "auditor",
   );
-  await command(
-    e,
-    "saveProcedurePlan",
-    { procedureId, plan: planInput() },
-    "auditor",
-  );
+  await command(e, "saveProcedurePlan", planSave(e), "auditor");
 }
 
 /** Approved brief and program: what procedure execution requires. */

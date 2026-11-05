@@ -36,6 +36,7 @@ import type {
 import {
   currentExecution,
   executionPlanCurrent,
+  procedureDraftRevision,
   procedureLabel,
   releaseState,
   revisionWarnings,
@@ -489,12 +490,7 @@ export function AuditProgram({
       baseRevision:
         kind === "brief"
           ? String(w?.brief?.revision ?? 0)
-          : [
-              p!.revision,
-              p!.execution?.revision ?? 0,
-              w!.program.revision,
-              w?.brief?.revision ?? 0,
-            ].join(":"),
+          : procedureDraftRevision(w!, p!, kind),
     };
   }
   function command(
@@ -641,6 +637,9 @@ export function AuditProgram({
       save: (v) =>
         act("saveProcedurePlan", {
           procedureId: p.id,
+          // The assignment this form shows: a save read before another
+          // change to it is refused instead of reverting that change.
+          assignmentRevision: p.assignmentRevision ?? 1,
           plan: {
             ...v,
             selected: v.selected === "true",

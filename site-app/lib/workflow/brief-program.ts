@@ -288,11 +288,26 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     const { e, c, writer, lead, authorized, w, procedure } = scope;
     writer();
     const a = z
-        .object({ procedureId: short, plan: planFields })
+        .object({
+          procedureId: short,
+          // The assignment revision the plan was read at.
+          assignmentRevision: z.number().int().positive(),
+          plan: planFields,
+        })
         .strict()
         .parse(data),
       p = procedure(a.procedureId);
     if (w().program.status !== "draft") lead();
+    // The plan carries the preparer, reviewer and due date, which change
+    // without the plan revision. A plan read before another change to them
+    // would revert it, so it is refused as a conflict.
+    if (a.assignmentRevision !== (p.assignmentRevision ?? 1))
+      fail(
+        409,
+        "The preparer, reviewer or due date of " +
+          p.title +
+          " changed after this plan was opened. Reload and apply your changes again.",
+      );
     if (a.plan.ownerId)
       await authorized(a.plan.ownerId, ["Auditor", "Lead Auditor"]);
     if (a.plan.reviewerId) {

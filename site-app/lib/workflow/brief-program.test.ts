@@ -16,6 +16,7 @@ import {
   model,
   planInput,
   planProgram,
+  planSave,
   procedureEntries,
   procedureId,
   procedureOf,
@@ -485,13 +486,7 @@ describe("procedure planning", () => {
     e: Engagement,
     plan: Record<string, unknown> = {},
     userId = "auditor",
-  ) =>
-    command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput(plan) },
-      userId,
-    );
+  ) => command(e, "saveProcedurePlan", planSave(e, plan), userId);
 
   it("plans a procedure, keeps its prior plan once and amends the draft program", async () => {
     const e = structuredEngagement();
@@ -545,6 +540,52 @@ describe("procedure planning", () => {
     expect(workflowOf(e)).toEqual(saved);
   });
 
+  it("refuses a plan read before another change to its assignment, instead of reverting it", async () => {
+    const resample = { sampling: "Stratified sample of 40" };
+    for (const reassignment of [
+      { ownerId: "second-auditor" },
+      { reviewerId: "second-reviewer" },
+      { dueDate: "2026-12-15" },
+    ]) {
+      const e = structuredEngagement();
+      await approveProgram(e);
+      const p = procedureOf(e, procedureId),
+        revision = p.revision;
+      // A Lead opens the plan to change the sample while another Lead
+      // reassigns the work, which leaves the plan revision as it was.
+      const opened = planSave(e, resample);
+      await command(
+        e,
+        "bulkPlanProcedures",
+        { procedureIds: [procedureId], patch: reassignment },
+        "second-lead",
+      );
+      expect(p).toMatchObject({
+        ...reassignment,
+        revision,
+        assignmentRevision: opened.assignmentRevision + 1,
+      });
+      const reassigned = structuredClone(workflowOf(e));
+      await expectFailure(
+        command(e, "saveProcedurePlan", opened, "lead"),
+        409,
+        "The preparer, reviewer or due date of " +
+          p.title +
+          " changed after this plan was opened. Reload and apply your changes again.",
+      );
+      expect(workflowOf(e)).toEqual(reassigned);
+      // Read again, the plan keeps the other Lead's change.
+      await command(
+        e,
+        "saveProcedurePlan",
+        planSave(e, { ...resample, ...reassignment }),
+        "lead",
+      );
+      expect(p).toMatchObject({ ...resample, ...reassignment });
+      expect(workflowOf(e).program.status).toBe("draft");
+    }
+  });
+
   it("lets 200 draft saves amend the program and its plans without using their history", async () => {
     const e = structuredEngagement();
     await approveScope(e);
@@ -595,7 +636,11 @@ describe("procedure planning", () => {
       command(
         e,
         "saveProcedurePlan",
-        { procedureId: "PROC-unknown", plan: planInput() },
+        {
+          procedureId: "PROC-unknown",
+          assignmentRevision: 1,
+          plan: planInput(),
+        },
         "auditor",
       ),
       404,
@@ -805,7 +850,7 @@ describe("bulk planning", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId: "PROC-WP-A12-01", plan: planInput() },
+      planSave(e, {}, "PROC-WP-A12-01"),
       "second-lead",
     );
     await expectFailure(
@@ -970,12 +1015,7 @@ describe("program submission", () => {
     const e = structuredEngagement();
     await approveScope(e);
     await planProgram(e);
-    await command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput(plan) },
-      userId,
-    );
+    await command(e, "saveProcedurePlan", planSave(e, plan), userId);
     return e;
   };
   const submit = (e: Engagement) => command(e, "submitProgram", {}, "auditor");
@@ -1045,7 +1085,7 @@ describe("program submission", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId, plan: planInput({ sampling: "Stratified sample of 40" }) },
+      planSave(e, { sampling: "Stratified sample of 40" }),
       "auditor",
     );
     await expectFailure(submit(e), 413, programLimit);
@@ -1062,7 +1102,7 @@ describe("program submission", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId, plan: planInput({ applicability: "readiness" }) },
+      planSave(e, { applicability: "readiness" }),
       "auditor",
     );
     await expectFailure(
@@ -1241,12 +1281,7 @@ describe("program approval", () => {
 
 describe("changes to a program in force", () => {
   const replan = (e: Engagement, plan: Record<string, unknown>) =>
-    command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput(plan) },
-      "lead",
-    );
+    command(e, "saveProcedurePlan", planSave(e, plan), "lead");
   const resample = { sampling: "Stratified sample of 40" };
 
   it("can be submitted and approved again one return short of the limit", async () => {
