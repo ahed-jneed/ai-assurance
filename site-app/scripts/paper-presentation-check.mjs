@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 
 const compiled = async (file) =>
   ts.transpileModule(await fs.readFile(file, "utf8"), {
@@ -14,12 +15,7 @@ const asURL = (js) =>
 // Use the actual domain and workflow predicates so register eligibility stays aligned
 // with the independent-review and current-execution rules used elsewhere.
 const workflowURL = asURL(await compiled("lib/workflow-state.ts"));
-const domainURL = asURL(
-  (await compiled("lib/domain.ts")).replace(
-    /from (['"])\.\/workflow-state\1/,
-    "from " + JSON.stringify(workflowURL),
-  ),
-);
+const domainURL = await sourceURL("lib/domain.ts");
 const paperWorkflowURL = asURL(
   (await compiled("lib/paper-workflow.ts")).replace(
     /from (['"])\.\/domain\1/,

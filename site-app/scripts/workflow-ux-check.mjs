@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 const compiled = async (file) =>
   ts.transpileModule(await fs.readFile(file, "utf8"), {
     compilerOptions: {
@@ -10,13 +11,7 @@ const compiled = async (file) =>
   }).outputText;
 const asURL = (js) =>
   "data:text/javascript;base64," + Buffer.from(js).toString("base64");
-const workflowState = asURL(await compiled("lib/workflow-state.ts"));
-const domain = asURL(
-  (await compiled("lib/domain.ts")).replace(
-    /from (['"])\.\/workflow-state\1/,
-    "from " + JSON.stringify(workflowState),
-  ),
-);
+const domain = await sourceURL("lib/domain.ts");
 const { paperChecklist, paperNextAction, personalPaperQueue } = await import(
   asURL(
     (await compiled("lib/paper-workflow.ts")).replace(
