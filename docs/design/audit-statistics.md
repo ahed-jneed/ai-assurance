@@ -35,7 +35,7 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
 7. **Metrics without a band are descriptive.** They are reported with an interval but never decide, and they do not count in any multiplicity adjustment. A criterion with no band at all is inconclusive (`no_threshold`).
    - This changes behaviour: an engine result no longer needs a threshold on every metric to pass.
    - Three derivation rules keep the change from letting a degenerate model pass, meaning one whose output does not depend on the truth (section 4.8):
-     - Every derived classification criterion carries a **chance baseline**: balanced accuracy ≥ 0.5 for binary data, and macro recall ≥ 1/k for k classes, or the policy's own bound when it is higher. A degenerate model's population value is exactly chance, and a constant model's estimate sits exactly on the bound, so it never passes.
+     - Every derived classification criterion carries a **chance baseline**: balanced accuracy ≥ 0.5 for binary data, and macro recall ≥ 1/k for k classes, or the policy's own bound when it is higher. A degenerate model's population value is exactly chance, so it passes with probability at most about α/2, and a constant model, whose estimate is exactly chance, never passes.
      - R² and ECE, which 1.0.0 cannot decide, **block a pass** in criteria derived from engine thresholds, as today's rule makes a pass depend on them.
      - A policy with no threshold that 1.0.0 can decide still never passes.
 8. **Power is checked when the plan is approved.**
@@ -244,7 +244,7 @@ Group and calibration criteria report one headline, the worst member, so that ex
 
 The pass side needs no adjustment because the population worst case is attained at one fixed (unknown) pair. The fail side needs the union bound. The headline interval therefore covers the population worst case with probability of approximately 1 − α (Appendix A.3):
 - at least 1 − α, up to the member intervals' own coverage error, when the criterion has one member or every true difference is 0;
-- at least 1 − (3/2 − 1/(2m))·α in general, by the union bound, which is loose away from W = 0.
+- at least 1 − (3/2 − 1/(2m))·α in general, by the union bound, which is loose unless the worst true difference is near 0.
 
 The simulations in section 13.3 give at least 0.943 over 2, 3 and 5 groups, the lowest being Newcombe's own coverage at d = 0, and 0.983 for 3 groups at 0.50, 0.45 and 0.40.
 
@@ -1313,7 +1313,7 @@ These items are unverified or secondary and are marked where they are used: the 
 **A.3 Headline bounds.** Take a two-sided difference band. Member i has true difference θ_i, nominal interval [L_i, U_i] and Bonferroni interval [L′_i, U′_i] at level α/m, which contains it. The headline interval is [max_i ℓ_i, max_i u_i], with ℓ_i = max(0, L′_i, −U′_i) and u_i = max(|L_i|, |U_i|); neither depends on how the pair is oriented. Let W = max_i |θ_i|, attained at a fixed, unknown member i\*, oriented so that θ_i\* = W ≥ 0. Each statement below holds up to the member intervals' own coverage error.
 - **Upper bound.** W > max_i u_i implies θ_i\* > U_i\*: member i\*'s nominal interval misses on one side, with probability at most α/2. If W = 0, the upper bound cannot fail. The pass side needs no adjustment.
 - **Lower bound.** W < max_i ℓ_i implies ℓ_i > W ≥ |θ_i| for some member i. Its interval at level α/m then lies wholly above W, and so above θ_i, or wholly below −W, and so below θ_i.
-  - Near θ_i = 0 both misses are possible, so the bound per member is α/m, not α/(2m) as an earlier revision stated.
+  - Near θ_i = 0 both misses are possible, so the bound per member is α/m, not α/(2m).
   - For i\* the second miss, U′_i\* < −W, implies U_i\* < θ_i\*, the event that bounds the upper-bound failure. So the upper-bound failure and member i\*'s lower-bound failure together have probability at most α/2 + α/(2m).
 - **Together.** By the union bound, P(the headline misses W) ≤ α/2 + α/(2m) + (m − 1)·α/m = (3/2 − 1/(2m))·α.
   - With one member (m = 1), this is α: the two failures are the two one-sided misses of one interval, which are disjoint.
