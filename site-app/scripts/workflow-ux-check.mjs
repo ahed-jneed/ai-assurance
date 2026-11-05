@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import ts from 'typescript';
 const compiled=async file=>ts.transpileModule(await fs.readFile(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
 const asURL=js=>'data:text/javascript;base64,'+Buffer.from(js).toString('base64');
-const workflowState=asURL(await compiled('lib/workflow-state.ts'));const domain=asURL((await compiled('lib/domain.ts')).replace("from './workflow-state'",'from '+JSON.stringify(workflowState)));
-const {paperChecklist,paperNextAction,personalPaperQueue}=await import(asURL((await compiled('lib/paper-workflow.ts')).replace("from './domain'",'from '+JSON.stringify(domain))));
+const workflowState=asURL(await compiled('lib/workflow-state.ts'));const domain=asURL((await compiled('lib/domain.ts')).replace(/from (['"])\.\/workflow-state\1/,'from '+JSON.stringify(workflowState)));
+const {paperChecklist,paperNextAction,personalPaperQueue}=await import(asURL((await compiled('lib/paper-workflow.ts')).replace(/from (['"])\.\/domain\1/,'from '+JSON.stringify(domain))));
 const {parseResume,permittedAuditView,resumeKey}=await import(asURL(await compiled('lib/workspace-preferences.ts')));
 const artifact={id:'evidence',status:'accepted'};
 const base={id:'paper',title:'Assessment',templateId:'WP-1',status:'draft',required:true,revision:2,authorId:'author',contributors:['contributor'],body:{results:'Recorded tests',conclusion:'Supported by evidence',conclusionStatus:'supported',criteria:'Assessment criteria'},evidenceIds:['evidence'],comments:[],reviews:[],signatures:[]};
@@ -66,7 +66,7 @@ assert.deepEqual(parseRecentEngagements(JSON.stringify({engagementTitle:'do not 
 assert.deepEqual(parseRecentEngagements(' '.repeat(4097)),[]);
 console.log('PASS bounded sidebar preferences, identity/practice separation, role-filtered shortcuts and engagement IDs only');
 
-const {findingWorkflow}=await import(asURL((await compiled('lib/finding-workflow.ts')).replace("from './domain'",'from '+JSON.stringify(domain))));
+const {findingWorkflow}=await import(asURL((await compiled('lib/finding-workflow.ts')).replace(/from (['"])\.\/domain\1/,'from '+JSON.stringify(domain))));
 const finding={id:'finding',status:'ready_for_retest',createdBy:'author',remediationBy:'remediator',remediation:'Independent retest recorded',retestEvidenceIds:['evidence']};
 assert.equal(findingWorkflow(finding,[artifact],'Reviewer','independent').canRetest,true);
 assert.equal(findingWorkflow(finding,[artifact],'Lead Auditor','author').canRetest,false);
@@ -82,8 +82,8 @@ assert.equal(findingWorkflow({...finding,status:'open'},[artifact],'Reviewer','i
 console.log('PASS contextual finding actions, independent retest and accepted-evidence prerequisites');
 
 const {stageGates,finalReportGates,reportBlockers,completionGates}=await import(domain);
-const paperWorkflow=asURL((await compiled('lib/paper-workflow.ts')).replaceAll("from './domain'",'from '+JSON.stringify(domain)));
-const {stagePaperQueue,auditStageIndex,paperEvidenceReferences}=await import(asURL((await compiled('lib/auditor-workflow.ts')).replaceAll("from './domain'",'from '+JSON.stringify(domain)).replaceAll("from './paper-workflow'",'from '+JSON.stringify(paperWorkflow))));
+const paperWorkflow=asURL((await compiled('lib/paper-workflow.ts')).replaceAll(/from (['"])\.\/domain\1/g,'from '+JSON.stringify(domain)));
+const {stagePaperQueue,auditStageIndex,paperEvidenceReferences}=await import(asURL((await compiled('lib/auditor-workflow.ts')).replaceAll(/from (['"])\.\/domain\1/g,'from '+JSON.stringify(domain)).replaceAll(/from (['"])\.\/paper-workflow\1/g,'from '+JSON.stringify(paperWorkflow))));
 const planning={...base,id:'planning',stage:'Planning'};
 const fieldwork={...base,id:'fieldwork',stage:'Fieldwork'};
 const evaluation={...base,id:'evaluation',stage:'Evidence Evaluation'};
@@ -123,7 +123,7 @@ assert(finalReportGates({...complete,findings:[],classification:{status:'approve
 assert.equal(finalReportGates({...complete,findings:[],classification:{status:'approved',prohibited:true}},'Adverse conclusion').length,0,'A scoped adverse conclusion can document a prohibited practice');
 console.log('PASS stage-focused work, visible unavailable evidence, lifecycle gates and opinion-aware final issuance');
 
-const requestModule=asURL((await compiled('lib/evidence-requests.ts')).replaceAll("from './domain'",'from '+JSON.stringify(domain)).replace("from 'zod'",'from '+JSON.stringify(new URL('../node_modules/zod/index.js',import.meta.url).href)));
+const requestModule=asURL((await compiled('lib/evidence-requests.ts')).replaceAll(/from (['"])\.\/domain\1/g,'from '+JSON.stringify(domain)).replace(/from (['"])zod\1/,'from '+JSON.stringify(new URL('../node_modules/zod/index.js',import.meta.url).href)));
 const {evidenceRequestCommand,requestLabel,requestOverdue}=await import(requestModule);
 let requestNumber=0;
 const requestContext={role:'Auditor',userId:'author',at:'2026-10-07T10:00:00Z',id:()=>`request-${++requestNumber}`,makeLimitationPaper:()=>({...structuredClone(base),id:`memo-${++requestNumber}`,title:'Limitations',templateId:'MEM-EX-01',stage:'Evidence Evaluation',history:[]})};

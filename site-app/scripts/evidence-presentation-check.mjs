@@ -9,19 +9,19 @@ const compiled = async file => ts.transpileModule(await fs.readFile(file, 'utf8'
 }).outputText;
 const asURL = js => 'data:text/javascript;base64,' + Buffer.from(js, 'utf8').toString('base64');
 const workflowURL = asURL(await compiled('lib/workflow-state.ts'));
-const domainURL = asURL((await compiled('lib/domain.ts')).replace("from './workflow-state'", 'from ' + JSON.stringify(workflowURL)));
+const domainURL = asURL((await compiled('lib/domain.ts')).replace(/from (['"])\.\/workflow-state\1/, 'from ' + JSON.stringify(workflowURL)));
 const require = createRequire(import.meta.url);
 const zodURL = pathToFileURL(require.resolve('zod')).href;
 const requestsURL = asURL((await compiled('lib/evidence-requests.ts'))
-  .replace("from 'zod'", 'from ' + JSON.stringify(zodURL))
-  .replace("from './domain'", 'from ' + JSON.stringify(domainURL)));
+  .replace(/from (['"])zod\1/, 'from ' + JSON.stringify(zodURL))
+  .replace(/from (['"])\.\/domain\1/, 'from ' + JSON.stringify(domainURL)));
 const { requestClosed, requestOverdue } = await import(requestsURL);
 const {
   evidenceFileViews, evidenceRequestViews, localEvidenceDay, evidenceDueDate,
   selectEvidenceRequests, evidenceRequestCounts, normalizeEvidenceQuery,
   readEvidenceQuery, evidenceQueryParams,
 } = await import(asURL((await compiled('lib/evidence-presentation.ts'))
-  .replace("from './evidence-requests'", 'from ' + JSON.stringify(requestsURL))));
+  .replace(/from (['"])\.\/evidence-requests\1/, 'from ' + JSON.stringify(requestsURL))));
 
 const day = '2026-10-10';
 const request = (id, patch = {}) => Object.freeze({

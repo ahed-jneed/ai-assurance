@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import ts from 'typescript';
 const dir='.sites-runtime/ml-unit';await fs.mkdir(dir,{recursive:true});
-for(const name of ['evaluation','diagnostics']){const js=ts.transpileModule(await fs.readFile('lib/'+name+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace("from './evaluation'","from './evaluation.js'");await fs.writeFile(dir+'/'+name+'.js',js);}
+for(const name of ['evaluation','diagnostics']){const js=ts.transpileModule(await fs.readFile('lib/'+name+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace(/from (['"])\.\/evaluation\1/,"from './evaluation.js'");await fs.writeFile(dir+'/'+name+'.js',js);}
 const {evaluate,inspectCSV,parseCSV}=await import('../'+dir+'/diagnostics.js');
 const {configSchema,assertSuite}=await import('../'+dir+'/evaluation.js');
 const config=configSchema.parse({labelColumn:'actual',predictionColumn:'predicted',groupColumn:'',positiveLabel:'1',minimumGroupSize:2,maximumParityGap:.1,minimumImpactRatio:.8,minimumAccuracy:.7,minimumSampleSize:2,minimumClassCount:1,minimumRecall:.7,minimumMacroF1:.5,maximumRmse:2});

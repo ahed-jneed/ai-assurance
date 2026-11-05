@@ -12,7 +12,7 @@ const {
   workbenchReviewState, normalizeWorkbenchQuery, readWorkbenchQuery,
   workbenchQueryParams, workbenchReviewQueue, selectWorkbenchRecords,
 } = await import(asURL((await compiled('lib/workbench-presentation.ts'))
-  .replace("from './assurance-store-client'", 'from ' + JSON.stringify(storeURL))));
+  .replace(/from (['"])\.\/assurance-store-client\1/, 'from ' + JSON.stringify(storeURL))));
 
 const record = (id, kind = 'assertion', actor = 'other-auditor', body = {}) => Object.freeze({
   id, kind, actor, sha256: 'a'.repeat(64), createdAt: '2026-10-10T10:00:00.000Z',
