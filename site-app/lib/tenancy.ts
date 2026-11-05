@@ -1,12 +1,12 @@
 // Who is calling, in which practice and with which role: resolves the signed-in
-// user to an active membership, provisions a practice on first sign-in and
-// enforces role and practice-administration permissions.
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+// user (lib/identity.ts) to an active membership, provisions a practice on
+// first sign-in and enforces role and practice-administration permissions.
 import type { Role } from "./domain";
 import { roles } from "./domain";
 import { db, now, sha256 } from "./engagement-repo";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
+import { currentUser } from "./identity";
 export type Context = {
   user: { userId: string; displayName: string; email: string };
   tenantId: string;
@@ -15,7 +15,7 @@ export type Context = {
   practiceAdmin?: boolean;
 };
 export async function context(tenantId?: string): Promise<Context> {
-  const user = await getChatGPTUser();
+  const user = currentUser();
   if (!user) throw new ApiError(401, "Sign in to access the audit workspace");
   if (!tenantId) {
     const existing = await db()
