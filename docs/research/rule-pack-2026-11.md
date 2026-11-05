@@ -337,7 +337,7 @@ Separately, new Art 42(3), added by 2026/1744 Art 1(18), deems high-risk systems
 
 ## 9. Diff against the repository: changes #18 must make
 
-The baseline is `main@b15f037`, which includes the Prettier reformat from #1; locate code by the quoted identifiers, not by line numbers. The four sources named in #8 are unchanged from `74c6463` (the only README change is outside the legal snapshot). "Before 2 Dec" marks changes that should ship before the 2 December 2026 milestones. Basis ids refer to the JSON. The machine-readable list is `repositoryDiff`.
+The baseline is `main@68ec79a`; locate code by the quoted identifiers, not by line numbers. Since the previous baseline, `b15f037`, `main` has split `site-app/lib/store.ts` (3629d91), `site-app/lib/domain.ts` (32ca048) and `site-app/app/workspace.tsx` (cb94d84) into modules, so RD-70, RD-71 and the `annexRoute` mapping under RD-27 name the files that now hold the code. The four sources named in #8 and every quoted "current" value are unchanged since `b15f037`, and the four sources are unchanged since `74c6463`; the only `README.md` changes are outside the legal snapshot. "Before 2 Dec" marks changes that should ship before the 2 December 2026 milestones. Basis ids refer to the JSON. The machine-readable list is `repositoryDiff`.
 
 **`templates/catalog.json`**
 
@@ -375,7 +375,7 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 | RD-29 | item AIA-11-1 `reviewNote` | SME/SMC simplified form | Correct | Optional: the Commission form is mandatory for simplified submissions and notified bodies must accept it | |
 | RD-30 | items AIA-AIV-8 (Art 47), AIA-AIV-9 (Art 72) | Annex IV points 8, 9 | Needs legal review | Flag the general-date versus Chapter III-date question (LR-02) | |
 
-**Facts used by the date predicates** (RD-27; `vocabularies.factVocabulary` in the JSON). None of them exists today in `/factTypes` or in the classification model (`Classification` in `site-app/lib/domain.ts`), whose only route field is the free-text `annexRoute`.
+**Facts used by the date predicates** (RD-27; `vocabularies.factVocabulary` in the JSON). None of them exists today in `/factTypes` or in the classification model (`Classification` in `site-app/lib/domain/classification.ts`, re-exported from `site-app/lib/domain.ts`), whose only route field is the free-text `annexRoute`.
 
 | Fact | Type | Used by | Value comes from | Needed before 2 Dec |
 |---|---|---|---|---|
@@ -388,12 +388,13 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 | `annexXLargeScaleItComponent` | Boolean or unknown | Art 111(1) entry; `exceptIf` of the Art 111(2) records | Not in #19's scope | No |
 | `gpaiModelPlacedOnMarketDate` | Date or unknown | Art 111(3) | Not in #19's scope; #19's GPAI model-provider role decides whether to ask it | No |
 
-- **Mapping `annexRoute` to `highRiskRoute`.** The values `site-app/app/workspace.tsx` offers map as follows:
+- **Mapping `annexRoute` to `highRiskRoute`.** The seven values that the classification form (`site-app/app/workspace/modals/classification.tsx`) offers map as follows:
   - "Annex III — sensitive use case" to `annex_iii`;
   - "Annex I Section A — regulated product" to `annex_i_section_a`;
   - "Annex I Section B — sector-specific review" to `annex_i_section_b`;
   - "Article 50 only" and "Outside high-risk scope" to `not_high_risk`;
-  - "Unassessed" to unknown, and "Article 6(3) exception assessment" to unknown until the derogation is decided.
+  - "Unassessed" to unknown, and "Article 6(3) exception assessment" to unknown until the derogation is decided;
+  - any other stored value to unknown: `annexRoute` is free text, and the `classify` command (`site-app/lib/commands/classification.ts`) accepts any short string.
 - **Consistency.** #19 rejects contradictions between the route and the flags, which keeps `highRiskRoute` consistent with the existing `highRiskConfirmed` and `annexISectionAProduct` facts.
 - **Timing.** #19 depends on #18 and may land after 2 December 2026. Until both Art 111(4) facts are captured, that entry yields `needs_information` for every engagement, unless #18 captures the two facts itself.
 
@@ -426,10 +427,10 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 
 | ID | Location | Finding | Change | Before 2 Dec |
 |---|---|---|---|---|
-| RD-70 | `site-app/lib/store.ts`, default classification (`version: "02024R1689-20260727"`, `asOf: "2026-10-05"`) | Stale | Read from the catalog | Yes |
-| RD-71 | `site-app/app/workspace.tsx`, "Applicable dates and legal sources" panel | Stale | Render from the catalog; add the 2 Dec 2026 milestones | Yes |
+| RD-70 | `site-app/lib/factories.ts`, `freshEngagement`, default classification (`version: "02024R1689-20260727"`, `asOf: "2026-10-05"`); `site-app/lib/store.ts` only re-exports `freshEngagement`. The same literals also appear in the test fixtures `site-app/lib/domain.test.ts` and `site-app/lib/workflow/test-fixtures.ts` | Stale | Read from the catalog | Yes |
+| RD-71 | `site-app/app/workspace/views/regulatory-mapping.tsx`, "Applicable dates and legal sources" panel | Stale | Render from the catalog; add the 2 Dec 2026 milestones | Yes |
 | RD-72 | `templates/annex-iv-map.json`, source block (`researchedAsOf` 2026-10-05) | Stale | Update with the snapshot | |
-| RD-73 | Generated copies. Byte-identical to the canonical files on `main@b15f037`: `site-app/lib/{catalog,obligation-subitems,annex-iv-map}.json`, `site-app/reference/docs/{audit-methodology.md,obligation-subitems.json}` and `site-app/reference/templates/{catalog.json,annex-iv-map.json,README.md}`. Not byte-identical: `site-app/reference/README.md` differs from `README.md` outside the legal section; its "Current legal snapshot" section matches | Stale after #18 | Regenerate the byte-identical copies through the sync check. Apply RD-60 to RD-64 to the legal section of `site-app/reference/README.md`, unless the sync check regenerates the whole file | |
+| RD-73 | Generated copies. Byte-identical to the canonical files on `main@68ec79a`, as on `b15f037`: `site-app/lib/{catalog,obligation-subitems,annex-iv-map}.json`, `site-app/reference/docs/{audit-methodology.md,obligation-subitems.json}` and `site-app/reference/templates/{catalog.json,annex-iv-map.json,README.md}`. Not byte-identical: `site-app/reference/README.md` differs from `README.md` outside the legal section; its "Current legal snapshot" section matches | Stale after #18 | Regenerate the byte-identical copies through the sync check. Apply RD-60 to RD-64 to the legal section of `site-app/reference/README.md`, unless the sync check regenerates the whole file | |
 | RD-74 | `templates/README.md`, last paragraph: "The legal snapshot is 27 July 2026, researched on 5 October 2026" | Stale | Keep the 27 July 2026 snapshot, which is still the latest consolidation. Update the research date and name rule pack 2026.11.1, or point to the catalog's `regulatorySnapshot` instead of restating it. Change it together with RD-60 | |
 
 ## 10. Items for qualified legal review
