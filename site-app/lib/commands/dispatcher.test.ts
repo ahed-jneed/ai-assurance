@@ -4,13 +4,12 @@ import { commandModules, dispatch } from "@/lib/commands";
 import { roles, type Engagement, type Role, type Run } from "@/lib/domain";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { evidenceRequestOps } from "@/lib/evidence-requests";
-import { freshEngagement } from "@/lib/factories";
 import { ApiError } from "@/lib/http";
-import { context, type Context } from "@/lib/tenancy";
+import { context } from "@/lib/tenancy";
 import { workflowOps } from "@/lib/workflow-service";
+import { caller, postRequest, stored } from "./test-fixtures";
 
-// Node has no Worker bindings: identity and persistence are faked per test.
-vi.mock("cloudflare:workers", () => ({ env: {} }));
+// Identity and persistence are faked per test.
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenancy")>()),
   context: vi.fn(),
@@ -21,24 +20,6 @@ vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
   save: vi.fn(),
 }));
 
-function caller(role: Role = "Lead Auditor"): Context {
-  return {
-    user: {
-      userId: "user-lead",
-      displayName: "Lead",
-      email: "lead@fixture.invalid",
-    },
-    tenantId: "tenant-1",
-    role,
-    clientId: null,
-    practiceAdmin: true,
-  };
-}
-function stored(version = 3): Engagement {
-  const e = freshEngagement("CL-1", "Model risk audit", "user-lead");
-  e.version = version;
-  return e;
-}
 function envelope(
   e: Engagement,
   op: string,
@@ -54,16 +35,7 @@ function envelope(
   };
 }
 function post(body: Record<string, unknown>) {
-  return POST(
-    new Request("https://workspace.test/api/workspace", {
-      method: "POST",
-      headers: {
-        origin: "https://workspace.test",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }),
-  );
+  return POST(postRequest("/api/workspace", body));
 }
 function load(e: Engagement, ctx = caller()) {
   vi.mocked(context).mockResolvedValue(ctx);
@@ -166,13 +138,16 @@ describe("POST /api/workspace", () => {
   it.each(["createClient", "createEngagement", "grantMember"])(
     "refers %s to client and user management for every role",
     async (op) => {
-      const e = stored();
-      load(e, caller("Client Viewer"));
-      const response = await post(envelope(e, op));
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({
-        error: "Use client and user management for this action",
-      });
+      for (const role of roles) {
+        const e = stored();
+        load(e, caller(role));
+        const response = await post(envelope(e, op));
+        expect(response.status, role).toBe(400);
+        expect(await response.json(), role).toEqual({
+          error: "Use client and user management for this action",
+        });
+      }
+      expect(save).not.toHaveBeenCalled();
     },
   );
 
