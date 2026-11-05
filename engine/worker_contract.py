@@ -9,12 +9,14 @@ import copy
 import hashlib
 import hmac
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
 from .contract import HASH, ID, validate_report
 from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, validate_config
+from .errors import EngineError
 
 WORKER_VERSION = "1.0.1"
 TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.0.0"
@@ -27,6 +29,31 @@ FAIRNESS = {"demographic_parity": "FAIR-DP", "disparate_impact": "FAIR-DI", "equ
 SUITES = {"performance": ["performance"], "regression": ["performance"], **{name: ["fairness"] for name in FAIRNESS}, "drift": ["drift"], "permutation": ["permutation_importance"], "perturbation": ["perturbation"], "explainability": ["shap", "lime"], "cross_validation": ["cross_validation", "adversarial"]}
 LABELS = {"performance": "Classification performance", "regression": "Regression performance", "demographic_parity": "Demographic parity", "disparate_impact": "Disparate impact", "equalized_odds": "Equalized odds", "drift": "Numeric distribution drift", "permutation": "Permutation importance", "perturbation": "Approved-range perturbation", "explainability": "SHAP / LIME", "cross_validation": "Cross-validation / adversarial robustness"}
 METRIC_ALIASES = {"demographic_parity_difference": "maximum_selection_rate_gap", "disparate_impact_ratio": "minimum_selection_rate_ratio", "equalized_odds_difference": "maximum_tpr_fpr_gap"}
+
+# Sanitized failure codes: the only `error` values posted with op:"fail",
+# besides http_<status>. engine/WORKER.md documents every code and a test
+# keeps both lists identical. A code never carries rows, paths or messages.
+# The compute process may report only COMPUTE_FAILURE_CODES in error.json.
+COMPUTE_FAILURE_CODES = frozenset({
+    "request_contract_rejected", "model_not_locally_approved_or_runtime_unavailable",
+    "dataset_input_pin_mismatch", "model_input_pin_mismatch",
+    "dataset_malformed", "dataset_limit_exceeded", "missing_column", "missing_value",
+    "invalid_numeric_value", "label_set_mismatch", "cardinality_limit_exceeded", "protocol_config_invalid",
+    "model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch",
+    "model_interface_mismatch", "model_output_invalid", "model_inference_failed",
+    "evidence_too_large", "compute_timeout", "compute_resource_exhausted", "compute_internal_error",
+})
+FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
+    "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
+    "transport_unavailable", "response_deadline_exceeded", "response_size_rejected", "model_input_size_mismatch",
+    "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
+})
+HTTP_FAILURE = re.compile(r"^http_[1-5][0-9]{2}$")
+
+
+def failure_code(code):
+    """Return a documented failure code unchanged; anything else is internal."""
+    return code if isinstance(code, str) and (code in FAILURE_CODES or HTTP_FAILURE.fullmatch(code)) else "worker_internal_error"
 
 
 def strict_json(data: str | bytes, *, maximum: int = MAX_ENVELOPE_BYTES) -> Any:
@@ -224,20 +251,25 @@ def translate_config(request, rows):
     if c.get("scoreColumn"):
         columns["score"] = c["scoreColumn"]
     if any(not isinstance(v, str) or not v.strip() or len(v) > 300 for v in columns.values()) or len(set(columns.values())) != len(columns):
-        raise ValueError("Mapped role columns must be nonempty and distinct")
+        raise EngineError("protocol_config_invalid", "Mapped role columns must be nonempty and distinct")
     inference = request["executionMode"] == "auditor_model"
     required = [name for role, name in columns.items() if not inference or role not in {"prediction", "score"}]
-    if not rows or any(name not in rows[0] for name in required):
-        raise ValueError("Required mapped input columns are absent")
+    absent = [name for name in required if not rows or name not in rows[0]]
+    if absent:
+        raise EngineError("missing_column", "Required mapped input columns are absent: "+", ".join(map(repr, absent)))
     if any(not str(row.get(name, "")).strip() for row in rows for name in required):
-        raise ValueError("Mapped inputs cannot silently drop missing values")
-    for row in rows:
+        raise EngineError("missing_value", "Mapped inputs cannot silently drop missing values")
+    for row_number, row in enumerate(rows, 2):
         if task == "regression":
             for name in (columns["target"], *([] if inference else [columns["prediction"]])):
-                if abs(finite_number(row[name], "regression input")) > 1e100:
-                    raise ValueError("Regression inputs exceed numeric bounds")
+                try:
+                    value = finite_number(row[name], f"row {row_number} column {name!r}")
+                except ValueError as exc:
+                    raise EngineError("invalid_numeric_value", str(exc)) from exc
+                if abs(value) > 1e100:
+                    raise EngineError("invalid_numeric_value", "Regression inputs exceed numeric bounds")
     if "protected" in columns and len({row[columns["protected"]].strip() for row in rows}) > 1000:
-        raise ValueError("Protected-group cardinality exceeds engine bounds")
+        raise EngineError("cardinality_limit_exceeded", "Protected-group cardinality exceeds engine bounds")
     suites = list(dict.fromkeys(s for test in selected for s in SUITES[test]))
     values = {}
 
@@ -263,10 +295,10 @@ def translate_config(request, rows):
     if task == "binary_classification":
         positive = c.get("positiveLabel")
         if not isinstance(positive, str) or not positive:
-            raise ValueError("A favourable binary class label is required")
+            raise EngineError("protocol_config_invalid", "A favourable binary class label is required")
         names = set(hosted.get("modelSpec", {}).get("outputLabels", [])) if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
         if len(names) != 2 or positive not in names:
-            raise ValueError("Binary class order/observations require two labels and the favourable label")
+            raise EngineError("label_set_mismatch", "Binary class order/observations require two labels and the favourable label")
         native.update(positiveLabel=positive, negativeLabel=next(label for label in names if label != positive))
     if "drift" in suites:
         native["driftFeatures"] = c.get("driftFeatures", hosted.get("modelSpec", {}).get("featureColumns"))

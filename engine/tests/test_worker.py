@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import tempfile
 import threading
 import unittest
@@ -13,8 +14,9 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from engine.diagnostics import read_csv, run, sha256
-from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_job, docker_control_env, runtime_readiness, stripped_compute_env, verify_result_bytes
-from engine.worker_contract import Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_request
+from engine.errors import EngineError
+from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, runtime_readiness, stripped_compute_env, verify_result_bytes
+from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_request
 
 TOKEN = "dummy-application-worker-token-for-tests"
 PLATFORM = "dummy-platform-service-token-for-tests"
@@ -295,6 +297,102 @@ class WorkerTests(unittest.TestCase):
             self.assertTrue(any(body["op"] == "fail" for body, _ in server.posts))
             self.assertNotIn(TOKEN, json.dumps(result))
             self.assertNotIn("tampered", json.dumps(result))
+
+    def operator_log(self):
+        return [json.loads(line) for line in (self.root/"jobs"/"operator-log.jsonl").read_text(encoding="utf-8").splitlines()]
+
+    def test_compute_failure_posts_its_code_and_keeps_details_local(self):
+        data = b"truth,predicted,group\n1,1,A\n0,0,B\n"
+        with RunnerServer(hosted_request(data, suite=["performance"]), data) as server:
+            result = self.worker(server.transport()).once()
+            self.assertEqual(result, {"state": "failed", "jobId": server.claim["jobId"], "attemptId": server.claim["attemptId"], "error": "missing_column"})
+            fails = [(body, raw) for body, raw in server.posts if body["op"] == "fail"]
+            self.assertEqual(len(fails), 1)
+            body, raw = fails[0]
+            self.assertEqual(set(body), {"op", "jobId", "attemptId", "fence", "nonce", "requestSha256", "error"})
+            self.assertEqual(body["error"], "missing_column")
+            # The column name and the operator message never leave the host.
+            self.assertNotIn(b"actual", raw)
+            self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
+        outputs = next((self.root/"jobs").glob("job-*/outputs"))
+        self.assertEqual(json.loads((outputs/"error.json").read_text(encoding="utf-8")), {"schemaVersion": "1.0", "code": "missing_column"})
+        entry = self.operator_log()[-1]
+        self.assertEqual((entry["event"], entry["code"], entry["failPosted"]), ("failed", "missing_column", True))
+        self.assertIn("'actual'", entry["detail"]["message"])
+        self.assertEqual(entry["detail"]["exceptionType"], "EngineError")
+
+    def test_label_set_mismatch_reaches_the_auditor_as_its_code(self):
+        data = b"actual,predicted\n1,1\n0,2\n1,0\n"
+        with RunnerServer(hosted_request(data, suite=["performance"]), data) as server:
+            self.assertEqual(self.worker(server.transport()).once()["error"], "label_set_mismatch")
+            self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["label_set_mismatch"])
+
+    def test_compute_main_writes_only_enumerated_codes(self):
+        cases = [
+            (EngineError("model_objective_mismatch", "Native objective differs from the declared task"), "model_objective_mismatch", "Native objective differs from the declared task"),
+            (EngineError("transport_unavailable", "not a compute code"), "compute_internal_error", "not a compute code"),
+            (RuntimeError("row 7 belongs to alice@example.com"), "compute_internal_error", None),
+            (MemoryError(), "compute_resource_exhausted", None),
+        ]
+        # compute_main normally runs in a child; keep POSIX rlimits off the test runner.
+        with patch("engine.worker.enforce_compute_limits"):
+            for index, (error, code, message) in enumerate(cases):
+                inputs, outputs = self.root/f"in-{index}", self.root/f"out-{index}"
+                inputs.mkdir()
+                outputs.mkdir()
+                with patch("engine.worker.compute_job", side_effect=error):
+                    self.assertEqual(compute_main(str(inputs), str(outputs)), 2)
+                self.assertEqual(json.loads((outputs/"error.json").read_text(encoding="utf-8")), {"schemaVersion": "1.0", "code": code})
+                detail = json.loads((outputs/"operator-detail.json").read_text(encoding="utf-8"))
+                self.assertEqual((detail["exceptionType"], detail["message"]), (type(error).__name__, message))
+                self.assertEqual(compute_failure_code(outputs), code)
+            # Without separate, valid directories nothing is written anywhere.
+            self.assertEqual(compute_main(str(inputs), str(inputs)), 2)
+            self.assertEqual(sorted(path.name for path in inputs.iterdir()), [])
+
+    def test_supervisor_trusts_only_listed_compute_codes(self):
+        outputs = self.root/"outputs"
+        outputs.mkdir()
+        self.assertEqual(compute_failure_code(outputs), "compute_rejected")
+        for raw, expected in (
+            (b'{"schemaVersion":"1.0","code":"missing_column"}', "missing_column"),
+            (b'{"schemaVersion":"1.0","code":"transport_unavailable"}', "compute_rejected"),
+            (b'{"schemaVersion":"1.0","code":"x; DROP TABLE jobs"}', "compute_rejected"),
+            (b'{"schemaVersion":"2.0","code":"missing_column"}', "compute_rejected"),
+            (b'{"schemaVersion":"1.0","code":"missing_column","code":"missing_value"}', "compute_rejected"),
+            (b"not json", "compute_rejected"),
+            (b'{"schemaVersion":"1.0","code":"missing_column","padding":"'+b"x"*5000+b'"}', "compute_rejected"),
+        ):
+            (outputs/"error.json").write_bytes(raw)
+            self.assertEqual(compute_failure_code(outputs), expected)
+
+    def test_control_plane_failures_are_posted_and_never_stop_the_worker(self):
+        for error, code in ((RuntimeError("unexpected"), "worker_internal_error"), (PermissionError("job directory"), "workspace_unavailable")):
+            with RunnerServer() as server, patch.object(Worker, "execute", side_effect=error):
+                result = self.worker(server.transport()).once()
+                self.assertEqual(result["error"], code)
+                self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], [code])
+        with RunnerServer() as server, patch("engine.worker.verify_result_bytes", side_effect=ValueError("tampered evidence")):
+            self.assertEqual(self.worker(server.transport()).once()["error"], "result_verification_failed")
+            self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
+            self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["result_verification_failed"])
+        self.assertEqual(self.operator_log()[-1]["detail"], {"exceptionType": "ProtocolError", "message": None})
+
+    def test_failure_codes_are_enumerated_and_documented(self):
+        engine = Path(__file__).resolve().parents[1]
+        section = (engine/"WORKER.md").read_text(encoding="utf-8").split("\n## Failure codes\n", 1)[1].split("\n## ", 1)[0]
+        documented = set(re.findall(r"^\| `([a-z0-9_<>]+)` \|", section, re.M))
+        self.assertEqual(documented, FAILURE_CODES | {"http_<status>"})
+        self.assertLess(COMPUTE_FAILURE_CODES, FAILURE_CODES)
+        raised = set()
+        for path in engine.glob("*.py"):
+            # Literal codes only; http_<status> is built from the response.
+            raised.update(re.findall(r"(?:EngineError|ProtocolError)\(\"([a-z0-9_]+)\"[,)]", path.read_text(encoding="utf-8")))
+        # Heartbeat outcomes end the lease locally and are never posted.
+        self.assertEqual(raised - FAILURE_CODES, {"invalid_heartbeat_response", "heartbeat_lease_expired"})
+        self.assertEqual([failure_code(code) for code in ("missing_column", "http_404", "http_4040", "Traceback: secret", None)], ["missing_column", "http_404", "worker_internal_error", "worker_internal_error", "worker_internal_error"])
+        self.assertEqual(job_failure_code(EngineError("not_a_code", "x")), "worker_internal_error")
+        self.assertEqual(job_failure_code(ProtocolError("http_503")), "http_503")
 
     def test_get_retries_are_bounded_and_claim_is_not_retried(self):
         with RunnerServer(transient_get=2) as server:

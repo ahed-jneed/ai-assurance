@@ -21,13 +21,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .contract import validate_report
 from .diagnostics import MAX_BYTES, read_csv, run, sha256
-from .worker_contract import Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, completion_body, evidence_envelope, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
+from .errors import EngineError
+from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
 
+# Compute writes the sanitized code to ERROR_FILE and a local-only message to
+# DETAIL_FILE; the control plane appends every job outcome to OPERATOR_LOG.
+ERROR_FILE, DETAIL_FILE, OPERATOR_LOG = "error.json", "operator-detail.json", "operator-log.jsonl"
 MODEL_SUFFIXES = {"onnx": ".onnx", "pmml": ".pmml", "xgboost_json": ".json", "lightgbm_text": ".txt"}
 RUNTIME_PACKAGES = {"onnx": ("numpy", "onnxruntime"), "pmml": ("numpy", "pandas", "pypmml"), "xgboost_json": ("numpy", "xgboost"), "lightgbm_text": ("numpy", "lightgbm")}
 WIRE_FORMATS = {"onnx": "ONNX", "pmml": "PMML", "xgboost_json": "XGBoost", "lightgbm_text": "LightGBM"}
@@ -235,7 +240,10 @@ class ProcessExecutor:
         self._execute_command(self.command(inputs, outputs), inputs, outputs, lease, timeout)
 
     def _execute_command(self, command, inputs, outputs, lease, timeout):
-        process = subprocess.Popen(command, cwd=Path(__file__).resolve().parent.parent, env=self.environment(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            process = subprocess.Popen(command, cwd=Path(__file__).resolve().parent.parent, env=self.environment(), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as exc:
+            raise ProtocolError("compute_unavailable") from exc
         started = time.monotonic()
         try:
             while process.poll() is None:
@@ -245,7 +253,7 @@ class ProcessExecutor:
                 time.sleep(.05)
             lease.valid()
             if process.returncode != 0:
-                raise ProtocolError("compute_rejected")
+                raise ProtocolError(compute_failure_code(outputs))
         finally:
             if process.poll() is None:
                 process.kill()
@@ -319,54 +327,121 @@ def enforce_compute_limits():
     # execution is therefore prohibited there by the outer executor gate.
 
 
+@contextmanager
+def failure_stage(code):
+    """Give uncoded validation errors from one compute stage a stable code."""
+    try:
+        yield
+    except EngineError:
+        raise
+    except ValueError as exc:
+        raise EngineError(code, str(exc)) from exc
+
+
 def compute_job(inputs, outputs):
-    envelope = strict_json(bound_bytes(inputs/"envelope.json", MAX_ENVELOPE_BYTES))
-    claim = Claim.parse(envelope["claim"], check_expiry=False)
-    request = claim.request
-    data_path = inputs/"dataset.csv"
-    data = bound_bytes(data_path, request["dataset"]["size"])
+    # The control plane wrote the envelope and verified the dataset, so a
+    # failure in these first steps is a worker defect, not a client problem.
+    with failure_stage("compute_internal_error"):
+        envelope = strict_json(bound_bytes(inputs/"envelope.json", MAX_ENVELOPE_BYTES))
+        claim = Claim.parse(envelope["claim"], check_expiry=False)
+        request = claim.request
+        data_path = inputs/"dataset.csv"
+        data = bound_bytes(data_path, request["dataset"]["size"])
     if len(data) != request["dataset"]["size"] or sha256(data) != request["inputHashes"]["dataset"]:
-        raise ValueError("Dataset byte/hash mismatch")
-    rows, _ = read_csv(data_path)
-    native = translate_config(request, rows)
+        raise EngineError("dataset_input_pin_mismatch", "Dataset byte/hash mismatch")
+    with failure_stage("dataset_malformed"):
+        rows, _ = read_csv(data_path)
+    with failure_stage("protocol_config_invalid"):
+        native = translate_config(request, rows)
     adapter = None
     format_name = FORMAT_ALIASES.get(request["model"].get("format")) if request["executionMode"] == "auditor_model" else None
     if format_name:
         expected = request["inputHashes"]["modelArtifact"]
         if envelope.get("approvedModelSha256") != expected or envelope["execution"].get("networkIsolation") != "docker_network_none":
-            raise ValueError("Model is outside the local approved isolated execution boundary")
+            raise EngineError("model_not_locally_approved_or_runtime_unavailable", "Model is outside the local approved isolated execution boundary")
         spec = native.get("modelSpec")
         if not isinstance(spec, dict):
-            raise ValueError("Independent inference requires frozen modelSpec")
+            raise EngineError("request_contract_rejected", "Independent inference requires frozen modelSpec")
         model_path = inputs/("model"+MODEL_SUFFIXES[format_name])
-        if sha256(bound_bytes(model_path, MAX_BYTES)) != expected:
-            raise ValueError("Model byte/hash mismatch")
+        with failure_stage("compute_internal_error"):
+            model_bytes = bound_bytes(model_path, MAX_BYTES)
+        if sha256(model_bytes) != expected:
+            raise EngineError("model_input_pin_mismatch", "Model byte/hash mismatch")
         from .optional_adapters import load_adapter
-        adapter = load_adapter(model_path, format_name, spec, trusted_model=True)
+        with failure_stage("model_artifact_invalid"):
+            adapter = load_adapter(model_path, format_name, spec, trusted_model=True)
     elif request["executionMode"] == "auditor_model":
-        raise ValueError("Model format is unsupported")
-    report = run(data_path, native, adapter=adapter)
-    validate_report(report)
-    result = evidence_envelope(report, claim, image_digest=envelope["imageDigest"], execution=envelope["execution"])
+        raise EngineError("request_contract_rejected", "Model format is unsupported")
+    # Data, label and model problems inside run() carry their own codes; an
+    # uncoded error at this point is an engine defect.
+    with failure_stage("compute_internal_error"):
+        report = run(data_path, native, adapter=adapter)
+        validate_report(report)
+        result = evidence_envelope(report, claim, image_digest=envelope["imageDigest"], execution=envelope["execution"])
     payload = json_bytes(result)+b"\n"
     if len(payload) > MAX_RESULT_BYTES:
-        raise ValueError("Completed evidence exceeds result byte bounds")
+        raise EngineError("evidence_too_large", "Completed evidence exceeds result byte bounds")
     create_once(outputs/"result.json", payload)
     return result
 
 
 def compute_main(input_dir, output_dir):
+    outputs = None
     try:
         enforce_compute_limits()
-        inputs, outputs = Path(input_dir).resolve(strict=True), Path(output_dir).resolve(strict=True)
-        if inputs == outputs or not inputs.is_dir() or not outputs.is_dir():
+        inputs, candidate = Path(input_dir).resolve(strict=True), Path(output_dir).resolve(strict=True)
+        if inputs == candidate or not inputs.is_dir() or not candidate.is_dir():
             raise ValueError("Input/output directories must be separate")
+        outputs = candidate
         compute_job(inputs, outputs)
-    except Exception:
-        # No raw source rows, secrets, file paths or native stack traces leave
-        # the compute process. Operators use dedicated trusted diagnostics.
+    except Exception as error:
+        if outputs is not None:
+            record_compute_failure(outputs, error)
         return 2
     return 0
+
+
+def record_compute_failure(outputs, error):
+    """Write the enumerated code for the control plane and a local operator note.
+
+    No raw source rows, secrets or native stack traces leave the compute
+    process. Engine-authored ValueError messages are written for operators;
+    any other exception may carry native-library text, so only its type is
+    kept. Neither file's message is ever posted to the platform.
+    """
+    if isinstance(error, EngineError) and error.code in COMPUTE_FAILURE_CODES:
+        code = error.code
+    else:
+        code = "compute_resource_exhausted" if isinstance(error, MemoryError) else "compute_internal_error"
+    message = str(error)[:1000] if isinstance(error, ValueError) else None
+    for name, value in ((ERROR_FILE, {"schemaVersion": "1.0", "code": code}), (DETAIL_FILE, {"schemaVersion": "1.0", "code": code, "exceptionType": type(error).__name__, "message": message})):
+        try:
+            create_once(outputs/name, json_bytes(value)+b"\n")
+        except OSError:
+            pass
+
+
+def compute_failure_code(outputs):
+    """The compute process's enumerated code; compute_rejected without one."""
+    try:
+        value = strict_json(bound_bytes(outputs/ERROR_FILE, 4096), maximum=4096)
+    except (OSError, ValueError):
+        return "compute_rejected"
+    code = value.get("code") if isinstance(value, dict) and value.get("schemaVersion") == "1.0" else None
+    # Compute may run a native parser on client bytes; trust only listed codes.
+    return code if code in COMPUTE_FAILURE_CODES else "compute_rejected"
+
+
+def compute_failure_detail(outputs):
+    """Bounded local operator note from the compute process, if present."""
+    try:
+        value = strict_json(bound_bytes(outputs/DETAIL_FILE, 16384), maximum=16384)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    kind, message = value.get("exceptionType"), value.get("message")
+    return {"exceptionType": kind[:100] if isinstance(kind, str) else None, "message": message[:1000] if isinstance(message, str) else None}
 
 
 class Worker:
@@ -409,9 +484,12 @@ class Worker:
     def at_capacity(self):
         return sum(1 for _ in self.workspace.glob("job-*")) >= self.maximum_jobs
 
-    def execute(self, claim):
+    def job_directory(self, claim):
         identity = sha256(json_bytes([claim.job_id, claim.attempt_id, claim.fence, claim.nonce, claim.request_sha256]))[:32]
-        directory = self.workspace/("job-"+identity)
+        return self.workspace/("job-"+identity)
+
+    def execute(self, claim):
+        directory = self.job_directory(claim)
         if sum(1 for item in self.workspace.glob("job-*")) >= self.maximum_jobs:
             raise ProtocolError("workspace_job_limit")
         directory.mkdir(mode=0o700)
@@ -451,8 +529,11 @@ class Worker:
             create_once(inputs/"envelope.json", json_bytes(envelope))
             lease.valid()
             self.executor.execute(inputs, outputs, lease, self.compute_timeout)
-            result = bound_bytes(outputs/"result.json", MAX_RESULT_BYTES)
-            verify_result_bytes(result, claim, self.image_digest)
+            try:
+                result = bound_bytes(outputs/"result.json", MAX_RESULT_BYTES)
+                verify_result_bytes(result, claim, self.image_digest)
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise ProtocolError("result_verification_failed") from exc
             lease.valid()
             body = completion_body(claim, result)
             create_once(directory/"completion.json", body)
@@ -472,18 +553,56 @@ class Worker:
         claim = self.claim()
         if claim is None:
             return {"state": "idle"}
+        attempt = {"jobId": claim.job_id, "attemptId": claim.attempt_id}
         try:
-            return {"state": "completed", **self.execute(claim)}
+            outcome = {"state": "completed", **self.execute(claim)}
+            self.record({"event": "completed", **attempt, "resultSha256": outcome["resultSha256"]})
+            return outcome
         except CompletionUncertain:
-            return {"state": "completion_uncertain", "jobId": claim.job_id, "attemptId": claim.attempt_id}
-        except (ProtocolError, ValueError, OSError) as error:
-            code = error.code if isinstance(error, ProtocolError) else "worker_validation_failed"
-            if not isinstance(error, LeaseLost):
-                try:
-                    self.transport.post({"op": "fail", **claim.pins(), "error": code}, retry=True)
-                except ProtocolError:
-                    pass
-            return {"state": "failed", "jobId": claim.job_id, "attemptId": claim.attempt_id, "error": code}
+            self.record({"event": "completion_uncertain", **attempt})
+            return {"state": "completion_uncertain", **attempt}
+        except LeaseLost:
+            # A stale worker never publishes, not even a failure.
+            self.record({"event": "lease_lost", **attempt})
+            return {"state": "failed", **attempt, "error": "lease_lost"}
+        except Exception as error:
+            # Every per-job failure is reported; none may stop the worker.
+            code = job_failure_code(error)
+            detail = compute_failure_detail(self.job_directory(claim)/"outputs") or exception_detail(error)
+            posted = self.post_failure(claim.pins(), code)
+            self.record({"event": "failed", **attempt, "code": code, "failPosted": posted, "detail": detail})
+            return {"state": "failed", **attempt, "error": code}
+
+    def post_failure(self, pins, code):
+        """Post one sanitized fail; True when the platform acknowledged it."""
+        try:
+            self.transport.post({"op": "fail", **pins, "error": failure_code(code)}, retry=True)
+            return True
+        except ProtocolError:
+            return False
+
+    def record(self, entry):
+        """Append one line to the local operator log; never sent to the platform."""
+        line = json.dumps({"at": datetime.now(timezone.utc).isoformat(), "workerId": self.worker_id, **entry}, ensure_ascii=False, allow_nan=False, sort_keys=True)
+        try:
+            with (self.workspace/OPERATOR_LOG).open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(line+"\n")
+        except OSError:
+            print(json.dumps({"state": "operator_log_unavailable"}), file=sys.stderr, flush=True)
+
+
+def job_failure_code(error):
+    """Map a per-job exception to its sanitized, documented failure code."""
+    if isinstance(error, (ProtocolError, EngineError)):
+        return failure_code(error.code)
+    if isinstance(error, OSError):
+        return "workspace_unavailable"
+    return "worker_internal_error"
+
+
+def exception_detail(error):
+    """Local operator detail for a control-plane failure (never posted)."""
+    return {"exceptionType": type(error).__name__, "message": str(error)[:1000] if isinstance(error, (ValueError, OSError)) else None}
 
 
 def verify_result_bytes(result_bytes, claim, image_digest):

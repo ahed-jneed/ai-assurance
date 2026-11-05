@@ -67,11 +67,58 @@ A claim response contains `{jobId,attemptId,fence,nonce,leaseUntil,requestSha256
 
 Input retrieval is `GET /api/runner?jobId=...&attemptId=...&fence=...&input=dataset|model` with the same authorization headers. The worker verifies the actual dataset byte count and SHA-256 before computation and again in the compute process. Native model bytes must match `inputHashes.modelArtifact`, the model's `sha256` or `sourceSha256`, and the local approval allowlist. An optional declared model byte count is checked. Dataset names and request identifiers never become input filesystem paths: filenames are application-owned `dataset.csv` and `model.<approved suffix>`.
 
-Heartbeat posts `{op:"heartbeat",jobId,attemptId,fence,nonce,requestSha256}`; its response must contain a future `leaseUntil`. A nonretryable heartbeat rejection or expired lease stops computation. The server must independently reject stale fences, nonces, cancelled jobs and expired leases at publication. A fail operation uses the same pins and a sanitized string `error`; rows, token values and raw native errors are not sent.
+Heartbeat posts `{op:"heartbeat",jobId,attemptId,fence,nonce,requestSha256}`; its response must contain a future `leaseUntil`. A nonretryable heartbeat rejection or expired lease stops computation. The server must independently reject stale fences, nonces, cancelled jobs and expired leases at publication. A fail operation uses the same pins and `error` set to one code from [Failure codes](#failure-codes); rows, column names, token values, file paths and raw native errors are never sent.
 
 Completion posts `{op:"complete",jobId,attemptId,fence,nonce,requestSha256,resultJSON,resultSha256}`. `resultJSON` is read verbatim from the created-once `outputs/result.json`; `resultSha256` hashes that string's exact UTF-8 bytes, including the trailing newline. Evidence is limited to 8 MiB and the escaped full completion body to 10 MiB. `X-Result-Signature` is lowercase hex HMAC-SHA256 over the **entire exact HTTP body bytes**, with key `SHA256(raw application token UTF-8)` bytes. The worker signs all POST bodies consistently; completion is the required verification point. The embedded engine report's `reportSha256` remains its existing canonical checksum and differs from the completion hash.
 
 Read-only downloads and idempotent heartbeat/complete/fail operations have at most two retries for temporary transport failures or HTTP 429/502/503/504, using the same serialized POST bytes. Claim has no automatic transport retry because an ambiguous request may already have acquired a lease. The server must make duplicate completion of the same accepted pins and digest idempotent. An ambiguous exhausted completion retains the evidence and returns `completion_uncertain`; the worker does not overwrite a possibly committed completion with fail. Reconciliation remains an operator/server responsibility.
+
+## Failure codes
+
+Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the worker then moves on to the next poll. The code is the only failure information that reaches the platform. `engine/worker_contract.py` holds the same list (`FAILURE_CODES`), and a test keeps the two identical.
+
+| Code | Stage | Meaning |
+| --- | --- | --- |
+| `request_contract_rejected` | Claim or compute | The frozen request breaks the worker contract, for example a binary `modelSpec` without exactly two `outputLabels`, more than 100 features, or an unsupported test or model format. Fix the protocol or system definition and queue a new job. |
+| `model_not_locally_approved_or_runtime_unavailable` | Local eligibility | The model format is not enabled on this worker, its SHA-256 is not in the local allowlist, or the executor has no network-isolated model runtime. |
+| `executable_preprocessing_unsupported` | Local eligibility | The request declares preprocessing that this worker would have to execute. Supply already prepared columns. |
+| `workspace_job_limit` | Local eligibility | The retained job directories reached `--maximum-jobs` while the attempt was being prepared. Archive evidence. |
+| `workspace_unavailable` | Local files | A job file could not be created or written (permissions, disk space). |
+| `transport_unavailable` | Input transfer | The connection failed or reset during download, after the allowed retries. |
+| `response_deadline_exceeded` | Input transfer | A download used up its time budget, after the allowed retries. |
+| `response_size_rejected` | Input transfer | The platform sent, or declared, more bytes than the pinned size or limit. |
+| `http_<status>` | Input transfer or completion | The platform answered a download or a completion with this HTTP status, for example `http_404`. |
+| `dataset_input_pin_mismatch` | Input transfer or compute | The dataset's size or SHA-256 differs from the frozen pin. |
+| `model_input_pin_mismatch` | Input transfer or compute | The model's SHA-256 differs from the frozen pin. |
+| `model_input_size_mismatch` | Input transfer | The model's byte count differs from the declared size. |
+| `dataset_malformed` | Compute | The dataset is not well-formed UTF-8 CSV: empty or duplicate headers, ragged rows, or no observations. |
+| `dataset_limit_exceeded` | Compute | The dataset exceeds the byte, row, column or batch limits. |
+| `missing_column` | Compute | A mapped column (label, prediction, group, score) or a model feature column is absent. |
+| `missing_value` | Compute | A mapped cell or model feature is empty; the worker never silently drops rows on this path. |
+| `invalid_numeric_value` | Compute | A numeric cell is not a finite number, a score lies outside [0, 1], or a metric overflowed. |
+| `label_set_mismatch` | Compute | Observed labels, the frozen positive and negative labels, and the model's `outputLabels` do not agree. |
+| `cardinality_limit_exceeded` | Compute | More than 1,000 protected groups or 100 classes. |
+| `protocol_config_invalid` | Compute | The frozen column mapping, acceptance criteria or minimum counts cannot be applied. |
+| `model_artifact_invalid` | Compute | The model bytes are not a valid artifact of the declared format, or the runtime could not load them. |
+| `model_runtime_unavailable` | Compute | The compute image lacks the runtime for the declared format. |
+| `model_objective_mismatch` | Compute | The native objective is outside the reviewed protocol or differs from the declared task. |
+| `model_interface_mismatch` | Compute | The model's inputs or named outputs do not match the frozen `modelSpec`. |
+| `model_output_invalid` | Compute | The model returned non-finite values, the wrong shape, labels outside `outputLabels`, or probabilities that do not sum to one. |
+| `model_inference_failed` | Compute | The native runtime raised an error while scoring. |
+| `evidence_too_large` | Compute | The completed evidence envelope exceeds 8 MiB. |
+| `compute_timeout` | Compute | Computation, or native scoring, exceeded its time limit. |
+| `compute_resource_exhausted` | Compute | The compute process ran out of memory. |
+| `compute_internal_error` | Compute | An unexpected engine error; the operator log has its type. Report it as a worker defect. |
+| `compute_unavailable` | Compute supervision | The compute process or container could not be started. |
+| `compute_rejected` | Compute supervision | The compute process failed without a valid `error.json` (for example it was killed, or the image predates this protocol). |
+| `result_verification_failed` | Result | The produced result failed the control plane's independent verification and was not submitted. |
+| `worker_internal_error` | Any | An unexpected control-plane error. Report it as a worker defect. |
+
+Local states that are never posted: `lease_lost` (a stale worker never publishes, not even a failure), `completion_uncertain` (see retries above), `workspace_capacity_reached` and `idle`.
+
+On a compute failure the compute process writes `outputs/error.json` (`{"schemaVersion":"1.0","code":...}`). The control plane accepts only a compute code from the table and otherwise posts `compute_rejected`, because compute may run a native parser on client bytes. The compute process also writes `outputs/operator-detail.json` with the exception type and, for engine validation errors only, the engine's message (for example which column is missing). Native-library messages are reduced to their type.
+
+The worker appends every job outcome (completed, failed with code and whether the fail was acknowledged, lease lost, completion uncertain) to `<workspace>/operator-log.jsonl`, including that operator detail. The log stays on the worker host and is never sent to the platform; rotate it with the job evidence.
 
 ## Hosted and external report translation
 

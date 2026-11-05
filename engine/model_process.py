@@ -3,38 +3,75 @@ import json
 import sys
 
 from .diagnostics import sha256
+from .errors import EngineError
 from .optional_adapters import NumericAdapter
+
+# Codes this child reports to NativeTreeAdapter as {"error": code} on stdout.
+# The parent maps anything else to model_inference_failed.
+FAILURE_CODES = frozenset({"model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch", "model_output_invalid", "model_inference_failed", "invalid_numeric_value", "missing_value", "dataset_limit_exceeded"})
+OBJECTIVES = {
+    "xgboost_json": {"binary_classification": {"binary:logistic"}, "multiclass_classification": {"multi:softprob"}, "regression": {"reg:squarederror", "reg:absoluteerror"}},
+    "lightgbm_text": {"binary_classification": {"binary"}, "multiclass_classification": {"multiclass"}, "regression": {"regression", "regression_l1"}},
+}
+
+
+def check_objective(format_name, objective, task):
+    """Reject native objectives outside the reviewed protocol or the declared task."""
+    expected = OBJECTIVES[format_name]
+    if objective not in set().union(*expected.values()):
+        raise EngineError("model_objective_mismatch", "Native objective is outside the reviewed adapter protocol")
+    if objective not in expected[task]:
+        raise EngineError("model_objective_mismatch", "Native objective differs from the declared task")
+
+
+def runtime(name):
+    try:
+        return __import__(name)
+    except ImportError as exc:
+        raise EngineError("model_runtime_unavailable", name+" is not installed in the compute runtime") from exc
+
+
+def score(payload):
+    adapter = NumericAdapter(payload["path"], payload["format"], payload["spec"], trusted_model=True)
+    if sha256(adapter.artifact_bytes) != payload["expectedSha256"]:
+        raise EngineError("model_artifact_invalid", "Native model artifact changed after eligibility review")
+    matrix = adapter.matrix(payload["records"])
+    task = adapter.descriptor.task
+    if payload["format"] == "xgboost_json":
+        xgb = runtime("xgboost")
+        model = xgb.Booster(params={"nthread": 1})
+        try:
+            model.load_model(bytearray(adapter.artifact_bytes))
+            objective = json.loads(model.save_config())["learner"]["objective"]["name"]
+        except Exception as exc:
+            raise EngineError("model_artifact_invalid", "XGBoost could not load the model ("+type(exc).__name__+")") from exc
+        check_objective("xgboost_json", objective, task)
+        values = model.predict(xgb.DMatrix(matrix, feature_names=[feature.name for feature in adapter.descriptor.feature_schema]))
+    else:
+        lgb = runtime("lightgbm")
+        try:
+            model = lgb.Booster(model_str=adapter.artifact_bytes.decode("utf-8"))
+        except Exception as exc:
+            raise EngineError("model_artifact_invalid", "LightGBM could not load the model ("+type(exc).__name__+")") from exc
+        objective = str(model.params.get("objective", "")).split()[0]
+        check_objective("lightgbm_text", objective, task)
+        values = model.predict(matrix, num_threads=1)
+    try:
+        return json.dumps(values.tolist(), allow_nan=False)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise EngineError("model_output_invalid", "Native model returned non-finite or non-numeric values") from exc
 
 
 def main():
-    payload = json.load(sys.stdin)
-    adapter = NumericAdapter(payload["path"], payload["format"], payload["spec"], trusted_model=True)
-    if sha256(adapter.artifact_bytes) != payload["expectedSha256"]:
-        raise ValueError("Native model artifact changed after eligibility review")
-    matrix = adapter.matrix(payload["records"])
-    if payload["format"] == "xgboost_json":
-        import xgboost as xgb
-        model = xgb.Booster(params={"nthread": 1})
-        model.load_model(bytearray(adapter.artifact_bytes))
-        objective = json.loads(model.save_config())["learner"]["objective"]["name"]
-        if objective not in {"binary:logistic", "multi:softprob", "reg:squarederror", "reg:absoluteerror"}:
-            raise ValueError("XGBoost objective is outside the reviewed adapter protocol")
-        expected = {"binary_classification": {"binary:logistic"}, "multiclass_classification": {"multi:softprob"}, "regression": {"reg:squarederror", "reg:absoluteerror"}}
-        if objective not in expected[adapter.descriptor.task]:
-            raise ValueError("XGBoost objective differs from declared task")
-        values = model.predict(xgb.DMatrix(matrix, feature_names=[feature.name for feature in adapter.descriptor.feature_schema]))
-    else:
-        import lightgbm as lgb
-        model = lgb.Booster(model_str=adapter.artifact_bytes.decode("utf-8"))
-        objective = str(model.params.get("objective", "")).split()[0]
-        if objective not in {"binary", "multiclass", "regression", "regression_l1"}:
-            raise ValueError("LightGBM objective is outside the reviewed adapter protocol")
-        expected = {"binary_classification": {"binary"}, "multiclass_classification": {"multiclass"}, "regression": {"regression", "regression_l1"}}
-        if objective not in expected[adapter.descriptor.task]:
-            raise ValueError("LightGBM objective differs from declared task")
-        values = model.predict(matrix, num_threads=1)
-    print(json.dumps(values.tolist(), allow_nan=False))
+    try:
+        output = score(json.load(sys.stdin))
+    except Exception as error:
+        # Only an allowed code reaches the parent; never a native message.
+        print(json.dumps({"error": error.code if isinstance(error, EngineError) and error.code in FAILURE_CODES else "model_inference_failed"}))
+        return 2
+    print(output)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
