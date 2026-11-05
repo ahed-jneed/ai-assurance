@@ -154,14 +154,21 @@ export function validateEvaluation(run: Run, csv: string) {
     );
     if (labels.size > 50)
       throw Error("Interactive classification supports at most 50 classes");
+    // Only the performance test measures its own positive class.
+    const positive = run.suite.includes("performance")
+      ? performancePositiveLabel(c)
+      : c.positiveLabel;
     if (
       task === "Binary classification" &&
       (labels.size !== 2 ||
         !labels.has(c.positiveLabel) ||
-        !labels.has(performancePositiveLabel(c)))
+        !labels.has(positive))
     )
       throw Error(
-        "Binary evaluation requires two class labels, including the favourable label and the performance positive class",
+        `Binary evaluation requires two class labels, including the favourable label '${c.positiveLabel}'` +
+          (positive !== c.positiveLabel
+            ? ` and the performance positive class '${positive}'`
+            : ""),
       );
   }
   if (fair && new Set(data.map((r) => r[c.groupColumn])).size > 50)

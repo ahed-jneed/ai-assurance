@@ -112,6 +112,19 @@ async function rejection(promise: Promise<unknown>) {
   expect(error).toBeInstanceOf(ApiError);
   return error as ApiError;
 }
+// A fairness-only protocol with a class typed before the performance test
+// was deselected.
+const fairnessOnly = (version: string) =>
+  binaryProtocol({
+    version,
+    suite: ["demographic_parity"],
+    config: {
+      ...criteria,
+      groupColumn: "group",
+      performancePositiveLabel: "fraud",
+    },
+    datasetContext: { ...context, sensitiveDataBasis: "Synthetic data" },
+  });
 
 describe("registerProfile", () => {
   it("freezes the performance positive class, defaulting to the favourable label", () => {
@@ -129,6 +142,22 @@ describe("registerProfile", () => {
         "auditor",
       ).config.performancePositiveLabel,
     ).toBe("0");
+  });
+
+  it("freezes no performance positive class without a performance test", async () => {
+    const profile = registerProfile(e, fairnessOnly("1.0"), "auditor");
+    expect(profile.config.performancePositiveLabel).toBe("");
+    // "fraud" is not a label of the data, and the run does not need it.
+    const run = await queueEvaluation(
+      e,
+      { modelId: "MODEL-1", datasetId: "EV-1", profileId: profile.id },
+      "auditor",
+    );
+    expect(run).toMatchObject({
+      state: "queued",
+      suite: ["demographic_parity"],
+      config: { performancePositiveLabel: "" },
+    });
   });
 
   it("requires a reviewed data-handling basis for fairness tests", async () => {

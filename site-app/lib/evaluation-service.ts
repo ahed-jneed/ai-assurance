@@ -120,10 +120,11 @@ export function registerProfile(
       400,
       "Binary classification needs a favourable class label",
     );
-  // The protocol freezes the class binary recall is measured on; only binary
-  // performance has one.
+  // The protocol freezes the class binary recall is measured on. Only binary
+  // performance has one: a value left from a deselected performance test
+  // would otherwise constrain the labels of a fairness-only protocol.
   a.config.performancePositiveLabel =
-    a.task === "Binary classification"
+    a.task === "Binary classification" && a.suite.includes("performance")
       ? a.config.performancePositiveLabel || a.config.positiveLabel
       : "";
   if (

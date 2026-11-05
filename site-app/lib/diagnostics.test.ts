@@ -268,6 +268,32 @@ describe("fairness", () => {
       "No group received the favourable prediction, so the selection-rate ratio is undefined.",
     );
   });
+
+  it("ignore a performance positive class when no performance test is selected", () => {
+    // A configuration frozen with the class of a deselected performance test.
+    const results = evaluate(
+      run(["demographic_parity", "disparate_impact"], {
+        performancePositiveLabel: "fraud",
+      }),
+      groups,
+    );
+    expect(results.map((r) => r.testId)).toEqual([
+      "demographic_parity",
+      "disparate_impact",
+    ]);
+    // Only the favourable label must be one of the two observed labels.
+    expect(() =>
+      evaluate(run(["demographic_parity"], { positiveLabel: "yes" }), groups),
+    ).toThrow(
+      /^Binary evaluation requires two class labels, including the favourable label 'yes'$/,
+    );
+    expect(() =>
+      evaluate(
+        run(["performance"], { performancePositiveLabel: "fraud" }),
+        groups,
+      ),
+    ).toThrow("and the performance positive class 'fraud'");
+  });
 });
 
 describe("blank rows", () => {
