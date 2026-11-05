@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/http";
 import { runWithIdentity, type Identity } from "@/lib/identity";
 import { context } from "@/lib/tenancy";
 
 // A D1 stand-in that answers context()'s lookups from `rows` and records every
-// statement that would write.
+// statement that would write. Each test installs it as the DB binding.
 type Row = Record<string, unknown> | null;
-const d1 = vi.hoisted(() => {
+function fakeD1() {
   const state = {
     writes: [] as { sql: string; args: unknown[] }[],
     lookup: (sql: string, args: unknown[]): Record<string, unknown> | null => {
@@ -44,8 +45,8 @@ const d1 = vi.hoisted(() => {
     },
   };
   return { state, db };
-});
-vi.mock("cloudflare:workers", () => ({ env: { DB: d1.db } }));
+}
+const d1 = fakeD1();
 
 const lea: Identity = {
   userId: "user-lea",
@@ -62,8 +63,12 @@ function rows(answers: [RegExp, Row][]) {
 }
 
 beforeEach(() => {
+  env.DB = d1.db as unknown as D1Database;
   d1.state.writes = [];
   rows([]);
+});
+afterEach(() => {
+  delete env.DB;
 });
 
 describe("context", () => {
