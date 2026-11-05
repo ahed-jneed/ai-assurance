@@ -41,9 +41,11 @@ def claim_body(request=None):
 
 class RunnerServer:
     """Real loopback HTTP fixture; no platform or native runtime assumed."""
-    def __init__(self, request=None, data=CSV, *, altered_input=False, redirect=False, transient_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
+    def __init__(self, request=None, data=CSV, *, altered_input=False, swapped_input=False, redirect=False, transient_get=0, truncated_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
         self.claim = claim_body(request)
-        self.data = data+b"tampered" if altered_input else data
+        # altered_input appends bytes; swapped_input keeps the size but not the hash.
+        self.data = data+b"tampered" if altered_input else data[:-2]+(b"1\n" if data[-2:] != b"1\n" else b"0\n") if swapped_input else data
+        self.truncated_get = truncated_get
         self.redirect, self.transient_get, self.transient_claim = redirect, transient_get, transient_claim
         self.transient_complete, self.heartbeat_rejected = transient_complete, heartbeat_rejected
         self.posts, self.gets, self.errors = [], [], []
@@ -111,6 +113,15 @@ class RunnerServer:
                 if fixture.transient_get:
                     fixture.transient_get -= 1
                     return self.respond({"error": "temporary"}, 503)
+                if fixture.truncated_get:
+                    # Declare the full length, send half, then close the connection.
+                    fixture.truncated_get -= 1
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(fixture.data)))
+                    self.end_headers()
+                    self.wfile.write(fixture.data[:len(fixture.data)//2])
+                    self.close_connection = True
+                    return
                 return self.respond(fixture.data)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -145,8 +156,8 @@ class WorkerTests(unittest.TestCase):
         report = run(data_path, translate_config(request, rows))
         return report, hosted_results(report, request)
 
-    def worker(self, transport, **kwargs):
-        return Worker(transport, ProcessExecutor(), self.root/"jobs", worker_id="worker-fixture", image_digest=IMAGE, heartbeat=1, **kwargs)
+    def worker(self, transport, workspace="jobs", **kwargs):
+        return Worker(transport, ProcessExecutor(), self.root/workspace, worker_id="worker-fixture", image_digest=IMAGE, heartbeat=1, **kwargs)
 
     def test_exact_request_bytes_and_duplicate_nonfinite_json_rejected(self):
         body = claim_body()
@@ -377,15 +388,21 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(server.gets[0]["input"], ["dataset"])
             self.assertEqual(server.gets[0]["fence"], ["7"])
             self.assertEqual(server.errors, [])
+            inputs = Path(result["resultFile"]).parent.parent/"inputs"
+            self.assertEqual((inputs/"dataset.csv").read_bytes(), CSV)
+            self.assertEqual(list(inputs.glob("*.partial")), [])
 
     def test_changed_download_never_completes_and_error_is_sanitized(self):
-        with RunnerServer(altered_input=True) as server:
-            result = self.worker(server.transport()).once()
-            self.assertEqual(result["state"], "failed")
-            self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
-            self.assertTrue(any(body["op"] == "fail" for body, _ in server.posts))
-            self.assertNotIn(TOKEN, json.dumps(result))
-            self.assertNotIn("tampered", json.dumps(result))
+        for option, code in (("altered_input", "response_size_rejected"), ("swapped_input", "dataset_input_pin_mismatch")):
+            with RunnerServer(**{option: True}) as server:
+                result = self.worker(server.transport(), workspace=option).once()
+                self.assertEqual((result["state"], result["error"]), ("failed", code))
+                self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
+                self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], [code])
+                self.assertNotIn(TOKEN, json.dumps(result))
+                self.assertNotIn("tampered", json.dumps(result))
+            # Rejected bytes never receive the dataset's name, even partially.
+            self.assertEqual(list((self.root/option).glob("job-*/inputs/dataset.csv*")), [])
 
     def operator_log(self):
         return [json.loads(line) for line in (self.root/"jobs"/"operator-log.jsonl").read_text(encoding="utf-8").splitlines()]
@@ -483,11 +500,22 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(job_failure_code(EngineError("not_a_code", "x")), "worker_internal_error")
         self.assertEqual(job_failure_code(ProtocolError("http_503")), "http_503")
 
+    def download(self, transport, claim, maximum=len(CSV), **kwargs):
+        destination = self.root/"dataset.csv"
+        return destination, transport.download(claim, "dataset", destination, maximum=maximum, **kwargs)
+
     def test_get_retries_are_bounded_and_claim_is_not_retried(self):
         with RunnerServer(transient_get=2) as server:
-            transport = server.transport()
-            self.assertEqual(transport.input(Claim.parse(server.claim), "dataset", maximum=len(CSV)), CSV)
+            destination, (partial, size, digest) = self.download(server.transport(), Claim.parse(server.claim))
+            self.assertEqual((partial, size, digest), (destination.with_name("dataset.csv.partial"), len(CSV), sha256(CSV)))
+            self.assertEqual(partial.read_bytes(), CSV)
             self.assertEqual(len(server.gets), 3)
+        with RunnerServer(transient_get=3) as server:
+            with self.assertRaises(ProtocolError) as error:
+                self.download(server.transport(), Claim.parse(server.claim))
+            self.assertEqual((error.exception.code, len(server.gets)), ("http_503", 3))
+            # A failed download leaves no partial bytes behind.
+            self.assertEqual(list(self.root.glob("dataset.csv*")), [])
         with RunnerServer(transient_claim=1) as server:
             with self.assertRaises(ProtocolError):
                 self.worker(server.transport()).claim()
@@ -496,9 +524,10 @@ class WorkerTests(unittest.TestCase):
     def test_credentials_are_not_forwarded_on_redirects(self):
         with RunnerServer(redirect=True) as server:
             with self.assertRaises(ProtocolError) as error:
-                server.transport().input(Claim.parse(server.claim), "dataset", maximum=len(CSV))
+                self.download(server.transport(), Claim.parse(server.claim))
             self.assertEqual(error.exception.status, 302)
             self.assertEqual(len(server.gets), 1)
+            self.assertEqual(list(self.root.glob("dataset.csv*")), [])
         with self.assertRaises(ValueError):
             Transport("http://example.org", TOKEN)
 
@@ -572,10 +601,16 @@ class WorkerTests(unittest.TestCase):
                     worker_id="worker-fixture", image_digest=IMAGE)
             resolving.assert_not_called()
 
-    def test_chunked_input_checks_deadline_and_lease_during_read(self):
+    def scripted_transport(self, *scripts, timeout=2, retries=2, clock=None):
+        """Transport whose attempts replay scripted read1 results in order.
+
+        A script item is bytes, an exception to raise, or None for "one byte
+        after a second", a live but far too slow trickle on `clock`.
+        """
         class Response:
-            headers = {}
-            reads = 0
+            def __init__(self, script, length):
+                self.script, self.reads = list(script), 0
+                self.headers = {} if length is None else {"Content-Length": str(length)}
             def __enter__(self):
                 return self
             def __exit__(self, *_):
@@ -584,30 +619,84 @@ class WorkerTests(unittest.TestCase):
                 raise AssertionError("Accumulating read must not be used")
             def read1(self, _):
                 self.reads += 1
-                return b"x"
+                item = self.script.pop(0) if len(self.script) > 1 else self.script[0]
+                if item is None:
+                    clock.now += 1
+                    return b"x"
+                if isinstance(item, Exception):
+                    raise item
+                return item
         class Opener:
-            def __init__(self, response):
-                self.response = response
-            def open(self, *_args, **_kwargs):
-                return self.response
-        transport = Transport("https://runner.example", TOKEN, timeout=2, retries=0)
-        response = Response()
-        transport.opener = Opener(response)
-        with patch("engine.worker.time.monotonic", side_effect=[0, 0, 0, .5, .5, 2]):
+            def __init__(self):
+                self.responses = []
+            def open(self, _request, *, timeout):
+                # The idle timeout bounds every connect and single read.
+                test.assertEqual(timeout, transport.timeout)
+                script, length = scripts[len(self.responses)]
+                self.responses.append(Response(script, length))
+                return self.responses[-1]
+        test = self
+        transport = Transport("https://runner.example", TOKEN, timeout=timeout, retries=retries)
+        transport.opener = Opener()
+        return transport
+
+    def test_trickling_download_is_bounded_and_each_retry_gets_a_fresh_budget(self):
+        class Clock:
+            now = 0.0
+            def __call__(self):
+                return self.now
+        clock, claim = Clock(), Claim.parse(claim_body())
+        transport = self.scripted_transport(*[([None], None)]*3, clock=clock)
+        with patch("engine.worker.time.monotonic", clock), patch("engine.worker.time.sleep"):
             with self.assertRaisesRegex(ProtocolError, "response_deadline_exceeded"):
-                transport.input(Claim.parse(claim_body()), "dataset", maximum=100)
-        self.assertEqual(response.reads, 2)
-        response = Response()
-        transport.opener = Opener(response)
+                self.download(transport, claim, maximum=100)
+        # Budget: 2 s idle timeout plus 100 bytes at the minimum rate. Every
+        # attempt reads for just over two seconds, including both retries.
+        self.assertEqual([response.reads for response in transport.opener.responses], [3, 3, 3])
+        self.assertEqual(list(self.root.glob("dataset.csv*")), [])
+        # The lease is checked around every read, and a lost lease is final.
+        transport = self.scripted_transport(*[([None], None)]*3, clock=clock)
         checks = 0
         def active():
             nonlocal checks
             checks += 1
             if checks == 3:
                 raise LeaseLost("lease_lost")
-        with self.assertRaisesRegex(LeaseLost, "lease_lost"):
-            transport.input(Claim.parse(claim_body()), "dataset", maximum=100, check_active=active)
-        self.assertEqual(response.reads, 1)
+        with patch("engine.worker.time.monotonic", clock):
+            with self.assertRaisesRegex(LeaseLost, "lease_lost"):
+                self.download(transport, claim, maximum=100, check_active=active)
+        self.assertEqual([response.reads for response in transport.opener.responses], [1])
+
+    def test_idle_timeout_retry_restarts_the_partial_file(self):
+        claim = Claim.parse(claim_body())
+        transport = self.scripted_transport(([CSV[:10], TimeoutError("timed out")], len(CSV)), ([CSV, b""], len(CSV)), retries=1)
+        with patch("engine.worker.time.sleep"):
+            _, (partial, size, digest) = self.download(transport, claim)
+        self.assertEqual((partial.read_bytes(), size, digest), (CSV, len(CSV), sha256(CSV)))
+        transport = self.scripted_transport(*[([CSV[:10], TimeoutError("timed out")], len(CSV))]*2, retries=1)
+        with patch("engine.worker.time.sleep"):
+            with self.assertRaisesRegex(ProtocolError, "transport_idle_timeout"):
+                self.download(transport, claim)
+        self.assertEqual(list(self.root.glob("dataset.csv*")), [])
+
+    def test_truncated_transfer_is_retried_over_real_http(self):
+        with RunnerServer(truncated_get=1) as server:
+            _, (partial, size, digest) = self.download(server.transport(), Claim.parse(server.claim))
+            self.assertEqual(len(server.gets), 2)
+            self.assertEqual((partial.read_bytes(), size, digest), (CSV, len(CSV), sha256(CSV)))
+        with RunnerServer(truncated_get=3) as server, patch("engine.worker.time.sleep"):
+            with self.assertRaisesRegex(ProtocolError, "response_truncated"):
+                self.download(server.transport(), Claim.parse(server.claim))
+            self.assertEqual(len(server.gets), 3)
+
+    def test_budget_scales_with_size_and_transport_timeout_is_bounded(self):
+        transport = Transport("https://runner.example", TOKEN, timeout=15)
+        self.assertEqual(transport.budget(100*1024*1024), 15+800)
+        self.assertEqual(transport.budget(0), 15)
+        self.assertEqual(Transport("https://runner.example", TOKEN, timeout=120).timeout, 120)
+        for timeout in (0.5, 121, True, float("nan"), "15"):
+            with self.assertRaises(ValueError):
+                Transport("https://runner.example", TOKEN, timeout=timeout)
 
 
 if __name__ == "__main__":

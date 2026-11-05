@@ -7,6 +7,8 @@ network disabled and a local artifact SHA-256 allowlist.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import http.client
 import importlib
 import importlib.metadata
 import json
@@ -38,6 +40,10 @@ RUNTIME_PACKAGES = {"onnx": ("numpy", "onnxruntime"), "pmml": ("numpy", "pandas"
 WIRE_FORMATS = {"onnx": "ONNX", "pmml": "PMML", "xgboost_json": "XGBoost", "lightgbm_text": "LightGBM"}
 MODULES = {"onnxruntime": "onnxruntime", "pypmml": "pypmml"}
 IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
+# Slowest sustained transfer an attempt is budgeted for (1 Mbit/s): a 100 MiB
+# dataset gets the idle timeout plus about 13 minutes per attempt.
+MIN_TRANSFER_RATE = 128 * 1024
+MAX_TRANSPORT_TIMEOUT = 120
 
 
 class ProtocolError(Exception):
@@ -61,7 +67,71 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class Collected:
+    """Response bytes kept in memory: small protocol envelopes only."""
+    def start(self):
+        self.chunks = []
+
+    def write(self, chunk):
+        self.chunks.append(chunk)
+
+    def finish(self):
+        return b"".join(self.chunks)
+
+    def discard(self):
+        self.chunks = []
+
+
+class StreamedFile:
+    """A download streamed into a partial file and hashed as it arrives.
+
+    Every attempt starts again from an empty file, so a retry never appends
+    to bytes from a failed attempt.
+    """
+    def __init__(self, path):
+        self.path, self.handle = path, None
+
+    def start(self):
+        self.discard()
+        self.size, self.digest = 0, hashlib.sha256()
+        self.handle = local_write(lambda: self.path.open("xb"))
+
+    def write(self, chunk):
+        local_write(lambda: self.handle.write(chunk))
+        self.digest.update(chunk)
+        self.size += len(chunk)
+
+    def finish(self):
+        local_write(self.handle.close)
+        self.handle = None
+        return self.path, self.size, self.digest.hexdigest()
+
+    def discard(self):
+        try:
+            if self.handle is not None:
+                self.handle.close()
+            self.path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        self.handle = None
+
+
+def local_write(operation):
+    """Run one local file operation; its failure is never retried as transport."""
+    try:
+        return operation()
+    except OSError as exc:
+        raise ProtocolError("workspace_unavailable") from exc
+
+
 class Transport:
+    """Bounded HTTPS client for /api/runner.
+
+    `timeout` is the idle timeout: the longest any connect or single read may
+    wait. Each attempt also has a wall-clock budget of the idle timeout plus
+    the time to move its maximum byte count at MIN_TRANSFER_RATE, and every
+    retry starts a fresh budget.
+    """
     def __init__(self, site, application_token, platform_token=None, *, timeout=15, retries=2, allow_local_http=False):
         parsed = urllib.parse.urlsplit(site)
         local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
@@ -71,14 +141,18 @@ class Transport:
             raise ValueError("Worker transport requires HTTPS; local HTTP is test-only")
         if not application_token or any(c in application_token for c in "\r\n") or platform_token and any(c in platform_token for c in "\r\n"):
             raise ValueError("Invalid worker credential configuration")
-        if not 1 <= timeout <= 60 or not 0 <= retries <= 3:
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= MAX_TRANSPORT_TIMEOUT or not 0 <= retries <= 3:
             raise ValueError("Transport timeout/retry bounds exceeded")
         self.endpoint = site.rstrip("/")+"/api/runner"
         self.application_token, self.platform_token = application_token, platform_token
         self.timeout, self.retries = timeout, retries
         self.opener = urllib.request.build_opener(NoRedirect())
 
-    def _request(self, method, url, *, body=None, maximum=MAX_ENVELOPE_BYTES, retry=False, sign=False, check_active=None):
+    def budget(self, size):
+        """Wall-clock seconds one attempt may take to move size bytes."""
+        return self.timeout+size/MIN_TRANSFER_RATE
+
+    def _request(self, method, url, *, body=None, maximum=MAX_ENVELOPE_BYTES, retry=False, sign=False, check_active=None, sink=None):
         headers = {"Authorization": "Bearer "+self.application_token, "Accept": "application/json", "User-Agent": "ai-assurance-worker/"+WORKER_VERSION}
         if self.platform_token:
             headers["OAI-Sites-Authorization"] = "Bearer "+self.platform_token
@@ -86,58 +160,78 @@ class Transport:
             headers["Content-Type"] = "application/json; charset=utf-8"
         if sign:
             headers["X-Result-Signature"] = result_signature(self.application_token, body)
-        deadline = time.monotonic()+self.timeout
+        sink = sink or Collected()
         for attempt in range((self.retries if retry else 0)+1):
+            deadline = time.monotonic()+self.budget(len(body or b"")+maximum)
             try:
+                sink.start()
                 if check_active:
                     check_active()
-                remaining = deadline-time.monotonic()
-                if remaining <= 0:
-                    raise ProtocolError("response_deadline_exceeded", retryable=True)
-                with self.opener.open(urllib.request.Request(url, data=body, method=method, headers=headers), timeout=remaining) as response:
-                    declared = response.headers.get("Content-Length")
-                    if declared and (not declared.isdigit() or int(declared) > maximum):
-                        raise ProtocolError("response_size_rejected")
-                    # HTTPResponse.read1 performs at most one raw read. read(n)
-                    # can instead wait for n slowly trickling bytes indefinitely.
-                    reader = getattr(response, "read1", response.read)
-                    chunks, size = [], 0
-                    while True:
-                        if check_active:
-                            check_active()
-                        if time.monotonic() >= deadline:
-                            raise ProtocolError("response_deadline_exceeded", retryable=True)
-                        chunk = reader(min(65536, maximum+1-size))
-                        if check_active:
-                            check_active()
-                        if time.monotonic() >= deadline:
-                            raise ProtocolError("response_deadline_exceeded", retryable=True)
-                        if not chunk:
-                            return b"".join(chunks)
-                        size += len(chunk)
-                        if size > maximum:
-                            raise ProtocolError("response_size_rejected")
-                        chunks.append(chunk)
+                self._exchange(urllib.request.Request(url, data=body, method=method, headers=headers), maximum, deadline, check_active, sink)
+                return sink.finish()
             except urllib.error.HTTPError as exc:
                 error = ProtocolError("http_"+str(exc.code), retryable=exc.code in {429, 502, 503, 504}, status=exc.code)
                 exc.close()
-            except (urllib.error.URLError, TimeoutError, OSError):
+            except ProtocolError as exc:
+                error = exc
+            except urllib.error.URLError as exc:
+                error = ProtocolError("transport_idle_timeout" if isinstance(exc.reason, TimeoutError) else "transport_unavailable", retryable=True)
+            except TimeoutError:
+                error = ProtocolError("transport_idle_timeout", retryable=True)
+            except (OSError, http.client.HTTPException):
                 error = ProtocolError("transport_unavailable", retryable=True)
+            except BaseException:
+                sink.discard()
+                raise
+            sink.discard()
             if not retry or not error.retryable or attempt >= self.retries:
                 raise error
             time.sleep(min(2, .25 * 2**attempt))
         raise ProtocolError("transport_unavailable")
+
+    def _exchange(self, request, maximum, deadline, check_active, sink):
+        def active():
+            if check_active:
+                check_active()
+            if time.monotonic() >= deadline:
+                raise ProtocolError("response_deadline_exceeded", retryable=True)
+        with self.opener.open(request, timeout=self.timeout) as response:
+            declared = response.headers.get("Content-Length")
+            if declared is not None and (not declared.isdigit() or int(declared) > maximum):
+                raise ProtocolError("response_size_rejected")
+            # HTTPResponse.read1 performs at most one raw read, which the idle
+            # timeout bounds. read(n) could wait for n slowly trickling bytes.
+            reader = getattr(response, "read1", response.read)
+            size = 0
+            while True:
+                active()
+                chunk = reader(min(65536, maximum+1-size))
+                active()
+                if not chunk:
+                    # read1 reports a connection closed early as a clean end.
+                    if declared is not None and size != int(declared):
+                        raise ProtocolError("response_truncated", retryable=True)
+                    return
+                size += len(chunk)
+                if size > maximum:
+                    raise ProtocolError("response_size_rejected")
+                sink.write(chunk)
 
     def post(self, body, *, retry=False):
         payload = body if isinstance(body, bytes) else json_bytes(body)
         raw = self._request("POST", self.endpoint, body=payload, retry=retry, sign=True)
         return strict_json(raw) if raw else None
 
-    def input(self, claim, purpose, *, maximum, check_active=None):
+    def download(self, claim, purpose, destination, *, maximum, check_active=None):
+        """Stream one pinned input to `destination` + ".partial" while hashing.
+
+        Returns (partial path, byte count, SHA-256). The caller verifies the
+        pins before giving the bytes their final name.
+        """
         if purpose not in {"dataset", "model"}:
             raise ValueError("Unsupported input purpose")
         query = urllib.parse.urlencode({"jobId": claim.job_id, "attemptId": claim.attempt_id, "fence": claim.fence, "input": purpose})
-        return self._request("GET", self.endpoint+"?"+query, maximum=maximum, retry=True, check_active=check_active)
+        return self._request("GET", self.endpoint+"?"+query, maximum=maximum, retry=True, check_active=check_active, sink=StreamedFile(destination.with_name(destination.name+".partial")))
 
 
 class LeaseKeeper:
@@ -315,6 +409,13 @@ def bound_bytes(path, maximum):
 def create_once(path, raw):
     with path.open("xb") as handle:
         handle.write(raw)
+
+
+def promote(partial, destination):
+    """Rename verified bytes into place without replacing an existing file."""
+    if destination.exists():
+        raise FileExistsError(destination)
+    partial.rename(destination)
 
 
 def enforce_compute_limits():
@@ -513,18 +614,9 @@ class Worker:
         execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "limitations": ["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."]}
         with LeaseKeeper(self.transport, claim, interval=self.heartbeat) as lease:
             lease.valid()
-            data = self.transport.input(claim, "dataset", maximum=request["dataset"]["size"], check_active=lease.valid)
-            if len(data) != request["dataset"]["size"] or sha256(data) != request["inputHashes"]["dataset"]:
-                raise ProtocolError("dataset_input_pin_mismatch")
-            create_once(inputs/"dataset.csv", data)
+            self.fetch(claim, "dataset", inputs/"dataset.csv", lease, digest=request["inputHashes"]["dataset"], size=request["dataset"]["size"], digest_code="dataset_input_pin_mismatch", size_code="dataset_input_pin_mismatch")
             if inference:
-                model = self.transport.input(claim, "model", maximum=MAX_BYTES, check_active=lease.valid)
-                if sha256(model) != request["inputHashes"]["modelArtifact"]:
-                    raise ProtocolError("model_input_pin_mismatch")
-                declared_size = request["model"].get("size")
-                if declared_size is not None and len(model) != declared_size:
-                    raise ProtocolError("model_input_size_mismatch")
-                create_once(inputs/("model"+MODEL_SUFFIXES[format_name]), model)
+                self.fetch(claim, "model", inputs/("model"+MODEL_SUFFIXES[format_name]), lease, digest=request["inputHashes"]["modelArtifact"], size=request["model"].get("size"), digest_code="model_input_pin_mismatch", size_code="model_input_size_mismatch")
             envelope = {"claim": claim.transport_dict(), "imageDigest": self.image_digest, "execution": execution, "approvedModelSha256": request["inputHashes"].get("modelArtifact") if inference else None}
             create_once(inputs/"envelope.json", json_bytes(envelope))
             lease.valid()
@@ -546,6 +638,15 @@ class Worker:
                     raise CompletionUncertain("completion_uncertain") from error
                 raise
             return {"jobId": claim.job_id, "attemptId": claim.attempt_id, "resultSha256": sha256(result), "resultFile": str((outputs/"result.json").resolve()), "response": response}
+
+    def fetch(self, claim, purpose, destination, lease, *, digest, size, digest_code, size_code):
+        """Download one pinned input; only verified bytes get the final name."""
+        partial, received, received_digest = self.transport.download(claim, purpose, destination, maximum=size or MAX_BYTES, check_active=lease.valid)
+        failure = digest_code if received_digest != digest else size_code if size is not None and received != size else None
+        if failure:
+            partial.unlink(missing_ok=True)
+            raise ProtocolError(failure)
+        local_write(lambda: promote(partial, destination))
 
     def once(self):
         if self.at_capacity():
@@ -649,6 +750,7 @@ def main(argv=None):
     parser.add_argument("--heartbeat-seconds", type=float, default=10)
     parser.add_argument("--compute-timeout", type=float, default=300)
     parser.add_argument("--maximum-jobs", type=int, default=100)
+    parser.add_argument("--transport-timeout", type=float, default=15, help=f"Idle timeout in seconds for any connect or single read (1-{MAX_TRANSPORT_TIMEOUT}); each attempt's total budget also scales with its size")
     args = parser.parse_args(argv)
     if args.readiness:
         print(json.dumps(runtime_readiness(), ensure_ascii=False, allow_nan=False))
@@ -661,7 +763,7 @@ def main(argv=None):
         token = os.environ.get("ASSURANCE_WORKER_TOKEN")
         if not token:
             raise ValueError("ASSURANCE_WORKER_TOKEN must be provided through the environment/secret manager")
-        transport = Transport(args.site, token, os.environ.get("ASSURANCE_SITE_SERVICE_TOKEN"))
+        transport = Transport(args.site, token, os.environ.get("ASSURANCE_SITE_SERVICE_TOKEN"), timeout=args.transport_timeout)
         executor = DockerExecutor(args.compute_image) if args.executor == "docker" else ProcessExecutor()
         worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs)
         while True:

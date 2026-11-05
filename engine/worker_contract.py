@@ -48,7 +48,7 @@ COMPUTE_FAILURE_CODES = frozenset({
 })
 FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
     "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
-    "transport_unavailable", "response_deadline_exceeded", "response_size_rejected", "model_input_size_mismatch",
+    "transport_unavailable", "transport_idle_timeout", "response_deadline_exceeded", "response_truncated", "response_size_rejected", "model_input_size_mismatch",
     "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
 })
 HTTP_FAILURE = re.compile(r"^http_[1-5][0-9]{2}$")
@@ -197,6 +197,9 @@ def validate_request(request):
         declared = request["model"].get("sha256", request["model"].get("sourceSha256"))
         if declared != model_hash:
             raise ValueError("Model artifact hash differs from request")
+        size = request["model"].get("size")
+        if size is not None and (isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= MAX_BYTES):
+            raise ValueError("Model size exceeds worker byte limits")
     suite = config.get("suite")
     if not isinstance(suite, list) or not suite or len(suite) > len(SUITES) or any(not isinstance(s, str) or s not in SUITES for s in suite) or len(set(suite)) != len(suite):
         raise ValueError("Invalid hosted suite selection")
