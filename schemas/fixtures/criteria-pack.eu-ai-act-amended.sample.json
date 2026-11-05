@@ -117,6 +117,10 @@
           "evidenceCategories": [
             "Governance"
           ],
+          "extensions": {
+            "legalSource": "EUR-Lex",
+            "version": "02024R1689-20260727"
+          },
           "provenance": {
             "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
             "sourceKind": "official_consolidation",
@@ -177,7 +181,73 @@
           }
         }
       ],
-      "notes": "Design sample for issue #26: the subset of the framework needed by three catalogue items. Article nodes come from the catalogue regulatoryRefs; child requirements from docs/obligation-subitems.json; requirement-level application dates are not recorded in data version 2026.10.1 (see applicationSummary)."
+      "notes": "Design sample for issue #26: the subset of the framework needed by three catalogue items. Article nodes come from the catalogue regulatoryRefs; child requirements from docs/obligation-subitems.json; requirement-level application dates are not recorded in data version 2026.10.1 (see applicationSummary). compat.obligations keeps the obligation file's top-level fields verbatim and its item order, restricted to the sample's one subitem.",
+      "compat": {
+        "obligations": {
+          "schemaVersion": "1.0",
+          "catalogVersion": "2026.10.07-proposed",
+          "status": "proposed_for_methodology_review",
+          "scope": "Selective audit prompts for Articles 9-15, Annex IV and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
+          "source": {
+            "legalSource": "EUR-Lex",
+            "version": "02024R1689-20260727",
+            "consolidatedAsOf": "2026-07-27",
+            "researchedAsOf": "2026-10-07",
+            "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+            "authenticAmendment": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744"
+          },
+          "applicationContext": {
+            "legalSource": "Article 113(c), version 02024R1689-20260727",
+            "annexIIIArticle6_2": "2027-12-02",
+            "annexIArticle6_1": "2028-08-02",
+            "covers": "Chapter III Sections 1, 2 and 3 except Article 6(5)",
+            "approvalRule": "Dates inform review; they do not automatically approve applicability. Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules. Annex I Section B requires sectoral-route analysis under Article 2(2), rather than automatic direct Section 2 application.",
+            "sourceCurrencyRule": "Source publication, research and application dates have different meanings. A new source version creates an impact-review candidate and never rewrites a historical decision."
+          },
+          "decisionPolicy": {
+            "candidateStates": [
+              "suggested",
+              "needs_information"
+            ],
+            "humanDecisionStates": [
+              "applicable",
+              "readiness",
+              "not_applicable",
+              "needs_information"
+            ],
+            "requiresHumanRationale": true,
+            "requiresIndependentReview": true,
+            "defaultAssessment": "not_assessed",
+            "categoryMatches": "candidate_evidence_only",
+            "unknownFacts": "needs_information_not_false_or_minimal_risk",
+            "automatedOutputs": "diagnostic_or_collection_signals_never_legal_approval",
+            "providerResponsibility": "Articles 9-15 are system requirements; provider responsibility is linked through Article 16(a). A deployer may inspect provider evidence but does not thereby assume every provider duty. Article 25 role changes need separate review.",
+            "dataScope": "Under Article 10(1), datasets used for data-trained models are assessed; Article 10(6) limits Article 10(2)-(4) and Article 4a(1) to testing datasets for systems without model training. Article 10(5) was deleted; special-category processing is a separate Article 4a/data-protection assessment, not an upload permission.",
+            "retention": "Retention is actor, control, purpose and law dependent. Article 26(6) is not one universal evidence-vault retention policy.",
+            "excludedActorDuties": "Other provider, deployer, representative, importer, distributor, sectoral, conformity, registration and fundamental-rights duties must be added where applicable. This selective catalog does not waive them."
+          },
+          "triggerType": {
+            "profile": "key_of_triggerProfiles",
+            "conditions": "array_of_fact_equals_predicates",
+            "evaluation": "Candidate selection only. Unknown in a required predicate yields needs_information. Legal-period approval and scope exclusions are separate human decisions."
+          },
+          "evidenceCategories": [
+            "Dataset",
+            "Model",
+            "Training log",
+            "Validation",
+            "Pipeline code",
+            "Governance",
+            "Instructions",
+            "Oversight",
+            "Security",
+            "Other"
+          ],
+          "order": [
+            "AIA-9-1"
+          ]
+        }
+      }
     },
     {
       "documentType": "pack",
@@ -207,6 +277,14 @@
         "independentReview": true,
         "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
         "statement": "Diagnostics support an audit assessment and do not constitute legal compliance or a conformity certificate."
+      },
+      "features": {
+        "aiActClassification": true,
+        "obligationAssessments": true
+      },
+      "reporting": {
+        "regulatorySource": "https://eur-lex.europa.eu/eli/reg/2024/1689",
+        "limitations": "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification."
       },
       "controlObjectives": [
         {
@@ -377,7 +455,7 @@
           ]
         }
       ],
-      "notes": "Design sample for issue #26: three catalogue items migrated by the converter rules of docs/design/criteria-model.md section 11.2. The full pack also declares roles and features, which reference items this sample omits.",
+      "notes": "Design sample for issue #26: three catalogue items migrated by the converter rules of docs/design/criteria-model.md section 11.2. The full pack also declares roles and features.annexIvIndex, which reference items this sample omits.",
       "compat": {
         "catalog": {
           "schemaVersion": "1.0.0",

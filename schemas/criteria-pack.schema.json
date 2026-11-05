@@ -400,7 +400,28 @@
           "items": { "$ref": "#/$defs/requirement" }
         },
         "notes": { "$ref": "#/$defs/longText" },
-        "compat": { "type": "object" }
+        "compat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "obligations": {
+              "description": "Only on frameworks converted from docs/obligation-subitems.json: every top-level field of that file except items, triggerProfiles and factTypes (which are framework fields), verbatim, plus order, the item codes in file order. With the requirement nodes it projects back to the file without loss (design section 11.3). Requirement nodes listed in order are the obligation subitems that obligation assessments may cite.",
+              "type": "object",
+              "required": ["schemaVersion", "catalogVersion", "source", "order"],
+              "properties": {
+                "schemaVersion": { "type": "string" },
+                "catalogVersion": { "type": "string" },
+                "source": { "type": "object" },
+                "order": {
+                  "type": "array",
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "items": { "$ref": "#/$defs/localId" }
+                }
+              }
+            }
+          }
+        }
       },
       "allOf": [
         {
@@ -516,7 +537,7 @@
       }
     },
     "item": {
-      "description": "A working-paper or memo template. The first eleven properties are the catalogue item fields of templates/catalog.json, unchanged; objectiveIds, phase and derivedFrom are new.",
+      "description": "A working-paper or memo template. The first twelve properties are the catalogue item fields of templates/catalog.json, unchanged; objectiveIds, phase and derivedFrom are new.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -666,6 +687,7 @@
           "items": { "$ref": "#/$defs/criteriaSet" }
         },
         "crosswalks": {
+          "description": "Crosswalk-only packs: the crosswalk versions released together with this pack (validator: each is released, and connects one of the pack's criteria editions). They do not pin the coverage view, which always uses the current version of each crosswalk (design section 9.6).",
           "type": "array",
           "uniqueItems": true,
           "items": {
@@ -737,12 +759,37 @@
           }
         },
         "features": {
+          "description": "AI Act behaviour that applies only to engagements on packs that switch it on (design section 7.1). Absent means false.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "annexIvIndex": {
               "description": "Compile the AI Act Annex IV evidence index (templates/annex-iv-map.json) into report snapshots.",
               "type": "boolean"
+            },
+            "aiActClassification": {
+              "description": "Engagements carry the AI Act risk classification: the classify and approveClassification commands, the classification and prohibited-practice gates of completionGates and stageGates, and the classification in report snapshots. Requires an eu-ai-act criteria set (validator rule).",
+              "type": "boolean"
+            },
+            "obligationAssessments": {
+              "description": "Engagements can record AI Act obligation-subitem assessments (assurance records of kind obligation), which coverage reads as direct requirement assessments. Requires an eu-ai-act criteria set whose framework carries compat.obligations (validator rule).",
+              "type": "boolean"
+            }
+          }
+        },
+        "reporting": {
+          "description": "Report snapshot texts that today are constants in createReport.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["limitations"],
+          "properties": {
+            "regulatorySource": {
+              "description": "Snapshot regulatorySource. Absent for packs whose criteria are not legislation; the snapshot then has no regulatorySource.",
+              "$ref": "#/$defs/httpsUrl"
+            },
+            "limitations": {
+              "description": "The limitations statement of every report snapshot of an engagement on this pack.",
+              "$ref": "#/$defs/text"
             }
           }
         },
@@ -781,6 +828,7 @@
             "required": ["kind"]
           },
           "then": {
+            "required": ["reporting"],
             "properties": {
               "items": { "minItems": 1 },
               "controlObjectives": { "minItems": 1 },
@@ -1024,16 +1072,20 @@
           }
         },
         "legacy": {
-          "description": "Read-time pin for engagements stored before criteria pins existed.",
+          "description": "Read-time pin for engagements stored before criteria pins existed (design section 11.4, M0). Each value is the pack version whose content the build before the criteria model served to that class of engagement.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["packId", "fallbackVersion", "methodologyVersions"],
+          "required": ["packId", "fallbackVersion", "stamps"],
           "properties": {
             "packId": { "$ref": "#/$defs/slug" },
-            "fallbackVersion": { "$ref": "#/$defs/dataVersion" },
-            "methodologyVersions": {
+            "fallbackVersion": {
+              "description": "Pack version for engagements without the rule-pack stamp of issue #18.",
+              "$ref": "#/$defs/dataVersion"
+            },
+            "stamps": {
+              "description": "Value of the #18 engagement stamp, verbatim, to pack version. Keys use the edition pattern so that a methodology version (2026.11.1) and a CELEX edition (02024R1689-20260727) are both accepted.",
               "type": "object",
-              "propertyNames": { "$ref": "#/$defs/dataVersion" },
+              "propertyNames": { "$ref": "#/$defs/edition" },
               "additionalProperties": { "$ref": "#/$defs/dataVersion" }
             }
           }
