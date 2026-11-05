@@ -18,4 +18,4 @@ Stable id families:
 | WP-RM | Remediation and monitoring |
 | MEM | Decision and communication memoranda |
 
-Every template inherits the warning: **diagnostic output is evidence for an auditor's assessment; it is not a legal conclusion or a conformity certificate**. Default numerical thresholds are unset until the test plan is approved. The legal snapshot is 27 July 2026, researched on 5 October 2026; refresh applicability before each engagement.
+Every template inherits the warning: **diagnostic output is evidence for an auditor's assessment; it is not a legal conclusion or a conformity certificate**. Default numerical thresholds are unset until the test plan is approved. The legal snapshot is the consolidated text of 27 July 2026 under rule pack 2026.11.1, researched on 5 November 2026 (`regulatorySnapshot` in `catalog.json`); refresh applicability before each engagement.

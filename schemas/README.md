@@ -47,3 +47,15 @@ node schemas/validate-procedure-schema.mjs site-app/.sites-runtime/execution-sch
 ```
 
 The execution schema checks record shape; accepted evidence, authorized actors, matching approved inputs and independent review remain server-enforced.
+
+## Rule pack
+
+`rule-pack.schema.json` (Draft 2020-12) defines the EU AI Act rule pack, the `regulatorySnapshot` of `templates/catalog.json`: per-provision application dates with sources, verification date, legal-review flags, approval metadata and change history; authority deadlines; the dated Article 5 practices; the standards and guidance registers; the legal-review items, unverified claims and the source register. From the workspace root:
+
+```powershell
+node schemas/validate-rule-pack.mjs
+```
+
+Beyond the schema, the validator checks unique ids; that every source, legal-review item and cross-reference resolves and every source is cited; real calendar dates; typed predicates over the facts declared in `docs/obligation-subitems.json`; the approval rules (an entry or the pack is approved only with a reviewer and an approval time, never while a legal-review item it depends on is pending); that secondary sources back only content marked `secondary_only`; the version and research date the catalog, the obligation file and the Annex IV map share; and agreement with the verified research file the pack names. It then proves that a set of single mutations is each rejected. CI runs it in the `engine` job, and the Site unit tests run the same checks on the copies in `site-app/lib/`.
+
+Hosted 1.1 and external 1.2 runs may also carry `rulePack` and `methodologyVersion`: the rule pack and methodology version the run was made under. Both are optional because earlier runs lack them.
