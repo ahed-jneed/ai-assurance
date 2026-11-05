@@ -2141,8 +2141,9 @@ export function TestingLab({
                   Cancel run
                 </Button>
                 <span className="subtle">
-                  Queued with frozen inputs. Start or cancel it before queueing
-                  another evaluation of the same procedure.
+                  Queued with frozen inputs.
+                  {shownRun.procedureBinding &&
+                    " Start or cancel it before queueing another evaluation of the same procedure."}
                 </span>
               </div>
             )}
