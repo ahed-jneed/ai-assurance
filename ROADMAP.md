@@ -69,7 +69,7 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 | [#29] | NIST AI RMF 1.0 and AI 600-1 crosswalk | P2 | [#27], [#28] | — |
 | [#30] | NYC Local Law 144 bias audit: computations, pack and publishable summary | P1 | [#22], [#27] | — |
 | [#31] | Design: GenAI evaluation evidence ingestion — formats, per-item schema, evidence levels | P1 | — | — |
-| [#32] | Engine: ingest and recompute GenAI evaluation evidence (Inspect, lm-eval-harness, promptfoo, garak) | P1 | [#31], [#21] | — |
+| [#32] | Engine: ingest and recompute GenAI evaluation evidence (Inspect, lm-eval-harness, promptfoo, garak) | P1 | [#31], [#21]; coordinate with [#62] (zstd) | — |
 | [#33] | GenAI evidence in the workspace: intake, evidence levels, results and readiness gate | P1 | [#32], [#27] | — |
 
 ### M3 Release readiness
