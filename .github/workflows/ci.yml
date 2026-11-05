@@ -58,6 +58,8 @@ jobs:
     env:
       # Interpreter for the Python-backed assurance harness.
       ASSURANCE_TEST_PYTHON: python
+      # Interpreter for scripts/sync-generated.mjs (run schema, runtime zip).
+      PYTHON: python
     steps:
       - uses: actions/checkout@v7
 
@@ -91,6 +93,11 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+      # Generated copies (lib/*.json, public/tools/*, the run schema) must
+      # match their canonical sources; the runtime zip is rebuilt in a temp dir.
+      - name: Generated files in sync
+        run: npm run check:sync
 
       - name: Build
         run: npm run build

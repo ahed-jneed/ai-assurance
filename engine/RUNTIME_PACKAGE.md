@@ -44,9 +44,10 @@ For schema verification, use a pre-existing dependency tree with Ajv 2020 and
 ajv-formats; the archive deliberately includes no node_modules:
 
 ```powershell
-python schemas/.build-run-schema.py
+python schemas/.build-run-schema.py --check
 node schemas/validate-run-schema.mjs --ajv-package path/to/package.json
-node schemas/validate-procedure-schema.mjs --ajv-package path/to/package.json
+node schemas/validate-procedure-schema.mjs --ajv-package path/to/package.json schemas/fixtures/procedure-execution.json
+node schemas/validate-working-paper-schema.mjs --ajv-package path/to/package.json
 ```
 
 The run-schema validator accepts `--external-run path/to/imported-run.json` for
@@ -63,5 +64,11 @@ python -m engine.package_runtime --output tmp/assurance-runtime.zip
 
 Outputs are created once; choose a new path for another archive. Packaging
 rejects symlinked source components and uses explicit source-file allowlists.
+The archive is reproducible from an LF checkout: entries are sorted, carry a
+fixed timestamp and mode, and stock zlib builds produce identical bytes. The
+workspace commits the downloadable copy as
+`site-app/public/tools/assurance-runtime.zip`; `npm run sync` in `site-app/`
+rebuilds it, and CI rebuilds it into a temporary path and fails unless the
+SHA-256 matches (or, for another zlib build, every entry is identical).
 Operators remain responsible for independent release review/signing, deployment,
 worker enrollment, access rotation, quotas and retained-evidence verification.
