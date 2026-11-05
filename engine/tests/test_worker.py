@@ -5,11 +5,14 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import threading
 import time
 import unittest
+import urllib.error
+import urllib.request
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,99 +23,226 @@ from urllib.parse import parse_qs, urlsplit
 from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
 from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, runtime_readiness, stripped_compute_env, verify_result_bytes
-from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_request
+from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, WORKER_VERSION, Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_model_spec, validate_request
 from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, fake_onnxruntime, requires_numpy
 
-TOKEN = "dummy-application-worker-token-for-tests"
+# Same shape as an enrolled platform token: two UUIDs, 72 characters.
+TOKEN = "00000000-0000-4000-8000-000000000001"+"00000000-0000-4000-8000-000000000002"
 PLATFORM = "dummy-platform-service-token-for-tests"
+WORKER_ID = "worker-fixture"
 IMAGE = "sha256:"+"a"*64
 CSV = b"actual,predicted,group\n1,1,A\n1,1,A\n0,0,A\n0,0,A\n1,1,B\n1,0,B\n0,0,B\n0,0,B\n"
 
 
 def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     c = {"labelColumn": "actual", "predictionColumn": "predicted", "groupColumn": "group", "positiveLabel": "1", "minimumGroupSize": 2, "maximumParityGap": .15, "minimumImpactRatio": .8, "minimumAccuracy": .8, "minimumSampleSize": 2, "minimumClassCount": 2, "maximumOddsGap": .1, "minimumRecall": .7, "minimumMacroF1": .6, "maximumRmse": .8}
-    return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": None, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite or ["performance", "demographic_parity", "disparate_impact", "equalized_odds"], "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
+    suite = suite or ["performance", "demographic_parity", "disparate_impact", "equalized_odds"]
+    # Like the platform's frozen request, the evaluation profile travels too.
+    profile = {"id": "fixture-policy", "version": "1", "task": task, "suite": suite, "config": c}
+    return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": profile, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite, "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
 
 
-def claim_body(request=None, *, job="job-fixture", attempt="attempt-fixture", lease_seconds=60):
+def claim_body(request=None, *, job="JOB-0123456789ab", attempt="ATTEMPT-0123456789ab", lease_seconds=120):
+    """A claim response shaped like route.ts: id('JOB'), crypto.randomUUID() nonce, toISOString()."""
     request = request or hosted_request()
     # Deliberately use the server's original insertion order, not canonical
     # object sorting: requestJSON is authoritative for the transport hash.
     text = json.dumps(request, separators=(",", ":"), ensure_ascii=False)
-    return {"jobId": job, "attemptId": attempt, "fence": 7, "nonce": "nonce-fixture-at-least-16-characters", "leaseUntil": (datetime.now(timezone.utc)+timedelta(seconds=lease_seconds)).isoformat(), "requestSha256": sha256(text.encode("utf-8")), "request": request, "requestJSON": text}
+    lease = (datetime.now(timezone.utc)+timedelta(seconds=lease_seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return {"jobId": job, "attemptId": attempt, "fence": 7, "nonce": "c0ffee00-0000-4000-8000-00000000f1x7", "leaseUntil": lease, "requestSha256": sha256(text.encode("utf-8")), "requestJSON": text, "request": request}
 
 
 PIN_KEYS = ("jobId", "attemptId", "fence", "nonce", "requestSha256")
+CONTRACT_VIOLATION = "Runner payload violates the versioned result contract"
+REQUEST_FAILED = "The request could not be completed. Your changes were not confirmed."
+HEX64 = re.compile(r"^[a-f0-9]{64}$")
+
+
+def short(value):
+    """route.ts / assurance-core `short`: a string of 1-300 characters."""
+    return isinstance(value, str) and 1 <= len(value) <= 300
+
+
+def pins_envelope(body, extra):
+    """route.ts `pins.extend(...).strict()`: exactly the pins plus `extra` keys."""
+    return set(body) <= set(PIN_KEYS) | extra and set(PIN_KEYS) <= set(body) and all(short(body[key]) for key in ("jobId", "attemptId", "nonce")) and isinstance(body["fence"], int) and not isinstance(body["fence"], bool) and body["fence"] > 0 and isinstance(body["requestSha256"], str) and HEX64.fullmatch(body["requestSha256"]) is not None
+
+
+def result_envelope_ok(packet):
+    """site-app/lib/assurance-core.ts `resultEnvelope`, field by field."""
+    def number(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and value == value and abs(value) != float("inf")
+    if not isinstance(packet, dict) or packet.get("schemaVersion") != "1.0" or not isinstance(packet.get("externalReport"), dict):
+        return False
+    results, provenance = packet.get("hostedResults"), packet.get("provenance")
+    if not isinstance(results, list) or len(results) > 30:
+        return False
+    for result in results:
+        if not isinstance(result, dict) or not short(result.get("testId")) or not short(result.get("label")) or result.get("article") not in {"10", "15"} or result.get("outcome") not in {"pass", "fail", "inconclusive", "not_applicable"}:
+            return False
+        metrics, notes = result.get("metrics"), result.get("limitations")
+        if not isinstance(metrics, list) or len(metrics) > 100 or not isinstance(notes, list) or len(notes) > 100 or any(not isinstance(note, str) or len(note.strip()) > 10000 for note in notes):
+            return False
+        for metric in metrics:
+            if not isinstance(metric, dict) or not short(metric.get("name")) or "value" not in metric or not (metric["value"] is None or number(metric["value"])) or not isinstance(metric.get("unit"), str) or len(metric["unit"]) > 100 or not isinstance(metric.get("sampleSize"), int) or isinstance(metric["sampleSize"], bool) or metric["sampleSize"] < 0:
+                return False
+    return isinstance(provenance, dict) and isinstance(provenance.get("requestSha256"), str) and HEX64.fullmatch(provenance["requestSha256"]) is not None and isinstance(provenance.get("inputHashes"), dict) and all(isinstance(value, str) and HEX64.fullmatch(value) for value in provenance["inputHashes"].values())
+
+
+class ModelReadyExecutor(ProcessExecutor):
+    """Reports a ready ONNX runtime so a worker may advertise ONNX.
+
+    Tests using it never reach native model execution.
+    """
+    permits_models = True
+
+    def readiness(self):
+        return {"modelFormats": {"onnx": {"runtimePresent": True}}}
 
 
 class RunnerServer:
-    """Real loopback HTTP fixture; no platform or native runtime assumed."""
-    def __init__(self, request=None, data=CSV, *, claims=None, altered_input=False, swapped_input=False, redirect=False, transient_get=0, truncated_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
+    """Loopback stand-in for site-app/app/api/runner/route.ts.
+
+    It enforces the route's observable contract: the bearer-token format
+    and lookup, strict per-operation envelopes, format filtering and
+    {"idle": true}, attempt pins and leases, HMAC verification of complete
+    and fail bodies, the result envelope and frozen-request checks,
+    duplicate completion, and GET input authorization. A restricted Site's
+    front door additionally requires the platform token. Database, R2 and
+    membership checks are out of scope. Fault injection (transient_*,
+    truncated_get, redirect, heartbeat_rejected) simulates infrastructure.
+    """
+    def __init__(self, request=None, data=CSV, *, claims=None, capabilities=("provided_predictions",), lease_seconds=120, altered_input=False, swapped_input=False, redirect=False, transient_get=0, truncated_get=0, transient_claim=0, transient_complete=0, heartbeat_rejected=False):
         # Claims are served once each, in order; then the queue is idle.
         self.queue = list(claims) if claims is not None else [claim_body(request)]
-        self.claim, self.issued = self.queue[0] if self.queue else None, []
+        self.claim = self.queue[0] if self.queue else None
+        self.jobs, self.issued = {}, []
+        self.capabilities, self.lease_seconds = list(capabilities), lease_seconds
         # altered_input appends bytes; swapped_input keeps the size but not the hash.
         self.data = data+b"tampered" if altered_input else data[:-2]+(b"1\n" if data[-2:] != b"1\n" else b"0\n") if swapped_input else data
         self.truncated_get = truncated_get
         self.redirect, self.transient_get, self.transient_claim = redirect, transient_get, transient_claim
         self.transient_complete, self.heartbeat_rejected = transient_complete, heartbeat_rejected
-        self.posts, self.gets, self.errors = [], [], []
+        # errors: every rejection (status, message); unsigned: ops posted without a valid signature.
+        self.posts, self.gets, self.errors, self.unsigned = [], [], [], []
         fixture = self
 
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_):
                 pass
 
-            def respond(self, value, status=200):
+            def respond(self, value, status=200, headers=(("Content-Type", "application/json"),)):
                 raw = value if isinstance(value, bytes) else json_bytes(value)
                 self.send_response(status)
+                for name, header in headers:
+                    self.send_header(name, header)
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()
                 self.wfile.write(raw)
 
-            def credentials(self):
-                if self.headers.get("Authorization") != "Bearer "+TOKEN or self.headers.get("OAI-Sites-Authorization") != "Bearer "+PLATFORM:
-                    fixture.errors.append("credential mismatch")
-                    self.respond({"error": "unauthorized"}, 401)
+            def reject(self, status, message):
+                fixture.errors.append((status, message))
+                self.respond({"error": message}, status)
+
+            def authenticated(self):
+                if self.headers.get("OAI-Sites-Authorization") != "Bearer "+PLATFORM:
+                    self.reject(401, "Sites service authentication required")
+                    return False
+                match = re.fullmatch(r"Bearer ([a-zA-Z0-9-]{60,100})", self.headers.get("Authorization") or "")
+                if not match:
+                    self.reject(401, "Runner authentication required")
+                    return False
+                if not hmac.compare_digest(match.group(1), TOKEN):
+                    self.reject(401, "Runner credential invalid or revoked")
                     return False
                 return True
 
             def do_POST(self):
-                if not self.credentials():
+                if not self.authenticated():
                     return
-                raw = self.rfile.read(int(self.headers["Content-Length"]))
-                if self.headers.get("X-Result-Signature") != result_signature(TOKEN, raw):
-                    fixture.errors.append("signature mismatch")
-                    return self.respond({"error": "signature"}, 401)
-                body = strict_json(raw, maximum=MAX_RESULT_BYTES+2*1024*1024)
+                length = int(self.headers.get("Content-Length") or 0)
+                if length > 10*1024*1024:
+                    return self.reject(413, "Request exceeds the permitted size")
+                raw = self.rfile.read(length)
+                try:
+                    body = json.loads(raw.decode("utf-8"))
+                except ValueError:
+                    return self.reject(500, REQUEST_FAILED)
                 fixture.posts.append((body, raw))
-                if body["op"] == "claim":
-                    if fixture.transient_claim:
-                        fixture.transient_claim -= 1
-                        return self.respond({"error": "temporary"}, 503)
-                    if not fixture.queue:
-                        return self.respond({"idle": True})
-                    fixture.issued.append(fixture.queue.pop(0))
-                    return self.respond(fixture.issued[-1])
-                if not any(all(body.get(key) == claim.get(key) for key in PIN_KEYS) for claim in fixture.issued or [fixture.claim]):
-                    fixture.errors.append("attempt pin mismatch")
-                    return self.respond({"error": "fence"}, 409)
-                if body["op"] == "heartbeat":
-                    if fixture.heartbeat_rejected:
-                        return self.respond({"error": "stale_fence"}, 409)
-                    return self.respond({"leaseUntil": (datetime.now(timezone.utc)+timedelta(seconds=60)).isoformat()})
+                if self.headers.get("X-Result-Signature") != result_signature(TOKEN, raw):
+                    fixture.unsigned.append(body.get("op") if isinstance(body, dict) else None)
+                op = body.get("op") if isinstance(body, dict) else None
+                if op == "claim":
+                    return self.claim(body)
+                if op == "heartbeat":
+                    return self.heartbeat(body)
+                if op in {"complete", "fail"}:
+                    return self.settle(body, raw)
+                return self.reject(400, "Unknown runner operation")
+
+            def claim(self, body):
+                if fixture.transient_claim:
+                    fixture.transient_claim -= 1
+                    return self.reject(503, "temporary")
+                formats = body.get("formats")
+                if set(body) - {"op", "workerId", "imageDigest", "formats", "capabilities"} or "workerId" in body and not short(body["workerId"]) or not isinstance(body.get("imageDigest"), str) or not re.fullmatch(r"sha256:[a-f0-9]{64}", body["imageDigest"]) or not isinstance(formats, list) or not 1 <= len(formats) <= 10 or not all(short(item) for item in formats) or "capabilities" in body and not isinstance(body["capabilities"], dict):
+                    return self.reject(400, CONTRACT_VIOLATION)
+                if body.get("workerId", WORKER_ID) != WORKER_ID or body["imageDigest"] != IMAGE:
+                    return self.reject(403, "Worker identity or enrolled image digest mismatch")
+                aliases = {"onnx": "ONNX", "xgboost_json": "XGBoost", "lightgbm_text": "LightGBM", "pmml": "PMML"}
+                accepted = [aliases.get(item, item) for item in formats if aliases.get(item, item) in fixture.capabilities]
+                if not accepted:
+                    return self.reject(409, "No compatible enrolled capability")
+                for index, queued in enumerate(fixture.queue):
+                    frozen = json.loads(queued["requestJSON"])
+                    if (frozen.get("model", {}).get("format") if frozen.get("executionMode") == "auditor_model" else "provided_predictions") in accepted:
+                        fixture.start(fixture.queue.pop(index))
+                        return self.respond(fixture.issued[-1], headers=(("Content-Type", "application/json"), ("Cache-Control", "no-store")))
+                return self.respond({"idle": True})
+
+            def heartbeat(self, body):
+                if not pins_envelope(body, {"op"}):
+                    return self.reject(400, CONTRACT_VIOLATION)
+                job = fixture.live(body)
+                if job is None:
+                    return self.reject(409, "Attempt identity or frozen request mismatch")
+                if not fixture.leased(job):
+                    return self.reject(409, "Attempt is expired, cancelled or already complete")
+                if fixture.heartbeat_rejected:
+                    return self.reject(409, "Attempt no longer active")
+                job["leaseUntil"] = datetime.now(timezone.utc)+timedelta(seconds=fixture.lease_seconds)
+                return self.respond({"leaseUntil": job["leaseUntil"].isoformat(timespec="milliseconds").replace("+00:00", "Z")})
+
+            def settle(self, body, raw):
+                # Not `finish`: StreamRequestHandler.finish flushes the response.
+                if not pins_envelope(body, {"op", "resultJSON", "resultSha256", "error"}) or "resultJSON" in body and not (isinstance(body["resultJSON"], str) and len(body["resultJSON"]) <= 9*1024*1024) or "resultSha256" in body and not (isinstance(body["resultSha256"], str) and HEX64.fullmatch(body["resultSha256"])) or "error" in body and not (isinstance(body["error"], str) and len(body["error"]) <= 1000):
+                    return self.reject(400, CONTRACT_VIOLATION)
+                job = fixture.live(body)
+                if job is None:
+                    return self.reject(409, "Attempt identity or frozen request mismatch")
+                signature = self.headers.get("X-Result-Signature") or ""
+                if not HEX64.fullmatch(signature):
+                    return self.reject(401, "Authenticated result signature required")
+                if not hmac.compare_digest(signature, result_signature(TOKEN, raw)):
+                    return self.reject(401, "Result signature verification failed")
+                if job["state"] == "succeeded" and body["op"] == "complete" and body.get("resultSha256") == job["resultSha256"]:
+                    return self.respond({"accepted": True, "duplicate": True})
+                if not fixture.leased(job):
+                    return self.reject(409, "Attempt is expired, cancelled or already complete")
                 if body["op"] == "complete":
-                    if sha256(body["resultJSON"].encode("utf-8")) != body["resultSha256"]:
-                        fixture.errors.append("exact result hash mismatch")
-                        return self.respond({"error": "digest"}, 400)
+                    status, problem = fixture.result_problem(job, body)
+                    if problem:
+                        return self.reject(status, problem)
                     if fixture.transient_complete:
                         fixture.transient_complete -= 1
-                        return self.respond({"error": "ambiguous_commit"}, 503)
-                    return self.respond({"state": "completed"})
-                return self.respond({"state": "failed"})
+                        return self.reject(503, "temporary")
+                    job.update(state="succeeded", resultSha256=body["resultSha256"])
+                else:
+                    job.update(state="failed", error=body.get("error") or "Worker execution failed")
+                return self.respond({"accepted": True})
 
             def do_GET(self):
-                if not self.credentials():
+                if not self.authenticated():
                     return
                 query = parse_qs(urlsplit(self.path).query)
                 fixture.gets.append(query)
@@ -123,21 +253,81 @@ class RunnerServer:
                     return
                 if fixture.transient_get:
                     fixture.transient_get -= 1
-                    return self.respond({"error": "temporary"}, 503)
+                    return self.reject(503, "temporary")
+                first = {key: values[0] for key, values in query.items()}
+                job = fixture.find(first.get("jobId"), first.get("attemptId"), first.get("fence"))
+                if job is None:
+                    return self.reject(404, "Attempt input not found")
+                if not fixture.leased(job):
+                    return self.reject(409, "Attempt is expired, cancelled or already complete")
+                if first.get("input") not in {"dataset", "model"}:
+                    return self.reject(500, REQUEST_FAILED)
+                if first["input"] == "model" and json.loads(job["claim"]["requestJSON"]).get("executionMode") != "auditor_model":
+                    return self.reject(403, "Model bytes are not authorized for this prediction-only request")
+                if first["input"] == "model":
+                    return self.reject(404, "Pinned input bytes unavailable")
+                headers = (("Content-Type", "application/octet-stream"), ("Cache-Control", "private, no-store"), ("X-Evidence-SHA256", sha256(fixture.data)))
                 if fixture.truncated_get:
                     # Declare the full length, send half, then close the connection.
                     fixture.truncated_get -= 1
                     self.send_response(200)
+                    for name, value in headers:
+                        self.send_header(name, value)
                     self.send_header("Content-Length", str(len(fixture.data)))
                     self.end_headers()
                     self.wfile.write(fixture.data[:len(fixture.data)//2])
                     self.close_connection = True
                     return
-                return self.respond(fixture.data)
+                return self.respond(fixture.data, headers=headers)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.origin = "http://127.0.0.1:"+str(self.server.server_port)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def start(self, claim):
+        """Lease an attempt as the route does; the server keeps its own lease clock."""
+        self.issued.append(claim)
+        self.jobs[claim["jobId"]] = {"claim": claim, "state": "running", "leaseUntil": datetime.now(timezone.utc)+timedelta(seconds=self.lease_seconds), "resultSha256": None, "error": None}
+
+    def job(self, job_id):
+        # Tests that drive Transport/LeaseKeeper directly skip the claim POST;
+        # treat the first queued claim as already leased to this worker.
+        if not self.jobs and self.claim is not None:
+            self.start(self.claim)
+            self.queue = [claim for claim in self.queue if claim is not self.claim]
+        return self.jobs.get(job_id)
+
+    def live(self, pins):
+        """route.ts live(): the current attempt must match every pin."""
+        job = self.job(pins.get("jobId"))
+        return job if job and all(job["claim"][key] == pins.get(key) for key in PIN_KEYS) else None
+
+    def find(self, job_id, attempt_id, fence):
+        job = self.job(job_id)
+        return job if job and job["claim"]["attemptId"] == attempt_id and str(job["claim"]["fence"]) == fence else None
+
+    @staticmethod
+    def leased(job):
+        return job["state"] == "running" and job["leaseUntil"] > datetime.now(timezone.utc)
+
+    @staticmethod
+    def result_problem(job, body):
+        """route.ts completion checks after the signature: (status, message) or (None, None)."""
+        if not body.get("resultJSON") or not body.get("resultSha256") or sha256(body["resultJSON"].encode("utf-8")) != body["resultSha256"]:
+            return 400, "Result bytes hash mismatch"
+        try:
+            packet = json.loads(body["resultJSON"])
+        except ValueError:
+            return 500, REQUEST_FAILED
+        if not result_envelope_ok(packet):
+            return 400, CONTRACT_VIOLATION
+        frozen, provenance = json.loads(job["claim"]["requestJSON"]), packet["provenance"]
+        if provenance["requestSha256"] != job["claim"]["requestSha256"] or provenance["inputHashes"].get("dataset") != frozen["inputHashes"]["dataset"] or frozen["executionMode"] == "auditor_model" and provenance["inputHashes"].get("modelArtifact") != frozen["inputHashes"]["modelArtifact"] or provenance.get("imageDigest") != IMAGE or provenance.get("executionMode") != frozen["executionMode"]:
+            return 400, "Consumed input or runtime pins mismatch"
+        suite, results = frozen["profile"]["suite"], packet["hostedResults"]
+        if len({result["testId"] for result in results}) != len(results) or len(suite) != len(results) or any(result["testId"] not in suite or result["article"] != ("15" if result["testId"] in {"performance", "regression"} else "10") for result in results):
+            return 400, "Result definitions do not match requested tests"
+        return None, None
 
     def __enter__(self):
         self.thread.start()
@@ -168,7 +358,7 @@ class WorkerTests(unittest.TestCase):
         return report, hosted_results(report, request)
 
     def worker(self, transport, workspace="jobs", **kwargs):
-        return Worker(transport, ProcessExecutor(), self.root/workspace, worker_id="worker-fixture", image_digest=IMAGE, heartbeat=1, **kwargs)
+        return Worker(transport, ProcessExecutor(), self.root/workspace, worker_id=WORKER_ID, image_digest=IMAGE, heartbeat=1, **kwargs)
 
     def test_exact_request_bytes_and_duplicate_nonfinite_json_rejected(self):
         body = claim_body()
@@ -544,10 +734,13 @@ class WorkerTests(unittest.TestCase):
             code = worker_main(argv)
         return code, [json.loads(line) for line in stdout.getvalue().splitlines()], stderr.getvalue()
 
+    def model_worker(self, transport, workspace="jobs"):
+        return Worker(transport, ModelReadyExecutor(), self.root/workspace, worker_id=WORKER_ID, image_digest=IMAGE, heartbeat=1, formats=["onnx"], approved_hashes=["b"*64])
+
     def test_malformed_claim_is_failed_and_the_daemon_continues(self):
         claims = [claim_body(self.model_request(outputLabels=["0", "1", "2"]), job="job-malformed", attempt="attempt-malformed"), claim_body(job="job-next", attempt="attempt-next")]
-        with RunnerServer(claims=claims) as server:
-            code, results, errors = self.run_daemon(server, 3)
+        with RunnerServer(claims=claims, capabilities=("provided_predictions", "ONNX")) as server, patch("engine.worker.ProcessExecutor", ModelReadyExecutor):
+            code, results, errors = self.run_daemon(server, 3, "--formats", "onnx", "--approved-model-hashes", "b"*64)
             self.assertEqual(code, 130, errors)
             self.assertEqual([result["state"] for result in results], ["failed", "completed", "idle"])
             self.assertEqual(results[0], {"state": "failed", "jobId": "job-malformed", "attemptId": "attempt-malformed", "error": "request_contract_rejected"})
@@ -567,8 +760,8 @@ class WorkerTests(unittest.TestCase):
             claim_body(unhashable),
             mismatched,
         )):
-            with RunnerServer(claims=[body]) as server:
-                result = self.worker(server.transport(), workspace=f"jobs-{index}").once()
+            with RunnerServer(claims=[body], capabilities=("provided_predictions", "ONNX")) as server:
+                result = self.model_worker(server.transport(), workspace=f"jobs-{index}").once()
                 self.assertEqual((result["state"], result["error"]), ("failed", "request_contract_rejected"), index)
                 self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["request_contract_rejected"])
                 self.assertEqual(server.gets, [])
@@ -589,6 +782,162 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(worker.once()["state"], "completed")
             self.assertEqual(worker.once(), {"state": "idle"})
         self.assertEqual([(entry["event"], entry.get("code")) for entry in self.operator_log()], [("claim_rejected", "claim_pins_invalid"), ("completed", None)])
+
+    def raw(self, server, method, *, body=None, token=TOKEN, sign=True, query=""):
+        """One request that bypasses the worker's own encoders: (status, JSON or bytes)."""
+        data = body if body is None or isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+        headers = {"Authorization": "Bearer "+token, "OAI-Sites-Authorization": "Bearer "+PLATFORM}
+        if data is not None and sign:
+            headers["X-Result-Signature"] = result_signature(token, data)
+        request = urllib.request.Request(server.origin+"/api/runner"+query, data=data, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                status, content = response.status, response.read()
+        except urllib.error.HTTPError as error:
+            status, content = error.code, error.read()
+        try:
+            return status, json.loads(content)
+        except ValueError:
+            return status, content
+
+    def test_fixture_enforces_the_runner_route_contract(self):
+        claim = {"op": "claim", "workerId": WORKER_ID, "imageDigest": IMAGE, "formats": ["provided_predictions"]}
+        with RunnerServer(claims=[]) as server:
+            # The platform issues 72-character tokens; a 40-character one is malformed.
+            self.assertEqual(self.raw(server, "POST", body=claim, token="dummy-application-worker-token-for-tests"), (401, {"error": "Runner authentication required"}))
+            self.assertEqual(self.raw(server, "POST", body=claim, token="f"*72), (401, {"error": "Runner credential invalid or revoked"}))
+            self.assertEqual(self.raw(server, "POST", body=claim), (200, {"idle": True}))
+            self.assertEqual(self.raw(server, "POST", body={**claim, "extra": 1})[0], 400)
+            self.assertEqual(self.raw(server, "POST", body={**claim, "imageDigest": "sha256:"+"b"*64})[0], 403)
+            self.assertEqual(self.raw(server, "POST", body={**claim, "formats": ["ONNX"]})[0], 409)
+            self.assertEqual(self.raw(server, "POST", body={"op": "release"})[0], 400)
+            self.assertEqual(self.raw(server, "POST", body=b"{not json")[0], 500)
+        with RunnerServer() as server:
+            status, issued = self.raw(server, "POST", body=claim)
+            self.assertEqual((status, set(issued)), (200, {"jobId", "attemptId", "fence", "nonce", "leaseUntil", "requestSha256", "requestJSON", "request"}))
+            pins = {key: issued[key] for key in PIN_KEYS}
+            self.assertEqual(self.raw(server, "POST", body={"op": "heartbeat", **pins, "extra": 1})[0], 400)
+            self.assertEqual(self.raw(server, "POST", body={"op": "heartbeat", **pins, "fence": 8})[0], 409)
+            self.assertEqual(self.raw(server, "POST", body={"op": "heartbeat", **pins})[0], 200)
+            self.assertEqual(self.raw(server, "POST", body={"op": "fail", **pins, "error": "x"}, sign=False), (401, {"error": "Authenticated result signature required"}))
+            self.assertEqual(self.raw(server, "POST", body={"op": "fail", **pins, "error": "x"*1001})[0], 400)
+            self.assertEqual(self.raw(server, "POST", body={"op": "complete", **pins, "resultJSON": "{}", "resultSha256": "0"*64}), (400, {"error": "Result bytes hash mismatch"}))
+            fence = "&fence="+str(pins["fence"])
+            base = "?jobId="+pins["jobId"]+"&attemptId="+pins["attemptId"]
+            self.assertEqual(self.raw(server, "GET", query=base+"&fence=8&input=dataset")[0], 404)
+            self.assertEqual(self.raw(server, "GET", query=base+fence+"&input=report")[0], 500)
+            self.assertEqual(self.raw(server, "GET", query=base+fence+"&input=model")[0], 403)
+            self.assertEqual(self.raw(server, "GET", query=base+fence+"&input=dataset"), (200, CSV))
+            self.assertEqual(self.raw(server, "POST", body={"op": "fail", **pins, "error": "request_contract_rejected"}), (200, {"accepted": True}))
+            # A settled attempt can neither renew its lease nor download inputs.
+            self.assertEqual(self.raw(server, "POST", body={"op": "heartbeat", **pins})[0], 409)
+            self.assertEqual(self.raw(server, "GET", query=base+fence+"&input=dataset")[0], 409)
+
+    def test_worker_envelopes_pass_every_route_check(self):
+        with RunnerServer() as server:
+            worker = self.worker(server.transport())
+            result = worker.once()
+            self.assertEqual(result["state"], "completed")
+            self.assertEqual(result["response"], {"accepted": True})
+            self.assertEqual((server.errors, server.unsigned), ([], []))
+            complete = next(raw for body, raw in server.posts if body["op"] == "complete")
+            # The route makes a retried completion of the same digest idempotent.
+            self.assertEqual(server.transport().post(complete), {"accepted": True, "duplicate": True})
+            self.assertEqual(worker.once(), {"state": "idle"})
+
+    def cli(self, argv, environment=None):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        variables = {key: value for key, value in os.environ.items() if not key.startswith("ASSURANCE_")}
+        with patch.dict(os.environ, {**variables, **(environment or {})}, clear=True), redirect_stdout(stdout), redirect_stderr(stderr):
+            code = worker_main(argv)
+        return code, stdout.getvalue(), stderr.getvalue()
+
+    def test_cli_rejects_incomplete_or_unsafe_configuration(self):
+        credentials = {"ASSURANCE_WORKER_TOKEN": TOKEN}
+        base = ["--site", "https://runner.example", "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--once"]
+        for name, argv, environment in (
+            ("token missing", base, {}),
+            ("site missing", base[2:], credentials),
+            ("plain HTTP site", ["--site", "http://runner.example", *base[2:]], credentials),
+            ("site with a path", ["--site", "https://runner.example/api", *base[2:]], credentials),
+            ("poll interval", [*base, "--poll-seconds", "0"], credentials),
+            ("transport timeout", [*base, "--transport-timeout", "500"], credentials),
+            ("image digest", [*base, "--image-digest", "sha256:short"], credentials),
+            ("worker id", [*base, "--worker-id", "worker id with spaces"], credentials),
+            ("native format without Docker", [*base, "--formats", "onnx", "--approved-model-hashes", "b"*64], credentials),
+            ("Docker without a pinned image", [*base, "--executor", "docker"], credentials),
+            ("unbounded job count", [*base, "--maximum-jobs", "0"], credentials),
+        ):
+            with self.subTest(name), patch("engine.worker.shutil.which", return_value="docker"):
+                code, stdout, stderr = self.cli(argv, environment)
+                self.assertEqual(code, 2)
+                self.assertEqual(stdout, "")
+                self.assertEqual(json.loads(stderr), {"state": "configuration_rejected", "error": "invalid_worker_configuration_or_runtime"})
+                self.assertNotIn(TOKEN, stderr)
+
+    def test_cli_once_exit_codes_follow_the_outcome(self):
+        def once(server, token=TOKEN):
+            loopback = lambda site, token, platform, *, timeout: Transport(site, token, platform, timeout=timeout, allow_local_http=True)
+            with patch("engine.worker.Transport", side_effect=loopback):
+                code, stdout, _ = self.cli(["--site", server.origin, "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--heartbeat-seconds", "1", "--once"], {"ASSURANCE_WORKER_TOKEN": token, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM})
+            return code, json.loads(stdout)
+        with RunnerServer(claims=[]) as server:
+            self.assertEqual(once(server), (0, {"state": "idle"}))
+        with RunnerServer() as server:
+            code, result = once(server)
+            self.assertEqual((code, result["state"]), (0, "completed"))
+        with RunnerServer(claims=[claim_body(lease_seconds=-30, job="job-skewed")]) as server:
+            self.assertEqual(once(server), (2, {"state": "failed", "jobId": "job-skewed", "attemptId": "ATTEMPT-0123456789ab", "error": "lease_expired_on_receipt"}))
+        with RunnerServer() as server:
+            self.assertEqual(once(server, token="f"*72), (2, {"state": "transport_failed", "error": "http_401"}))
+        code, stdout, _ = self.cli(["--readiness"])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(stdout)["workerVersion"], WORKER_VERSION)
+
+    def test_cli_runs_as_a_module(self):
+        root = Path(__file__).resolve().parents[2]
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("ASSURANCE_")}
+        readiness = subprocess.run([sys.executable, "-m", "engine.worker", "--readiness"], cwd=root, env=environment, capture_output=True, text=True, timeout=60)
+        self.assertEqual(readiness.returncode, 0, readiness.stderr)
+        self.assertEqual(json.loads(readiness.stdout)["workerVersion"], WORKER_VERSION)
+        rejected = subprocess.run([sys.executable, "-m", "engine.worker", "--once", "--workspace", str(self.root/"module")], cwd=root, env=environment, capture_output=True, text=True, timeout=60)
+        self.assertEqual(rejected.returncode, 2)
+        self.assertEqual(json.loads(rejected.stderr)["state"], "configuration_rejected")
+
+    def test_validate_model_spec_enforces_the_typed_contract(self):
+        binary = {"task": "binary_classification", "featureColumns": ["age", "income"], "outputLabels": ["0", "1"], "decisionThreshold": .5, "predictionOutput": "label", "predictionKind": "probability", "labelEncoding": "class_index", "probabilityOutput": "probabilities"}
+        validate_model_spec(binary, "binary_classification")
+        validate_model_spec({**binary, "featureColumns": [f"feature-{n}" for n in range(100)], "decisionThreshold": 1}, "binary_classification")
+        validate_model_spec({"task": "regression", "featureColumns": ["x"], "outputLabels": []}, "regression")
+        validate_model_spec({"task": "multiclass_classification", "featureColumns": ["x"], "outputLabels": [str(n) for n in range(100)]}, "multiclass_classification")
+        for name, spec, task in (
+            ("not an object", [], "binary_classification"),
+            ("unknown field", {**binary, "pipeline": "scaler.pkl"}, "binary_classification"),
+            ("task differs", binary, "regression"),
+            ("no features", {**binary, "featureColumns": []}, "binary_classification"),
+            ("101 features", {**binary, "featureColumns": [f"feature-{n}" for n in range(101)]}, "binary_classification"),
+            ("duplicate feature", {**binary, "featureColumns": ["age", "age"]}, "binary_classification"),
+            ("blank feature", {**binary, "featureColumns": ["age", " "]}, "binary_classification"),
+            ("long feature", {**binary, "featureColumns": ["x"*301]}, "binary_classification"),
+            ("non-text feature", {**binary, "featureColumns": [1]}, "binary_classification"),
+            ("three binary classes", {**binary, "outputLabels": ["0", "1", "2"]}, "binary_classification"),
+            ("one binary class", {**binary, "outputLabels": ["1"]}, "binary_classification"),
+            ("duplicate class", {**binary, "outputLabels": ["1", "1"]}, "binary_classification"),
+            ("empty class", {**binary, "outputLabels": ["", "1"]}, "binary_classification"),
+            ("regression with classes", {"task": "regression", "featureColumns": ["x"], "outputLabels": ["0", "1"]}, "regression"),
+            ("101 classes", {"task": "multiclass_classification", "featureColumns": ["x"], "outputLabels": [str(n) for n in range(101)]}, "multiclass_classification"),
+            ("threshold above one", {**binary, "decisionThreshold": 1.5}, "binary_classification"),
+            ("negative threshold", {**binary, "decisionThreshold": -.1}, "binary_classification"),
+            ("boolean threshold", {**binary, "decisionThreshold": True}, "binary_classification"),
+            ("text threshold", {**binary, "decisionThreshold": "0.5"}, "binary_classification"),
+            ("NaN threshold", {**binary, "decisionThreshold": float("nan")}, "binary_classification"),
+            ("prediction kind", {**binary, "predictionKind": "score"}, "binary_classification"),
+            ("label encoding", {**binary, "labelEncoding": "one_hot"}, "binary_classification"),
+            ("empty output name", {**binary, "predictionOutput": ""}, "binary_classification"),
+            ("non-text output name", {**binary, "probabilityOutput": 3}, "binary_classification"),
+        ):
+            with self.subTest(name), self.assertRaises(ValueError):
+                validate_model_spec(spec, task)
 
     def test_get_retries_are_bounded_and_claim_is_not_retried(self):
         with RunnerServer(transient_get=2) as server:

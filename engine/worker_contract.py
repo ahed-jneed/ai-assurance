@@ -239,7 +239,9 @@ def validate_model_spec(spec, task):
         raise ValueError("modelSpec requires explicit outputLabels")
     if task == "regression" and labels or task == "binary_classification" and len(labels) != 2 or task == "multiclass_classification" and not 2 <= len(labels) <= 100:
         raise ValueError("Output class order differs from task")
-    if "decisionThreshold" in spec and not 0 <= finite_number(spec["decisionThreshold"], "decisionThreshold") <= 1:
+    threshold = spec.get("decisionThreshold", .5)
+    # A JSON number only: finite_number would also accept text such as "0.5".
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0 <= threshold <= 1:
         raise ValueError("Invalid decision threshold")
     if spec.get("predictionKind", "label") not in {"label", "probability"} or spec.get("labelEncoding", "label") not in {"label", "class_index"}:
         raise ValueError("Unsupported output encoding")
