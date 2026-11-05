@@ -1870,28 +1870,30 @@ export function AssuranceWorkbench({
                     </label>
                   ))}
               </div>
-              <div className="briefing-actions">
-                {[
-                  ["summary", "Brief selected evidence"],
-                  ["contradictions", "Show recorded contradictions"],
-                  ["unsupported", "Find support gaps"],
-                  ["questions", "Draft collection questions"],
-                ].map(([action, title]) => (
-                  <Button
-                    key={action}
-                    variant="outline"
-                    disabled={busy || !sourceIds.length}
-                    onClick={() =>
-                      void act("assist", { sourceIds, action })
-                        // "assist" always responds with the created briefing.
-                        .then((v) => setSelected(v.record as AssuranceRecord))
-                        .catch(() => {})
-                    }
-                  >
-                    {title}
-                  </Button>
-                ))}
-              </div>
+              {writer && (
+                <div className="briefing-actions">
+                  {[
+                    ["summary", "Brief selected evidence"],
+                    ["contradictions", "Show recorded contradictions"],
+                    ["unsupported", "Find support gaps"],
+                    ["questions", "Draft collection questions"],
+                  ].map(([action, title]) => (
+                    <Button
+                      key={action}
+                      variant="outline"
+                      disabled={busy || !sourceIds.length}
+                      onClick={() =>
+                        void act("assist", { sourceIds, action })
+                          // "assist" always responds with the created briefing.
+                          .then((v) => setSelected(v.record as AssuranceRecord))
+                          .catch(() => {})
+                      }
+                    >
+                      {title}
+                    </Button>
+                  ))}
+                </div>
+              )}
               {list(
                 kind("assistant"),
                 "No evidence briefings prepared yet",

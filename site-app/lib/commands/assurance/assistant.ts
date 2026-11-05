@@ -334,7 +334,9 @@ export const assistant: AssuranceModule = defineCommands({
     },
   },
   assist: {
-    roles: ["Auditor", "Lead Auditor", "Reviewer"],
+    // Briefings are preparer work, as in the other assistant ops; a Reviewer
+    // reads them but does not add them.
+    roles: ["Auditor", "Lead Auditor"],
     async handle({ e, lookup, accepted }, d, ctx) {
       const v = z
         .object({

@@ -153,6 +153,9 @@ describe("POST /api/assurance", () => {
     const register = await post(e, "registerSystem", { name: "" });
     expect(register.status).toBe(403);
     expect(await register.json()).toEqual(refusal);
+    const assist = await post(e, "assist", { sourceIds: [] });
+    expect(assist.status).toBe(403);
+    expect(await assist.json()).toEqual(refusal);
     load(e, caller("Auditor"));
     const review = await post(e, "reviewAssertion", { assertionId: "" });
     expect(review.status).toBe(403);
@@ -393,9 +396,9 @@ describe("GET /api/assurance", () => {
 });
 
 describe("assurance command registry", () => {
-  // The ops and role checks of the route's if-chain before the split. assist
-  // had no role check of its own: the client-role gate left the three
-  // internal roles.
+  // The ops and role checks of the route's if-chain before the split, except
+  // assist: it had no role check of its own (the client-role gate let the
+  // three internal roles through) and is now preparer work.
   const allowed: Record<string, Role[]> = {
     setAccess: ["Lead Auditor"],
     enrollWorker: ["Lead Auditor"],
@@ -414,7 +417,7 @@ describe("assurance command registry", () => {
     reviewImpact: ["Reviewer", "Lead Auditor"],
     exportBriefing: ["Auditor", "Lead Auditor"],
     importBriefing: ["Auditor", "Lead Auditor"],
-    assist: ["Auditor", "Lead Auditor", "Reviewer"],
+    assist: ["Auditor", "Lead Auditor"],
     acceptAssistant: ["Auditor", "Lead Auditor"],
     queueExternal: ["Auditor", "Lead Auditor"],
     cancelJob: ["Auditor", "Lead Auditor"],
