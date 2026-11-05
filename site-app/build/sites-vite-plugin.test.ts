@@ -100,7 +100,7 @@ describe("localAuthMiddleware (the dev server's persona sign-in)", () => {
       expect(anonymous.rawIdentity, remoteAddress).toEqual([]);
     }
     const persona = call({
-      headers: { ...forged, cookie: "__sites_local_auth=qa-auditor" },
+      headers: { ...forged, cookie: "__sites_local_auth_5184=qa-auditor" },
     });
     expect(persona.identity).toEqual(signedIn(auditor));
   });
@@ -115,28 +115,28 @@ describe("localAuthMiddleware (the dev server's persona sign-in)", () => {
     expect(signIn).toMatchObject({ passed: false, status: 302 });
     expect(signIn.location).toBe(deepLink);
     expect(signIn.setCookie).toBe(
-      "__sites_local_auth=qa-auditor; Path=/; HttpOnly; SameSite=Lax",
+      "__sites_local_auth_5184=qa-auditor; Path=/; HttpOnly; SameSite=Lax",
     );
     expect(
       call({ path: "/signin-with-chatgpt?return_to=//evil.example" }),
     ).toMatchObject({
       location: "/",
-      setCookie: "__sites_local_auth=1; Path=/; HttpOnly; SameSite=Lax",
+      setCookie: "__sites_local_auth_5184=1; Path=/; HttpOnly; SameSite=Lax",
     });
     expect(
       call({ path: "/signin-with-chatgpt?as=qa-lead", secure: true }).setCookie,
     ).toBe(
-      "__sites_local_auth=qa-lead; Path=/; HttpOnly; SameSite=Lax; Secure",
+      "__sites_local_auth_5184=qa-lead; Path=/; HttpOnly; SameSite=Lax; Secure",
     );
 
     const app = call({
-      headers: { cookie: "__sites_local_auth=qa-auditor" },
+      headers: { cookie: "__sites_local_auth_5184=qa-auditor" },
     });
     expect(app.passed).toBe(true);
     expect(app.identity).toEqual(signedIn(auditor));
     expect(app.cookie, "the app never sees the sign-in cookie").toBe(undefined);
     expect(
-      call({ headers: { cookie: "__sites_local_auth=1" } }).identity,
+      call({ headers: { cookie: "__sites_local_auth_5184=1" } }).identity,
     ).toEqual(signedIn(devPersonas.defaultIdentity));
   });
 
@@ -156,13 +156,13 @@ describe("localAuthMiddleware (the dev server's persona sign-in)", () => {
 
   it("leaves a cookie value outside the fixture anonymous", () => {
     for (const cookie of [
-      "__sites_local_auth=qa-admin",
-      "__sites_local_auth=persona-qa-lead",
-      "__sites_local_auth=",
-      "__sites_local_auth=__proto__",
-      "__sites_local_auth=constructor",
-      "__sites_local_auth=QA-LEAD",
-      "__sites_local_auth=qa-lead; __sites_local_auth=qa-lead",
+      "__sites_local_auth_5184=qa-admin",
+      "__sites_local_auth_5184=persona-qa-lead",
+      "__sites_local_auth_5184=",
+      "__sites_local_auth_5184=__proto__",
+      "__sites_local_auth_5184=constructor",
+      "__sites_local_auth_5184=QA-LEAD",
+      "__sites_local_auth_5184=qa-lead; __sites_local_auth_5184=qa-lead",
     ]) {
       const response = call({ headers: { ...forged, cookie } });
       expect(response.passed, cookie).toBe(true);
@@ -186,7 +186,7 @@ describe("localAuthMiddleware (the dev server's persona sign-in)", () => {
         call({ path: "/signout-with-chatgpt", remoteAddress }).status,
       ).toBe(403);
       const app = call({
-        headers: { ...forged, cookie: "__sites_local_auth=qa-lead" },
+        headers: { ...forged, cookie: "__sites_local_auth_5184=qa-lead" },
         remoteAddress,
       });
       expect(app.passed, remoteAddress).toBe(true);
@@ -198,5 +198,42 @@ describe("localAuthMiddleware (the dev server's persona sign-in)", () => {
       headers: { host: "audit.example:5184" },
     });
     expect(proxied.status).toBe(403);
+  });
+
+  it("reads and clears only the sign-in cookie of its own port", () => {
+    const jar = [
+      "theme=dark",
+      "__sites_local_auth=qa-lead",
+      "__sites_local_auth_5194=qa-lead",
+      "__sites_local_auth_5184=qa-auditor",
+    ].join("; ");
+    const here = call({ port: 5184, headers: { cookie: jar } });
+    expect(here.identity).toEqual(signedIn(auditor));
+    expect(here.cookie, "no sign-in cookie reaches the app").toBe("theme=dark");
+    expect(call({ port: 5194, headers: { cookie: jar } }).identity).toEqual(
+      signedIn(lead),
+    );
+    for (const cookie of [
+      "__sites_local_auth_5194=qa-lead",
+      "__sites_local_auth=qa-lead",
+      "__sites_local_auth_51840=qa-lead",
+    ])
+      expect(
+        call({ port: 5184, headers: { cookie } }).identity,
+        cookie,
+      ).toEqual({});
+
+    const signOut = call({
+      port: 5184,
+      path: "/signout-with-chatgpt?return_to=%2F%3Fview%3DOverview",
+      headers: { cookie: jar },
+    });
+    expect(signOut).toMatchObject({ status: 302, location: "/?view=Overview" });
+    expect(signOut.setCookie).toBe(
+      "__sites_local_auth_5184=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+    );
+    expect(
+      call({ port: 5194, path: "/signin-with-chatgpt?as=qa-lead" }).setCookie,
+    ).toBe("__sites_local_auth_5194=qa-lead; Path=/; HttpOnly; SameSite=Lax");
   });
 });

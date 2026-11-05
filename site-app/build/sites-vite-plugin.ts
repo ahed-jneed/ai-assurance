@@ -1,10 +1,10 @@
 // Vendored from @openai/sites-vite-plugin 0.2.0 (openai/sites#9).
 // See sites-vite-plugin.LICENSE for the upstream MIT license.
 // Local changes: test personas (`/signin-with-chatgpt?as=<id>`) from
-// fixtures/dev-personas.json, shared return-path checks, the middleware
-// exported for its tests, and hosting.json staying optional. The mock runs
-// only in the development server, never in a build; the Worker trusts its
-// headers in IDENTITY_MODE=dev (lib/identity.ts).
+// fixtures/dev-personas.json, a sign-in cookie per dev server port, shared
+// return-path checks, the middleware exported for its tests, and hosting.json
+// staying optional. The mock runs only in the development server, never in a
+// build; the Worker trusts its headers in IDENTITY_MODE=dev (lib/identity.ts).
 import { access, cp, mkdir, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
@@ -19,7 +19,12 @@ import {
 } from "../lib/auth-paths";
 
 type LocalIdentity = { userId: string; email: string; name: string };
-const localCookieName = "__sites_local_auth";
+// Cookies ignore the port, so dev servers on one host would share a single
+// sign-in cookie and sign each other in and out. Each server reads and sets
+// only the cookie named for its own port. Upstream's unsuffixed name and other
+// ports' cookies are never read, and no local sign-in cookie reaches the app.
+const localCookiePrefix = "__sites_local_auth";
+const localCookiePattern = /^__sites_local_auth(?:_\d+)?=/;
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 const localAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 // Cookie value "1" is the default identity (as upstream); a persona id selects
@@ -78,9 +83,13 @@ export function localAuthMiddleware({
     }
 
     const hostname = authority.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    // Local change: the port this server accepted the connection on names its
+    // sign-in cookie.
+    const port = request.socket.localPort;
     if (
       !localHosts.has(hostname) ||
       !localAddresses.has(request.socket.remoteAddress ?? "") ||
+      !port ||
       url.origin !== authority.origin
     ) {
       if (isAuthPath(url.pathname)) respond(response, 403);
@@ -88,6 +97,7 @@ export function localAuthMiddleware({
       return;
     }
 
+    const localCookieName = `${localCookiePrefix}_${port}`;
     const cookies = (request.headers.cookie ?? "")
       .split(";")
       .map((cookie) => cookie.trim())
@@ -96,7 +106,7 @@ export function localAuthMiddleware({
       .filter((cookie) => cookie.startsWith(`${localCookieName}=`))
       .map((cookie) => cookie.slice(localCookieName.length + 1));
     const applicationCookies = cookies.filter(
-      (cookie) => !cookie.startsWith(`${localCookieName}=`),
+      (cookie) => !localCookiePattern.test(cookie),
     );
     if (applicationCookies.length !== cookies.length) {
       removeHeader(request, "cookie");

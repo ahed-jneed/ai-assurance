@@ -59,9 +59,10 @@ async function identify(who) {
         new URLSearchParams({ as: who.id, return_to: "/" }),
       { redirect: "manual" },
     );
+    // The dev server names its sign-in cookie for its port.
     const cookie = response.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__sites_local_auth="));
+      .find((c) => /^__sites_local_auth_\d+=/.test(c));
     if (response.status !== 302 || !cookie)
       throw new Error(
         `Persona sign-in failed (HTTP ${response.status}). Is \`npm run dev\` serving ${base}? For a built Worker in trusted-headers mode pass --trusted-headers.`,
