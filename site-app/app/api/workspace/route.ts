@@ -1,6 +1,5 @@
 import { records } from "@/lib/assurance-store";
 import { z } from "zod";
-import catalog from "@/lib/catalog.json";
 import annexMap from "@/lib/annex-iv-map.json";
 import {
   ApiError,
@@ -35,7 +34,6 @@ import {
   WorkflowError,
   calendarDate,
 } from "@/lib/workflow-service";
-import { isClientRole, isInternalRole } from "@/lib/workflow-state";
 import { protocolConfigKeys } from "@/lib/evaluation";
 import { assurancePins, jobs, assuranceGates } from "@/lib/assurance-store";
 import { diagnosticNarrative } from "@/lib/presentation";
@@ -44,126 +42,14 @@ import {
   evidenceRequestCommand,
   EvidenceRequestError,
 } from "@/lib/evidence-requests";
+import { workspaceView } from "@/lib/read-models/workspace-view";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url),
       ctx = await context(url.searchParams.get("tenantId") ?? undefined);
-    const memberships = (
-      await db()
-        .prepare(
-          "SELECT m.tenant_id,t.name,m.role FROM memberships m JOIN tenants t ON t.id=m.tenant_id WHERE m.user_id=? AND m.status='active' ORDER BY t.name",
-        )
-        .bind(ctx.user.userId)
-        .all()
-    ).results;
-    let clientRows = (
-      await db()
-        .prepare(
-          "SELECT id,name,sector FROM clients WHERE tenant_id=?" +
-            (isClientRole(ctx.role) ? " AND id=?" : "") +
-            " ORDER BY name",
-        )
-        .bind(ctx.tenantId, ...(isClientRole(ctx.role) ? [ctx.clientId] : []))
-        .all()
-    ).results;
-    let engagementRows = (
-      await db()
-        .prepare(
-          "SELECT id,client_id,title,version,json_extract(body,'$.stage') AS stage,json_extract(body,'$.dueDate') AS due_date FROM engagements WHERE tenant_id=?" +
-            (isClientRole(ctx.role) ? " AND client_id=?" : "") +
-            " ORDER BY title",
-        )
-        .bind(ctx.tenantId, ...(isClientRole(ctx.role) ? [ctx.clientId] : []))
-        .all()
-    ).results;
-    if (ctx.role !== "Client Viewer") {
-      const granted = [];
-      for (const row of engagementRows) {
-        try {
-          await getEngagement(ctx, String(row.id));
-          granted.push(row);
-        } catch (error) {
-          if (!(error instanceof ApiError) || error.status !== 404) throw error;
-        }
-      }
-      engagementRows = granted;
-    }
-    if (isInternalRole(ctx.role) && !ctx.practiceAdmin)
-      clientRows = clientRows.filter((c) =>
-        engagementRows.some((e) => e.client_id === c.id),
-      );
-    const selectedId =
-      url.searchParams.get("engagementId") ??
-      (engagementRows[0]?.id as string | undefined);
-    const e = selectedId ? await getEngagement(ctx, selectedId) : null;
-    const members = ctx.practiceAdmin
-      ? (
-          await db()
-            .prepare(
-              "SELECT user_id,role,client_id,display_name,status FROM memberships WHERE tenant_id=? ORDER BY display_name",
-            )
-            .bind(ctx.tenantId)
-            .all()
-        ).results
-      : [];
-    const people = isInternalRole(ctx.role)
-      ? (
-          await db()
-            .prepare(
-              "SELECT m.user_id,m.display_name,m.role,m.status,m.client_id FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=? AND m.status='active' AND a.engagement_id=? AND a.active=1",
-            )
-            .bind(ctx.tenantId, e?.id ?? "")
-            .all()
-        ).results
-      : [];
-    const managementVersion = (await db()
-      .prepare("SELECT version FROM tenants WHERE id=?")
-      .bind(ctx.tenantId)
-      .first<{
-        version: number;
-      }>())!.version;
-    const managementEvents = ctx.practiceAdmin
-      ? (
-          await db()
-            .prepare(
-              "SELECT id,actor,action,details,hash,created_at FROM management_events WHERE tenant_id=? ORDER BY created_at DESC LIMIT 30",
-            )
-            .bind(ctx.tenantId)
-            .all()
-        ).results
-      : [];
-    const events =
-      e && isInternalRole(ctx.role)
-        ? (
-            await db()
-              .prepare(
-                "SELECT id,actor,action,hash,previous_hash,created_at,details FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 30",
-              )
-              .bind(ctx.tenantId, e.id)
-              .all()
-          ).results
-        : [];
     return Response.json(
-      {
-        identity: {
-          id: ctx.user.userId,
-          name: ctx.user.displayName,
-          role: ctx.role,
-          practiceAdmin: ctx.practiceAdmin,
-        },
-        tenantId: ctx.tenantId,
-        memberships,
-        clients: clientRows,
-        engagements: engagementRows,
-        engagement: e ? sanitize(e, ctx) : null,
-        members,
-        people,
-        managementVersion,
-        managementEvents,
-        events,
-        catalog: isClientRole(ctx.role) ? null : catalog,
-      },
+      await workspaceView(ctx, url.searchParams.get("engagementId")),
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
