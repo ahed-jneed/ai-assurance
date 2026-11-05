@@ -1,0 +1,1110 @@
+{
+  "evalId": "eval-JX7-2026-11-05T15:57:09",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-11-05T15:57:09.276Z",
+    "prompts": [
+      {
+        "id": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "raw": "You are a careful assistant. Answer briefly: {{question}}",
+        "label": "You are a careful assistant. Answer briefly: {{question}}",
+        "provider": "echo-model",
+        "metrics": {
+          "score": 4,
+          "testPassCount": 4,
+          "testFailCount": 2,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 6,
+          "assertFailCount": 2,
+          "totalLatencyMs": 15,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 6,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {},
+          "namedScoresCount": {},
+          "namedScoreWeights": {},
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "paris"
+              }
+            }
+          ]
+        },
+        "id": "76eb451c-b341-4d92-ae99-128ff3e7a05b",
+        "latencyMs": 5,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "raw": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "geography",
+          "vars": {
+            "question": "What is the capital of France? Choose Paris or Lyon."
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "paris"
+            }
+          ],
+          "metadata": {
+            "category": "geography",
+            "passage": "geo"
+          },
+          "options": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "What is the capital of France? Choose Paris or Lyon."
+        },
+        "metadata": {
+          "category": "geography",
+          "passage": "geo",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "paris"
+              }
+            }
+          ]
+        },
+        "id": "df370bb5-77e0-47dd-b73a-e88e7dff1162",
+        "latencyMs": 3,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "raw": "You are a careful assistant. Answer briefly: What is the capital of France? Choose Paris or Lyon.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "geography",
+          "vars": {
+            "question": "What is the capital of France? Choose Paris or Lyon."
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "paris"
+            }
+          ],
+          "metadata": {
+            "category": "geography",
+            "passage": "geo"
+          },
+          "options": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "What is the capital of France? Choose Paris or Lyon."
+        },
+        "metadata": {
+          "category": "geography",
+          "passage": "geo",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"jupiter\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"jupiter\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"jupiter\"",
+              "assertion": {
+                "type": "icontains",
+                "value": "jupiter"
+              }
+            }
+          ]
+        },
+        "id": "736f2665-9f59-45be-9d53-13ed0b5356f4",
+        "latencyMs": 2,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "raw": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "astronomy",
+          "vars": {
+            "question": "Name the largest planet in the solar system."
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "jupiter"
+            }
+          ],
+          "metadata": {
+            "category": "astronomy",
+            "passage": "geo"
+          },
+          "options": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "Name the largest planet in the solar system."
+        },
+        "metadata": {
+          "category": "astronomy",
+          "passage": "geo",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"jupiter\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to contain \"jupiter\"",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"jupiter\"",
+              "assertion": {
+                "type": "icontains",
+                "value": "jupiter"
+              }
+            }
+          ]
+        },
+        "id": "5ddc2194-051b-4569-9515-b9bb3fb111ec",
+        "latencyMs": 2,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "raw": "You are a careful assistant. Answer briefly: Name the largest planet in the solar system.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "astronomy",
+          "vars": {
+            "question": "Name the largest planet in the solar system."
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "jupiter"
+            }
+          ],
+          "metadata": {
+            "category": "astronomy",
+            "passage": "geo"
+          },
+          "options": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "Name the largest planet in the solar system."
+        },
+        "metadata": {
+          "category": "astronomy",
+          "passage": "geo",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "hello"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.length < 200"
+              }
+            }
+          ]
+        },
+        "id": "9711d6a2-8f98-45ef-8a3b-7e2d0b8c877a",
+        "latencyMs": 2,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "raw": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "greeting",
+          "vars": {
+            "question": "Say hello to the user."
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "hello"
+            },
+            {
+              "type": "javascript",
+              "value": "output.length < 200"
+            }
+          ],
+          "metadata": {
+            "category": "smalltalk",
+            "passage": "misc"
+          },
+          "options": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "Say hello to the user."
+        },
+        "metadata": {
+          "category": "smalltalk",
+          "passage": "misc",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {},
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "contains",
+                "value": "hello"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.length < 200"
+              }
+            }
+          ]
+        },
+        "id": "3eb32c74-1ea6-4659-a13f-a6c419a84a3b",
+        "latencyMs": 1,
+        "namedScores": {},
+        "prompt": {
+          "raw": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "label": "You are a careful assistant. Answer briefly: {{question}}",
+          "config": {}
+        },
+        "promptId": "24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+        "promptIdx": 0,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "echo",
+          "label": "echo-model"
+        },
+        "response": {
+          "output": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "raw": "You are a careful assistant. Answer briefly: Say hello to the user.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "greeting",
+          "vars": {
+            "question": "Say hello to the user."
+          },
+          "assert": [
+            {
+              "type": "contains",
+              "value": "hello"
+            },
+            {
+              "type": "javascript",
+              "value": "output.length < 200"
+            }
+          ],
+          "metadata": {
+            "category": "smalltalk",
+            "passage": "misc"
+          },
+          "options": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "question": "Say hello to the user."
+        },
+        "metadata": {
+          "category": "smalltalk",
+          "passage": "misc",
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      }
+    ],
+    "stats": {
+      "successes": 4,
+      "failures": 2,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 6,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 97,
+      "evaluationDurationMs": 97
+    },
+    "repeatStability": {
+      "totalGroups": 3,
+      "unstableGroups": 0,
+      "groupsWithErrors": 0,
+      "cachedResults": 0,
+      "groups": [
+        {
+          "repeatGroupId": "test-0-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "echo",
+            "label": "echo-model"
+          },
+          "description": "geography",
+          "promptLabel": "You are a careful assistant. Answer briefly: {{question}}",
+          "repetitions": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 1,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238022750665303,
+            "upper": 1
+          }
+        },
+        {
+          "repeatGroupId": "test-1-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "echo",
+            "label": "echo-model"
+          },
+          "description": "astronomy",
+          "promptLabel": "You are a careful assistant. Answer briefly: {{question}}",
+          "repetitions": 2,
+          "passed": 0,
+          "failed": 2,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 0,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0,
+            "upper": 0.6576197724933469
+          }
+        },
+        {
+          "repeatGroupId": "test-2-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "echo",
+            "label": "echo-model"
+          },
+          "description": "greeting",
+          "promptLabel": "You are a careful assistant. Answer briefly: {{question}}",
+          "repetitions": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 1,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238022750665303,
+            "upper": 1
+          }
+        }
+      ]
+    }
+  },
+  "config": {
+    "tags": {},
+    "description": "Tiny echo-provider eval (ai-assurance genai-evidence fixture)",
+    "prompts": [
+      {
+        "id": "brief",
+        "raw": "You are a careful assistant. Answer briefly: {{question}}"
+      }
+    ],
+    "providers": [
+      {
+        "id": "echo",
+        "label": "echo-model"
+      }
+    ],
+    "tests": [
+      {
+        "description": "geography",
+        "vars": {
+          "question": "What is the capital of France? Choose Paris or Lyon."
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "paris"
+          }
+        ],
+        "metadata": {
+          "category": "geography",
+          "passage": "geo"
+        }
+      },
+      {
+        "description": "astronomy",
+        "vars": {
+          "question": "Name the largest planet in the solar system."
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "jupiter"
+          }
+        ],
+        "metadata": {
+          "category": "astronomy",
+          "passage": "geo"
+        }
+      },
+      {
+        "description": "greeting",
+        "vars": {
+          "question": "Say hello to the user."
+        },
+        "assert": [
+          {
+            "type": "contains",
+            "value": "hello"
+          },
+          {
+            "type": "javascript",
+            "value": "output.length < 200"
+          }
+        ],
+        "metadata": {
+          "category": "smalltalk",
+          "passage": "misc"
+        }
+      }
+    ],
+    "env": {},
+    "sharing": false,
+    "outputPath": [
+      "results.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {},
+    "basePath": "<redacted>\\runs\\promptfoo"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.125.1",
+    "nodeVersion": "v22.21.1",
+    "platform": "win32",
+    "arch": "x64",
+    "exportedAt": "2026-11-05T15:57:09.439Z",
+    "evaluationCreatedAt": "2026-11-05T15:57:09.276Z"
+  },
+  "vars": [
+    "question"
+  ],
+  "runtimeOptions": {
+    "eventSource": "cli",
+    "showProgressBar": false,
+    "repeat": 2,
+    "maxConcurrency": 4,
+    "cache": false
+  }
+}
