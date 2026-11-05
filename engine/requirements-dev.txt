@@ -1,5 +1,8 @@
 # Test-only packages; the core runner stays standard-library only (see
 # requirements.txt). cryptography enables the Ed25519 signature tests in
 # engine/tests (skipped without it) and the trusted-signature verification in
-# site-app/scripts/assurance-integration-check.mjs.
+# site-app/scripts/assurance-integration-check.mjs. numpy is needed by the
+# native-adapter tests in engine/tests/test_connectors_adapters.py; its pin
+# matches requirements-optional.txt.
 cryptography==50.0.2
+numpy==2.3.5
