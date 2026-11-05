@@ -981,6 +981,20 @@
         "notes": { "$ref": "#/$defs/longText" }
       }
     },
+    "approval": {
+      "description": "One release approval: who approved, in which role, and when. The validator checks the roles each document needs and that two approvals come from two different people.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "by", "at"],
+      "properties": {
+        "role": {
+          "description": "legal_reviewer: a qualified legal reviewer (decision D5 of the codebase review). methodology_owner: the owner of the audit methodology.",
+          "enum": ["methodology_owner", "legal_reviewer"]
+        },
+        "by": { "$ref": "#/$defs/shortText" },
+        "at": { "$ref": "#/$defs/date" }
+      }
+    },
     "indexEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -999,8 +1013,29 @@
           "$ref": "#/$defs/sha256"
         },
         "status": { "enum": ["draft", "released", "withdrawn"] },
-        "approvedBy": { "$ref": "#/$defs/shortText" },
-        "approvedAt": { "$ref": "#/$defs/date" },
+        "approvals": {
+          "description": "Release approvals, at most one per role (design section 18, Q4). Validator rule 12b: a framework of kind legislation, implementing_act or local_law needs a legal_reviewer approval; every other document a methodology_owner approval; a crosswalk with a legalEffect entry both, given by two different people.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/approval" },
+          "allOf": [
+            {
+              "contains": {
+                "properties": { "role": { "const": "methodology_owner" } }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            },
+            {
+              "contains": {
+                "properties": { "role": { "const": "legal_reviewer" } }
+              },
+              "minContains": 0,
+              "maxContains": 1
+            }
+          ]
+        },
         "releasedAt": { "$ref": "#/$defs/date" },
         "withdrawnAt": { "$ref": "#/$defs/date" },
         "withdrawalReason": { "$ref": "#/$defs/text" },
@@ -1016,7 +1051,7 @@
             "required": ["status"]
           },
           "then": {
-            "required": ["sha256", "approvedBy", "approvedAt", "releasedAt"]
+            "required": ["sha256", "approvals", "releasedAt"]
           }
         },
         {
@@ -1072,7 +1107,7 @@
           }
         },
         "legacy": {
-          "description": "Read-time pin for engagements stored before criteria pins existed (design section 11.4, M0). Each value is the pack version whose content the build before the criteria model served to that class of engagement.",
+          "description": "Read-time pin for engagements stored before criteria pins existed (design section 11.4, M0). Each value is the pack version whose content the build before the criteria model served to that class of engagement. A stamp value missing from stamps fails closed. Once on main, packId, fallbackVersion and every existing stamps entry are frozen; stamps may only be added (validator rule 13).",
           "type": "object",
           "additionalProperties": false,
           "required": ["packId", "fallbackVersion", "stamps"],

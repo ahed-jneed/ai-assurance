@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Issue | #26 (design). Phase 1 is implemented by #27. |
-| Status | Draft for review, 5 November 2026; revised the same day after the independent review on PR #45 |
+| Status | Draft for review, 5 November 2026. Revised the same day after the independent review and re-review round 1 on PR #45, and to record the orchestrator's decisions on the open questions (comment on #27 of 5 November 2026; section 18) |
 | Deliverables | This document; `schemas/criteria-pack.schema.json` (draft); `schemas/fixtures/criteria-pack.eu-ai-act-amended.sample.json` (the EU AI Act pack in the new shape, three sample requirements) |
-| Coordinates with | #3 (methodology sync), #8 and #18 (rule pack 2026.11.1), #19 (classification facts), #20 (report model v2), #28, #29, #30 (next packs) |
+| Coordinates with | #3 (methodology sync), #8 and #18 (rule pack 2026.11.1), #19 (classification facts), #20 (report model v2), #28, #29, #30 (next packs), #61 (phase 2), #57 (owner actions for Q1 to Q3 and Q8) |
 
 ## 1. Summary
 
@@ -18,7 +18,7 @@ The audit criteria stop being one fixed catalogue and become versioned data. The
    - `index.json` lists every document with its digest and lifecycle status.
 
    One JSON Schema (`schemas/criteria-pack.schema.json`) validates all five document types (the four above plus the bundle used for fixtures and loading).
-2. **Released documents never change.** The index records a SHA-256 over the RFC 8785 canonical form of each released document, and CI rejects any change to it. An engagement stores only a pin: pack id, version and digest, about 300 bytes inside the existing D1 aggregate. No D1 migration and no new table.
+2. **Released documents never change.** The index records a SHA-256 over the RFC 8785 canonical form of each released document, and CI rejects any change to it. An engagement stores only a pin: pack id, version and digest, about 300 bytes inside the existing D1 aggregate. No D1 migration and no new table. Each release records its approvals, as decided under Q4: a qualified legal reviewer for legislation, the methodology owner for packs, crosswalks and other frameworks, and both, two different people, for a crosswalk with a legal effect.
 3. **The existing catalogue becomes pack #1, "EU AI Act (amended)", without loss.** A deterministic converter produces the pack and its framework from `templates/catalog.json` and `docs/obligation-subitems.json`. Tests prove that the pack projects back to the catalogue and the framework back to the whole obligation file exactly. Existing engagements have no pin. At read time they resolve to the pack #1 version whose content the build before #27 served them, which depends on what #18 does (section 11.4), and nothing is written to them.
 4. **AI-Act-only behaviour becomes pack data.** The AI Act risk classification and its gates, obligation-subitem assessments, the Annex IV index and the report snapshot's regulatory source and limitations follow the pinned pack's `features` and `reporting` (section 7.1). An EN 18286 + ISO/IEC 42001 engagement therefore needs no AI Act classification to reach Fieldwork.
 5. **One relationship vocabulary everywhere.** Control objectives link to requirements, and crosswalks link requirements across frameworks, with the NIST IR 8477 set theory relationships (`equal`, `subset_of`, `superset_of`, `intersects_with`, `no_relationship`) and a rationale (`syntactic`, `semantic`, `functional`). Coverage is therefore one algorithm.
@@ -30,7 +30,7 @@ The audit criteria stop being one fixed catalogue and become versioned data. The
    - Section 9 defines the eight cell states, the algorithm and a 49-case truth table. A reference prototype passed all 49 cases and 30,000 randomised weakening checks.
 7. **Licensing is data.** Each framework declares its text policy (`full_text`, `paraphrased_titles` or `identifiers_only`) and whether that position is confirmed. The schema forbids stored text and long titles for ISO and CEN-CENELEC standards, and the validator blocks release while a licence is unconfirmed. AIUC-1 stays out until AIUC grants a licence.
 8. **Loading follows #3.** The canonical documents are copied into `site-app` at build time by the #3 sync script, as one generated bundle checked in CI. A server-only loader serves projections to the client.
-9. **Six phases.** Phase 1 is one pull request (#27): data model, validation, loader, the pack #1 migration, the pack features, pack selection and the coverage view. Phases 2 to 6 are listed in section 17.
+9. **Six phases.** Phase 1 is one pull request (#27): data model, validation, loader, the pack #1 migration, the pack features, pack selection and the coverage view. Phase 2 is #61, phases 4 and 5 are #28 to #30, and phases 3 and 6 are on the Later list of `ROADMAP.md` (section 17).
 
 ## 2. Context: what exists today
 
@@ -191,7 +191,7 @@ Requirement-level application dates use `applicability` rows: `{from, until, con
 
 ### 5.4 Index and bundle
 
-The index lists each document with `documentType`, `id`, `edition` (frameworks only), `version`, `path`, `status` (`draft`, `released` or `withdrawn`), `sha256`, `approvedBy`, `approvedAt`, `releasedAt`, the withdrawal fields and `selectable` (packs only). It also holds `defaults.pack` and the `legacy` pin rule (section 11.4). A bundle is several documents in one file. It serves as the fixture format and as the generated loader artefact.
+The index lists each document with `documentType`, `id`, `edition` (frameworks only), `version`, `path`, `status` (`draft`, `released` or `withdrawn`), `sha256`, `approvals`, `releasedAt`, the withdrawal fields and `selectable` (packs only). Each approval is `{role, by, at}`, with `role` `legal_reviewer` or `methodology_owner` and at most one approval per role; which roles a document needs is the Q4 decision (section 18), checked by rule 12b. The index also holds `defaults.pack` and the `legacy` pin rule (section 11.4). A bundle is several documents in one file. It serves as the fixture format and as the generated loader artefact.
 
 ## 6. Versioning and immutability
 
@@ -208,7 +208,7 @@ The index lists each document with `documentType`, `id`, `edition` (frameworks o
 5. **Digest.** `sha256` is the SHA-256 of the RFC 8785 (JCS) canonical serialisation of the parsed document (sorted keys, no whitespace, ECMAScript number and string forms).
    - Raw bytes are not used because checkouts differ in line endings. A Windows checkout made before `.gitattributes` existed keeps CRLF: in the worktree used for this design, `templates/catalog.json` hashed `a8ca2ffa…` on disk, while the committed LF blob hashes `10a75f63…`. JCS gives the same digest for both, and the prototype checked that.
    - Loaded documents are deep-frozen and indexes live in separate maps. The prototype showed why: attaching an index to a document silently changed its digest.
-6. **Lifecycle.** `draft` → `released` (needs `sha256`, `approvedBy`, `approvedAt`, `releasedAt`) → optionally `withdrawn` (needs `withdrawnAt` and `withdrawalReason`). Entries are never deleted.
+6. **Lifecycle.** `draft` → `released` (needs `sha256`, `releasedAt` and the `approvals` that Q4 requires) → optionally `withdrawn` (needs `withdrawnAt` and `withdrawalReason`). Entries are never deleted.
    - The current version of a pack or crosswalk is its highest released, non-withdrawn version.
    - Withdrawal means the methodology owner no longer stands behind the document; a newer version alone does not withdraw an older one. It blocks new pins.
    - Engagements pinned to a withdrawn pack, or to a pack whose framework data version was withdrawn, keep working: their templates resolve and their recorded work does not change. Their coverage is capped at "Partly covered" by the clamp of section 9.2, and the view and the drawer show the withdrawal date and reason. The remedy is a reviewed move to another pack version (M2, phase 3).
@@ -301,7 +301,7 @@ The same pair can be mapped once per rationale, with different relationships; NI
 **Other rules.**
 - **No transitivity.** Coverage uses only crosswalks directly between one of the pack's criteria frameworks and the framework being viewed. A→B and B→T never imply A→T. Each mapping reflects its own use case and assumptions, and NIST IR 8477 (section 4.2) warns against assuming that the way A relates to B carries over to how B relates to C.
 - **Nothing is inferred from what is not mapped.** The OSCAL mapping model states the same ([OSCAL mapping model](https://pages.nist.gov/OSCAL-Reference/models/v1.2.1/mapping/json-reference/)). "Not mapped" is displayed as such, never as a gap or a pass.
-- **Approval.** A crosswalk is released through the index like any document. An entry with `legalEffect` also needs `legalReview: completed` on its provenance before release.
+- **Approval.** A crosswalk is released through the index like any document, with the methodology owner's approval. An entry with `legalEffect` also needs `legalReview: completed` on its provenance, and its crosswalk's index entry needs a second approval by a qualified legal reviewer, who must be a different person (Q4; rules 10 and 12b).
 - **OSCAL compatibility.** The enums map one to one onto the OSCAL Control Mapping Model (v1.2.x) for a later export (phase 6):
 
 | This model | OSCAL mapping-collection |
@@ -659,7 +659,7 @@ SELECT json_extract(e.body, '$.<stamp>') AS stamp, json_extract(p.value, '$.temp
 Worked example: the EN 18286 + ISO/IEC 42001 programme of #28, cut down to one working paper. A scratch harness checked each step:
 
 - the six JSON blocks below validate against the draft schema;
-- together with the sample AI Act documents, they pass a prototype of integrity rules 1, 2, 4 to 11, 12a and 12b of section 14.2. Rule 12b runs on the two released AI Act entries, whose digests it checks, and on `defaults` and `legacy`; rule 11 compares `MEM-EX-01` with the full pack #1 conversion; rule 10 finds the draft legal effect allowed. Rules 3 and 13 compare several data versions or the previous index, so a single set of documents cannot exercise them;
+- together with the sample AI Act documents, they pass a prototype of integrity rules 1, 2, 4 to 11, 12a and 12b of section 14.2. Rule 12b runs on the two released AI Act entries, whose digests and approvals it checks, and on `defaults` and `legacy`; rule 11 compares `MEM-EX-01` with the full pack #1 conversion; rule 10 finds the draft legal effect allowed. Rules 3 and 13 compare several data versions or the previous index, so a single set of documents cannot exercise them;
 - the coverage engine gives the results in the table at the end of this section.
 
 The EN 18286 clause numbers and topics come from a secondary source and are marked so. The three ISO/IEC 42001 subclause numbers were checked against the table of contents in the publisher's preview. Both must be confirmed against licensed copies before #28 releases anything.
@@ -671,8 +671,8 @@ The EN 18286 clause numbers and topics come from a secondary source and are mark
 3. Add `crosswalks/iso-iec-42001-to-eu-ai-act/2027.1.0.json` and `crosswalks/en-18286-to-eu-ai-act/2027.1.0.json`.
 4. Add the five entries to `templates/criteria/index.json` as `draft`.
 5. Run `node schemas/validate-criteria.mjs`, then the #3 sync script (`npm run sync`, which runs `site-app/scripts/sync-generated.mjs` in PR #42), then `npm test`. Drafts are excluded from the production bundle; tests load them through an injected registry.
-6. Review in the pull request. After counsel confirms the licence policy (Q1), set `licence.status` to `confirmed`, and once the Annex ZA scope is confirmed (Q8), record the completed legal review of the crosswalk's legal effect, which rule 10 requires before release. The documents are still drafts, so both changes are allowed.
-7. Mark the entries `released` with approver and dates. `node schemas/validate-criteria.mjs --stamp` fills in their JCS digests, CI enforces the digests from then on, the bundle includes the documents, and the pack appears in the new-engagement dialog.
+6. Review in the pull request. After counsel confirms the licence policy (Q1, an owner action tracked in #57), set `licence.status` to `confirmed`, and once the Annex ZA scope is confirmed (Q8, also #57), record the completed legal review of the crosswalk's legal effect, which rule 10 requires before release. The documents are still drafts, so both changes are allowed.
+7. Mark the entries `released` with their dates and `approvals` (Q4): the methodology owner for the two frameworks, which are standards, the pack and both crosswalks, and in addition a qualified legal reviewer, a different person, for `en-18286-to-eu-ai-act`, whose entry has a legal effect. `node schemas/validate-criteria.mjs --stamp` fills in their JCS digests, CI enforces the digests from then on, the bundle includes the documents, and the pack appears in the new-engagement dialog.
 
 Framework, EN 18286:
 
@@ -959,7 +959,7 @@ Crosswalk, EN 18286 to the AI Act, recording the presumption of conformity as a 
 }
 ```
 
-Index after the change. The two released entries carry the real JCS digests of the sample fixture's documents; the approver is an example value:
+Index after the change. The two released entries carry the real JCS digests of the sample fixture's documents. Under Q4 the AI Act framework, which is legislation, is approved by a qualified legal reviewer and the pack by the methodology owner; the names and dates are example values:
 
 ```json
 {
@@ -974,8 +974,7 @@ Index after the change. The two released entries carry the real JCS digests of t
       "path": "frameworks/eu-ai-act/02024R1689-20260727/2026.10.1.json",
       "sha256": "2decbb4a6c55cb4a0e830e77670c01f63728adab8b88e15f239dcd985e996f46",
       "status": "released",
-      "approvedBy": "Methodology owner (example)",
-      "approvedAt": "2026-12-01",
+      "approvals": [{ "role": "legal_reviewer", "by": "Qualified legal reviewer (example)", "at": "2026-12-01" }],
       "releasedAt": "2026-12-01"
     },
     {
@@ -985,8 +984,7 @@ Index after the change. The two released entries carry the real JCS digests of t
       "path": "packs/eu-ai-act-amended/2026.10.1.json",
       "sha256": "fd88e15ff804f756949ebcd4f48b93c720f7d5b3abf09aa9035d03e2ed10a8dc",
       "status": "released",
-      "approvedBy": "Methodology owner (example)",
-      "approvedAt": "2026-12-01",
+      "approvals": [{ "role": "methodology_owner", "by": "Methodology owner (example)", "at": "2026-12-01" }],
       "releasedAt": "2026-12-01",
       "selectable": true
     },
@@ -1025,12 +1023,12 @@ Pack-specific features that #28 also wants are *features*, not criteria, and nee
 | Source | Position | Text policy | Status |
 |---|---|---|---|
 | EU AI Act and other EU legislation | Reuse of EUR-Lex content is authorised provided the source is acknowledged, under Commission Decision 2011/833/EU ([Decision](https://eur-lex.europa.eu/eli/dec/2011/833/oj)). Consolidated texts are research aids; the Official Journal is authentic. The wording was confirmed through mirrors of the EUR-Lex notice, because the live legal notice page returned empty to automated fetching | `full_text`, with attribution | confirmed (re-check the live notice before #27 releases) |
-| EN 18286:2026 and other CEN-CENELEC standards | Copyright of CEN-CENELEC and the national members; sold through national standards bodies | `paraphrased_titles`: clause numbers and our own titles of at most 80 characters. No text, tables, figures or Annex ZA table rows. State facts about the standard (scope of the presumption) with sources | unconfirmed until counsel signs off (Q1) |
-| ISO/IEC 42001, 42005, 42006, 23894 | ISO and IEC copyright, sold through ISO and national bodies ([ISO/IEC 42001](https://www.iso.org/standard/42001)) | `paraphrased_titles` | unconfirmed until counsel signs off (Q1) |
+| EN 18286:2026 and other CEN-CENELEC standards | Copyright of CEN-CENELEC and the national members; sold through national standards bodies | `paraphrased_titles`: clause numbers and our own titles of at most 80 characters. No text, tables, figures or Annex ZA table rows. State facts about the standard (scope of the presumption) with sources | unconfirmed until counsel signs off (Q1, #57) |
+| ISO/IEC 42001, 42005, 42006, 23894 | ISO and IEC copyright, sold through ISO and national bodies ([ISO/IEC 42001](https://www.iso.org/standard/42001)) | `paraphrased_titles` | unconfirmed until counsel signs off (Q1, #57) |
 | NIST AI RMF 1.0, NIST AI 600-1 | NIST: except material marked as copyrighted, information on NIST sites is public information and may be distributed or copied; credit is requested ([NIST](https://www.nist.gov/oism/copyrights)) | `full_text`, with attribution | confirmed for NIST-authored content; check third-party crosswalks on the AIRC separately |
 | NYC Local Law 144 and the DCWP rules | Enacted local law and agency rules, assumed free to reproduce. Not checked for this design: no source was read for the reuse terms of the official publications | `full_text` (proposed) | unverified: `unconfirmed` in the data, which blocks release, until someone checks the terms before #30 releases |
-| AIUC-1 | The standard site's footer reads "© AIUC — ALL RIGHTS RESERVED" ([standard](https://standard.aiuc-1.com/)). The AIUC terms of service (last updated 15 July 2025) grant only personal, non-commercial use of the site and prohibit copying, redistribution and derivative works of site content ([terms](https://aiuc.com/legal/terms)). The terms do not mention the standard specifically | `identifiers_only` at most | unconfirmed: do not ship any AIUC-1 framework or crosswalk until AIUC grants written permission (Q2) |
-| CSA AI Controls Matrix (route for SOC 2 + AI and AIUC-1 mapping) | Free to download; CSA publishes a licensing FAQ that distinguishes internal reference from licensed use ([CSA FAQ](https://cloudsecurityalliance.org/artifacts/ccm-aicm-licensing-faq)). Terms not read for this design | to decide | unconfirmed (Q3) |
+| AIUC-1 | The standard site's footer reads "© AIUC — ALL RIGHTS RESERVED" ([standard](https://standard.aiuc-1.com/)). The AIUC terms of service (last updated 15 July 2025) grant only personal, non-commercial use of the site and prohibit copying, redistribution and derivative works of site content ([terms](https://aiuc.com/legal/terms)). The terms do not mention the standard specifically | `identifiers_only` at most | unconfirmed: do not ship any AIUC-1 framework or crosswalk until AIUC grants written permission (Q2, #57) |
+| CSA AI Controls Matrix (route for SOC 2 + AI and AIUC-1 mapping) | Free to download; CSA publishes a licensing FAQ that distinguishes internal reference from licensed use ([CSA FAQ](https://cloudsecurityalliance.org/artifacts/ccm-aicm-licensing-faq)). Terms not read for this design | to decide | unconfirmed (Q3, #57) |
 
 **Enforcement.**
 - **Schema.** `paraphrased_titles` requires titles of at most 80 characters and forbids `text`. `identifiers_only` forbids titles. Only `full_text` allows `text`. The fixture tests reject each violation.
@@ -1051,9 +1049,9 @@ Pack-specific features that #28 also wants are *features*, not criteria, and nee
 - working papers having objectives, steps (at most 30, the limit of `recordProcedureExecution`) and evidence;
 - audit programmes having a primary criteria set and `reporting` with a `limitations` text;
 - the known `features` only, as booleans; `compat.obligations` with a non-empty `order`;
-- index entries: release metadata and digests on released entries, withdrawal reasons, and `edition` and `selectable` only where they belong; `legacy.stamps` keys in the edition pattern and values that are data versions.
+- index entries: release metadata (`releasedAt` and at least one approval) and digests on released entries, at most one approval per role, withdrawal reasons, and `edition` and `selectable` only where they belong; `legacy.stamps` keys in the edition pattern and values that are data versions.
 
-The draft was checked against the sample fixture, the requirement fragment of section 5.1, 24 rejected document mutations and 10 rejected index mutations. Among them: a migrated `superset_of` link, text or an 81-character title under `paraphrased_titles`, an audit programme without `reporting`, an unknown feature, `compat.obligations` without `order`, and the first draft's `methodologyVersions` map.
+The draft was checked against the sample fixture, the requirement fragment of section 5.1, 24 rejected document mutations and 14 rejected index mutations. Among them: a migrated `superset_of` link, text or an 81-character title under `paraphrased_titles`, an audit programme without `reporting`, an unknown feature, `compat.obligations` without `order`, the first draft's `methodologyVersions` map, a released entry without approvals, two approvals in one role, an unknown role and the first draft's `approvedBy` field.
 
 ### 14.2 Integrity rules
 
@@ -1068,11 +1066,12 @@ JSON Schema cannot check these; `schemas/validate-criteria.mjs` must. Each needs
 7. Every `regulatoryRefs` string of an item resolves through `aliases` in a primary framework.
 8. `roles` reference items of the pack; `features.annexIvIndex` requires every `paperIds` entry of `templates/annex-iv-map.json` to be an item; `features.aiActClassification` and `features.obligationAssessments` require a criteria set of framework `eu-ai-act`, and `obligationAssessments` requires that framework to carry `compat.obligations` whose `order` lists requirement nodes of it.
 9. Crosswalk endpoints are in the right frameworks and exist in the latest released data version of each edition; for a draft crosswalk, in the latest data version, draft or released. A crosswalk-only pack's `crosswalks` exist and connect one of its criteria editions.
-10. An entry with `legalEffect` has `legalReview: completed` before release.
+10. An entry with `legalEffect` has `legalReview: completed` before release, and its crosswalk is released only with both approvals of rule 12b.
 11. A `derivedFrom` item equals its upstream item (ignoring `objectiveIds`, `phase` and `derivedFrom`); otherwise the validator prints an "upstream changed" report. This is a warning, not a failure.
 12. Index.
     - **12a. Structure, for every entry, drafts included:** every listed path exists and every file under `templates/criteria/{frameworks,packs,crosswalks}` is listed; ids, editions and versions match the file content and its path; versions increase per id (and edition); `selectable` appears only on audit programmes.
     - **12b. Release, for released and withdrawn entries:** the digest equals the JCS digest of the file; a released framework has a confirmed licence (section 13); a released document references only released or withdrawn documents, never a draft, so the frameworks of a released pack all have confirmed licences and a released crosswalk-only pack lists only released crosswalk versions; `defaults.pack` points at a released, non-withdrawn, selectable audit programme; `legacy.fallbackVersion` and every `legacy.stamps` value point at released or withdrawn versions of `legacy.packId`. Withdrawn versions are allowed there because the rule must keep reproducing what existing engagements were served.
+    - **12b, approvals (Q4):** a framework whose `kind` is `legislation`, `implementing_act` or `local_law` has a `legal_reviewer` approval; every other document (packs, crosswalks and the other frameworks) has a `methodology_owner` approval; a crosswalk with a `legalEffect` entry has both, and their `by` values differ (compared trimmed and case-insensitively). The index names people as free text, so the validator can only check that the names differ; the release review checks who they are.
 13. Released entries are never removed and their digests never change. CI compares the index with the index at a named base, read with `git show <base>:templates/criteria/index.json`:
     - **pull request:** the base is the first parent of the merge commit that `actions/checkout` checks out for the event (`refs/pull/<n>/merge`), that is, the base branch tip. The step needs `fetch-depth: 2`, because the default depth of 1 has no parent;
     - **push to `main`:** the base is `github.event.before`, the tip before the push, fetched with `git fetch --depth=1 origin <sha>`. `HEAD~1` would miss the earlier commits of a push that carries several. For a new branch, where `before` is all zeros, the check is skipped.
@@ -1204,8 +1203,8 @@ Art. 50  Transparency obligations    [XX] Exception in a related source: WP-XC-0
 ## 16. Test strategy
 
 - **Vitest, `site-app/lib/criteria/*.test.ts`:**
-  1. every committed criteria document and fixture validates; negative mutations as in `schemas/validate-procedure-schema.mjs`, starting from the 34 mutations used for this design;
-  2. each integrity rule of 14.2 against a failing fixture, including two criteria sets for one framework id, an AI Act feature without an AI Act criteria set, a selectable crosswalk-only pack, a released framework with an unconfirmed licence and a `legacy` rule pointing at a draft; rule 13 against a base index with a released entry removed and one with a changed digest;
+  1. every committed criteria document and fixture validates; negative mutations as in `schemas/validate-procedure-schema.mjs`, starting from the 38 mutations used for this design;
+  2. each integrity rule of 14.2 against a failing fixture, including two criteria sets for one framework id, an AI Act feature without an AI Act criteria set, a selectable crosswalk-only pack, a released framework with an unconfirmed licence, a `legacy` rule pointing at a draft, a legislation framework approved only by the methodology owner, and a crosswalk with a legal effect approved in both roles by the same person; rule 13 against a base index with a released entry removed and one with a changed digest;
   3. the JCS digest, including line-ending and whitespace invariance, and index digests;
   4. the pack #1 golden tests of 11.3: both projections, for 2026.10.1 and 2026.11.1 (the obligation one over the whole file), and seeding and paper templates once per legacy class against the fixtures captured from the build before #27;
   5. `pinOf` and `legacyPin` for each legacy class: no stamp, and every stamp value #18 writes;
@@ -1225,11 +1224,13 @@ Art. 50  Transparency obligations    [XX] Exception in a related source: WP-XC-0
 | Phase | Issue | Size | Scope | Done when |
 |---|---|---|---|---|
 | 1 | #27 | L, one PR | The data model: final schema, `validate-criteria.mjs` and its CI step. Converter plus pack #1 2026.10.1 and 2026.11.1 with the golden fixtures, captured per legacy class from the build before #27. Index, with the legacy rule set from #18. Sync extension, bundle and loader. Pin resolution with M0. Refactor of `templatePaper`, `freshEngagement`, `seedWorkflow`, `makePaper`, the limitation memo, run papers and the GET projection onto the pinned pack. The pack features and `reporting` of section 7.1: classification gates, commands and panels; obligation commands and panel; Annex IV index; report texts. `createEngagement` with `packId`, follow-up inheritance and the dialog. Coverage engine with findings and obligation records, crosswalk views, withdrawal clamp and banner, `GET /api/coverage` and the heatmap | The golden tests pass for every legacy class; the existing harnesses pass unchanged; the section 12 pack works from data alone in a test, without AI Act gates; the 49 cases pass |
-| 2 | new | M | M1 explicit pin commands. Report and dossier stamps for frameworks and crosswalks. `obligation-subitems.json` and `annex-iv-map.json` generated from the AI Act framework and pack, with projection tests. Obligation codes validated against the pinned framework, and the workbench's obligation options served by the API. Findings `criteriaRefs` for #20, with coverage placing unlinked findings through them | Obligation and Annex IV projections are lossless; snapshots carry every stamp |
-| 3 | new | M | M2 repin with diff, impact review and revert (revision-limit check up front; template content re-derived on revert). Reviewed links for pack #1 (the 33 papers against the 68 subitems; methodology data only) as pack #1 2026.12.x or later | A repin and its revert are tested; pack #1 shows precise coverage |
-| 4 | #28 | L | The EN 18286 + ISO/IEC 42001 pack as data, following section 12, plus its features: Statement of Applicability, nonconformity grading, certification recommendation | Q1 resolved; the #28 criteria pass |
+| 2 | [#61](https://github.com/ahed-jneed/ai-assurance/issues/61) | M | M1 explicit pin commands. Report and dossier stamps for frameworks and crosswalks. `obligation-subitems.json` and `annex-iv-map.json` generated from the AI Act framework and pack, with projection tests. Obligation codes validated against the pinned framework, and the workbench's obligation options served by the API. Findings `criteriaRefs` for #20, with coverage placing unlinked findings through them. Client-visible coverage, decided with #20 (Q7) | Obligation and Annex IV projections are lossless; snapshots carry every stamp |
+| 3 | Later list of `ROADMAP.md` | M | M2 repin with diff, impact review and revert (revision-limit check up front; template content re-derived on revert). Reviewed links for pack #1 (the 33 papers against the 68 subitems; methodology data only) as pack #1 2026.12.x or later | A repin and its revert are tested; pack #1 shows precise coverage |
+| 4 | #28 | L | The EN 18286 + ISO/IEC 42001 pack as data, following section 12, plus its features: Statement of Applicability, nonconformity grading, certification recommendation | Q1 and Q8 resolved (#57); the #28 criteria pass |
 | 5 | #29, #30 | S, M | NIST AI RMF 1.0 and AI 600-1 frameworks and crosswalks as a crosswalk-only pack (data and tests only). The NYC LL144 pack (data plus the computations of #30) | The packs validate; crosswalk targets exist; coverage cases pass |
-| 6 | new | M | OSCAL catalog and mapping-collection export. Tenant default pack. Engagement-level link tailoring with approval. AIUC-1 after Q2. Tenant-authored packs, which would need a D1 table of immutable documents with the same schema and digests | Each item tested on its own |
+| 6 | Later list of `ROADMAP.md` | M | OSCAL catalog and mapping-collection export. Tenant default pack. Engagement-level link tailoring with approval. AIUC-1 after Q2 (#57). Tenant-authored packs, which would need a D1 table of immutable documents with the same schema and digests | Each item tested on its own |
+
+Phase 2 is #61. Phases 3 and 6 are on the Later list of `ROADMAP.md` (orchestrator decision of 5 November 2026), so they have no issue yet and are scheduled from there.
 
 Commit order for phase 1:
 
@@ -1245,26 +1246,28 @@ The refactor commit uses the module layout that #4, #5 and #6 put on `main` (`li
 
 ## 18. Open questions and risks
 
-**Open questions** (each blocks the item named):
+**Decisions and open questions.** The orchestrator decided Q4 to Q6 on 5 November 2026 (comment on #27; Q5 also on #18). Q1 to Q3 and Q8 are owner actions tracked in #57, and Q7 moved to #61 (phase 2). An open item still blocks what it names.
 
-- **Q1. Standards licensing (blocks the #28 release).** Counsel to confirm that clause numbers plus our own titles of at most 80 characters, with no text, tables or figures, is acceptable for ISO/IEC and CEN-CENELEC standards in a commercial product. Also: whether stating the scope of a presumption of conformity in our own words is acceptable.
-- **Q2. AIUC-1 (blocks R4.6).** Written permission from AIUC for identifiers, titles and AIUC's published crosswalks, and how quarterly releases may be redistributed.
-- **Q3. CSA AI Controls Matrix (blocks the SOC 2 + AI mapping route).** The licence terms for commercial use.
-- **Q4. Approvers.** Who may approve a release in the index:
-  - framework documents for legislation need qualified legal review (decision D5 of the codebase review);
-  - packs and crosswalks need the methodology owner;
-  - two people for `legalEffect` entries?
-- **Q5. Coordination with #18 (blocks #27's legacy rule).** #27 answers these from #18's merged code and records the answers as index data and golden fixtures (section 11.4):
-  - the name and values of #18's engagement-level stamp. It must hold a rule-pack or methodology version, because a CELEX edition alone cannot tell 2026.10.1 engagements from 2026.11.1 ones;
-  - which content the #18 build serves to engagements created before #18 (no stamp) whenever `templatePaper` runs, which sets `legacy.fallbackVersion`, and to each stamp value, which sets `legacy.stamps`;
-  - whether #18 or #27 converts methodology 2026.11.1 into pack #1 2026.11.1. Proposed: #27, since #18 merges first and does not know the criteria model.
-- **Q6. Obligation records.** Should they count as direct coverage sources from phase 1? Proposed: yes, on packs with `features.obligationAssessments`, with readiness taken from the record's applicability.
-- **Q7. Client-visible coverage.** Should clients see coverage in released reports, and which crosswalk views? Decide with #20 in phase 2.
-- **Q8. EN 18286 facts.** The clause structure and the exact Annex ZA scope (Art. 17(1) and the first sentence of Art. 11(1), per secondary sources) must be confirmed against the purchased standard and Implementing Decision (EU) 2026/2274 before #28 encodes them.
+- **Q1. Standards licensing (owner action, #57; blocks the #28 release).** Counsel to confirm that clause numbers plus our own titles of at most 80 characters, with no text, tables or figures, is acceptable for ISO/IEC and CEN-CENELEC standards in a commercial product. Also: whether stating the scope of a presumption of conformity in our own words is acceptable.
+- **Q2. AIUC-1 (owner action, #57; blocks R4.6).** Written permission from AIUC for identifiers, titles and AIUC's published crosswalks, and how quarterly releases may be redistributed.
+- **Q3. CSA AI Controls Matrix (owner action, #57; blocks the SOC 2 + AI mapping route).** The licence terms for commercial use.
+- **Q4. Approvers (decided).** Framework documents for legislation need a qualified legal reviewer (decision D5 of the codebase review); packs and crosswalks need the methodology owner; entries with `legalEffect` need both, two different people. The design applies the decision as follows:
+  - each index entry records its release approvals in `approvals`, as `{role, by, at}` with `role` `legal_reviewer` or `methodology_owner`, at most one per role (section 5.4), and rule 12b checks them;
+  - "legislation" is a framework whose `kind` is `legislation`, `implementing_act` or `local_law`;
+  - the decision names no approver for the other framework documents (standards, frameworks, profiles, schemes and guidance). They carry no legal effect of their own, since legal effects live in crosswalk entries, so the design requires the methodology owner for them, as for packs and crosswalks;
+  - an entry with `legalEffect` is released only as part of its crosswalk, so the crosswalk's index entry needs both approvals, from two different people, and the entry's provenance needs `legalReview: completed` (rule 10);
+  - **consequence for #27:** the AI Act framework data versions 2026.10.1 and 2026.11.1 are legislation, and rule 12b lets a released pack reference only released frameworks. Releasing pack #1, and with it `defaults.pack` and the legacy rule that M0 needs, therefore waits for a qualified legal reviewer's approval of both frameworks before #27 can deploy. #57 tracks the legal review of #18's rule-pack entries, but does not yet name this approval.
+- **Q5. Coordination with #18 (decided as proposed).** #18 defines the engagement-level rule-pack stamp, its field name and values. #27 reads it from #18's merged code and converts methodology 2026.11.1 into pack #1 2026.11.1. From #18's merged code, #27 also determines, and records as index data and golden fixtures (section 11.4):
+  - the stamp's name and values. The stamp must hold a rule-pack or methodology version, because a CELEX edition alone cannot tell 2026.10.1 engagements from 2026.11.1 ones;
+  - which content the #18 build serves to engagements created before #18 (no stamp) whenever `templatePaper` runs, which sets `legacy.fallbackVersion`, and to each stamp value, which sets `legacy.stamps`.
+- **Q6. Obligation records (decided as proposed).** They count as direct coverage sources from phase 1, on packs with `features.obligationAssessments`, with readiness taken from the record's applicability (section 9.1).
+- **Q7. Client-visible coverage (moved to #61, phase 2).** Should clients see coverage in released reports, and which crosswalk views? #61 decides it with #20.
+- **Q8. EN 18286 facts (owner action, #57; blocks #28).** The clause structure and the exact Annex ZA scope (Art. 17(1) and the first sentence of Art. 11(1), per secondary sources) must be confirmed against the purchased standard and Implementing Decision (EU) 2026/2274 before #28 encodes them.
 
 **Risks:**
 
 - **Phase 1 is large.** Mitigation: the commit order above, and moving M1, M2 and the obligation folding out of it.
+- **Q4 puts a qualified legal reviewer on #27's path.** Pack #1 cannot be released, so #27 cannot deploy, until the two AI Act framework data versions are approved (Q4 above). Mitigation: ask for these approvals in #57 together with the review of LR-01 to LR-10, before #27 is ready to merge.
 - **Users may read "Partly covered" on day one as a regression** against the old 100% article bars. Mitigation: show papers signed (progress) and criteria coverage as separate measures, as the methodology already requires, and explain the migration note in the drawer.
 - **Obligation data drifts from the framework until phase 2.** Mitigation: the projection test in 11.3, and records with codes the pinned framework lacks are counted, not dropped (section 9.1).
 - **Withdrawing pack #1 would cap the coverage of every legacy engagement.** That is intended (section 6.6), but it makes a withdrawal of pack #1 a decision for the methodology owner with a repin plan, not a routine correction; a mistake in a released version is normally fixed by releasing a newer one.
