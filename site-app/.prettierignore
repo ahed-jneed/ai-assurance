@@ -8,7 +8,6 @@ coverage/
 package-lock.json
 
 # Copies and vendored sources kept byte-identical with their upstream
-reference/
 vendor/
 public/
 drizzle/meta/
