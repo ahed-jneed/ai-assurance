@@ -12,7 +12,22 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output and checkout-local tool state.
+    "dist/**",
+    "coverage/**",
+    ".vinext/**",
+    ".wrangler/**",
+    ".sites-runtime/**",
   ]),
+  {
+    rules: {
+      // Allow the `const { omitted, ...rest } = value` idiom for dropping keys.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { ignoreRestSiblings: true },
+      ],
+    },
+  },
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {
