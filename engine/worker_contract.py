@@ -11,7 +11,7 @@ import hmac
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .contract import HASH, ID, validate_report
@@ -148,13 +148,14 @@ class Claim:
     request_json: str
 
     @classmethod
-    def parse(cls, body, *, check_expiry=True):
+    def parse(cls, body):
+        """Validate a claim's pins, lease timestamp and exact request.
+
+        Whether the lease is still running is a question for the server's
+        clock, so the worker checks it with the claim response's Date header.
+        """
         pins = claim_pins(body)
-        lease = timestamp(body.get("leaseUntil"))
-        if check_expiry and lease <= datetime.now(timezone.utc):
-            # The server granted this lease moments ago, so a lease already
-            # past on arrival usually means this host's clock runs ahead.
-            raise EngineError("lease_expired_on_receipt", "Attempt lease has already expired by this worker's clock")
+        timestamp(body.get("leaseUntil"))
         request_json = body.get("requestJSON")
         # Exact server bytes remove JavaScript/Python number serialization ambiguity.
         if not isinstance(request_json, str):

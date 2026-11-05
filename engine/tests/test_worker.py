@@ -13,7 +13,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,7 +22,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
-from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, stripped_compute_env, verify_result_bytes
+from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, ServerClock, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, stripped_compute_env, verify_result_bytes
 from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, WORKER_VERSION, Claim, MAX_RESULT_BYTES, completion_body, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_model_spec, validate_request
 from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, fake_onnxruntime, requires_numpy
 
@@ -50,6 +50,17 @@ def claim_body(request=None, *, job="JOB-0123456789ab", attempt="ATTEMPT-0123456
     text = json.dumps(request, separators=(",", ":"), ensure_ascii=False)
     lease = (datetime.now(timezone.utc)+timedelta(seconds=lease_seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     return {"jobId": job, "attemptId": attempt, "fence": 7, "nonce": "c0ffee00-0000-4000-8000-00000000f1x7", "leaseUntil": lease, "requestSha256": sha256(text.encode("utf-8")), "requestJSON": text, "request": request}
+
+
+@contextmanager
+def skewed_worker_clock(seconds):
+    """Run the worker's wall clock `seconds` fast (negative: slow); the server's stays right."""
+    class Skewed(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime.now(tz)+timedelta(seconds=seconds)
+    with patch("engine.worker.datetime", Skewed), patch("engine.worker_contract.datetime", Skewed):
+        yield
 
 
 PIN_KEYS = ("jobId", "attemptId", "fence", "nonce", "requestSha256")
@@ -772,6 +783,37 @@ class WorkerTests(unittest.TestCase):
             self.assertEqual(result["error"], "lease_expired_on_receipt")
             self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], ["lease_expired_on_receipt"])
             self.assertEqual(server.gets, [])
+        self.assertIn("by the server's clock", self.operator_log()[-1]["detail"]["message"])
+
+    def test_a_skewed_worker_clock_honours_the_server_lease(self):
+        # Ten minutes fast used to fail every claim with lease_expired_on_receipt;
+        # leases now count down from the server's Date header on the monotonic clock.
+        with RunnerServer() as server, skewed_worker_clock(600):
+            result = self.worker(server.transport()).once()
+            self.assertEqual(result["state"], "completed")
+            self.assertEqual(server.errors, [])
+            self.assertEqual([body["op"] for body, _ in server.posts if body["op"] in {"complete", "fail"}], ["complete"])
+        # Ten minutes slow cannot keep alive a lease the server has already ended.
+        with RunnerServer(claims=[claim_body(lease_seconds=-30)]) as server, skewed_worker_clock(-600):
+            self.assertEqual(self.worker(server.transport(), workspace="slow").once()["error"], "lease_expired_on_receipt")
+            self.assertEqual(server.gets, [])
+
+    def test_lease_deadlines_count_down_from_the_server_clock(self):
+        clock = ServerClock(1000.0, "Thu, 05 Nov 2026 12:00:00 GMT")
+        # 120 s left by the server, less one second for the Date header's resolution.
+        self.assertEqual(clock.deadline("2026-11-05T12:02:00.000Z"), 1119.0)
+        self.assertEqual(clock.deadline("2026-11-05T12:00:00.250Z"), 999.25)
+        with skewed_worker_clock(3600):
+            self.assertEqual(clock.deadline("2026-11-05T12:02:00.000Z"), 1119.0)
+        with self.assertRaises(ValueError):
+            clock.deadline("12:02")
+        # Without a usable Date header only this host's clock can say what is left.
+        lease = (datetime.now(timezone.utc)+timedelta(seconds=60)).isoformat()
+        for date in (None, "", "yesterday", "Thu, 05 Nov 2026 12:00:00 -0000"):
+            with self.subTest(date=date):
+                fallback = ServerClock(1000.0, date)
+                self.assertIn("no usable Date header", fallback.source)
+                self.assertAlmostEqual(fallback.deadline(lease)-time.monotonic(), 60, delta=5)
 
     def test_claim_without_valid_pins_is_logged_and_never_failed(self):
         unaddressable = {**claim_body(), "jobId": "../../etc/passwd"}
@@ -886,8 +928,8 @@ class WorkerTests(unittest.TestCase):
         with RunnerServer() as server:
             code, result = once(server)
             self.assertEqual((code, result["state"]), (0, "completed"))
-        with RunnerServer(claims=[claim_body(lease_seconds=-30, job="job-skewed")]) as server:
-            self.assertEqual(once(server), (2, {"state": "failed", "jobId": "job-skewed", "attemptId": "ATTEMPT-0123456789ab", "error": "lease_expired_on_receipt"}))
+        with RunnerServer(claims=[claim_body(lease_seconds=-30, job="job-expired")]) as server:
+            self.assertEqual(once(server), (2, {"state": "failed", "jobId": "job-expired", "attemptId": "ATTEMPT-0123456789ab", "error": "lease_expired_on_receipt"}))
         with RunnerServer() as server:
             self.assertEqual(once(server, token="f"*72), (2, {"state": "transport_failed", "error": "http_401"}))
         code, stdout, _ = self.cli(["--readiness"])
@@ -967,9 +1009,7 @@ class WorkerTests(unittest.TestCase):
             Transport("http://example.org", TOKEN)
 
     def test_stale_lease_cannot_publish_and_compute_has_no_service_secrets(self):
-        claim = Claim.parse(claim_body())
-        keeper = LeaseKeeper(None, claim)
-        keeper.until = datetime.now(timezone.utc)-timedelta(seconds=1)
+        keeper = LeaseKeeper(None, Claim.parse(claim_body()), time.monotonic()-1)
         with self.assertRaises(LeaseLost):
             keeper.valid()
         with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM, "HTTP_PROXY": "fixture-proxy", "DOCKER_HOST": "unix:///fixture-rootless-docker.sock"}):
@@ -993,17 +1033,20 @@ class WorkerTests(unittest.TestCase):
             Worker(None, MissingRuntime(), self.root/"separate", worker_id="worker-fixture", image_digest=IMAGE, formats=["onnx"], approved_hashes=["b"*64])
 
     def test_heartbeat_renews_and_rejected_fence_stops_compute(self):
-        with RunnerServer() as server:
-            claim = Claim.parse(server.claim)
-            with LeaseKeeper(server.transport(), claim, interval=.05) as lease:
-                deadline = __import__("time").monotonic()+3
-                while not any(body["op"] == "heartbeat" for body, _ in server.posts) and __import__("time").monotonic() < deadline:
-                    __import__("time").sleep(.02)
+        # A host clock ten minutes fast once made every renewed lease look expired.
+        with RunnerServer() as server, skewed_worker_clock(600):
+            claim, initial = Claim.parse(server.claim), time.monotonic()+30
+            with LeaseKeeper(server.transport(), claim, initial, interval=.05) as lease:
+                deadline = time.monotonic()+3
+                while lease.deadline == initial and time.monotonic() < deadline:
+                    time.sleep(.02)
                 lease.valid()
+                # Renewed from the server's Date header: about two minutes from now.
+                self.assertGreater(lease.deadline, initial)
             self.assertTrue(any(body["op"] == "heartbeat" for body, _ in server.posts))
             self.assertEqual(server.errors, [])
         with RunnerServer(heartbeat_rejected=True) as server:
-            with LeaseKeeper(server.transport(), Claim.parse(server.claim), interval=.05) as lease:
+            with LeaseKeeper(server.transport(), Claim.parse(server.claim), time.monotonic()+30, interval=.05) as lease:
                 self.assertTrue(lease.lost.wait(timeout=3))
                 with self.assertRaises(LeaseLost):
                     lease.valid()

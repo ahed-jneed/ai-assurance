@@ -7,6 +7,7 @@ network disabled and a local artifact SHA-256 allowlist.
 from __future__ import annotations
 
 import argparse
+import email.utils
 import hashlib
 import http.client
 import importlib
@@ -124,6 +125,40 @@ def local_write(operation):
         raise ProtocolError("workspace_unavailable") from exc
 
 
+def http_date(value):
+    """The time in an HTTP Date header, or None if it is absent or invalid."""
+    try:
+        parsed = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    # An HTTP date is always GMT; a date without a zone is not trusted.
+    return parsed if parsed.tzinfo is not None else None
+
+
+class ServerClock:
+    """The server's time when it answered one request, on this host's monotonic clock.
+
+    Lease timestamps come from the server's clock. A lease's deadline is
+    counted on time.monotonic() from when the request was sent, for as long
+    as the response's Date header says is left. A host whose wall clock runs
+    fast or slow therefore neither expires a valid lease nor extends an
+    expired one. The deadline is never later than the real one: the server
+    answered after the request was sent, and one second covers the Date
+    header's whole-second resolution. Only without a usable Date header does
+    the deadline depend on this host's wall clock.
+    """
+    def __init__(self, sent, date):
+        self.sent, self.server_now = sent, http_date(date)
+        self.source = "this host's clock (the response had no usable Date header)" if self.server_now is None else "the server's clock (response Date header)"
+
+    def deadline(self, lease_until):
+        """Monotonic time by which a lease that the server ends at lease_until has ended."""
+        until = timestamp(lease_until)
+        if self.server_now is None:
+            return time.monotonic()+(until-datetime.now(timezone.utc)).total_seconds()
+        return self.sent+(until-self.server_now).total_seconds()-1
+
+
 class Transport:
     """Bounded HTTPS client for /api/runner.
 
@@ -153,6 +188,7 @@ class Transport:
         return self.timeout+size/MIN_TRANSFER_RATE
 
     def _request(self, method, url, *, body=None, maximum=MAX_ENVELOPE_BYTES, retry=False, sign=False, check_active=None, sink=None):
+        """One bounded request: (what the sink collected, ServerClock of the answering attempt)."""
         headers = {"Authorization": "Bearer "+self.application_token, "Accept": "application/json", "User-Agent": "ai-assurance-worker/"+WORKER_VERSION}
         if self.platform_token:
             headers["OAI-Sites-Authorization"] = "Bearer "+self.platform_token
@@ -162,13 +198,14 @@ class Transport:
             headers["X-Result-Signature"] = result_signature(self.application_token, body)
         sink = sink or Collected()
         for attempt in range((self.retries if retry else 0)+1):
-            deadline = time.monotonic()+self.budget(len(body or b"")+maximum)
+            sent = time.monotonic()
+            deadline = sent+self.budget(len(body or b"")+maximum)
             try:
                 sink.start()
                 if check_active:
                     check_active()
-                self._exchange(urllib.request.Request(url, data=body, method=method, headers=headers), maximum, deadline, check_active, sink)
-                return sink.finish()
+                date = self._exchange(urllib.request.Request(url, data=body, method=method, headers=headers), maximum, deadline, check_active, sink)
+                return sink.finish(), ServerClock(sent, date)
             except urllib.error.HTTPError as exc:
                 error = ProtocolError("http_"+str(exc.code), retryable=exc.code in {429, 502, 503, 504}, status=exc.code)
                 exc.close()
@@ -190,6 +227,7 @@ class Transport:
         raise ProtocolError("transport_unavailable")
 
     def _exchange(self, request, maximum, deadline, check_active, sink):
+        """Stream one response body into sink; return its Date header."""
         def active():
             if check_active:
                 check_active()
@@ -211,16 +249,20 @@ class Transport:
                     # read1 reports a connection closed early as a clean end.
                     if declared is not None and size != int(declared):
                         raise ProtocolError("response_truncated", retryable=True)
-                    return
+                    return response.headers.get("Date")
                 size += len(chunk)
                 if size > maximum:
                     raise ProtocolError("response_size_rejected")
                 sink.write(chunk)
 
     def post(self, body, *, retry=False):
+        return self.post_timed(body, retry=retry)[0]
+
+    def post_timed(self, body, *, retry=False):
+        """POST one signed envelope: (its JSON response, the ServerClock to read its leases with)."""
         payload = body if isinstance(body, bytes) else json_bytes(body)
-        raw = self._request("POST", self.endpoint, body=payload, retry=retry, sign=True)
-        return strict_json(raw) if raw else None
+        raw, clock = self._request("POST", self.endpoint, body=payload, retry=retry, sign=True)
+        return (strict_json(raw) if raw else None), clock
 
     def download(self, claim, purpose, destination, *, maximum, check_active=None):
         """Stream one pinned input to `destination` + ".partial" while hashing.
@@ -231,14 +273,19 @@ class Transport:
         if purpose not in {"dataset", "model"}:
             raise ValueError("Unsupported input purpose")
         query = urllib.parse.urlencode({"jobId": claim.job_id, "attemptId": claim.attempt_id, "fence": claim.fence, "input": purpose})
-        return self._request("GET", self.endpoint+"?"+query, maximum=maximum, retry=True, check_active=check_active, sink=StreamedFile(destination.with_name(destination.name+".partial")))
+        return self._request("GET", self.endpoint+"?"+query, maximum=maximum, retry=True, check_active=check_active, sink=StreamedFile(destination.with_name(destination.name+".partial")))[0]
 
 
 class LeaseKeeper:
-    def __init__(self, transport, claim, *, interval=10):
+    """Renews one attempt's lease and says when it has ended.
+
+    `deadline` is the time.monotonic() value at which the lease ends
+    (ServerClock.deadline), so the host's wall clock plays no part.
+    """
+    def __init__(self, transport, claim, deadline, *, interval=10):
         self.transport, self.claim = transport, claim
         self.interval = max(.05, interval)
-        self.until = timestamp(claim.lease_until)
+        self.deadline = deadline
         self.stop = threading.Event()
         self.lost = threading.Event()
         self.thread = threading.Thread(target=self._loop, name="worker-lease", daemon=True)
@@ -248,30 +295,30 @@ class LeaseKeeper:
         return self
 
     def valid(self):
-        if self.lost.is_set() or datetime.now(timezone.utc) >= self.until:
+        if self.lost.is_set() or time.monotonic() >= self.deadline:
             self.lost.set()
             raise LeaseLost("lease_lost")
 
     def _loop(self):
         while not self.stop.is_set():
-            remaining = (self.until-datetime.now(timezone.utc)).total_seconds()
+            remaining = self.deadline-time.monotonic()
             if remaining <= 0:
                 self.lost.set()
                 return
             if self.stop.wait(min(self.interval, max(.05, remaining/3))):
                 return
             try:
-                response = self.transport.post({"op": "heartbeat", **self.claim.pins()}, retry=True)
+                response, clock = self.transport.post_timed({"op": "heartbeat", **self.claim.pins()}, retry=True)
                 if not isinstance(response, dict):
                     raise ProtocolError("invalid_heartbeat_response")
-                updated = timestamp(response.get("leaseUntil"))
-                if updated <= datetime.now(timezone.utc):
+                deadline = clock.deadline(response.get("leaseUntil"))
+                if deadline <= time.monotonic():
                     raise ProtocolError("heartbeat_lease_expired")
-                self.until = updated
+                self.deadline = deadline
             except ProtocolError as error:
                 # A temporary failure can consume the remaining lease; stale
                 # workers never publish after authoritative expiry/rejection.
-                if not error.retryable or datetime.now(timezone.utc) >= self.until:
+                if not error.retryable or time.monotonic() >= self.deadline:
                     self.lost.set()
                     return
             except (ValueError, TypeError):
@@ -444,7 +491,7 @@ def compute_job(inputs, outputs):
     # failure in these first steps is a worker defect, not a client problem.
     with failure_stage("compute_internal_error"):
         envelope = strict_json(bound_bytes(inputs/"envelope.json", MAX_ENVELOPE_BYTES))
-        claim = Claim.parse(envelope["claim"], check_expiry=False)
+        claim = Claim.parse(envelope["claim"])
         request = claim.request
         data_path = inputs/"dataset.csv"
         data = bound_bytes(data_path, request["dataset"]["size"])
@@ -576,15 +623,15 @@ class Worker:
         self.heartbeat, self.compute_timeout, self.maximum_jobs = heartbeat, compute_timeout, maximum_jobs
 
     def request_claim(self):
-        """Ask for one attempt: the raw claim body, or None when idle.
+        """Ask for one attempt: (raw claim body, ServerClock), or None when idle.
 
         The platform answers {"idle": true} when it has nothing to run.
         """
         # No transport retry: an ambiguous claim can have acquired a lease.
-        body = self.transport.post({"op": "claim", "workerId": self.worker_id, "imageDigest": self.image_digest, "formats": self.wire_formats})
+        body, clock = self.transport.post_timed({"op": "claim", "workerId": self.worker_id, "imageDigest": self.image_digest, "formats": self.wire_formats})
         if isinstance(body, dict) and body.get("idle") is True:
             return None
-        return body
+        return body, clock
 
     def at_capacity(self):
         return sum(1 for _ in self.workspace.glob("job-*")) >= self.maximum_jobs
@@ -593,7 +640,8 @@ class Worker:
         identity = sha256(json_bytes([claim.job_id, claim.attempt_id, claim.fence, claim.nonce, claim.request_sha256]))[:32]
         return self.workspace/("job-"+identity)
 
-    def execute(self, claim):
+    def execute(self, claim, deadline):
+        """Run one claimed attempt whose lease ends at monotonic `deadline`."""
         directory = self.job_directory(claim)
         if sum(1 for item in self.workspace.glob("job-*")) >= self.maximum_jobs:
             raise ProtocolError("workspace_job_limit")
@@ -616,7 +664,7 @@ class Worker:
             if request.get("inputPreparation") != "already_preprocessed":
                 raise ProtocolError("executable_preprocessing_unsupported")
         execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "limitations": ["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."]}
-        with LeaseKeeper(self.transport, claim, interval=self.heartbeat) as lease:
+        with LeaseKeeper(self.transport, claim, deadline, interval=self.heartbeat) as lease:
             lease.valid()
             self.fetch(claim, "dataset", inputs/"dataset.csv", lease, digest=request["inputHashes"]["dataset"], size=request["dataset"]["size"], digest_code="dataset_input_pin_mismatch", size_code="dataset_input_pin_mismatch")
             if inference:
@@ -658,16 +706,20 @@ class Worker:
     def once(self):
         if self.at_capacity():
             return {"state": "workspace_capacity_reached", "error": "archive_job_evidence_before_claiming_more_work"}
-        body = self.request_claim()
-        if body is None:
+        claimed = self.request_claim()
+        if claimed is None:
             return {"state": "idle"}
+        body, clock = claimed
         try:
             claim = Claim.parse(body)
+            deadline = clock.deadline(claim.lease_until)
+            if deadline <= time.monotonic():
+                raise EngineError("lease_expired_on_receipt", "The attempt lease had already ended when the claim arrived, by "+clock.source)
         except Exception as error:
             # The claim body is untrusted input: any parse failure is a
             # per-claim problem, never a reason to stop the worker.
             return self.reject_claim(body, error)
-        return self.run_claim(claim)
+        return self.run_claim(claim, deadline)
 
     def reject_claim(self, body, error):
         """Fail a claimed attempt this worker cannot run, if its pins allow."""
@@ -684,10 +736,10 @@ class Worker:
         self.record({"event": "failed", **attempt, "code": code, "failPosted": posted, "detail": exception_detail(error)})
         return {"state": "failed", **attempt, "error": code}
 
-    def run_claim(self, claim):
+    def run_claim(self, claim, deadline):
         attempt = {"jobId": claim.job_id, "attemptId": claim.attempt_id}
         try:
-            outcome = {"state": "completed", **self.execute(claim)}
+            outcome = {"state": "completed", **self.execute(claim, deadline)}
             self.record({"event": "completed", **attempt, "resultSha256": outcome["resultSha256"]})
             return outcome
         except CompletionUncertain:
