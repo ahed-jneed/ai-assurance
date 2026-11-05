@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { env } from "cloudflare:workers";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Artifact, Engagement, Model } from "./domain";
 import { runnerVersion, testDefinitionVersion } from "./evaluation";
 import {
@@ -11,20 +12,17 @@ import {
 } from "./evaluation-service";
 import { ApiError } from "./http";
 
-// Evidence bytes by R2 key; Node has no Worker bindings.
-const objects = vi.hoisted(() => new Map<string, Uint8Array>());
-vi.mock("cloudflare:workers", () => ({
-  env: {
-    BUCKET: {
-      async get(key: string) {
-        const bytes = objects.get(key);
-        return bytes
-          ? { size: bytes.byteLength, arrayBuffer: async () => bytes.buffer }
-          : null;
-      },
-    },
+// Evidence bytes by R2 key, served as the BUCKET binding of the shared
+// cloudflare:workers stub.
+const objects = new Map<string, Uint8Array>();
+const evidence = {
+  async get(key: string) {
+    const bytes = objects.get(key);
+    return bytes
+      ? { size: bytes.byteLength, arrayBuffer: async () => bytes.buffer }
+      : null;
   },
-}));
+} as unknown as R2Bucket;
 
 const predictions =
   "actual,predicted,group\n" +
@@ -75,6 +73,7 @@ beforeEach(async () => {
     sha256 = await digest(bytes);
   objects.clear();
   objects.set("tenant/predictions.csv", bytes);
+  env.BUCKET = evidence;
   e = {
     id: "ENG-1",
     artifacts: [
@@ -104,6 +103,9 @@ beforeEach(async () => {
     evaluationProfiles: [],
     runs: [],
   } as unknown as Engagement;
+});
+afterEach(() => {
+  delete env.BUCKET;
 });
 async function rejection(promise: Promise<unknown>) {
   const error = await promise.then(
