@@ -1,0 +1,1069 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:criteria-pack:1.0.0",
+  "title": "Criteria documents: frameworks, engagement packs, crosswalks, index and bundles",
+  "description": "DRAFT (design issue #26, see docs/design/criteria-model.md). One schema validates the five criteria document types, selected by documentType. JSON Schema checks shape only. Referential integrity, licence policy, digest immutability and coverage semantics are enforced by the companion validator specified in section 14 of the design.",
+  "oneOf": [
+    { "$ref": "#/$defs/frameworkDocument" },
+    { "$ref": "#/$defs/packDocument" },
+    { "$ref": "#/$defs/crosswalkDocument" },
+    { "$ref": "#/$defs/indexDocument" },
+    { "$ref": "#/$defs/bundleDocument" }
+  ],
+  "$defs": {
+    "schemaVersion": { "const": "1.0.0" },
+    "slug": {
+      "description": "Lower-case kebab-case identifier of a framework, pack or crosswalk.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "dataVersion": {
+      "description": "Release version of a criteria document: YEAR.MONTH.SEQUENCE, as used by methodologyVersion (e.g. 2026.10.1). Compared numerically part by part.",
+      "type": "string",
+      "pattern": "^20[0-9]{2}\\.(?:[1-9]|1[0-2])\\.(?:0|[1-9][0-9]{0,3})$"
+    },
+    "edition": {
+      "description": "Edition of the external source: a consolidated CELEX version, a publication year, a version number or a quarterly release label.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "localId": {
+      "description": "Requirement identifier, unique within one framework edition. Opaque and stable: once released it never changes meaning. No spaces or colons.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "requirementRef": {
+      "description": "Global requirement reference <frameworkId>:<requirementId>. The edition comes from the pack criteria set or crosswalk that contains the reference.",
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*:[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "templateId": {
+      "description": "Working-paper, memo or procedure-step identifier in the existing catalogue style (WP-A09-01, MEM-EX-01, WP-A09-01-P01).",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$",
+      "maxLength": 64
+    },
+    "objectiveId": {
+      "type": "string",
+      "pattern": "^CO-[A-Z0-9]+(?:-[A-Z0-9]+)*$",
+      "maxLength": 64
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "pattern": "\\S"
+    },
+    "longText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000,
+      "pattern": "\\S"
+    },
+    "shortText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "\\S"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "date": { "type": "string", "format": "date" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "relationship": {
+      "description": "NIST IR 8477 set theory relationship, read as '<source> <relationship> <target>'. equal and superset_of are full-strength; subset_of and intersects_with are partial; no_relationship records a reviewed non-relationship.",
+      "enum": [
+        "equal",
+        "subset_of",
+        "superset_of",
+        "intersects_with",
+        "no_relationship"
+      ]
+    },
+    "rationale": {
+      "description": "NIST IR 8477 rationale: syntactic (wording), semantic (meaning) or functional (results of execution). Coverage uses semantic and functional entries only.",
+      "enum": ["syntactic", "semantic", "functional"]
+    },
+    "evidenceCategory": {
+      "enum": [
+        "Dataset",
+        "Model",
+        "Training log",
+        "Validation",
+        "Pipeline code",
+        "Governance",
+        "Instructions",
+        "Oversight",
+        "Security",
+        "Other"
+      ]
+    },
+    "provenance": {
+      "description": "Where a fact comes from and how far it has been checked. Values follow the verified / secondary-only convention of issue #8.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "sourceKind", "verification"],
+      "properties": {
+        "source": { "$ref": "#/$defs/httpsUrl" },
+        "sourceKind": {
+          "enum": [
+            "authentic_text",
+            "official_consolidation",
+            "official_guidance",
+            "standard_text",
+            "secondary",
+            "repository"
+          ]
+        },
+        "verification": {
+          "enum": ["verified", "secondary_only", "unverified"]
+        },
+        "checkedAt": { "$ref": "#/$defs/date" },
+        "legalReview": { "enum": ["required", "completed", "not_required"] },
+        "note": { "$ref": "#/$defs/text" }
+      },
+      "if": {
+        "properties": { "verification": { "const": "verified" } },
+        "required": ["verification"]
+      },
+      "then": { "required": ["checkedAt"] }
+    },
+    "licence": {
+      "description": "Redistribution position for the source text. full_text: official text may be stored. paraphrased_titles: identifiers plus our own short titles only (ISO, CEN-CENELEC). identifiers_only: identifiers only. A framework whose licence status is unconfirmed cannot be released (validator rule).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["holder", "textPolicy", "status", "basis"],
+      "properties": {
+        "holder": { "$ref": "#/$defs/shortText" },
+        "textPolicy": {
+          "enum": ["full_text", "paraphrased_titles", "identifiers_only"]
+        },
+        "status": { "enum": ["confirmed", "unconfirmed"] },
+        "basis": { "$ref": "#/$defs/text" },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "attribution": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "applicabilityRow": {
+      "description": "One dated application condition of a requirement (for example the Annex III route date). Dates inform review and never approve applicability automatically.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "condition", "provenance"],
+      "properties": {
+        "from": { "$ref": "#/$defs/date" },
+        "until": {
+          "oneOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }]
+        },
+        "condition": { "$ref": "#/$defs/text" },
+        "legalRef": { "$ref": "#/$defs/shortText" },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "trigger": {
+      "description": "Candidate-selection trigger in the docs/obligation-subitems.json format: a framework trigger profile plus fact predicates. Unknown facts yield needs_information.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "conditions"],
+      "properties": {
+        "profile": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "conditions": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact", "equals"],
+            "properties": {
+              "fact": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+              },
+              "equals": { "type": ["boolean", "string", "number"] }
+            }
+          }
+        }
+      }
+    },
+    "requirement": {
+      "description": "One node of a framework edition. group: a container that is not assessed itself (a heading or an article with listed sub-requirements). requirement: an assessable unit. informative: guidance that is never a coverage target.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ref", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "ref": {
+          "description": "Citation as displayed, for example 'Art. 9(1)', '6.1.2' or 'GOVERN 1.1'.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "pattern": "\\S"
+        },
+        "title": { "$ref": "#/$defs/shortText" },
+        "type": { "enum": ["group", "requirement", "informative"] },
+        "parent": { "$ref": "#/$defs/localId" },
+        "exhaustive": {
+          "description": "Group nodes only. true when the listed children together cover the whole group, which allows a full roll-up. Defaults to false.",
+          "type": "boolean"
+        },
+        "aliases": {
+          "description": "Legacy reference strings that resolve to this node, e.g. catalogue regulatoryRefs such as 'Art.9'.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "actors": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "applicability": {
+          "type": "array",
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/applicabilityRow" }
+        },
+        "evidenceCategories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/evidenceCategory" }
+        },
+        "text": {
+          "description": "Official text. Allowed only when the framework licence textPolicy is full_text.",
+          "$ref": "#/$defs/longText"
+        },
+        "reviewNote": { "$ref": "#/$defs/text" },
+        "deprecated": { "type": "boolean" },
+        "replacedBy": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/localId" }
+        },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "extensions": {
+          "description": "Framework-specific fields kept for lossless projections (e.g. specificDocumentRequired from the obligation catalogue).",
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "group" } },
+            "required": ["type"]
+          },
+          "else": { "not": { "required": ["exhaustive"] } }
+        },
+        {
+          "if": { "required": ["replacedBy"] },
+          "then": {
+            "properties": { "deprecated": { "const": true } },
+            "required": ["deprecated"]
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "url"],
+      "properties": {
+        "role": {
+          "enum": [
+            "official_text",
+            "authentic_text",
+            "authentic_amendment",
+            "consolidated_html",
+            "explorer",
+            "timeline",
+            "publisher_page",
+            "catalogue_entry",
+            "secondary"
+          ]
+        },
+        "url": { "$ref": "#/$defs/httpsUrl" },
+        "title": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "frameworkDocument": {
+      "description": "One data version of one edition of an external criteria source: a law, standard, framework, profile or scheme.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentType",
+        "schemaVersion",
+        "id",
+        "edition",
+        "version",
+        "title",
+        "shortTitle",
+        "kind",
+        "publisher",
+        "jurisdiction",
+        "licence",
+        "sources",
+        "requirements"
+      ],
+      "properties": {
+        "documentType": { "const": "framework" },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "id": { "$ref": "#/$defs/slug" },
+        "edition": { "$ref": "#/$defs/edition" },
+        "version": { "$ref": "#/$defs/dataVersion" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "shortTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60,
+          "pattern": "\\S"
+        },
+        "kind": {
+          "enum": [
+            "legislation",
+            "implementing_act",
+            "harmonised_standard",
+            "international_standard",
+            "national_standard",
+            "framework",
+            "profile",
+            "certification_scheme",
+            "local_law",
+            "guidance"
+          ]
+        },
+        "publisher": { "$ref": "#/$defs/shortText" },
+        "jurisdiction": {
+          "description": "EU, US, US-NY-NYC, international, ...",
+          "type": "string",
+          "pattern": "^(?:international|[A-Z]{2}(?:-[A-Z0-9]{1,8})*)$"
+        },
+        "status": {
+          "enum": [
+            "in_force",
+            "published",
+            "cited_in_oj",
+            "draft",
+            "withdrawn",
+            "superseded"
+          ]
+        },
+        "editionDate": { "$ref": "#/$defs/date" },
+        "consolidatedAsOf": { "$ref": "#/$defs/date" },
+        "researchedAsOf": { "$ref": "#/$defs/date" },
+        "amendingActs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/source" }
+        },
+        "licence": { "$ref": "#/$defs/licence" },
+        "defaultProvenance": {
+          "description": "Provenance of every requirement that does not state its own.",
+          "$ref": "#/$defs/provenance"
+        },
+        "applicationSummary": {
+          "description": "Coarse application dates copied verbatim from a migrated catalogue (regulatorySnapshot.applicationDates).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["reference", "date"],
+            "properties": {
+              "reference": { "$ref": "#/$defs/shortText" },
+              "date": { "$ref": "#/$defs/date" }
+            }
+          }
+        },
+        "guidance": { "$ref": "#/$defs/longText" },
+        "triggerProfiles": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+          "additionalProperties": { "type": "object" }
+        },
+        "factTypes": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$" },
+          "additionalProperties": { "type": "string" }
+        },
+        "requirements": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "items": { "$ref": "#/$defs/requirement" }
+        },
+        "notes": { "$ref": "#/$defs/longText" },
+        "compat": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "licence": {
+                "properties": { "textPolicy": { "const": "full_text" } },
+                "required": ["textPolicy"]
+              }
+            },
+            "required": ["licence"]
+          },
+          "then": {
+            "properties": {
+              "requirements": { "items": { "required": ["title"] } }
+            }
+          },
+          "else": {
+            "properties": {
+              "requirements": { "items": { "not": { "required": ["text"] } } }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "licence": {
+                "properties": {
+                  "textPolicy": { "const": "paraphrased_titles" }
+                },
+                "required": ["textPolicy"]
+              }
+            },
+            "required": ["licence"]
+          },
+          "then": {
+            "properties": {
+              "requirements": {
+                "items": {
+                  "required": ["title"],
+                  "properties": { "title": { "maxLength": 80 } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "licence": {
+                "properties": { "textPolicy": { "const": "identifiers_only" } },
+                "required": ["textPolicy"]
+              }
+            },
+            "required": ["licence"]
+          },
+          "then": {
+            "properties": {
+              "requirements": { "items": { "not": { "required": ["title"] } } }
+            }
+          }
+        }
+      ]
+    },
+    "link": {
+      "description": "Typed link from a control objective (source) to a requirement (target). Migrated links claim partial overlap only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requirement",
+        "relationship",
+        "rationale",
+        "justification",
+        "origin"
+      ],
+      "properties": {
+        "requirement": { "$ref": "#/$defs/requirementRef" },
+        "relationship": { "$ref": "#/$defs/relationship" },
+        "rationale": { "$ref": "#/$defs/rationale" },
+        "justification": { "$ref": "#/$defs/text" },
+        "origin": { "enum": ["authored", "migrated"] }
+      },
+      "if": {
+        "properties": { "origin": { "const": "migrated" } },
+        "required": ["origin"]
+      },
+      "then": {
+        "properties": { "relationship": { "const": "intersects_with" } }
+      }
+    },
+    "controlObjective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "addresses"],
+      "properties": {
+        "id": { "$ref": "#/$defs/objectiveId" },
+        "statement": { "$ref": "#/$defs/text" },
+        "addresses": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "$ref": "#/$defs/link" }
+        },
+        "notes": { "$ref": "#/$defs/text" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text"],
+      "properties": {
+        "id": { "$ref": "#/$defs/templateId" },
+        "text": { "$ref": "#/$defs/text" }
+      }
+    },
+    "item": {
+      "description": "A working-paper or memo template. The first eleven properties are the catalogue item fields of templates/catalog.json, unchanged; objectiveIds, phase and derivedFrom are new.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "stage",
+        "folder",
+        "templatePath",
+        "regulatoryRefs",
+        "automationMode",
+        "objective",
+        "procedures",
+        "evidenceRequired",
+        "signOffGate",
+        "objectiveIds"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/templateId" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "kind": { "enum": ["working_paper", "memo"] },
+        "stage": {
+          "enum": [
+            "Planning",
+            "Fieldwork",
+            "Evidence Evaluation",
+            "Reporting",
+            "Sign-off",
+            "Remediation and Monitoring"
+          ]
+        },
+        "folder": { "$ref": "#/$defs/shortText" },
+        "templatePath": {
+          "type": "string",
+          "pattern": "^templates/[A-Za-z0-9._/-]+\\.md$"
+        },
+        "regulatoryRefs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "automationMode": { "enum": ["manual", "hybrid", "automated"] },
+        "objective": { "$ref": "#/$defs/text" },
+        "procedures": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": { "$ref": "#/$defs/step" }
+        },
+        "evidenceRequired": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/shortText" }
+        },
+        "signOffGate": { "$ref": "#/$defs/text" },
+        "objectiveIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/objectiveId" }
+        },
+        "phase": { "$ref": "#/$defs/slug" },
+        "derivedFrom": {
+          "description": "Provenance of an item copied from another pack, so CI can report upstream changes.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packId", "version", "itemId"],
+          "properties": {
+            "packId": { "$ref": "#/$defs/slug" },
+            "version": { "$ref": "#/$defs/dataVersion" },
+            "itemId": { "$ref": "#/$defs/templateId" }
+          }
+        }
+      },
+      "if": {
+        "properties": { "kind": { "const": "working_paper" } },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "objectiveIds": { "minItems": 1 } } }
+    },
+    "criteriaSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "edition", "version", "role"],
+      "properties": {
+        "framework": { "$ref": "#/$defs/slug" },
+        "edition": { "$ref": "#/$defs/edition" },
+        "version": { "$ref": "#/$defs/dataVersion" },
+        "role": { "enum": ["primary", "supporting"] },
+        "include": {
+          "description": "Requirement or group ids in scope; a group includes its descendants. Absent means the whole framework edition.",
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/localId" }
+        }
+      }
+    },
+    "packDocument": {
+      "description": "One release of an engagement pack: the criteria it selects and the audit programme that tests them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentType",
+        "schemaVersion",
+        "id",
+        "version",
+        "title",
+        "kind",
+        "methodologyVersion",
+        "criteria",
+        "defaults",
+        "controlObjectives",
+        "items"
+      ],
+      "properties": {
+        "documentType": { "const": "pack" },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "$ref": "#/$defs/dataVersion" },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "\\S"
+        },
+        "summary": { "$ref": "#/$defs/text" },
+        "kind": { "enum": ["audit_programme", "crosswalk_only"] },
+        "methodologyVersion": { "$ref": "#/$defs/dataVersion" },
+        "supersedes": { "$ref": "#/$defs/dataVersion" },
+        "engagementTypes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "attestation",
+              "direct",
+              "agreed_upon_procedures",
+              "readiness_assessment",
+              "certification_audit"
+            ]
+          }
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/criteriaSet" }
+        },
+        "crosswalks": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version"],
+            "properties": {
+              "id": { "$ref": "#/$defs/slug" },
+              "version": { "$ref": "#/$defs/dataVersion" }
+            }
+          }
+        },
+        "phases": {
+          "description": "Optional programme phases shown alongside lifecycle stages, e.g. ISO/IEC 17021-1 Stage 1 and Stage 2.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "title"],
+            "properties": {
+              "id": { "$ref": "#/$defs/slug" },
+              "title": { "$ref": "#/$defs/shortText" }
+            }
+          }
+        },
+        "defaults": {
+          "description": "Methodology defaults, the defaults block of templates/catalog.json.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "initialStatus",
+            "applicability",
+            "auditorConclusion",
+            "diagnosticState",
+            "numericalThreshold",
+            "conclusionOwner",
+            "approvalBindsTo",
+            "independentReview",
+            "coverageRule",
+            "statement"
+          ],
+          "properties": {
+            "initialStatus": { "$ref": "#/$defs/shortText" },
+            "applicability": { "$ref": "#/$defs/shortText" },
+            "auditorConclusion": { "$ref": "#/$defs/shortText" },
+            "diagnosticState": { "$ref": "#/$defs/shortText" },
+            "numericalThreshold": { "type": ["number", "null"] },
+            "conclusionOwner": { "$ref": "#/$defs/shortText" },
+            "approvalBindsTo": { "$ref": "#/$defs/shortText" },
+            "independentReview": { "type": "boolean" },
+            "coverageRule": { "$ref": "#/$defs/text" },
+            "statement": { "$ref": "#/$defs/text" }
+          }
+        },
+        "roles": {
+          "description": "Templates that platform features instantiate. Replaces the template ids hard-coded in the API routes.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "limitationMemo": { "$ref": "#/$defs/templateId" },
+            "diagnosticPaperByResultArticle": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": { "pattern": "^(?:\\*|[0-9]{1,3}[a-z]?)$" },
+              "additionalProperties": { "$ref": "#/$defs/templateId" }
+            },
+            "externalExecutionPaper": { "$ref": "#/$defs/templateId" }
+          }
+        },
+        "features": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "annexIvIndex": {
+              "description": "Compile the AI Act Annex IV evidence index (templates/annex-iv-map.json) into report snapshots.",
+              "type": "boolean"
+            }
+          }
+        },
+        "controlObjectives": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/controlObjective" }
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "$ref": "#/$defs/item" }
+        },
+        "notes": { "$ref": "#/$defs/longText" },
+        "compat": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "catalog": {
+              "description": "Fields needed to project this pack back to the templates/catalog.json shape without loss.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["schemaVersion", "regulatorySnapshot"],
+              "properties": {
+                "schemaVersion": { "type": "string" },
+                "regulatorySnapshot": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "const": "audit_programme" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "items": { "minItems": 1 },
+              "controlObjectives": { "minItems": 1 },
+              "criteria": {
+                "contains": {
+                  "properties": { "role": { "const": "primary" } },
+                  "required": ["role"]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "crosswalk_only" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["crosswalks"],
+            "properties": {
+              "items": { "maxItems": 0 },
+              "controlObjectives": { "maxItems": 0 },
+              "crosswalks": { "minItems": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "crosswalkEntry": {
+      "description": "One NIST IR 8477 set theory relationship: '<sources, jointly> <relationship> <target>'. Several sources express joint coverage and can be used only in the authored direction.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sources",
+        "target",
+        "relationship",
+        "rationale",
+        "justification"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/localId" }
+        },
+        "target": { "$ref": "#/$defs/localId" },
+        "relationship": { "$ref": "#/$defs/relationship" },
+        "rationale": { "$ref": "#/$defs/rationale" },
+        "justification": { "$ref": "#/$defs/text" },
+        "confidence": { "enum": ["high", "medium", "low"] },
+        "qualifiers": {
+          "description": "Gaps and conditions, aligned with OSCAL mapping qualifiers.",
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["subject", "predicate", "category", "description"],
+            "properties": {
+              "subject": { "enum": ["source", "target", "both"] },
+              "predicate": {
+                "enum": ["has_requirement", "has_incompatibility"]
+              },
+              "category": { "enum": ["restricted", "addressable", "blocked"] },
+              "description": { "$ref": "#/$defs/text" }
+            }
+          }
+        },
+        "legalEffect": {
+          "description": "A legal consequence attached to the relationship, e.g. the presumption of conformity that a harmonised standard's Annex ZA gives for listed provisions. Informational: it never changes coverage strength.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "basis", "conditions", "provenance"],
+          "properties": {
+            "kind": { "enum": ["presumption_of_conformity"] },
+            "basis": { "$ref": "#/$defs/text" },
+            "conditions": { "$ref": "#/$defs/text" },
+            "provenance": { "$ref": "#/$defs/provenance" }
+          }
+        }
+      }
+    },
+    "frameworkEdition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framework", "edition"],
+      "properties": {
+        "framework": { "$ref": "#/$defs/slug" },
+        "edition": { "$ref": "#/$defs/edition" }
+      }
+    },
+    "crosswalkDocument": {
+      "description": "Typed mapping between two framework editions. source is the NIST IR 8477 focal document, target the reference document.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentType",
+        "schemaVersion",
+        "id",
+        "version",
+        "title",
+        "source",
+        "target",
+        "useCase",
+        "method",
+        "entries"
+      ],
+      "properties": {
+        "documentType": { "const": "crosswalk" },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "id": { "$ref": "#/$defs/slug" },
+        "version": { "$ref": "#/$defs/dataVersion" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "source": { "$ref": "#/$defs/frameworkEdition" },
+        "target": { "$ref": "#/$defs/frameworkEdition" },
+        "useCase": {
+          "description": "NIST IR 8477 recommends documenting the use case before mapping.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["intendedUsers", "purpose", "conceptTypes", "assumptions"],
+          "properties": {
+            "intendedUsers": { "$ref": "#/$defs/text" },
+            "purpose": { "$ref": "#/$defs/text" },
+            "conceptTypes": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source", "target"],
+              "properties": {
+                "source": { "$ref": "#/$defs/shortText" },
+                "target": { "$ref": "#/$defs/shortText" }
+              }
+            },
+            "assumptions": { "$ref": "#/$defs/text" },
+            "exhaustive": {
+              "description": "true when every source requirement was examined; false (the NIST IR 8477 recommendation) when only the strongest direct relationships are recorded. Display only: coverage never infers anything from unmapped requirements.",
+              "type": "boolean"
+            }
+          }
+        },
+        "method": { "enum": ["human", "automation", "hybrid"] },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "items": { "$ref": "#/$defs/crosswalkEntry" }
+        },
+        "notes": { "$ref": "#/$defs/longText" }
+      }
+    },
+    "indexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "id", "version", "path", "status"],
+      "properties": {
+        "documentType": { "enum": ["framework", "pack", "crosswalk"] },
+        "id": { "$ref": "#/$defs/slug" },
+        "edition": { "$ref": "#/$defs/edition" },
+        "version": { "$ref": "#/$defs/dataVersion" },
+        "path": {
+          "type": "string",
+          "pattern": "^(?:frameworks|packs|crosswalks)/[A-Za-z0-9._/-]+\\.json$"
+        },
+        "sha256": {
+          "description": "SHA-256 of the RFC 8785 (JCS) canonical form of the parsed document.",
+          "$ref": "#/$defs/sha256"
+        },
+        "status": { "enum": ["draft", "released", "withdrawn"] },
+        "approvedBy": { "$ref": "#/$defs/shortText" },
+        "approvedAt": { "$ref": "#/$defs/date" },
+        "releasedAt": { "$ref": "#/$defs/date" },
+        "withdrawnAt": { "$ref": "#/$defs/date" },
+        "withdrawalReason": { "$ref": "#/$defs/text" },
+        "selectable": {
+          "description": "Packs only: offered at engagement creation.",
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "enum": ["released", "withdrawn"] } },
+            "required": ["status"]
+          },
+          "then": {
+            "required": ["sha256", "approvedBy", "approvedAt", "releasedAt"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "withdrawn" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["withdrawnAt", "withdrawalReason"] }
+        },
+        {
+          "if": {
+            "properties": { "documentType": { "const": "framework" } },
+            "required": ["documentType"]
+          },
+          "then": { "required": ["edition"] },
+          "else": { "not": { "required": ["edition"] } }
+        },
+        {
+          "if": {
+            "properties": { "documentType": { "const": "pack" } },
+            "required": ["documentType"]
+          },
+          "else": { "not": { "required": ["selectable"] } }
+        }
+      ]
+    },
+    "indexDocument": {
+      "description": "Registry of every criteria document with its digest and lifecycle status. The only mutable criteria file: released document content never changes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "schemaVersion", "documents", "defaults", "legacy"],
+      "properties": {
+        "documentType": { "const": "index" },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "documents": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/indexEntry" }
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["pack"],
+          "properties": {
+            "pack": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "version"],
+              "properties": {
+                "id": { "$ref": "#/$defs/slug" },
+                "version": { "$ref": "#/$defs/dataVersion" }
+              }
+            }
+          }
+        },
+        "legacy": {
+          "description": "Read-time pin for engagements stored before criteria pins existed.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["packId", "fallbackVersion", "methodologyVersions"],
+          "properties": {
+            "packId": { "$ref": "#/$defs/slug" },
+            "fallbackVersion": { "$ref": "#/$defs/dataVersion" },
+            "methodologyVersions": {
+              "type": "object",
+              "propertyNames": { "$ref": "#/$defs/dataVersion" },
+              "additionalProperties": { "$ref": "#/$defs/dataVersion" }
+            }
+          }
+        }
+      }
+    },
+    "bundleDocument": {
+      "description": "Several criteria documents in one file: the generated loader artefact in site-app and the fixture format.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentType", "schemaVersion", "purpose", "documents"],
+      "properties": {
+        "documentType": { "const": "bundle" },
+        "schemaVersion": { "$ref": "#/$defs/schemaVersion" },
+        "purpose": { "enum": ["fixture", "generated"] },
+        "title": { "$ref": "#/$defs/shortText" },
+        "notes": { "$ref": "#/$defs/longText" },
+        "index": { "$ref": "#/$defs/indexDocument" },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/frameworkDocument" },
+              { "$ref": "#/$defs/packDocument" },
+              { "$ref": "#/$defs/crosswalkDocument" }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
