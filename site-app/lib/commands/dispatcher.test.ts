@@ -9,8 +9,7 @@ import { ApiError } from "@/lib/http";
 import { context, type Context } from "@/lib/tenancy";
 import { workflowOps } from "@/lib/workflow-service";
 
-// Node has no Worker bindings: identity and persistence are faked per test.
-vi.mock("cloudflare:workers", () => ({ env: {} }));
+// Identity and persistence are faked per test.
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenancy")>()),
   context: vi.fn(),
