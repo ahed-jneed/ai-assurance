@@ -2,7 +2,7 @@
 
 Small real outputs of the evaluation tools that `docs/design/genai-evidence.md` (issue #31) supports. Issue #32 uses them for parser, recomputation and fuzz tests. Every file was produced on 2026-11-05 by running the tool itself in a throwaway virtualenv or npm prefix outside this repository, with no network access to any model provider and no API keys. Models are the tools' own offline test doubles (Inspect `mockllm`, lm-evaluation-harness `dummy`, promptfoo `echo` or a local stub, garak `test.Repeat`) or deterministic stubs written for this purpose (`generate/`). The fixtures are therefore format samples, not evidence about any real model.
 
-Each tool output is under 100 KB; the reference file `normalized-items.jsonl` is about 190 KB. The `.gitattributes` in this directory switches off line-ending conversion, because `expected.json`, `normalized-examples.json` and `normalized-items.jsonl` pin the SHA-256 of these exact bytes.
+Each tool output is under 100 KB; the reference file `normalized-items.jsonl` is about 190 KB. The `.gitattributes` in this directory switches off line-ending conversion, because `expected.json`, `normalized-examples.json` and `normalized-items.jsonl` pin the SHA-256 of these exact bytes. `engine/.dockerignore` keeps this directory out of the worker image's build context, so none of these files ship in the image.
 
 ## Files
 
