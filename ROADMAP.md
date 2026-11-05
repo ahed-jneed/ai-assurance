@@ -9,11 +9,11 @@ The plan for the current cycle, set on 5 November 2026. The [product direction](
 | Milestone | Goal | Issues |
 |---|---|---|
 | [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene. Must land before parallel feature work. | 6, of which 4 merged |
-| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 23 |
+| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 27 |
 | [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion. | 9 |
 | [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification. | 10 |
 
-In the tables below, rows are in dependency order: no row comes before an issue it depends on. "Depends on" lists the issues that must merge first, as each issue states. After a semicolon come softer orderings: issues to coordinate with, an issue to land after or before, a prerequisite for one part only, and another issue's "Blocks" line. "Findings" lists the codebase-review finding ids that the issue, or an orchestrator comment on it, quotes ([codebase map](docs/engineering/codebase-map.md) section 3.3 groups all of them by area). F-75, which asks every issue to delete the dead code it touches, is left out.
+In the tables below, rows are in dependency order: no row comes before an issue it depends on. "Depends on" lists the issues that must merge first, as each issue states. After a semicolon come softer orderings: issues to coordinate with or to decide a rule with, an issue to land after or before, a prerequisite for one part only, and another issue's "Blocks" line. "Findings" lists the codebase-review finding ids that the issue, or an orchestrator comment on it, quotes ([codebase map](docs/engineering/codebase-map.md) section 3.3 groups all of them by area). F-75, which asks every issue to delete the dead code it touches, is left out.
 
 ### M0 Foundation
 
@@ -41,6 +41,10 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 | [#13] | Bug: plan edits invalidate all executed work, and program history caps lock engagements | P1 | [#6] | F-04, F-29, F-64 |
 | [#14] | Bug: orphaned signed papers, circular final-stage gates and unsuperseded released reports | P1 | [#6], [#4] | F-05, F-30, F-32, F-61, F-62, F-65, F-66 |
 | [#15] | Bug: testing lab passes a constant predictor and reuses stale dataset cards | P1 | [#5] | F-06, F-07, F-33, F-58, F-63 |
+| [#65] | Engine: apply the 2.1.0 performance rules and the performance positive class to external runs | P1 | [#15], [#10]; coordinate with [#21] and [#22] | F-06 |
+| [#66] | Assurance API: aggregate imported external runs with `aggregateOutcome`, and reject blank rows in audit sampling | P2 | [#50], [#15] | F-63 |
+| [#67] | Testing lab: keep the dataset card pin on retries and planned evaluations, and refuse duplicate queued runs per procedure | P2 | [#15] | F-33 |
+| [#68] | Regression performance: compare RMSE with the mean-prediction baseline, so a constant predictor cannot pass | P2 | [#15]; decide the rule with [#9] and [#22] | — |
 | [#60] | Art 4a: record the legal basis before special-category data reaches the platform, and test fairness client-side by default | P1 | [#15], [#8]; coordinate with [#18] | F-58 |
 | [#16] | Performance and resilience: stop hydrating every engagement and isolate corrupt blobs | P2 | [#4]; [#50] blocks it | F-08, F-26, F-54 |
 | [#17] | Bug: more than 1,000 assurance records permanently breaks an engagement | P1 | [#1]; [#50] blocks it | F-03 |
@@ -85,14 +89,14 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 
 ## Dependency order
 
-Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line and a "lands after" or "before" instruction count as prerequisites; "coordinate with" does not. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
+Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line and a "lands after" or "before" instruction count as prerequisites; "coordinate with" and "decide the rule with" do not. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
 
 | Step | Issues | What they wait for |
 |---|---|---|
 | 0 | [#1] (merged), [#7], [#8], [#9], [#10], [#26], [#31] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/` |
 | 1 | [#3], [#4] (merged), [#5] (merged), [#6] (merged), [#21], [#59] | #1, except #21, which needs #9 and #10, and #59, which needs #8 |
 | 2 | [#11], [#13], [#14], [#15], [#18], [#32], [#39], [#50], [#51], [#62] | #11, #13, #14, #15, #39 and #50 wait only for M0 splits, which have merged. #18 needs #3 and #8; #51 needs #3; #62 needs #3 and #10; #32 needs #21 and #31 |
-| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63] | #11 (for #12 and #34); #50 (for #12, #16, #17 and #58); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60 and #63), with #21 for #22 and #39 for #63 |
+| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #68), with #21 for #22, #39 for #63 and #10 for #65 |
 | 4 | [#24], [#25], [#27] | #12 and #20 (for #24), #12 and #17 (for #25), #18, #19 and #26 (for #27) |
 | 5 | [#28], [#30], [#33], [#35], [#52], [#61] | #27 (for #28, #30, #33 and #61); #23 and #24 (for #35); the M1 workflow fixes #13, #14, #23 and #24 (for #52) |
 | 6 | [#29], [#36], [#64] | #28 (for #29); #34 and #35 (for #36); #33, #58, #60 and #63 (for #64) |
@@ -108,6 +112,7 @@ Each step holds the issues whose longest chain of prerequisites has that many li
   - identity and security: #4 → #11 → #12 → #24 and #25; #11 → #34;
   - API and worker: #4 → #50 → #12, #16 and #17; #10 and #50 → #58;
   - workspace UI: #5 → #15 → #22; #5 → #39; #15 and #8 → #60; #15 and #39 → #63; #23 and #24 → #35 → #36; #33, #58, #60 and #63 → #64;
+  - evaluation follow-ups to #15: #10 and #15 → #65; #15 and #50 → #66; #15 → #67 and #68;
   - tests and packaging: #3 and #10 → #62; #13, #14, #23 and #24 → #52.
 - **Shared files.** The M0 splits have merged: `/api/workspace` ops live in `lib/commands/**`, the workspace UI in `app/workspace/**`, and `lib/store.ts`, `lib/domain.ts` and `lib/workflow-service.ts` are barrels over their new modules (under `site-app/`). [#50] splits `app/api/assurance/route.ts` and `app/api/management/route.ts` next, ahead of the issues that change them, and [#64] splits `app/audit-program.tsx`, `app/assurance-workbench.tsx` and `app/testing-lab.tsx` last. The other hot files and their rules are in [codebase map](docs/engineering/codebase-map.md) section 3.2. An issue that needs a D1 migration takes the next free number and renumbers on rebase.
 
@@ -250,3 +255,7 @@ Facts the plan depends on that are still moving. On each date, re-check the item
 [#62]: https://github.com/ahed-jneed/ai-assurance/issues/62
 [#63]: https://github.com/ahed-jneed/ai-assurance/issues/63
 [#64]: https://github.com/ahed-jneed/ai-assurance/issues/64
+[#65]: https://github.com/ahed-jneed/ai-assurance/issues/65
+[#66]: https://github.com/ahed-jneed/ai-assurance/issues/66
+[#67]: https://github.com/ahed-jneed/ai-assurance/issues/67
+[#68]: https://github.com/ahed-jneed/ai-assurance/issues/68
