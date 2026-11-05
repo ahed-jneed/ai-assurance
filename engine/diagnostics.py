@@ -421,7 +421,10 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
     if reference is None:
         return [result("DRIFT-INPUT", "Numeric distribution drift", "10, 15", [], ["Reference dataset is absent; no baseline was invented."], "inconclusive")]
     output = []
-    for feature in config["driftFeatures"]:
+    # Test IDs must match the shared schema's identifier pattern. Column names
+    # may contain spaces or any Unicode, so they stay in labels and details.
+    for index, feature in enumerate(config["driftFeatures"], 1):
+        test_id = f"DRIFT-{index}"
         if feature not in rows[0] or feature not in reference[0]:
             raise ValueError(f"Drift feature {feature!r} is missing in current or reference CSV")
         a_raw = [numeric_cell(row[feature], f"reference row {i+2} feature {feature}") for i, row in enumerate(reference)]
@@ -430,7 +433,7 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
         b = [v for v in b_raw if v is not None]
         missing_details = {"feature": feature, "referenceN": len(a), "currentN": len(b), "referenceMissing": len(a_raw)-len(a), "currentMissing": len(b_raw)-len(b), "referenceMissingRate": (len(a_raw)-len(a))/len(a_raw), "currentMissingRate": (len(b_raw)-len(b))/len(b_raw)}
         if not a or not b:
-            output.append(result("DRIFT-"+feature, f"Distribution drift: {feature}", "10, 15", [], ["At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
+            output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", [], ["At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
             continue
         psi_value, psi_details = psi(a, b, config["psiBins"])
         ks = ks_statistic(a, b)
@@ -440,7 +443,7 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
         insufficient = min(len(a), len(b)) < config["minSampleSize"]
         if insufficient:
             notes.append("Insufficient current or reference numeric observations.")
-        output.append(result("DRIFT-"+feature, f"Distribution drift: {feature}", "10, 15", measurements, notes, "inconclusive" if insufficient else None))
+        output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", measurements, notes, "inconclusive" if insufficient else None))
     return output
 
 
