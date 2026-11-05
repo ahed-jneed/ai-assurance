@@ -3,8 +3,9 @@
 > **Snapshot of `main` at commit `74c6463`, 5 November 2026.** These are sections 1, 2 and 7 of the verified codebase review that the [roadmap](../../ROADMAP.md) was planned from, renumbered 1 to 3. The review combined six subsystem reports (API, persistence and authorization; domain and workflow; UI; tooling and tests; Python engine; docs and methodology) with read-only spot checks of `main`. The research behind the roadmap is in [docs/research/2026-11/](../research/2026-11/README.md).
 >
 > - **Line numbers refer to commit `74c6463`, before the Prettier reformat** (commit `ef0286f`, merged with [PR #2](https://github.com/ahed-jneed/ai-assurance/pull/2) for [#1](https://github.com/ahed-jneed/ai-assurance/issues/1)). At `74c6463` most `site-app` files were dense single-line code. The reformat moved every `site-app` line number, so find code by the quoted identifiers.
-> - **Finding ids (F-xx)** come from the review's findings table, which is not reproduced here. Most roadmap issues quote the ids they fix, and [ROADMAP.md](../../ROADMAP.md) names the findings deferred to Later.
+> - **Finding ids (F-xx)** come from the review's findings table, which is not reproduced here. Most roadmap issues quote the ids they fix, and [ROADMAP.md](../../ROADMAP.md) names the findings placed in issues on 5 November 2026 and those deferred to Later.
 > - **Counts, sizes and limits** (85 KB files, 17 tables, a 1.5 MB engagement body and so on) describe `74c6463` and will drift. The rules in section 3 are the review's recommendations for parallel work; where an issue says otherwise, the issue wins.
+> - **Edits to the review's text.** Apart from the renumbering, twelve lines differ from the review. Nine pointed to review sections not reproduced here (3, 5 and 6.5) or to its Wave 0 and Wave 1 plan; they now point to the README, to the note above, or to the issue or PR that does the work. Three gained issue references: the `hosting.json` setup step, and the `lib/domain.ts` and `lib/workflow-service.ts` rows of section 3.2. The `---` rules between the review's sections were dropped.
 
 ## 1. Architecture map
 
@@ -351,11 +352,11 @@ Paths are relative to `site-app/` unless they start with a root folder name.
 | `lib/store.ts` | Identity, persistence, projection and HTTP helpers in one file | Split in [#4](https://github.com/ahed-jneed/ai-assurance/issues/4), led by A1; A2 and A3 take their modules |
 | `lib/domain.ts`, `lib/workflow-types.ts` | Types and gates imported by every area | Additive changes only. A3 reviews every change. Gates move to their own file ([#6](https://github.com/ahed-jneed/ai-assurance/issues/6) splits `lib/domain.ts`) |
 | `lib/workflow-service.ts` | 32 ops in one file | Split per aggregate in [#6](https://github.com/ahed-jneed/ai-assurance/issues/6) (A3) |
-| `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` | 35–50 KB each | The review proposes splitting them (A5, A7, A5 and A4 respectively); no issue schedules this yet |
+| `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` | 35–50 KB each | Split by [#50](https://github.com/ahed-jneed/ai-assurance/issues/50) (the route, with `app/api/management/route.ts`) and [#64](https://github.com/ahed-jneed/ai-assurance/issues/64) (the three screens, last in M3); the review assigned them to A5, A7, A5 and A4 respectively |
 | `app/globals.css`, the sibling stylesheets, the import order in `app/layout.tsx` | Order-dependent cascade | A6 owns tokens and base styles. Feature styles live in per-area files |
 | `app/workspace-types.ts` | Hand-written API contract | Replace with `lib/api-types.ts`; changes go with the op that needs them |
 | `package.json`, `package-lock.json` | Every dependency change | A0 batches dependency changes. On rebase, regenerate the lock with `npm install --package-lock-only` rather than merging it by hand |
-| `scripts/integration-check.mjs` | 53 KB holding every API assertion | Split into per-area specs (A0); no issue schedules this yet |
+| `scripts/integration-check.mjs` | 53 KB holding every API assertion | Split into per-area specs (A0) by [#52](https://github.com/ahed-jneed/ai-assurance/issues/52) |
 | `db/schema.ts`, `drizzle/meta/*` | Migration numbers and snapshots | One migration PR at a time (A2) |
 | `tsconfig.tsbuildinfo` | Rewritten by every `tsc` run | Untracked by [#1](https://github.com/ahed-jneed/ai-assurance/issues/1) ([PR #2](https://github.com/ahed-jneed/ai-assurance/pull/2)) |
 | `lib/catalog.json` and its root copies | Methodology changes | A9 only; the copies are generated |
