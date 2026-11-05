@@ -34,8 +34,11 @@ import type {
 } from "@/lib/workflow-types";
 import {
   currentExecution,
+  executionPlanCurrent,
   procedureLabel,
   releaseState,
+  revisionWarnings,
+  runBindsProcedure,
 } from "@/lib/workflow-state";
 import type { WorkspaceData } from "./workspace-types";
 import { FrozenReportDetails } from "./report-details";
@@ -573,8 +576,12 @@ export function AuditProgram({
       choice(
         "reviewerId",
         "Independent reviewer",
+        // Saving makes you a contributor, so you cannot review it either.
         people(["Reviewer", "Lead Auditor"]).filter(
-          (x) => x.value !== p.ownerId && !p.contributors.includes(x.value),
+          (x) =>
+            x.value !== p.ownerId &&
+            x.value !== uid &&
+            !p.contributors.includes(x.value),
         ),
         p.reviewerId,
       ),
@@ -619,6 +626,8 @@ export function AuditProgram({
       title: "Plan · " + p.templateId,
       action: "Save plan revision",
       draft: draftScope("procedure-plan", p.id, p),
+      description:
+        "Changing what this procedure tests or how returns an approved program to draft and requires this procedure's work to be performed again. Preparer, reviewer and due-date changes keep the program approval and recorded work.",
       fields,
       save: (v) =>
         act("saveProcedurePlan", {
@@ -670,11 +679,7 @@ export function AuditProgram({
           ids: v?.runIds,
           options: e.runs
             .filter(
-              (r) =>
-                r.state === "succeeded" &&
-                r.procedureBinding?.procedureId === p.id &&
-                r.procedureBinding.procedureRevision === p.revision &&
-                r.procedureBinding.programRevision === w?.program.revision,
+              (r) => r.state === "succeeded" && runBindsProcedure(e, p, r),
             )
             .map((r) => ({
               value: r.id,
@@ -774,9 +779,9 @@ export function AuditProgram({
   function staffing() {
     setForm({
       title: "Assign selected procedures",
-      action: "Save planning revision",
+      action: "Save assignments",
       description:
-        "Only the fields you choose will change. Planning changes require renewed program approval.",
+        "Only the fields you choose will change. The program approval and recorded work stay valid; reviewed work keeps its reviewer.",
       fields: [
         choice(
           "ownerId",
@@ -788,7 +793,7 @@ export function AuditProgram({
         choice(
           "reviewerId",
           "Independent reviewer",
-          people(["Reviewer", "Lead Auditor"]),
+          people(["Reviewer", "Lead Auditor"]).filter((x) => x.value !== uid),
           "",
           true,
         ),
@@ -903,7 +908,21 @@ export function AuditProgram({
       (p) => p.selected && p.state === "reviewed",
     ).length,
     inScope = w.procedures.filter((p) => p.selected).length;
-  const b = w.brief;
+  const b = w.brief,
+    warnings = revisionWarnings(w),
+    lastProgramEntry = w.program.history.at(-1),
+    programReturn =
+      w.program.status === "draft" && lastProgramEntry?.status === "returned"
+        ? lastProgramEntry
+        : undefined;
+  const warningCards = (show: (id: string) => boolean) =>
+    warnings
+      .filter((x) => show(x.recordId ?? x.id))
+      .map((x) => (
+        <p className="warning-card" role="status" key={x.id}>
+          {x.message}
+        </p>
+      ));
   return (
     <>
       <div className="workflow-spine">
@@ -994,6 +1013,7 @@ export function AuditProgram({
                     )}
                   </div>
                 )}
+                {warningCards((id) => id === "brief")}
                 {[
                   ["intendedUse", "Intended use"],
                   ["boundary", "Boundary and exclusions"],
@@ -1164,6 +1184,17 @@ export function AuditProgram({
                 )}
               </div>
             </div>
+            {programReturn && (
+              <div className="comment-box">
+                <b>
+                  Revision {programReturn.revision} returned by{" "}
+                  {name(programReturn.actor)}
+                </b>
+                <p className="record-text">{programReturn.reason}</p>
+                <small>{new Date(programReturn.at).toLocaleString()}</small>
+              </div>
+            )}
+            {warningCards((id) => id !== "brief")}
             <div className="workflow-toolbar">
               <div className="workflow-filters">
                 {[
@@ -1356,6 +1387,7 @@ export function AuditProgram({
                   <p key={i}>
                     Revision {h.revision} · {h.status} · scope {h.briefRevision}{" "}
                     · {new Date(h.at).toLocaleString()} · {name(h.actor)}
+                    {h.reason && " · " + h.reason}
                   </p>
                 ))}
             </details>
@@ -1684,13 +1716,15 @@ export function AuditProgram({
                 Back to program
               </Button>
               <span>
-                {p.templateId} · revision {p.revision}
+                {p.templateId} · plan revision {p.revision} · assignment{" "}
+                {p.assignmentRevision ?? 1}
               </span>
             </div>
             <div className="sheet-scroll">
               <div className="document-page">
                 <SheetTitle className="document-title">{p.title}</SheetTitle>
                 <p className="subtle">{procedureLabel(e, p)}</p>
+                {warningCards((id) => id === p.id)}
                 <ProcedureContext
                   tenantId={data.tenantId}
                   engagement={e}
@@ -1771,15 +1805,15 @@ export function AuditProgram({
                       <>
                         <p className="subtle">
                           Executed by {name(p.execution.actor)} ·{" "}
-                          {new Date(p.execution.at).toLocaleString()} · scope{" "}
-                          {p.execution.briefRevision} / program{" "}
-                          {p.execution.programRevision}
+                          {new Date(p.execution.at).toLocaleString()} · scope
+                          revision {p.execution.briefRevision} · plan revision{" "}
+                          {p.execution.procedureRevision}
                         </p>
                         {!currentExecution(e, p) && (
                           <p className="form-error">
-                            This execution predates the current scope or plan.
-                            Reperform it or obtain an independent impact
-                            assessment for unchanged steps.
+                            {executionPlanCurrent(p)
+                              ? "The scope changed after this execution. Reperform it or obtain an independent impact assessment."
+                              : "This procedure's plan changed after this execution. Record the work performed against the current plan."}
                           </p>
                         )}
                         {[
@@ -1895,7 +1929,7 @@ export function AuditProgram({
                       {reviewer &&
                         p.execution &&
                         !currentExecution(e, p) &&
-                        p.execution.procedureRevision === p.revision && (
+                        executionPlanCurrent(p) && (
                           <Button
                             variant="outline"
                             disabled={busy || p.contributors.includes(uid)}
@@ -2099,6 +2133,11 @@ export function AuditProgram({
                               {h.execution?.revision ?? "not recorded"}
                             </b>
                             <p>{h.execution?.results ?? h.plan.rationale}</p>
+                            <small>
+                              Preparer {name(h.plan.ownerId)} · reviewer{" "}
+                              {name(h.plan.reviewerId)} · due{" "}
+                              {h.plan.dueDate || "not set"}
+                            </small>
                             <small>
                               {name(h.actor)} ·{" "}
                               {new Date(h.at).toLocaleString()}
