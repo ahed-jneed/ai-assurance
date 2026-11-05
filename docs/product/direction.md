@@ -77,7 +77,7 @@ Two rules sit under all five:
 ## 6. Open questions
 
 - **Law and standards.** Legal content stays unverified against primary sources until [#8] lands, and [#18] labels what needs qualified legal review. EUR-Lex refused automated fetching, so the Official Journal references (Regulation (EU) 2026/1744, Implementing Decision (EU) 2026/2274) rest on secondary sources, which disagree on the EN 18286 citation date (14 or 19 October 2026). No AI Act notified body could be verified in NANDO.
-- **Unconfirmed claims the design must not lean on:** the EEOC's rescission of its Uniform Guidelines' interpretive parts (the Justice Department's 9 June 2026 opinion against those guidelines is confirmed); SR 26-2's exclusion of generative and agentic AI (SR 26-2 itself, superseding SR 11-7, is confirmed); and whether AIUC-1's "quarterly" means retests or revisions of the standard (plan for both). AIUC-1 content licensing is unconfirmed.
+- **Unconfirmed claims the design must not lean on:** the EEOC's rescission of its Uniform Guidelines' interpretive parts (the Justice Department's 9 June 2026 opinion against those guidelines is confirmed), and whether AIUC-1's "quarterly" means retests or revisions of the standard (plan for both). AIUC-1 content licensing is unconfirmed.
 - **Scope:** per-practice SSO and MFA, Colorado and CCPA ADMT audits, the Art 4a record and the rest of [Not yet placed](../../ROADMAP.md#not-yet-placed) need a decision.
 
 ## Sources and verification
@@ -98,7 +98,7 @@ Two rules sit under all five:
 | Fairness criteria conflict; LLM-judge biases | [Kleinberg et al.](https://arxiv.org/abs/1609.05807), [Chouldechova](https://arxiv.org/abs/1610.07524), [Zheng et al.](https://arxiv.org/abs/2306.05685) | Verified (abstracts) |
 | Benchmark vs generalized accuracy; crosswalk relationship types | [NIST AI 800-3](https://www.nist.gov/node/1906641), [NIST IR 8477](https://doi.org/10.6028/NIST.IR.8477) | Verified |
 | Worked statistics in section 4 | Recomputed: Katz-log intervals, two-proportion z, normal-approximation sample size (two-sided α = 0.05, 80% power), SciPy Fisher exact | Verified |
-| SR 26-2; its generative-AI exclusion | [Federal Reserve](https://www.federalreserve.gov/supervisionreg/srletters/sr2602.htm) | Verified; exclusion secondary |
+| SR 26-2 (17 Apr 2026) supersedes SR 11-7; footnote 3 of its attached guidance puts generative and agentic AI models out of scope | [Federal Reserve](https://www.federalreserve.gov/supervisionreg/srletters/sr2602.htm), [attachment, footnote 3](https://www.federalreserve.gov/supervisionreg/srletters/SR2602a1.pdf) | Verified |
 | DOJ opinion; EEOC rescission | [DOJ](https://www.justice.gov/opa/pr/justice-department-concludes-eeoc-disparate-impact-guidelines-violate-constitution), [DirectEmployers](https://directemployers.org/2026/10/23/eeoc-ugesp-rescission-final-rule-oira/) | Verified; rescission secondary |
 | Competitors and market structure, DSA and LL144 critiques, Colorado and CCPA dates, audit-firm security expectations, UX patterns | [Research briefs](../research/2026-11/README.md) | Secondary |
 
