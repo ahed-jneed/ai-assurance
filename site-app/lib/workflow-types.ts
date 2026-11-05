@@ -26,6 +26,12 @@ export type Brief = BriefFields & {
   updatedBy: string;
   updatedAt: string;
   approval?: Approval;
+  // The reviewer's open request for changes, kept apart from the preparer's
+  // fields: set when a submitted brief is returned, cleared when it is
+  // submitted again. The history keeps the returned revision with it.
+  returnReason?: string;
+  returnedBy?: string;
+  returnedAt?: string;
   history: Omit<Brief, "history">[];
 };
 export type ProcedurePlan = {

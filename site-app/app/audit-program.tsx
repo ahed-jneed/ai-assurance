@@ -985,6 +985,15 @@ export function AuditProgram({
                     </dd>
                   </div>
                 </dl>
+                {b.returnReason && (
+                  <div className="comment-box">
+                    <b>Changes requested by {name(b.returnedBy ?? "")}</b>
+                    <p className="record-text">{b.returnReason}</p>
+                    {b.returnedAt && (
+                      <small>{new Date(b.returnedAt).toLocaleString()}</small>
+                    )}
+                  </div>
+                )}
                 {[
                   ["intendedUse", "Intended use"],
                   ["boundary", "Boundary and exclusions"],
@@ -1020,6 +1029,12 @@ export function AuditProgram({
                       </b>
                       <p>{h.boundary}</p>
                       <p>{h.changeImpact}</p>
+                      {h.returnReason && (
+                        <p>
+                          Changes requested by {name(h.returnedBy ?? "")}:{" "}
+                          {h.returnReason}
+                        </p>
+                      )}
                       <small>
                         {name(h.updatedBy)} ·{" "}
                         {new Date(h.updatedAt).toLocaleString()}

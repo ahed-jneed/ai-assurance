@@ -80,6 +80,15 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     if (old && old.history.length >= 40)
       fail(413, "Scope revision limit reached");
     const history = old ? [...old.history, snapshot(old)] : [];
+    // An open return stays with the draft that answers it.
+    const returned =
+      old?.returnReason === undefined
+        ? {}
+        : {
+            returnReason: old.returnReason,
+            returnedBy: old.returnedBy,
+            returnedAt: old.returnedAt,
+          };
     x.brief = {
       ...a,
       revision: (old?.revision ?? 0) + 1,
@@ -87,6 +96,7 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       contributors: [...new Set([...(old?.contributors ?? []), c.userId])],
       updatedBy: c.userId,
       updatedAt: c.at,
+      ...returned,
       history,
     };
     if (x.program.status !== "draft") programDraft();
@@ -97,6 +107,10 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     const b = w().brief ?? fail(400, "Complete the engagement brief first");
     if (b.status !== "draft") fail(409, "Only a scope draft can be submitted");
     b.status = "submitted";
+    // The resubmission answers the return the history keeps.
+    delete b.returnReason;
+    delete b.returnedBy;
+    delete b.returnedAt;
     return { briefRevision: String(b.revision) };
   },
   async approveBrief({ c, independent, w }, data) {
@@ -120,16 +134,18 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     b.status = "approved";
     return { briefRevision: String(b.revision) };
   },
-  async returnBrief({ reviewer, w }, data) {
+  async returnBrief({ c, reviewer, w }, data) {
     reviewer();
-    const a = z.object({ reason: text }).strict().parse(data),
-      x = w();
-    const b = x.brief ?? fail(400, "Complete the brief first");
+    const a = z.object({ reason: text }).strict().parse(data);
+    const b = w().brief ?? fail(400, "Complete the brief first");
     if (b.status !== "submitted") fail(409, "Return a submitted scope");
+    // The reason is the reviewer's, never the preparer's change impact. The
+    // returned revision enters the history with it.
+    b.returnReason = a.reason;
+    b.returnedBy = c.userId;
+    b.returnedAt = c.at;
     b.history.push(snapshot(b));
     b.status = "draft";
-    b.approval = undefined;
-    b.changeImpact = a.reason;
     return { reason: a.reason };
   },
   async saveProcedurePlan(

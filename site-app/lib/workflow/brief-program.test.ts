@@ -269,27 +269,35 @@ describe("engagement brief", () => {
     );
   });
 
-  it("returns a submitted scope with the reason as its change impact", async () => {
+  it("returns a submitted scope with the reason kept apart from the preparer's text", async () => {
     const e = structuredEngagement();
+    const prepared = { ...briefInput, changeImpact: "No earlier work exists" };
     const send = (userId: string) =>
       command(e, "returnBrief", { reason: "Clarify the boundary" }, userId);
     await expectFailure(send("reviewer"), 400, "Complete the brief first");
-    await command(e, "saveBrief", briefInput, "auditor");
+    await command(e, "saveBrief", prepared, "auditor");
     await expectFailure(send("reviewer"), 409, "Return a submitted scope");
     await command(e, "submitBrief", {}, "auditor");
     await expectFailure(send("auditor"), 403, reviewerOnly);
     expect(await send("reviewer")).toEqual({ reason: "Clarify the boundary" });
+    const returned = {
+      returnReason: "Clarify the boundary",
+      returnedBy: "reviewer",
+      returnedAt: at,
+    };
     const brief = workflowOf(e).brief!;
     expect(brief).toMatchObject({
+      ...returned,
       revision: 1,
       status: "draft",
-      changeImpact: "Clarify the boundary",
+      changeImpact: "No earlier work exists",
       contributors: ["auditor"],
     });
     expect(brief.approval).toBeUndefined();
     expect(brief.history).toEqual([
       {
-        ...briefInput,
+        ...prepared,
+        ...returned,
         revision: 1,
         status: "submitted",
         contributors: ["auditor"],
@@ -297,6 +305,28 @@ describe("engagement brief", () => {
         updatedAt: at,
       },
     ]);
+    // The revision answering the return shows it until it is resubmitted,
+    // in the preparer's own words.
+    await command(
+      e,
+      "saveBrief",
+      { ...prepared, boundary: "Scoring service only" },
+      "auditor",
+    );
+    expect(workflowOf(e).brief).toMatchObject({
+      ...returned,
+      revision: 2,
+      changeImpact: "No earlier work exists",
+    });
+    await command(e, "submitBrief", {}, "auditor");
+    const resubmitted = workflowOf(e).brief!;
+    expect(resubmitted).toMatchObject({
+      status: "submitted",
+      changeImpact: "No earlier work exists",
+    });
+    for (const key of ["returnReason", "returnedBy", "returnedAt"])
+      expect(resubmitted).not.toHaveProperty(key);
+    expect(resubmitted.history).toHaveLength(2);
   });
 
   it("lets only a Lead revise an approved scope, explaining its impact", async () => {
