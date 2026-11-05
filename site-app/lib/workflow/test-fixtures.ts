@@ -44,11 +44,13 @@ export const people: Record<string, Member> = {
 let sequence = 0;
 const nextId = (prefix: string) => prefix + "-" + ++sequence;
 
-export async function sha256(value: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
+// The digest of sha256 in lib/store.ts, which the workspace route passes to
+// the commands. Like it, this rejects a value that is neither text nor bytes,
+// such as JSON.stringify(undefined), instead of hashing it as empty text.
+export async function sha256(value: string | ArrayBuffer) {
+  const bytes =
+    typeof value === "string" ? new TextEncoder().encode(value) : value;
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)]
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");

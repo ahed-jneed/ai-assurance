@@ -156,6 +156,39 @@ describe("opinion-aware final issuance", () => {
     ).toBe("run");
   });
 
+  it("needs an approved classification for every opinion", () => {
+    const provisional = {
+      ...complete,
+      findings: [],
+      classification: {
+        ...complete.classification,
+        status: "provisional" as const,
+      },
+    };
+    for (const opinion of ["Readiness assessment", ...opinions])
+      expect(finalReportGates(provisional, opinion)).toEqual([
+        {
+          id: "classification",
+          kind: "classification",
+          title: "Approve regulatory classification",
+          message: "Regulatory classification needs independent approval",
+        },
+      ]);
+    expect(
+      kinds({ ...provisional, stage: "Evidence evaluation" }, "Reporting"),
+    ).toEqual(["classification"]);
+    expect(kinds({ ...provisional, stage: "Reporting" }, "Sign-off")).toEqual([
+      "classification",
+    ]);
+    const unassessed = {
+      ...provisional,
+      classification: { ...provisional.classification, intendedPurpose: "" },
+    };
+    expect(completionGates(unassessed).map((g) => g.title)).toEqual([
+      "Assess and approve classification",
+    ]);
+  });
+
   it("reports the completion gate messages as blockers", () => {
     expect(completionGates(audit).map((g) => g.message)).toEqual(
       reportBlockers(audit),
