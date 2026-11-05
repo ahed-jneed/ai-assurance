@@ -550,13 +550,39 @@ try {
       minimumAccuracy: 0.8,
     },
   };
+  // A new run needs a saved protocol; an explicit suite and configuration
+  // would skip its checks, such as the fairness data-handling basis.
+  await command("queueRun", runInput, owner, 400);
+  const fairnessProtocol = {
+    name: "Synthetic performance and fairness",
+    version: "1.0",
+    task: "Binary classification",
+    suite: runInput.suite,
+    config: runInput.config,
+    datasetContext: {
+      split: "test",
+      population: "Synthetic full fixture population",
+      predictionProvenance: "Controlled synthetic predictions",
+      independence: "Synthetic fixture; no real holdout independence claim",
+      sensitiveDataBasis: "Synthetic groups; no personal data",
+    },
+    rationale: "Fixture acceptance rules assess arithmetic, not conformity",
+  };
   await command(
-    "queueRun",
-    { ...runInput, suite: ["performance", "performance"] },
+    "createEvaluationProfile",
+    { ...fairnessProtocol, suite: ["performance", "performance"] },
     owner,
     400,
   );
-  const queued = await command("queueRun", runInput);
+  const fairnessProfile = await command(
+    "createEvaluationProfile",
+    fairnessProtocol,
+  );
+  const queued = await command("queueRun", {
+    modelId: runInput.modelId,
+    datasetId: runInput.datasetId,
+    profileId: fairnessProfile.details.profileId,
+  });
   await command("executeRun", { runId: queued.details.runId });
   const run = e.runs.at(-1);
   assert.equal(
@@ -668,13 +694,21 @@ try {
   assert.equal(e.models.at(-1).card.source.revision, "a".repeat(40));
   await command(
     "queueRun",
-    { ...runInput, datasetId: "different-artifact" },
+    {
+      modelId: runInput.modelId,
+      datasetId: "different-artifact",
+      profileId: fairnessProfile.details.profileId,
+    },
     owner,
     400,
   );
   await command(
-    "queueRun",
-    { ...runInput, config: { ...runInput.config, predictionColumn: "actual" } },
+    "createEvaluationProfile",
+    {
+      ...fairnessProtocol,
+      version: "1.1",
+      config: { ...runInput.config, predictionColumn: "actual" },
+    },
     owner,
     400,
   );
@@ -799,9 +833,11 @@ try {
       intendedPurpose: "Task expansion fixture",
       artifactId,
     });
-    const q = await command("queueRun", {
-      modelId: e.models.at(-1).id,
-      datasetId: artifactId,
+    const modelId = e.models.at(-1).id;
+    const protocol = await command("createEvaluationProfile", {
+      ...profileInput,
+      name: item.task + " acceptance",
+      task: item.task,
       suite: item.suite,
       config: {
         ...runInput.config,
@@ -811,6 +847,11 @@ try {
         maximumRmse: 2,
         minimumMacroF1: 0.5,
       },
+    });
+    const q = await command("queueRun", {
+      modelId,
+      datasetId: artifactId,
+      profileId: protocol.details.profileId,
     });
     await command("executeRun", { runId: q.details.runId });
     const tested = e.runs.at(-1);
@@ -1139,7 +1180,10 @@ try {
   });
   assert.equal(report.snapshot.annexIV.length, 9);
   assert.equal(report.snapshot.models.length, e.models.length);
-  assert.equal(report.snapshot.evaluationProfiles.length, 2);
+  assert.equal(
+    report.snapshot.evaluationProfiles.length,
+    e.evaluationProfiles.length,
+  );
   await command("reopenPaper", { paperId: p.id });
   assert.equal(e.papers.find((x) => x.id === p.id).signatures.length, 0);
   assert.equal(
