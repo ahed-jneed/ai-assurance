@@ -1,33 +1,295 @@
 "use client";
-import { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ArrowUpRight, CheckCircle2, Search } from 'lucide-react';
-import { Select,SelectTrigger,SelectValue,SelectContent,SelectItem } from '@/components/ui/select';
-import { finalReportGates, type AuditGate, type Engagement, type Role } from '@/lib/domain';
-import { paperNextAction, type PaperTarget } from '@/lib/paper-workflow';
-export const reportOpinions=['Readiness assessment','Qualified conclusion','Adverse conclusion','Unable to conclude'];
-export type GateAction=(gate:AuditGate,target?:PaperTarget)=>void;
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight, CheckCircle2, Search } from "lucide-react";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import {
+  finalReportGates,
+  type AuditGate,
+  type Engagement,
+  type Role,
+} from "@/lib/domain";
+import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
+export const reportOpinions = [
+  "Readiness assessment",
+  "Qualified conclusion",
+  "Adverse conclusion",
+  "Unable to conclude",
+];
+export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;
 
-export function AuditGateList({gates,engagement:e,role,userId,onGate,compact=false}:{gates:AuditGate[];engagement:Engagement;role:Role;userId:string;onGate?:GateAction;compact?:boolean}){
- const groups=['Scope & program','Classification','Evidence collection','Paper preparation','Independent review','Paper signatures','Conclusion exceptions','Evaluations','Findings','Engagement stage'];
- const group=(g:AuditGate)=>g.kind==='paper'?({draft:'Paper preparation',in_review:'Independent review',reviewed:'Paper signatures',signed:'Paper signatures'}[e.papers.find(p=>p.id===g.recordId)?.status??'draft']):({workflow:'Scope & program',classification:'Classification',run:'Evaluations',finding:'Findings',stage:'Engagement stage',request:'Evidence collection',conclusion:'Conclusion exceptions'}[g.kind]);
- function row(g:AuditGate){
-  const p=['paper','conclusion'].includes(g.kind)?e.papers.find(p=>p.id===g.recordId):undefined,next=p?paperNextAction({paper:p,artifacts:e.artifacts,role,userId}):undefined;
-  const run=g.kind==='run'?e.runs.find(r=>r.id===g.recordId):undefined;
-  const detail=next?.reason??(g.kind==='stage'?`Current stage: ${e.stage}. A Lead Auditor advances one stage at a time from Overview.`:g.kind==='classification'?(g.id==='prohibited'?'Document the prohibited-practice assessment and use an appropriately scoped adverse or unable-to-conclude opinion.':e.classification.intendedPurpose?'Independent classification approval required.':'Record the intended purpose and risk route, then obtain independent approval.'):g.kind==='finding'?'An open High or Critical finding prevents a readiness opinion.':g.kind==='run'?(run?.state==='queued'?'An Auditor or Lead Auditor executes or cancels this queued evaluation.':'Wait for execution to finish. A Lead Auditor can recover an interrupted run after two minutes.'):'');
-  const request=g.kind==='request'?e.evidenceRequests?.find(r=>r.id===g.recordId):undefined;
-  const guidance=g.kind==='conclusion'?`Recorded conclusion: ${p?.body.conclusionStatus?.replaceAll('_',' ')}. Resolve and review a new revision, or select an opinion that reflects the exception.`:g.kind==='request'?(request?.disposition==='unobtainable'?'Unavailable evidence requires a scoped qualified, adverse or unable-to-conclude opinion.':`Responsible party: ${request?.responsibleParty??'Not recorded'}. Due ${request?.dueDate??'not recorded'}. Record a response and assess it, or obtain a Lead-approved limitation/scope decision.`):detail||g.message;
-  const action=p?(next?.target==='review'?'Review comments':p.status==='draft'?'Prepare paper':p.status==='in_review'?'Open review':p.status==='reviewed'?'Open sign-off':'Open paper'):({paper:'Open paper',workflow:g.recordId?'Open procedure':'Open scope & program',classification:'Open assessment',request:'Assess receipt',run:'Open evaluation',finding:'Review remediation',stage:'Open lifecycle',conclusion:'Assess conclusion'}[g.kind]);
-  const content=<><span className='audit-gate-description'><b>{g.title}</b>{guidance&&<small>{guidance}</small>}</span>{onGate&&<span className='audit-gate-action'>{action}<ArrowUpRight size={14} aria-hidden='true'/></span>}</>;
-  return onGate?<button type="button" className="audit-gate-row" key={g.id} onClick={()=>onGate(g,next?.target)}>{content}</button>:<div className="audit-gate-row" key={g.id}>{content}</div>;
- }
- return <div className={'audit-gate-list '+(compact?'compact':'')}>{groups.map(label=>{const items=gates.filter(g=>group(g)===label);return items.length?<details className="audit-gate-group" key={label} open={items.length===1}><summary><span className="gate-group-label">{label}<small>{items[0].title}</small></span><span className="count-label">{items.length}</span></summary><div>{items.map(row)}</div></details>:null;})}</div>;
+export function AuditGateList({
+  gates,
+  engagement: e,
+  role,
+  userId,
+  onGate,
+  compact = false,
+}: {
+  gates: AuditGate[];
+  engagement: Engagement;
+  role: Role;
+  userId: string;
+  onGate?: GateAction;
+  compact?: boolean;
+}) {
+  const groups = [
+    "Scope & program",
+    "Classification",
+    "Evidence collection",
+    "Paper preparation",
+    "Independent review",
+    "Paper signatures",
+    "Conclusion exceptions",
+    "Evaluations",
+    "Findings",
+    "Engagement stage",
+  ];
+  const group = (g: AuditGate) =>
+    g.kind === "paper"
+      ? {
+          draft: "Paper preparation",
+          in_review: "Independent review",
+          reviewed: "Paper signatures",
+          signed: "Paper signatures",
+        }[e.papers.find((p) => p.id === g.recordId)?.status ?? "draft"]
+      : {
+          workflow: "Scope & program",
+          classification: "Classification",
+          run: "Evaluations",
+          finding: "Findings",
+          stage: "Engagement stage",
+          request: "Evidence collection",
+          conclusion: "Conclusion exceptions",
+        }[g.kind];
+  function row(g: AuditGate) {
+    const p = ["paper", "conclusion"].includes(g.kind)
+        ? e.papers.find((p) => p.id === g.recordId)
+        : undefined,
+      next = p
+        ? paperNextAction({ paper: p, artifacts: e.artifacts, role, userId })
+        : undefined;
+    const run =
+      g.kind === "run" ? e.runs.find((r) => r.id === g.recordId) : undefined;
+    const detail =
+      next?.reason ??
+      (g.kind === "stage"
+        ? `Current stage: ${e.stage}. A Lead Auditor advances one stage at a time from Overview.`
+        : g.kind === "classification"
+          ? g.id === "prohibited"
+            ? "Document the prohibited-practice assessment and use an appropriately scoped adverse or unable-to-conclude opinion."
+            : e.classification.intendedPurpose
+              ? "Independent classification approval required."
+              : "Record the intended purpose and risk route, then obtain independent approval."
+          : g.kind === "finding"
+            ? "An open High or Critical finding prevents a readiness opinion."
+            : g.kind === "run"
+              ? run?.state === "queued"
+                ? "An Auditor or Lead Auditor executes or cancels this queued evaluation."
+                : "Wait for execution to finish. A Lead Auditor can recover an interrupted run after two minutes."
+              : "");
+    const request =
+      g.kind === "request"
+        ? e.evidenceRequests?.find((r) => r.id === g.recordId)
+        : undefined;
+    const guidance =
+      g.kind === "conclusion"
+        ? `Recorded conclusion: ${p?.body.conclusionStatus?.replaceAll("_", " ")}. Resolve and review a new revision, or select an opinion that reflects the exception.`
+        : g.kind === "request"
+          ? request?.disposition === "unobtainable"
+            ? "Unavailable evidence requires a scoped qualified, adverse or unable-to-conclude opinion."
+            : `Responsible party: ${request?.responsibleParty ?? "Not recorded"}. Due ${request?.dueDate ?? "not recorded"}. Record a response and assess it, or obtain a Lead-approved limitation/scope decision.`
+          : detail || g.message;
+    const action = p
+      ? next?.target === "review"
+        ? "Review comments"
+        : p.status === "draft"
+          ? "Prepare paper"
+          : p.status === "in_review"
+            ? "Open review"
+            : p.status === "reviewed"
+              ? "Open sign-off"
+              : "Open paper"
+      : {
+          paper: "Open paper",
+          workflow: g.recordId ? "Open procedure" : "Open scope & program",
+          classification: "Open assessment",
+          request: "Assess receipt",
+          run: "Open evaluation",
+          finding: "Review remediation",
+          stage: "Open lifecycle",
+          conclusion: "Assess conclusion",
+        }[g.kind];
+    const content = (
+      <>
+        <span className="audit-gate-description">
+          <b>{g.title}</b>
+          {guidance && <small>{guidance}</small>}
+        </span>
+        {onGate && (
+          <span className="audit-gate-action">
+            {action}
+            <ArrowUpRight size={14} aria-hidden="true" />
+          </span>
+        )}
+      </>
+    );
+    return onGate ? (
+      <button
+        type="button"
+        className="audit-gate-row"
+        key={g.id}
+        onClick={() => onGate(g, next?.target)}
+      >
+        {content}
+      </button>
+    ) : (
+      <div className="audit-gate-row" key={g.id}>
+        {content}
+      </div>
+    );
+  }
+  return (
+    <div className={"audit-gate-list " + (compact ? "compact" : "")}>
+      {groups.map((label) => {
+        const items = gates.filter((g) => group(g) === label);
+        return items.length ? (
+          <details
+            className="audit-gate-group"
+            key={label}
+            open={items.length === 1}
+          >
+            <summary>
+              <span className="gate-group-label">
+                {label}
+                <small>{items[0].title}</small>
+              </span>
+              <span className="count-label">{items.length}</span>
+            </summary>
+            <div>{items.map(row)}</div>
+          </details>
+        ) : null;
+      })}
+    </div>
+  );
 }
 
-export function ReportReadiness({engagement:e,role,userId,opinion,onOpinion,onGate}:{engagement:Engagement;role:Role;userId:string;opinion:string;onOpinion:(v:string)=>void;onGate:GateAction}){
- const [search,setSearch]=useState('');
- const gates=finalReportGates(e,opinion),exceptions=e.findings.filter(f=>f.status!=='closed'&&['High','Critical'].includes(f.severity)).length;
- const query=search.trim().toLowerCase(),visible=gates.filter(g=>!query||(g.title+' '+g.message).toLowerCase().includes(query));
- return <section className="report-readiness"><div className="readiness-heading"><div><h2>Completion checklist</h2><p className="subtle">{gates.length?`${gates.length} ${gates.length===1?'requirement remains':'requirements remain'} before final capture`:'Completion gates met for the selected opinion.'}</p></div><label className="readiness-opinion">Scoped opinion<Select value={opinion} onValueChange={onOpinion}><SelectTrigger aria-label="Readiness opinion"><SelectValue/></SelectTrigger><SelectContent>{reportOpinions.map(o=><SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select></label></div>{opinion!=='Readiness assessment'&&!!exceptions&&<p className="readiness-context">{exceptions} open High or Critical {exceptions===1?'finding must':'findings must'} be addressed in the scoped opinion and disclosures.</p>}{!!gates.length&&<div className="completion-search"><Search size={16} aria-hidden="true"/><Input name="completionSearch" autoComplete="off" aria-label="Search completion requirements" placeholder="Find a paper, procedure or requirement…" value={search} onChange={ev=>setSearch(ev.target.value)}/>{search&&<Button size="sm" variant="ghost" onClick={()=>setSearch('')}>Clear</Button>}</div>}{gates.length?(visible.length?<><p className="checklist-match-count" role="status">{query?`${visible.length} of ${gates.length} requirements match`:''}</p><AuditGateList gates={visible} engagement={e} role={role} userId={userId} onGate={onGate}/></>:<div className="queue-empty"><span>No requirements match this search.</span><Button variant="ghost" onClick={()=>setSearch('')}>Clear search</Button></div>):<div className="queue-empty"><CheckCircle2 size={18} aria-hidden="true"/><span>Classification, papers, evaluations and lifecycle are complete.</span></div>}</section>;
+export function ReportReadiness({
+  engagement: e,
+  role,
+  userId,
+  opinion,
+  onOpinion,
+  onGate,
+}: {
+  engagement: Engagement;
+  role: Role;
+  userId: string;
+  opinion: string;
+  onOpinion: (v: string) => void;
+  onGate: GateAction;
+}) {
+  const [search, setSearch] = useState("");
+  const gates = finalReportGates(e, opinion),
+    exceptions = e.findings.filter(
+      (f) => f.status !== "closed" && ["High", "Critical"].includes(f.severity),
+    ).length;
+  const query = search.trim().toLowerCase(),
+    visible = gates.filter(
+      (g) =>
+        !query || (g.title + " " + g.message).toLowerCase().includes(query),
+    );
+  return (
+    <section className="report-readiness">
+      <div className="readiness-heading">
+        <div>
+          <h2>Completion checklist</h2>
+          <p className="subtle">
+            {gates.length
+              ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} before final capture`
+              : "Completion gates met for the selected opinion."}
+          </p>
+        </div>
+        <label className="readiness-opinion">
+          Scoped opinion
+          <Select value={opinion} onValueChange={onOpinion}>
+            <SelectTrigger aria-label="Readiness opinion">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {reportOpinions.map((o) => (
+                <SelectItem key={o} value={o}>
+                  {o}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+      </div>
+      {opinion !== "Readiness assessment" && !!exceptions && (
+        <p className="readiness-context">
+          {exceptions} open High or Critical{" "}
+          {exceptions === 1 ? "finding must" : "findings must"} be addressed in
+          the scoped opinion and disclosures.
+        </p>
+      )}
+      {!!gates.length && (
+        <div className="completion-search">
+          <Search size={16} aria-hidden="true" />
+          <Input
+            name="completionSearch"
+            autoComplete="off"
+            aria-label="Search completion requirements"
+            placeholder="Find a paper, procedure or requirement…"
+            value={search}
+            onChange={(ev) => setSearch(ev.target.value)}
+          />
+          {search && (
+            <Button size="sm" variant="ghost" onClick={() => setSearch("")}>
+              Clear
+            </Button>
+          )}
+        </div>
+      )}
+      {gates.length ? (
+        visible.length ? (
+          <>
+            <p className="checklist-match-count" role="status">
+              {query
+                ? `${visible.length} of ${gates.length} requirements match`
+                : ""}
+            </p>
+            <AuditGateList
+              gates={visible}
+              engagement={e}
+              role={role}
+              userId={userId}
+              onGate={onGate}
+            />
+          </>
+        ) : (
+          <div className="queue-empty">
+            <span>No requirements match this search.</span>
+            <Button variant="ghost" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          </div>
+        )
+      ) : (
+        <div className="queue-empty">
+          <CheckCircle2 size={18} aria-hidden="true" />
+          <span>
+            Classification, papers, evaluations and lifecycle are complete.
+          </span>
+        </div>
+      )}
+    </section>
+  );
 }

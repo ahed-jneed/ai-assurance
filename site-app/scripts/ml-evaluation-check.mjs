@@ -1,45 +1,224 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import ts from 'typescript';
-const dir='.sites-runtime/ml-unit';await fs.mkdir(dir,{recursive:true});
-for(const name of ['evaluation','diagnostics']){const js=ts.transpileModule(await fs.readFile('lib/'+name+'.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText.replace("from './evaluation'","from './evaluation.js'");await fs.writeFile(dir+'/'+name+'.js',js);}
-const {evaluate,inspectCSV,parseCSV}=await import('../'+dir+'/diagnostics.js');
-const {configSchema,assertSuite}=await import('../'+dir+'/evaluation.js');
-const config=configSchema.parse({labelColumn:'actual',predictionColumn:'predicted',groupColumn:'',positiveLabel:'1',minimumGroupSize:2,maximumParityGap:.1,minimumImpactRatio:.8,minimumAccuracy:.7,minimumSampleSize:2,minimumClassCount:1,minimumRecall:.7,minimumMacroF1:.5,maximumRmse:2});
-const run=(task='Binary classification',suite=['performance'],extra={})=>({task,suite,config:{...config,...extra}});
-const binary='actual,predicted\n1,1\n1,0\n0,0\n0,0';
-assert.equal(evaluate(run(),binary)[0].metrics[0].value,.75);
-assert.equal(evaluate(run(),binary)[0].outcome,'fail','Recall must also meet its explicit criterion');
-assert.equal(evaluate(run('Binary classification',['performance'],{minimumRecall:.5}),binary)[0].outcome,'pass');
-assert.throws(()=>evaluate(run('Binary classification',['performance'],{predictionColumn:'actual'}),binary),/distinct/);
-assert.throws(()=>evaluate(run('Binary classification',['demographic_parity']),binary),/missing/);
-assert.equal(evaluate(run(),'actual,predicted\n0,0\n0,1')[0].outcome,'inconclusive','No actual positives cannot pass accuracy');
-assert.throws(()=>evaluate(run(),'actual,predicted\n1,\n0,0'),/missing/);
-const multi=evaluate(run('Multiclass classification'),'actual,predicted\nA,A\nA,B\nB,B\nC,C')[0];
-assert.equal(multi.metrics[0].value,.75);assert(Math.abs(multi.metrics[1].value-7/9)<1e-12);assert.equal(multi.outcome,'pass');
-assert.equal(evaluate(run('Multiclass classification'),'actual,predicted\nA,A\nA,B')[0].outcome,'inconclusive');
-const reg=evaluate(run('Regression',['regression']),'actual,predicted\n1,2\n2,2\n3,4')[0];
-assert.equal(reg.metrics[0].value,2/3);assert(Math.abs(reg.metrics[1].value-Math.sqrt(2/3))<1e-12);assert.equal(reg.metrics[2].value,0);assert.equal(reg.outcome,'pass');
-assert.equal(evaluate(run('Regression',['regression'],{maximumRmse:.5}),'actual,predicted\n1,2\n2,2\n3,4')[0].outcome,'fail');
-assert.equal(evaluate(run('Regression',['regression']),'actual,predicted\n2,2\n2,3')[0].metrics[2].value,null);
-assert.equal(evaluate(run('Regression',['regression']),'actual,predicted\n1,3\n2,3')[0].metrics[2].value,-9);
-assert.throws(()=>evaluate(run('Regression',['regression']),'actual,predicted\n1,NaN\n2,3'),/finite/);
-assert.throws(()=>evaluate(run('Regression',['regression']),'actual,predicted\n1,1e101\n2,3'),/finite/);
-assert.throws(()=>evaluate(run('Regression',['regression']),'actual,predicted\n0x10,2\n2,3'),/decimal/);
-assert.throws(()=>assertSuite('Regression',['demographic_parity']),/not available/);
-assert.throws(()=>assertSuite('Classical NLP',['performance']),/not available/);
-assert.throws(()=>parseCSV('actual,actual\n1,2'),/unique/);
-assert.throws(()=>parseCSV('a,b\n1'),/mismatch/);
-assert.throws(()=>parseCSV('a,b\n"1,2'),/Unclosed/);
-assert.throws(()=>parseCSV('a,b\n"1"x,2'),/Unexpected/);
-assert.equal(parseCSV('a,b\n"a""b",2')[0].a,'a"b');
-const inspection=inspectCSV('\uFEFFactual,predicted,note\r\n1,1,"comma, quote"\r\n0,0,');assert.equal(inspection.rowCount,2);assert.equal(inspection.columns[2].missing,1);
-const groups='actual,predicted,group\n1,1,A\n0,0,A\n1,0,B\n0,1,B';
-const fair=evaluate(run('Binary classification',['demographic_parity','equalized_odds'],{groupColumn:'group',minimumGroupSize:2,maximumOddsGap:.2}),groups);assert.equal(fair[0].outcome,'pass');assert.equal(fair[1].outcome,'fail');
-assert.equal(evaluate(run('Binary classification',['equalized_odds'],{groupColumn:'group',minimumClassCount:2}),groups)[0].outcome,'inconclusive');
-assert.equal(evaluate(run('Binary classification',['demographic_parity'],{groupColumn:'group',minimumSampleSize:5}),groups)[0].outcome,'inconclusive');
-const boundary='actual,predicted,group\n'+Array.from({length:20},(_,i)=>`1,${i<11?'1':'0'},A`).join('\n')+'\n'+Array.from({length:20},(_,i)=>`1,${i<9?'1':'0'},B`).join('\n');
-assert.equal(evaluate(run('Binary classification',['demographic_parity'],{groupColumn:'group',maximumParityGap:.1}),boundary)[0].outcome,'pass','An exact .1 gap must pass an inclusive .1 criterion despite binary floating-point noise');
-assert.equal(evaluate(run('Binary classification',['demographic_parity'],{groupColumn:'group',maximumParityGap:.099}),boundary)[0].outcome,'fail');
-const extreme=evaluate(run('Regression',['regression']),'actual,predicted\n1e-100,1e100\n-1e-100,1e100')[0];assert.equal(extreme.metrics[2].value,null);assert(extreme.limitations.some(l=>l.includes('numeric range')));assert(extreme.metrics.every(m=>m.value===null||Number.isFinite(m.value)));
-console.log('PASS binary criteria and missing-class safeguards; multiclass/regression numerics; fair group/class denominators; strict mappings and bounded CSV preflight');
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import ts from "typescript";
+const dir = ".sites-runtime/ml-unit";
+await fs.mkdir(dir, { recursive: true });
+for (const name of ["evaluation", "diagnostics"]) {
+  const js = ts
+    .transpileModule(await fs.readFile("lib/" + name + ".ts", "utf8"), {
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ES2022,
+      },
+    })
+    .outputText.replace(
+      /from (['"])\.\/evaluation\1/,
+      "from './evaluation.js'",
+    );
+  await fs.writeFile(dir + "/" + name + ".js", js);
+}
+const { evaluate, inspectCSV, parseCSV } = await import(
+  "../" + dir + "/diagnostics.js"
+);
+const { configSchema, assertSuite } = await import(
+  "../" + dir + "/evaluation.js"
+);
+const config = configSchema.parse({
+  labelColumn: "actual",
+  predictionColumn: "predicted",
+  groupColumn: "",
+  positiveLabel: "1",
+  minimumGroupSize: 2,
+  maximumParityGap: 0.1,
+  minimumImpactRatio: 0.8,
+  minimumAccuracy: 0.7,
+  minimumSampleSize: 2,
+  minimumClassCount: 1,
+  minimumRecall: 0.7,
+  minimumMacroF1: 0.5,
+  maximumRmse: 2,
+});
+const run = (
+  task = "Binary classification",
+  suite = ["performance"],
+  extra = {},
+) => ({ task, suite, config: { ...config, ...extra } });
+const binary = "actual,predicted\n1,1\n1,0\n0,0\n0,0";
+assert.equal(evaluate(run(), binary)[0].metrics[0].value, 0.75);
+assert.equal(
+  evaluate(run(), binary)[0].outcome,
+  "fail",
+  "Recall must also meet its explicit criterion",
+);
+assert.equal(
+  evaluate(
+    run("Binary classification", ["performance"], { minimumRecall: 0.5 }),
+    binary,
+  )[0].outcome,
+  "pass",
+);
+assert.throws(
+  () =>
+    evaluate(
+      run("Binary classification", ["performance"], {
+        predictionColumn: "actual",
+      }),
+      binary,
+    ),
+  /distinct/,
+);
+assert.throws(
+  () => evaluate(run("Binary classification", ["demographic_parity"]), binary),
+  /missing/,
+);
+assert.equal(
+  evaluate(run(), "actual,predicted\n0,0\n0,1")[0].outcome,
+  "inconclusive",
+  "No actual positives cannot pass accuracy",
+);
+assert.throws(() => evaluate(run(), "actual,predicted\n1,\n0,0"), /missing/);
+const multi = evaluate(
+  run("Multiclass classification"),
+  "actual,predicted\nA,A\nA,B\nB,B\nC,C",
+)[0];
+assert.equal(multi.metrics[0].value, 0.75);
+assert(Math.abs(multi.metrics[1].value - 7 / 9) < 1e-12);
+assert.equal(multi.outcome, "pass");
+assert.equal(
+  evaluate(run("Multiclass classification"), "actual,predicted\nA,A\nA,B")[0]
+    .outcome,
+  "inconclusive",
+);
+const reg = evaluate(
+  run("Regression", ["regression"]),
+  "actual,predicted\n1,2\n2,2\n3,4",
+)[0];
+assert.equal(reg.metrics[0].value, 2 / 3);
+assert(Math.abs(reg.metrics[1].value - Math.sqrt(2 / 3)) < 1e-12);
+assert.equal(reg.metrics[2].value, 0);
+assert.equal(reg.outcome, "pass");
+assert.equal(
+  evaluate(
+    run("Regression", ["regression"], { maximumRmse: 0.5 }),
+    "actual,predicted\n1,2\n2,2\n3,4",
+  )[0].outcome,
+  "fail",
+);
+assert.equal(
+  evaluate(run("Regression", ["regression"]), "actual,predicted\n2,2\n2,3")[0]
+    .metrics[2].value,
+  null,
+);
+assert.equal(
+  evaluate(run("Regression", ["regression"]), "actual,predicted\n1,3\n2,3")[0]
+    .metrics[2].value,
+  -9,
+);
+assert.throws(
+  () =>
+    evaluate(run("Regression", ["regression"]), "actual,predicted\n1,NaN\n2,3"),
+  /finite/,
+);
+assert.throws(
+  () =>
+    evaluate(
+      run("Regression", ["regression"]),
+      "actual,predicted\n1,1e101\n2,3",
+    ),
+  /finite/,
+);
+assert.throws(
+  () =>
+    evaluate(
+      run("Regression", ["regression"]),
+      "actual,predicted\n0x10,2\n2,3",
+    ),
+  /decimal/,
+);
+assert.throws(
+  () => assertSuite("Regression", ["demographic_parity"]),
+  /not available/,
+);
+assert.throws(
+  () => assertSuite("Classical NLP", ["performance"]),
+  /not available/,
+);
+assert.throws(() => parseCSV("actual,actual\n1,2"), /unique/);
+assert.throws(() => parseCSV("a,b\n1"), /mismatch/);
+assert.throws(() => parseCSV('a,b\n"1,2'), /Unclosed/);
+assert.throws(() => parseCSV('a,b\n"1"x,2'), /Unexpected/);
+assert.equal(parseCSV('a,b\n"a""b",2')[0].a, 'a"b');
+const inspection = inspectCSV(
+  '\uFEFFactual,predicted,note\r\n1,1,"comma, quote"\r\n0,0,',
+);
+assert.equal(inspection.rowCount, 2);
+assert.equal(inspection.columns[2].missing, 1);
+const groups = "actual,predicted,group\n1,1,A\n0,0,A\n1,0,B\n0,1,B";
+const fair = evaluate(
+  run("Binary classification", ["demographic_parity", "equalized_odds"], {
+    groupColumn: "group",
+    minimumGroupSize: 2,
+    maximumOddsGap: 0.2,
+  }),
+  groups,
+);
+assert.equal(fair[0].outcome, "pass");
+assert.equal(fair[1].outcome, "fail");
+assert.equal(
+  evaluate(
+    run("Binary classification", ["equalized_odds"], {
+      groupColumn: "group",
+      minimumClassCount: 2,
+    }),
+    groups,
+  )[0].outcome,
+  "inconclusive",
+);
+assert.equal(
+  evaluate(
+    run("Binary classification", ["demographic_parity"], {
+      groupColumn: "group",
+      minimumSampleSize: 5,
+    }),
+    groups,
+  )[0].outcome,
+  "inconclusive",
+);
+const boundary =
+  "actual,predicted,group\n" +
+  Array.from({ length: 20 }, (_, i) => `1,${i < 11 ? "1" : "0"},A`).join("\n") +
+  "\n" +
+  Array.from({ length: 20 }, (_, i) => `1,${i < 9 ? "1" : "0"},B`).join("\n");
+assert.equal(
+  evaluate(
+    run("Binary classification", ["demographic_parity"], {
+      groupColumn: "group",
+      maximumParityGap: 0.1,
+    }),
+    boundary,
+  )[0].outcome,
+  "pass",
+  "An exact .1 gap must pass an inclusive .1 criterion despite binary floating-point noise",
+);
+assert.equal(
+  evaluate(
+    run("Binary classification", ["demographic_parity"], {
+      groupColumn: "group",
+      maximumParityGap: 0.099,
+    }),
+    boundary,
+  )[0].outcome,
+  "fail",
+);
+const extreme = evaluate(
+  run("Regression", ["regression"]),
+  "actual,predicted\n1e-100,1e100\n-1e-100,1e100",
+)[0];
+assert.equal(extreme.metrics[2].value, null);
+assert(extreme.limitations.some((l) => l.includes("numeric range")));
+assert(
+  extreme.metrics.every((m) => m.value === null || Number.isFinite(m.value)),
+);
+console.log(
+  "PASS binary criteria and missing-class safeguards; multiclass/regression numerics; fair group/class denominators; strict mappings and bounded CSV preflight",
+);

@@ -39,33 +39,46 @@ Every report is a fixed snapshot. Final issuance requires signed required/exclud
 
 ## Run locally
 
-Node >=22.13.0. Install using the supplied lockfile: `npm run install:ci`. Generate/build the Worker with `npm run build`; apply pending local D1 migrations in order using the starter's instructions in `site-app/README.md`. Start `npm run dev` and use the loopback Sign in with ChatGPT simulation. Hosting uses dispatch-owned identity, not the local mock.
-
-This machine's npm shell shim required invoking the installed npm CLI directly; normal npm works on a correctly configured development host.
+Node >=22.13.0 (CI uses Node 22) and Python 3.11. Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations in order (every file in `site-app/drizzle/`; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. Hosting uses dispatch-owned identity, not the local mock. `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
 
 ```powershell
 cd site-app
-npm run install:ci
+npm ci
 npm run build
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_sour_tana_nile.sql
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_immutable_history.sql
+# ...repeat for each later migration in drizzle/, in order
 npm run dev
 ```
 
 Apply each migration once; do not replay already-applied migrations. Hosting applies production migrations separately.
 
+### Checks
+
+CI (`.github/workflows/ci.yml`) runs two jobs on every pull request and on pushes to `main`. In `site-app/`, `npm run check` runs the same steps as the `web` job, in order:
+
+| Command | What it does |
+|---|---|
+| `npm run format:check` | Verify Prettier formatting (`npm run format` applies it) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint; any warning fails |
+| `npm test` | Vitest unit tests (`lib/**/*.test.ts`) |
+| `npm run build` | Production Worker build; must stay warning-free |
+| `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
+
+The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs.
+
+The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
+
 ```powershell
-# From repository root
+python -m pip install -r engine/requirements-dev.txt
 python -m unittest discover -s engine/tests -v
-python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-report.json
-# The CLI refuses to overwrite an existing output.
-cd site-app
-node node_modules/typescript/bin/tsc --noEmit
-npm run build
-node scripts/integration-check.mjs
+node schemas/validate-run-schema.mjs
+node schemas/validate-procedure-schema.mjs
 ```
 
-The integration harness provisions an ephemeral local Miniflare database/object store. Fictional fixture identity headers are injected directly into the local Worker only; the harness refuses non-loopback URLs and does not exercise Sites' real authentication dispatcher.
+Run the diagnostics CLI with `python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-report.json`; it refuses to overwrite an existing output.
+
+`site-app/package-lock.json` is maintained with npm 11. Change dependencies with `npx npm@11 install …`: npm 10 (bundled with Node 22) rewrites unrelated lockfile entries.
 
 ## Current legal snapshot
 
