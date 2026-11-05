@@ -39,13 +39,13 @@
       "ai_office": "The AI Office (part of the Commission)."
     },
     "factVocabulary": {
-      "firstPlacedOnMarketOrPutIntoServiceDate": "date | unknown. Earliest date on which the AI system was placed on the Union market or put into service.",
-      "placedOnMarketDate": "date | unknown. Date the AI system was first placed on the Union market.",
+      "firstPlacedOnMarketOrPutIntoServiceDate": "date | unknown. Date on which the first unit of the system's type and model was placed on the Union market or put into service. Recital (39) of Regulation (EU) 2026/1744 makes this the decisive date for the Art 111(2) grace period; the Art 111(1) entry uses the same fact.",
+      "placedOnMarketDate": "date | unknown. Date on which the AI system was first placed on the Union market. Art 111(4) uses it; how a system that was only put into service is treated is LR-04.",
       "gpaiModelPlacedOnMarketDate": "date | unknown. Date the general-purpose AI model was first placed on the Union market.",
       "generatesSyntheticContent": "boolean | unknown. The AI system (including a general-purpose AI system) generates synthetic audio, image, video or text content.",
-      "highRiskRoute": "annex_iii | annex_i_section_a | annex_i_section_b | not_high_risk | unknown.",
+      "highRiskRoute": "annex_iii | annex_i_section_a | annex_i_section_b | not_high_risk | unknown. Classification route under Art 6, derived from the reviewed classification route (annexRoute in site-app/lib/domain.ts; mapping in RD-27).",
       "significantDesignChangeOnOrAfterChapterIIIDate": "boolean | unknown. The system has been subject to significant changes in its design on or after the Chapter III application date for its route.",
-      "intendedForUseByPublicAuthorities": "boolean | unknown.",
+      "intendedForUseByPublicAuthorities": "boolean | unknown. The high-risk AI system is intended to be used by public authorities (Art 111(2), second sentence).",
       "annexXLargeScaleItComponent": "boolean | unknown. Component of a large-scale IT system established by the legal acts listed in Annex X."
     },
     "predicateOperators": {
@@ -54,7 +54,8 @@
       "before": "date fact is strictly earlier than value",
       "onOrAfter": "date fact is on or after value"
     },
-    "predicateRule": "Predicates select candidate rules only. A required fact that is unknown yields needs_information, never a pass or a not-applicable decision. Applicability remains a reviewed human decision."
+    "predicateRule": "Predicates select candidate rules only. Each predicate list is a conjunction evaluated in three-valued logic: false if any predicate is false, true if all are true, otherwise unknown. An entry or transitional record is a candidate when appliesIf is true (an absent list counts as true) and exceptIf is false (an absent list counts as false). An unknown result yields needs_information, never a pass or a not-applicable decision. obligationsApplyOnlyIf states when the obligations reach a legacy system. Applicability remains a reviewed human decision.",
+    "crossReferenceRule": "A transitional record with entryId restates the standalone applicationDates or authorityDeadlines entry it names and carries the same deadline and predicates. List the rule once, under that entry, and show the record as a cross-reference. In prohibitedPractices, entryId names the applicationDates entry that dates the point."
   },
   "legalText": {
     "baseAct": {
@@ -234,7 +235,7 @@
       "kind": "commission",
       "accessUrl": "https://digital-strategy.ec.europa.eu/en/policies/ai-act-standardisation",
       "retrievedOn": "2026-11-05",
-      "notes": "Last update 19 October 2026. prEN 18286 entered public enquiry on 30 October 2025; standardisation request C(2025) 3871; ten standardisation areas. No status for the other drafts."
+      "notes": "Last update 19 October 2026. prEN 18286 entered public enquiry on 30 October 2025; the standard was published in the OJ by Implementing Decision (EU) 2026/2274 and is designed to help providers meet Article 17; standardisation request C(2025) 3871; ten standardisation areas. No status for the other drafts."
     },
     {
       "id": "SRC-EC-DRAFT-HR-GUIDELINES",
@@ -271,7 +272,7 @@
       "canonicalUrl": "https://standards.cencenelec.eu/dyn/www/f?p=205:22:0::::FSP_ORG_ID,FSP_LANG_ID:2916257,25",
       "retrievedVia": "Read in a browser on 2026-11-05 by navigating from https://standards.cencenelec.eu/ords/f?p=CEN:6 to CEN/CLC/JTC 21 > Work programme. The canonical deep link returned HTTP 500 to automated requests and needs a session checksum.",
       "retrievedOn": "2026-11-05",
-      "notes": "CEN publishes stages and dates, not enquiry vote results. 'Under Approval' covers the stages after an enquiry closes and does not imply a positive enquiry result."
+      "notes": "CEN publishes stages and dates, not enquiry vote results. The status labels (Under Drafting, Under Enquiry, Under Approval) are CEN's own and are reproduced without interpretation."
     },
     {
       "id": "SRC-CEN-JTC21-PUBLISHED",
@@ -385,6 +386,15 @@
       "accessUrl": "https://kla.digital/blog/jtc-21-standards-tracker",
       "retrievedOn": "2026-11-05",
       "notes": "Enquiry outcomes come from AI Standardisation Watch edition 16 (https://krogrules.com/news/edition-16-september-2026, not fetched) and are reported, not official."
+    },
+    {
+      "id": "SEC-REGULATIONSAI-ART6",
+      "title": "EU AI Act High-Risk Classification Guidelines (tracker entry RAI-EU-NA-CLASSIF-2026)",
+      "publisher": "Regulations.ai (third-party tracker), as of 7 Sep 2026",
+      "kind": "secondary",
+      "accessUrl": "https://regulations.ai/regulations/RAI-EU-NA-CLASSIF-2026",
+      "retrievedOn": "2026-11-05",
+      "notes": "Says the guidelines remain a draft and that final adoption is expected by the end of 2026. Cites no source for that date: its listed sources are the Commission consultation page, the Service Desk page and Art 6. The footer says the page was created on 27 May 2026 and reviewed against official sources on 7 Sep 2026 with AI tools. Cited only by UV-03."
     }
   ],
   "applicationDates": [
@@ -437,6 +447,7 @@
           "reference": "Art 111(3)",
           "rule": "Providers of GPAI models placed on the market before 2 Aug 2025 must take the necessary steps to comply by 2 Aug 2027.",
           "deadline": "2027-08-02",
+          "entryId": "aia-2027-08-02-gpai-legacy-models",
           "appliesIf": [{"fact": "gpaiModelPlacedOnMarketDate", "op": "before", "value": "2025-08-02"}]
         }
       ],
@@ -521,6 +532,7 @@
           "reference": "Art 111(4)",
           "rule": "Providers of AI systems, including general-purpose AI systems, generating synthetic audio, image, video or text content that were placed on the market before 2 Aug 2026 must take the necessary steps to comply with Art 50(2) by 2 Dec 2026. Only Art 50(2) is transitioned.",
           "deadline": "2026-12-02",
+          "entryId": "aia-2026-12-02-art50-2-legacy-transition",
           "appliesIf": [
             {"fact": "generatesSyntheticContent", "op": "eq", "value": true},
             {"fact": "placedOnMarketDate", "op": "before", "value": "2026-08-02"}
@@ -642,22 +654,41 @@
       "transitional": [
         {
           "reference": "Art 111(2), first sentence, as replaced",
-          "rule": "For high-risk systems placed on the market or put into service before the date of application of Chapter III, the Regulation applies to their operators only if, as from that date, the systems are subject to significant changes in their designs. Without prejudice to Art 5. The original text used the fixed date 2 Aug 2026.",
+          "rule": "For high-risk systems, other than the Art 111(1) systems, placed on the market or put into service before the date of application of Chapter III (2 Dec 2027 for Annex III), the Regulation applies to their operators only if, as from that date, the systems are subject to significant changes in their designs. Recital (39) of Regulation (EU) 2026/1744: the grace period attaches to the type and model, and the decisive date is when its first unit was placed on the market or put into service. Without prejudice to Art 5. The original text used the fixed date 2 Aug 2026.",
           "appliesIf": [
             {"fact": "highRiskRoute", "op": "eq", "value": "annex_iii"},
             {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-12-02"}
+          ],
+          "exceptIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
           ],
           "obligationsApplyOnlyIf": [{"fact": "significantDesignChangeOnOrAfterChapterIIIDate", "op": "eq", "value": true}]
         },
         {
           "reference": "Art 111(2), second sentence",
-          "rule": "In any case, providers and deployers of high-risk AI systems intended to be used by public authorities must take the necessary steps to comply by 2 Aug 2030.",
-          "deadline": "2030-08-02"
+          "rule": "In any case, providers and deployers of these legacy high-risk systems that are intended to be used by public authorities must take the necessary steps to comply by 2 Aug 2030, whether or not the design changes.",
+          "deadline": "2030-08-02",
+          "entryId": "aia-2030-08-02-public-authority-legacy-annex-iii",
+          "appliesIf": [
+            {"fact": "highRiskRoute", "op": "eq", "value": "annex_iii"},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-12-02"},
+            {"fact": "intendedForUseByPublicAuthorities", "op": "eq", "value": true}
+          ],
+          "exceptIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+          ]
         },
         {
           "reference": "Art 111(1)",
-          "rule": "Components of the large-scale IT systems listed in Annex X placed on the market or put into service before 2 Aug 2027 must be brought into compliance by 31 Dec 2030.",
-          "deadline": "2030-12-31"
+          "rule": "Components of the large-scale IT systems listed in Annex X placed on the market or put into service before 2 Aug 2027 must be brought into compliance by 31 Dec 2030. Art 111(2) covers high-risk systems other than these.",
+          "deadline": "2030-12-31",
+          "entryId": "aia-2030-12-31-annex-x-large-scale-it",
+          "appliesIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+          ]
         }
       ],
       "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689", "SRC-AISD-TIMELINE"],
@@ -680,21 +711,52 @@
       "transitional": [
         {
           "reference": "Art 111(2), first sentence, as replaced",
-          "rule": "Legacy rule as for Annex III, with the Annex I date as the Chapter III application date.",
+          "rule": "For high-risk systems, other than the Art 111(1) systems, placed on the market or put into service before the date of application of Chapter III (2 Aug 2028 for Annex I), the Regulation applies to their operators only if, as from that date, the systems are subject to significant changes in their designs. Recital (39) of Regulation (EU) 2026/1744: the grace period attaches to the type and model, and the decisive date is when its first unit was placed on the market or put into service. Without prejudice to Art 5. The original text used the fixed date 2 Aug 2026.",
           "appliesIf": [
             {"fact": "highRiskRoute", "op": "in", "value": ["annex_i_section_a", "annex_i_section_b"]},
             {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2028-08-02"}
           ],
+          "exceptIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+          ],
           "obligationsApplyOnlyIf": [{"fact": "significantDesignChangeOnOrAfterChapterIIIDate", "op": "eq", "value": true}]
         },
         {
+          "reference": "Art 111(2), second sentence",
+          "rule": "In any case, providers and deployers of these legacy high-risk systems that are intended to be used by public authorities must take the necessary steps to comply by 2 Aug 2030, whether or not the design changes.",
+          "deadline": "2030-08-02",
+          "entryId": "aia-2030-08-02-public-authority-legacy-annex-i",
+          "appliesIf": [
+            {"fact": "highRiskRoute", "op": "in", "value": ["annex_i_section_a", "annex_i_section_b"]},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2028-08-02"},
+            {"fact": "intendedForUseByPublicAuthorities", "op": "eq", "value": true}
+          ],
+          "exceptIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+          ]
+        },
+        {
+          "reference": "Art 111(1)",
+          "rule": "Components of the large-scale IT systems listed in Annex X placed on the market or put into service before 2 Aug 2027 must be brought into compliance by 31 Dec 2030. Art 111(2) covers high-risk systems other than these.",
+          "deadline": "2030-12-31",
+          "entryId": "aia-2030-12-31-annex-x-large-scale-it",
+          "appliesIf": [
+            {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+            {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+          ]
+        },
+        {
           "reference": "Art 2(13)",
-          "rule": "For Art 6(1) systems, specific requirements in Arts 9 to 15 and 17 to 25 may be limited where Annex I Section A legislation gives equivalent or higher protection; the Commission must adopt delegated acts specifying this by 2 Aug 2027."
+          "rule": "For Art 6(1) systems, specific requirements in Arts 9 to 15 and 17 to 25 may be limited where Annex I Section A legislation gives equivalent or higher protection; the Commission must adopt delegated acts specifying this by 2 Aug 2027.",
+          "entryId": "aia-auth-2027-08-02-art2-13-delegated-acts"
         },
         {
           "reference": "Art 43(3) as replaced",
           "rule": "Notified bodies notified under Annex I Section A legislation must apply for designation under the AI Act by 28 Jan 2028.",
-          "deadline": "2028-01-28"
+          "deadline": "2028-01-28",
+          "entryId": "aia-auth-2028-01-28-art43-3-notified-bodies"
         }
       ],
       "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689", "SRC-AISD-TIMELINE"],
@@ -702,21 +764,56 @@
       "legalReview": {"required": true, "itemIds": ["LR-03", "LR-09", "LR-10"]}
     },
     {
-      "id": "aia-2030-08-02-public-authority-legacy-high-risk",
+      "id": "aia-2030-08-02-public-authority-legacy-annex-iii",
       "date": "2030-08-02",
       "dateType": "compliance_deadline",
       "provisions": ["Art 111(2), second sentence"],
-      "scope": "High-risk AI systems intended to be used by public authorities and placed on the market or put into service before the Chapter III date",
+      "scope": "Annex III high-risk AI systems intended to be used by public authorities whose type and model was first placed on the market or put into service before 2 Dec 2027 (the Annex III date of application of Chapter III), other than the Art 111(1) systems",
       "actors": ["provider", "deployer"],
-      "summary": "Providers and deployers of high-risk AI systems intended to be used by public authorities must take the necessary steps to comply with the Regulation's requirements and obligations by 2 Aug 2030, whether or not the systems undergo significant design changes.",
+      "summary": "Providers and deployers of these legacy systems must take the necessary steps to comply with the Regulation's requirements and obligations by 2 Aug 2030, whether or not the systems undergo significant design changes. A significant design change from 2 Dec 2027 brings the obligations forward to the date of the change (first sentence). A system first placed on the market or put into service on or after 2 Dec 2027 is not a legacy system: the Regulation applies to it from that point, so this deadline does not concern it.",
       "appliesIf": [
-        {"fact": "highRiskRoute", "op": "in", "value": ["annex_iii", "annex_i_section_a", "annex_i_section_b"]},
+        {"fact": "highRiskRoute", "op": "eq", "value": "annex_iii"},
+        {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-12-02"},
         {"fact": "intendedForUseByPublicAuthorities", "op": "eq", "value": true}
       ],
-      "legalBasis": {"reference": "Art 111(2), second sentence", "amendedBy": "Paragraph 2 replaced by Regulation (EU) 2026/1744, Art 1, point (39)(a); the 2 Aug 2030 date is unchanged."},
-      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
+      "exceptIf": [
+        {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+        {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+      ],
+      "legalBasis": {
+        "reference": "Art 111(2), second sentence, read with Art 113, third paragraph, point (c)(i)",
+        "amendedBy": "Paragraph 2 replaced by Regulation (EU) 2026/1744, Art 1, point (39)(a): the cut-off is now the Chapter III date for the route; the 2 Aug 2030 date is unchanged."
+      },
+      "notes": "exceptIf leaves out the Art 111(1) systems (Annex X components placed on the market or put into service before 2 Aug 2027): Art 111(2) covers high-risk systems 'other than the systems referred to in paragraph 1', and recital (177) of Regulation (EU) 2024/1689 gives the two groups their deadlines 'respectively'. Whether the second sentence carries that exclusion is part of LR-03.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"},
       "legalReview": {"required": true, "itemIds": ["LR-03"]}
+    },
+    {
+      "id": "aia-2030-08-02-public-authority-legacy-annex-i",
+      "date": "2030-08-02",
+      "dateType": "compliance_deadline",
+      "provisions": ["Art 111(2), second sentence"],
+      "scope": "Annex I high-risk AI systems intended to be used by public authorities whose type and model was first placed on the market or put into service before 2 Aug 2028 (the Annex I date of application of Chapter III), other than the Art 111(1) systems",
+      "actors": ["provider", "deployer"],
+      "summary": "Providers and deployers of these legacy systems must take the necessary steps to comply with the Regulation's requirements and obligations by 2 Aug 2030, whether or not the systems undergo significant design changes. A significant design change from 2 Aug 2028 brings the obligations forward to the date of the change (first sentence). A system first placed on the market or put into service on or after 2 Aug 2028 is not a legacy system: the Regulation applies to it from that point, so this deadline does not concern it.",
+      "appliesIf": [
+        {"fact": "highRiskRoute", "op": "in", "value": ["annex_i_section_a", "annex_i_section_b"]},
+        {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2028-08-02"},
+        {"fact": "intendedForUseByPublicAuthorities", "op": "eq", "value": true}
+      ],
+      "exceptIf": [
+        {"fact": "annexXLargeScaleItComponent", "op": "eq", "value": true},
+        {"fact": "firstPlacedOnMarketOrPutIntoServiceDate", "op": "before", "value": "2027-08-02"}
+      ],
+      "legalBasis": {
+        "reference": "Art 111(2), second sentence, read with Art 113, third paragraph, point (c)(ii)",
+        "amendedBy": "Paragraph 2 replaced by Regulation (EU) 2026/1744, Art 1, point (39)(a): the cut-off is now the Chapter III date for the route; the 2 Aug 2030 date is unchanged."
+      },
+      "notes": "exceptIf leaves out the Art 111(1) systems, as for Annex III (LR-03). For Annex I Section B products only Art 6(1), Art 60a and Arts 102 to 112 apply (Art 2(2)), so what this deadline requires of them is part of LR-10.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
+      "verification": {"status": "verified", "verifiedOn": "2026-11-05"},
+      "legalReview": {"required": true, "itemIds": ["LR-03", "LR-10"]}
     },
     {
       "id": "aia-2030-12-31-annex-x-large-scale-it",
@@ -793,16 +890,16 @@
     }
   ],
   "prohibitedPractices": [
-    {"point": "Art 5(1)(a)", "label": "Subliminal, purposefully manipulative or deceptive techniques that materially distort behaviour and cause or are likely to cause significant harm", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(b)", "label": "Exploitation of vulnerabilities due to age, disability or a specific social or economic situation", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(ba)", "label": "Generation or manipulation of realistic intimate or sexually explicit material of an identifiable person without explicit consent", "appliesFrom": "2026-12-02", "conditions": ["Art 5(1a)", "Art 5(1b)"]},
-    {"point": "Art 5(1)(bb)", "label": "Generation or manipulation of child sexual abuse material (Directive 2011/93/EU, Art 2(c) and (e)), unless a 'without right' defence applies under national law", "appliesFrom": "2026-12-02", "conditions": ["Art 5(1a)"]},
-    {"point": "Art 5(1)(c)", "label": "Social scoring leading to detrimental or unfavourable treatment", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(d)", "label": "Risk assessment of individuals to predict criminal offences based solely on profiling or personality traits", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(e)", "label": "Creating or expanding facial recognition databases through untargeted scraping", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(f)", "label": "Emotion inference in the workplace and education institutions, except for medical or safety reasons", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(g)", "label": "Biometric categorisation to deduce or infer race, political opinions, trade union membership, religious or philosophical beliefs, sex life or sexual orientation", "appliesFrom": "2025-02-02"},
-    {"point": "Art 5(1)(h)", "label": "Use of real-time remote biometric identification in publicly accessible spaces for law enforcement, except for the listed objectives and subject to Art 5(2) to (7)", "appliesFrom": "2025-02-02"}
+    {"point": "Art 5(1)(a)", "label": "Subliminal, purposefully manipulative or deceptive techniques that materially distort behaviour and cause or are likely to cause significant harm", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(b)", "label": "Exploitation of vulnerabilities due to age, disability or a specific social or economic situation", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(ba)", "label": "Generation or manipulation of realistic intimate or sexually explicit material of an identifiable person without explicit consent", "appliesFrom": "2026-12-02", "conditions": ["Art 5(1a)", "Art 5(1b)"], "entryId": "aia-2026-12-02-art5-new-prohibitions", "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(bb)", "label": "Generation or manipulation of child sexual abuse material (Directive 2011/93/EU, Art 2(c) and (e)), unless a 'without right' defence applies under national law", "appliesFrom": "2026-12-02", "conditions": ["Art 5(1a)"], "entryId": "aia-2026-12-02-art5-new-prohibitions", "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(c)", "label": "Social scoring leading to detrimental or unfavourable treatment", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(d)", "label": "Risk assessment of individuals to predict criminal offences based solely on profiling or personality traits", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(e)", "label": "Creating or expanding facial recognition databases through untargeted scraping", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(f)", "label": "Emotion inference in the workplace and education institutions, except for medical or safety reasons", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(g)", "label": "Biometric categorisation to deduce or infer race, political opinions, trade union membership, religious or philosophical beliefs, sex life or sexual orientation", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}},
+    {"point": "Art 5(1)(h)", "label": "Use of real-time remote biometric identification in publicly accessible spaces for law enforcement, except for the listed objectives and subject to Art 5(2) to (7)", "appliesFrom": "2025-02-02", "entryId": "aia-2025-02-02-prohibitions", "sourceIds": ["SRC-OJ-2024-1689", "SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "verification": {"status": "verified", "verifiedOn": "2026-11-05"}}
   ],
   "provisionReferences": [
     {
@@ -810,6 +907,7 @@
       "change": "inserted",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (7)(a)",
       "appliesFrom": "2026-12-02",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -817,6 +915,7 @@
       "change": "inserted",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (7)(b)",
       "appliesFrom": "2026-12-02",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -824,6 +923,7 @@
       "change": "replaced",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (39)(a)",
       "effect": "Legacy cut-off moves from the fixed date 2 Aug 2026 to the date of application of Chapter III referred to in Art 113; the public-authority deadline of 2 Aug 2030 is unchanged.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -831,6 +931,7 @@
       "change": "added",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (39)(b)",
       "effect": "Art 50(2) transition to 2 Dec 2026 for generative systems placed on the market before 2 Aug 2026.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -838,6 +939,7 @@
       "change": "replaced",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(a)",
       "effect": "Chapters I and II from 2 Feb 2025, except Art 5(1)(ba) and (bb) and Art 5(1a) and (1b), which apply from 2 Dec 2026.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -845,6 +947,7 @@
       "change": "replaced",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(b)",
       "effect": "Chapter III Sections 1 to 3, except Art 6(5), apply from (i) 2 Dec 2027 for Art 6(2)/Annex III systems and (ii) 2 Aug 2028 for Art 6(1)/Annex I systems. Previously Art 6(1) and corresponding obligations from 2 Aug 2027, the rest of Chapter III (other than Section 4) from 2 Aug 2026.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -852,6 +955,7 @@
       "change": "added",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(c)",
       "effect": "Arts 102 to 110 apply from 27 Jul 2026.",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -859,6 +963,7 @@
       "change": "unchanged",
       "amendingProvision": null,
       "effect": "General application 2 Aug 2026; Chapter III Section 4, Chapter V, Chapter VII, Chapter XII and Art 78 from 2 Aug 2025, except Art 101.",
+      "sourceIds": ["SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
@@ -866,6 +971,15 @@
       "change": "Art 6(4) unchanged; Annex VIII Section B points 7 and 9 deleted",
       "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (42)",
       "effect": "A provider relying on the Art 6(3) derogation still documents its assessment and registers under Art 49(2); the registration no longer asks for the summary of grounds (point 7) or the Member States concerned (point 9).",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2024-1689"],
+      "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
+    },
+    {
+      "provision": "Art 40(2), fourth subparagraph",
+      "change": "added",
+      "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (17)",
+      "effect": "The Commission must request, without undue delay, standardisation deliverables (including harmonised standards, as appropriate) that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and with the relevant requirements and obligations of the Annex I legislation (recital (21)). Art 40(1), which sets the presumption and refers to Section 2 requirements and Chapter V obligations, is unchanged (LR-01).",
+      "sourceIds": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     }
   ],
@@ -925,7 +1039,7 @@
         "standardisationRequest": "Commission Implementing Decision C(2025) 3871 of 23 June 2025, Annex I point 9 (quality management systems for providers, including post-market monitoring processes)"
       },
       "presumptionOfConformity": {
-        "statutoryBasis": "Art 40(1): systems in conformity with cited harmonised standards are presumed to conform with the requirements of Chapter III Section 2 (Arts 8 to 15) or, as applicable, the obligations of Chapter V Sections 2 and 3, to the extent the standards cover them. Art 17 is in Chapter III Section 3.",
+        "statutoryBasis": "Art 40(1), unchanged: systems in conformity with cited harmonised standards are presumed to conform with the requirements of Chapter III Section 2 (Arts 8 to 15) or, as applicable, the obligations of Chapter V Sections 2 and 3, to the extent the standards cover them. Art 17 is in Chapter III Section 3. Art 40(2), fourth subparagraph, added by Regulation (EU) 2026/1744, Art 1, point (17): the Commission must request standardisation deliverables, including harmonised standards as appropriate, that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and with the relevant requirements and obligations of the Annex I legislation (recital (21)). That subparagraph governs standardisation requests and does not amend Art 40(1). EN 18286 was requested earlier, under C(2025) 3871 of 23 June 2025. Recital (1) of Implementing Decision (EU) 2026/2274 summarises Art 40 as a presumption for the requirements the standards cover, without the Section 2 limit.",
         "officialDescription": "Commission (19 Oct 2026, updated 21 Oct 2026): presumption of conformity with the Article 17 requirements covered by the standard; the only AI QMS standard with a presumption. CEN-CENELEC (15 Oct 2026): presumption of conformity with the corresponding provisions of the AI Act.",
         "clauseScope": {
           "claim": "Annex ZA (Table ZA.1) links the standard to Art 17(1) (first sentence, the documentation requirement and points (a) to (m)) and to the first sentence of Art 11(1). Art 17(2), (3) and (4) are not covered.",
@@ -937,7 +1051,7 @@
         "applicableFrom": "The presumption runs from OJ publication (14 Oct 2026, recital (6) of the Decision); Art 17 itself applies from 2 Dec 2027 (Annex III) or 2 Aug 2028 (Annex I)."
       },
       "relationToOtherStandards": "Designed to sit on top of ISO/IEC 42001, ISO 9001 or ISO 13485 rather than replace them (Commission news item).",
-      "sourceIds": ["SRC-OJ-DEC-2026-2274", "SRC-CEN-JTC21-PUBLISHED", "SRC-EC-NEWS-EN18286", "SRC-CEN-NEWS-EN18286-OJEU", "SRC-CEN-NEWS-EN18286-PUBLISHED", "SRC-CELLAR-SPARQL"],
+      "sourceIds": ["SRC-OJ-DEC-2026-2274", "SRC-CONS-2024-1689-20260727", "SRC-OJ-2026-1744", "SRC-CEN-JTC21-PUBLISHED", "SRC-EC-NEWS-EN18286", "SRC-EC-STANDARDISATION", "SRC-CEN-NEWS-EN18286-OJEU", "SRC-CEN-NEWS-EN18286-PUBLISHED", "SRC-CELLAR-SPARQL"],
       "verification": {"status": "verified", "verifiedOn": "2026-11-05", "except": "clauseScope is secondary_only"},
       "legalReview": {"required": true, "itemIds": ["LR-01"]}
     },
@@ -1128,13 +1242,17 @@
       "status": "draft",
       "statutoryDeadline": "2026-02-02",
       "draftPublished": "2026-05-19",
-      "consultation": {"originalDeadline": "2026-06-23", "extendedDeadline": "2026-07-23"},
+      "consultation": {
+        "newsItemDeadline": "2026-06-23",
+        "serviceDeskDeadline": "2026-07-23",
+        "note": "The Commission news item of 19 May 2026 gives 23 June 2026; the Service Desk page gives 23 July 2026. No official page says the deadline was extended; the later date suggests that it was."
+      },
       "lastUpdated": "2026-07-23",
       "finalAdoption": "No adopted version found on the Commission pages checked on 2026-11-05; the Service Desk says formal adoption follows the consultation.",
-      "expectedFinal": {"text": "End of 2026", "status": "secondary_only", "note": "Seen only in a search snippet of a third-party tracker (regulations.ai, September 2026); not fetched."},
+      "expectedFinal": {"date": null, "note": "No Commission page checked on 2026-11-05 gives a date for formal adoption. A third-party tracker's expectation of end-2026 has no stated source and is recorded only as UV-03."},
       "platformUse": "Cite the draft in classification rationales, label it as a draft, and raise a re-review task when the final version is adopted.",
       "sourceIds": ["SRC-EC-DRAFT-HR-GUIDELINES", "SRC-EC-NEWS-HR-CONSULTATION", "SRC-AISD-HR-GUIDELINES", "SRC-CONS-2024-1689-20260727"],
-      "verification": {"status": "verified", "verifiedOn": "2026-11-05", "except": "expectedFinal is secondary_only"}
+      "verification": {"status": "verified", "verifiedOn": "2026-11-05"}
     },
     {
       "id": "GUID-ART50-TRANSPARENCY",
@@ -1172,7 +1290,7 @@
     {"id": "RD-04", "file": "templates/catalog.json", "location": "/regulatorySnapshot/amendingRegulation", "current": "(EU) 2026/1744", "finding": "incomplete", "change": "Add OJ reference 'OJ L, 2026/1744, 24.7.2026', adoption 2026-07-08, entry into force 2026-07-27, ELI, and that it also amends Regulations (EU) 2018/1139 and 2023/1230.", "basis": ["legalText.amendingActs"], "beforeDec2": false},
     {"id": "RD-05", "file": "templates/catalog.json", "location": "/regulatorySnapshot/authenticAmendmentUrl", "current": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744", "finding": "incomplete", "change": "Keep for readers; add the ELI http://data.europa.eu/eli/reg/2026/1744/oj as the canonical identifier. Use https://publications.europa.eu/resource/celex/32026R1744 for automated source checks because EUR-Lex challenges automated clients.", "basis": ["SRC-OJ-2026-1744"], "beforeDec2": false},
     {"id": "RD-06", "file": "templates/catalog.json", "location": "/regulatorySnapshot/officialTextUrl", "current": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727", "finding": "imprecise", "change": "The URL is the consolidated text, which states it has no legal effect. Label it as the consolidated documentation text (for example consolidatedTextUrl with legalEffect none) so the UI does not present it as the official text.", "basis": ["legalText.consolidatedVersion"], "beforeDec2": false},
-    {"id": "RD-07", "file": "templates/catalog.json", "location": "/regulatorySnapshot/applicationDates", "current": "Three entries: 2027-12-02, 2028-08-02, 2026-08-02", "finding": "incomplete", "change": "Replace with the per-provision entries in applicationDates (2025-02-02 x2, 2025-08-02 x2, 2026-07-27 x2, 2026-08-02 x5, 2026-12-02 x2, 2027-08-02, 2027-12-02, 2028-08-02, 2030-08-02, 2030-12-31), each with legal basis, sourceIds, verifiedOn, legalReview and the approval metadata #18 adds.", "basis": ["applicationDates"], "beforeDec2": true},
+    {"id": "RD-07", "file": "templates/catalog.json", "location": "/regulatorySnapshot/applicationDates", "current": "Three entries: 2027-12-02, 2028-08-02, 2026-08-02", "finding": "incomplete", "change": "Replace with the 19 per-provision entries in applicationDates (2025-02-02 x2, 2025-08-02 x2, 2026-07-27 x2, 2026-08-02 x5, 2026-12-02 x2, 2027-08-02, 2027-12-02, 2028-08-02, 2030-08-02 x2 (one per route), 2030-12-31), each with legal basis, sourceIds, verifiedOn, legalReview and the approval metadata #18 adds. List a transitional record that has an entryId once, under the entry it names.", "basis": ["applicationDates", "vocabularies.crossReferenceRule"], "beforeDec2": true},
     {"id": "RD-08", "file": "templates/catalog.json", "location": "/regulatorySnapshot/applicationDates[2] (Art.50 entry)", "current": "Art.50 general transparency requirements; transitions assessed separately", "finding": "incomplete", "change": "Name the transition: Art 111(4) requires providers of generative systems placed on the market before 2026-08-02 to comply with Art 50(2) by 2026-12-02.", "basis": ["aia-2026-08-02-art50-transparency", "aia-2026-12-02-art50-2-legacy-transition"], "beforeDec2": true},
     {"id": "RD-09", "file": "templates/catalog.json", "location": "/regulatorySnapshot/applicationDates[0] and [1] (Chapter III entries)", "current": "2027-12-02 Annex III; 2028-08-02 Annex I", "finding": "correct", "change": "Keep. Add the exact legal basis (Art 113, third paragraph, point (c)(i) and (ii), as replaced by Regulation (EU) 2026/1744, Art 1, point (40)(b)) and the Art 111(2) legacy rule.", "basis": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i"], "beforeDec2": false},
     {"id": "RD-10", "file": "templates/catalog.json", "location": "/regulatorySnapshot/guidance", "current": "Mentions readiness labels, OJ primacy, deletion of Art 10(5) and Art 4a", "finding": "incomplete", "change": "Keep the existing sentences (verified). Add the 2026-12-02 Art 5(1)(ba)/(bb) screen and the distinction between Art 4a(1) and Art 4a(2).", "basis": ["aia-2026-12-02-art5-new-prohibitions", "specialCategoryData"], "beforeDec2": true},
@@ -1187,8 +1305,8 @@
     {"id": "RD-23", "file": "docs/obligation-subitems.json", "location": "/source/url and /source/authenticAmendment", "current": "EUR-Lex HTML and OJ URLs", "finding": "incomplete", "change": "Add the ELI identifiers and the Publications Office access URLs (as RD-05).", "basis": ["SRC-OJ-2026-1744", "SRC-CONS-2024-1689-20260727"], "beforeDec2": false},
     {"id": "RD-24", "file": "docs/obligation-subitems.json", "location": "/applicationContext/legalSource", "current": "Article 113(c), version 02024R1689-20260727", "finding": "imprecise", "change": "Cite 'Article 113, third paragraph, point (c)(i) and (ii), as replaced by Regulation (EU) 2026/1744, Art 1, point (40)(b)'.", "basis": ["provisionReferences"], "beforeDec2": false},
     {"id": "RD-25", "file": "docs/obligation-subitems.json", "location": "/applicationContext/annexIIIArticle6_2, /annexIArticle6_1, /covers", "current": "2027-12-02; 2028-08-02; Chapter III Sections 1, 2 and 3 except Article 6(5)", "finding": "correct", "change": "No change.", "basis": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i"], "beforeDec2": false},
-    {"id": "RD-26", "file": "docs/obligation-subitems.json", "location": "/applicationContext/approvalRule", "current": "Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules", "finding": "incomplete", "change": "State the Art 111 rules explicitly: legacy cut-off is the Chapter III date for the route (no longer the fixed 2026-08-02); significant design change trigger; public-authority deadline 2030-08-02; Annex X deadline 2030-12-31; Art 5 unaffected.", "basis": ["aia-2027-12-02-high-risk-annex-iii", "aia-2030-08-02-public-authority-legacy-high-risk", "aia-2030-12-31-annex-x-large-scale-it"], "beforeDec2": false},
-    {"id": "RD-27", "file": "docs/obligation-subitems.json", "location": "/factTypes", "current": "16 boolean_or_unknown facts; no dates", "finding": "missing", "change": "Add the facts the transitional rules need (see vocabularies.factVocabulary): firstPlacedOnMarketOrPutIntoServiceDate, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent. Coordinate names with #19.", "basis": ["vocabularies.factVocabulary"], "beforeDec2": false},
+    {"id": "RD-26", "file": "docs/obligation-subitems.json", "location": "/applicationContext/approvalRule", "current": "Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules", "finding": "incomplete", "change": "State the Art 111 rules explicitly: the legacy cut-off is the Chapter III date for the route (no longer the fixed 2026-08-02), and the first unit of the type and model sets it (recital (39) of Regulation (EU) 2026/1744); significant design change trigger; public-authority deadline 2030-08-02 for legacy systems only; Annex X deadline 2030-12-31, with those systems outside Art 111(2); Art 5 unaffected.", "basis": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i", "aia-2030-08-02-public-authority-legacy-annex-iii", "aia-2030-08-02-public-authority-legacy-annex-i", "aia-2030-12-31-annex-x-large-scale-it"], "beforeDec2": false},
+    {"id": "RD-27", "file": "docs/obligation-subitems.json", "location": "/factTypes", "current": "15 boolean_or_unknown facts and one array_of_reviewed_actor_roles_or_unknown fact (operatorRoles); no dates", "finding": "missing", "change": "Declare all eight facts that the applicationDates predicates use (vocabularies.factVocabulary), so that every predicate evaluates and an uncaptured value yields needs_information: three dates (firstPlacedOnMarketOrPutIntoServiceDate, placedOnMarketDate, gpaiModelPlacedOnMarketDate), four tri-state booleans (generatesSyntheticContent, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent) and one enumeration (highRiskRoute). Before 2 Dec 2026, generatesSyntheticContent and placedOnMarketDate select the Art 111(4) entry. highRiskRoute maps from the existing classification route (annexRoute in site-app/lib/domain.ts): 'Annex III — sensitive use case' to annex_iii; 'Annex I Section A — regulated product' to annex_i_section_a; 'Annex I Section B — sector-specific review' to annex_i_section_b; 'Article 50 only' and 'Outside high-risk scope' to not_high_risk; 'Unassessed', and 'Article 6(3) exception assessment' until the derogation is decided, to unknown. #19 provides two facts: highRiskRoute (it derives high-risk from the route and rejects contradictions, which keeps the fact consistent with highRiskConfirmed and annexISectionAProduct) and generatesSyntheticContent (its Art 50(2) provider trigger). The other six are not in #19's scope as written. #19 depends on #18 and may land after 2 Dec 2026: until both values are captured, the Art 111(4) entry yields needs_information for every engagement, unless #18 captures them itself.", "basis": ["vocabularies.factVocabulary", "aia-2026-12-02-art50-2-legacy-transition"], "beforeDec2": true},
     {"id": "RD-28", "file": "docs/obligation-subitems.json", "location": "/decisionPolicy/dataScope", "current": "Art 10(6) limits Art 10(2)-(4) and Art 4a(1) to testing datasets...; Art 10(5) deleted; Art 4a/data-protection assessment, not an upload permission", "finding": "correct", "change": "Keep (verified). Add that Art 4a(2) covers providers and deployers of other AI systems and models and deployers of high-risk systems under the same safeguards, and creates no obligation to run bias detection.", "basis": ["specialCategoryData"], "beforeDec2": false},
     {"id": "RD-29", "file": "docs/obligation-subitems.json", "location": "items AIA-11-1 reviewNote", "current": "Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs", "finding": "correct", "change": "Optionally add that a simplified submission must use the Commission's form and that notified bodies must accept it (Art 11(1), second subparagraph, as replaced).", "basis": ["SRC-OJ-2026-1744"], "beforeDec2": false},
     {"id": "RD-30", "file": "docs/obligation-subitems.json", "location": "items AIA-AIV-8 (Art 47) and AIA-AIV-9 (Art 72)", "current": "Annex IV points 8 and 9", "finding": "needs_legal_review", "change": "Flag that Art 47 (Chapter III Section 5) and Art 72 (Chapter IX) fall under the 2026-08-02 general date on the text but attach to high-risk systems whose obligations apply from 2027-12-02 or 2028-08-02.", "basis": ["aia-2026-08-02-high-risk-linked-provisions"], "beforeDec2": false},
@@ -1210,24 +1328,25 @@
     {"id": "RD-70", "file": "site-app/lib/store.ts", "location": "default classification object (version, asOf)", "current": "version: \"02024R1689-20260727\", asOf: \"2026-10-05\"", "finding": "stale", "change": "Outside the four sources named in #8, but in #18 scope 3: read the default from the catalog instead of hard-coding it.", "basis": [], "beforeDec2": true},
     {"id": "RD-71", "file": "site-app/app/workspace.tsx", "location": "'Applicable dates and legal sources' panel", "current": "Hard-codes 'researched 5 October 2026', the two Chapter III dates and the 2026/1744 link", "finding": "stale", "change": "Outside the four sources named in #8, but in #18 scope 3: render from the catalog and include the 2 Dec 2026 milestones.", "basis": ["applicationDates"], "beforeDec2": true},
     {"id": "RD-72", "file": "templates/annex-iv-map.json", "location": "source block (celex, researchedAsOf, URLs)", "current": "researchedAsOf 2026-10-05", "finding": "stale", "change": "Update with the catalog snapshot (templates/** is in #18 scope).", "basis": [], "beforeDec2": false},
-    {"id": "RD-73", "file": "site-app/lib/catalog.json, site-app/lib/obligation-subitems.json, site-app/reference/** copies", "location": "generated copies", "current": "Byte-identical to the canonical files on main@b15f037", "finding": "stale", "change": "Regenerate through the methodology sync check after the canonical files change.", "basis": [], "beforeDec2": false}
+    {"id": "RD-73", "file": "site-app/lib/{catalog,obligation-subitems,annex-iv-map}.json, site-app/reference/docs/{audit-methodology.md,obligation-subitems.json}, site-app/reference/templates/{catalog.json,annex-iv-map.json,README.md}, site-app/reference/README.md", "location": "generated copies", "current": "On main@b15f037 the listed copies are byte-identical to templates/catalog.json, docs/obligation-subitems.json, templates/annex-iv-map.json, docs/audit-methodology.md and templates/README.md. site-app/reference/README.md is not: it differs from README.md outside the legal section, and its 'Current legal snapshot' section matches README.md.", "finding": "stale", "change": "Regenerate the byte-identical copies through the methodology sync check after the canonical files change. site-app/reference/README.md is not a byte copy: apply RD-60 to RD-64 to its 'Current legal snapshot' section, unless the sync check regenerates the whole file.", "basis": [], "beforeDec2": false},
+    {"id": "RD-74", "file": "templates/README.md", "location": "last paragraph (warning inherited by every template)", "current": "The legal snapshot is 27 July 2026, researched on 5 October 2026; refresh applicability before each engagement.", "finding": "stale", "change": "Keep the 27 July 2026 legal snapshot (still the latest consolidation). Update the research date to 5 November 2026 and name rule pack 2026.11.1, or refer to the catalog's regulatorySnapshot instead of restating it. Change it together with RD-60; the copy in site-app/reference/templates/ follows through RD-73.", "basis": ["legalText.consolidatedVersion"], "beforeDec2": false}
   ],
   "legalReviewItems": [
-    {"id": "LR-01", "topic": "Scope of the EN 18286:2026 presumption", "question": "Art 40(1) grants a presumption for Chapter III Section 2 requirements (Arts 8 to 15) and Chapter V obligations; Art 17 sits in Section 3. The Commission and CEN-CENELEC nonetheless describe a presumption for the Art 17 requirements the standard covers, and secondary sources say Annex ZA maps Art 17(1) and the first sentence of Art 11(1). Confirm the legal basis and exact scope, and check Annex ZA in a licensed copy.", "relatedIds": ["STD-EN-18286-2026"]},
+    {"id": "LR-01", "topic": "Scope of the EN 18286:2026 presumption", "question": "Art 40(1), unchanged, grants a presumption for Chapter III Section 2 requirements (Arts 8 to 15) and Chapter V obligations; Art 17 sits in Section 3. The fourth subparagraph of Art 40(2), added by Regulation (EU) 2026/1744, Art 1, point (17), requires the Commission to request deliverables that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and the relevant Annex I legislation (recital (21)), but it does not amend Art 40(1), and EN 18286 was requested earlier under C(2025) 3871. Recital (1) of Implementing Decision (EU) 2026/2274 summarises Art 40 without the Section 2 limit, and the Commission and CEN-CENELEC describe a presumption for the Art 17 requirements the standard covers. Secondary sources say Annex ZA maps Art 17(1) and the first sentence of Art 11(1). Confirm the legal basis and exact scope, and check Annex ZA in a licensed copy.", "relatedIds": ["STD-EN-18286-2026", "provisionReferences"]},
     {"id": "LR-02", "topic": "Operative date of high-risk-linked provisions outside Chapter III Sections 1 to 3", "question": "Chapter III Section 5 (Arts 40 to 49), Art 71 and Arts 72 and 73 fall under the 2 Aug 2026 general date on the text, but the duties that trigger them (Art 16, Art 6(4), Art 26) apply from 2 Dec 2027 or 2 Aug 2028. Confirm the operative date per duty (registration, declaration, CE marking, post-market monitoring, serious-incident reporting).", "relatedIds": ["aia-2026-08-02-general-application", "aia-2026-08-02-high-risk-linked-provisions", "aia-2027-12-02-high-risk-annex-iii"]},
-    {"id": "LR-03", "topic": "Art 111(2) legacy high-risk systems", "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route); what counts as 'significant changes in their designs'; and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems.", "relatedIds": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i", "aia-2030-08-02-public-authority-legacy-high-risk", "aia-2026-08-02-art50-transparency"]},
+    {"id": "LR-03", "topic": "Art 111(2) legacy high-risk systems", "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route, set by the first unit of the type and model under recital (39) of Regulation (EU) 2026/1744); what counts as 'significant changes in their designs' (recital (177) of Regulation (EU) 2024/1689 treats it as equivalent in substance to a substantial modification); whether the 2 Aug 2030 sentence, like the first sentence, excludes the Art 111(1) systems (recital (177) gives the two groups their deadlines 'respectively'; the data assumes it does); and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems.", "relatedIds": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i", "aia-2030-08-02-public-authority-legacy-annex-iii", "aia-2030-08-02-public-authority-legacy-annex-i", "aia-2030-12-31-annex-x-large-scale-it", "aia-2026-08-02-art50-transparency"]},
     {"id": "LR-04", "topic": "Art 111(4) scope", "question": "The transition covers systems 'placed on the market' before 2 Aug 2026. Confirm the treatment of systems only put into service (for example in-house) before that date, and whether new versions or new distribution channels after 2 Aug 2026 count as a new placing on the market.", "relatedIds": ["aia-2026-12-02-art50-2-legacy-transition"]},
     {"id": "LR-05", "topic": "Art 5(1)(ba)/(bb) assessment standard", "question": "How auditors should evidence 'reasonably foreseeable and reproducible outcome without significant technical modification' and 'reasonable and adequate technical safety measures and other safeguards' under Art 5(1a)(a)(ii), including for open-source releases and API access; and how the consent condition in point (ba) is evidenced.", "relatedIds": ["aia-2026-12-02-art5-new-prohibitions"]},
     {"id": "LR-06", "topic": "Art 4a timing and external auditors", "question": "Confirm that Art 4a applies from 27 Jul 2026 (recital (9) refers to the date of entry into application of 'that Regulation'), and whether an external auditor or audit platform is an 'other party' under Art 4a(1)(d), so that special-category data may not be transferred to it under Art 4a.", "relatedIds": ["aia-2026-07-27-art4a-bias-data", "specialCategoryData"]},
     {"id": "LR-07", "topic": "Amended text in chapters that already applied", "question": "Regulation (EU) 2026/1744 sets no separate application date for amendments to Chapters I and II other than the new Art 5 points. Confirm that the replaced Art 4, the amended Art 3 definitions and Art 4a take effect on 27 Jul 2026.", "relatedIds": ["aia-2025-02-02-ai-literacy", "aia-2026-07-27-omnibus-entry-into-force", "aia-2026-07-27-art4a-bias-data"]},
     {"id": "LR-08", "topic": "AI Office exclusive competence", "question": "Confirm that the replaced Art 75(1) and Arts 75a to 75d operate from 2 Aug 2026 (Chapter IX general date) and how the exceptions in Art 75(1)(a)(i) to (iv) apply to the engagement's system.", "relatedIds": ["aia-2026-08-02-ai-office-competence"]},
     {"id": "LR-09", "topic": "Art 6(1a) to (1c) timing", "question": "The new safety-component clarifications sit in Chapter III Section 1 and so apply from the point (c) dates. Confirm whether classification work before those dates should already apply them (readiness).", "relatedIds": ["aia-2027-12-02-high-risk-annex-iii", "aia-2028-08-02-high-risk-annex-i"]},
-    {"id": "LR-10", "topic": "Annex I Section B and machinery", "question": "Confirm the consequences of moving Regulation (EU) 2023/1230 to Annex I Section B (point 21): under Art 2(2) only Art 6(1), Art 60a and Arts 102 to 112 apply, and Art 3 of Regulation (EU) 2026/1744 amends the Machinery Regulation, whose related delegated acts apply by 2 Aug 2028.", "relatedIds": ["aia-2028-08-02-high-risk-annex-i"]}
+    {"id": "LR-10", "topic": "Annex I Section B and machinery", "question": "Confirm the consequences of moving Regulation (EU) 2023/1230 to Annex I Section B (point 21): under Art 2(2) only Art 6(1), Art 60a and Arts 102 to 112 apply, and Art 3 of Regulation (EU) 2026/1744 amends the Machinery Regulation, whose related delegated acts apply by 2 Aug 2028. This also decides what the Art 111(2) legacy rule and the 2 Aug 2030 public-authority deadline require of Section B systems.", "relatedIds": ["aia-2028-08-02-high-risk-annex-i", "aia-2030-08-02-public-authority-legacy-annex-i"]}
   ],
   "unverified": [
     {"id": "UV-01", "claim": "Annex ZA clause scope of EN 18286:2026", "status": "secondary_only", "reason": "The standard is paywalled; four secondary sources agree in substance."},
     {"id": "UV-02", "claim": "JTC 21 enquiry outcomes (prEN 18228, 18229-1, 18282 rejected or failed)", "status": "secondary_only", "reason": "CEN does not publish enquiry results; reported by a newsletter via a vendor tracker."},
-    {"id": "UV-03", "claim": "Final Art 6 guidelines expected by end-2026", "status": "secondary_only", "reason": "Search snippet only; no official date."},
+    {"id": "UV-03", "claim": "Final Art 6 guidelines expected by end-2026", "status": "secondary_only", "reason": "The only source found is a third-party tracker (regulations.ai, as of 7 Sep 2026, read on 2026-11-05). It cites no source for the date and says it was generated with AI tools. The Commission pages checked on 2026-11-05 give no adoption date, so guidance records none.", "sourceIds": ["SEC-REGULATIONSAI-ART6"]},
     {"id": "UV-04", "claim": "Standardisation request expiry ('M/613 expires 28 Feb 2027', from the earlier research)", "status": "secondary_only", "reason": "Not verified and not needed by #18; the request in force is C(2025) 3871 of 23 June 2025 (verified from the Decision)."},
     {"id": "UV-05", "claim": "Final Code of Practice on marking and labelling published 10 Jun 2026 (earlier research)", "status": "secondary_only", "reason": "Not fetched. Only the Commission opinion of 9 Jul 2026 is verified, as a listing."},
     {"id": "UV-06", "claim": "EUR-Lex pages for the cited acts", "status": "secondary_only", "reason": "EUR-Lex returned an AWS WAF challenge to automated requests. The same OJ documents were read from the Publications Office CELLAR repository; the EUR-Lex URLs themselves were not machine-checked."},

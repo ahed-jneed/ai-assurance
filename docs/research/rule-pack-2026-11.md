@@ -21,20 +21,20 @@ Issue [#8](https://github.com/ahed-jneed/ai-assurance/issues/8). Researched 5 No
 5. **EN 18286:2026 is the only harmonised AI Act standard cited in the OJ.**
    - **Citation (verified).** Commission Implementing Decision (EU) 2026/2274 of 12 October 2026, OJ L of 14 October 2026, in force that day. The Commission's news item is dated 19 October 2026, which explains the "19 Oct" in earlier research.
    - **Clause scope (secondary-only).** The claim that the presumption covers Art 17(1) and the first sentence of Art 11(1) comes from the standard's Annex ZA, as reported by four secondary sources. Annex ZA is paywalled and was not read.
-   - **Legal question.** Art 40(1) grants the presumption for Chapter III Section 2 requirements, but Art 17 sits in Section 3 (LR-01).
+   - **Legal question (LR-01).** Art 40(1), which is unchanged, grants the presumption for Chapter III Section 2 requirements and Chapter V obligations, but Art 17 sits in Section 3. Regulation (EU) 2026/1744, Art 1(17), added a fourth subparagraph to Art 40(2): the Commission must request standardisation deliverables that facilitate "joint compliance and presumption of conformity" with the requirements or obligations of Chapter III Sections 2 **and 3** and of the Annex I legislation (recital (21)). That indicates the legislature contemplates standards supporting a presumption for Section 3 obligations, at least where Annex I legislation also applies. But the subparagraph governs standardisation requests and does not amend Art 40(1), so it does not settle the question.
 6. **No ISO/IEC standard gives a presumption of conformity.**
    - ISO/IEC 42001, 42005, 42006 and 23894 are published ISO standards. None is cited in the OJ.
    - ISO/IEC 42001 and 23894 have been adopted as ENs. ISO/IEC 42006 is a draft EN (prEN). ISO/IEC 42005 is not in JTC 21's published list or work programme.
    - Every CEN-CENELEC JTC 21 draft listed in the issue is still a draft. Their stages come from CEN's own work programme, read on 5 November 2026.
 7. **The Art 6 classification guidelines are still a draft.**
    - The statutory deadline was 2 February 2026.
-   - The draft was published on 19 May 2026, and the consultation was extended to 23 July 2026.
-   - No adopted version was found on 5 November 2026.
+   - The draft was published on 19 May 2026. The Commission's news item gave 23 June 2026 as the consultation deadline and the Service Desk gives 23 July 2026. That suggests an extension, but no official page says so.
+   - No adopted version was found on 5 November 2026, and the Commission has announced no adoption date.
 8. **The conditions of Art 4a are verified.**
    - Paragraph 1 covers providers of high-risk systems, subject to six cumulative conditions.
    - Paragraph 2 extends the same safeguards to other AI systems and models, and to deployers of high-risk systems, and creates no obligation to test for bias.
-9. **The diff for #18 has 45 entries** ([section 9](#9-diff-against-the-repository-changes-18-must-make)).
-   - 35 are changes. Of these, 15 should ship before 2 December 2026 (`beforeDec2: true` in the JSON).
+9. **The diff for #18 has 46 entries** ([section 9](#9-diff-against-the-repository-changes-18-must-make)).
+   - 36 are changes. Of these, 16 should ship before 2 December 2026 (`beforeDec2: true` in the JSON).
    - 10 confirm that a current statement is correct; 6 of those suggest a small addition.
 10. **Ten questions need qualified legal review** ([section 10](#10-items-for-qualified-legal-review)). The most consequential:
     - the operative date of high-risk-linked duties that the text places on the 2 August 2026 general date (LR-02);
@@ -85,6 +85,7 @@ Issue [#8](https://github.com/ahed-jneed/ai-assurance/issues/8). Researched 5 No
 | SEC-SWISSGRC-EN18286 | Swiss GRC blog, 26 Oct 2026 (secondary) | <https://swissgrc.com/en/harmonised-standard-ai-act-evidence/> | Annex ZA scope |
 | SEC-ORRICK-EN18286 | Orrick, 27 Oct 2026 (secondary) | <https://www.orrick.com/en/Insights/2026/10/First-Harmonised-Technical-Standard-Published-Under-the-EU-AI-Act> | "Articles 11(1) and 17(1)" |
 | SEC-KLA-JTC21 | KLA tracker, status 15 Oct 2026 (secondary) | <https://kla.digital/blog/jtc-21-standards-tracker> | Enquiry outcomes, from AI Standardisation Watch ed. 16 |
+| SEC-REGULATIONSAI-ART6 | Regulations.ai tracker entry, as of 7 Sep 2026 (secondary) | <https://regulations.ai/regulations/RAI-EU-NA-CLASSIF-2026> | Expects the final Art 6 guidelines by end-2026, with no source for that date; its footer says it was generated with AI tools. Cited only by UV-03 |
 
 ## 3. The amending act and the consolidated text
 
@@ -120,7 +121,7 @@ Each row below is one entry in `applicationDates` (operator duties) or `authorit
 | 2 Aug 2027 | Art 111(3) legacy GPAI models. Also, as authority deadlines: Art 57(1) national sandboxes and Art 2(13) delegated acts | `aia-2027-08-02-gpai-legacy-models` |
 | 2 Dec 2027 | Chapter III Sections 1 to 3 for Annex III systems | `aia-2027-12-02-high-risk-annex-iii` |
 | 2 Aug 2028 | Chapter III Sections 1 to 3 for Annex I systems | `aia-2028-08-02-high-risk-annex-i` |
-| 2 Aug 2030 | Art 111(2): legacy high-risk systems used by public authorities | `aia-2030-08-02-public-authority-legacy-high-risk` |
+| 2 Aug 2030 | Art 111(2), second sentence: legacy high-risk systems intended for use by public authorities, one entry per route | `aia-2030-08-02-public-authority-legacy-annex-iii`, `aia-2030-08-02-public-authority-legacy-annex-i` |
 | 31 Dec 2030 | Art 111(1): Annex X large-scale IT systems | `aia-2030-12-31-annex-x-large-scale-it` |
 
 ### 2 February 2025
@@ -180,22 +181,29 @@ All three are verified.
 
 | Provision | Actor | Obligation | Transitional conditions | Basis | Source | Status |
 |---|---|---|---|---|---|---|
-| Chapter III Sections 1 to 3 (Arts 6 to 27, except Art 6(5)) for Art 6(2)/Annex III systems | Providers, deployers, importers, distributors, authorised representatives | Classification rules; requirements of Arts 8 to 15; obligations of Arts 16 to 27, including deployer duties (Art 26) and the fundamental rights impact assessment (Art 27). Previously 2 Aug 2026 | **Art 111(2) (replaced):** <br>• Systems placed on the market or put into service before the Chapter III date are covered only if they undergo significant design changes from that date. <br>• Public-authority systems must comply by 2 Aug 2030. <br>• Art 111(1): Annex X systems placed before 2 Aug 2027 must comply by 31 Dec 2030. <br>• The Art 5 prohibitions are unaffected | Art 113(3)(c)(i) as replaced by 2026/1744 Art 1(40)(b) | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689], [AISD][aisd] | Verified 2026-11-05; **Legal review** LR-02, LR-03, LR-09 |
+| Chapter III Sections 1 to 3 (Arts 6 to 27, except Art 6(5)) for Art 6(2)/Annex III systems | Providers, deployers, importers, distributors, authorised representatives | Classification rules; requirements of Arts 8 to 15; obligations of Arts 16 to 27, including deployer duties (Art 26) and the fundamental rights impact assessment (Art 27). Previously 2 Aug 2026 | **Art 111(2) (replaced), cut-off 2 Dec 2027:** <br>• Systems first placed on the market or put into service before 2 Dec 2027 are covered only if they undergo significant design changes from that date. The first unit of the type and model sets the date (recital (39) of 2026/1744). <br>• Of those, systems intended for use by public authorities must comply by 2 Aug 2030 (`aia-2030-08-02-public-authority-legacy-annex-iii`). <br>• Art 111(2) leaves out the Art 111(1) systems: Annex X components placed before 2 Aug 2027, which must comply by 31 Dec 2030. <br>• The Art 5 prohibitions are unaffected | Art 113(3)(c)(i) as replaced by 2026/1744 Art 1(40)(b) | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689], [AISD][aisd] | Verified 2026-11-05; **Legal review** LR-02, LR-03, LR-09 |
 
 ### 2 August 2028
 
 | Provision | Actor | Obligation | Transitional conditions | Basis | Source | Status |
 |---|---|---|---|---|---|---|
-| Chapter III Sections 1 to 3 for Art 6(1)/Annex I systems; Art 6(1a) to (1c); Art 2(2) as replaced; Annex I | Providers, product manufacturers, deployers, importers, distributors, authorised representatives | Chapter III Sections 1 to 3 apply to Annex I systems. Previously 2 Aug 2027. Changes made by 2026/1744: <br>• Annex I Section B products: only Art 6(1), Art 60a and Arts 102 to 112 apply; Arts 57 to 59 only where the requirements have been integrated into sector law. <br>• Annex I: Section A point 1 (Machinery Directive 2006/42/EC) deleted; Regulation (EU) 2023/1230 added as Section B point 21. <br>• Art 6(1a) to (1c) narrow the meaning of "safety component" | Art 111(2) legacy rule, with this date as the cut-off. <br>Art 2(13) limitations, specified by delegated acts due by 2 Aug 2027. <br>Art 43(3): Annex I Section A notified bodies apply for designation by 28 Jan 2028 | Art 113(3)(c)(ii) as replaced; 2026/1744 Art 1(2)(a), (8), (40)(b), (41) | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689], [AISD][aisd] | Verified 2026-11-05; **Legal review** LR-03, LR-09, LR-10 |
+| Chapter III Sections 1 to 3 for Art 6(1)/Annex I systems; Art 6(1a) to (1c); Art 2(2) as replaced; Annex I | Providers, product manufacturers, deployers, importers, distributors, authorised representatives | Chapter III Sections 1 to 3 apply to Annex I systems. Previously 2 Aug 2027. Changes made by 2026/1744: <br>• Annex I Section B products: only Art 6(1), Art 60a and Arts 102 to 112 apply; Arts 57 to 59 only where the requirements have been integrated into sector law. <br>• Annex I: Section A point 1 (Machinery Directive 2006/42/EC) deleted; Regulation (EU) 2023/1230 added as Section B point 21. <br>• Art 6(1a) to (1c) narrow the meaning of "safety component" | **Art 111(2) (replaced), cut-off 2 Aug 2028:** <br>• Systems first placed on the market or put into service before 2 Aug 2028 are covered only if they undergo significant design changes from that date (recital (39) of 2026/1744). <br>• Of those, systems intended for use by public authorities must comply by 2 Aug 2030 (`aia-2030-08-02-public-authority-legacy-annex-i`). <br>• Art 111(2) leaves out the Art 111(1) systems (31 Dec 2030). <br>**Also:** <br>• Art 2(13) limitations, specified by delegated acts due by 2 Aug 2027. <br>• Art 43(3): Annex I Section A notified bodies apply for designation by 28 Jan 2028 | Art 113(3)(c)(ii) as replaced; 2026/1744 Art 1(2)(a), (8), (40)(b), (41) | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689], [AISD][aisd] | Verified 2026-11-05; **Legal review** LR-03, LR-09, LR-10 |
 
 ### 2 August 2030 and 31 December 2030
 
 | Provision | Actor | Obligation | Transitional conditions | Basis | Source | Status |
 |---|---|---|---|---|---|---|
-| Art 111(2), second sentence | Providers and deployers of high-risk systems intended for use by public authorities | Must comply by 2 Aug 2030, whether or not the design changes | Selection: high-risk route, and `intendedForUseByPublicAuthorities = true` | Art 111(2) as replaced by 2026/1744 Art 1(39)(a); date unchanged | [OJ 2026/1744][oj1744], [Consolidated][cons] | Verified 2026-11-05; **Legal review** LR-03 |
+| Art 111(2), second sentence, Annex III route (`aia-2030-08-02-public-authority-legacy-annex-iii`) | Providers and deployers of legacy high-risk systems intended for use by public authorities | Must comply by 2 Aug 2030, whether or not the design changes; a significant design change from the cut-off brings the obligations forward. A system first placed on the market or put into service on or after the cut-off is not a legacy system: the Regulation applies to it from that point | Selection: `highRiskRoute = annex_iii`, `firstPlacedOnMarketOrPutIntoServiceDate < 2027-12-02` and `intendedForUseByPublicAuthorities = true`, except Art 111(1) systems | Art 111(2) as replaced by 2026/1744 Art 1(39)(a), with Art 113(3)(c)(i); date unchanged | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689] | Verified 2026-11-05; **Legal review** LR-03 |
+| Art 111(2), second sentence, Annex I route (`aia-2030-08-02-public-authority-legacy-annex-i`) | As above | As above | Selection: `highRiskRoute` in Annex I Section A or B, `firstPlacedOnMarketOrPutIntoServiceDate < 2028-08-02` and `intendedForUseByPublicAuthorities = true`, except Art 111(1) systems | Art 111(2) as replaced by 2026/1744 Art 1(39)(a), with Art 113(3)(c)(ii); date unchanged | [OJ 2026/1744][oj1744], [Consolidated][cons], [OJ 2024/1689][oj1689] | Verified 2026-11-05; **Legal review** LR-03, LR-10 |
 | Art 111(1) | Providers, deployers | Components of the Annex X large-scale IT systems placed on the market or put into service before 2 Aug 2027 must comply by **31 Dec 2030** | Selection: `annexXLargeScaleItComponent = true`, placed before 2027-08-02 | Art 111(1), unchanged | [Consolidated][cons], [OJ 2024/1689][oj1689] | Verified 2026-11-05 |
 
-The Commission's timeline ([AISD][aisd]) lists every date above except 2 August 2030 and 31 December 2030, which come from Art 111 only.
+**How the Art 111 rules are encoded.**
+- **Cut-off by route.** Art 111(2) uses "the date of application of Chapter III referred to in Article 113". Each Chapter III entry and each 2 Aug 2030 entry therefore tests the cut-off for its own route. A public-authority system first placed on the market in 2028 under Annex III is not selected for the 2030 deadline, because the Regulation applies to it from placing.
+- **Art 111(1) systems.** Art 111(2) covers high-risk systems "other than the systems referred to in paragraph 1", that is, Annex X components placed on the market or put into service before 2 August 2027. The Art 111(2) records and the 2030 entries leave these out through `exceptIf`. An Annex X component first placed between 2 August 2027 and the cut-off is not an Art 111(1) system, so Art 111(2) still reaches it.
+- **The 2030 sentence.** Recital (177) of Regulation (EU) 2024/1689 gives the Annex X systems and the public-authority systems their deadlines "respectively". The data therefore applies the exclusion to the 2 August 2030 sentence as well; LR-03 asks a lawyer to confirm this.
+- **Cross-references.** Every transitional record that restates a standalone entry carries that entry's `entryId`, with the same deadline and predicates. The Annex III and Annex I entries carry the same three Art 111 records.
+
+The Commission's timeline ([AISD][aisd]) has entries for 1 August 2024, 2 February 2025, 2 August 2025, 2 August 2026, 2 December 2026, 2 August 2027 (national sandboxes, not Art 111(3)), 2 December 2027 and 2 August 2028. It has none for 27 July 2026, 2 August 2030 or 31 December 2030. Those dates come from Art 4 of Regulation (EU) 2026/1744 and from Art 111.
 
 ## 5. Exact references: Art 5, Art 111 and Art 113
 
@@ -210,6 +218,7 @@ The Commission's timeline ([AISD][aisd]) lists every date above except 2 August 
 | Art 113, third paragraph, point (d) | Added | Art 1, point (40)(c) | Arts 102 to 110 from 27 Jul 2026 | Verified 2026-11-05 ([OJ][oj1744]) |
 | Art 113, second paragraph; third paragraph, point (b) | Unchanged | none | 2 Aug 2026 general date; 2 Aug 2025 for Chapter III Section 4, Chapter V, Chapter VII, Chapter XII and Art 78, except Art 101 | Verified 2026-11-05 ([Consolidated][cons]) |
 | Art 6(4); Annex VIII Section B | Art 6(4) unchanged; Section B points 7 and 9 deleted | Art 1, point (42) | Art 6(3) derogations are still documented and registered under Art 49(2), with less information | Verified 2026-11-05 ([OJ][oj1744], [Consolidated][cons]) |
+| Art 40(2), fourth subparagraph | Added | Art 1, point (17) | The Commission must request standardisation deliverables that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and of the Annex I legislation (recital (21)). Art 40(1) is unchanged (LR-01) | Verified 2026-11-05 ([OJ][oj1744], [Consolidated][cons]) |
 
 **Conditions of the new prohibitions** (Art 5(1a) and (1b); paraphrased, so the authentic text governs):
 - **Providers (Art 5(1a)(a)).** Placing on the market or putting into service is prohibited only where:
@@ -234,7 +243,7 @@ The Commission's timeline ([AISD][aisd]) lists every date above except 2 August 
 | (g) | Biometric categorisation inferring sensitive characteristics | 2 Feb 2025 |
 | (h) | Real-time remote biometric identification in public spaces for law enforcement, except listed objectives | 2 Feb 2025 |
 
-Source for the table: [Consolidated][cons], [OJ 2026/1744][oj1744]. Status: Verified 2026-11-05.
+Source for the table: [Consolidated][cons], [OJ 2026/1744][oj1744], and [OJ 2024/1689][oj1689] for the unchanged points. Status: Verified 2026-11-05. In the JSON, each point carries its own `sourceIds`, `verification` and the `entryId` of the entry that dates it.
 
 ## 6. Article 4a: special-category data for bias detection
 
@@ -268,8 +277,8 @@ Art 4a was inserted by 2026/1744 Art 1(6) and has been in force since 27 July 20
 
 | Item | Status | Dates | Source | Marker |
 |---|---|---|---|---|
-| Art 6(5) guidelines on high-risk classification | **Draft** | Statutory deadline 2 Feb 2026 (missed); draft published 19 May 2026; consultation deadline 23 Jun 2026, extended to 23 Jul 2026; page last updated 23 Jul 2026; no adopted version found on 5 Nov 2026 | [Draft][hrdraft], [news][hrnews], [Service Desk][hraisd], [Consolidated][cons] | Verified 2026-11-05 |
-| Expected final adoption | End-2026 | Third-party tracker (regulations.ai, Sept 2026), search snippet only | (not fetched) | Secondary-only |
+| Art 6(5) guidelines on high-risk classification | **Draft** | Statutory deadline 2 Feb 2026 (missed); draft published 19 May 2026; consultation deadline 23 Jun 2026 in the news item and 23 Jul 2026 on the Service Desk (an extension is inferred; no official page says so); page last updated 23 Jul 2026; no adopted version found on 5 Nov 2026 | [Draft][hrdraft], [news][hrnews], [Service Desk][hraisd], [Consolidated][cons] | Verified 2026-11-05 |
+| Expected final adoption | **Not announced** | No Commission page checked gives a date. One third-party tracker ([regulations.ai][regai], as of 7 Sep 2026) expects end-2026, but it cites no source for that date and its footer says it was generated with AI tools. Recorded as UV-03 and not used in the data | [Draft][hrdraft], [Service Desk][hraisd] | Verified 2026-11-05 (no date announced); the tracker's date is secondary-only |
 | Guidelines on transparency obligations (Art 50) | Published | Listed 20 Jul 2026; content not reviewed | [EC page][ecpage] ([document](https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems)) | Verified 2026-11-05 (listing) |
 | Commission opinion on the Code of Practice on Transparency of AI-generated Content | Published | Listed 9 Jul 2026; content not reviewed. Under Art 50(7) as replaced, the Commission assesses whether codes are adequate for Art 50(2) and (4) | [EC page][ecpage] ([document](https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content)) | Verified 2026-11-05 (listing) |
 | Guidelines on prohibited AI practices | Published for prohibitions 1 to 8 | No guidance specific to (ba)/(bb) found | [EC page][ecpage] | Verified 2026-11-05 |
@@ -289,7 +298,7 @@ Art 4a was inserted by 2026/1744 Art 1(6) and has been in force since 27 July 20
 | Restrictions in the Decision | None: the Annex lists only the reference and title | [Decision][dec2274] | Verified 2026-11-05 |
 | Standardisation request | Implementing Decision C(2025) 3871 of 23 June 2025, Annex I point 9 (QMS including post-market monitoring) | [Decision][dec2274] | Verified 2026-11-05 |
 | Only cited AI Act standard | Yes. SPARQL found no other implementing decision on harmonised standards for 2024/1689 | [SPARQL][sparql] | Verified 2026-11-05 |
-| Statutory basis of the presumption | Art 40(1): conformity with a cited harmonised standard gives a presumption for Chapter III **Section 2** requirements (Arts 8 to 15), or Chapter V obligations, to the extent the standard covers them. Art 17 is in **Section 3**. The presumption runs from OJ publication (recital (6) of the Decision); Art 17 itself applies from 2 Dec 2027 or 2 Aug 2028 | [Consolidated][cons], [Decision][dec2274] | Verified 2026-11-05; **Legal review** LR-01 |
+| Statutory basis of the presumption | **Art 40(1), unchanged:** conformity with a cited harmonised standard gives a presumption for Chapter III **Section 2** requirements (Arts 8 to 15), or Chapter V obligations, to the extent the standard covers them. Art 17 is in **Section 3**. <br>**Art 40(2), fourth subparagraph**, added by 2026/1744 Art 1(17): the Commission must request deliverables that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and of the Annex I legislation (recital (21)). It governs standardisation requests and does not amend Art 40(1); EN 18286 was requested earlier, under C(2025) 3871. <br>**The Decision:** its recital (1) summarises Art 40 as a presumption for the requirements the standards cover, without the Section 2 limit. The presumption runs from OJ publication (recital (6)); Art 17 itself applies from 2 Dec 2027 or 2 Aug 2028 | [Consolidated][cons], [OJ 2026/1744][oj1744], [Decision][dec2274] | Verified 2026-11-05; **Legal review** LR-01 |
 | Official description | Commission: a presumption of conformity with the Art 17 requirements the standard covers; the only AI QMS standard with a presumption; designed to layer on ISO/IEC 42001, ISO 9001 or ISO 13485. CEN-CENELEC: a presumption of conformity with the corresponding AI Act provisions | [EC news][ecnews18286], [CEN news][cennews10] | Verified 2026-11-05 |
 | Clause scope (Annex ZA, Table ZA.1) | Art 17(1) (first sentence, the documentation sentence and points (a) to (m)) and the first sentence of Art 11(1). Art 17(2), (3) and (4) are not covered. Orrick says "Articles 11(1) and 17(1)" without the first-sentence qualifier | [Intertek][intertek], [Modulos][modulos], [Swiss GRC][swissgrc], [Orrick][orrick] | **Secondary-only**: Annex ZA (paywalled) not read |
 
@@ -307,7 +316,7 @@ Cite ISO/IEC and EN content by clause number only: these standards are paywalled
 ### 8.3 CEN-CENELEC JTC 21 drafts (not harmonised; state of the art only)
 
 - **Stages and dates (verified).** Read from CEN's work programme ([CEN work programme][cenwp]) on 5 November 2026.
-- **What "Under Approval" means.** In CEN's terms it covers the stages after an enquiry closes; it does not imply that the enquiry was positive.
+- **Status labels.** "Under Drafting", "Under Enquiry" and "Under Approval" are CEN's own labels, reproduced as its work programme shows them. This report does not interpret which stages each label covers. For example, CEN shows prEN 18229-2 "Under Approval" from 29 October 2026, while the tracker placed it in Commission pre-enquiry assessment on 15 October.
 - **Enquiry outcomes (secondary-only).** CEN does not publish them. The "reported" column comes from a vendor tracker ([KLA][kla]) that cites AI Standardisation Watch ed. 16.
 - **AI Act article mapping (indicative).** Taken from the titles and the standardisation request areas.
 
@@ -340,7 +349,7 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 | RD-04 | `/regulatorySnapshot/amendingRegulation` | `(EU) 2026/1744` | Incomplete | Add the OJ reference, adoption and entry-into-force dates, the ELI and the two other regulations it amends | |
 | RD-05 | `/regulatorySnapshot/authenticAmendmentUrl` | EUR-Lex `OJ:L_202601744` | Incomplete | Add the ELI as canonical; use CELLAR for automated checks | |
 | RD-06 | `/regulatorySnapshot/officialTextUrl` | Consolidated-text URL | Imprecise | Label it as the consolidated text with no legal effect | |
-| RD-07 | `/regulatorySnapshot/applicationDates` | 3 entries | Incomplete | Replace with the 18 `applicationDates` entries, adding source, `verifiedOn`, legal-review flags and approval metadata | Yes |
+| RD-07 | `/regulatorySnapshot/applicationDates` | 3 entries | Incomplete | Replace with the 19 `applicationDates` entries, adding source, `verifiedOn`, legal-review flags and approval metadata. List a transitional record that has an `entryId` once, under the entry it names | Yes |
 | RD-08 | `applicationDates[2]` (Art 50) | "transitions assessed separately" | Incomplete | Name the Art 111(4) deadline of 2 Dec 2026 | Yes |
 | RD-09 | `applicationDates[0..1]` (Chapter III) | 2027-12-02, 2028-08-02 | Correct | Keep; add the Art 113(3)(c) basis and the Art 111(2) rule | |
 | RD-10 | `/regulatorySnapshot/guidance` | Readiness labels, Art 10(5) deleted, Art 4a | Incomplete | Add the Art 5(1)(ba)/(bb) screen and Art 4a(1) versus 4a(2) | Yes |
@@ -360,11 +369,33 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 | RD-23 | `/source/url`, `/source/authenticAmendment` | EUR-Lex URLs | Incomplete | Add the ELI and CELLAR access URLs | |
 | RD-24 | `/applicationContext/legalSource` | "Article 113(c), version ..." | Imprecise | "Article 113, third paragraph, point (c)(i) and (ii), as replaced by Regulation (EU) 2026/1744, Art 1, point (40)(b)" | |
 | RD-25 | `/applicationContext` dates and `covers` | 2027-12-02, 2028-08-02, Sections 1 to 3 except 6(5) | Correct | No change | |
-| RD-26 | `/applicationContext/approvalRule` | "Assess Articles 2 and 111..." | Incomplete | Spell out Art 111: the route-specific cut-off, the significant design change trigger, 2 Aug 2030, 31 Dec 2030, and that Art 5 is unaffected | |
-| RD-27 | `/factTypes` | 16 booleans, no dates | Missing | Add `firstPlacedOnMarketOrPutIntoServiceDate`, `significantDesignChangeOnOrAfterChapterIIIDate`, `intendedForUseByPublicAuthorities`, `annexXLargeScaleItComponent` (align with #19) | |
+| RD-26 | `/applicationContext/approvalRule` | "Assess Articles 2 and 111..." | Incomplete | Spell out Art 111: the route-specific cut-off set by the first unit of the type and model, the significant design change trigger, 2 Aug 2030 for legacy systems only, 31 Dec 2030 for Annex X systems (outside Art 111(2)), and that Art 5 is unaffected | |
+| RD-27 | `/factTypes` | 15 `boolean_or_unknown` facts and 1 array (`operatorRoles`); no dates | Missing | Declare all 8 facts the date predicates use (table below). 2 of them select the 2 Dec 2026 Art 111(4) entry | Yes |
 | RD-28 | `/decisionPolicy/dataScope` | Art 10(6) and Art 4a(1); Art 10(5) deleted | Correct | Keep; add Art 4a(2) and its "no obligation" sentence | |
 | RD-29 | item AIA-11-1 `reviewNote` | SME/SMC simplified form | Correct | Optional: the Commission form is mandatory for simplified submissions and notified bodies must accept it | |
 | RD-30 | items AIA-AIV-8 (Art 47), AIA-AIV-9 (Art 72) | Annex IV points 8, 9 | Needs legal review | Flag the general-date versus Chapter III-date question (LR-02) | |
+
+**Facts used by the date predicates** (RD-27; `vocabularies.factVocabulary` in the JSON). None of them exists today in `/factTypes` or in the classification model (`Classification` in `site-app/lib/domain.ts`), whose only route field is the free-text `annexRoute`.
+
+| Fact | Type | Used by | Value comes from | Needed before 2 Dec |
+|---|---|---|---|---|
+| `generatesSyntheticContent` | Boolean or unknown | Art 111(4): `aia-2026-12-02-art50-2-legacy-transition` and its record in the Art 50 entry | #19, as its Art 50(2) provider trigger | Yes |
+| `placedOnMarketDate` | Date or unknown | Art 111(4) | Not in #19's scope | Yes |
+| `highRiskRoute` | `annex_iii`, `annex_i_section_a`, `annex_i_section_b`, `not_high_risk` or unknown | Art 111(2) records; 2 Aug 2030 entries | #19, which derives high-risk from the route; maps from `annexRoute` (below) | No |
+| `firstPlacedOnMarketOrPutIntoServiceDate` | Date or unknown (first unit of the type and model, recital (39)) | Art 111(1) and (2) | Not in #19's scope | No |
+| `significantDesignChangeOnOrAfterChapterIIIDate` | Boolean or unknown | Art 111(2), `obligationsApplyOnlyIf` | Not in #19's scope | No |
+| `intendedForUseByPublicAuthorities` | Boolean or unknown | 2 Aug 2030 entries | Not in #19's scope | No |
+| `annexXLargeScaleItComponent` | Boolean or unknown | Art 111(1) entry; `exceptIf` of the Art 111(2) records | Not in #19's scope | No |
+| `gpaiModelPlacedOnMarketDate` | Date or unknown | Art 111(3) | Not in #19's scope; #19's GPAI model-provider role decides whether to ask it | No |
+
+- **Mapping `annexRoute` to `highRiskRoute`.** The values `site-app/app/workspace.tsx` offers map as follows:
+  - "Annex III — sensitive use case" to `annex_iii`;
+  - "Annex I Section A — regulated product" to `annex_i_section_a`;
+  - "Annex I Section B — sector-specific review" to `annex_i_section_b`;
+  - "Article 50 only" and "Outside high-risk scope" to `not_high_risk`;
+  - "Unassessed" to unknown, and "Article 6(3) exception assessment" to unknown until the derogation is decided.
+- **Consistency.** #19 rejects contradictions between the route and the flags, which keeps `highRiskRoute` consistent with the existing `highRiskConfirmed` and `annexISectionAProduct` facts.
+- **Timing.** #19 depends on #18 and may land after 2 December 2026. Until both Art 111(4) facts are captured, that entry yields `needs_information` for every engagement, unless #18 captures the two facts itself.
 
 **`docs/audit-methodology.md`**
 
@@ -398,22 +429,23 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 | RD-70 | `site-app/lib/store.ts`, default classification (`version: "02024R1689-20260727"`, `asOf: "2026-10-05"`) | Stale | Read from the catalog | Yes |
 | RD-71 | `site-app/app/workspace.tsx`, "Applicable dates and legal sources" panel | Stale | Render from the catalog; add the 2 Dec 2026 milestones | Yes |
 | RD-72 | `templates/annex-iv-map.json`, source block (`researchedAsOf` 2026-10-05) | Stale | Update with the snapshot | |
-| RD-73 | Generated copies in `site-app/lib/` and `site-app/reference/` (byte-identical to the canonical files today) | Stale after #18 | Regenerate through the sync check | |
+| RD-73 | Generated copies. Byte-identical to the canonical files on `main@b15f037`: `site-app/lib/{catalog,obligation-subitems,annex-iv-map}.json`, `site-app/reference/docs/{audit-methodology.md,obligation-subitems.json}` and `site-app/reference/templates/{catalog.json,annex-iv-map.json,README.md}`. Not byte-identical: `site-app/reference/README.md` differs from `README.md` outside the legal section; its "Current legal snapshot" section matches | Stale after #18 | Regenerate the byte-identical copies through the sync check. Apply RD-60 to RD-64 to the legal section of `site-app/reference/README.md`, unless the sync check regenerates the whole file | |
+| RD-74 | `templates/README.md`, last paragraph: "The legal snapshot is 27 July 2026, researched on 5 October 2026" | Stale | Keep the 27 July 2026 snapshot, which is still the latest consolidation. Update the research date and name rule pack 2026.11.1, or point to the catalog's `regulatorySnapshot` instead of restating it. Change it together with RD-60 | |
 
 ## 10. Items for qualified legal review
 
 | ID | Topic | Question |
 |---|---|---|
-| LR-01 | EN 18286 presumption | Art 40(1) covers Chapter III Section 2 requirements and Chapter V obligations, but Art 17 is in Section 3. Confirm the legal basis and scope of the presumption the Commission describes, and check Annex ZA in a licensed copy. |
+| LR-01 | EN 18286 presumption | Art 40(1), unchanged, covers Chapter III Section 2 requirements and Chapter V obligations, but Art 17 is in Section 3. The new fourth subparagraph of Art 40(2) (2026/1744 Art 1(17); recital (21)) has the Commission request deliverables for "presumption of conformity" with Sections 2 and 3, but it governs standardisation requests and does not amend Art 40(1). Recital (1) of Decision 2026/2274 summarises Art 40 without the Section 2 limit. Confirm the legal basis and scope of the presumption the Commission describes, and check Annex ZA in a licensed copy. |
 | LR-02 | High-risk-linked provisions on the general date | Chapter III Section 5, Art 71, Art 72 and Art 73 apply from 2 Aug 2026 on the text, but their triggers (Art 16, 6(4), 26) apply from 2 Dec 2027 or 2 Aug 2028. Confirm the operative date for each duty. |
-| LR-03 | Art 111(2) legacy systems | Which Chapter III date is the cut-off (assumed: the route-specific point (c) date)? What is a "significant change in design"? Does "this Regulation shall apply ... only if" also suspend non-Chapter III duties, such as Art 50, for legacy high-risk systems? |
+| LR-03 | Art 111(2) legacy systems | Which Chapter III date is the cut-off (assumed: the route-specific point (c) date, set by the first unit of the type and model under recital (39) of 2026/1744)? What is a "significant change in design" (recital (177) of 2024/1689 treats it as equivalent in substance to a substantial modification)? Does the 2 Aug 2030 sentence, like the first, leave out the Art 111(1) systems (assumed yes, from recital (177))? Does "this Regulation shall apply ... only if" also suspend non-Chapter III duties, such as Art 50, for legacy high-risk systems? |
 | LR-04 | Art 111(4) scope | How should systems that were only put into service before 2 Aug 2026 be treated? Do new versions or channels after that date count as a new placing on the market? |
 | LR-05 | Art 5(1)(ba)/(bb) evidence | What evidence standard applies to "reasonably foreseeable and reproducible outcome" and "reasonable and adequate safeguards", including for open-source and API releases? How is the consent condition in point (ba) evidenced? |
 | LR-06 | Art 4a timing and auditors | Confirm application from 27 Jul 2026 (recital (9)). Is an external auditor or audit platform an "other party" under Art 4a(1)(d)? |
 | LR-07 | Amendments to chapters already in application | Confirm that the replaced Art 4, the amended Art 3 definitions and Art 4a take effect on 27 Jul 2026. |
 | LR-08 | AI Office competence | Confirm that the replaced Art 75(1) and Arts 75a to 75d operate from 2 Aug 2026, and how the exceptions in Art 75(1)(a)(i) to (iv) apply. |
 | LR-09 | Art 6(1a) to (1c) timing | These sit in Chapter III Section 1, so they apply from the point (c) dates. Should readiness classification apply them now? |
-| LR-10 | Annex I Section B and machinery | What are the consequences of moving Regulation (EU) 2023/1230 to Section B (point 21) and of Art 2(2), including the amendments 2026/1744 makes to the Machinery Regulation? |
+| LR-10 | Annex I Section B and machinery | What are the consequences of moving Regulation (EU) 2023/1230 to Section B (point 21) and of Art 2(2), including the amendments 2026/1744 makes to the Machinery Regulation? What do the Art 111(2) legacy rule and the 2 Aug 2030 deadline require of Section B systems? |
 
 ## 11. Not verified
 
@@ -421,7 +453,7 @@ The baseline is `main@b15f037`, which includes the Prettier reformat from #1; lo
 |---|---|---|
 | UV-01 | Clause scope of EN 18286 Annex ZA | Paywalled; four secondary sources agree in substance |
 | UV-02 | JTC 21 enquiry outcomes | CEN does not publish them; reported by a newsletter via a vendor tracker |
-| UV-03 | Final Art 6 guidelines by end-2026 | Search snippet only |
+| UV-03 | Final Art 6 guidelines by end-2026 | The only source is a third-party tracker ([regulations.ai][regai], as of 7 Sep 2026). It cites no source for the date and says it was generated with AI tools. The Commission gives no date, so the data records none |
 | UV-04 | "M/613 expires 28 Feb 2027" (earlier research) | Not verified and not needed. The request in force is C(2025) 3871 (verified) |
 | UV-05 | Final marking and labelling Code of Practice on 10 Jun 2026 (earlier research) | Not fetched; only the Commission opinion of 9 Jul 2026 is verified, and only as a listing |
 | UV-06 | EUR-Lex pages | WAF challenge; the same documents were read via CELLAR, but the EUR-Lex URLs in the repository were not machine-checked |
@@ -439,24 +471,30 @@ Conflicts in the earlier research, now resolved:
 |---|---|
 | `schemaVersion`, `kind`, `id`, `researchedOn` | `1.0.0`, `rule-pack-research`, `rule-pack-2026-11`, `2026-11-05` |
 | `approval` | `status` (`unapproved`), `reviewer`, `approvedAt`. Every entry is unapproved until #18 records a review |
-| `vocabularies` | Meaning of `verificationStatus`, `dateType` and `actor` values; `factVocabulary` (facts used in predicates); `predicateOperators`; `predicateRule` |
+| `vocabularies` | Meaning of `verificationStatus`, `dateType` and `actor` values; `factVocabulary` (facts used in predicates); `predicateOperators`; `predicateRule`; `crossReferenceRule` |
 | `legalText` | `baseAct`, `amendingActs` (with corrigenda), `consolidatedVersion`, `otherChecks` |
 | `sources` | Source register: `id`, `title`, `publisher`, `kind`, `canonicalUrl` and/or `accessUrl`, `retrievedVia`, `sha256`, `retrievedOn`, `notes` |
-| `applicationDates` | Operator-facing entries: `id`, `date`, `dateType`, `provisions`, `scope`, `actors`, `summary`, `conditions`, `appliesIf`, `transitional[]` (`reference`, `rule`, `deadline`, `appliesIf`, `obligationsApplyOnlyIf`), `legalBasis` (`reference`, `amendedBy`, `previousValue`), `sourceIds`, `verification`, `legalReview` (`required`, `itemIds`) |
+| `applicationDates` | Operator-facing entries: `id`, `date`, `dateType`, `provisions`, `scope`, `actors`, `summary`, `conditions`, `appliesIf`, `exceptIf`, `transitional[]` (`reference`, `rule`, `deadline`, `entryId`, `appliesIf`, `exceptIf`, `obligationsApplyOnlyIf`), `legalBasis` (`reference`, `amendedBy`, `previousValue`), `notes`, `sourceIds`, `verification`, `legalReview` (`required`, `itemIds`) |
 | `authorityDeadlines` | Commission, Member State and notified-body deadlines |
-| `prohibitedPractices` | Each Art 5(1) point with `appliesFrom` |
-| `provisionReferences` | Exact amended references and the 2026/1744 points that amend them |
+| `prohibitedPractices` | Each Art 5(1) point with `appliesFrom`, `conditions`, `entryId` (the entry that dates it), `sourceIds` and `verification` |
+| `provisionReferences` | Exact amended references and the 2026/1744 points that amend them, each with `sourceIds` and `verification` |
 | `specialCategoryData` | Art 4a paragraphs 1 and 2 with every condition |
 | `standards` | Register entries with `category` (`harmonised_standard_cited`, `international_standard_not_cited`, `draft_not_harmonised`), CEN stage data and `reportedOutcome` (secondary-only) |
 | `guidance` | Art 6 guidelines and Art 50 guidance status |
 | `repositoryDiff` | `id`, `file`, `location`, `current`, `finding`, `change`, `basis` (JSON ids), `beforeDec2` |
-| `legalReviewItems`, `unverified` | The lists in sections 10 and 11 |
+| `legalReviewItems`, `unverified` | The lists in sections 10 and 11; an `unverified` entry cites its source in `sourceIds` where one exists |
 
 **Rules for #18**
 - **Dates.** An entry's `date` maps to `effectiveFrom`. `effectiveTo` stays open until a later rule pack supersedes the entry.
 - **Approval.** `reviewer` and `approvedAt` belong in #18's rule records after legal review. This file deliberately leaves them empty.
-- **Predicates.** `appliesIf` selects candidate entries; `obligationsApplyOnlyIf` states the Art 111(2) condition under which the obligations reach a legacy system. A required fact that is unknown yields `needs_information`. Predicates never approve applicability.
-- **Secondary-only content.** Fields marked `secondary_only` (EN 18286 clause scope, JTC 21 enquiry outcomes, the expected date of the final Art 6 guidelines) must be shown as unverified.
+- **Predicates.**
+  - `appliesIf` selects candidate entries and transitional records.
+  - `exceptIf` removes candidates. The Art 111(2) records and the 2 Aug 2030 entries use it to leave out the Art 111(1) systems.
+  - `obligationsApplyOnlyIf` states the Art 111(2) condition under which the obligations reach a legacy system.
+  - Each list is a conjunction evaluated in three-valued logic: false if any predicate is false, true if all are true, otherwise unknown. A candidate needs `appliesIf` true (an absent list counts as true) and `exceptIf` false (an absent list counts as false).
+  - An unknown result yields `needs_information`. Predicates never approve applicability.
+- **Cross-references.** A transitional record with `entryId` restates the standalone entry it names, with the same deadline and predicates. List the rule once, under that entry, so the "Obligations by date" view does not show it twice; show the record as a link. In `prohibitedPractices`, `entryId` names the entry that dates the point; that entry carries the point's legal-review flags.
+- **Secondary-only content.** Fields marked `secondary_only` (EN 18286 clause scope, JTC 21 enquiry outcomes) and the `unverified` list must be shown as unverified.
 
 The schema below (JSON Schema draft 2020-12) is the one the validation run used. It is read straight from this section.
 
@@ -474,16 +512,18 @@ The schema below (JSON Schema draft 2020-12) is the one the validation run used.
     "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
     "applicationDates": {"type": "array", "items": {"$ref": "#/$defs/applicationDate"}},
     "authorityDeadlines": {"type": "array", "items": {"type": "object", "required": ["id", "date", "provision", "actor", "summary", "sourceIds", "verification"], "properties": {"date": {"$ref": "#/$defs/date"}, "actor": {"$ref": "#/$defs/actor"}, "verification": {"$ref": "#/$defs/verification"}}}},
-    "prohibitedPractices": {"type": "array", "items": {"type": "object", "required": ["point", "label", "appliesFrom"], "properties": {"appliesFrom": {"$ref": "#/$defs/date"}}}},
-    "provisionReferences": {"type": "array", "items": {"type": "object", "required": ["provision", "change", "amendingProvision", "verification"]}},
+    "prohibitedPractices": {"type": "array", "items": {"type": "object", "required": ["point", "label", "appliesFrom", "entryId", "sourceIds", "verification"], "properties": {"appliesFrom": {"$ref": "#/$defs/date"}, "entryId": {"type": "string"}, "sourceIds": {"$ref": "#/$defs/sourceIds"}, "verification": {"$ref": "#/$defs/verification"}}}},
+    "provisionReferences": {"type": "array", "items": {"type": "object", "required": ["provision", "change", "amendingProvision", "sourceIds", "verification"], "properties": {"sourceIds": {"$ref": "#/$defs/sourceIds"}, "verification": {"$ref": "#/$defs/verification"}}}},
     "standards": {"type": "array", "items": {"type": "object", "required": ["id", "reference", "title", "category", "sourceIds", "verification"], "properties": {"category": {"enum": ["harmonised_standard_cited", "international_standard_not_cited", "draft_not_harmonised"]}, "verification": {"$ref": "#/$defs/verification"}}}},
     "guidance": {"type": "array", "items": {"type": "object", "required": ["id", "title", "status", "sourceIds", "verification"]}},
     "repositoryDiff": {"type": "array", "items": {"type": "object", "required": ["id", "file", "location", "current", "finding", "change", "basis", "beforeDec2"], "properties": {"finding": {"enum": ["correct", "incomplete", "stale", "imprecise", "incorrect", "missing", "needs_legal_review", "needs_decision"]}, "beforeDec2": {"type": "boolean"}}}},
     "legalReviewItems": {"type": "array", "items": {"type": "object", "required": ["id", "topic", "question", "relatedIds"]}},
-    "unverified": {"type": "array", "items": {"type": "object", "required": ["id", "claim", "status", "reason"], "properties": {"status": {"const": "secondary_only"}}}}
+    "unverified": {"type": "array", "items": {"type": "object", "required": ["id", "claim", "status", "reason"], "properties": {"status": {"const": "secondary_only"}, "sourceIds": {"$ref": "#/$defs/sourceIds"}}}}
   },
   "$defs": {
     "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "sourceIds": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "predicates": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/predicate"}},
     "actor": {"enum": ["operator", "provider", "deployer", "importer", "distributor", "authorised_representative", "product_manufacturer", "gpai_model_provider", "notified_body", "member_state", "commission", "ai_office"]},
     "verification": {"type": "object", "required": ["status", "verifiedOn"], "properties": {"status": {"enum": ["verified", "secondary_only"]}, "verifiedOn": {"$ref": "#/$defs/date"}}},
     "predicate": {"type": "object", "required": ["fact", "op", "value"], "properties": {"op": {"enum": ["eq", "in", "before", "onOrAfter"]}}},
@@ -497,9 +537,10 @@ The schema below (JSON Schema draft 2020-12) is the one the validation run used.
         "provisions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "actors": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/actor"}},
         "legalBasis": {"type": "object", "required": ["reference", "amendedBy"]},
-        "appliesIf": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-        "transitional": {"type": "array", "items": {"type": "object", "required": ["reference", "rule"], "properties": {"deadline": {"$ref": "#/$defs/date"}, "appliesIf": {"type": "array", "items": {"$ref": "#/$defs/predicate"}}, "obligationsApplyOnlyIf": {"type": "array", "items": {"$ref": "#/$defs/predicate"}}}}},
-        "sourceIds": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "appliesIf": {"$ref": "#/$defs/predicates"},
+        "exceptIf": {"$ref": "#/$defs/predicates"},
+        "transitional": {"type": "array", "items": {"type": "object", "required": ["reference", "rule"], "properties": {"deadline": {"$ref": "#/$defs/date"}, "entryId": {"type": "string"}, "appliesIf": {"$ref": "#/$defs/predicates"}, "exceptIf": {"$ref": "#/$defs/predicates"}, "obligationsApplyOnlyIf": {"$ref": "#/$defs/predicates"}}}},
+        "sourceIds": {"$ref": "#/$defs/sourceIds"},
         "verification": {"$ref": "#/$defs/verification"},
         "legalReview": {"type": "object", "required": ["required", "itemIds"], "properties": {"required": {"type": "boolean"}, "itemIds": {"type": "array", "items": {"type": "string"}}}}
       }
@@ -510,10 +551,13 @@ The schema below (JSON Schema draft 2020-12) is the one the validation run used.
 
 **What the validation also checked**
 - Ids are unique.
-- Every `sourceIds`, `legalReview.itemIds`, `basis` and `relatedIds` value resolves.
+- Every `sourceIds`, `legalReview.itemIds`, `basis`, `relatedIds` and `entryId` value resolves, and every source in the register is cited.
 - Every date is a real calendar date.
-- Every predicate fact is declared in `factVocabulary`.
+- Every predicate fact is declared in `factVocabulary`, and every predicate's operator and value suit the fact's type.
 - No secondary source backs a field that is not marked `secondary_only`.
+- Every transitional record with a deadline has an `entryId`. Its deadline, `appliesIf` and `exceptIf` match the entry it names, and each practice's `appliesFrom` matches its entry's date.
+- The two Chapter III entries carry the same Art 111 records. Each Art 111(2) record tests the route, the cut-off for that route and the Art 111(1) exclusion.
+- The RD, LR and UV tables and the source register in this report match the JSON, and every `applicationDates` id is named in the report.
 
 ## 13. Reproducing the checks
 
@@ -569,3 +613,4 @@ SELECT DISTINCT ?celex ?date WHERE { ?w cdm:resource_legal_id_celex ?celex ; cdm
 [swissgrc]: https://swissgrc.com/en/harmonised-standard-ai-act-evidence/
 [orrick]: https://www.orrick.com/en/Insights/2026/10/First-Harmonised-Technical-Standard-Published-Under-the-EU-AI-Act
 [kla]: https://kla.digital/blog/jtc-21-standards-tracker
+[regai]: https://regulations.ai/regulations/RAI-EU-NA-CLASSIF-2026
