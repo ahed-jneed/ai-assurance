@@ -15,7 +15,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { canWrite } from "@/lib/domain";
 import { selectPaperRegister } from "@/lib/paper-presentation";
-import { AccountMenu, DevPersonaSignIn, signInHere } from "../account-menu";
+import {
+  AccountMenu,
+  DevPersonaSignIn,
+  SIGN_IN_LABEL,
+  signInHere,
+} from "../account-menu";
 import { EngagementSwitcher } from "../engagement-switcher";
 import { MemberOnboarding } from "../member-onboarding";
 import { WorkspaceNavigation } from "../workspace-navigation";
@@ -78,7 +83,7 @@ function SignedOut() {
           audit evidence.
         </p>
         <a href={signInHere()} target="_top" className="signin-button">
-          Sign in with ChatGPT
+          {SIGN_IN_LABEL}
         </a>
         <DevPersonaSignIn />
         <p className="subtle">

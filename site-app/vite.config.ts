@@ -63,7 +63,8 @@ export default defineConfig(async ({ command }) => {
   // dispatch, and any other build answers 401 until the deployment sets it.
   // The Sites build also compiles `sites` in as the default for an unset
   // IDENTITY_MODE, in case the Sites publisher does not apply the vars of
-  // dist/server/wrangler.json. An explicit IDENTITY_MODE still wins.
+  // dist/server/wrangler.json. An explicit IDENTITY_MODE still wins. The
+  // browser reads the same define only to label the sign-in button.
   const mockAuth = command === "serve" && !managedLinux;
   const sitesBuild = command === "build" && sitesProject;
   const identityVars: Record<string, string> = mockAuth

@@ -26,6 +26,8 @@ The workspace never decides on its own whom to trust. The Worker entry (`site-ap
 
 Local overrides go in `site-app/.dev.vars` for the dev server, or are passed as `--var` to Wrangler for the built Worker, for example `npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests`.
 
+**The sign-in label follows the build.** The signed-out screen says "Sign in with ChatGPT" only in the Sites build and on the development server, where Sites dispatch or its local mock signs the user in. Every other build, such as a Cloudflare Access deployment, says "Sign in". The label is compiled in from the same `define` as the Sites default (`signInLabel()` in `site-app/lib/auth-paths.ts`). It is text only: the browser reads nothing new to choose it, and it changes nothing about whom the Worker trusts.
+
 ## Configure Cloudflare Access
 
 1. In Cloudflare Zero Trust, create a **self-hosted Access application** that covers the Worker's hostname, with the identity providers and policies of your practice. Copy the application's **Audience (AUD) tag**. Your **team domain** is `<team>.cloudflareaccess.com`.
@@ -60,5 +62,5 @@ Persona sign-in exists only in the dev server (`build/sites-vite-plugin.ts`) and
 
 - `site-app/lib/identity.test.ts` and `lib/cloudflare-access.test.ts` (Vitest) cover mode selection, forged headers in every mode, header removal and token verification, using a locally generated key pair and a stub key set.
 - `site-app/build/sites-vite-plugin.test.ts` (Vitest) drives the dev server's persona middleware with fake requests. Inbound identity headers are stripped. An unknown persona gets 400, a cookie value outside the fixture stays anonymous, and a non-loopback socket gets 403 and no identity. Each port reads and clears only its own cookie.
-- `site-app/scripts/identity-check.mjs` runs the same matrix against the built Worker in Miniflare, including Access tokens served by a stub `outboundService`, and checks that an anonymous `/report` in `cloudflare-access` mode ends at a 401 from sign-in instead of looping. It also checks that the build configures `sites` mode, and defaults to it, only for Sites checkouts, and that it contains no personas.
+- `site-app/scripts/identity-check.mjs` runs the same matrix against the built Worker in Miniflare, including Access tokens served by a stub `outboundService`, and checks that an anonymous `/report` in `cloudflare-access` mode ends at a 401 from sign-in instead of looping. It also checks that the build configures `sites` mode, and defaults to it, only for Sites checkouts, that the define is compiled into the Worker and the browser bundle, and that the build contains no personas.
 - The integration harnesses opt in to `trusted-headers` explicitly.

@@ -15,14 +15,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import personaFixture from "@/fixtures/dev-personas.json";
-import { signInPath, signOutPath } from "@/lib/auth-paths";
+import { signInLabel, signInPath, signOutPath } from "@/lib/auth-paths";
 import type { WorkspaceData } from "./workspace-types";
+
+/** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
+declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
 
 /**
  * Test personas, on the development server only: in a build the condition is
  * false, so the fixture and the persona controls are left out of the bundle.
  */
 const devPersonas = import.meta.env.DEV ? personaFixture.personas : [];
+
+/**
+ * The sign-in button's text: "Sign in with ChatGPT" in the Sites build and on
+ * the development server, "Sign in" in every other build. Compiled in, so the
+ * browser reads nothing to choose it.
+ */
+export const SIGN_IN_LABEL = signInLabel({
+  devServer: import.meta.env.DEV,
+  defaultMode: __SITES_IDENTITY_DEFAULT__,
+});
 
 /** The current location, to return to after signing in or out. */
 function here() {

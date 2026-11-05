@@ -50,3 +50,18 @@ export function signOutPath(returnTo = "/"): string {
     new URLSearchParams({ return_to: safeReturnPath(returnTo) })
   );
 }
+
+/**
+ * The sign-in button's text for a build. Only Sites dispatch signs in with
+ * ChatGPT, and the development server mocks it, so only the Sites build (whose
+ * `defaultMode` is "sites") and the development server name ChatGPT; every
+ * other build says "Sign in". Display only: the Worker decides whom it trusts.
+ */
+export function signInLabel(build: {
+  devServer: boolean;
+  defaultMode?: "sites";
+}): string {
+  return build.devServer || build.defaultMode === "sites"
+    ? "Sign in with ChatGPT"
+    : "Sign in";
+}

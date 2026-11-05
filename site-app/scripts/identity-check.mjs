@@ -343,13 +343,6 @@ assert.equal(
   sitesCheckout ? "sites" : undefined,
   "only the Sites build (a checkout with .openai/hosting.json) trusts dispatch headers",
 );
-for (const file of modules) {
-  const text = await fs.readFile(path.join("dist/server", file), "utf8");
-  assert(
-    !text.includes("__SITES_IDENTITY_DEFAULT__"),
-    `dist/server/${file} still references __SITES_IDENTITY_DEFAULT__, which vite.config.ts defines`,
-  );
-}
 const personas = JSON.parse(
   await fs.readFile("fixtures/dev-personas.json", "utf8"),
 );
@@ -364,7 +357,13 @@ for (const file of await fs.readdir("dist", { recursive: true })) {
       !text.includes(marker),
       `${file} contains the dev persona ${marker}`,
     );
+  // The Worker's default mode and the browser's sign-in label read the
+  // define; a reference left in the output would throw when it runs.
+  assert(
+    !/\.m?js$/.test(file) || !text.includes("__SITES_IDENTITY_DEFAULT__"),
+    `dist/${file} still references __SITES_IDENTITY_DEFAULT__, which vite.config.ts defines`,
+  );
 }
 console.log(
-  "PASS the build configures identity only for Sites and contains no development personas",
+  "PASS the build configures identity only for Sites, compiles its Sites default into the Worker and the browser bundle, and contains no development personas",
 );

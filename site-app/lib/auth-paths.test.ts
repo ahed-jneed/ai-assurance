@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAuthPath,
   safeReturnPath,
+  signInLabel,
   signInPath,
   signOutPath,
 } from "@/lib/auth-paths";
@@ -60,5 +61,28 @@ describe("sign-in and sign-out paths", () => {
     expect(isAuthPath("/signin-with-chatgpt")).toBe(true);
     expect(isAuthPath("/callback")).toBe(true);
     expect(isAuthPath("/api/workspace")).toBe(false);
+  });
+});
+
+describe("signInLabel", () => {
+  it.each([
+    [
+      "the Sites build",
+      { devServer: false, defaultMode: "sites" },
+      "Sign in with ChatGPT",
+    ],
+    ["the development server", { devServer: true }, "Sign in with ChatGPT"],
+    [
+      "any other build (Cloudflare Access, trusted-headers or no mode)",
+      { devServer: false },
+      "Sign in",
+    ],
+    [
+      "a build without the Sites default",
+      { devServer: false, defaultMode: undefined },
+      "Sign in",
+    ],
+  ] as const)("labels the sign-in button for %s", (_, build, label) => {
+    expect(signInLabel(build)).toBe(label);
   });
 });
