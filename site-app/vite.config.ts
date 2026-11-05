@@ -57,6 +57,11 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    build: {
+      // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
+      // load, so it made `npm run build` output non-deterministic.
+      rolldownOptions: { checks: { pluginTimings: false } },
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
