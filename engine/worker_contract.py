@@ -18,7 +18,7 @@ from .contract import HASH, ID, validate_report
 from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, validate_config
 from .errors import EngineError
 
-WORKER_VERSION = "1.0.1"
+WORKER_VERSION = "1.1.0"
 TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.1.0"
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
