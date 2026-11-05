@@ -2334,10 +2334,13 @@ def false_fail_enumeration():
 
 
 def simulate(fixture, sims=20000):
+    """Monte Carlo checks; returns the report lines and whether every power figure is within FORMULA_ERROR."""
     import numpy as np
 
     rng = np.random.default_rng(20261105)
     report = []
+    FORMULA_ERROR = 0.02  # sections 8 and 13.3: the member formulas are normal approximations
+    worst_member, worst_range = 0.0, 0.0
 
     def interval_pass(lo, hi, b):
         return (b["lower"] is None or lo >= b["lower"]) and (b["upper"] is None or hi <= b["upper"])
@@ -2408,7 +2411,15 @@ def simulate(fixture, sims=20000):
         exp = case["expected"]
         formula_members = ", ".join(f"{m['passProbability']:.4f}" for m in exp["members"])
         simulated_members = ", ".join(f"{count / sims:.4f}" for count in member_hits.values())
-        report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {hits / sims:.4f}; members formula ({formula_members}), simulated ({simulated_members})")
+        assert len(member_hits) == len(exp["members"])
+        rate = hits / sims
+        member_gap = max(abs(m["passProbability"] - count / sims) for m, count in zip(exp["members"], member_hits.values()))
+        range_gap = max(0.0, exp["passProbability"] - rate, rate - exp["passProbabilityUpperBound"])
+        worst_member, worst_range = max(worst_member, member_gap), max(worst_range, range_gap)
+        where = "inside the range" if range_gap == 0.0 else f"outside the range by {range_gap:.4f}"
+        report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {rate:.4f} ({where}); members formula ({formula_members}), simulated ({simulated_members}), largest gap {member_gap:.4f}")
+    ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR
+    report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}: {'within' if ok else 'EXCEEDED'}")
 
     # Coverage of the derived intervals.
     z = zcrit(0.95)
@@ -2445,7 +2456,25 @@ def simulate(fixture, sims=20000):
         return max(lows), max(highs)
 
     coverage("headline worst-member bounds, 3 groups (0.50/0.45/0.40, n=300)", lambda: tuple(rng.binomial(n_group, r) for r in rates), 0.10, worst_gap)
-    return report
+
+    # Appendix A.3: headline coverage over 2, 3 and 5 groups, at parity (W = 0), near it and away from it.
+    lowest = (1.0, None)
+    for k in (2, 3, 5):
+        pairs = [(i, j) for i in range(k) for j in range(i + 1, k)]
+        z_b = zcrit(1 - 0.05 / len(pairs))
+        for spread in (0.0, 0.02, 0.10):
+            group_rates = [0.5 - spread * i / (k - 1) for i in range(k)]
+            truth = max(abs(group_rates[i] - group_rates[j]) for i, j in pairs)
+            for n in (100, 1000):
+                hits = 0
+                for row in np.column_stack([rng.binomial(n, r, sims) for r in group_rates]):
+                    xs = [int(x) for x in row]
+                    low = max(max(0.0, lo, -hi) for lo, hi in (newcombe(xs[i], n, xs[j], n, z_b) for i, j in pairs))
+                    high = max(max(abs(lo), abs(hi)) for lo, hi in (newcombe(xs[i], n, xs[j], n, z) for i, j in pairs))
+                    hits += low <= truth <= high
+                lowest = min(lowest, (hits / sims, f"{k} groups, W = {truth:.2f}, n = {n}"))
+    report.append(f"coverage headline worst-member bounds over 2, 3 and 5 groups, W = 0, 0.02 and 0.10, n = 100 and 1000 per group (18 designs): lowest {lowest[0]:.4f}, at {lowest[1]} (nominal 0.95)")
+    return report, ok
 
 
 def markdown(fixture):
@@ -2536,8 +2565,10 @@ def main():
             print("  missed: " + name)
         status |= bool(missed)
     if args.simulate:
-        for line in simulate(built):
+        lines, ok = simulate(built)
+        for line in lines:
             print(line)
+        status |= not ok
     if args.markdown:
         print(markdown(built))
     return status

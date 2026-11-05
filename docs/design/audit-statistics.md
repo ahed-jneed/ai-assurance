@@ -242,7 +242,11 @@ Group and calibration criteria report one headline, the worst member, so that ex
 - **One-sided ratio band (reference mode):** the smallest ratio, with band `{lower: τ}`. Its value can exceed 1.
 - **Missing pass-side bound:** if a pool member is not evaluated, the bound becomes the statistic's natural limit: 1 for a gap and 0 for a ratio. This is valid but uninformative and keeps the existing `confidenceInterval` shape numeric.
 
-The pass side needs no adjustment because the population worst case is attained at one fixed (unknown) pair. The fail side needs the union bound. The headline interval therefore covers the population worst case with probability ≥ 1 − α; the 3-group simulation in section 13.3 gives 0.983.
+The pass side needs no adjustment because the population worst case is attained at one fixed (unknown) pair. The fail side needs the union bound. The headline interval therefore covers the population worst case with probability of approximately 1 − α (Appendix A.3):
+- at least 1 − α, up to the member intervals' own coverage error, when the criterion has one member or every true difference is 0;
+- at least 1 − (3/2 − 1/(2m))·α in general, by the union bound, which is loose away from W = 0.
+
+The simulations in section 13.3 give at least 0.943 over 2, 3 and 5 groups, the lowest being Newcombe's own coverage at d = 0, and 0.983 for 3 groups at 0.50, 0.45 and 0.40.
 
 Before the small-cell gate and family adjustment, a criterion passes exactly when its headline interval is inside the headline band and fails exactly when it is outside. `method` is `worst_member_bounds`.
 
@@ -640,8 +644,10 @@ The failMde fields follow these rules:
 - **GC-44 (regression).** With σ = 1 and 120 rows, MAE ≤ 0.9 and RMSE ≤ 1.15 pass with probabilities 0.458 and 0.705, so the criterion's range is [0.163, 0.458]. It needs 293 rows.
 
 **Accuracy.** Simulating the actual decision rules (section 13.3) gives these results:
-- Every member formula is within 0.02 of its simulated rate.
-- The criterion's simulated pass rate falls inside [`passProbability`, `passProbabilityUpperBound`] up to Monte Carlo error. GC-40: 0.429 in [0.081, 0.609]. GC-41: 0.654 in [0.352, 0.745].
+- Every member formula is within 0.02 of its simulated rate. The largest gaps are GC-44's: 0.020 for RMSE and 0.009 for MAE, whose formula is low.
+- The range bounds the criterion's pass probability exactly only for the true member probabilities. Built from the formulas, it holds up to their approximation error of at most 0.02, not merely up to Monte Carlo error:
+  - GC-40: 0.429 in [0.081, 0.609]; GC-41: 0.654 in [0.352, 0.745].
+  - GC-44: 0.461, which is 0.003 above its upper bound of 0.4585, the MAE formula. A 200,000-run simulation puts the MAE member at 0.469 and the criterion at 0.462, both ±0.001.
 - The lower bound is loose when members share groups, as in GC-40. That is the price of holding under any dependence. The approval display shows the range, and the required sizes are conservative.
 
 **Approval behaviour.**
@@ -1129,15 +1135,18 @@ What the cross-check does not recompute: the library view in `decision.libraryEn
 | GC-42 | 0 | 0 |
 | GC-44 | range [0.1632, 0.4585]; members 0.4585, 0.7047 | 0.4612; members 0.4677, 0.6847 |
 
-  Every member formula is within 0.02 of simulation, and every criterion's simulated rate lies in its range up to Monte Carlo error.
+  - Every member formula is within 0.02 of simulation; the largest gap is GC-44's RMSE member, 0.020.
+  - A criterion's simulated rate lies in its formula range only up to the member formulas' approximation error, at most 0.02, not up to Monte Carlo error. GC-44's 0.4612 is 0.0028 above its upper bound, because its MAE formula is 0.009 low. A single-member criterion's range is one point, so GC-27 and GC-29 differ from it by their member's gap.
+  - `--simulate` checks both distances against 0.02 and exits non-zero if either is exceeded.
 - Coverage of the derived intervals:
   - F1 Jaccard–Wilson: 0.9513.
   - Balanced-accuracy MOVER: 0.9509.
   - Koopman with frequent zero counts: 0.9628.
   - Macro-F1 Bonferroni: 0.9989, and macro-precision Bonferroni: 1.000 (both conservative).
-  - Headline worst-member bounds for 3 groups: 0.9833.
+  - Headline worst-member bounds for 3 groups at rates 0.50, 0.45 and 0.40: 0.9833.
+  - Headline worst-member bounds over 18 designs: 2, 3 and 5 groups, a true worst gap W of 0, 0.02 or 0.10, and 100 or 1,000 per group. The lowest coverage is 0.9428, at 2 groups, W = 0 and 100 per group. There the headline is the one Newcombe interval, whose exact coverage at d = 0 is 0.9440 (enumerated with statsmodels), so the shortfall is the member interval's own (Appendix A.3).
 
-  All are at or above the nominal 0.95 within Monte Carlo error.
+  All are at or above the nominal 0.95 within Monte Carlo error, except where the member interval itself undercovers, as Newcombe does at d = 0 with 100 per group.
 
 **4. Exact enumeration (`--enumerate`, stdlib).** This reproduces the section 6 false-fail figures for a two-sided band by summing binomial probabilities over every table: 0.0345 (0.0279 above the band, 0.0066 below) and 0.0354.
 
@@ -1301,10 +1310,18 @@ These items are unverified or secondary and are marked where they are used: the 
 - **The confirmatory family.** P(some wrong claim) ≤ Σ_i P(P_i ≤ α/F and claim i is wrong) ≤ F·α/F = α, whatever the dependence between criteria.
 - **Why not a step-down.** A step-down such as Holm would need a fixed set of true null hypotheses. Here each criterion contributes the pair {outside, inside}, one of which is true, and its data choose which is tested. Every hypothesis lies in a consistent intersection of F hypotheses (one per criterion), so closed testing with Bonferroni local tests rejects it only at α/F (Shaffer 1986).
 
-**A.3 Headline bounds.**
-- Let W = max_i |θ_i| be attained at a fixed i\*. Then P(W > max_i U_i) ≤ P(|θ_i\*| > U_i\*) ≤ α/2. The pass side needs no adjustment.
-- P(W < max_i L_i) ≤ P(some i has |θ_i| < L_i) ≤ m·α/(2m) = α/2 at level α/m. The fail side uses Bonferroni.
-- Together, coverage is ≥ 1 − α. The same argument holds on the |ln r| scale, and for one-sided gaps with |θ| replaced by the signed gap.
+**A.3 Headline bounds.** Take a two-sided difference band. Member i has true difference θ_i, nominal interval [L_i, U_i] and Bonferroni interval [L′_i, U′_i] at level α/m, which contains it. The headline interval is [max_i ℓ_i, max_i u_i], with ℓ_i = max(0, L′_i, −U′_i) and u_i = max(|L_i|, |U_i|); neither depends on how the pair is oriented. Let W = max_i |θ_i|, attained at a fixed, unknown member i\*, oriented so that θ_i\* = W ≥ 0. Each statement below holds up to the member intervals' own coverage error.
+- **Upper bound.** W > max_i u_i implies θ_i\* > U_i\*: member i\*'s nominal interval misses on one side, with probability at most α/2. If W = 0, the upper bound cannot fail. The pass side needs no adjustment.
+- **Lower bound.** W < max_i ℓ_i implies ℓ_i > W ≥ |θ_i| for some member i. Its interval at level α/m then lies wholly above W, and so above θ_i, or wholly below −W, and so below θ_i.
+  - Near θ_i = 0 both misses are possible, so the bound per member is α/m, not α/(2m) as an earlier revision stated.
+  - For i\* the second miss, U′_i\* < −W, implies U_i\* < θ_i\*, the event that bounds the upper-bound failure. So the upper-bound failure and member i\*'s lower-bound failure together have probability at most α/2 + α/(2m).
+- **Together.** By the union bound, P(the headline misses W) ≤ α/2 + α/(2m) + (m − 1)·α/m = (3/2 − 1/(2m))·α.
+  - With one member (m = 1), this is α: the two failures are the two one-sided misses of one interval, which are disjoint.
+  - When every θ_i is 0 (W = 0), the upper bound cannot fail and the lower bound fails with probability at most α.
+  - Otherwise, with every pair oriented so that θ_i ≥ 0, the excess over α comes from the far-side misses U′_i < −W. Each is a miss by at least W, so the excess becomes negligible once W is a few standard errors from 0.
+
+  The headline coverage is therefore approximately 1 − α rather than guaranteed. The simulations in section 13.3, over 2, 3 and 5 groups, W of 0, 0.02 and 0.10 and 100 or 1,000 per group, give at least 0.943. The lowest value is at 2 groups and W = 0, where the headline is one Newcombe interval and has its exact coverage of 0.944.
+- The same argument holds on the |ln r| scale, and for one-sided gaps with |θ| replaced by the signed gap.
 
 **A.4 Power combination.**
 - For member pass events A_i, P(∩A_i) = 1 − P(∪A_iᶜ) ≥ 1 − Σ(1 − P(A_i)) (Boole–Bonferroni), and P(∩A_i) ≤ min_i P(A_i). Neither bound needs any assumption about the dependence between members.
