@@ -250,9 +250,8 @@ export function useWorkspaceNavigation({
         facet: "all",
       });
     else if (gate.kind === "stage") navigate("Overview");
-    else if (gate.kind === "run") {
-      if (navigate("Testing lab") === "opened") url.setLabView("runs");
-    } else if (gate.kind === "finding") {
+    else if (gate.kind === "run") showRun(gate.recordId ?? "");
+    else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
       if (record) viewRecord(record.title, record);
     }
@@ -329,6 +328,7 @@ export function useWorkspaceNavigation({
     }
     guarded(() => {
       workspace.requestRestore(null);
+      lab.clear();
       paper.clearPaper();
       sheet.setDetail(null);
       paper.setHasPendingComment(false);
@@ -363,6 +363,7 @@ export function useWorkspaceNavigation({
   function changePractice(id: string) {
     return guarded(() => {
       workspace.requestRestore(null);
+      lab.clear();
       paper.clearPaper();
       url.setClientId(null);
       setView("Overview");
@@ -422,10 +423,31 @@ export function useWorkspaceNavigation({
   }
   /** The Assurance workbench hands a hosted evaluation to the Testing lab. */
   function handOffToLab(procedureId: string, datasetCardRecordId: string) {
+    if (!e) return;
+    const engagementId = e.id;
     navigate("Testing lab", {}, () => {
       url.setProcedureContext(procedureId);
-      lab.setDatasetCardRecordId(datasetCardRecordId);
+      lab.request({
+        kind: "evaluate",
+        engagementId,
+        procedureId,
+        datasetCardRecordId,
+      });
     });
+  }
+  /** Opens the Testing lab on a run, such as a queued run blocking issue. */
+  function showRun(runId: string, procedureId?: string) {
+    if (!e) return;
+    const engagementId = e.id;
+    navigate("Testing lab", {}, () => {
+      if (procedureId) url.setProcedureContext(procedureId);
+      url.setLabView("runs");
+      lab.request({ kind: "showRun", engagementId, runId });
+    });
+  }
+  /** The audit program queued a planned evaluation: show it, not a setup. */
+  function showQueuedRun(procedureId: string, runId: string) {
+    showRun(runId, procedureId);
   }
   function createPaperFromTemplate(templateId: string) {
     void act("createPaper", { templateId })
@@ -500,6 +522,7 @@ export function useWorkspaceNavigation({
     changePractice,
     searchSelect,
     handOffToLab,
+    showQueuedRun,
     createPaperFromTemplate,
     modalFollowUps,
   };
