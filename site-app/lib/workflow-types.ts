@@ -35,9 +35,9 @@ export type Brief = BriefFields & {
   /**
    * Submitted revisions: each returned revision, with its return reason, and
    * each approved revision once a Lead revises it. A draft that was never
-   * submitted is superseded without an entry. Engagements saved before
-   * November 2026 also hold one entry per earlier draft save, and returned
-   * revisions without a return reason.
+   * submitted is superseded without an entry. Older histories also hold one
+   * entry per earlier draft save, and returned revisions without a return
+   * reason; those count towards no return limit.
    */
   history: Omit<Brief, "history">[];
 };
@@ -150,8 +150,9 @@ export type Procedure = ProcedurePlan & {
   review?: Approval;
   history: {
     /**
-     * The change this entry kept the state before. Entries recorded before
-     * November 2026 have none.
+     * The change this entry kept the state before. The commands set it on
+     * every entry they write; an entry without it was written before actions
+     * were recorded and counts towards no limit, whatever its date.
      */
     action?: ProcedureChange;
     plan: ProcedurePlan;
@@ -180,8 +181,8 @@ export type Program = {
    * Each submission ("submitted") and its outcome, with the procedure plans
    * it bound: "approved", "returned" with the reviewer's reason, or
    * "withdrawn" when a Lead's plan or scope change took it back to draft.
-   * Engagements saved before November 2026 also hold one entry per earlier
-   * plan save, with the status the program had before that save.
+   * Older histories also hold one entry per earlier plan save, with the
+   * status the program had before that save; none of them is a return.
    */
   history: {
     revision: number;

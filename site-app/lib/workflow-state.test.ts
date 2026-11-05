@@ -101,12 +101,12 @@ describe("revision limit warnings", () => {
     const w = workflow();
     const { history, ...revision } = w.brief!;
     // Approved revisions a Lead revised, and the drafts and returned
-    // revisions (without a reason) that engagements kept before November 2026.
+    // revisions (without a reason) that older histories keep.
     w.brief!.history = (["approved", "draft", "submitted"] as const).flatMap(
       (status) => Array.from({ length: 40 }, () => ({ ...revision, status })),
     );
-    // Submissions and their other outcomes, and the drafts kept before
-    // November 2026.
+    // Submissions and their other outcomes, and the drafts that older
+    // histories keep.
     w.program.history = ["submitted", "approved", "withdrawn", "draft"].flatMap(
       (status) =>
         Array.from({ length: 75 }, () => ({

@@ -230,7 +230,7 @@ describe("engagement brief", () => {
     await approveProgram(e);
     const brief = () => workflowOf(e).brief!;
     // 39 returns, besides approved revisions a Lead revised, and the drafts
-    // and returned revisions without a reason kept before November 2026.
+    // and returned revisions without a reason that older histories keep.
     const { history, ...revision } = brief();
     brief().history = [
       ...scopeReturns(e, 39),
@@ -770,8 +770,8 @@ describe("procedure planning", () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveProgram(e);
     const p = procedureOf(e, procedureId);
-    // Work recorded up to the limit, and the entries of draft saves kept
-    // before November 2026.
+    // Work recorded up to the limit, and the entries without an action that
+    // older draft saves kept.
     p.history = [
       ...procedureEntries(p, 30, "execute"),
       ...procedureEntries(p, 30),
@@ -1066,7 +1066,7 @@ describe("program submission", () => {
     await planProgram(e);
     const program = workflowOf(e).program;
     // 74 returns, besides submissions, approvals and withdrawals, and the
-    // drafts kept before November 2026.
+    // drafts that older histories keep.
     program.history = [
       ...programEntries(74, "returned"),
       ...["submitted", "approved", "withdrawn", "draft"].flatMap((status) =>

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { completionGates, finalReportGates, type Engagement } from "../domain";
-import { currentExecution, procedureLabel } from "../workflow-state";
+import {
+  currentExecution,
+  procedureLabel,
+  revisionWarnings,
+} from "../workflow-state";
 import {
   approveProgram,
   approveScope,
@@ -835,20 +839,28 @@ describe("procedure history limit", () => {
     await expectFailure(evaluate(e), 413, reworkLimit);
   });
 
-  it("counts no entries recorded before November 2026", async () => {
-    const e = await ready();
+  it("counts entries by their shape, never by their date", async () => {
+    const e = await full();
     const p = procedureOf(e, procedureId);
+    // Entries without an action, as written until this change was deployed,
+    // count towards nothing, including those written in November 2026.
     p.history = [
-      ...procedureEntries(p, 30),
+      ...procedureEntries(p, 30, undefined, "2026-11-04T09:00:00.000Z"),
       ...procedureEntries(p, 30, "plan"),
       ...procedureEntries(p, 30, "return"),
     ];
-    await record(e);
     await record(e, { results: "One exception, remediated" });
     expect(p.execution).toMatchObject({
       revision: 2,
       results: "One exception, remediated",
     });
+    expect(p.history.at(-1)).toMatchObject({ action: "execute" });
+    // Entries that name their change count, including those dated before
+    // November 2026: with this one, 30 work revisions are used.
+    p.history.push(
+      ...procedureEntries(p, 29, "evaluate", "2026-10-15T09:00:00.000Z"),
+    );
+    await expectFailure(record(e), 413, reworkLimit);
   });
 });
 
@@ -1135,9 +1147,9 @@ describe("plan changes after execution", () => {
   });
 
   describe("in an engagement saved before plan hashes", () => {
-    // The shape saved until November 2026: no plan hashes or assignment
-    // revisions, a program revision and history entry for every plan save,
-    // and executions bound to the program revision.
+    // The shape saved before plan hashes: no plan hashes, assignment
+    // revisions or history actions, a program revision and history entry
+    // for every plan save, and executions bound to the program revision.
     async function saved() {
       const e = await recorded(),
         w = workflowOf(e);
@@ -1145,6 +1157,7 @@ describe("plan changes after execution", () => {
         delete p.planHash;
         delete p.planAmended;
         delete p.assignmentRevision;
+        for (const h of p.history) delete h.action;
         if (p.execution) {
           delete p.execution.planHash;
           p.execution.programRevision = 151;
@@ -1236,6 +1249,76 @@ describe("plan changes after execution", () => {
         "lead",
       );
       expect(current(e)).toEqual([]);
+    });
+
+    it("unlocks a procedure that already holds 30 entries and names every change it records", async () => {
+      // The earlier limit refused every change to a procedure holding 30
+      // entries, a reassignment included. Some were written in November
+      // 2026, before this change was deployed: their shape, not their
+      // date, keeps them out of the count.
+      const e = await saved(),
+        p = procedureOf(e, procedureId),
+        legacy = 30 - p.history.length;
+      p.history.push(
+        ...procedureEntries(p, legacy, undefined, "2026-11-04T09:00:00.000Z"),
+      );
+      expect(p.history).toHaveLength(30);
+      expect(p.history.every((h) => h.action === undefined)).toBe(true);
+      // A Lead moves the due date and then changes the sample.
+      await command(
+        e,
+        "bulkPlanProcedures",
+        { procedureIds: [procedureId], patch: { dueDate: "2026-12-15" } },
+        "lead",
+      );
+      await command(
+        e,
+        "saveProcedurePlan",
+        plan(e, procedureId, {
+          dueDate: "2026-12-15",
+          sampling: "Stratified sample of 40",
+        }),
+        "lead",
+      );
+      await command(e, "submitProgram", {}, "auditor");
+      await command(
+        e,
+        "approveProgram",
+        { revision: 152, reason: "Revised sample agreed" },
+        "reviewer",
+      );
+      // The work is performed and evaluated again, the evaluation redone,
+      // and the submitted work returned.
+      await record(e, { sampling: "Stratified sample of 40" });
+      await evaluate(e);
+      await command(
+        e,
+        "evaluateProcedure",
+        { ...assessmentInput, conclusion: "Supported on the larger sample" },
+        "auditor",
+      );
+      await command(e, "submitProcedure", { procedureId }, "auditor");
+      await command(
+        e,
+        "returnProcedure",
+        { procedureId, reason: "Explain the strata" },
+        "reviewer",
+      );
+      expect(p.history.slice(0, 30)).toEqual(
+        expect.not.arrayContaining([
+          expect.objectContaining({ action: expect.anything() }),
+        ]),
+      );
+      expect(p.history.slice(30).map((h) => h.action)).toEqual([
+        "plan",
+        "plan",
+        "execute",
+        "evaluate",
+        "evaluate",
+        "return",
+      ]);
+      expect(revisionWarnings(workflowOf(e))).toEqual([]);
+      expect(procedureLabel(e, p)).toBe("Changes requested");
     });
   });
 });

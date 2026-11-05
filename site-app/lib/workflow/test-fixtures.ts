@@ -356,18 +356,20 @@ export function procedureOf(e: Engagement, id: string): Procedure {
 
 /**
  * Procedure history entries kept before this kind of change, to fill a
- * history; without one, as engagements recorded them before November 2026.
+ * history; without one, in the shape written before entries recorded their
+ * change. They are dated `recordedAt`, by default the fixture date.
  */
 export function procedureEntries(
   p: Procedure,
   length: number,
   action?: ProcedureChange,
+  recordedAt = at,
 ): Procedure["history"] {
   return Array.from({ length }, () => ({
     ...(action && { action }),
     plan: { ...p },
     revision: p.revision,
-    at,
+    at: recordedAt,
     actor: "auditor",
   }));
 }

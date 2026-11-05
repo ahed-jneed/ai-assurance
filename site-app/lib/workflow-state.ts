@@ -100,8 +100,11 @@ export function procedureDraftRevision(
 // halfway. The scope and the program count returns only: a submission that is
 // approved or withdrawn uses none, so a scope or program in force always has a
 // submission left for a change to it. A procedure counts the work recorded on
-// it, and its limit refuses only redoing current work. Entries recorded before
-// November 2026 count towards no limit.
+// it, and its limit refuses only redoing current work. An entry's shape, never
+// its date, decides whether it counts: entries in the shape written before
+// these limits count towards no limit, whenever they were written. Those are
+// procedure entries without an `action`, brief revisions returned without a
+// `returnReason`, and program entries, which never had the "returned" status.
 export const revisionLimits = { brief: 40, program: 75, procedure: 30 };
 /** How close to a limit warnings start. */
 export const revisionWarningLevel = 5;
@@ -110,7 +113,11 @@ export const briefReturns = (b: Brief) =>
   b.history.filter((h) => h.returnReason !== undefined).length;
 export const programReturns = (p: Program) =>
   p.history.filter((h) => h.status === "returned").length;
-/** Work recorded on a procedure: executions, evaluations and impact reviews. */
+/**
+ * Work recorded on a procedure: executions, evaluations and impact reviews.
+ * Every entry the commands write names the change that followed it; an entry
+ * without an `action` has the shape written before, so it is not counted.
+ */
 export const procedureWorkRevisions = (p: Procedure) =>
   p.history.filter(
     (h) =>
