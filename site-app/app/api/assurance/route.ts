@@ -31,7 +31,7 @@ import {
   sampleRecords,
   assist,
 } from "@/lib/assurance-core";
-import { datasetCSV } from "@/lib/evaluation-service";
+import { assertExternalProtocol, datasetCSV } from "@/lib/evaluation-service";
 import { parseCSV } from "@/lib/diagnostics";
 import { isClientRole } from "@/lib/workflow-state";
 import { packetSummary } from "@/lib/assurance-packet";
@@ -1077,6 +1077,7 @@ export async function POST(request: Request) {
           409,
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
+      assertExternalProtocol(profile);
       const card = v.datasetCardRecordId
         ? find(v.datasetCardRecordId, "dataset")
         : undefined;
