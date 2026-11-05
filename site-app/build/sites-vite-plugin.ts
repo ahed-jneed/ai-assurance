@@ -1,13 +1,14 @@
 // Vendored from @openai/sites-vite-plugin 0.2.0 (openai/sites#9).
 // See sites-vite-plugin.LICENSE for the upstream MIT license.
 // Local changes: test personas (`/signin-with-chatgpt?as=<id>`) from
-// fixtures/dev-personas.json, shared return-path checks, and hosting.json
-// staying optional. The mock runs only in the development server, never in a
-// build; the Worker trusts its headers in IDENTITY_MODE=dev (lib/identity.ts).
+// fixtures/dev-personas.json, shared return-path checks, the middleware
+// exported for its tests, and hosting.json staying optional. The mock runs
+// only in the development server, never in a build; the Worker trusts its
+// headers in IDENTITY_MODE=dev (lib/identity.ts).
 import { access, cp, mkdir, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
-import type { Plugin } from "vite";
+import type { Connect, Plugin } from "vite";
 import devPersonas from "../fixtures/dev-personas.json";
 import {
   CALLBACK_PATH,
@@ -42,6 +43,155 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+/**
+ * The development server's sign-in mock. It answers the reserved sign-in
+ * routes for loopback requests and turns this server's sign-in cookie into the
+ * oai-authenticated-user-* headers that IDENTITY_MODE=dev trusts. Inbound
+ * copies of those headers are removed from every request first.
+ */
+export function localAuthMiddleware({
+  secure,
+}: {
+  secure: boolean;
+}): Connect.NextHandleFunction {
+  return (request, response, next) => {
+    for (const name of Object.keys(request.headers)) {
+      if (name.startsWith("oai-authenticated-user-")) {
+        removeHeader(request, name);
+      }
+    }
+
+    let authority: URL;
+    let url: URL;
+    try {
+      authority = new URL(
+        `${secure ? "https" : "http"}://${request.headers.host}`,
+      );
+      url = new URL(request.url ?? "/", authority);
+    } catch {
+      if (isAuthPath((request.url ?? "/").split("?")[0])) {
+        respond(response, 403);
+      } else {
+        next();
+      }
+      return;
+    }
+
+    const hostname = authority.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    if (
+      !localHosts.has(hostname) ||
+      !localAddresses.has(request.socket.remoteAddress ?? "") ||
+      url.origin !== authority.origin
+    ) {
+      if (isAuthPath(url.pathname)) respond(response, 403);
+      else next();
+      return;
+    }
+
+    const cookies = (request.headers.cookie ?? "")
+      .split(";")
+      .map((cookie) => cookie.trim())
+      .filter(Boolean);
+    const signInCookies = cookies
+      .filter((cookie) => cookie.startsWith(`${localCookieName}=`))
+      .map((cookie) => cookie.slice(localCookieName.length + 1));
+    const applicationCookies = cookies.filter(
+      (cookie) => !cookie.startsWith(`${localCookieName}=`),
+    );
+    if (applicationCookies.length !== cookies.length) {
+      removeHeader(request, "cookie");
+      if (applicationCookies.length) {
+        setHeader(request, "cookie", applicationCookies.join("; "));
+      }
+    }
+
+    if (url.pathname === CALLBACK_PATH) {
+      respond(response, 501);
+      return;
+    }
+
+    const signIn = url.pathname === SIGN_IN_PATH;
+    const signOut = url.pathname === SIGN_OUT_PATH;
+    if (!signIn && !signOut) {
+      const identity =
+        signInCookies.length === 1
+          ? localIdentity(signInCookies[0])
+          : undefined;
+      if (identity) {
+        setHeader(request, "oai-authenticated-user-id", identity.userId);
+        setHeader(request, "oai-authenticated-user-email", identity.email);
+        setHeader(
+          request,
+          "oai-authenticated-user-full-name",
+          encodeURIComponent(identity.name),
+        );
+        setHeader(
+          request,
+          "oai-authenticated-user-full-name-encoding",
+          "percent-encoded-utf-8",
+        );
+      }
+      next();
+      return;
+    }
+
+    if (
+      (request.headers.origin && request.headers.origin !== url.origin) ||
+      request.headers["sec-fetch-site"] === "cross-site"
+    ) {
+      respond(response, 403);
+      return;
+    }
+
+    if (
+      request.headers["next-router-prefetch"] !== undefined ||
+      request.headers["x-middleware-prefetch"] === "1" ||
+      [request.headers.purpose, request.headers["sec-purpose"]].some(
+        (value) =>
+          typeof value === "string" &&
+          value
+            .split(/[;,]/)
+            .some((part) => part.trim().toLowerCase() === "prefetch"),
+      )
+    ) {
+      respond(response, 204);
+      return;
+    }
+
+    if (request.method !== "GET" && (!signOut || request.method !== "POST")) {
+      response.setHeader("Allow", signIn ? "GET" : "GET, POST");
+      respond(response, 405);
+      return;
+    }
+
+    // Local change: `?as=<id>` signs in as a persona from the fixture.
+    const persona = signIn ? url.searchParams.get("as") : null;
+    if (persona !== null && !personas.has(persona)) {
+      response.statusCode = 400;
+      response.setHeader("Cache-Control", "private, no-store");
+      response.setHeader("Content-Type", "text/plain; charset=utf-8");
+      response.end(
+        `Unknown persona. Choose one of: ${[...personas.keys()].join(", ")}.\n`,
+      );
+      return;
+    }
+
+    response.statusCode = request.method === "POST" ? 303 : 302;
+    response.setHeader("Cache-Control", "private, no-store");
+    response.setHeader(
+      "Location",
+      safeReturnPath(url.searchParams.get("return_to")),
+    );
+    response.setHeader(
+      "Set-Cookie",
+      `${localCookieName}=${signIn ? (persona ?? "1") : ""}; Path=/; ${
+        signOut ? "Max-Age=0; " : ""
+      }HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
+    );
+    response.end();
+  };
+}
+
 export function sites({ mockAuth = true } = {}): Plugin {
   let root = process.cwd();
   let command: "build" | "serve" = "build";
@@ -59,147 +209,7 @@ export function sites({ mockAuth = true } = {}): Plugin {
       server.config.logger.info(
         `Sites local sign-in: ${devPersonas.defaultIdentity.email}; personas: ${SIGN_IN_PATH}?as=<${[...personas.keys()].join("|")}>`,
       );
-      server.middlewares.use((request, response, next) => {
-        for (const name of Object.keys(request.headers)) {
-          if (name.startsWith("oai-authenticated-user-")) {
-            removeHeader(request, name);
-          }
-        }
-
-        let authority: URL;
-        let url: URL;
-        try {
-          authority = new URL(
-            `${secure ? "https" : "http"}://${request.headers.host}`,
-          );
-          url = new URL(request.url ?? "/", authority);
-        } catch {
-          if (isAuthPath((request.url ?? "/").split("?")[0])) {
-            respond(response, 403);
-          } else {
-            next();
-          }
-          return;
-        }
-
-        const hostname = authority.hostname
-          .replace(/^\[|\]$/g, "")
-          .toLowerCase();
-        if (
-          !localHosts.has(hostname) ||
-          !localAddresses.has(request.socket.remoteAddress ?? "") ||
-          url.origin !== authority.origin
-        ) {
-          if (isAuthPath(url.pathname)) respond(response, 403);
-          else next();
-          return;
-        }
-
-        const cookies = (request.headers.cookie ?? "")
-          .split(";")
-          .map((cookie) => cookie.trim())
-          .filter(Boolean);
-        const signInCookies = cookies
-          .filter((cookie) => cookie.startsWith(`${localCookieName}=`))
-          .map((cookie) => cookie.slice(localCookieName.length + 1));
-        const applicationCookies = cookies.filter(
-          (cookie) => !cookie.startsWith(`${localCookieName}=`),
-        );
-        if (applicationCookies.length !== cookies.length) {
-          removeHeader(request, "cookie");
-          if (applicationCookies.length) {
-            setHeader(request, "cookie", applicationCookies.join("; "));
-          }
-        }
-
-        if (url.pathname === CALLBACK_PATH) {
-          respond(response, 501);
-          return;
-        }
-
-        const signIn = url.pathname === SIGN_IN_PATH;
-        const signOut = url.pathname === SIGN_OUT_PATH;
-        if (!signIn && !signOut) {
-          const identity =
-            signInCookies.length === 1
-              ? localIdentity(signInCookies[0])
-              : undefined;
-          if (identity) {
-            setHeader(request, "oai-authenticated-user-id", identity.userId);
-            setHeader(request, "oai-authenticated-user-email", identity.email);
-            setHeader(
-              request,
-              "oai-authenticated-user-full-name",
-              encodeURIComponent(identity.name),
-            );
-            setHeader(
-              request,
-              "oai-authenticated-user-full-name-encoding",
-              "percent-encoded-utf-8",
-            );
-          }
-          next();
-          return;
-        }
-
-        if (
-          (request.headers.origin && request.headers.origin !== url.origin) ||
-          request.headers["sec-fetch-site"] === "cross-site"
-        ) {
-          respond(response, 403);
-          return;
-        }
-
-        if (
-          request.headers["next-router-prefetch"] !== undefined ||
-          request.headers["x-middleware-prefetch"] === "1" ||
-          [request.headers.purpose, request.headers["sec-purpose"]].some(
-            (value) =>
-              typeof value === "string" &&
-              value
-                .split(/[;,]/)
-                .some((part) => part.trim().toLowerCase() === "prefetch"),
-          )
-        ) {
-          respond(response, 204);
-          return;
-        }
-
-        if (
-          request.method !== "GET" &&
-          (!signOut || request.method !== "POST")
-        ) {
-          response.setHeader("Allow", signIn ? "GET" : "GET, POST");
-          respond(response, 405);
-          return;
-        }
-
-        // Local change: `?as=<id>` signs in as a persona from the fixture.
-        const persona = signIn ? url.searchParams.get("as") : null;
-        if (persona !== null && !personas.has(persona)) {
-          response.statusCode = 400;
-          response.setHeader("Cache-Control", "private, no-store");
-          response.setHeader("Content-Type", "text/plain; charset=utf-8");
-          response.end(
-            `Unknown persona. Choose one of: ${[...personas.keys()].join(", ")}.\n`,
-          );
-          return;
-        }
-
-        response.statusCode = request.method === "POST" ? 303 : 302;
-        response.setHeader("Cache-Control", "private, no-store");
-        response.setHeader(
-          "Location",
-          safeReturnPath(url.searchParams.get("return_to")),
-        );
-        response.setHeader(
-          "Set-Cookie",
-          `${localCookieName}=${signIn ? (persona ?? "1") : ""}; Path=/; ${
-            signOut ? "Max-Age=0; " : ""
-          }HttpOnly; SameSite=Lax${secure ? "; Secure" : ""}`,
-        );
-        response.end();
-      });
+      server.middlewares.use(localAuthMiddleware({ secure }));
     },
     async closeBundle() {
       if (command !== "build") return;
