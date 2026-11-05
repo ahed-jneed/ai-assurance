@@ -411,11 +411,14 @@ class PackCommandTests(unittest.TestCase):
         self.assertEqual(base64.b64decode(container["files"][0]["contentBase64"]), b"id,value\n1,2\n")
 
     def test_absolute_parent_and_drive_paths_are_rejected(self):
-        for source in (str(self.root / "outside.json"), "../outside.json", "evidence/../../outside.json", "evidence\\..\\..\\outside.json", "C:outside.json", "/outside.json", "\\\\server\\share\\outside.json", ".."):
+        # Each case must fail its own check: re-rooted under the base, an
+        # absolute path would otherwise fail only because nothing is there.
+        relative, leaves = "must be relative to the specification directory", "cannot leave the base directory"
+        for source, reason in ((str(self.root / "outside.json"), relative), ("C:outside.json", relative), ("/outside.json", relative), ("\\\\server\\share\\outside.json", relative), ("../outside.json", leaves), ("evidence/../../outside.json", leaves), ("evidence\\..\\..\\outside.json", leaves), ("..", leaves)):
             with self.subTest(source=source):
                 code, errors, output = self.pack(source)
                 self.assertEqual(code, 2)
-                self.assertIn("Assurance procedure rejected", errors)
+                self.assertIn("Assurance procedure rejected: Pack sources "+reason, errors)
                 self.assertNotIn("outside the engagement", errors)
                 self.assertFalse(output.exists())
 
