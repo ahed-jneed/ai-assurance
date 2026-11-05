@@ -216,9 +216,14 @@ class ConnectorAdapterTests(unittest.TestCase):
 
     @requires_numpy
     def test_native_tree_loading_lets_memory_errors_reach_the_child_main(self):
-        with patch.dict(sys.modules, {"lightgbm": types.SimpleNamespace(Booster=out_of_memory)}):
-            with self.assertRaises(MemoryError):
-                model_process.score(self.lightgbm_payload("binary sigmoid:1"))
+        model = self.directory/"model.json"
+        model.write_text('{"learner": {}}', encoding="utf-8")
+        xgboost = {**self.lightgbm_payload("binary sigmoid:1"), "path": str(model), "format": "xgboost_json", "expectedSha256": sha256(model.read_bytes())}
+        runtimes = {"lightgbm": types.SimpleNamespace(Booster=out_of_memory), "xgboost": types.SimpleNamespace(Booster=lambda params: types.SimpleNamespace(load_model=out_of_memory))}
+        with patch.dict(sys.modules, runtimes):
+            for payload in (self.lightgbm_payload("binary sigmoid:1"), xgboost):
+                with self.subTest(payload["format"]), self.assertRaises(MemoryError):
+                    model_process.score(payload)
 
     def numeric_adapter(self, labels, *, threshold=None, positive=None):
         path = self.directory/"threshold-model.txt"
