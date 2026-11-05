@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -651,6 +652,9 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual((entry["event"], entry["code"], entry["failPosted"]), ("failed", "missing_column", True))
         self.assertIn("'actual'", entry["detail"]["message"])
         self.assertEqual(entry["detail"]["exceptionType"], "EngineError")
+        if os.name == "posix":  # Windows has no POSIX permission bits.
+            # Owner-only, like the job directories, because it names columns.
+            self.assertEqual(stat.S_IMODE((self.root/"jobs"/"operator-log.jsonl").stat().st_mode), 0o600)
 
     def test_label_set_mismatch_reaches_the_auditor_as_its_code(self):
         data = b"actual,predicted\n1,1\n0,2\n1,0\n"

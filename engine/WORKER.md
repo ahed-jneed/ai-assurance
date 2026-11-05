@@ -125,7 +125,7 @@ Local states that are never posted: `lease_lost` (a stale worker never publishes
 
 On a compute failure the compute process writes `outputs/error.json` (`{"schemaVersion":"1.0","code":...}`). The control plane accepts only a compute code from the table and otherwise posts `compute_rejected`, because compute may run a native parser on client bytes. The compute process also writes `outputs/operator-detail.json` with the exception type and, for engine validation errors only, the engine's message (for example which column is missing). Native-library messages are reduced to their type.
 
-The worker appends every job outcome (completed, failed with code and whether the fail was acknowledged, lease lost, completion uncertain) to `<workspace>/operator-log.jsonl`, including that operator detail. The log stays on the worker host and is never sent to the platform; rotate it with the job evidence.
+The worker appends every job outcome (completed, failed with code and whether the fail was acknowledged, lease lost, completion uncertain) to `<workspace>/operator-log.jsonl`, including that operator detail. It creates the log owner-only (mode 0600, like the 0700 job directories), because entries can name columns and labels. The log stays on the worker host and is never sent to the platform; rotate it with the job evidence.
 
 ## Hosted and external report translation
 

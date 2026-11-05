@@ -771,7 +771,10 @@ class Worker:
         """Append one line to the local operator log; never sent to the platform."""
         line = json.dumps({"at": datetime.now(timezone.utc).isoformat(), "workerId": self.worker_id, **entry}, ensure_ascii=False, allow_nan=False, sort_keys=True)
         try:
-            with (self.workspace/OPERATOR_LOG).open("a", encoding="utf-8", newline="\n") as handle:
+            # Owner-only, like the job directories: entries name jobs and
+            # columns. O_BINARY (Windows only) keeps "\n" line endings as written.
+            descriptor = os.open(self.workspace/OPERATOR_LOG, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0), 0o600)
+            with open(descriptor, "a", encoding="utf-8", newline="\n") as handle:
                 handle.write(line+"\n")
         except OSError:
             print(json.dumps({"state": "operator_log_unavailable"}), file=sys.stderr, flush=True)
