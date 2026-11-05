@@ -22,7 +22,11 @@ import { WorkspaceSearch } from "../workspace-search";
 import { useLabIntent } from "./lab-intent";
 import { ModalHost } from "./modal-host";
 import { useModelContextTools } from "./model-context-tools";
-import { navigationGuard, useLeaveGuard } from "./navigation-guards";
+import {
+  navigationGuard,
+  useEditingRegistry,
+  useLeaveGuard,
+} from "./navigation-guards";
 import { PaperEditorHost } from "./paper-editor-host";
 import { usePanelPrefetch } from "./panels";
 import { RecordSheet } from "./record-sheet";
@@ -96,7 +100,7 @@ export default function Workspace() {
     reviewer = ["Reviewer", "Lead Auditor"].includes(role),
     lead = role === "Lead Auditor",
     viewer = ["Client Viewer", "Client Contributor"].includes(role);
-  const [labEditing, setLabEditing] = useState(false);
+  const editing = useEditingRegistry();
   const url = useUrlState(data);
   const modal = useModalState();
   const sheet = useRecordSheet();
@@ -115,7 +119,7 @@ export default function Workspace() {
         sheet.setDetail(null);
         paper.clearPaper();
         modal.setModal("");
-        setLabEditing(false);
+        editing.clear();
         paper.setHasPendingComment(false);
       },
       onRestoreView: url.setView,
@@ -129,7 +133,7 @@ export default function Workspace() {
     bootstrapping,
     modal: modal.modal,
     isModalSubmitting: modal.isSubmitting,
-    editorOpen: labEditing,
+    editorOpen: editing.editorOpen,
     view: url.view,
     isDirty: paper.isNavigationDirty,
     confirmDiscard: paper.confirmDiscard,
@@ -156,7 +160,7 @@ export default function Workspace() {
     loading,
     bootstrapping,
     modal: modal.modal,
-    editorOpen: labEditing,
+    editorOpen: editing.editorOpen,
     guarded,
     load: workspace.load,
     getData: workspace.getData,
@@ -174,9 +178,11 @@ export default function Workspace() {
     switchOpen ||
     !!modal.modal ||
     !!sheet.detail ||
-    labEditing;
+    editing.editorOpen;
   useSearchShortcut(searchDisabled, setSearchOpen);
-  useLeaveGuard(paper.navigationDirty || labEditing || modal.modalDirty);
+  useLeaveGuard(
+    paper.navigationDirty || editing.editorOpen || modal.modalDirty,
+  );
   const resolveName = nameResolver(data);
   const paperRows = e
     ? selectPaperRegister(
@@ -254,7 +260,7 @@ export default function Workspace() {
                 load={workspace.load}
                 displayedEvidenceTab={displayedEvidenceTab}
                 paperRows={paperRows}
-                onEditing={setLabEditing}
+                reporters={editing.reporters}
                 resolve={resolveName}
                 labIntent={lab.intent}
                 onModal={modal.open}
@@ -273,7 +279,7 @@ export default function Workspace() {
           busy={busy}
           manage={workspace.manage}
           act={workspace.act}
-          onEditing={setLabEditing}
+          onEditing={editing.reporters["member-onboarding"]}
         />
       )}
       <PaperEditorHost
@@ -317,7 +323,7 @@ export default function Workspace() {
       />
       <RecordSheet
         sheet={sheet}
-        editorOpen={labEditing}
+        editorOpen={editing.editorOpen}
         data={data}
         engagement={e}
         role={role}
@@ -327,7 +333,7 @@ export default function Workspace() {
         act={workspace.act}
         safeAct={workspace.safeAct}
         load={workspace.load}
-        onEditing={setLabEditing}
+        reporters={editing.reporters}
         onPaper={nav.openPaper}
         onModal={modal.open}
         onRequestForm={nav.requestForm}

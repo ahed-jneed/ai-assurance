@@ -7,6 +7,7 @@ import type { WorkItem } from "@/lib/work-items";
 import { EngagementOverview } from "../../engagement-overview";
 import type { WorkspaceData } from "../../workspace-types";
 import { articleCoverage } from "../coverage";
+import type { EditingReporter } from "../navigation-guards";
 import { ClientPortal, panelFallback } from "../panels";
 import type { Navigate } from "../types";
 import { ClientOverview } from "./client-overview";
@@ -32,7 +33,7 @@ export function Overview({
   role: Role;
   viewer: boolean;
   busy: boolean;
-  onEditing: (editing: boolean) => void;
+  onEditing: EditingReporter;
   onReload: () => Promise<unknown>;
   onNavigate: Navigate;
   onWork: (item: WorkItem) => void;
