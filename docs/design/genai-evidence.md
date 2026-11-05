@@ -146,7 +146,7 @@ Every run carries `$defs/runMetadata` from `schemas/genai-evidence-item.schema.j
 | `dataset` | Name, version and SHA-256 when known (section 7 per format) |
 | `datasetFingerprint` | Computed for every run: SHA-256 of the canonical JSON list of the run's **distinct** `[groupKey, promptSha256, targetSha256]` triples over all items (any status), sorted by `groupKey`, then `promptSha256`, then `targetSha256`, with null before any string. Epochs repeat a group's triple, so the fingerprint does not depend on epoch counts. Equal fingerprints mean the same items, which pairing requires (8.6) |
 | `attackSet` | For attack criteria: name, version and hash (for example garak probe spec plus garak version; promptfoo `config.tests`, hashed as canonical JSON) |
-| `judges` | One entry per distinct (judge model, scorer): `ref` (`J1`, `J2`, … in order of first appearance), `role` (`grader`, `pairwise_judge`, `detector_model`, `scorer_model`), `model` (with snapshot and family), `promptTemplateSha256` (the judge configuration hash of section 7.9), and `validation` (kappa, interval, n, level, position consistency, binding, label-file SHA-256, evidence level) |
+| `judges` | One entry per distinct (judge model, scorer) the log shows, plus the declared-only entries of section 6.3: `ref` (`J1`, `J2`, …: observed entries in order of first appearance, then declared-only entries), `role` (`grader`, `pairwise_judge`, `detector_model`, `scorer_model`; assigned in 6.3), `model` (with snapshot and family), `promptTemplateSha256` (the judge configuration hash of section 7.9), and `validation` (kappa, interval, n, level, position consistency, binding, label-file SHA-256, evidence level) |
 | `epochs` | Repeats per test item (Inspect `config.epochs`, promptfoo `repeat`, garak `run.generations`), otherwise 1 |
 | `n` | Computed: `items` (item records, one per epoch), `groups` (distinct `groupKey`s) and `scored` (items with status `scored`). Decisions count scored groups (8.2), which each criterion reports |
 | `dates` | `runStartedAt` and `runCompletedAt`, timezone-aware. Naive timestamps (garak) are converted only when the manifest declares `dates.utcOffset` (for example `"+01:00"`); otherwise they are null with `naive_timestamp` |
@@ -182,6 +182,7 @@ A required field is **missing** when it is null after extraction and declaration
 - `c(x)`, the **component rule**, applies to every identifier a tool recorded (ids, names, task names, provider ids, labels). `c(x)` is `x` itself when `x` matches `^[A-Za-z0-9._@+=/#-]{1,128}$`, is not of the escape form `h-` plus 16 lowercase hex, and matches no secret pattern of section 11.4. Otherwise `c(x)` is `h-` followed by the first 16 hex characters of SHA-256 of `x`. An empty string, a space (promptfoo `exec: python chain.py`), a colon (promptfoo `openai:gpt-4o`, `file://target.js`, ISO times in `evalId`), a URL with a query or credentials, and a redaction marker all hash. Separators therefore never appear inside a component, and no secret reaches a key.
 - `t16(h)` is the first 16 characters of a 64-hex SHA-256 value `h` that the engine computed or recomputed. Content hashes enter keys only as `t16` values; the full values stay in `promptSha256`, `toolHashes` and the fingerprint. Tool identifiers that happen to be hashes (promptfoo `promptId`) go through `c()` unchanged.
 - Occurrence counters (`:<n>`, from 0) number groups that would otherwise share a key, in the order the table gives.
+- **Length.** A composed `runKey` or `groupKey` has at most 250 characters, so `itemKey` (with an epoch of at most five digits) stays within the 512 characters of `$defs/key`. A longer composed key keeps its first component and replaces the rest with `h-` and the first 16 hex characters of SHA-256 of the whole composed key, for example `promptfoo:h-<16 hex>`. Only the promptfoo and lm-evaluation-harness `runKey`s and the Inspect and PyRIT `groupKey`s can grow that long, because they join several components of up to 128 characters. No fixture key comes close: the longest `runKey` in `normalized-items.jsonl` has 126 characters.
 
 | Format | `runKey` | `groupKey` | Occurrence order |
 |---|---|---|---|
@@ -193,7 +194,7 @@ A required field is **missing** when it is null after extraction and declaration
 | DeepEval | `deepeval:` t16(file SHA-256), unless declared | `deepeval:` c(`name`) when every name is present and unique, else `deepeval:order-<order>` | none |
 | Ragas | `ragas:` t16(file SHA-256), unless declared | `ragas:` t16(SHA-256 of `user_input`; canonical JSON when not a string) `:` n | file line among rows with the same `user_input` |
 
-The date id is the `<date>` group of the lm-evaluation-harness file names (7.3). A declared `runKey` (manifest `inputs[].runKey`, allowed only for `pyrit_export`, `deepeval_test_run` and `ragas_results`) MUST match the key pattern and contain no `|`. `normalized-items.jsonl` holds every key these rules give for the fixtures.
+The date id is the `<date>` group of the lm-evaluation-harness file names (7.3). A declared `runKey` (manifest `inputs[].runKey`, allowed only for `pyrit_export`, `deepeval_test_run` and `ragas_results`) MUST match `^[A-Za-z0-9._:/#@+=-]{1,128}$`, the key alphabet without `|` and at most 128 characters; otherwise the manifest is invalid (`manifest_invalid`). `normalized-items.jsonl` holds every key these rules give for the fixtures.
 
 ### 6.3 Bundle manifest (`genai-bundle/0.1`)
 
@@ -219,15 +220,21 @@ The date id is the `<date>` group of the lm-evaluation-harness file names (7.3).
 ```
 
 - `origin` is `auditee_supplied` or `auditor_rerun`.
-- Inputs are matched to files by SHA-256, never by name or path. `inputs[].runKey` (optional) names the run of a `pyrit_export`, `deepeval_test_run` or `ragas_results` input (6.2).
+- Inputs are matched to files by SHA-256, never by name or path. `inputs[].runKey` (optional, at most 128 characters) names the run of a `pyrit_export`, `deepeval_test_run` or `ragas_results` input (6.2).
 - `role` is one of `log`, `samples`, `results`, `hitlog`, `judge_validation` or `attack_set`.
 - Every `family` value MUST be one of `schemas/genai-evidence-item.schema.json` `$defs/family`: the manifest schema of G4 references that definition instead of repeating the list.
 - A declaration never overrides an extracted value. Both values are kept, and the warning `declaration_conflict` is added when the declaration disagrees with the log:
   - strings are compared exactly;
   - a declared `snapshot` is compared with the extracted snapshot when one was extracted, and MUST equal it;
-  - when no snapshot was extracted, the declared one fills the field (source `declared`) and is consistent with the extracted model name when it starts with the last `/`-separated segment of that name (`gpt-4o-2024-08-06` for `openai/gpt-4o`, `model-2026-11-05` for `mockllm/model`) or is a revision or digest (`^[0-9a-f]{7,40}$`, `^sha256:[0-9a-f]{64}$`); any other value is a `declaration_conflict`.
-- Declared judges are matched to observed judges by `model`; each observed judge entry with that model takes the declared snapshot, family and, when the log yields none, `promptTemplateSha256`. A declared judge that is never observed raises `declared_judge_not_observed`. An observed judge that is never declared stays with `family: null`.
-- `declared.judges[].scores` lists score names that this judge produced although the log does not show it (Ragas LLM columns, a promptfoo `javascript` assertion that calls a model, a PyRIT self-ask scorer). Those scores become `model_graded` with that judge.
+  - when no snapshot was extracted, the declared one fills the field (source `declared`). It is consistent with the extracted model name when it equals the name's last `/`-separated segment, when it continues that segment with a separator (`-`, `_`, `.`, `:` or `@`) and then a digit or `v` and a digit (the remainder matches `^[-_.:@]v?[0-9]`: a date, a number or a version), or when it is a revision or digest (`^[0-9a-f]{7,40}$`, `^sha256:[0-9a-f]{64}$`). So `gpt-4o-2024-08-06` fits `openai/gpt-4o` and `model-2026-11-05` fits `mockllm/model`, while `gpt-4o-mini-2024-07-18` for `openai/gpt-4o` is a `declaration_conflict`, like any other value.
+- Declared judges are matched to observed judges by `model`; each observed judge entry with that model takes the declared snapshot, family and, when the log yields none, `promptTemplateSha256`. A declared judge that matches no observed judge and names no score of any run (next point) raises `declared_judge_not_observed`. An observed judge that is never declared stays with `family: null`. The manifest's `declared.judges[].ref` names the declaration, and `inputs[].judgeRef` refers to it; run-level refs are numbered per run (6.1), so the two can differ. A label file bound to a declaration can validate the judge entries that the declaration matched or created.
+- `declared.judges[].scores` lists score names that this judge produced although the log does not show it (Ragas LLM columns, a promptfoo `javascript` assertion that calls a model, a promptfoo model-graded assertion graded by promptfoo's default grader, a PyRIT self-ask scorer). Those scores become `model_graded` with that judge. When the log shows no judge for such a score, the declaration gets a **declared-only judge entry** in each run that has one of its scores:
+  - `ref` is numbered after that run's observed entries, in `declared.judges[]` order;
+  - `model`, `snapshot`, `family` and `promptTemplateSha256` come from the declaration (source `declared`, pointer `manifest#/declared/judges/<i>`), and `role` follows the next point;
+  - it is the `judgeRef` of every score the declaration names in that run, and it raises no `declared_judge_not_observed`.
+
+  A score whose judge the log shows keeps its observed entry.
+- **Judge roles.** `pairwise_judge` for a judge that compares outputs: an entry with a promptfoo `select-best` score, or any entry of a declaration with `pairwise: true` (optional, default false; it only adds a validation condition, so it applies to observed entries too). Otherwise the format decides: `detector_model` for garak's model-as-judge detectors (7.5), `scorer_model` for PyRIT scorers (7.6), and `grader` for every other judge (Inspect scorer models, the other promptfoo model-graded assertions, DeepEval `evaluationModel`, Ragas LLM columns). A pairwise judge is validated only with position consistency (8.7, condition 6), so a label file without AB/BA pairs never validates it.
 - `declared.scorers[]` is `{score, kind: "deterministic", rationale}` for an `unknown` score that is in fact deterministic (for example a promptfoo `javascript` assertion whose recorded source only compares strings). The declaration is recorded as `declaredBy`, and the score decides only after a `genai_acknowledgement` with flag `scorer_kind_declared` (12.1). A declaration can never change an observed `model_graded` score.
 
 ## 7. Formats (field-level mapping)
@@ -249,6 +256,14 @@ All mappings below were checked against the fixtures in `engine/tests/fixtures/g
   Only scored items enter denominators. The counts of the other three statuses are always reported.
 - **Scorer kinds fail closed (normative).** A score is `deterministic` (or `tool_detector` for garak) only when the format's allowlist below names it, and `model_graded` when the log shows a judge model or the type is a known model-graded one. Everything else is `unknown`, and the gate treats `unknown` like `model_graded` (8.7). The allowlists live in `engine/genai/scorers.py` with the tool version they were verified against. A composite score (promptfoo `overall`, PyRIT wrapper scorers) takes the most restrictive kind of its parts, in the order `unknown`, `model_graded`, `human`, `tool_detector`, `deterministic`, and the gate checks every part. Names are not proof: a task-file scorer that reuses a built-in name, or a renamed Ragas metric, is indistinguishable in the log, which is why the claim scope names the scorer and the reviewer sees the kind of every deciding score.
 - **Labels** keep at most 50 scalar metadata entries (keys `^[A-Za-z0-9_.:-]{1,100}$`, string values truncated to 500 characters with `label_truncated`). Objects, arrays and keys starting with `_` are dropped.
+- **Scores per item.** An item has at most `MAX_SCORES_PER_ITEM` (50) scores. An item with more is the error `too_many_scores`, with its locator. Scores are never truncated, because a dropped score could be the primary score or a part of a composite. lm-evaluation-harness items reach the bound first, because merging filters gives one score per filter and metric (7.3).
+- **Values as strings.** `clusterId`, `technique` and `variant` read from metadata, columns or paths are strings: a string as recorded, a number or boolean as its canonical JSON text. Null, an absent key, an object or an array gives null, and a value longer than 300 characters (the schema bound) becomes `h-` plus the first 16 hex characters of its SHA-256.
+- **Fields a format table does not list** take the same values in every format, as `normalized-items.jsonl` does:
+  - `toolHashes` is `{}`;
+  - `systemPromptSha256` and `targetSha256` are null, because the format records no system message or no single target for the item;
+  - `technique` and `variant` are null for items that are not attacks;
+  - `categories` comes from the plan in the formats without tags (Inspect, lm-evaluation-harness, PyRIT, DeepEval, Ragas): `plan.categories.byTechnique[technique]`, else `plan.categories.default`, sorted (8.1);
+  - the optional fields are left out: `transcriptSha256` except on Inspect agent items, `usage` except for Inspect and promptfoo, `timing` except for Inspect, `excerpt` unless `plan.excerpts` selects the item, and `warnings` when the item has none.
 
 ### 7.2 Inspect AI (`inspect_eval`, `inspect_json`)
 
@@ -348,7 +363,7 @@ Inspect's header metrics apply score edits but **not** invalidations; this was o
 
 **Version gate.** `lm_eval_version` major.minor 0.4. Verified: 0.4.13. Version 0.5.0.dev1 is tagged upstream and is not accepted until verified.
 
-**Runs and items.** Each task is one run, so a criterion never pools tasks (a results file for `tiny_mc` and `tiny_gen` gives two runs). The samples file has one row per (filter, document): `evaluate()` logs a sample inside `for filter_key in task.instances[0].filtered_resps` (`lm_eval/evaluator.py`, v0.4.13), so a task with two filters, such as gsm8k's `strict-match` and `flexible-extract`, writes every document twice. The engine merges the rows of one `doc_id` into **one item** whose scores carry the filter in their name. The merged rows MUST agree on `doc_hash`, `prompt_hash` and `target_hash`, and every filter MUST cover the same `doc_id`s; otherwise the error is `lm_eval_bundle_mismatch`. n therefore counts documents, never (filter, document) pairs.
+**Runs and items.** Each task is one run, so a criterion never pools tasks (a results file for `tiny_mc` and `tiny_gen` gives two runs). The samples file has one row per (filter, document): `evaluate()` logs a sample inside `for filter_key in task.instances[0].filtered_resps` (`lm_eval/evaluator.py`, v0.4.13), so a task with two filters, such as gsm8k's `strict-match` and `flexible-extract`, writes every document twice. The engine merges the rows of one `doc_id` into **one item** whose scores carry the filter in their name. The merged rows MUST agree on `doc_hash`, `prompt_hash` and `target_hash`, and every filter MUST cover the same `doc_id`s; otherwise the error is `lm_eval_bundle_mismatch`. n therefore counts documents, never (filter, document) pairs. An item carries one score per filter and metric, at most 50 (`too_many_scores`, 7.1).
 
 | Per-item field | Source |
 |---|---|
@@ -356,12 +371,13 @@ Inspect's header metrics apply score edits but **not** invalidations; this was o
 | `epoch` | 1. Generation `repeats` feed the tool's filters and are kept as `labels.repeats` |
 | `source` | `locator`: `<samples file name>:<line>` of the item's first row (first filter in file order); `toolItemId`: `str(doc_id)` |
 | `task` | The task name; `str(versions[task])` |
+| `itemType` | `qa`. lm-evaluation-harness records no attack or agent semantics, so `plan.taskTypes` does not apply |
 | `promptSha256` | SHA-256 of `arguments.gen_args_0.arg_0`. It MUST equal `prompt_hash`, which lm-evaluation-harness computes over `requests[0].arguments[0]`, the same string |
 | `targetSha256` | `target` as text: a string as is, any other value as canonical JSON |
 | `toolHashes` | `lm_eval.doc_hash`, `lm_eval.prompt_hash`, `lm_eval.target_hash` as recorded, each recomputed (7.1). `doc_hash` is SHA-256 of `json.dumps(doc, indent=2, ensure_ascii=False)` over the decoded `doc`, with Python's `json` module and non-finite markers written back as `NaN`, `Infinity` and `-Infinity`. `target_hash` is SHA-256 of Python `str()` of the decoded `target`; for a list-valued target `str(tuple(target))` is also accepted, because the tool writes a tuple as a JSON list. Both recipes are those of `evaluate()` at v0.4.13 and reproduce every fixture row |
 | `responseSha256` | `generate_until`: SHA-256 of `resps[0][0]` (the first raw generation of the first request) when it is a string; filters only post-process it. `loglikelihood` and `multiple_choice`: null |
 | `scores[]` | One per (filter, metric), named `<metric>,<filter>` as in lm-evaluation-harness's own results keys (`acc,none`, `exact_match,strict-match`), ordered by filter (first appearance in the file), then by the row's `metrics` list. `value` is `row[metric]` for numbers and booleans; anything else (a tuple-valued metric such as `acc_all`, `bleu` or `f1`) is `null` with `unparseable_score`. `scale` is `binary` when every value of that score in the run is 0 or 1, otherwise `real` |
-| `scores[].scorer.kind` | `deterministic` when the metric is a registered lm-evaluation-harness metric (`acc`, `acc_all`, `acc_bytes`, `acc_mutual_info`, `acc_norm`, `bits_per_byte`, `bleu`, `brier_score`, `byte_perplexity`, `chrf`, `chrf++`, `exact_match`, `f1`, `likelihood`, `mcc`, `perplexity`, `ter`, `word_perplexity`; `lm_eval/api/metrics.py` at v0.4.13), its `metric_list` entry names it as a string, and the task config has no `process_results` hook. Otherwise `unknown`: a `!function` metric or `process_results` runs task code that may call anything |
+| `scores[].scorer.kind` | `deterministic` when the metric is a registered lm-evaluation-harness metric (`acc`, `acc_all`, `acc_bytes`, `acc_mutual_info`, `acc_norm`, `bits_per_byte`, `bleu`, `brier_score`, `byte_perplexity`, `chrf`, `chrf++`, `exact_match`, `f1`, `likelihood`, `mcc`, `perplexity`, `ter`, `word_perplexity`; `lm_eval/api/metrics.py` at v0.4.13), its `metric_list` entry names it as a string, and the task config has no `process_results` hook. A config without `metric_list` counts as naming the output type's default metrics: lm-evaluation-harness leaves null fields out of the config it writes and then evaluates `DEFAULT_METRIC_REGISTRY` (`lm_eval/api/registry.py`, v0.4.13), which is `perplexity` and `acc` for `loglikelihood`, `acc` and `acc_norm` for `multiple_choice`, `exact_match` for `generate_until`, and `word_perplexity`, `byte_perplexity` and `bits_per_byte` for `loglikelihood_rolling`. Otherwise `unknown`: a `!function` metric or `process_results` runs task code that may call anything |
 | `outcome` | `metric`: `correct` when the primary score's scale is `binary`, otherwise `score`; rule `lm_eval.metric_value` |
 | `clusterId` | `plan.clusterKey` (a string, or a map from task name to key) as a dot path into the samples row, for example `doc.passage` |
 | `labels` | `filters` (comma-joined, in order), `outputType` (`configs[task].output_type`), `repeats` (`configs[task].repeats`) |
@@ -375,9 +391,14 @@ Inspect's header metrics apply score edits but **not** invalidations; this was o
 | `tools` | Computed `{agentic: false, offered: []}`: lm-evaluation-harness 0.4 evaluates no tool calls |
 | `dataset` | `configs[task].dataset_path`, plus `:<dataset_name>` when set; `str(versions[task])`; `sha256` is `task_hashes[task]`, recomputed as SHA-256 of the concatenated `doc_hash + prompt_hash + target_hash` of the task's rows in file order (`lm_eval/loggers/evaluation_tracker.py`; it reproduces both fixture tasks) |
 | `epochs` | 1 (computed) |
-| `dates` | `date` is Unix seconds in UTC (observed: 1793894046.10 is 15:54:06Z, while the file name shows local 16-54-06). `runCompletedAt` is `date` + `total_evaluation_time_seconds` (computed) |
+| `dates` | `date` is Unix seconds in UTC (observed: 1793894046.10 is 15:54:06Z, while the file name shows local 16-54-06). `runCompletedAt` is `date` + `total_evaluation_time_seconds` (computed). In 0.4.13 `total_evaluation_time_seconds` is a JSON string (`"145.86609690007754"` in the fixture), parsed as a decimal number of seconds; when it is absent or not a finite, non-negative decimal, `runCompletedAt` is null |
 
-**Reconciliation.** Only metrics whose `configs[task].metric_list[].aggregation` is `mean` are compared: `results[task]["<metric>,<filter>"]` and `["<metric>_stderr,<filter>"]` against the recomputed mean and IID SE. For `mean`, lm-evaluation-harness uses the sample standard deviation over √n (`mean_stderr`), which reproduced every value in the fixture (checked to 6 decimal places). Every other aggregation is `not_comparable`: `stderr_for_metric` bootstraps the aggregations `median`, `matthews_corrcoef`, `f1_score`, `perplexity`, `bleu`, `chrf`, `chrfpp`, `ter` and `nanmean` (`lm_eval/api/metrics.py`), so their standard errors depend on a random seed, and `acc_all` aggregates (prediction, document) pairs per MultiRC question, which per-item values cannot reproduce. A `stderr` of `"N/A"` (`bootstrap_iters` 0) is `not_comparable` too. A criterion whose primary score is not a `mean` aggregation is inconclusive (`unsupported_aggregation`).
+**Reconciliation.** Only metrics whose aggregation is `mean` are compared: `results[task]["<metric>,<filter>"]` and `["<metric>_stderr,<filter>"]` against the recomputed mean and IID SE. For `mean`, lm-evaluation-harness uses the sample standard deviation over √n (`mean_stderr`), which reproduced every value in the fixture (checked to 6 decimal places).
+
+- **Which aggregation.** It is the `aggregation` of the metric's `configs[task].metric_list[]` entry when the entry has one. Task YAML may leave the key out; lm-evaluation-harness then logs a warning and applies the metric's registered default (`get_metric_aggregation` in `lm_eval/api/task.py`, v0.4.13), and it does the same for the default metrics of a config without `metric_list`. The engine follows it for the allowlisted metrics, with the defaults registered in `lm_eval/api/metrics.py` at v0.4.13: `mean` for `acc`, `acc_all`, `acc_bytes`, `acc_mutual_info`, `acc_norm`, `exact_match` and `likelihood`; `perplexity`, `weighted_perplexity` (for `word_perplexity` and `byte_perplexity`), `bits_per_byte`, `brier_score`, `matthews_corrcoef` (for `mcc`), `f1`, `bleu`, `chrf`, `chrf++` and `ter` for the others. A metric outside the allowlist without the key is `not_comparable`.
+- **Not comparable.** Every aggregation other than `mean` is `not_comparable`: `stderr_for_metric` bootstraps the aggregations `median`, `matthews_corrcoef`, `f1_score`, `perplexity`, `bleu`, `chrf`, `chrfpp`, `ter` and `nanmean` (`lm_eval/api/metrics.py`), so their standard errors depend on a random seed. `acc_all` is `not_comparable` even under its registered `mean`: it groups (prediction, document) pairs per MultiRC question, which per-item values cannot reproduce. A `stderr` of `"N/A"` (`bootstrap_iters` 0) is `not_comparable` too.
+
+A criterion whose primary score is `acc_all` or not a `mean` aggregation is inconclusive (`unsupported_aggregation`).
 
 **Never** evaluate task configuration strings. Results files serialise `!function` hooks as source text. Never use `trust_remote_code` or tasks flagged `unsafe_code`, which execute model output when the auditor re-runs them (L3 needs a sandbox; [interface docs](https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md)). `--predict_only` runs have no metric values, so every item is `unscored` and the run is L1. lm-evaluation-harness can write `NaN`: it serialises samples with `json.dumps` defaults, which allow non-finite numbers.
 
@@ -399,6 +420,7 @@ Inspect's header metrics apply score edits but **not** invalidations; this was o
 | `promptSha256` | If `prompt.raw` parses as a JSON array of `{role, content}` objects, the chat rule; otherwise SHA-256 of `prompt.raw` |
 | `systemPromptSha256` | The system messages of the parsed chat array; null for a non-chat prompt |
 | `responseSha256` | `response.output` (a string as is; anything else as canonical JSON); null when `failureReason == 2` |
+| `targetSha256` | Null: promptfoo grades with assertions and records no single target |
 | `scores[]` | One per `gradingResult.componentResults[]`, in order: `name` is `assertion.type`, suffixed with `:<metric>` when `assertion.metric` is set; when a name repeats within the item, its k-th occurrence (k ≥ 2) gets `#k` (`icontains`, `icontains#2`); `value` and `raw` are `score`, `passed` is `pass`, `scale` is `proportion`, and `threshold` is `assertion.threshold` when set. Then `overall`: `raw` and `value` the result's `score`, `passed` its `success`. Items without a `gradingResult` (provider errors) have no scores |
 | `scores[].scorer.kind` | See below |
 | `status` | `error` when `failureReason == 2`; otherwise `scored` when the primary score exists. `failureReason` 0 means none and 1 means an assertion failed |
@@ -471,14 +493,17 @@ The digest is documented in the [garak reporting reference](https://reference.ga
 | `runKey`, `groupKey` | Section 6.2 (`transient.run_id` equals `init.run`) |
 | `source` | `locator`: `<file>:<line>#/outputs/<g>`; `toolItemId`: the attempt `uuid` |
 | `task` | `probe_classname`; version `_config.version` |
+| `itemType` | `attack`: every attempt is an attack |
 | `promptSha256` | `prompt.turns[]` normalized as `{role, content}`, with the chat rule. A turn's content is `content.text` when that is a string and `content.data_path` is null; otherwise the whole `content` object (canonical JSON) |
 | `systemPromptSha256` | System turns, rule of section 6.2; null when there are none |
 | `responseSha256` | `outputs[g].text`; a null output gives `unscored` |
+| `targetSha256` | SHA-256 of the canonical JSON of the attempt's `targets` when that list is non-empty (target strings searched for in the outputs, per `garak/attempt.py` at v0.17.1); null otherwise, as in every fixture attempt |
 | `scores[]` | One per detector of `detector_results`, in recorded order: `name` the detector, `raw` and `value` `detector_results[detector][g]`, `passed` = value < threshold, `scale` `proportion`, `threshold` the run threshold |
 | `outcome` | `attack_success` = 1 when **any** detector's value is ≥ threshold, 0 when every non-null value is below it, `unscored` when all are null (rule `garak.any_detector_threshold`). A plan or criterion `primaryScore` that names one detector uses that detector alone (rule `garak.detector_threshold`) |
 | `technique`, `variant` | `probe_classname`; null (detectors are scores, not variants) |
 | `labels` | `detectors` (comma-joined), `goal`, `intent`, and the probe `tags` from `plugin_cache` joined with commas |
 | `categories` | Section 9.3 (probe table plus translated tags) |
+| `clusterId` | `plan.clusterKey` as a dot path into the attempt entry (for example `intent`), as a string (7.1); null when unset |
 
 **Scorer kinds** (garak 0.17.1, `garak/detectors/base.py`, `judge.py`, `agent_breaker.py`), read from the detector's `plugin_cache` entry:
 
@@ -529,14 +554,17 @@ The engine never opens PyRIT SQLite databases. An untrusted database is a larger
 | `variant` | The `class_name`s of `….attack.children.request_converters[]` joined with `+` (`Base64Converter`), or `none` when the list is absent or empty |
 | `source` | `locator`: `<file>:<line>`; `toolItemId`: `attack_result_id` |
 | `task` | The technique; version `pyritVersion` |
-| `promptSha256` | The first `user` piece (by `sequence`) and its `converted_value_sha256` (what the target received). It MUST equal SHA-256 of `converted_value`; that piece's `original_value_sha256` goes to `toolHashes` |
+| `itemType`, `epoch` | `attack` (every attack result is an attack) and 1 |
+| `promptSha256` | The first `user` piece (by `sequence`) and its `converted_value_sha256` (what the target received). It MUST equal SHA-256 of `converted_value`; that piece's `original_value_sha256` goes to `toolHashes["pyrit.original_value_sha256"]` |
 | `systemPromptSha256` | Pieces with role `system` (rule of section 6.2); null when there are none |
 | `responseSha256` | The last `assistant` piece's `converted_value_sha256` (verified the same way) |
+| `targetSha256` | Null: PyRIT records an objective, which the `groupKey` hashes, not a target |
 | `scores[]` | `attackResult.last_score`, named by its `scorer_class_identifier.class_name`: `score_value` `"true"` becomes 1 and `"false"` becomes 0; `passed` = not true; `scale` `binary` |
 | `scores[].scorer.kind` | `deterministic` only for `pyrit.score.true_false.substring_scorer.SubStringScorer` and the classes of module `pyrit.score.true_false.regex.*` except `PackageHallucinationScorer` (matched on both `class_module` and `class_name`; PyRIT 1.1.0 `pyrit/score/__init__.py`). The wrappers `TrueFalseInverterScorer`, `TrueFalseCompositeScorer` and `FloatScaleThresholdScorer` are `deterministic` only when every child scorer in their identifier is. Everything else, including every `SelfAsk*` scorer, `InsecureCodeScorer`, `LlamaGuardScorer`, `ShieldGemmaScorer`, `PromptShieldScorer` and `AzureContentFilterScorer`, is `unknown`, and its judge MUST be declared |
-| `outcome` | `attack_success`: `outcome == "success"` gives 1, `"failure"` gives 0, `"undetermined"` gives `unscored`; `error_type` set gives `error` |
+| `outcome` | `attack_success`, rule `pyrit.attack_outcome`: `outcome == "success"` gives 1, `"failure"` gives 0, `"undetermined"` gives `unscored`; `error_type` set gives `error` |
 | `labels` | `attackResult.labels` (memory labels), `outcome`, `targeted_harm_categories` (joined with commas, when non-empty) |
-| `categories` | `plan.categories` (PyRIT carries no taxonomy) |
+| `clusterId` | `attackResult.labels[plan.clusterKey]` (a memory label), as a string (7.1); null when unset |
+| `categories` | From the plan (7.1): PyRIT carries no taxonomy |
 
 | Run metadata | Source |
 |---|---|
@@ -557,12 +585,14 @@ DeepEval 4.3.3 writes `test_run_<YYYYMMDD_HHMMSS>.json` into `DEEPEVAL_RESULTS_F
 |---|---|
 | `runKey`, `groupKey` | Section 6.2 |
 | `source` | `locator`: `#/testCases/<index>`; `toolItemId`: `name` |
+| `task`, `epoch` | `{name: "deepeval", version: null}` and 1. The file names no task, so `plan.taskTypes` and a criterion's `select.task` use `deepeval` |
 | Hashes | `input` (prompt), `actualOutput` (response), `expectedOutput` (target), each a string as is or canonical JSON; `labels.retrievalContextSha256` = SHA-256 of the canonical JSON of `retrievalContext` |
 | `scores[]` | `metricsData[]`, in order: `name`, `raw` and `value` from `score`, `passed` from `success`, `threshold`, `scale` `proportion`. `reason` and `verboseLogs` are never copied |
 | `scores[].scorer.kind` | `deterministic` only for `Exact Match` and `Pattern Match` (`ExactMatchMetric`, `PatternMatchMetric`; `evaluationModel` is null for both in the fixture). `model_graded` when `evaluationModel` is set, and that name becomes a judge. `unknown` otherwise |
 | `itemType` | `plan.taskTypes["deepeval"]` when set; else `rag` when `retrievalContext` is non-empty, otherwise `qa`. `conversationalTestCases[]` are not supported in 0.1 (`unsupported_conversational_case`) |
-| `outcome` | The primary score (no default; the plan MUST name one), metric by `itemType` (`score` for `rag`), rule `deepeval.metric_score` |
-| `clusterId`, `labels` | `metadata[plan.clusterKey]`; scalar `metadata` entries plus `retrievalContextSha256` |
+| `outcome` | The primary score's `value` (no default; the plan MUST name one), rule `deepeval.metric_score`. `metric` is `score` for `qa` and `rag` items, because DeepEval scores are proportions. It is `attack_success` for `attack` and `task_success` for `agent_task` items, which need a `threshold` or `value_in` `successRule` so that the outcome is 0 or 1 (a `tool_native` plan for them is `plan_invalid`) |
+| `technique`, `variant` | Attack items: `metadata[plan.techniqueKey]` and `metadata[plan.variantKey]`, as strings (7.1); null when the key is unset or absent |
+| `clusterId`, `labels` | `metadata[plan.clusterKey]`, as a string (7.1); scalar `metadata` entries plus `retrievalContextSha256` |
 
 The run metadata is declared, apart from `epochs` (1, computed) and the judges observed through `evaluationModel`; `tools` is missing unless declared.
 
@@ -572,15 +602,20 @@ The run metadata is declared, apart from `epochs` (1, computed) and the judges o
 
 Ragas 0.4.3 returns an `EvaluationResult` and leaves files to user code. The supported export is **`result.to_pandas().to_json(path, orient="records", lines=True)`** (fixture `ragas/results.jsonl`). CSV is rejected (`unsupported_format`): `to_csv` writes list columns as Python `repr` strings, and those would need `ast.literal_eval` to read.
 
-**Detection.** JSONL rows with `user_input`, `response` and at least one numeric or null column that is not a known input column. Known input columns are `user_input`, `retrieved_contexts`, `reference_contexts`, `response`, `multi_responses`, `reference`, `rubrics` and `reference_tool_calls`. **Version gate:** declared. Verified: 0.4.x.
+**Detection.** JSONL rows with `user_input`, `response` and at least one numeric or null column that is not a known input column. Known input columns are `user_input`, `retrieved_contexts`, `reference_contexts`, `response`, `multi_responses`, `reference`, `rubrics` and `reference_tool_calls`. A **metric column** is any other column whose values are all JSON numbers or null; the remaining columns (for example a `technique` column added to the frame before the export) are **label columns**. **Version gate:** declared. Verified: 0.4.x.
 
 | Per-item field | Source |
 |---|---|
 | `runKey`, `groupKey` | Section 6.2 |
 | `source` | `locator`: `<file>:<line>`; `toolItemId`: null |
+| `task`, `epoch` | `{name: "ragas", version: null}` and 1. The file names no task, so `plan.taskTypes` and a criterion's `select.task` use `ragas` |
+| `itemType` | `plan.taskTypes["ragas"]` when set; else `rag` when `retrieved_contexts` is a non-empty list, otherwise `qa` (as for DeepEval) |
 | Hashes | `user_input` (prompt), `response`, `reference` (target), each a string as is or canonical JSON; `labels.retrievedContextsSha256` and `labels.referenceContextsSha256`, SHA-256 of the canonical JSON of `retrieved_contexts` and `reference_contexts` |
 | `scores[]` | One per metric column, in column order; `scale` `proportion`; null or `NaN` gives value null with `non_finite_score`, and the item counts as `unscored` when that column is the primary score (no default; the plan MUST name one) |
 | `scores[].scorer.kind` | `deterministic` only for the non-LLM metrics of Ragas 0.4.3 (`name` attributes in `ragas/metrics/`): `exact_match`, `string_present`, `non_llm_string_similarity`, `bleu_score`, `rouge_score`, `chrf_score`, `non_llm_context_precision_with_reference`, `id_based_context_precision`, `non_llm_context_recall`, `id_based_context_recall`, `tool_call_accuracy`, `tool_call_f1` and `data_compare_score`. Every other column is `unknown`: Ragas records no judge, so a column produced by an LLM metric MUST be declared as `manifest.declared.judges[].scores: [<column>]`, which makes it `model_graded` with that judge |
+| `outcome` | As for DeepEval (7.7), with rule `ragas.metric_value`: the primary score's `value`, and `metric` `score` for `qa` and `rag` items |
+| `clusterId`, `technique`, `variant` | The row's values in the columns that `plan.clusterKey`, `plan.techniqueKey` and `plan.variantKey` name, as strings (7.1); `technique` and `variant` only on attack items; null when the key is unset or the column absent |
+| `labels` | `retrievedContextsSha256` and `referenceContextsSha256` (above), plus the scalar values of the label columns under the label rules of section 7.1 |
 
 Every run-metadata field except `epochs` (1, computed) is declared; `tools` is missing unless declared.
 
@@ -609,7 +644,7 @@ Labels are strings of at most 100 characters from `labelSet`, a set needs at lea
 | garak model-as-judge detectors | SHA-256 of the canonical JSON `{"harness": "garak", "version": <_config.version>, "detector": <name>, "params": <its DEFAULT_PARAMS with the setup entry's overrides, without detector_model_type, detector_model_name and detector_model_config>}`; the judge prompts ship with the garak version |
 | PyRIT, DeepEval, Ragas | Not recorded in the files: MUST be declared (`declared.judges[].promptTemplateSha256`), otherwise `judges.promptTemplate` is missing |
 
-**Position consistency** (pairwise judges): `pairs` counts the `pairId`s that have both an `AB` and a `BA` row, `consistent` those whose verdicts mirror (`A` under `AB` with `B` under `BA`, and the reverse, or `tie` twice), and `lower` is the Wilson lower bound of consistent/pairs at the validation level. All three are stored in `validation.positionConsistency`.
+**Position consistency** (pairwise judges, 6.3): `pairs` counts the `pairId`s that have both an `AB` and a `BA` row, `consistent` those whose verdicts mirror (`A` under `AB` with `B` under `BA`, and the reverse, or `tie` twice), `estimate` is consistent/pairs, and `lower` is the Wilson lower bound of consistent/pairs at the validation level. All four are stored in `validation.positionConsistency`. A label file without such pairs gives `pairs` 0 and null `estimate` and `lower`, so it never validates a pairwise judge (8.7).
 
 Fixtures: `judge_small_60.jsonl` (not validated) and `judge_large_200.jsonl` (validated). Both are synthetic, and their headers bind them to J1 of `inspect/judged_qa_30.eval` with the snapshot that the section 6.3 manifest declares, so the acceptance scenario of section 12.3 turns on the kappa alone.
 
@@ -644,8 +679,8 @@ The plan is frozen before ingestion and bound into the result by SHA-256. Its st
 | `scorePolicy` | `original` | `original` uses the scores the run produced; `as_edited` applies score edits and excludes invalidated samples |
 | `clusterKey` | null | Metadata path whose value clusters items (section 8.3): a string for every run, or an object from task name to path (`{"tiny_mc": "doc.passage"}`) |
 | `techniqueKey`, `variantKey` | per format | The sample metadata keys for `technique` and `variant` (8.4) in formats without attack semantics (Inspect, DeepEval, Ragas). `techniqueKey` is required for DeepEval and Ragas attack criteria; Inspect defaults the technique to the task name |
-| `taskTypes` | `{}` | Item type per task name (`qa`, `attack`, `rag`, `agent_task`) for Inspect, DeepEval and Ragas, which do not say whether a task is an attack |
-| `categories` | `{default: [], byTechnique: {}}` | Categories for formats without tags (Inspect, DeepEval, Ragas, PyRIT) |
+| `taskTypes` | `{}` | Item type per task name (`qa`, `attack`, `rag`, `agent_task`) for Inspect, DeepEval and Ragas, which do not say whether a task is an attack. DeepEval and Ragas runs have the task names `deepeval` and `ragas` (7.7, 7.8) |
+| `categories` | `{default: [], byTechnique: {}}` | Categories for formats without tags (Inspect, lm-evaluation-harness, PyRIT, DeepEval, Ragas; rule in 7.1) |
 | `maxUnscoredFraction`, `maxErrorFraction` | 0.05, 0.05 | Above either one, the criterion is inconclusive |
 | `criteria[]` | required | Section 8.8 |
 | `judgeValidation` | `{minimumItems: 50, minimumKappaLowerBound: 0.60, requireDifferentFamily: true, pairwiseMinimumConsistencyLowerBound: 0.80}` | Floors (section 8.7) |
@@ -801,7 +836,7 @@ Worked example (n = 10, binary): A = 8/10, B = 5/10, d̄ = 0.3, SE_paired = 0.15
 3. The label file's header binds it to this judge entry and this run (7.9): all four `binding` values are true, or a reviewer has acknowledged the validation scope.
 4. n ≥ `judgeValidation.minimumItems` (50).
 5. The kappa's 95% lower bound ≥ `minimumKappaLowerBound` (0.60, "substantial" agreement in [Landis & Koch 1977](https://doi.org/10.2307/2529310), applied to the lower bound rather than the point estimate).
-6. For pairwise judges: `positionConsistency.lower`, the Wilson lower bound of the share of `pairId`s whose verdict mirrors when the order is swapped, is ≥ `pairwiseMinimumConsistencyLowerBound` (0.80).
+6. For pairwise judges (role `pairwise_judge`, 6.3): `positionConsistency.lower`, the Wilson lower bound of the share of `pairId`s whose verdict mirrors when the order is swapped, is ≥ `pairwiseMinimumConsistencyLowerBound` (0.80). Without AB/BA pairs `lower` is null, and the judge is not validated.
 
 Worked examples:
 
@@ -823,7 +858,7 @@ Judge validation is a gate condition, not a criterion, so it is outside the Holm
 
 Every criterion has `role` `confirmatory` (default) or `exploratory`. Families, Holm or BH adjustment, the run outcome and the `decision` object are exactly those of `docs/design/audit-statistics.md` sections 4.3–4.6, 6 and 11.
 
-**Scoping (normative).** A criterion applies to every run of the bundle unless it sets `select`, an object with any of `runKey`, `task` and `format`; a run is selected when every given field matches. `task` matches a run when every item of the run has that `task.name`, which holds for the one-task runs of Inspect, lm-evaluation-harness, promptfoo, DeepEval and Ragas; garak and PyRIT runs name the probe or attack there, and are narrowed with `groupBy` instead. The paired-difference selectors `candidate` and `baseline` have the same form and MUST each select exactly one run. A criterion MAY set `primaryScore`, overriding the plan's for the selected runs; with lm-evaluation-harness it names `<metric>,<filter>`. Members are always computed within one run, so a `genai_mean` criterion over a bundle with `tiny_mc` and `tiny_gen` has two members (`acc,none` and `exact_match,strip`), never one pooled mean. A selection that matches no run, or a `primaryScore` that no selected run has, is `plan_invalid`.
+**Scoping (normative).** A criterion applies to every run of the bundle unless it sets `select`, an object with any of `runKey`, `task` and `format`; a run is selected when every given field matches. `task` matches a run when every item of the run has that `task.name`, which holds for the one-task runs of Inspect, lm-evaluation-harness, promptfoo, DeepEval (`deepeval`) and Ragas (`ragas`); garak and PyRIT runs name the probe or attack there, and are narrowed with `groupBy` instead. The paired-difference selectors `candidate` and `baseline` have the same form and MUST each select exactly one run. A criterion MAY set `primaryScore`, overriding the plan's for the selected runs; with lm-evaluation-harness it names `<metric>,<filter>`. Members are always computed within one run, so a `genai_mean` criterion over a bundle with `tiny_mc` and `tiny_gen` has two members (`acc,none` and `exact_match,strip`), never one pooled mean. A selection that matches no run, or a `primaryScore` that no selected run has, is `plan_invalid`.
 
 ### 8.9 Gates
 
@@ -1149,10 +1184,17 @@ Ingested files come from the auditee, or from tools the auditee configured, so t
 | `MAX_JSONL_LINE_BYTES` | 16 MiB | garak attempts with long outputs |
 | `MAX_JSON_DEPTH` / `MAX_OBJECT_KEYS` / `MAX_STRING_BYTES` | 64 / 10,000 / 16 MiB | Inspect event nesting stays well under 64 |
 | `MAX_ITEMS` | 50,000 per bundle | Set by memory, below. Items are held as their canonical JSON lines plus a compact tuple for statistics (group, outcome, cluster, member keys, status), never as nested objects for the whole bundle |
-| `MAX_SCORES_PER_ITEM` / `MAX_LABELS` | 50 / 50 | Schema bounds |
+| `MAX_SCORES_PER_ITEM` / `MAX_LABELS` | 50 / 50 | Schema bounds. More scores on one item is the error `too_many_scores`, never a truncation (7.1) |
 | Inline items / envelope / completion body | 4 MiB / 8 MiB (`MAX_RESULT_BYTES`) / 10 MiB (`MAX_COMPLETION_BYTES`) | Section 10.3 size procedure |
 
-**Measured here, and to be re-measured in G1.** On this design's host (CPython 3.11.7, Windows, `tracemalloc`), strict `json.loads` with a duplicate-rejecting `object_pairs_hook` peaked at 91, 182, 363 and 726 MiB for event-heavy Inspect-like entries of 16, 32, 64 and 128 MiB, taking 1.1, 2.7, 6.9 and 12.5 s of CPU. A 128 MiB entry would therefore leave no room under Docker's default 1 GiB once the raw buffer and the items are added, which is why `MAX_ENTRY_BYTES` is 64 MiB. Holding 100,000 normalized items (copies of the fixtures' lm-evaluation-harness and Ragas records) as Python objects took 687–819 MiB, and 0.99–1.18 GiB at peak once serialized, while their canonical JSONL is 150–179 MiB; hence `MAX_ITEMS` 50,000 and the line representation. G1 MUST repeat both measurements inside the compute image (Linux, Python 3.12, `DockerExecutor` with `--memory 1g`), with peak RSS (`ru_maxrss`) rather than `tracemalloc`, for one `.eval` whose largest entry is `MAX_ENTRY_BYTES`, a 50 MiB single-document promptfoo file, and a `MAX_ITEMS` lm-evaluation-harness bundle. Each case MUST stay under 768 MiB peak RSS and 150 s of CPU (half of `RLIMIT_CPU`); otherwise G1 lowers the constant to the largest power of two (bytes) or multiple of 10,000 (items) that passes and records the numbers in `engine/GENAI.md`.
+**Measured here, and to be re-measured in G1.** On this design's host (CPython 3.11.7, Windows, `tracemalloc`), strict `json.loads` with a duplicate-rejecting `object_pairs_hook` peaked at 91, 182, 363 and 726 MiB for event-heavy Inspect-like entries of 16, 32, 64 and 128 MiB, taking 1.1, 2.7, 6.9 and 12.5 s of CPU. A 128 MiB entry would therefore leave no room under Docker's default 1 GiB once the raw buffer and the items are added, which is why `MAX_ENTRY_BYTES` is 64 MiB. Holding 100,000 normalized items (copies of the fixtures' lm-evaluation-harness and Ragas records) as Python objects took 687–819 MiB, and 0.99–1.18 GiB at peak once serialized, while their canonical JSONL is 150–179 MiB; hence `MAX_ITEMS` 50,000 and the line representation. G1 MUST repeat both measurements inside the compute image (Linux, Python 3.12, `DockerExecutor` with `--memory 1g`), with peak RSS (`ru_maxrss`) rather than `tracemalloc`, for four cases:
+
+1. one `.eval` whose largest entry is `MAX_ENTRY_BYTES`;
+2. a 50 MiB single-document promptfoo file;
+3. a `MAX_ITEMS` lm-evaluation-harness bundle;
+4. the combined worst case, because `run_bundle` holds every input as bytes: a bundle of `MAX_BUNDLE_BYTES` that contains such an `.eval` and yields `MAX_ITEMS` items, so the inputs stay resident while the largest entry is parsed and the item lines accumulate. Adding the single measurements above gives roughly 650 MiB for it (200 MiB of inputs, 363 MiB for the entry, 75–90 MiB of item lines), close to the bound.
+
+Each case MUST stay under 768 MiB peak RSS and 150 s of CPU (half of `RLIMIT_CPU`). Otherwise G1 lowers the constant to the largest power of two (bytes) or multiple of 10,000 (items) that passes; when only the combined case fails, it lowers `MAX_BUNDLE_BYTES` first, in steps of 25 MiB and never below `MAX_INPUT_FILE_BYTES`. G1 records the numbers in `engine/GENAI.md`.
 
 ### 11.4 Secrets and configuration
 
@@ -1174,7 +1216,7 @@ A match in a copied string is replaced by `[redacted:<first 12 hex of SHA-256>]`
 **Seeded mutation fuzzer, standard library only.** For each format, start from its fixtures and apply mutators:
 
 - bytes: flip, insert, delete, truncate, duplicate a range;
-- JSON structure: drop a key, duplicate a key, change a type, nest 10,000 levels, a 10⁶-digit integer, `1e999`, `NaN` in every number position, a lone surrogate `\ud800`, a BOM, invalid UTF-8, CRLF;
+- JSON structure: drop a key, duplicate a key, change a type, nest 10,000 levels, a 10⁶-digit integer, `1e999`, `NaN` in every number position, a lone surrogate `\ud800`, a BOM, invalid UTF-8, CRLF, 51 scores on one item (`too_many_scores`), identifiers of 128 characters in every key component;
 - JSONL: blank lines, a 17 MiB line, a non-object line;
 - zip: a bad CRC, unsupported method 99, the encrypted flag, names with `../`, `C:\` or a NUL, duplicate names, local-header sizes that disagree with the central directory (accepted: the central directory decides), an entry whose data is longer or shorter than the central directory says (`zip_entry_size_mismatch`), a data-descriptor entry (accepted), ZIP64 extra fields, and a zstd bomb of 1 GiB of zeros;
 - format confusion: every parser on every other format's fixture.
@@ -1200,7 +1242,7 @@ CI runs 300 iterations per format (`GENAI_FUZZ_ITERATIONS`, seed `GENAI_FUZZ_SEE
 - pass^1 = pass@1 = mean success;
 - kappa is symmetric when the raters are swapped;
 - permuting JSONL lines leaves aggregates unchanged (garak, lm-evaluation-harness, Ragas, PyRIT), and leaves item keys unchanged for lm-evaluation-harness, garak and PyRIT, whose occurrence orders do not use the file order (6.2);
-- `itemKey` values are unique, and every key component matches the component rule;
+- `itemKey` values are unique, every key component matches the component rule, and every composed `runKey` and `groupKey` has at most 250 characters, also when every component has 128 (6.2);
 - duplicating an lm-evaluation-harness task's rows under a second filter leaves n unchanged and adds one score per row;
 - adding a second detector to every garak attempt leaves n unchanged;
 - lm-evaluation-harness `prompt_hash` equals SHA-256 of `arg_0`, and `task_hashes` is reproduced;
@@ -1212,7 +1254,7 @@ CI runs 300 iterations per format (`GENAI_FUZZ_ITERATIONS`, seed `GENAI_FUZZ_SEE
 
 **Errors** (`GenaiInputError.code`; reported as worker failure codes):
 
-- `input_too_large`, `bundle_too_large`, `line_too_long`, `too_many_items`
+- `input_too_large`, `bundle_too_large`, `line_too_long`, `too_many_items`, `too_many_scores`
 - `nesting_too_deep`, `invalid_utf8`, `invalid_json`, `duplicate_key`, `number_out_of_range`
 - `unknown_format`, `format_mismatch`, `unsupported_format`, `unsupported_format_version`
 - `zip_invalid`, `zip_entry_unsafe_name`, `zip_entry_too_large`, `zip_entry_size_mismatch`, `zip_ratio_exceeded`, `zip_method_unsupported`, `zip_encrypted`, `zip_crc_mismatch`, `zstd_unavailable`
@@ -1268,7 +1310,7 @@ Raw text never appears unless excerpts were enabled, and then only as inert text
 
 `site-app/lib/genai-readiness.ts` (pure, tested with Vitest) computes `{effectiveLevel, blockers[], claimScope[]}` for each GenAI result linked to a procedure (12.1). The mechanism uses the existing outcome values, so it needs no new value and no migration:
 
-- `submitProcedure` rejects (400) an `outcome` of `supported` or `qualified` while any GenAI result linked to the execution has blockers, or while a GenAI programme item (12.4) links no GenAI result at all. `not_supported` is accepted, and the blockers are appended to the paper's `limitations`, so the reviewer sees why the evidence could not support the criterion. The check runs at every submission, so a paper can be resubmitted with a positive outcome once the blockers have cleared (an acknowledgement recorded, a new label file ingested).
+- `submitProcedure` rejects (400) an `outcome` of `supported` or `qualified` while any GenAI result linked to the execution has blockers, or while a GenAI programme item (12.4) links no GenAI result at all. A procedure is a GenAI programme item when its `templateId` is an item of the `genai-evaluation` pack, `WP-GA-01` to `WP-GA-07`; `genai-readiness.ts` exports that list as one constant, and a W3 test checks that it equals the pack's items. `not_supported` is accepted, and the blockers are appended to the paper's `limitations`, so the reviewer sees why the evidence could not support the criterion. The check runs at every submission, so a paper can be resubmitted with a positive outcome once the blockers have cleared (an acknowledgement recorded, a new label file ingested).
 - The workbench disables the two outcomes and lists the blockers while they exist; the server check is the authoritative one.
 - Report readiness (`site-app/lib/domain/gates.ts`) needs no change: a signed paper concluding `not_supported` already blocks a readiness opinion. Its view also lists the blockers of linked GenAI results.
 
@@ -1305,7 +1347,7 @@ When there are no blockers, the claim-scope statements are inserted into the pap
 | WP-GA-06 | Harmful content and bias | `harmful_content`, `bias_fairness` | Art. 55(1)(a) for GPAI with systemic risk; Art. 10; NIST 1, 3, 6, 11 |
 | WP-GA-07 | Transparency to users (Art. 50) | `ai_interaction_disclosure`; marking checks belong to R6.5 | Art. 50(1), 50(2), 50(4); NIST 7, 8 |
 
-Each item carries the claim-scope rule and the gate. Each states "supporting evidence; the auditor determines sufficiency", like the existing catalogue's diagnostic mapping.
+Each item carries the claim-scope rule and the gate. Each states "supporting evidence; the auditor determines sufficiency", like the existing catalogue's diagnostic mapping. The item ids are the procedure `templateId`s by which `submitProcedure` recognises a GenAI programme item (12.3).
 
 ## 13. Phased implementation plan
 
@@ -1318,8 +1360,8 @@ Each item carries the claim-scope rule and the gate. Each states "supporting evi
 | G5 | #32 | Worker: `validate_genai_request`, the `evidence` download through `Transport.download` and `Worker.fetch`, the `genai_ingest` branch of `Worker.execute` and `compute_job`, `verify_genai_result_bytes`, the codes in `COMPUTE_FAILURE_CODES` and `engine/WORKER.md`, hash-pinned `zstandard` in `engine/Dockerfile`, the `genaiIngest` readiness entry and the capability gate; loopback tests extending `engine/tests/test_worker.py`'s fake server | M | G4; #10 (PR #47) | A fake runner completes a `genai_ingest` job end to end, in `ProcessExecutor` and in the Docker image; bad bundles fail with coded errors and the daemon continues; a worker without a zstd back-end does not advertise `genai_ingest` |
 | G6 | #32 | DeepEval, Ragas, PyRIT (`pyrit-export/1`) and judge-validation parsers (header binding, position consistency); the export recipe documented in `engine/GENAI.md` | M | G3 | Fixture records and values reproduced |
 | W1 | #33 | Runner route and assurance operations (10.2, 10.4, 12.1), including the job-type checks of `importJob` and `compileGenaiResult` and the envelope artifact linked through `evidenceIds`; `genaiResultEnvelope` zod; R2 storage; summaries; Vitest for import validation (hash, pin, custody, upload-cap and job-type cases) | L | G5; #41 if the API split has landed | Worker and upload paths import the fixture envelope; tampered hashes are rejected; `importJob` rejects a GenAI job and `compileGenaiResult` a tabular one |
-| W2 | #33 | Results view (12.2), `genai-readiness.ts` gate and the `submitProcedure` check (12.3) | M | W1 | The acceptance scenario of 12.3 passes in the integration harness; `submitProcedure` rejects `supported` and `qualified` while a linked result has blockers and accepts `not_supported` |
-| W3 | #33 | Frameworks and the `genai-evaluation` pack (9.4, 12.4), after confirming the OWASP 2026 IDs (Q1) | M | W2; #27 merged; #29 for NIST AI 600-1 | The pack validates under #26's validator; items appear in the programme; coverage links resolve |
+| W2 | #33 | Results view (12.2), `genai-readiness.ts` gate and the `submitProcedure` check (12.3), recognising GenAI programme items by `templateId` | M | W1 | The acceptance scenario of 12.3 passes in the integration harness; `submitProcedure` rejects `supported` and `qualified` while a linked result has blockers and accepts `not_supported` |
+| W3 | #33 | Frameworks and the `genai-evaluation` pack (9.4, 12.4), after confirming the OWASP 2026 IDs (Q1) | M | W2; #27 merged; #29 for NIST AI 600-1 | The pack validates under #26's validator; items appear in the programme; coverage links resolve; the item list exported by `genai-readiness.ts` equals the pack's items |
 
 G1 and #21 E1 can proceed in parallel. G3 needs the statistics core; until #21 lands, G3 MAY implement Wilson and inversion locally with an identical interface and a test against `schemas/fixtures/statistics-golden.json`, then switch over.
 

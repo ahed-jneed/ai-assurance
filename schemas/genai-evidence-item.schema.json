@@ -376,7 +376,7 @@
       "minLength": 1,
       "maxLength": 512,
       "pattern": "^[A-Za-z0-9._:|/#@+=-]+$",
-      "description": "Components are joined with : (and | in itemKey). A tool identifier that is empty, longer than 128 characters, contains a character outside [A-Za-z0-9._@+=/#-], looks like an escape (h- plus 16 hex) or matches a secret pattern is replaced by h-<first 16 hex of its SHA-256> (design section 6.2)."
+      "description": "Components are joined with : (and | in itemKey). A tool identifier that is empty, longer than 128 characters, contains a character outside [A-Za-z0-9._@+=/#-], looks like an escape (h- plus 16 hex) or matches a secret pattern is replaced by h-<first 16 hex of its SHA-256>. A composed runKey or groupKey longer than 250 characters keeps its first component and replaces the rest with h-<first 16 hex of the SHA-256 of the composed key>, so itemKey stays within 512 characters; a declared runKey has at most 128 characters (design section 6.2)."
     },
     "shortText": {
       "type": "string",
