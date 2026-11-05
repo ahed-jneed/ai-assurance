@@ -147,7 +147,7 @@ The supported frozen `engineConfig.modelSpec` is:
 {"task":"binary_classification","featureColumns":["age","income"],"outputLabels":["0","1"],"decisionThreshold":0.5}
 ```
 
-`featureColumns` is an ordered list of 1–100 complete numeric prepared columns. Classification requires explicit ordered `outputLabels` (exactly two for binary); regression uses an empty list. ONNX additionally requires `predictionOutput`, accepts `predictionKind:"label"|"probability"`, `labelEncoding:"label"|"class_index"`, and optional `probabilityOutput`. PMML requires `predictionOutput`. Native tree objective/task compatibility is checked by the existing adapter. There is no raw text or arbitrary categorical/preprocessing pipeline execution.
+`featureColumns` is an ordered list of 1–100 complete numeric prepared columns. Classification requires explicit ordered `outputLabels` (exactly two for binary); regression uses an empty list. ONNX additionally requires `predictionOutput`, accepts `predictionKind:"label"|"probability"`, `labelEncoding:"label"|"class_index"`, and optional `probabilityOutput`. PMML requires `predictionOutput`. The native tree objective must be in the reviewed protocol and match the task: XGBoost's is read from the loaded model's configuration, LightGBM's from the `objective=` line in the model text header, because a Booster loaded from text has empty `params`. A mismatch fails with `model_objective_mismatch`. There is no raw text or arbitrary categorical/preprocessing pipeline execution.
 
 Build the core image from the engine directory, replacing the base image with a reviewed immutable digest for production:
 

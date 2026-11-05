@@ -1,20 +1,44 @@
 import copy
+import io
 import json
 import sqlite3
 import subprocess
+import sys
 import tempfile
+import types
 import unittest
 from contextlib import closing
 from unittest.mock import patch
 from pathlib import Path
 
+from engine import model_process
 from engine.adapters import Feature, ModelDescriptor
 from engine.connectors import readonly_sqlite, sqlite_snapshot
 from engine.contract import validate_report
 from engine.diagnostics import run, sha256, validate_config
+from engine.errors import EngineError
 from engine.model_diagnostics import permutation_importance, perturbation
-from engine.optional_adapters import NativeTreeAdapter, load_adapter, require_artifact
+from engine.optional_adapters import NativeTreeAdapter, load_adapter, require_artifact, scoring_failure_code
 from engine.tests.test_diagnostics import config
+
+try:
+    import numpy
+except ImportError:  # Installed by engine/requirements-dev.txt.
+    numpy = None
+
+requires_numpy = unittest.skipUnless(numpy, "numpy is not installed; install engine/requirements-dev.txt")
+# Shape of a native LightGBM text model; the runtime itself is optional.
+LIGHTGBM_MODEL = "tree\nversion=v4\nnum_class=1\nnum_tree_per_iteration=1\nlabel_index=0\nmax_feature_idx=0\nobjective={objective}\nfeature_names=x\n\nTree=0\nnum_leaves=1\n\nend of trees\n\nparameters:\n[objective: {objective}]\nend of parameters\n"
+
+
+class FakeLightGBMBooster:
+    """Like lightgbm.Booster(model_str=...): params stay empty after a string load."""
+    def __init__(self, model_str):
+        self.params = {}
+        self.model_str = model_str
+
+    def predict(self, matrix, num_threads):
+        return numpy.asarray(matrix)[:, 0]
 
 
 class TrustedThresholdAdapter:
@@ -95,6 +119,52 @@ class ConnectorAdapterTests(unittest.TestCase):
         with patch("engine.optional_adapters.subprocess.run", side_effect=subprocess.TimeoutExpired("fixed-native-worker", 60)):
             with self.assertRaisesRegex(ValueError, "60-second"):
                 adapter.predict([{"x": 1.0}])
+
+    def lightgbm_payload(self, objective, task="binary_classification"):
+        path = self.directory/"model.txt"
+        path.write_text(LIGHTGBM_MODEL.format(objective=objective), encoding="utf-8")
+        spec = {"task": task, "featureColumns": ["x"], "outputLabels": ["0", "1"] if task != "regression" else []}
+        return {"path": str(path), "format": "lightgbm_text", "expectedSha256": sha256(path.read_bytes()), "spec": spec, "records": [{"x": 0.2}, {"x": 0.9}]}
+
+    def test_lightgbm_objective_is_read_from_the_model_header(self):
+        self.assertEqual(model_process.lightgbm_objective(LIGHTGBM_MODEL.format(objective="binary sigmoid:1")), "binary")
+        self.assertEqual(model_process.lightgbm_objective(LIGHTGBM_MODEL.format(objective="multiclass num_class:3").replace("\n", "\r\n")), "multiclass")
+        # Only the header counts: a parameters-section echo is not a declaration.
+        for text in ("tree\nversion=v4\n\nTree=0\n\nend of trees\n\nparameters:\n[objective: binary]\nend of parameters\n", "tree\nobjective=\n\nTree=0\n", "tree\nobjective=binary\nobjective=regression\n\nTree=0\n"):
+            with self.assertRaises(EngineError) as error:
+                model_process.lightgbm_objective(text)
+            self.assertEqual(error.exception.code, "model_artifact_invalid")
+        for objective, task in (("regression", "binary_classification"), ("lambdarank", "binary_classification"), ("binary", "regression")):
+            with self.assertRaises(EngineError) as error:
+                model_process.check_objective("lightgbm_text", objective, task)
+            self.assertEqual(error.exception.code, "model_objective_mismatch")
+        model_process.check_objective("lightgbm_text", "regression_l1", "regression")
+
+    @requires_numpy
+    def test_lightgbm_scoring_does_not_depend_on_booster_params(self):
+        with patch.dict(sys.modules, {"lightgbm": types.SimpleNamespace(Booster=FakeLightGBMBooster)}):
+            self.assertEqual(json.loads(model_process.score(self.lightgbm_payload("binary sigmoid:1"))), [0.2, 0.9])
+            with self.assertRaises(EngineError) as error:
+                model_process.score(self.lightgbm_payload("regression"))
+            self.assertEqual(error.exception.code, "model_objective_mismatch")
+
+    @requires_numpy
+    def test_scoring_child_reports_only_allowed_codes(self):
+        with patch.object(sys, "stdin", io.StringIO(json.dumps(self.lightgbm_payload("regression")))), patch.object(sys, "stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(model_process.main(), 2)
+        self.assertEqual(json.loads(output.getvalue()), {"error": "model_objective_mismatch"})
+        self.assertEqual(scoring_failure_code('{"error":"model_objective_mismatch"}'), "model_objective_mismatch")
+        for stdout in ('{"error":"Traceback: /home/client/model.txt"}', "Segmentation fault", '{"error":"'+"x"*5000+'"}'):
+            self.assertEqual(scoring_failure_code(stdout), "model_inference_failed")
+        path = self.directory/"native.json"
+        path.write_text('{"learner": {}}', encoding="utf-8")
+        with patch("engine.optional_adapters.importlib.metadata.version", return_value="test-installed-runtime"):
+            adapter = NativeTreeAdapter(path, "xgboost_json", {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"]}, trusted_model=True)
+        child = subprocess.CompletedProcess([], 2, stdout='{"error":"model_objective_mismatch"}\n', stderr="native details stay local")
+        with patch("engine.optional_adapters.subprocess.run", return_value=child):
+            with self.assertRaises(EngineError) as error:
+                adapter.predict([{"x": 1.0}])
+        self.assertEqual(error.exception.code, "model_objective_mismatch")
 
     def test_actual_seeded_permutation_distinguishes_signal_and_noise(self):
         adapter = TrustedThresholdAdapter()

@@ -24,6 +24,24 @@ def check_objective(format_name, objective, task):
         raise EngineError("model_objective_mismatch", "Native objective differs from the declared task")
 
 
+def lightgbm_objective(model_text):
+    """The objective a LightGBM text model declares in its header.
+
+    Booster.params is empty when a model is loaded with model_str, so it
+    cannot be used. The header's `objective=` line is what LightGBM itself
+    reads to build the model's objective function.
+    """
+    declared = []
+    for line in model_text.splitlines():
+        if line.startswith("Tree=") or line.strip() == "end of trees":
+            break
+        if line.startswith("objective="):
+            declared.append(line[len("objective="):].split())
+    if len(declared) != 1 or not declared[0]:
+        raise EngineError("model_artifact_invalid", "LightGBM model text must declare exactly one objective before its trees")
+    return declared[0][0]
+
+
 def runtime(name):
     try:
         return __import__(name)
@@ -48,13 +66,16 @@ def score(payload):
         check_objective("xgboost_json", objective, task)
         values = model.predict(xgb.DMatrix(matrix, feature_names=[feature.name for feature in adapter.descriptor.feature_schema]))
     else:
+        try:
+            model_text = adapter.artifact_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise EngineError("model_artifact_invalid", "LightGBM model text must be UTF-8") from exc
+        check_objective("lightgbm_text", lightgbm_objective(model_text), task)
         lgb = runtime("lightgbm")
         try:
-            model = lgb.Booster(model_str=adapter.artifact_bytes.decode("utf-8"))
+            model = lgb.Booster(model_str=model_text)
         except Exception as exc:
             raise EngineError("model_artifact_invalid", "LightGBM could not load the model ("+type(exc).__name__+")") from exc
-        objective = str(model.params.get("objective", "")).split()[0]
-        check_objective("lightgbm_text", objective, task)
         values = model.predict(matrix, num_threads=1)
     try:
         return json.dumps(values.tolist(), allow_nan=False)
