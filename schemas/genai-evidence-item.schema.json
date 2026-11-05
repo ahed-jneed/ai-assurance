@@ -22,6 +22,7 @@
     "targetSha256",
     "toolHashes",
     "technique",
+    "variant",
     "categories",
     "clusterId",
     "scores",
@@ -38,7 +39,7 @@
     },
     "groupKey": {
       "$ref": "#/$defs/key",
-      "description": "Identity of the test item across epochs and across runs (pairing key). Derivation is per format; see the design document."
+      "description": "Identity of the test item across epochs and across runs. Derivation is pinned per format in design section 6.2 (key derivations table); pairing matches groupKey together with promptSha256 and targetSha256 (section 8.6)."
     },
     "runKey": {
       "$ref": "#/$defs/key",
@@ -133,8 +134,10 @@
         "unparseable_score",
         "invalidated_post_run",
         "incomplete_run",
-        "excluded_by_plan"
-      ]
+        "excluded_by_plan",
+        "score_out_of_range"
+      ],
+      "description": "score_out_of_range: under successRule tool_native the primary score lies outside [0, 1] (for example BLEU on 0-100), so the item is unscored (design section 8.2)."
     },
     "promptSha256": {
       "$ref": "#/$defs/nullableSha256",
@@ -172,7 +175,15 @@
         "null"
       ],
       "maxLength": 300,
-      "description": "Grouping key for attack-success rates (promptfoo <pluginId>/<strategyId>, garak <probe>, PyRIT <attack>+<converters>, Inspect metadata named by the plan)."
+      "description": "Primary attack grouping, attack items only (design section 7): promptfoo metadata.pluginId, garak probe class, PyRIT attack class, or the sample metadata named by plan.techniqueKey (Inspect default: the task name). Null for non-attack items."
+    },
+    "variant": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300,
+      "description": "Secondary attack grouping, attack items only: promptfoo metadata.strategyId or basic, PyRIT request-converter classes joined with + or none, or the metadata named by plan.variantKey. Null when the format defines none (garak, whose detectors are scores). Member keys per groupBy are defined in design section 8.4."
     },
     "categories": {
       "type": "array",
@@ -181,7 +192,7 @@
       "items": {
         "$ref": "#/$defs/categoryKey"
       },
-      "description": "Risk categories from the platform taxonomy (design document section 6), assigned by mapping rules."
+      "description": "Risk categories from the platform taxonomy (design section 9.2), assigned by the translation rules of section 9.3 or by plan.categories; sorted ascending."
     },
     "clusterId": {
       "type": [
@@ -229,7 +240,7 @@
         "rule": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
-          "description": "Derivation rule identifier, e.g. inspect.value_to_float, promptfoo.redteam_failure, garak.any_generation_hit."
+          "description": "Derivation rule identifier, e.g. inspect.value_to_float, promptfoo.redteam_failure, garak.any_detector_threshold."
         },
         "policy": {
           "enum": [
@@ -364,7 +375,8 @@
       "type": "string",
       "minLength": 1,
       "maxLength": 512,
-      "pattern": "^[A-Za-z0-9._:|/#@+=-]+$"
+      "pattern": "^[A-Za-z0-9._:|/#@+=-]+$",
+      "description": "Components are joined with : (and | in itemKey). A tool identifier that is empty, longer than 128 characters, contains a character outside [A-Za-z0-9._@+=/#-], looks like an escape (h- plus 16 hex) or matches a secret pattern is replaced by h-<first 16 hex of its SHA-256> (design section 6.2)."
     },
     "shortText": {
       "type": "string",
@@ -388,13 +400,35 @@
       "pattern": "^[a-z][a-z0-9_]{1,63}$"
     },
     "family": {
-      "type": [
-        "string",
-        "null"
-      ],
-      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "maxLength": 64,
-      "description": "Model family slug from the controlled vocabulary in the design document (e.g. openai-gpt, anthropic-claude, google-gemini, meta-llama); other:<name> is written as other-<name>."
+      "description": "Developer-level model family from the closed vocabulary of design section 8.7: one of the listed developers, or other-<name> for a developer outside the list (other-<listed developer> is invalid). Fine-tunes and distillations inherit the family of their base model. The different-family rule compares these values exactly, so the bundle manifest schema references this definition rather than repeating it.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "openai",
+            "anthropic",
+            "google",
+            "meta",
+            "mistral",
+            "alibaba",
+            "deepseek",
+            "xai",
+            "cohere",
+            "microsoft",
+            "nvidia",
+            "ibm",
+            "amazon",
+            "ai21"
+          ]
+        },
+        {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^other-(?!(?:openai|anthropic|google|meta|mistral|alibaba|deepseek|xai|cohere|microsoft|nvidia|ibm|amazon|ai21)$)[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      ]
     },
     "score": {
       "type": "object",
@@ -411,7 +445,8 @@
       ],
       "properties": {
         "name": {
-          "$ref": "#/$defs/shortText"
+          "$ref": "#/$defs/shortText",
+          "description": "Unique within the item. Per format (design section 7): lm-evaluation-harness <metric>,<filter>; promptfoo <assertion type>[:<metric>], with #<k> appended to the k-th occurrence (k >= 2) of a repeated name, plus overall; Inspect <scorer>, or <scorer>/<key> for dict-valued scores; garak the detector."
         },
         "raw": {
           "type": [
@@ -467,7 +502,8 @@
                 "human",
                 "tool_detector",
                 "unknown"
-              ]
+              ],
+              "description": "deterministic and tool_detector only for the per-format allowlists of design section 7; anything not on an allowlist is unknown, which the gate treats like model_graded (section 8.7). A composite score takes the most restrictive kind of its components."
             },
             "judgeRef": {
               "type": [
@@ -645,7 +681,8 @@
           "$ref": "#/$defs/modelRef"
         },
         "promptTemplateSha256": {
-          "$ref": "#/$defs/nullableSha256"
+          "$ref": "#/$defs/nullableSha256",
+          "description": "Judge configuration hash (prompt template, rubric wrapper and grading options) with the per-format recipe of design section 7.9; null when neither extracted nor declared."
         },
         "validation": {
           "type": [
@@ -659,6 +696,8 @@
             "upper",
             "n",
             "level",
+            "positionConsistency",
+            "binding",
             "artifactSha256",
             "evidenceLevel"
           ],
@@ -700,11 +739,80 @@
             },
             "positionConsistency": {
               "type": [
-                "number",
+                "object",
                 "null"
               ],
-              "minimum": 0,
-              "maximum": 1
+              "additionalProperties": false,
+              "required": [
+                "consistent",
+                "pairs",
+                "estimate",
+                "lower"
+              ],
+              "properties": {
+                "consistent": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "pairs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimate": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lower": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "description": "Pairwise judges only (null otherwise): pairIds whose verdict mirrors when the order is swapped, out of pairs, and the Wilson lower bound at the validation level that the gate compares with pairwiseMinimumConsistencyLowerBound."
+            },
+            "binding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "snapshot",
+                "promptTemplate",
+                "sampledFrom"
+              ],
+              "properties": {
+                "model": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "snapshot": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "promptTemplate": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "sampledFrom": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "description": "Whether the label file header matches this judge and this run (design section 7.9); null when a side is unknown. Anything other than true for all four leaves the judge unvalidated unless a reviewer acknowledges the validation scope."
             },
             "artifactSha256": {
               "$ref": "#/$defs/nullableSha256",
@@ -734,6 +842,7 @@
         "decoding",
         "tools",
         "dataset",
+        "datasetFingerprint",
         "attackSet",
         "judges",
         "epochs",
@@ -744,6 +853,10 @@
       "properties": {
         "runKey": {
           "$ref": "#/$defs/key"
+        },
+        "datasetFingerprint": {
+          "$ref": "#/$defs/sha256",
+          "description": "Computed: SHA-256 of the canonical JSON list of the run's distinct [groupKey, promptSha256, targetSha256] triples over all items, sorted by groupKey, then promptSha256, then targetSha256, null before any string (design section 6.1). Equal fingerprints mean the same items, whatever the epoch counts."
         },
         "format": {
           "$ref": "#/$defs/format"
@@ -957,6 +1070,7 @@
         "n": {
           "type": "object",
           "additionalProperties": false,
+          "description": "Computed counts: items (item and epoch records), groups (distinct groupKeys) and scored (items with status scored). Decisions use scored groups after epoch reduction, which each criterion reports.",
           "required": [
             "items",
             "groups",
@@ -1062,6 +1176,7 @@
           "attackSet",
           "judges.model",
           "judges.family",
+          "judges.promptTemplate",
           "judges.validation",
           "epochs",
           "dates"
