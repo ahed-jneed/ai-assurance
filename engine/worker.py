@@ -648,7 +648,10 @@ class Worker:
         partial, received, received_digest = self.transport.download(claim, purpose, destination, maximum=size or MAX_BYTES, check_active=lease.valid)
         failure = digest_code if received_digest != digest else size_code if size is not None and received != size else None
         if failure:
-            partial.unlink(missing_ok=True)
+            try:
+                partial.unlink(missing_ok=True)
+            except OSError:
+                pass  # The pin mismatch, not the cleanup, is the failure to report.
             raise ProtocolError(failure)
         local_write(lambda: promote(partial, destination))
 
