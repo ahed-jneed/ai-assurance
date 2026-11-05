@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 const compiled = async (file) =>
   ts.transpileModule(await fs.readFile(file, "utf8"), {
     compilerOptions: {
@@ -10,13 +11,7 @@ const compiled = async (file) =>
   }).outputText;
 const asURL = (js) =>
   "data:text/javascript;base64," + Buffer.from(js).toString("base64");
-const workflowState = asURL(await compiled("lib/workflow-state.ts"));
-const domain = asURL(
-  (await compiled("lib/domain.ts")).replace(
-    /from (['"])\.\/workflow-state\1/,
-    "from " + JSON.stringify(workflowState),
-  ),
-);
+const domain = await sourceURL("lib/domain.ts");
 const { paperChecklist, paperNextAction, personalPaperQueue } = await import(
   asURL(
     (await compiled("lib/paper-workflow.ts")).replace(
@@ -398,8 +393,9 @@ console.log(
   "PASS contextual finding actions, independent retest and accepted-evidence prerequisites",
 );
 
-const { stageGates, finalReportGates, reportBlockers, completionGates } =
-  await import(domain);
+// The lifecycle, final-issuance and conclusion gates are unit-tested in
+// lib/domain/gates.test.ts; the evidence request flow below still uses them.
+const { completionGates } = await import(domain);
 const paperWorkflow = asURL(
   (await compiled("lib/paper-workflow.ts")).replaceAll(
     /from (['"])\.\/domain\1/g,
@@ -511,113 +507,7 @@ assert.equal(
   ]).find((c) => c.target === "evidence").done,
   false,
 );
-assert.equal(stageGates(audit, "Fieldwork").length, 1);
-assert.equal(
-  stageGates(
-    { ...audit, papers: [{ ...planning, status: "signed" }, fieldwork] },
-    "Fieldwork",
-  ).length,
-  0,
-  "Only required Planning papers gate Fieldwork",
-);
-assert.equal(
-  stageGates(
-    { ...audit, classification: { status: "provisional" }, papers: [] },
-    "Fieldwork",
-  )[0].kind,
-  "classification",
-);
-assert.equal(
-  stageGates(audit, "Reporting")[0].kind,
-  "stage",
-  "Skipping stages must remain blocked",
-);
-const activeRun = { id: "run", modelId: "model", state: "running" };
-assert.equal(
-  stageGates(
-    { ...audit, stage: "Fieldwork", runs: [activeRun] },
-    "Evidence evaluation",
-  )[0].kind,
-  "run",
-);
-assert.equal(
-  stageGates({ ...audit, stage: "Fieldwork" }, "Evidence evaluation").length,
-  0,
-  "Paper signatures do not gate entry to Evidence evaluation",
-);
-const stageExclusion = {
-  ...base,
-  id: "excluded",
-  stage: "Reporting",
-  required: false,
-  body: { ...base.body, conclusionStatus: "not_applicable" },
-};
-assert.equal(
-  stageGates(
-    { ...audit, stage: "Evidence evaluation", papers: [stageExclusion] },
-    "Reporting",
-  )[0].recordId,
-  "excluded",
-  "Applicability exclusions need signed assessments before Reporting",
-);
-const complete = {
-  ...audit,
-  stage: "Sign-off",
-  papers: [{ ...planning, status: "signed" }],
-  findings: [
-    { id: "high", title: "High finding", severity: "High", status: "open" },
-  ],
-};
-assert.equal(
-  finalReportGates(complete, "Readiness assessment")[0].kind,
-  "finding",
-);
-for (const opinion of [
-  "Qualified conclusion",
-  "Adverse conclusion",
-  "Unable to conclude",
-])
-  assert.equal(finalReportGates(complete, opinion).length, 0);
-assert.equal(
-  finalReportGates({ ...complete, stage: "Reporting" }, "Adverse conclusion")[0]
-    .kind,
-  "stage",
-);
-assert.equal(
-  finalReportGates({ ...complete, runs: [activeRun] }, "Adverse conclusion")[0]
-    .kind,
-  "run",
-);
-assert.deepEqual(
-  completionGates(audit).map((g) => g.message),
-  reportBlockers(audit),
-);
-assert(
-  finalReportGates(
-    {
-      ...complete,
-      findings: [],
-      classification: { status: "approved", prohibited: true },
-    },
-    "Readiness assessment",
-  ).some((g) => g.id === "prohibited"),
-  "Approved prohibited classification cannot support positive readiness",
-);
-assert.equal(
-  finalReportGates(
-    {
-      ...complete,
-      findings: [],
-      classification: { status: "approved", prohibited: true },
-    },
-    "Adverse conclusion",
-  ).length,
-  0,
-  "A scoped adverse conclusion can document a prohibited practice",
-);
-console.log(
-  "PASS stage-focused work, visible unavailable evidence, lifecycle gates and opinion-aware final issuance",
-);
+console.log("PASS stage-focused work and visible unavailable evidence");
 
 const requestModule = asURL(
   (await compiled("lib/evidence-requests.ts"))
@@ -822,23 +712,6 @@ assert(
     (g) => g.recordId === memo.id,
   ),
   "Limitation memo still requires independent review/signature",
-);
-const qualifiedPaper = {
-  ...planning,
-  status: "signed",
-  body: { ...planning.body, conclusionStatus: "qualified" },
-};
-assert(
-  completionGates(
-    { ...audit, papers: [qualifiedPaper] },
-    "Readiness assessment",
-  ).some((g) => g.kind === "conclusion"),
-);
-assert(
-  !completionGates(
-    { ...audit, papers: [qualifiedPaper] },
-    "Qualified conclusion",
-  ).some((g) => g.kind === "conclusion"),
 );
 console.log(
   "PASS evidence request states, scoped sufficiency, real dates, same-engagement references, Lead exceptions and positive-opinion safeguards",
