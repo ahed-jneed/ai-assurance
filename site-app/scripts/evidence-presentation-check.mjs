@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 
 const compiled = async (file) =>
   ts.transpileModule(await fs.readFile(file, "utf8"), {
@@ -13,13 +14,7 @@ const compiled = async (file) =>
   }).outputText;
 const asURL = (js) =>
   "data:text/javascript;base64," + Buffer.from(js, "utf8").toString("base64");
-const workflowURL = asURL(await compiled("lib/workflow-state.ts"));
-const domainURL = asURL(
-  (await compiled("lib/domain.ts")).replace(
-    /from (['"])\.\/workflow-state\1/,
-    "from " + JSON.stringify(workflowURL),
-  ),
-);
+const domainURL = await sourceURL("lib/domain.ts");
 const require = createRequire(import.meta.url);
 const zodURL = pathToFileURL(require.resolve("zod")).href;
 const requestsURL = asURL(
