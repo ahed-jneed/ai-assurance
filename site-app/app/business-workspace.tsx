@@ -58,7 +58,11 @@ export function usePersonalPreferences(tenantId: string) {
             new URLSearchParams({ tenantId, kind: "preferences" }),
           { cache: "no-store", signal: controller.signal },
         ),
-        v = (await r.json()) as any;
+        v = (await r.json()) as {
+          error?: string;
+          preferences: PersonalPreferences;
+          version: number;
+        };
       if (!r.ok)
         throw Error(
           v.error ??
@@ -96,6 +100,7 @@ export function usePersonalPreferences(tenantId: string) {
     void load();
     return () => {
       request.current.generation++;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
       request.current.controller?.abort();
     };
   }, [load]);
@@ -114,7 +119,7 @@ export function usePersonalPreferences(tenantId: string) {
             preferences: next,
           }),
         }),
-        v = (await r.json()) as any;
+        v = (await r.json()) as { error?: string; version: number };
       if (!r.ok)
         throw Error(
           v.error ??
@@ -332,6 +337,7 @@ export function EngagementTaskQueue({
     [all, setAll] = useState(false);
   const actionable = items.filter((i) => i.state !== "waiting"),
     waiting = items.filter((i) => i.state === "waiting");
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- collapses the queue again after the engagement or stage changes (post-commit reset is the current behaviour)
   useEffect(() => setAll(false), [e.id, e.stage]);
   return (
     <section className="panel engagement-task-queue">

@@ -76,7 +76,15 @@ export async function buildDossier(
   const bytes = (s: string) => new TextEncoder().encode(s);
   await add("report.json", bytes(JSON.stringify(snapshot)), "application/json");
   const papers = Array.isArray(snapshot.papers)
-    ? (snapshot.papers as any[])
+    ? (snapshot.papers as {
+        id: string;
+        title: string;
+        revision: number;
+        status: string;
+        body?: Record<string, string>;
+        conclusion?: string;
+        conclusionStatus?: string;
+      }[])
     : [];
   const html =
     '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Audit report</title><style>body{max-width:900px;margin:48px auto;font:16px/1.6 system-ui;color:#222;padding:24px}h1,h2,h3{line-height:1.3}section{margin-top:36px;border-top:1px solid #ddd;padding-top:20px}pre{white-space:pre-wrap;font:inherit}small{color:#666}</style></head><body><small>' +
@@ -229,7 +237,7 @@ export async function buildDossier(
   };
 }
 export async function signingKey(ctx: Context, rotate = false) {
-  let existing = await db()
+  const existing = await db()
     .prepare(
       "SELECT * FROM dossier_keys WHERE tenant_id=? AND active=1 ORDER BY created_at DESC LIMIT 1",
     )

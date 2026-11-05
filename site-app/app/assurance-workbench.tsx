@@ -54,15 +54,51 @@ import { ExecutionPlanner } from "./testing-readiness";
 
 import { AssuranceRegister, recordTitle } from "./assurance-register";
 
+// Rows of GET /api/assurance, as selected in app/api/assurance/route.ts and
+// lib/assurance-store.ts (jobs).
+type ExecutionJob = {
+  id: string;
+  state: string;
+  system_name: string;
+  mode: string;
+  fence: number;
+  created_at: string;
+  error: string | null;
+};
+type RunnerWorker = {
+  id: string;
+  name: string;
+  image_digest: string;
+  capabilities: string;
+  active: number;
+  last_seen: string | null;
+};
+type EngagementAccess = {
+  user_id: string;
+  display_name: string;
+  role: string;
+  status: string;
+  active: number;
+};
+
 type Snapshot = {
   records: AssuranceRecord[];
-  jobs: any[];
-  workers: any[];
-  access: any[];
-  eligibleMembers: any[];
+  jobs: ExecutionJob[];
+  workers: RunnerWorker[];
+  access: EngagementAccess[];
+  eligibleMembers: WorkspaceData["people"];
   capabilities: Record<string, string>;
   telemetry: { queued: number; stalled: number };
 };
+
+// Fields of the POST /api/assurance response that the workbench reads; each
+// operation returns only some of them.
+type ActResult = {
+  error?: string;
+  record?: AssuranceRecord;
+  packet?: unknown;
+  trust?: unknown;
+} & ({ token?: undefined } | { token: string; workerId: string });
 
 type Field = {
   name: string;
@@ -177,7 +213,9 @@ export function AssuranceWorkbench({
     }
   }, [data.tenantId, e.id]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the workbench snapshot whenever the engagement changes
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
     return () => requestRef.current.controller?.abort();
   }, [load]);
 
@@ -206,7 +244,7 @@ export function AssuranceWorkbench({
             data: values,
           }),
         }),
-        v = (await r.json()) as any;
+        v = (await r.json()) as ActResult;
       if (!r.ok) throw Error(v.error);
       await load();
       await onRefresh();
@@ -226,6 +264,7 @@ export function AssuranceWorkbench({
     return () => onEditing(false);
   }, [dirty, busy, onEditing]);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the unsaved-review flag after another record is selected
     setDirty(false);
   }, [location.recordId]);
 
@@ -883,11 +922,13 @@ export function AssuranceWorkbench({
     setExecutionMode(defaults.mode ?? "provided_predictions");
     setRevision(previous);
     setRelations(
-      previous?.body.relations?.map((r: any) => ({
-        locationId: r.locationId,
-        relation: r.relation,
-        rationale: r.rationale,
-      })) ?? [{ locationId: "", relation: "supports", rationale: "" }],
+      previous?.body.relations?.map(
+        (r: { locationId: string; relation: string; rationale: string }) => ({
+          locationId: r.locationId,
+          relation: r.relation,
+          rationale: r.rationale,
+        }),
+      ) ?? [{ locationId: "", relation: "supports", rationale: "" }],
     );
     setExclusions([{ recordId: "", reason: "" }]);
     if (op === "impact") setAffectedIds(previous?.body.affectedIds ?? []);
@@ -1801,7 +1842,8 @@ export function AssuranceWorkbench({
                     disabled={busy || !sourceIds.length}
                     onClick={() =>
                       void act("assist", { sourceIds, action })
-                        .then((v) => setSelected(v.record))
+                        // "assist" always responds with the created briefing.
+                        .then((v) => setSelected(v.record as AssuranceRecord))
                         .catch(() => {})
                     }
                   >
@@ -2607,7 +2649,7 @@ export function AssuranceWorkbench({
                           name="editedText"
                           required
                           defaultValue={(selected.body.items ?? [])
-                            .map((i: any) => i.text)
+                            .map((i: { text: string }) => i.text)
                             .join("\n\n")}
                         />
                       </label>

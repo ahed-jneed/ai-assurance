@@ -70,11 +70,12 @@ function PlainValue({
   resolve: (id: string) => string;
 }) {
   if (name === "details" && typeof value === "string") {
+    let parsed: unknown;
     try {
-      const parsed = JSON.parse(value);
-      if (isRecord(parsed))
-        return <RecordFields value={parsed} resolve={resolve} />;
+      parsed = JSON.parse(value);
     } catch {}
+    if (isRecord(parsed))
+      return <RecordFields value={parsed} resolve={resolve} />;
   }
   if (value === null || value === undefined || value === "")
     return <span className="subtle">Not recorded</span>;

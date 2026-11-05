@@ -1,6 +1,7 @@
 import {
   navigationRoutes,
   permittedNavigationRoutes,
+  type NavigationRoute,
 } from "./navigation-preferences";
 import type { Role } from "./domain";
 export type WorkspaceLink = {
@@ -13,13 +14,13 @@ export type WorkspaceLink = {
 };
 export function readWorkspaceLink(search: string): WorkspaceLink | null {
   const q = new URLSearchParams(search),
-    module = q.get("view");
-  if (!module) return null;
-  if (!navigationRoutes.includes(module as any)) return null;
+    view = q.get("view");
+  if (!view) return null;
+  if (!navigationRoutes.includes(view as NavigationRoute)) return null;
   const value = {
     tenantId: q.get("practice") ?? "",
     engagementId: q.get("engagement") ?? "",
-    module,
+    module: view,
     kind: q.get("kind") ?? "",
     recordId: q.get("record") ?? "",
     section: q.get("section") ?? "",
@@ -48,7 +49,7 @@ export function authorizedLink(
 ) {
   return (
     permittedNavigationRoutes(role, hasEngagement).includes(
-      link.module as any,
+      link.module as NavigationRoute,
     ) &&
     (!["Client Viewer", "Client Contributor"].includes(role) ||
       !["paper", "procedure", "model", "run"].includes(link.kind))

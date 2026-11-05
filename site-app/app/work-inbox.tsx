@@ -146,9 +146,11 @@ export function WorkInbox({
         if (generation === request.current.generation) setBusy(false);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- an identity change must re-create load so that the inbox reloads for the new account
     [data.tenantId, data.identity.id, data.identity.role],
   );
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the list and reloads it whenever load is re-created
     setItems([]);
     setLoaded(0);
     setPage(0);
@@ -157,10 +159,12 @@ export function WorkInbox({
     void load();
     return () => {
       request.current.generation++;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
       request.current.controller?.abort();
     };
   }, [load]);
   useEffect(
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets paging after the filters change (post-commit reset is the current behaviour)
     () => setLimit(40),
     [q.view, q.scope, q.search, q.kind, q.due, q.engagementId, q.sort],
   );

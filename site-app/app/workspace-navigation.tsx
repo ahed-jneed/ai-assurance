@@ -142,6 +142,7 @@ export function WorkspaceNavigation({
   const shellRef = useRef<HTMLDivElement>(null),
     dragRef = useRef<{ x: number; width: number } | null>(null);
   const setters = useRef({ setOpen, onWidthChange });
+  // eslint-disable-next-line react-hooks/refs -- latest-setters ref so that the restore effect depends only on preferenceKey; writing it during render is the current behaviour
   setters.current = { setOpen, onWidthChange };
   const preferenceKey = data
     ? navigationPreferenceKey(data.identity.id, data.tenantId)
@@ -176,6 +177,7 @@ export function WorkspaceNavigation({
       saved = parseNavigationPreferences(localStorage.getItem(preferenceKey));
     } catch {}
     const next = saved ?? defaultNavigation;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores navigation preferences from browser-only storage after hydration
     setPreferences(next);
     setters.current.setOpen(!next.compact);
     setters.current.onWidthChange(next.width);
@@ -187,6 +189,7 @@ export function WorkspaceNavigation({
       !allowed.includes(view as NavigationRoute)
     )
       return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- records the current view as recent once the stored preferences are restored
     setPreferences((p) =>
       p.recent[0] === view
         ? p
@@ -198,6 +201,7 @@ export function WorkspaceNavigation({
             ].slice(0, 5),
           },
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- allowedKey is the stable stand-in for the allowed array, which is rebuilt on every render
   }, [view, allowedKey, restoredKey, preferenceKey]);
   useEffect(() => {
     if (!preferenceKey || restoredKey !== preferenceKey) return;
@@ -234,6 +238,7 @@ export function WorkspaceNavigation({
   }, [view, compact, isMobile, openMobile, revealCurrent]);
   useEffect(() => {
     setOpenMobile(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- closes the quick-page menu after switching practice or engagement
     setQuickOpen(false);
   }, [data?.tenantId, e?.id, setOpenMobile]);
 
@@ -347,8 +352,8 @@ export function WorkspaceNavigation({
     );
   }
   function quickPage(route: NavigationRoute) {
-    const module = allModules.find((m) => m[0] === route)!;
-    const Icon = module[1];
+    const entry = allModules.find((m) => m[0] === route)!;
+    const Icon = entry[1];
     return (
       <button
         key={route}
@@ -357,7 +362,7 @@ export function WorkspaceNavigation({
         onClick={() => go(route)}
       >
         <Icon size={16} aria-hidden="true" />
-        <span>{module[2]}</span>
+        <span>{entry[2]}</span>
         {route === view && <Check size={14} aria-label="Current page" />}
       </button>
     );

@@ -15,6 +15,7 @@ import {
   sha256,
 } from "@/lib/store";
 import { activeGrant } from "@/lib/workflow-state";
+import type { Submission } from "@/lib/workflow-types";
 export const dynamic = "force-dynamic";
 const base = z.object({
   tenantId: z.string().min(1),
@@ -217,7 +218,7 @@ export async function POST(request: Request) {
         const committed =
           row &&
           JSON.parse(row.body).workflow?.submissions?.some(
-            (s: any) => s.id === scope!.submissionId,
+            (s: Submission) => s.id === scope!.submissionId,
           );
         if (!committed) for (const key of keys) await bucket().delete(key);
       } catch {

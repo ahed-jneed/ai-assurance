@@ -18,6 +18,7 @@ import {
 import {
   navigationRoutes,
   permittedNavigationRoutes,
+  type NavigationRoute,
 } from "@/lib/navigation-preferences";
 export const dynamic = "force-dynamic";
 const short = z.string().min(1).max(300);
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
           "SELECT body,version,updated_at FROM personal_preferences WHERE tenant_id=? AND user_id=?",
         )
         .bind(ctx.tenantId, ctx.user.userId)
-        .first<any>();
+        .first<{ body: string; version: number; updated_at: string }>();
       return Response.json(
         {
           preferences: row
@@ -106,7 +107,12 @@ export async function GET(request: Request) {
         "SELECT body,base_revision,version,updated_at FROM workspace_drafts WHERE tenant_id=? AND engagement_id=? AND user_id=? AND kind=? AND record_id=?",
       )
       .bind(ctx.tenantId, a.engagementId, ctx.user.userId, a.kind, a.recordId)
-      .first<any>();
+      .first<{
+        body: string;
+        base_revision: string;
+        version: number;
+        updated_at: string;
+      }>();
     return Response.json(
       {
         draft: row
@@ -151,8 +157,8 @@ export async function POST(request: Request) {
       if (
         a.preferences.views.some(
           (v) =>
-            !navigationRoutes.includes(v.module as any) ||
-            !allowed.includes(v.module as any),
+            !navigationRoutes.includes(v.module as NavigationRoute) ||
+            !allowed.includes(v.module as NavigationRoute),
         )
       )
         throw new ApiError(

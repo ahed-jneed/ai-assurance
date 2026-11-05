@@ -21,6 +21,7 @@ export function NextSteps({
   const { active, later, waiting, teamOutstanding, earlierOutstanding } =
     stagePaperQueue(e, role, userId);
   const [showAll, setShowAll] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- collapses the list again after the engagement or stage changes (post-commit reset is the current behaviour)
   useEffect(() => setShowAll(false), [e.id, e.stage]);
   function row(item: (typeof active)[number], index: number, primary = false) {
     const carryover =

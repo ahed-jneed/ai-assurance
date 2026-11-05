@@ -10,6 +10,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import type { AssuranceRecord } from "@/lib/assurance-core";
+type CapturedEvidence = { id: string; name: string; status: string };
+type SealedDossier = { files: number; keyId: string; publicKeySPKI: string };
 export function DossierControls({
   tenantId,
   engagementId,
@@ -22,10 +25,10 @@ export function DossierControls({
   onRefresh?: () => Promise<unknown>;
 }) {
   const [audience, setAudience] = useState(""),
-    [captured, setCaptured] = useState<Record<string, any[]>>({}),
+    [captured, setCaptured] = useState<Record<string, CapturedEvidence[]>>({}),
     [withheld, setWithheld] = useState<Record<string, string>>({});
   const [role, setRole] = useState(""),
-    [sealed, setSealed] = useState<Record<string, any>>({}),
+    [sealed, setSealed] = useState<Record<string, SealedDossier>>({}),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const q = new URLSearchParams({ tenantId, engagementId, reportId });
@@ -37,7 +40,7 @@ export function DossierControls({
     )
       .then(async (r) => {
         if (!r.ok) return;
-        const v = (await r.json()) as any;
+        const v = (await r.json()) as { identity: { role: string } };
         if (!active) return;
         setRole(v.identity.role);
         if (
@@ -48,16 +51,16 @@ export function DossierControls({
             { cache: "no-store" },
           );
           if (res.ok) {
-            const s = (await res.json()) as any;
+            const s = (await res.json()) as { records: AssuranceRecord[] };
             if (active)
               setSealed(
                 Object.fromEntries(
                   s.records
                     .filter(
-                      (x: any) =>
+                      (x) =>
                         x.kind === "dossier" && x.body.reportId === reportId,
                     )
-                    .map((x: any) => [x.body.audience, x.body]),
+                    .map((x) => [x.body.audience, x.body]),
                 ),
               );
           }
@@ -76,9 +79,19 @@ export function DossierControls({
           "/api/workspace?" + new URLSearchParams({ tenantId, engagementId }),
           { cache: "no-store" },
         ),
-        v = (await r.json()) as any;
+        v = (await r.json()) as {
+          error?: string;
+          engagement: {
+            reports: {
+              id: string;
+              snapshot?: { evidence?: CapturedEvidence[] };
+              clientSnapshot?: { evidence?: CapturedEvidence[] };
+            }[];
+          };
+        };
       if (!r.ok) throw Error(v.error);
-      const report = v.engagement.reports.find((r: any) => r.id === reportId);
+      // A missing report throws below and surfaces as "Report unavailable".
+      const report = v.engagement.reports.find((r) => r.id === reportId)!;
       setCaptured({
         internal: report.snapshot?.evidence ?? [],
         client: report.clientSnapshot?.evidence ?? [],
@@ -109,7 +122,10 @@ export function DossierControls({
             })),
           }),
         }),
-        v = (await r.json()) as any;
+        v = (await r.json()) as {
+          error?: string;
+          record: { body: SealedDossier };
+        };
       if (!r.ok) throw Error(v.error);
       setSealed({ ...sealed, [audience]: v.record.body });
       setAudience("");

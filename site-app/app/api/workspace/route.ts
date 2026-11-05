@@ -18,16 +18,9 @@ import {
   sanitize,
   readBounded,
   checkOrigin,
-  bucket,
 } from "@/lib/store";
-import {
-  canWrite,
-  risk,
-  stageGates,
-  finalReportGates,
-  roles,
-} from "@/lib/domain";
-import type { Engagement, Paper, Run } from "@/lib/domain";
+import { risk, stageGates, finalReportGates } from "@/lib/domain";
+import type { Engagement, Paper } from "@/lib/domain";
 import { evaluate } from "@/lib/diagnostics";
 import {
   registerModel,
@@ -42,11 +35,7 @@ import {
   WorkflowError,
   calendarDate,
 } from "@/lib/workflow-service";
-import {
-  isClientRole,
-  isInternalRole,
-  currentExecution,
-} from "@/lib/workflow-state";
+import { isClientRole, isInternalRole } from "@/lib/workflow-state";
 import { protocolConfigKeys } from "@/lib/evaluation";
 import { assurancePins, jobs, assuranceGates } from "@/lib/assurance-store";
 import { diagnosticNarrative } from "@/lib/presentation";
@@ -987,7 +976,6 @@ export async function POST(request: Request) {
       await save(ctx, e, payload.expectedVersion, "claimRun", {
         runId: run.id,
       });
-      const claimedVersion = e.version;
       try {
         const { a, csv } = await executionCSV(e, run);
         run.results = evaluate(run, csv);

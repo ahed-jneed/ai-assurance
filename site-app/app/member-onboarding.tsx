@@ -47,6 +47,7 @@ export function MemberOnboarding({
     [discard, setDiscard] = useState(false);
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the wizard each time the dialog opens
       setStep(0);
       setUserId("");
       setName("");
@@ -64,6 +65,7 @@ export function MemberOnboarding({
         new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
       );
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when the dialog opens; a refreshed client list must not wipe a form in progress
   }, [open]);
   useEffect(() => {
     onEditing(open);
@@ -102,7 +104,7 @@ export function MemberOnboarding({
   async function save() {
     setSaving(true);
     setError("");
-    let done = [...completed];
+    const done = [...completed];
     try {
       if (!done.includes("membership")) {
         await manage("grantMember", {

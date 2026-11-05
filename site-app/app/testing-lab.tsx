@@ -311,9 +311,11 @@ export function TestingLab({
       m = e.models.find((m) => m.id === p?.modelId),
       profile = profiles.find((x) => x.id === p?.profileId);
     if (p && m && profile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the wizard for an incoming procedure deep link
       startWizard(m, profile);
       setBoundProcedure(p.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when a procedure deep link arrives, not when models or profiles refresh
   }, [initialProcedure]);
   function startRegistration(m?: Model) {
     setTouched(false);
@@ -336,6 +338,7 @@ export function TestingLab({
     if (!wizard || !model) return;
     let active = true;
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the previous inspection while the selected model's dataset is fetched
     setInspect(null);
     setInspecting(true);
     fetch(
@@ -389,6 +392,7 @@ export function TestingLab({
       active = false;
       controller.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- modelId identifies model; picking a profile must not re-inspect the dataset
   }, [wizard, modelId, e.id, tenantId]);
   async function registerVersion(ev: React.FormEvent) {
     ev.preventDefault();

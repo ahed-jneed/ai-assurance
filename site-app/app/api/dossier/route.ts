@@ -73,7 +73,7 @@ export async function POST(request: Request) {
             ?.evidence ||
           !(
             (v.audience === "client" ? r.clientSnapshot : r.snapshot)!
-              .evidence as any[]
+              .evidence as { id: string }[]
           ).some((a) => a.id === w.id),
       )
     )
