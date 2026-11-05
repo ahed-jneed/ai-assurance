@@ -4,37 +4,82 @@
   container-type: inline-size;
 }
 
-.audit-main > *, .database-tools, .register-controls, .search-field,
-.page-heading, .workflow-toolbar > *, .client-properties > *,
-.document-properties dd, .record-stack, .record-item > summary > span {
+.audit-main > *,
+.database-tools,
+.register-controls,
+.search-field,
+.page-heading,
+.workflow-toolbar > *,
+.client-properties > *,
+.document-properties dd,
+.record-stack,
+.record-item > summary > span {
   min-width: 0;
 }
 
-.page-heading h1, .document-title, .document-properties dd,
-.client-link b, .client-properties, .comment-box p, .record-text,
-.record-item > summary, .assurance-record-name b, .assurance-record-name small {
+.page-heading h1,
+.document-title,
+.document-properties dd,
+.client-link b,
+.client-properties,
+.comment-box p,
+.record-text,
+.record-item > summary,
+.assurance-record-name b,
+.assurance-record-name small {
   overflow-wrap: anywhere;
 }
 
-.database-tools, .register-controls, .search-field, .workflow-search {
+.database-tools,
+.register-controls,
+.search-field,
+.workflow-search {
   max-width: 100%;
 }
-.database-tools { flex-wrap: wrap; }
-.database-tools .search-field input { min-width: 0; flex: 1; }
-.search-field > svg { flex: none; }
-.register-controls { flex-wrap: wrap; }
-.register-controls .filter-active { white-space: normal; height: auto; }
-.client-properties, .comment-person, .history-row { flex-wrap: wrap; }
-.client-link { min-width: 0; }
-.client-avatar { flex: none; }
-.panel [data-slot=table-container], .workflow-table,
-.record-sheet [data-slot=table-container] {
+.database-tools {
+  flex-wrap: wrap;
+}
+.database-tools .search-field input {
+  min-width: 0;
+  flex: 1;
+}
+.search-field > svg {
+  flex: none;
+}
+.register-controls {
+  flex-wrap: wrap;
+}
+.register-controls .filter-active {
+  white-space: normal;
+  height: auto;
+}
+.client-properties,
+.comment-person,
+.history-row {
+  flex-wrap: wrap;
+}
+.client-link {
+  min-width: 0;
+}
+.client-avatar {
+  flex: none;
+}
+.panel [data-slot="table-container"],
+.workflow-table,
+.record-sheet [data-slot="table-container"] {
   max-width: 100%;
   overscroll-behavior-x: contain;
 }
-.compact-register td { white-space: normal; overflow-wrap: anywhere; }
-.assurance-record-row .badge { max-width: 100%; white-space: normal; }
-.record-stack > [data-slot=button], .workflow-procedure [data-slot=button] {
+.compact-register td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.assurance-record-row .badge {
+  max-width: 100%;
+  white-space: normal;
+}
+.record-stack > [data-slot="button"],
+.workflow-procedure [data-slot="button"] {
   white-space: normal;
   height: auto;
   min-height: 36px;
@@ -43,67 +88,164 @@
 }
 
 /* Keep modal scroll within the screen, including short landscape windows. */
-[data-slot=dialog-content], [data-slot=alert-dialog-content] {
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
   max-height: calc(100dvh - 24px);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.audit-dialog, .ml-dialog, .workbench-dialog, .workflow-dialog {
+.audit-dialog,
+.ml-dialog,
+.workbench-dialog,
+.workflow-dialog {
   max-width: min(780px, calc(100vw - 24px)) !important;
   max-height: calc(100dvh - 24px);
   scroll-padding-block: 20px 84px;
 }
-.audit-dialog [data-slot=dialog-header] { padding-right: 30px; }
-.standard-form .form-footer { bottom: -28px; padding-bottom: 16px; }
-.paper-sheet, .record-sheet { height: 100dvh; min-height: 0; }
-.sheet-scroll { min-width: 0; overscroll-behavior: contain; }
-.document-footer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
-.record-item > summary { flex-wrap: wrap; }
+.audit-dialog [data-slot="dialog-header"] {
+  padding-right: 30px;
+}
+.standard-form .form-footer {
+  bottom: -28px;
+  padding-bottom: 16px;
+}
+.paper-sheet,
+.record-sheet {
+  height: 100dvh;
+  min-height: 0;
+}
+.sheet-scroll {
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.document-footer {
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+}
+.record-item > summary {
+  flex-wrap: wrap;
+}
 .workspace-search {
   display: flex;
   flex-direction: column;
   max-height: calc(100dvh - 24px);
 }
-.workspace-search > [data-slot=command] {
+.workspace-search > [data-slot="command"] {
   height: auto;
   min-height: 0;
   flex: 1;
 }
-.workspace-search [data-slot=command-list] { min-height: 0; flex: 1; }
-.workspace-search :is([data-slot=command-input-wrapper], footer, .picker-header, .picker-options) { flex: none; }
-[data-slot=popover-content], [data-slot=select-content], [data-slot=dropdown-menu-content] {
+.workspace-search [data-slot="command-list"] {
+  min-height: 0;
+  flex: 1;
+}
+.workspace-search
+  :is(
+    [data-slot="command-input-wrapper"],
+    footer,
+    .picker-header,
+    .picker-options
+  ) {
+  flex: none;
+}
+[data-slot="popover-content"],
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"] {
   max-width: calc(100vw - 24px);
 }
 
 @container audit-content (max-width: 760px) {
-  .overview-workspace, .split-grid { grid-template-columns: minmax(0, 1fr); }
-  .overview-checkpoints { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 24px; }
-  .page-head { align-items: flex-start; flex-wrap: wrap; gap: 12px; }
-  .page-head > .row-actions { margin-left: 0; }
-  .page-heading { flex: 1 1 100%; }
-  .database-toolbar { flex-wrap: wrap; }
-  .database-views { flex-basis: 100%; }
-  .database-tools { width: 100%; margin-left: 0; justify-content: flex-start; padding-top: 8px; }
-  .database-tools .search-field { flex: 1 1 180px; }
-  .database-tools .search-field input { width: 100%; }
-  .workflow-spine { display: flex; overflow-x: auto; }
-  .workflow-spine button { min-width: 156px; }
-  .workflow-toolbar { padding: 12px 0; }
-  .workflow-search { width: 100%; }
-  .workflow-document { padding: 20px 0; }
-  .workbench-bar { flex-wrap: wrap; }
-  .workbench-bar > [data-slot=tabs] { flex-basis: 100%; }
-  .section-toolbar, .assurance-filters { flex-wrap: wrap; }
-  .assurance-filters .search-field { min-width: 0; flex: 1 1 180px; }
-  .assurance-register-head, .assurance-record-row { grid-template-columns: minmax(0, 1fr) 115px; gap: 12px; }
-  .assurance-record-person, .assurance-register-head > span:nth-child(2), .assurance-record-chevron,
-  .assurance-register-head > span:last-child { display: none; }
+  .overview-workspace,
+  .split-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .overview-checkpoints {
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+  }
+  .page-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .page-head > .row-actions {
+    margin-left: 0;
+  }
+  .page-heading {
+    flex: 1 1 100%;
+  }
+  .database-toolbar {
+    flex-wrap: wrap;
+  }
+  .database-views {
+    flex-basis: 100%;
+  }
+  .database-tools {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    padding-top: 8px;
+  }
+  .database-tools .search-field {
+    flex: 1 1 180px;
+  }
+  .database-tools .search-field input {
+    width: 100%;
+  }
+  .workflow-spine {
+    display: flex;
+    overflow-x: auto;
+  }
+  .workflow-spine button {
+    min-width: 156px;
+  }
+  .workflow-toolbar {
+    padding: 12px 0;
+  }
+  .workflow-search {
+    width: 100%;
+  }
+  .workflow-document {
+    padding: 20px 0;
+  }
+  .workbench-bar {
+    flex-wrap: wrap;
+  }
+  .workbench-bar > [data-slot="tabs"] {
+    flex-basis: 100%;
+  }
+  .section-toolbar,
+  .assurance-filters {
+    flex-wrap: wrap;
+  }
+  .assurance-filters .search-field {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+  .assurance-register-head,
+  .assurance-record-row {
+    grid-template-columns: minmax(0, 1fr) 115px;
+    gap: 12px;
+  }
+  .assurance-record-person,
+  .assurance-register-head > span:nth-child(2),
+  .assurance-record-chevron,
+  .assurance-register-head > span:last-child {
+    display: none;
+  }
 }
 
 /* Labeled records retain every field when the table no longer fits. */
 @container audit-content (max-width: 700px) {
-  .compact-register, .compact-register tbody { display: block; width: 100%; }
-  .compact-register thead { display: none; }
+  .compact-register,
+  .compact-register tbody {
+    display: block;
+    width: 100%;
+  }
+  .compact-register thead {
+    display: none;
+  }
   .compact-register tbody tr {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -118,7 +260,9 @@
     white-space: normal;
     font-size: 13px;
   }
-  .compact-register td:first-child { grid-column: 1 / -1; }
+  .compact-register td:first-child {
+    grid-column: 1 / -1;
+  }
   .compact-register td[data-label]::before {
     content: attr(data-label);
     display: block;
@@ -127,51 +271,234 @@
     color: var(--muted-foreground);
     margin-bottom: 4px;
   }
-  .compact-register td:has(.row-actions), .compact-register td:has(.workflow-next) { grid-column: 1 / -1; }
-  .compact-register .workflow-next { max-width: none; }
-  .compact-register .mobile-label { display: none; }
-  .workflow-table .compact-register td:first-child, .workflow-table .compact-register td:nth-child(3) { min-width: 0; }
+  .compact-register td:has(.row-actions),
+  .compact-register td:has(.workflow-next) {
+    grid-column: 1 / -1;
+  }
+  .compact-register .workflow-next {
+    max-width: none;
+  }
+  .compact-register .mobile-label {
+    display: none;
+  }
+  .workflow-table .compact-register td:first-child,
+  .workflow-table .compact-register td:nth-child(3) {
+    min-width: 0;
+  }
 
-  .paper-register, .paper-register tbody { display: block; width: 100%; }
-  .paper-register thead { display: none; }
-  .paper-register tbody tr { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 12px; padding: 17px 4px; }
-  .audit-main .paper-register td { display: block; padding: 0; white-space: normal; }
-  .paper-register td:first-child { grid-column: 1; grid-row: 1; font-size: 11px; }
-  .paper-register td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
-  .paper-register td:nth-child(3) { grid-column: 1; grid-row: 3; font-size: 12px; }
-  .paper-register td:nth-child(4) { grid-column: 2; grid-row: 1; justify-self: end; }
-  .paper-register td:nth-child(5) { grid-column: 2; grid-row: 3; justify-self: end; font-size: 12px; }
-  .paper-revision-label { display: inline; }
+  .paper-register,
+  .paper-register tbody {
+    display: block;
+    width: 100%;
+  }
+  .paper-register thead {
+    display: none;
+  }
+  .paper-register tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 17px 4px;
+  }
+  .audit-main .paper-register td {
+    display: block;
+    padding: 0;
+    white-space: normal;
+  }
+  .paper-register td:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 11px;
+  }
+  .paper-register td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .paper-register td:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 12px;
+  }
+  .paper-register td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+  .paper-register td:nth-child(5) {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: end;
+    font-size: 12px;
+  }
+  .paper-revision-label {
+    display: inline;
+  }
 
-  .audit-register, .audit-register tbody { display: block; width: 100%; }
-  .audit-register thead { display: none; }
-  .audit-register tbody tr { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 11px 14px; padding: 18px 3px; }
-  .audit-main .audit-register td { display: block; padding: 0; white-space: normal; min-width: 0; }
-  .audit-register .register-title-cell { grid-column: 1 / -1; grid-row: 1; }
-  .audit-register .register-status { grid-column: 2; grid-row: 2; justify-self: end; }
-  .audit-register :is(.register-category,.register-risk) { grid-column: 1; grid-row: 2; font-size: 12px; }
-  .audit-register .register-actions { grid-column: 1 / -1; grid-row: 4; }
-  .evidence-register .register-actions { grid-column: 2; grid-row: 3; }
-  .finding-register .register-owner { grid-column: 1 / -1; grid-row: 3; display: flex; gap: 12px; flex-wrap: wrap; }
-  .finding-register .register-risk { display: flex; gap: 8px; flex-wrap: wrap; }
+  .audit-register,
+  .audit-register tbody {
+    display: block;
+    width: 100%;
+  }
+  .audit-register thead {
+    display: none;
+  }
+  .audit-register tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 11px 14px;
+    padding: 18px 3px;
+  }
+  .audit-main .audit-register td {
+    display: block;
+    padding: 0;
+    white-space: normal;
+    min-width: 0;
+  }
+  .audit-register .register-title-cell {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .audit-register .register-status {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
+  .audit-register :is(.register-category, .register-risk) {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 12px;
+  }
+  .audit-register .register-actions {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+  .evidence-register .register-actions {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  .finding-register .register-owner {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .finding-register .register-risk {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
 
-  .model-registry-table, .protocol-register-table, .evaluation-register-table { width: 100%; min-width: 0; }
-  :is(.model-registry-table,.protocol-register-table,.evaluation-register-table) thead { display: none; }
-  :is(.model-registry-table,.protocol-register-table,.evaluation-register-table) tbody { display: grid; }
-  :is(.model-registry-table,.protocol-register-table,.evaluation-register-table) tr { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px 12px; padding: 18px 2px; border-bottom: 1px solid var(--border); }
-  .ml-lab :is(.model-registry-table,.protocol-register-table,.evaluation-register-table) td { padding: 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
-  :is(.model-registry-table,.protocol-register-table,.evaluation-register-table) td:first-child { grid-column: 1 / -1; padding-bottom: 4px; }
-  :is(.model-registry-table,.protocol-register-table) td:nth-child(2) { grid-row: 2; grid-column: 1; font-size: 13px; }
-  :is(.model-registry-table,.protocol-register-table) td:nth-child(3) { display: block; grid-column: 1 / -1; grid-row: 4; font-size: 12px; color: var(--muted-foreground); }
-  :is(.model-registry-table,.protocol-register-table) td[data-label]::before { content: attr(data-label) ': '; color: var(--muted-foreground); }
-  .model-registry-table td:nth-child(4) { grid-row: 3; grid-column: 1; }
-  .model-registry-table td:nth-child(5) { grid-row: 2 / 4; grid-column: 2; align-self: center; }
-  .protocol-register-table td:nth-child(4) { grid-row: 2; grid-column: 2; }
-  .evaluation-register-table td:nth-child(2) { grid-column: 1 / -1; font-size: 12px; }
-  .evaluation-register-table td:nth-child(3) { grid-row: 3; grid-column: 1; }
-  .evaluation-register-table td:nth-child(4) { grid-row: 3; grid-column: 2; text-align: right; }
-  .evaluation-register-table td:last-child { grid-column: 1 / -1; }
-  .audit-main :is(.compact-register,.paper-register,.audit-register,.model-registry-table,.protocol-register-table,.evaluation-register-table) thead {
+  .model-registry-table,
+  .protocol-register-table,
+  .evaluation-register-table {
+    width: 100%;
+    min-width: 0;
+  }
+  :is(
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    thead {
+    display: none;
+  }
+  :is(
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    tbody {
+    display: grid;
+  }
+  :is(
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 18px 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ml-lab
+    :is(
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    td {
+    padding: 0;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  :is(
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    td:first-child {
+    grid-column: 1 / -1;
+    padding-bottom: 4px;
+  }
+  :is(.model-registry-table, .protocol-register-table) td:nth-child(2) {
+    grid-row: 2;
+    grid-column: 1;
+    font-size: 13px;
+  }
+  :is(.model-registry-table, .protocol-register-table) td:nth-child(3) {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 4;
+    font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  :is(.model-registry-table, .protocol-register-table) td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--muted-foreground);
+  }
+  .model-registry-table td:nth-child(4) {
+    grid-row: 3;
+    grid-column: 1;
+  }
+  .model-registry-table td:nth-child(5) {
+    grid-row: 2 / 4;
+    grid-column: 2;
+    align-self: center;
+  }
+  .protocol-register-table td:nth-child(4) {
+    grid-row: 2;
+    grid-column: 2;
+  }
+  .evaluation-register-table td:nth-child(2) {
+    grid-column: 1 / -1;
+    font-size: 12px;
+  }
+  .evaluation-register-table td:nth-child(3) {
+    grid-row: 3;
+    grid-column: 1;
+  }
+  .evaluation-register-table td:nth-child(4) {
+    grid-row: 3;
+    grid-column: 2;
+    text-align: right;
+  }
+  .evaluation-register-table td:last-child {
+    grid-column: 1 / -1;
+  }
+  .audit-main
+    :is(
+      .compact-register,
+      .paper-register,
+      .audit-register,
+      .model-registry-table,
+      .protocol-register-table,
+      .evaluation-register-table
+    )
+    thead {
     display: table-header-group;
     position: absolute;
     width: 1px;
@@ -183,85 +510,316 @@
 }
 
 @container audit-content (max-width: 400px) {
-  .assurance-register-head { display: none; }
-  .assurance-record-row { grid-template-columns: minmax(0,1fr); }
-  .compact-register tbody tr { grid-template-columns: minmax(0,1fr); }
-  .audit-register .register-status { max-width: 130px; }
-  .client-properties { gap: 10px; }
+  .assurance-register-head {
+    display: none;
+  }
+  .assurance-record-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .compact-register tbody tr {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .audit-register .register-status {
+    max-width: 130px;
+  }
+  .client-properties {
+    gap: 10px;
+  }
 }
 
 @media (max-width: 700px) {
-  .audit-main { padding: 24px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left)); }
-  .workspace-breadcrumbs > .crumb, .workspace-breadcrumbs > svg { display: none; }
-  .workspace-breadcrumbs > .crumb:last-child { display: block; max-width: none; }
-  .topbar .workspace-breadcrumbs > span:last-child { max-width: none; font-size: 13px; }
-  .topbar-tools { flex: none; }
-  .topbar .workspace-breadcrumbs { flex: 1; }
-  .workspace-breadcrumbs [data-sidebar=trigger] { flex: none; }
-  .audit-dialog, .ml-dialog, .workbench-dialog, .workflow-dialog { width: calc(100vw - 24px); padding: 20px !important; gap: 18px !important; }
-  .finding-form-section .field-grid, .record-summary-grid, .ml-form-grid, .workbench-form-grid { grid-template-columns: minmax(0,1fr); }
-  .form-grid label, .ml-field, .workbench-field { min-width: 0; }
-  .standard-form .form-footer { bottom: -20px; flex-wrap: wrap; gap: 10px; }
-  .workbench-dialog .ml-footer { bottom: -20px; margin: 16px -20px -20px; padding: 14px 20px; }
-  .paper-sheet, .record-sheet, .paper-sheet.expanded, .record-sheet.expanded { width: 100vw !important; }
-  .sheet-expand-control { display: none; }
-  .document-page { padding: 26px max(20px,env(safe-area-inset-right)) 36px max(20px,env(safe-area-inset-left)); }
-  .document-footer { padding-bottom: max(12px,env(safe-area-inset-bottom)); }
-  .peek-bar { min-height: 56px; height: auto; padding-right: 58px; }
-  .document-properties dd { min-width: 0; }
-  .record-workspace-tabs > [role=tablist], [data-slot=tabs-list] { max-width: 100%; overflow-x: auto; justify-content: flex-start; }
-  .row-actions [data-slot=button], .ml-actions [data-slot=button], .page-head > [data-slot=button],
-  .record-primary-actions [data-slot=button], .standard-form [data-slot=button] {
-    white-space: normal; height: auto; min-height: 44px; max-width: 100%; text-align: left;
+  .audit-main {
+    padding: 24px max(16px, env(safe-area-inset-right)) 40px
+      max(16px, env(safe-area-inset-left));
   }
-  :is(.audit-dialog,.ml-dialog,.workbench-dialog,.workflow-dialog,.paper-sheet,.record-sheet,.audit-main,.workspace-search) :is(input,select,textarea,[data-slot=select-trigger]) { font-size: 16px !important; }
-  .document-input { max-width: calc(100% + 20px); }
-  .database-tools .search-field { min-height: 44px; }
-  .database-tools .search-field input { height: 42px; font-size: 16px; }
-  .workspace-search footer { flex-wrap: wrap; gap: 8px 14px !important; }
+  .workspace-breadcrumbs > .crumb,
+  .workspace-breadcrumbs > svg {
+    display: none;
+  }
+  .workspace-breadcrumbs > .crumb:last-child {
+    display: block;
+    max-width: none;
+  }
+  .topbar .workspace-breadcrumbs > span:last-child {
+    max-width: none;
+    font-size: 13px;
+  }
+  .topbar-tools {
+    flex: none;
+  }
+  .topbar .workspace-breadcrumbs {
+    flex: 1;
+  }
+  .workspace-breadcrumbs [data-sidebar="trigger"] {
+    flex: none;
+  }
+  .audit-dialog,
+  .ml-dialog,
+  .workbench-dialog,
+  .workflow-dialog {
+    width: calc(100vw - 24px);
+    padding: 20px !important;
+    gap: 18px !important;
+  }
+  .finding-form-section .field-grid,
+  .record-summary-grid,
+  .ml-form-grid,
+  .workbench-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-grid label,
+  .ml-field,
+  .workbench-field {
+    min-width: 0;
+  }
+  .standard-form .form-footer {
+    bottom: -20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .workbench-dialog .ml-footer {
+    bottom: -20px;
+    margin: 16px -20px -20px;
+    padding: 14px 20px;
+  }
+  .paper-sheet,
+  .record-sheet,
+  .paper-sheet.expanded,
+  .record-sheet.expanded {
+    width: 100vw !important;
+  }
+  .sheet-expand-control {
+    display: none;
+  }
+  .document-page {
+    padding: 26px max(20px, env(safe-area-inset-right)) 36px
+      max(20px, env(safe-area-inset-left));
+  }
+  .document-footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .peek-bar {
+    min-height: 56px;
+    height: auto;
+    padding-right: 58px;
+  }
+  .document-properties dd {
+    min-width: 0;
+  }
+  .record-workspace-tabs > [role="tablist"],
+  [data-slot="tabs-list"] {
+    max-width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+  .row-actions [data-slot="button"],
+  .ml-actions [data-slot="button"],
+  .page-head > [data-slot="button"],
+  .record-primary-actions [data-slot="button"],
+  .standard-form [data-slot="button"] {
+    white-space: normal;
+    height: auto;
+    min-height: 44px;
+    max-width: 100%;
+    text-align: left;
+  }
+  :is(
+      .audit-dialog,
+      .ml-dialog,
+      .workbench-dialog,
+      .workflow-dialog,
+      .paper-sheet,
+      .record-sheet,
+      .audit-main,
+      .workspace-search
+    )
+    :is(input, select, textarea, [data-slot="select-trigger"]) {
+    font-size: 16px !important;
+  }
+  .document-input {
+    max-width: calc(100% + 20px);
+  }
+  .database-tools .search-field {
+    min-height: 44px;
+  }
+  .database-tools .search-field input {
+    height: 42px;
+    font-size: 16px;
+  }
+  .workspace-search footer {
+    flex-wrap: wrap;
+    gap: 8px 14px !important;
+  }
 }
 
 @media (max-width: 480px) {
-  .ml-stepper { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
-  .ml-stepper li { flex-direction: column; text-align: center; min-width: 0; overflow-wrap: anywhere; }
-  .confusion-grid, .feature-row { grid-template-columns: minmax(0,1fr); }
-  .document-properties > div { grid-template-columns: minmax(0,1fr); gap: 3px; }
-  .paper-workflow-footer { gap: 8px; }
-  .workflow-reason { line-height: 1.4; }
-  .picker-options { padding-inline: 18px; }
+  .ml-stepper {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .ml-stepper li {
+    flex-direction: column;
+    text-align: center;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .confusion-grid,
+  .feature-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .document-properties > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+  .paper-workflow-footer {
+    gap: 8px;
+  }
+  .workflow-reason {
+    line-height: 1.4;
+  }
+  .picker-options {
+    padding-inline: 18px;
+  }
 }
 
 @media (pointer: coarse), (max-width: 700px) {
-  :is(.audit-main,.audit-dialog,.ml-dialog,.workbench-dialog,.workflow-dialog,.paper-sheet,.record-sheet) [data-slot=button],
-  .database-views > button, .register-controls > button, .workflow-filters button,
-  .topbar [data-slot=button], .nav-collapse-control, .nav-quick-trigger, .nav-preferences-trigger,
-  .nav-quick-page, .nav-pin-options > button, .sort-options > button, .picker-load-more,
-  .register-download { min-height: 44px; }
-  .audit-nav-shell [data-slot=sidebar-menu-button] { height: 44px; }
-  .nav-preferences-trigger, .nav-quick-trigger, .nav-collapse-control, .topbar [data-slot=button] { min-width: 44px; }
-  .nav-search { min-height: 44px; }
-  [data-slot=dialog-close], [data-slot=sheet-close], .paper-sheet > button:last-child, .record-sheet > button:last-child { display: grid; place-items: center; width: 44px; height: 44px; top: 6px; right: 6px; }
-  .paper-adjacent [data-slot=button], .peek-bar [data-slot=button] { min-width: 44px; }
-  .sheet-scroll [data-slot=tabs-trigger], .record-workspace-tabs > [role=tablist] > [role=tab], .ml-lab [data-slot=tabs-trigger] { min-height: 44px; }
-  .database-tools .search-field > button { min-width: 36px; min-height: 42px; }
-  .paper-readiness button, .evidence-views > button, .picker-options select, .engagement-picker footer > button { min-height: 44px; }
-  .audit-main .paper-link, .client-link, .nav-preference-action, .nav-preference-reset { min-height: 44px; }
-  .finding-register .finding-actions.compact [data-slot=button] { min-height: 44px; }
-  .audit-nav-shell[data-compact=true] [data-slot=sidebar-menu-button] { height: 44px !important; width: 44px !important; }
-  :is(.audit-main,.audit-dialog,.ml-dialog,.workbench-dialog,.workflow-dialog,.paper-sheet,.record-sheet) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),select,[data-slot=select-trigger]) { min-height: 44px; }
+  :is(
+      .audit-main,
+      .audit-dialog,
+      .ml-dialog,
+      .workbench-dialog,
+      .workflow-dialog,
+      .paper-sheet,
+      .record-sheet
+    )
+    [data-slot="button"],
+  .database-views > button,
+  .register-controls > button,
+  .workflow-filters button,
+  .topbar [data-slot="button"],
+  .nav-collapse-control,
+  .nav-quick-trigger,
+  .nav-preferences-trigger,
+  .nav-quick-page,
+  .nav-pin-options > button,
+  .sort-options > button,
+  .picker-load-more,
+  .register-download {
+    min-height: 44px;
+  }
+  .audit-nav-shell [data-slot="sidebar-menu-button"] {
+    height: 44px;
+  }
+  .nav-preferences-trigger,
+  .nav-quick-trigger,
+  .nav-collapse-control,
+  .topbar [data-slot="button"] {
+    min-width: 44px;
+  }
+  .nav-search {
+    min-height: 44px;
+  }
+  [data-slot="dialog-close"],
+  [data-slot="sheet-close"],
+  .paper-sheet > button:last-child,
+  .record-sheet > button:last-child {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    top: 6px;
+    right: 6px;
+  }
+  .paper-adjacent [data-slot="button"],
+  .peek-bar [data-slot="button"] {
+    min-width: 44px;
+  }
+  .sheet-scroll [data-slot="tabs-trigger"],
+  .record-workspace-tabs > [role="tablist"] > [role="tab"],
+  .ml-lab [data-slot="tabs-trigger"] {
+    min-height: 44px;
+  }
+  .database-tools .search-field > button {
+    min-width: 36px;
+    min-height: 42px;
+  }
+  .paper-readiness button,
+  .evidence-views > button,
+  .picker-options select,
+  .engagement-picker footer > button {
+    min-height: 44px;
+  }
+  .audit-main .paper-link,
+  .client-link,
+  .nav-preference-action,
+  .nav-preference-reset {
+    min-height: 44px;
+  }
+  .finding-register .finding-actions.compact [data-slot="button"] {
+    min-height: 44px;
+  }
+  .audit-nav-shell[data-compact="true"] [data-slot="sidebar-menu-button"] {
+    height: 44px !important;
+    width: 44px !important;
+  }
+  :is(
+      .audit-main,
+      .audit-dialog,
+      .ml-dialog,
+      .workbench-dialog,
+      .workflow-dialog,
+      .paper-sheet,
+      .record-sheet
+    )
+    :is(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+      select,
+      [data-slot="select-trigger"]
+    ) {
+    min-height: 44px;
+  }
 }
 
 /* With a keyboard or short landscape viewport, every document field stays reachable. */
 @media (max-height: 500px) and (max-width: 700px) {
-  .paper-sheet, .record-sheet { overflow-y: auto; overscroll-behavior: contain; }
-  .paper-sheet .sheet-scroll, .record-sheet .sheet-scroll { flex: none; overflow: visible; }
-  .paper-sheet .peek-bar, .record-sheet .peek-bar { position: sticky; top: 0; background: white; z-index: 2; }
-  .paper-sheet > button:last-child, .record-sheet > button:last-child { position: fixed; z-index: 3; }
+  .paper-sheet,
+  .record-sheet {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .paper-sheet .sheet-scroll,
+  .record-sheet .sheet-scroll {
+    flex: none;
+    overflow: visible;
+  }
+  .paper-sheet .peek-bar,
+  .record-sheet .peek-bar {
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 2;
+  }
+  .paper-sheet > button:last-child,
+  .record-sheet > button:last-child {
+    position: fixed;
+    z-index: 3;
+  }
 }
 
 @media screen and (max-width: 700px) {
-  .print-report { padding: 24px 18px; margin: 0; width: 100%; }
-  .print-report :is(h1,h2,h3,p,td,th) { overflow-wrap: anywhere; }
-  .print-report table { table-layout: fixed; }
-  .print-toolbar { gap: 10px; }
+  .print-report {
+    padding: 24px 18px;
+    margin: 0;
+    width: 100%;
+  }
+  .print-report :is(h1, h2, h3, p, td, th) {
+    overflow-wrap: anywhere;
+  }
+  .print-report table {
+    table-layout: fixed;
+  }
+  .print-toolbar {
+    gap: 10px;
+  }
 }

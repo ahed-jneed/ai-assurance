@@ -1,14 +1,171 @@
 "use client";
-import {useState,useEffect} from 'react';
-import type {AssuranceRecord} from '@/lib/assurance-core';
-import { CheckCircle2,Circle } from 'lucide-react';
-import { procedureWork } from '@/lib/work-items';
-import { currentExecution } from '@/lib/workflow-state';
-import type { Engagement } from '@/lib/domain';
-import type { Procedure } from '@/lib/workflow-types';
-export function ProcedureContext({tenantId,engagement:e,procedure:p,onRecord}:{tenantId:string;engagement:Engagement;procedure:Procedure;onRecord:(title:string,value:unknown)=>void}){
- const [samples,setSamples]=useState<AssuranceRecord[]>([]);useEffect(()=>{const controller=new AbortController();void fetch('/api/assurance?'+new URLSearchParams({tenantId,engagementId:e.id}),{signal:controller.signal,cache:'no-store'}).then(async r=>{if(r.ok){const v=await r.json() as {records:AssuranceRecord[]};setSamples(v.records.filter(r=>r.kind==='sample'&&r.body.procedureId===p.id));}}).catch(()=>{});return()=>controller.abort();},[tenantId,e.id,p.id,e.version]);
- const x=procedureWork(e,p.id)!,ids=new Set([...p.execution?.evidenceIds??[],...x.requests.flatMap(r=>r.evidenceIds)]),artifacts=e.artifacts.filter(a=>ids.has(a.id)),runs=e.runs.filter(r=>p.execution?.runIds.includes(r.id)||r.procedureBinding?.procedureId===p.id),findings=e.findings.filter(f=>f.support?.procedureId===p.id);
- const checks=[['Scope & program approved',e.workflow?.brief?.status==='approved'&&e.workflow.program.status==='approved'],['Preparer & reviewer assigned',!!p.ownerId&&!!p.reviewerId],['Current execution recorded',!!p.execution&&currentExecution(e,p)],['Evidence requests resolved',!x.outstanding.length],['Supporting files accepted',!!p.execution?.evidenceIds.length&&p.execution.evidenceIds.every(id=>e.artifacts.some(a=>a.id===id&&a.status==='accepted'))],['Review questions resolved',!x.paper?.comments.some(c=>!c.resolved)],['Evidence assessment recorded',!!p.execution?.assessment],['Independent review completed',p.state==='reviewed'&&!!p.review],['Working paper signed',x.paper?.status==='signed']] as const;
- return <div className="procedure-work-context"><details open><summary>Procedure readiness</summary><ul>{checks.map(([text,done])=><li key={text}>{done?<CheckCircle2 size={16} color="#477a59"/>:<Circle size={16} color="#9298a1"/>}<span>{text}</span></li>)}</ul></details><details><summary>Connected evidence & decisions ({artifacts.length+x.requests.length+runs.length+findings.length+samples.length})</summary>{x.requests.map(r=><button key={r.id} className="related-record-button" onClick={()=>onRecord(r.subject,r)}>{r.subject}<small>Request · {r.status}{r.dueDate?' · due '+r.dueDate:''}</small></button>)}{artifacts.map(a=><button key={a.id} className="related-record-button" onClick={()=>onRecord(a.name,a)}>{a.name}<small>Evidence · {a.status}</small></button>)}{runs.map(r=><button key={r.id} className="related-record-button" onClick={()=>onRecord('Evaluation · '+r.id,r)}>{e.models.find(m=>m.id===r.modelId)?.name??'Evaluation'}<small>{r.state} · {r.outcome??'No diagnostic outcome'}</small></button>)}{findings.map(f=><button key={f.id} className="related-record-button" onClick={()=>onRecord(f.title,f)}>{f.title}<small>Finding · {f.severity} · {f.status}</small></button>)}{samples.map(s=><button key={s.id} className="related-record-button" onClick={()=>onRecord('Sample manifest',s)}>Sample · {s.body.method}<small>{s.body.procedureRevision===p.revision&&s.body.programRevision===e.workflow?.program.revision?'Current planning pins':'Earlier planning pins'} · {new Date(s.createdAt).toLocaleString()}</small></button>)}{!samples.length&&!artifacts.length&&!x.requests.length&&!runs.length&&!findings.length&&<p className="subtle">No related records yet.</p>}</details></div>;
+import { useState, useEffect } from "react";
+import type { AssuranceRecord } from "@/lib/assurance-core";
+import { CheckCircle2, Circle } from "lucide-react";
+import { procedureWork } from "@/lib/work-items";
+import { currentExecution } from "@/lib/workflow-state";
+import type { Engagement } from "@/lib/domain";
+import type { Procedure } from "@/lib/workflow-types";
+export function ProcedureContext({
+  tenantId,
+  engagement: e,
+  procedure: p,
+  onRecord,
+}: {
+  tenantId: string;
+  engagement: Engagement;
+  procedure: Procedure;
+  onRecord: (title: string, value: unknown) => void;
+}) {
+  const [samples, setSamples] = useState<AssuranceRecord[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(
+      "/api/assurance?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+      { signal: controller.signal, cache: "no-store" },
+    )
+      .then(async (r) => {
+        if (r.ok) {
+          const v = (await r.json()) as { records: AssuranceRecord[] };
+          setSamples(
+            v.records.filter(
+              (r) => r.kind === "sample" && r.body.procedureId === p.id,
+            ),
+          );
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [tenantId, e.id, p.id, e.version]);
+  const x = procedureWork(e, p.id)!,
+    ids = new Set([
+      ...(p.execution?.evidenceIds ?? []),
+      ...x.requests.flatMap((r) => r.evidenceIds),
+    ]),
+    artifacts = e.artifacts.filter((a) => ids.has(a.id)),
+    runs = e.runs.filter(
+      (r) =>
+        p.execution?.runIds.includes(r.id) ||
+        r.procedureBinding?.procedureId === p.id,
+    ),
+    findings = e.findings.filter((f) => f.support?.procedureId === p.id);
+  const checks = [
+    [
+      "Scope & program approved",
+      e.workflow?.brief?.status === "approved" &&
+        e.workflow.program.status === "approved",
+    ],
+    ["Preparer & reviewer assigned", !!p.ownerId && !!p.reviewerId],
+    ["Current execution recorded", !!p.execution && currentExecution(e, p)],
+    ["Evidence requests resolved", !x.outstanding.length],
+    [
+      "Supporting files accepted",
+      !!p.execution?.evidenceIds.length &&
+        p.execution.evidenceIds.every((id) =>
+          e.artifacts.some((a) => a.id === id && a.status === "accepted"),
+        ),
+    ],
+    ["Review questions resolved", !x.paper?.comments.some((c) => !c.resolved)],
+    ["Evidence assessment recorded", !!p.execution?.assessment],
+    ["Independent review completed", p.state === "reviewed" && !!p.review],
+    ["Working paper signed", x.paper?.status === "signed"],
+  ] as const;
+  return (
+    <div className="procedure-work-context">
+      <details open>
+        <summary>Procedure readiness</summary>
+        <ul>
+          {checks.map(([text, done]) => (
+            <li key={text}>
+              {done ? (
+                <CheckCircle2 size={16} color="#477a59" />
+              ) : (
+                <Circle size={16} color="#9298a1" />
+              )}
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+      <details>
+        <summary>
+          Connected evidence & decisions (
+          {artifacts.length +
+            x.requests.length +
+            runs.length +
+            findings.length +
+            samples.length}
+          )
+        </summary>
+        {x.requests.map((r) => (
+          <button
+            key={r.id}
+            className="related-record-button"
+            onClick={() => onRecord(r.subject, r)}
+          >
+            {r.subject}
+            <small>
+              Request · {r.status}
+              {r.dueDate ? " · due " + r.dueDate : ""}
+            </small>
+          </button>
+        ))}
+        {artifacts.map((a) => (
+          <button
+            key={a.id}
+            className="related-record-button"
+            onClick={() => onRecord(a.name, a)}
+          >
+            {a.name}
+            <small>Evidence · {a.status}</small>
+          </button>
+        ))}
+        {runs.map((r) => (
+          <button
+            key={r.id}
+            className="related-record-button"
+            onClick={() => onRecord("Evaluation · " + r.id, r)}
+          >
+            {e.models.find((m) => m.id === r.modelId)?.name ?? "Evaluation"}
+            <small>
+              {r.state} · {r.outcome ?? "No diagnostic outcome"}
+            </small>
+          </button>
+        ))}
+        {findings.map((f) => (
+          <button
+            key={f.id}
+            className="related-record-button"
+            onClick={() => onRecord(f.title, f)}
+          >
+            {f.title}
+            <small>
+              Finding · {f.severity} · {f.status}
+            </small>
+          </button>
+        ))}
+        {samples.map((s) => (
+          <button
+            key={s.id}
+            className="related-record-button"
+            onClick={() => onRecord("Sample manifest", s)}
+          >
+            Sample · {s.body.method}
+            <small>
+              {s.body.procedureRevision === p.revision &&
+              s.body.programRevision === e.workflow?.program.revision
+                ? "Current planning pins"
+                : "Earlier planning pins"}{" "}
+              · {new Date(s.createdAt).toLocaleString()}
+            </small>
+          </button>
+        ))}
+        {!samples.length &&
+          !artifacts.length &&
+          !x.requests.length &&
+          !runs.length &&
+          !findings.length && <p className="subtle">No related records yet.</p>}
+      </details>
+    </div>
+  );
 }
