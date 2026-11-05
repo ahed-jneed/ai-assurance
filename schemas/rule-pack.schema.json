@@ -1,0 +1,689 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:rule-pack:1.0.0",
+  "title": "EU AI Act rule pack",
+  "description": "The regulatorySnapshot of templates/catalog.json: per-provision application dates with sources, verification and approval metadata, authority deadlines, the dated Art 5 practices, the standards and guidance registers, legal-review items and unverified claims. Portable JSON Schema checks the shape; schemas/validate-rule-pack.mjs also resolves ids and references, checks calendar dates, predicates, the legal-review and approval rules, and compares the data with the verified research in docs/research.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rulePackVersion",
+    "jurisdiction",
+    "celex",
+    "consolidatedAsOf",
+    "researchedAsOf",
+    "staleAfterDays",
+    "research",
+    "approval",
+    "amendingRegulation",
+    "baseAct",
+    "amendingActs",
+    "consolidatedVersion",
+    "otherChecks",
+    "consolidatedTextUrl",
+    "consolidatedTextLegalEffect",
+    "authenticAmendmentUrl",
+    "authenticAmendmentEli",
+    "authenticBaseActEli",
+    "automatedAccessUrl",
+    "explorerUrl",
+    "timelineUrl",
+    "guidance",
+    "predicateRule",
+    "crossReferenceRule",
+    "applicationDates",
+    "authorityDeadlines",
+    "prohibitedPractices",
+    "standardsCitationRule",
+    "standards",
+    "guidanceDocuments",
+    "legalReviewItems",
+    "unverified",
+    "sources"
+  ],
+  "properties": {
+    "rulePackVersion": { "$ref": "#/$defs/methodologyVersion" },
+    "jurisdiction": { "const": "EU" },
+    "celex": { "type": "string", "pattern": "^0[0-9]{4}R[0-9]{4}-[0-9]{8}$" },
+    "consolidatedAsOf": { "$ref": "#/$defs/date" },
+    "researchedAsOf": { "$ref": "#/$defs/date" },
+    "staleAfterDays": {
+      "description": "Configurable age, in days after researchedAsOf, from which the workspace shows the staleness banner.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 730
+    },
+    "research": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "report", "data"],
+      "properties": {
+        "issue": { "$ref": "#/$defs/url" },
+        "report": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.md$" },
+        "data": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.json$" }
+      }
+    },
+    "approval": { "$ref": "#/$defs/packApproval" },
+    "amendingRegulation": { "type": "string", "pattern": "^\\(EU\\) [0-9]{4}/[0-9]+$" },
+    "baseAct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "celex", "ojReference", "eli", "entryIntoForce", "sourceIds", "verification"],
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "celex": { "type": "string", "pattern": "^3[0-9]{4}R[0-9]{4}$" },
+        "ojReference": { "$ref": "#/$defs/text" },
+        "eli": { "$ref": "#/$defs/eli" },
+        "entryIntoForce": { "$ref": "#/$defs/date" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "amendingActs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "number",
+          "shortName",
+          "title",
+          "celex",
+          "adopted",
+          "ojReference",
+          "publicationDate",
+          "entryIntoForce",
+          "eli",
+          "eurLexUrl",
+          "alsoAmends",
+          "corrigenda",
+          "sourceIds",
+          "verification"
+        ],
+        "properties": {
+          "number": { "type": "string", "pattern": "^\\(EU\\) [0-9]{4}/[0-9]+$" },
+          "shortName": { "$ref": "#/$defs/shortText" },
+          "title": { "$ref": "#/$defs/text" },
+          "celex": { "type": "string", "pattern": "^3[0-9]{4}R[0-9]{4}$" },
+          "adopted": { "$ref": "#/$defs/date" },
+          "ojReference": { "$ref": "#/$defs/text" },
+          "publicationDate": { "$ref": "#/$defs/date" },
+          "entryIntoForce": { "$ref": "#/$defs/date" },
+          "eli": { "$ref": "#/$defs/eli" },
+          "eurLexUrl": { "$ref": "#/$defs/url" },
+          "alsoAmends": { "type": "array", "items": { "$ref": "#/$defs/text" } },
+          "corrigenda": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["celex", "date", "languages", "effectOnEnglishText", "sourceIds", "verification"],
+              "properties": {
+                "celex": { "type": "string", "minLength": 1 },
+                "date": { "$ref": "#/$defs/date" },
+                "languages": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[A-Z]{3}$" } },
+                "effectOnEnglishText": { "$ref": "#/$defs/text" },
+                "sourceIds": { "$ref": "#/$defs/sourceIds" },
+                "verification": { "$ref": "#/$defs/verification" }
+              }
+            }
+          },
+          "sourceIds": { "$ref": "#/$defs/sourceIds" },
+          "verification": { "$ref": "#/$defs/verification" }
+        }
+      }
+    },
+    "consolidatedVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["celex", "consolidatedAsOf", "legalEffect", "isLatestConsolidation", "laterVersionsChecked", "sourceIds", "verification"],
+      "properties": {
+        "celex": { "type": "string", "pattern": "^0[0-9]{4}R[0-9]{4}-[0-9]{8}$" },
+        "consolidatedAsOf": { "$ref": "#/$defs/date" },
+        "legalEffect": { "type": "string", "pattern": "^none" },
+        "isLatestConsolidation": { "type": "boolean" },
+        "laterVersionsChecked": { "$ref": "#/$defs/text" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "otherChecks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "result", "sourceIds", "verification"],
+        "properties": {
+          "check": { "$ref": "#/$defs/text" },
+          "result": { "$ref": "#/$defs/text" },
+          "sourceIds": { "$ref": "#/$defs/sourceIds" },
+          "verification": { "$ref": "#/$defs/verification" }
+        }
+      }
+    },
+    "consolidatedTextUrl": { "$ref": "#/$defs/url" },
+    "consolidatedTextLegalEffect": {
+      "description": "The consolidated text is a documentation tool; the UI must not present it as the official text (RD-06).",
+      "type": "string",
+      "pattern": "^none"
+    },
+    "authenticAmendmentUrl": { "$ref": "#/$defs/url" },
+    "authenticAmendmentEli": { "$ref": "#/$defs/eli" },
+    "authenticBaseActEli": { "$ref": "#/$defs/eli" },
+    "automatedAccessUrl": { "$ref": "#/$defs/url" },
+    "explorerUrl": { "$ref": "#/$defs/url" },
+    "timelineUrl": { "$ref": "#/$defs/url" },
+    "guidance": { "$ref": "#/$defs/text" },
+    "predicateRule": { "$ref": "#/$defs/text" },
+    "crossReferenceRule": { "$ref": "#/$defs/text" },
+    "applicationDates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/applicationDate" } },
+    "authorityDeadlines": { "type": "array", "items": { "$ref": "#/$defs/authorityDeadline" } },
+    "prohibitedPractices": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/prohibitedPractice" } },
+    "standardsCitationRule": { "$ref": "#/$defs/text" },
+    "standards": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/standard" } },
+    "guidanceDocuments": { "type": "array", "items": { "$ref": "#/$defs/guidanceDocument" } },
+    "legalReviewItems": { "type": "array", "items": { "$ref": "#/$defs/legalReviewItem" } },
+    "unverified": { "type": "array", "items": { "$ref": "#/$defs/unverifiedClaim" } },
+    "sources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/source" } }
+  },
+  "$defs": {
+    "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "timestamp": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:T[0-9:.]+(?:Z|[+-][0-9]{2}:[0-9]{2}))?$" },
+    "methodologyVersion": {
+      "description": "Methodology format YEAR.MONTH.SEQUENCE; the rule-pack revision is the methodology version.",
+      "type": "string",
+      "pattern": "^[0-9]{4}\\.(?:[1-9]|1[0-2])\\.[1-9][0-9]*$"
+    },
+    "url": { "type": "string", "pattern": "^https?://[^\\s]+$" },
+    "eli": { "type": "string", "pattern": "^http://data\\.europa\\.eu/eli/[a-z_]+/[0-9]{4}/[0-9]+/oj$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "shortText": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "entryId": { "type": "string", "pattern": "^aia-(?:auth-)?[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9-]+$" },
+    "sourceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(?:SRC|SEC)-[A-Z0-9-]+$" }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "verifiedOn"],
+      "properties": {
+        "status": { "enum": ["verified", "secondary_only"] },
+        "verifiedOn": { "$ref": "#/$defs/date" },
+        "except": { "$ref": "#/$defs/text" }
+      }
+    },
+    "legalReview": {
+      "description": "Legal-review flags. Every referenced item is pending until the qualified legal review (#57) resolves it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "itemIds"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "itemIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^LR-[0-9]{2}$" } }
+      },
+      "if": { "properties": { "required": { "const": true } } },
+      "then": { "properties": { "itemIds": { "minItems": 1 } } },
+      "else": { "properties": { "itemIds": { "maxItems": 0 } } }
+    },
+    "approval": {
+      "description": "Approval metadata the methodology requires. Pending until a qualified legal reviewer approves; never approved without a reviewer and an approval time.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "approvedAt"],
+      "properties": {
+        "status": { "enum": ["pending_legal_review", "approved"] },
+        "reviewer": { "type": ["string", "null"] },
+        "approvedAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] }
+      },
+      "if": { "properties": { "status": { "const": "approved" } } },
+      "then": {
+        "properties": { "reviewer": { "type": "string", "minLength": 1 }, "approvedAt": { "$ref": "#/$defs/timestamp" } }
+      },
+      "else": { "properties": { "reviewer": { "type": "null" }, "approvedAt": { "type": "null" } } }
+    },
+    "packApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "reviewer", "approvedAt", "tracking", "note"],
+      "properties": {
+        "status": { "enum": ["pending_legal_review", "approved"] },
+        "reviewer": { "type": ["string", "null"] },
+        "approvedAt": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "tracking": { "$ref": "#/$defs/url" },
+        "note": { "$ref": "#/$defs/text" }
+      },
+      "if": { "properties": { "status": { "const": "approved" } } },
+      "then": {
+        "properties": { "reviewer": { "type": "string", "minLength": 1 }, "approvedAt": { "$ref": "#/$defs/timestamp" } }
+      },
+      "else": { "properties": { "reviewer": { "type": "null" }, "approvedAt": { "type": "null" } } }
+    },
+    "actor": {
+      "enum": [
+        "operator",
+        "provider",
+        "deployer",
+        "importer",
+        "distributor",
+        "authorised_representative",
+        "product_manufacturer",
+        "gpai_model_provider",
+        "notified_body",
+        "member_state",
+        "commission",
+        "ai_office"
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact", "op", "value"],
+      "properties": {
+        "fact": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*$" },
+        "op": { "enum": ["eq", "in", "before", "onOrAfter"] },
+        "value": true
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "in" } } },
+          "then": { "properties": { "value": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } } } }
+        },
+        {
+          "if": { "properties": { "op": { "enum": ["before", "onOrAfter"] } } },
+          "then": { "properties": { "value": { "$ref": "#/$defs/date" } } }
+        },
+        {
+          "if": { "properties": { "op": { "const": "eq" } } },
+          "then": { "properties": { "value": { "type": ["boolean", "string"] } } }
+        }
+      ]
+    },
+    "predicates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate" } },
+    "transitional": {
+      "oneOf": [
+        {
+          "description": "Cross-reference: the rule is listed once, under the entry it names (crossReferenceRule).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "entryId"],
+          "properties": { "reference": { "$ref": "#/$defs/text" }, "entryId": { "$ref": "#/$defs/entryId" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "rule"],
+          "properties": {
+            "reference": { "$ref": "#/$defs/text" },
+            "rule": { "$ref": "#/$defs/text" },
+            "deadline": { "$ref": "#/$defs/date" },
+            "appliesIf": { "$ref": "#/$defs/predicates" },
+            "exceptIf": { "$ref": "#/$defs/predicates" },
+            "obligationsApplyOnlyIf": { "$ref": "#/$defs/predicates" }
+          }
+        }
+      ]
+    },
+    "legalBasis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "amendedBy"],
+      "properties": {
+        "reference": { "$ref": "#/$defs/text" },
+        "amendedBy": { "anyOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+        "previousValue": { "$ref": "#/$defs/text" }
+      }
+    },
+    "history": {
+      "description": "Change history of the entry across rule-pack revisions.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rulePackVersion", "change", "note"],
+        "properties": {
+          "rulePackVersion": { "$ref": "#/$defs/methodologyVersion" },
+          "change": { "enum": ["added", "revised", "unchanged", "superseded"] },
+          "note": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "applicationDate": {
+      "description": "An operator-facing application date. date is effectiveFrom; effectiveTo stays open until a later rule pack supersedes the entry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "date",
+        "dateType",
+        "provisions",
+        "scope",
+        "actors",
+        "summary",
+        "legalBasis",
+        "effectiveFrom",
+        "effectiveTo",
+        "sourceIds",
+        "verification",
+        "legalReview",
+        "approval",
+        "history"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/entryId" },
+        "title": { "$ref": "#/$defs/shortText" },
+        "date": { "$ref": "#/$defs/date" },
+        "dateType": { "enum": ["entry_into_force", "applies_from", "compliance_deadline"] },
+        "provisions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+        "scope": { "$ref": "#/$defs/text" },
+        "actors": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/actor" } },
+        "summary": { "$ref": "#/$defs/text" },
+        "conditions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+        "appliesIf": { "$ref": "#/$defs/predicates" },
+        "exceptIf": { "$ref": "#/$defs/predicates" },
+        "transitional": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/transitional" } },
+        "legalBasis": { "$ref": "#/$defs/legalBasis" },
+        "notes": { "$ref": "#/$defs/text" },
+        "effectiveFrom": { "$ref": "#/$defs/date" },
+        "effectiveTo": { "anyOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" },
+        "legalReview": { "$ref": "#/$defs/legalReview" },
+        "approval": { "$ref": "#/$defs/approval" },
+        "history": { "$ref": "#/$defs/history" }
+      }
+    },
+    "authorityDeadline": {
+      "description": "A Commission, Member State or notified-body deadline; not an operator duty.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "date", "provision", "actor", "summary", "sourceIds", "verification"],
+      "properties": {
+        "id": { "$ref": "#/$defs/entryId" },
+        "date": { "$ref": "#/$defs/date" },
+        "provision": { "$ref": "#/$defs/text" },
+        "actor": { "enum": ["notified_body", "member_state", "commission", "ai_office"] },
+        "summary": { "$ref": "#/$defs/text" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "prohibitedPractice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point", "label", "appliesFrom", "entryId", "sourceIds", "verification"],
+      "properties": {
+        "point": { "type": "string", "pattern": "^Art 5\\(1\\)\\([a-z]{1,2}\\)$" },
+        "label": { "$ref": "#/$defs/text" },
+        "appliesFrom": { "$ref": "#/$defs/date" },
+        "conditions": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^Art 5\\(1[ab]\\)$" } },
+        "entryId": { "$ref": "#/$defs/entryId" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "secondaryOnly": {
+      "type": "object",
+      "required": ["status", "sourceIds"],
+      "properties": { "status": { "const": "secondary_only" }, "sourceIds": { "$ref": "#/$defs/sourceIds" } }
+    },
+    "standard": {
+      "description": "Standards register entry (D-03): our own title of at most 80 characters, clause numbers only, no standard text.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "reference",
+        "title",
+        "body",
+        "category",
+        "label",
+        "presumptionOfConformity",
+        "useInAudits",
+        "sourceIds",
+        "verification",
+        "legalReview"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^STD-[A-Z0-9-]+$" },
+        "reference": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "title": { "$ref": "#/$defs/shortText" },
+        "body": { "$ref": "#/$defs/text" },
+        "category": { "enum": ["harmonised_standard_cited", "international_standard_not_cited", "draft_not_harmonised"] },
+        "label": { "$ref": "#/$defs/shortText" },
+        "cenPublicationDate": { "$ref": "#/$defs/date" },
+        "ojCitation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decisionNumber", "celex", "adopted", "ojReference", "publicationDate", "entryIntoForce", "eli", "restrictions", "standardisationRequest"],
+          "properties": {
+            "decisionNumber": { "type": "string", "pattern": "^\\(EU\\) [0-9]{4}/[0-9]+$" },
+            "celex": { "type": "string", "pattern": "^3[0-9]{4}D[0-9]{4}$" },
+            "adopted": { "$ref": "#/$defs/date" },
+            "ojReference": { "$ref": "#/$defs/text" },
+            "publicationDate": { "$ref": "#/$defs/date" },
+            "entryIntoForce": { "$ref": "#/$defs/date" },
+            "eli": { "$ref": "#/$defs/eli" },
+            "restrictions": { "$ref": "#/$defs/text" },
+            "standardisationRequest": { "$ref": "#/$defs/text" }
+          }
+        },
+        "presumptionOfConformity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "enum": ["limited_to_covered_clauses", "none"] },
+            "from": { "$ref": "#/$defs/date" },
+            "clauseScope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["clause", "covers", "excludes", "status", "sourceIds", "verificationGap"],
+              "properties": {
+                "clause": { "$ref": "#/$defs/shortText" },
+                "covers": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^Art [0-9]+[a-z]?\\(" } },
+                "excludes": { "type": "array", "items": { "type": "string", "pattern": "^Art [0-9]+[a-z]?\\(" } },
+                "status": { "enum": ["verified", "secondary_only"] },
+                "sourceIds": { "$ref": "#/$defs/sourceIds" },
+                "variance": { "$ref": "#/$defs/text" },
+                "verificationGap": { "$ref": "#/$defs/text" }
+              }
+            },
+            "statutoryBasis": { "$ref": "#/$defs/text" },
+            "applicationNote": { "$ref": "#/$defs/text" },
+            "note": { "$ref": "#/$defs/text" }
+          },
+          "if": { "properties": { "status": { "const": "limited_to_covered_clauses" } } },
+          "then": { "required": ["from", "clauseScope", "statutoryBasis"] },
+          "else": { "not": { "anyOf": [{ "required": ["clauseScope"] }, { "required": ["from"] }] } }
+        },
+        "relationToOtherStandards": { "$ref": "#/$defs/text" },
+        "isoStatus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["published", "edition", "stage"],
+          "properties": {
+            "published": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$" },
+            "edition": { "type": "integer", "minimum": 1 },
+            "stage": { "type": "string", "pattern": "^[0-9]{2}\\.[0-9]{2}$" }
+          }
+        },
+        "europeanAdoption": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "citedInOJ"],
+          "properties": {
+            "reference": { "type": ["string", "null"] },
+            "cenPublicationDate": { "$ref": "#/$defs/date" },
+            "workItem": { "type": "string", "pattern": "^JT[0-9]{6}$" },
+            "cenStatus": { "$ref": "#/$defs/shortText" },
+            "cenCurrentStageDate": { "$ref": "#/$defs/date" },
+            "cenNextStageDate": { "$ref": "#/$defs/date" },
+            "forecastVotingDate": { "$ref": "#/$defs/date" },
+            "note": { "$ref": "#/$defs/text" },
+            "citedInOJ": { "const": false }
+          }
+        },
+        "aiActArticleIndicative": { "$ref": "#/$defs/shortText" },
+        "cen": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "initialDate", "currentStageDate", "nextStageDate", "forecastVotingDate"],
+          "properties": {
+            "status": { "enum": ["Under Drafting", "Under Enquiry", "Under Approval"] },
+            "initialDate": { "$ref": "#/$defs/date" },
+            "currentStageDate": { "$ref": "#/$defs/date" },
+            "nextStageDate": { "anyOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+            "forecastVotingDate": { "$ref": "#/$defs/date" },
+            "note": { "$ref": "#/$defs/text" }
+          }
+        },
+        "reportedOutcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "status", "sourceIds"],
+          "properties": {
+            "text": { "$ref": "#/$defs/text" },
+            "status": { "const": "secondary_only" },
+            "sourceIds": { "$ref": "#/$defs/sourceIds" }
+          }
+        },
+        "useInAudits": { "$ref": "#/$defs/text" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" },
+        "legalReview": { "$ref": "#/$defs/legalReview" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "category": { "const": "harmonised_standard_cited" } } },
+          "then": {
+            "required": ["ojCitation", "cenPublicationDate"],
+            "properties": {
+              "label": { "const": "Harmonised standard cited in the OJ" },
+              "presumptionOfConformity": { "properties": { "status": { "const": "limited_to_covered_clauses" } } }
+            }
+          },
+          "else": {
+            "not": { "required": ["ojCitation"] },
+            "properties": { "presumptionOfConformity": { "properties": { "status": { "const": "none" } } } }
+          }
+        },
+        {
+          "if": { "properties": { "category": { "const": "international_standard_not_cited" } } },
+          "then": {
+            "required": ["isoStatus", "europeanAdoption"],
+            "properties": { "label": { "const": "Not cited in the OJ: no presumption of conformity" } }
+          }
+        },
+        {
+          "if": { "properties": { "category": { "const": "draft_not_harmonised" } } },
+          "then": {
+            "required": ["cen", "aiActArticleIndicative"],
+            "properties": {
+              "reference": { "pattern": "^prEN " },
+              "label": { "const": "Not harmonised — state of the art" }
+            }
+          }
+        }
+      ]
+    },
+    "guidanceDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "status", "sourceIds", "verification"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^GUID-[A-Z0-9-]+$" },
+        "title": { "$ref": "#/$defs/text" },
+        "status": { "$ref": "#/$defs/text" },
+        "statutoryDeadline": { "$ref": "#/$defs/date" },
+        "draftPublished": { "$ref": "#/$defs/date" },
+        "consultation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["note"],
+          "properties": {
+            "newsItemDeadline": { "$ref": "#/$defs/date" },
+            "serviceDeskDeadline": { "$ref": "#/$defs/date" },
+            "note": { "$ref": "#/$defs/text" }
+          }
+        },
+        "lastUpdated": { "$ref": "#/$defs/date" },
+        "finalAdoption": { "$ref": "#/$defs/text" },
+        "expectedFinal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["date", "note"],
+          "properties": {
+            "date": { "anyOf": [{ "$ref": "#/$defs/date" }, { "type": "null" }] },
+            "note": { "$ref": "#/$defs/text" }
+          }
+        },
+        "listedDate": { "$ref": "#/$defs/date" },
+        "url": { "$ref": "#/$defs/url" },
+        "note": { "$ref": "#/$defs/text" },
+        "platformUse": { "$ref": "#/$defs/text" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" },
+        "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "legalReviewItem": {
+      "description": "A question for qualified legal review. Pending until #57 records the reviewer, time and resolution.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "topic", "question", "relatedIds", "status", "tracking"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^LR-[0-9]{2}$" },
+        "topic": { "$ref": "#/$defs/text" },
+        "question": { "$ref": "#/$defs/text" },
+        "relatedIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "status": { "enum": ["pending", "resolved"] },
+        "tracking": { "$ref": "#/$defs/url" },
+        "reviewer": { "type": "string", "minLength": 1 },
+        "resolvedAt": { "$ref": "#/$defs/timestamp" },
+        "resolution": { "$ref": "#/$defs/text" }
+      },
+      "if": { "properties": { "status": { "const": "resolved" } } },
+      "then": { "required": ["reviewer", "resolvedAt", "resolution"] },
+      "else": { "not": { "anyOf": [{ "required": ["reviewer"] }, { "required": ["resolvedAt"] }, { "required": ["resolution"] }] } }
+    },
+    "unverifiedClaim": {
+      "description": "A claim taken only from secondary sources, or not verified; shown as unverified, never as fact.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "claim", "status", "reason"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^UV-[0-9]{2}$" },
+        "claim": { "$ref": "#/$defs/text" },
+        "status": { "const": "secondary_only" },
+        "reason": { "$ref": "#/$defs/text" },
+        "sourceIds": { "$ref": "#/$defs/sourceIds" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "publisher", "kind", "retrievedOn"],
+      "anyOf": [{ "required": ["accessUrl"] }, { "required": ["canonicalUrl"] }],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(?:SRC|SEC)-[A-Z0-9-]+$" },
+        "title": { "$ref": "#/$defs/text" },
+        "publisher": { "$ref": "#/$defs/text" },
+        "kind": {
+          "enum": ["official_journal", "publications_office_metadata", "consolidated_text", "commission", "standards_body", "secondary"]
+        },
+        "canonicalUrl": { "$ref": "#/$defs/url" },
+        "accessUrl": { "$ref": "#/$defs/url" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "retrievedOn": { "$ref": "#/$defs/date" },
+        "notes": { "$ref": "#/$defs/text" }
+      },
+      "if": { "properties": { "id": { "pattern": "^SEC-" } } },
+      "then": { "properties": { "kind": { "const": "secondary" } } },
+      "else": { "properties": { "kind": { "not": { "const": "secondary" } } } }
+    }
+  }
+}
