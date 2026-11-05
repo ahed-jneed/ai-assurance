@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Issue | #31 (milestone M2, "Multi-framework and GenAI evidence") |
-| Status | Proposed design, GenAI evidence specification version **0.1** (revised the same day after independent review of PR #49) |
+| Status | Proposed design, GenAI evidence specification version **0.1** (revised the same day after the independent review and the re-review of PR #49; the open questions were decided on 5 November 2026, section 14) |
 | Date | 5 November 2026 |
 | Implemented by | #32 (engine, `engine/`, `schemas/genai-*.json`), #33 (workspace, `site-app/`) |
 | Builds on | `docs/design/audit-statistics.md` (#9, open as PR #46; decision rule, Wilson, Holm/BH, minimums), the criteria model of #26 (open as PR #45), worker hardening #10 (open as PR #47) |
@@ -423,7 +423,7 @@ Inspect's header metrics apply score edits but **not** invalidations; this was o
 - `strategyId` when a strategy transformed the test (lines 731–752; no `strategyId` means the base test, recorded as `basic`);
 - the graders as `promptfoo:redteam:<plugin>` assertions (`src/redteam/plugins/base.ts`).
 
-`success: true` means the target resisted. Therefore `attack_success = 1` when `success == false` and `failureReason == 1`, and errors are excluded. DefectDojo's parser reads it the same way. The fixture `redteam_shaped.results.json` carries these metadata keys with deterministic graders. A genuine `promptfoo redteam run` was not generated, because red-team commands require promptfoo cloud email verification (`checkEmailStatus` in `dist/src/accounts-*.js`). The grader assertion names are therefore **verified from source only** (open question Q4).
+`success: true` means the target resisted. Therefore `attack_success = 1` when `success == false` and `failureReason == 1`, and errors are excluded. DefectDojo's parser reads it the same way. The fixture `redteam_shaped.results.json` carries these metadata keys with deterministic graders. A genuine `promptfoo redteam run` was not generated, because red-team commands require promptfoo cloud email verification (`checkEmailStatus` in `dist/src/accounts-*.js`). The grader assertion names are therefore **verified from source only** (Q4; a genuine red-team fixture is an optional owner action, #57).
 
 | Run metadata | Source |
 |---|---|
@@ -1323,25 +1323,29 @@ Each item carries the claim-scope rule and the gate. Each states "supporting evi
 
 G1 and #21 E1 can proceed in parallel. G3 needs the statistics core; until #21 lands, G3 MAY implement Wilson and inversion locally with an identical interface and a test against `schemas/fixtures/statistics-golden.json`, then switch over.
 
-## 14. Open questions and risks (each has a default)
+## 14. Open questions and risks (decided on 5 November 2026)
 
-| # | Question | Default |
-|---|---|---|
-| Q1 | The OWASP LLM Top 10 2026 identifiers come from CSA and other secondary summaries; the official PDF was not parsed | Use them as in 9.2; W3 MUST confirm against the official document before releasing the pack |
-| Q2 | Should an uploaded envelope count as L2 when a reviewer re-performs it locally? | No. Only a worker recomputation authenticates it (4.2). Re-performance with `verify` is recorded but does not lift the cap |
-| Q3 | κ ≥ 0.60 on the 95% lower bound with n ≥ 50: is it too strict for small validation budgets? | Keep it as a floor. Plans may raise it, never lower it. A methodology owner should sign this off |
-| Q4 | Genuine `promptfoo redteam run` output was not generated (email verification) | Field names are verified from source at 0.125.1. Add a real red-team fixture when one is available, and re-check the `promptfoo:redteam:*` assertion names then |
-| Q5 | PyRIT has no exporter; `pyrit-export/1` depends on PyRIT's pydantic model shapes | Gate on PyRIT major version 1; re-verify each minor release; switch to PyRIT's own `--output json` when it ships |
-| Q6 | Family for distilled models, merges and models trained on another family's outputs | Developer-level base lineage; declare `other-<name>` with a rationale when unclear. A reviewer resolves conflicts |
-| Q7 | The analytic clustered SE departs from `docs/design/audit-statistics.md` section 5.11 (cluster bootstrap for tabular data) | Keep the analytic CR1 form for GenAI means: it reconciles with Inspect and needs no seed. The bootstrap stays available as a cross-check |
-| Q8 | Paired binary differences use a normal interval; a score interval for paired proportions (Newcombe 1998) would be better for small discordant counts | Normal interval with n ≥ 30; revisit with #21 |
-| Q9 | Multi-gigabyte agent logs exceed the 50 MB upload and parse limits | Out of scope for 0.1. Needs chunked or streamed upload and an incremental parser |
-| Q10 | DeepEval and Ragas carry no harness version or model identity, so their results rest on declarations | They are accepted, and the gate makes the declarations visible (`declaredOnly`). Recommend Inspect or promptfoo where the client can choose |
-| Q11 | Inspect `.json` and `.eval` holding the same log have different bytes and hashes | Pin the file actually supplied. `inspect log convert` output is a different artifact |
-| Q12 | Real logs can contain personal data or harmful text, which matters for excerpts and retention | Excerpts off by default. Envelopes are internal-only. Retention follows R7.4 |
-| Q13 | Pairing on (groupKey, promptSha256, targetSha256) means two promptfoo prompt templates whose user messages differ never pair on the same tests (templates that differ only in their system message do, because `promptSha256` excludes system messages), although comparing prompts is a common promptfoo use | Keep the strict rule in 0.1: a paired comparison is between systems on the same inputs, so a prompt-variant comparison matches no group and is gated by the sample-size floor. An unpaired two-sample criterion is a later addition |
-| Q14 | With clustering, a sample with no success uses the worst-case design effect (8.3), while one with a few successes uses the estimated one, which is unstable for rare events; zero successes can therefore be judged more strictly than one | Accept the conservative asymmetry in 0.1 and report the design effect with every clustered member; revisit with #21 (for example a cluster-level interval when few clusters have events) |
-| Q15 | The scorer allowlists key on names (Inspect scorer names, Ragas columns, garak detector parameters). A task-file scorer named `match`, or an LLM metric renamed `exact_match`, would be classified deterministic | Allowlists are kept per tool version in `engine/genai/scorers.py`; the results view shows every deciding score's kind, and Inspect's scorer-span check still catches judges that call models through Inspect. Recommend that auditors re-run with built-in scorers where the conclusion depends on one |
+Every question had a default. All of them were decided on 5 November 2026 (the orchestrator's notes on #32 and #33): Q1 keeps its confirmation condition, Q3 and Q6 are approved as the methodology defaults, a genuine red-team fixture for Q4 is an optional owner action, and the other defaults are accepted. Q9 and the unpaired criterion of Q13 are on the Later list in `ROADMAP.md`.
+
+| # | Question | Default | Decision |
+|---|---|---|---|
+| Q1 | The OWASP LLM Top 10 2026 identifiers come from CSA and other secondary summaries; the official PDF was not parsed | Use them as in 9.2; W3 MUST confirm against the official document before releasing the pack | Default accepted with that condition: before W3 (#33) releases the pack, it MUST confirm the identifiers and their order against the official OWASP document, including the `owasp:llm10` mapping of 9.3 |
+| Q2 | Should an uploaded envelope count as L2 when a reviewer re-performs it locally? | No. Only a worker recomputation authenticates it (4.2). Re-performance with `verify` is recorded but does not lift the cap | Default accepted |
+| Q3 | κ ≥ 0.60 on the 95% lower bound with n ≥ 50: is it too strict for small validation budgets? | Keep it as a floor. Plans may raise it, never lower it. A methodology owner should sign this off | Approved as the methodology default: the 95% lower bound of kappa MUST be at least 0.60 on at least 50 items; plans may raise the floor, never lower it |
+| Q4 | Genuine `promptfoo redteam run` output was not generated (email verification) | Field names are verified from source at 0.125.1. Add a real red-team fixture when one is available, and re-check the `promptfoo:redteam:*` assertion names then | Default accepted. A genuine red-team fixture needs a promptfoo account, which is an optional owner action (#57); the red-team-shaped fixture stands until then |
+| Q5 | PyRIT has no exporter; `pyrit-export/1` depends on PyRIT's pydantic model shapes | Gate on PyRIT major version 1; re-verify each minor release; switch to PyRIT's own `--output json` when it ships | Default accepted |
+| Q6 | Family for distilled models, merges and models trained on another family's outputs | Developer-level base lineage; declare `other-<name>` with a rationale when unclear. A reviewer resolves conflicts | Approved as the methodology default: the developer-level family rule of 8.7 |
+| Q7 | The analytic clustered SE departs from `docs/design/audit-statistics.md` section 5.11 (cluster bootstrap for tabular data) | Keep the analytic CR1 form for GenAI means: it reconciles with Inspect and needs no seed. The bootstrap stays available as a cross-check | Default accepted |
+| Q8 | Paired binary differences use a normal interval; a score interval for paired proportions (Newcombe 1998) would be better for small discordant counts | Normal interval with n ≥ 30; revisit with #21 | Default accepted |
+| Q9 | Multi-gigabyte agent logs exceed the 50 MB upload and parse limits | Out of scope for 0.1. Needs chunked or streamed upload and an incremental parser | Default accepted; chunked or streamed upload with an incremental parser is on the Later list in `ROADMAP.md` |
+| Q10 | DeepEval and Ragas carry no harness version or model identity, so their results rest on declarations | They are accepted, and the gate makes the declarations visible (`declaredOnly`). Recommend Inspect or promptfoo where the client can choose | Default accepted |
+| Q11 | Inspect `.json` and `.eval` holding the same log have different bytes and hashes | Pin the file actually supplied. `inspect log convert` output is a different artifact | Default accepted |
+| Q12 | Real logs can contain personal data or harmful text, which matters for excerpts and retention | Excerpts off by default. Envelopes are internal-only. Retention follows R7.4 | Default accepted |
+| Q13 | Pairing on (groupKey, promptSha256, targetSha256) means two promptfoo prompt templates whose user messages differ never pair on the same tests (templates that differ only in their system message do, because `promptSha256` excludes system messages), although comparing prompts is a common promptfoo use | Keep the strict rule in 0.1: a paired comparison is between systems on the same inputs, so a prompt-variant comparison matches no group and is gated by the sample-size floor. An unpaired two-sample criterion is a later addition | Default accepted; the unpaired two-sample criterion is on the Later list in `ROADMAP.md` |
+| Q14 | With clustering, a sample with no success uses the worst-case design effect (8.3), while one with a few successes uses the estimated one, which is unstable for rare events; zero successes can therefore be judged more strictly than one | Accept the conservative asymmetry in 0.1 and report the design effect with every clustered member; revisit with #21 (for example a cluster-level interval when few clusters have events) | Default accepted |
+| Q15 | The scorer allowlists key on names (Inspect scorer names, Ragas columns, garak detector parameters). A task-file scorer named `match`, or an LLM metric renamed `exact_match`, would be classified deterministic | Allowlists are kept per tool version in `engine/genai/scorers.py`; the results view shows every deciding score's kind, and Inspect's scorer-span check still catches judges that call models through Inspect. Recommend that auditors re-run with built-in scorers where the conclusion depends on one | Default accepted |
+
+The same notes leave one packaging choice to #62: whether zstd comes from the standard library (Python 3.14 and later) or from the optional `zstandard` package. Section 7.2 reads either back-end, so only the `zstandard` steps of G1 and G5 (section 13) depend on that choice, and they follow #62.
 
 **Unverified items in this document**:
 
