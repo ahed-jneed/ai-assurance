@@ -132,6 +132,16 @@ const undefinedR2 = copy(regression);
 undefinedR2.results[0].metrics.find(metric => metric.name === 'r2').value = null;
 undefinedR2.results[0].limitations.push('R² is undefined for this target population.');
 positive('Hosted null R² evidence', undefinedR2);
+// Test definitions 2.1.0: binary performance freezes its positive class and
+// reports specificity, prevalence and the majority-class baseline.
+const perClass = copy(complete);
+perClass.config.performancePositiveLabel = perClass.config.positiveLabel;
+perClass.thresholds.performancePositiveLabel = perClass.config.positiveLabel;
+const perClassResult = perClass.results.find(result => result.testId === 'performance');
+for (const name of ['specificity', 'prevalence', 'majority_baseline_accuracy']) perClassResult.metrics.push({ name, value: 0.5, unit: 'ratio', sampleSize: perClassResult.metrics[0].sampleSize });
+positive('Hosted performance positive class and per-class evidence', perClass);
+negative('per-class ratio outside range', perClass, run => { run.results.find(result => result.testId === 'performance').metrics.at(-1).value = 1.5; });
+negative('per-class metric on a fairness result', perClass, run => { run.results.find(result => result.testId === 'demographic_parity').metrics.push({ name: 'specificity', value: 0.5, unit: 'ratio', sampleSize: 1 }); });
 
 const mutations = [
   ['unknown contract', complete, run => { run.contractVersion = '2.0'; }],
