@@ -65,6 +65,18 @@ def skewed_worker_clock(seconds):
         yield
 
 
+class FakeMonotonic:
+    """Stands in for time.monotonic(); scripted reads and backoff sleeps advance it."""
+    def __init__(self, now=0.0):
+        self.now = now
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
 PIN_KEYS = ("jobId", "attemptId", "fence", "nonce", "requestSha256")
 CONTRACT_VIOLATION = "Runner payload violates the versioned result contract"
 REQUEST_FAILED = "The request could not be completed. Your changes were not confirmed."
@@ -861,6 +873,20 @@ class WorkerTests(unittest.TestCase):
                 self.assertIn("no usable Date header", fallback.source)
                 self.assertAlmostEqual(fallback.deadline(lease)-time.monotonic(), 60, delta=5)
 
+    def test_a_lease_counts_down_from_when_the_answering_attempt_was_sent(self):
+        # The server reads its clock while it answers, after the request left.
+        # Counting from receipt would end the local lease after the real one.
+        monotonic = FakeMonotonic(1000.0)
+        lease = json_bytes({"leaseUntil": "2026-11-05T12:02:00.000Z"})
+        # The first attempt times out after 2 s; the retry's answer takes 7.5 s to read.
+        transport = self.scripted_transport(([(2, TimeoutError("timed out"))], None), ([(7.5, lease), b""], len(lease)), clock=monotonic, date="Thu, 05 Nov 2026 12:00:00 GMT")
+        with patch("engine.worker.time.monotonic", monotonic), patch("engine.worker.time.sleep", monotonic.sleep):
+            response, clock = transport.post_timed({"op": "heartbeat"}, retry=True)
+        # The retry was sent at 1002.25, after a 0.25 s backoff, and answered at 1009.75.
+        self.assertEqual((len(transport.opener.responses), monotonic()), (2, 1009.75))
+        # 120 s left by the Date header, less one second, counted from 1002.25.
+        self.assertEqual(clock.deadline(response["leaseUntil"]), 1121.25)
+
     def test_claim_without_valid_pins_is_logged_and_never_failed(self):
         unaddressable = {**claim_body(), "jobId": "../../etc/passwd"}
         with RunnerServer(claims=[unaddressable, claim_body(job="job-next", attempt="attempt-next")]) as server:
@@ -1125,16 +1151,20 @@ class WorkerTests(unittest.TestCase):
                     worker_id="worker-fixture", image_digest=IMAGE)
             resolving.assert_not_called()
 
-    def scripted_transport(self, *scripts, timeout=2, retries=2, clock=None):
+    def scripted_transport(self, *scripts, timeout=2, retries=2, clock=None, date=None):
         """Transport whose attempts replay scripted read1 results in order.
 
         A script item is bytes, an exception to raise, or None for "one byte
-        after a second", a live but far too slow trickle on `clock`.
+        after a second", a live but far too slow trickle on `clock`. A
+        (seconds, item) pair is that item after `seconds` on `clock`. Every
+        response carries `date`, when given, as its Date header.
         """
         class Response:
             def __init__(self, script, length):
                 self.script, self.reads = list(script), 0
                 self.headers = {} if length is None else {"Content-Length": str(length)}
+                if date is not None:
+                    self.headers["Date"] = date
             def __enter__(self):
                 return self
             def __exit__(self, *_):
@@ -1144,6 +1174,9 @@ class WorkerTests(unittest.TestCase):
             def read1(self, _):
                 self.reads += 1
                 item = self.script.pop(0) if len(self.script) > 1 else self.script[0]
+                if isinstance(item, tuple):
+                    seconds, item = item
+                    clock.now += seconds
                 if item is None:
                     clock.now += 1
                     return b"x"
@@ -1165,11 +1198,7 @@ class WorkerTests(unittest.TestCase):
         return transport
 
     def test_trickling_download_is_bounded_and_each_retry_gets_a_fresh_budget(self):
-        class Clock:
-            now = 0.0
-            def __call__(self):
-                return self.now
-        clock, claim = Clock(), Claim.parse(claim_body())
+        clock, claim = FakeMonotonic(), Claim.parse(claim_body())
         transport = self.scripted_transport(*[([None], None)]*3, clock=clock)
         with patch("engine.worker.time.monotonic", clock), patch("engine.worker.time.sleep"):
             with self.assertRaisesRegex(ProtocolError, "response_deadline_exceeded"):
