@@ -1,16 +1,20 @@
 {
   "schemaVersion": "1.0.0",
-  "mapVersion": "2026.10.1",
+  "mapVersion": "2026.11.1",
   "source": {
     "regulation": "Regulation (EU) 2024/1689 as amended",
     "reference": "Article 11(1), Annex IV",
     "celex": "02024R1689-20260727",
     "consolidatedAsOf": "2026-07-27",
-    "researchedAsOf": "2026-10-05",
+    "researchedAsOf": "2026-11-05",
+    "rulePackVersion": "2026.11.1",
     "sourceUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/annex-4",
     "consolidatedUrl": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+    "consolidatedLegalEffect": "none: a documentation tool; the authentic Official Journal acts govern",
     "authenticOriginalUrl": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202401689",
+    "authenticOriginalEli": "http://data.europa.eu/eli/reg/2024/1689/oj",
     "authenticAmendmentUrl": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744",
+    "authenticAmendmentEli": "http://data.europa.eu/eli/reg/2026/1744/oj",
     "titlesAre": "Concise paraphrases; consult the source for the full applicable requirements."
   },
   "assemblyPolicy": {
