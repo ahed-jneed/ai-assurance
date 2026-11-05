@@ -1,0 +1,7142 @@
+{
+ "schemaVersion": "1.0",
+ "specification": "docs/design/audit-statistics.md",
+ "specificationVersion": "1.0.0",
+ "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels cross-check)",
+ "howToUse": {
+  "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members are matched by memberId; reasons are compared as sets; all other fields exactly.",
+  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise).",
+  "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target 0 and prediction = error. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. Positive label '1'."
+ },
+ "defaults": {
+  "confidenceLevel": 0.95,
+  "minimums": {
+   "sampleSize": 30,
+   "groupSize": 30,
+   "classCount": 10
+  },
+  "minimumCoverage": 1.0,
+  "confirmatoryAdjustment": "holm",
+  "exploratoryAdjustment": "benjamini_hochberg"
+ },
+ "tolerances": {
+  "estimate": 1e-06,
+  "interval": 1e-06,
+  "pValueAbsolute": 1e-09,
+  "pValueRelative": 1e-05,
+  "probability": 1e-06,
+  "reasonsComparedAsSets": true
+ },
+ "numerics": {
+  "normalQuantiles": [
+   {
+    "twoSidedLevel": 0.9,
+    "z": 1.64485362695
+   },
+   {
+    "twoSidedLevel": 0.95,
+    "z": 1.95996398454
+   },
+   {
+    "twoSidedLevel": 0.99,
+    "z": 2.57582930355
+   },
+   {
+    "twoSidedLevel": 0.983333333333,
+    "z": 2.39397979982
+   },
+   {
+    "twoSidedLevel": 0.991666666667,
+    "z": 2.63825727348
+   },
+   {
+    "twoSidedLevel": 0.997619047619,
+    "z": 3.03807430492
+   }
+  ],
+  "erfc": [
+   {
+    "x": 0.5,
+    "value": 0.479500122187
+   },
+   {
+    "x": 1.0,
+    "value": 0.15729920705
+   },
+   {
+    "x": 2.0,
+    "value": 0.00467773498105
+   },
+   {
+    "x": 5.0,
+    "value": 1.53745979443e-12
+   },
+   {
+    "x": 10.0,
+    "value": 2.08848758376e-45
+   },
+   {
+    "x": 20.0,
+    "value": 5.39586561161e-176
+   },
+   {
+    "x": 26.0,
+    "value": 5.66319240886e-296
+   }
+  ]
+ },
+ "cases": [
+  {
+   "id": "GC-01",
+   "category": "small_sample",
+   "title": "Recall 40/50 = 0.80 against a 0.70 minimum: the point estimate passes, the interval does not",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 40,
+      "fp": 6,
+      "fn": 10,
+      "tn": 144
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "recall-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "recall",
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "recall-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 40,
+         "n": 50
+        },
+        "estimate": 0.8,
+        "interval": {
+         "lower": 0.669628940678,
+         "upper": 0.887562499842,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.122822648101,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 200,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.122822648101,
+      "decidingMemberId": "recall",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.122822648101,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-02",
+   "category": "large_sample",
+   "title": "Accuracy 9,120/10,000 against a 0.90 minimum passes",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 1520,
+      "fp": 400,
+      "fn": 480,
+      "tn": 7600
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "accuracy-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "accuracy-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 9120,
+         "n": 10000
+        },
+        "estimate": 0.912,
+        "interval": {
+         "lower": 0.906288126963,
+         "upper": 0.917395458379,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 6.33424836662e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 10000,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 6.33424836662e-05,
+      "decidingMemberId": "accuracy",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 6.33424836662e-05,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-03",
+   "category": "fail",
+   "title": "Accuracy 80/100 against a 0.90 minimum fails",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 30,
+      "fp": 8,
+      "fn": 12,
+      "tn": 50
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "accuracy-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "accuracy-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 80,
+         "n": 100
+        },
+        "estimate": 0.8,
+        "interval": {
+         "lower": 0.711170834407,
+         "upper": 0.866633066669,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.000858120666394,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 100,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "fail",
+      "pValue": 0.000858120666394,
+      "decidingMemberId": "accuracy",
+      "unadjustedOutcome": "fail",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.000858120666394,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-04",
+   "category": "zero_numerator",
+   "title": "False-positive rate 0/40 against a 0.10 maximum passes (Wilson handles zero events)",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 50,
+      "fp": 0,
+      "fn": 10,
+      "tn": 40
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "fpr-maximum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "false_positive_rate",
+        "band": {
+         "lower": null,
+         "upper": 0.1
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "fpr-maximum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "false_positive_rate",
+        "metric": "false_positive_rate",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 40
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.0876216011973,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": null,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0350149810197,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 100,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.0350149810197,
+      "decidingMemberId": "false_positive_rate",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.0350149810197,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-05",
+   "category": "all_events",
+   "title": "Precision 30/30 against a 0.85 minimum passes",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 30,
+      "fp": 0,
+      "fn": 20,
+      "tn": 50
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "precision-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "precision",
+        "band": {
+         "lower": 0.85,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "precision-minimum",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "precision",
+        "metric": "precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 30,
+         "n": 30
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.886486606826,
+         "upper": 1.0,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.85,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0213975686969,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 100,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.0213975686969,
+      "decidingMemberId": "precision",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.0213975686969,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-06",
+   "category": "zero_denominator",
+   "title": "Constant negative predictor: precision undefined, recall 0, criterion fails on recall",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 0,
+      "fp": 0,
+      "fn": 60,
+      "tn": 940
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        }
+       },
+       {
+        "metric": "recall",
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       },
+       {
+        "metric": "precision",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       },
+       {
+        "metric": "f1",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 940,
+         "n": 1000
+        },
+        "estimate": 0.94,
+        "interval": {
+         "lower": 0.923528925209,
+         "upper": 0.953103527324,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 2.48266063388e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 60
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.0601718521421,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 2.66203489046e-32,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 0,
+         "positives": 60,
+         "tn": 940,
+         "negatives": 940
+        },
+        "estimate": 0.5,
+        "interval": {
+         "lower": 0.497964987242,
+         "upper": 0.530085926071,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "estimate_on_band_boundary"
+        ]
+       },
+       {
+        "memberId": "precision",
+        "metric": "precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 0
+        },
+        "estimate": null,
+        "interval": null,
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "undefined",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "undefined_zero_denominator"
+        ]
+       },
+       {
+        "memberId": "f1",
+        "metric": "f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 0,
+         "tpPlusFpPlusFn": 60,
+         "positives": 60
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.113513393174,
+         "level": 0.95,
+         "method": "jaccard_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 4.32046305783e-08,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 1000,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "fail",
+      "pValue": 1.06481395618e-31,
+      "decidingMemberId": "recall",
+      "unadjustedOutcome": "fail",
+      "reasons": [
+       "estimate_on_band_boundary",
+       "undefined_zero_denominator"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 1.06481395618e-31,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-07",
+   "category": "single_class",
+   "title": "Reference labels contain one class: specificity and balanced accuracy undefined, criterion inconclusive",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 45,
+      "fp": 0,
+      "fn": 5,
+      "tn": 0
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       },
+       {
+        "metric": "specificity",
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 45,
+         "n": 50
+        },
+        "estimate": 0.9,
+        "interval": {
+         "lower": 0.786397685625,
+         "upper": 0.956524235068,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0770998717435,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 45,
+         "positives": 50,
+         "tn": 0,
+         "negatives": 0
+        },
+        "estimate": null,
+        "interval": null,
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "undefined",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "single_class"
+        ]
+       },
+       {
+        "memberId": "specificity",
+        "metric": "specificity",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 0,
+         "n": 0
+        },
+        "estimate": null,
+        "interval": null,
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        },
+        "status": "undefined",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "single_class"
+        ]
+       }
+      ],
+      "headline": null,
+      "sampleSize": 50,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 1.0,
+      "decidingMemberId": null,
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "single_class"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 1.0,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-08",
+   "category": "small_sample",
+   "title": "Issue example: 6/20 vs 10/20 selected; impact ratio 0.60 is inconclusive (and below the group minimum)",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 6,
+      "n": 20
+     },
+     {
+      "group": "B",
+      "selected": 10,
+      "n": 20
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 6,
+          "n": 20
+         },
+         "comparator": {
+          "x": 10,
+          "n": 20
+         }
+        },
+        "estimate": 0.6,
+        "interval": {
+         "lower": 0.269556417323,
+         "upper": 1.33552746982,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       }
+      ],
+      "headline": null,
+      "sampleSize": 40,
+      "coverage": {
+       "eligibleRows": 0,
+       "populationRows": 40,
+       "unknownGroupRows": 0,
+       "value": 0.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [
+       {
+        "group": "A",
+        "n": 20
+       },
+       {
+        "group": "B",
+        "n": 20
+       }
+      ],
+      "direction": "none",
+      "pValue": 1.0,
+      "decidingMemberId": null,
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "group_suppressed_below_minimum",
+       "insufficient_coverage",
+       "insufficient_groups"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 1.0,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-09",
+   "category": "large_sample",
+   "title": "Issue example: 22,500/50,000 vs 25,000/50,000; ratio 0.90 passes the screen while a 0.02 parity band fails",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 22500,
+      "n": 50000
+     },
+     {
+      "group": "B",
+      "selected": 25000,
+      "n": 50000
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "parity-0.02",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.02,
+       "upper": 0.02
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 22500,
+          "n": 50000
+         },
+         "comparator": {
+          "x": 25000,
+          "n": 50000
+         }
+        },
+        "estimate": 0.9,
+        "interval": {
+         "lower": 0.888316711732,
+         "upper": 0.911836948807,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 7.46909027122e-70,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.9,
+       "interval": {
+        "lower": 0.888316711732,
+        "upper": 0.911836948807,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 100000,
+      "coverage": {
+       "eligibleRows": 100000,
+       "populationRows": 100000,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 7.46909027122e-70,
+      "decidingMemberId": "selection_rate_ratio:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 1.49381805424e-69,
+      "outcome": "pass"
+     },
+     {
+      "id": "parity-0.02",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 22500,
+          "n": 50000
+         },
+         "comparator": {
+          "x": 25000,
+          "n": 50000
+         }
+        },
+        "estimate": -0.05,
+        "interval": {
+         "lower": -0.0561794910608,
+         "upper": -0.0438150903788,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.02,
+         "upper": 0.02
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 2.11926499372e-21,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.05,
+       "interval": {
+        "lower": 0.0438150903788,
+        "upper": 0.0561794910608,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 100000,
+      "coverage": {
+       "eligibleRows": 100000,
+       "populationRows": 100000,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 2.11926499372e-21,
+      "decidingMemberId": "selection_rate_difference:A|B",
+      "unadjustedOutcome": "fail",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 2.11926499372e-21,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-10",
+   "category": "perfect_parity",
+   "title": "Perfect parity with 300 per group passes both the difference and the ratio band",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 150,
+      "n": 300
+     },
+     {
+      "group": "B",
+      "selected": 150,
+      "n": 300
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 150,
+          "n": 300
+         },
+         "comparator": {
+          "x": 150,
+          "n": 300
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0795077707666,
+         "upper": 0.0795077707666,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0133475759268,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0795077707666,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 600,
+      "coverage": {
+       "eligibleRows": 600,
+       "populationRows": 600,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.0133475759268,
+      "decidingMemberId": "selection_rate_difference:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.0133475759268,
+      "outcome": "pass"
+     },
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 150,
+          "n": 300
+         },
+         "comparator": {
+          "x": 150,
+          "n": 300
+         }
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.852117893382,
+         "upper": 1.1735465336,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00627719184932,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 1.0,
+       "interval": {
+        "lower": 0.852117893382,
+        "upper": 1.0,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 600,
+      "coverage": {
+       "eligibleRows": 600,
+       "populationRows": 600,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.00627719184932,
+      "decidingMemberId": "selection_rate_ratio:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.0125543836986,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-11",
+   "category": "perfect_parity",
+   "title": "Perfect parity with 30 per group is inconclusive: equality is not evidence of parity",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 15,
+      "n": 30
+     },
+     {
+      "group": "B",
+      "selected": 15,
+      "n": 30
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 15,
+          "n": 30
+         },
+         "comparator": {
+          "x": 15,
+          "n": 30
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.238236639892,
+         "upper": 0.238236639892,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.433943816298,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.238236639892,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 60,
+      "coverage": {
+       "eligibleRows": 60,
+       "populationRows": 60,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.433943816298,
+      "decidingMemberId": "selection_rate_difference:A|B",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.433943816298,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-12",
+   "category": "extreme_imbalance",
+   "title": "9,000 vs 40: a 0.60 ratio cannot be resolved for the small group",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "majority",
+      "selected": 4500,
+      "n": 9000
+     },
+     {
+      "group": "minority",
+      "selected": 12,
+      "n": 40
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:minority|majority",
+        "metric": "selection_rate_ratio",
+        "subject": "minority",
+        "comparator": "majority",
+        "counts": {
+         "subject": {
+          "x": 12,
+          "n": 40
+         },
+         "comparator": {
+          "x": 4500,
+          "n": 9000
+         }
+        },
+        "estimate": 0.6,
+        "interval": {
+         "lower": 0.373569012526,
+         "upper": 0.963677360618,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.234052616952,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.6,
+       "interval": {
+        "lower": 0.373569012526,
+        "upper": 0.963677360618,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 9040,
+      "coverage": {
+       "eligibleRows": 9040,
+       "populationRows": 9040,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.234052616952,
+      "decidingMemberId": "selection_rate_ratio:minority|majority",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.39539425111,
+      "outcome": "inconclusive"
+     },
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:minority|majority",
+        "metric": "selection_rate_difference",
+        "subject": "minority",
+        "comparator": "majority",
+        "counts": {
+         "subject": {
+          "x": 12,
+          "n": 40
+         },
+         "comparator": {
+          "x": 4500,
+          "n": 9000
+         }
+        },
+        "estimate": -0.2,
+        "interval": {
+         "lower": -0.319697925181,
+         "upper": -0.0453545676846,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.197697125555,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.2,
+       "interval": {
+        "lower": 0.0453545676846,
+        "upper": 0.319697925181,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 9040,
+      "coverage": {
+       "eligibleRows": 9040,
+       "populationRows": 9040,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.197697125555,
+      "decidingMemberId": "selection_rate_difference:minority|majority",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.39539425111,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-13",
+   "category": "zero_numerator",
+   "title": "0/40 vs 10/40: Koopman interval for a zero count; Fisher confirms the fail",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 0,
+      "n": 40
+     },
+     {
+      "group": "B",
+      "selected": 10,
+      "n": 40
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 0,
+          "n": 40
+         },
+         "comparator": {
+          "x": 10,
+          "n": 40
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.357924082993,
+         "level": 0.95,
+         "method": "koopman_score"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.00267606920279,
+        "smallCell": true,
+        "fisherExactP": 0.00102965634975,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.357924082993,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 80,
+      "coverage": {
+       "eligibleRows": 80,
+       "populationRows": 80,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.00267606920279,
+      "decidingMemberId": "selection_rate_ratio:A|B",
+      "unadjustedOutcome": "fail",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.00267606920279,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-14",
+   "category": "small_cell",
+   "title": "0/30 vs 5/30: the interval lies below 0.8 but Fisher p > 0.05, so the small-cell rule blocks the fail",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 0,
+      "n": 30
+     },
+     {
+      "group": "B",
+      "selected": 5,
+      "n": 30
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 0,
+          "n": 30
+         },
+         "comparator": {
+          "x": 5,
+          "n": 30
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.714258022019,
+         "level": 0.95,
+         "method": "koopman_score"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.0521855486173,
+        "smallCell": true,
+        "fisherExactP": 0.0521855486173,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.714258022019,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 60,
+      "coverage": {
+       "eligibleRows": 60,
+       "populationRows": 60,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.0521855486173,
+      "decidingMemberId": "selection_rate_ratio:A|B",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "small_cell_exact_test_not_significant"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.0521855486173,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-15",
+   "category": "zero_denominator",
+   "title": "Nobody selected in either group: parity difference passes, impact ratio undefined",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 0,
+      "n": 50
+     },
+     {
+      "group": "B",
+      "selected": 0,
+      "n": 50
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 0,
+          "n": 50
+         },
+         "comparator": {
+          "x": 0,
+          "n": 50
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0713475991334,
+         "upper": 0.0713475991334,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0184221254541,
+        "smallCell": true,
+        "fisherExactP": 1.0,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0713475991334,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 100,
+      "coverage": {
+       "eligibleRows": 100,
+       "populationRows": 100,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.0184221254541,
+      "decidingMemberId": "selection_rate_difference:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.0368442509082,
+      "outcome": "pass"
+     },
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 0,
+          "n": 50
+         },
+         "comparator": {
+          "x": 0,
+          "n": 50
+         }
+        },
+        "estimate": null,
+        "interval": null,
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "undefined",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": true,
+        "fisherExactP": null,
+        "reasons": [
+         "undefined_zero_denominator"
+        ]
+       }
+      ],
+      "headline": null,
+      "sampleSize": 100,
+      "coverage": {
+       "eligibleRows": 100,
+       "populationRows": 100,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "none",
+      "pValue": 1.0,
+      "decidingMemberId": null,
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "undefined_zero_denominator"
+      ],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 1.0,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-16",
+   "category": "empty_group",
+   "title": "A declared group has no rows: comparisons among the others are evaluated but the criterion cannot pass",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 200,
+      "n": 400
+     },
+     {
+      "group": "B",
+      "selected": 196,
+      "n": 400
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0,
+      "declaredGroups": [
+       "A",
+       "B",
+       "C"
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:B|A",
+        "metric": "selection_rate_difference",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 196,
+          "n": 400
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.01,
+        "interval": {
+         "lower": -0.0788907717876,
+         "upper": 0.0590252825524,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0101686257694,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.01,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0788907717876,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 800,
+      "coverage": {
+       "eligibleRows": 800,
+       "populationRows": 800,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [
+       {
+        "group": "C",
+        "n": 0
+       }
+      ],
+      "direction": "pass",
+      "pValue": 1.0,
+      "decidingMemberId": null,
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "group_suppressed_below_minimum",
+       "empty_declared_group"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 1.0,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-17",
+   "category": "multiplicity",
+   "title": "Three groups: one comparison lies beyond the band at 95% but not after Bonferroni within the criterion",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 300,
+      "n": 600
+     },
+     {
+      "group": "B",
+      "selected": 290,
+      "n": 600
+     },
+     {
+      "group": "C",
+      "selected": 234,
+      "n": 600
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "parity-0.05",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.05,
+       "upper": 0.05
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "parity-0.05",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:B|A",
+        "metric": "selection_rate_difference",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 290,
+          "n": 600
+         },
+         "comparator": {
+          "x": 300,
+          "n": 600
+         }
+        },
+        "estimate": -0.0166666666667,
+        "interval": {
+         "lower": -0.0729752243758,
+         "upper": 0.0397917962253,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.05,
+         "upper": 0.05
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.247182997136,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:C|A",
+        "metric": "selection_rate_difference",
+        "subject": "C",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 234,
+          "n": 600
+         },
+         "comparator": {
+          "x": 300,
+          "n": 600
+         }
+        },
+        "estimate": -0.11,
+        "interval": {
+         "lower": -0.165230397336,
+         "upper": -0.0537922615001,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.05,
+         "upper": 0.05
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.0364495940008,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:C|B",
+        "metric": "selection_rate_difference",
+        "subject": "C",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 234,
+          "n": 600
+         },
+         "comparator": {
+          "x": 290,
+          "n": 600
+         }
+        },
+        "estimate": -0.0933333333333,
+        "interval": {
+         "lower": -0.148624420456,
+         "upper": -0.0372163748296,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.05,
+         "upper": 0.05
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.129990348929,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.11,
+       "interval": {
+        "lower": 0.0413179578561,
+        "upper": 0.165230397336,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1800,
+      "coverage": {
+       "eligibleRows": 1800,
+       "populationRows": 1800,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.109348782002,
+      "decidingMemberId": "selection_rate_difference:C|A",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "within_criterion_multiplicity"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.109348782002,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-18",
+   "category": "multiplicity",
+   "title": "Holm across four confirmatory criteria",
+   "type": "multiplicity",
+   "input": {
+    "method": "holm",
+    "alpha": 0.05,
+    "pValues": [
+     0.004,
+     0.03,
+     0.012,
+     0.2
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "adjustedPValues": [
+     0.016,
+     0.06,
+     0.036,
+     0.2
+    ],
+    "rejected": [
+     true,
+     false,
+     true,
+     false
+    ]
+   }
+  },
+  {
+   "id": "GC-19",
+   "category": "multiplicity",
+   "title": "Benjamini-Hochberg across eight exploratory criteria",
+   "type": "multiplicity",
+   "input": {
+    "method": "benjamini_hochberg",
+    "alpha": 0.05,
+    "pValues": [
+     0.001,
+     0.008,
+     0.039,
+     0.041,
+     0.042,
+     0.06,
+     0.074,
+     0.205
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "adjustedPValues": [
+     0.008,
+     0.032,
+     0.0672,
+     0.0672,
+     0.0672,
+     0.08,
+     0.0845714285714,
+     0.205
+    ],
+    "rejected": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  {
+   "id": "GC-20",
+   "category": "equalized_odds",
+   "title": "Equalized odds with two groups fails on the true-positive-rate gap",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "tp": 160,
+      "fp": 30,
+      "fn": 40,
+      "tn": 270
+     },
+     {
+      "group": "B",
+      "tp": 100,
+      "fp": 33,
+      "fn": 100,
+      "tn": 267
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "equalized-odds-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "equalized_odds",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "equalized-odds-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "tpr_difference:B|A",
+        "metric": "tpr_difference",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 100,
+          "n": 200
+         },
+         "comparator": {
+          "x": 160,
+          "n": 200
+         }
+        },
+        "estimate": -0.3,
+        "interval": {
+         "lower": -0.384654208286,
+         "upper": -0.208268406063,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 2.71605435699e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "fpr_difference:A|B",
+        "metric": "fpr_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 30,
+          "n": 300
+         },
+         "comparator": {
+          "x": 33,
+          "n": 300
+         }
+        },
+        "estimate": -0.01,
+        "interval": {
+         "lower": -0.0598069311818,
+         "upper": 0.0396995809098,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000561879343605,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_tpr_or_fpr_difference",
+       "estimate": 0.3,
+       "interval": {
+        "lower": 0.194730870318,
+        "upper": 0.384654208286,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1000,
+      "coverage": {
+       "eligibleRows": 1000,
+       "populationRows": 1000,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 5.43210871397e-05,
+      "decidingMemberId": "tpr_difference:B|A",
+      "unadjustedOutcome": "fail",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 5.43210871397e-05,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-21",
+   "category": "performance",
+   "title": "Performance criterion with balanced accuracy and F1 members passes",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "all",
+      "tp": 170,
+      "fp": 40,
+      "fn": 30,
+      "tn": 760
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        }
+       },
+       {
+        "metric": "recall",
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       },
+       {
+        "metric": "f1",
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 930,
+         "n": 1000
+        },
+        "estimate": 0.93,
+        "interval": {
+         "lower": 0.912485351849,
+         "upper": 0.944223635854,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.9,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.001565402258,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 170,
+         "n": 200
+        },
+        "estimate": 0.85,
+        "interval": {
+         "lower": 0.793944207158,
+         "upper": 0.892864064378,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00109083517613,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 170,
+         "positives": 200,
+         "tn": 760,
+         "negatives": 800
+        },
+        "estimate": 0.9,
+        "interval": {
+         "lower": 0.870657390233,
+         "upper": 0.922406007435,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.03679525246e-134,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "f1",
+        "metric": "f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 170,
+         "tpPlusFpPlusFn": 240,
+         "positives": 200
+        },
+        "estimate": 0.829268292683,
+        "interval": {
+         "lower": 0.786339143306,
+         "upper": 0.865052285557,
+         "level": 0.95,
+         "method": "jaccard_wilson"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000612989768973,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 1000,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.001565402258,
+      "decidingMemberId": "accuracy",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.001565402258,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-22",
+   "category": "intersectional_suppression",
+   "title": "Sex x race strata: two small strata suppressed, coverage 0.981 meets a pre-registered 0.95, parity passes",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "F/X",
+      "selected": 200,
+      "n": 400
+     },
+     {
+      "group": "F/Y",
+      "selected": 172,
+      "n": 350
+     },
+     {
+      "group": "M/X",
+      "selected": 214,
+      "n": 420
+     },
+     {
+      "group": "M/Y",
+      "selected": 190,
+      "n": 380
+     },
+     {
+      "group": "F/Z",
+      "selected": 5,
+      "n": 12
+     },
+     {
+      "group": "M/Z",
+      "selected": 8,
+      "n": 18
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "intersectional-parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 0.95
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "intersectional-parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:F/Y|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 172,
+          "n": 350
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.00857142857143,
+        "interval": {
+         "lower": -0.0798575356158,
+         "upper": 0.0628505419474,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0116399893882,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.0833333333333,
+        "interval": {
+         "lower": -0.312000060576,
+         "upper": 0.184957800016,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/X|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/X",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 200,
+          "n": 400
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.00952380952381,
+        "interval": {
+         "lower": -0.0776039720775,
+         "upper": 0.0586769306564,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00892512359559,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/X|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/X",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 200,
+          "n": 400
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0698573999257,
+         "upper": 0.0698573999257,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00479797438284,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.0555555555556,
+        "interval": {
+         "lower": -0.260297107392,
+         "upper": 0.168214140337,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|F/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "F/Y",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 172,
+          "n": 350
+         }
+        },
+        "estimate": -0.0747619047619,
+        "interval": {
+         "lower": -0.304181657298,
+         "upper": 0.194135276563,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 172,
+          "n": 350
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.0180952380952,
+        "interval": {
+         "lower": -0.0885258452467,
+         "upper": 0.0525892132839,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0223695394538,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 172,
+          "n": 350
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.00857142857143,
+        "interval": {
+         "lower": -0.0807213988747,
+         "upper": 0.0637127815303,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0126925919025,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|F/Y",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "F/Y",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 172,
+          "n": 350
+         }
+        },
+        "estimate": -0.0469841269841,
+        "interval": {
+         "lower": -0.252566358109,
+         "upper": 0.177511838882,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.0928571428571,
+        "interval": {
+         "lower": -0.32125861727,
+         "upper": 0.175238597557,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.0833333333333,
+        "interval": {
+         "lower": -0.312270838572,
+         "upper": 0.185188623667,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/Z",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/Z",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 8,
+          "n": 18
+         }
+        },
+        "estimate": -0.0277777777778,
+        "interval": {
+         "lower": -0.34019608995,
+         "upper": 0.302590332238,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:M/Y|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Y",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 190,
+          "n": 380
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.00952380952381,
+        "interval": {
+         "lower": -0.0785079938748,
+         "upper": 0.0595793750508,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00987214803681,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.0650793650794,
+        "interval": {
+         "lower": -0.269524625271,
+         "upper": 0.158456024946,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.0555555555556,
+        "interval": {
+         "lower": -0.260599483058,
+         "upper": 0.168490836866,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.0180952380952,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0885258452467,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1580,
+      "coverage": {
+       "eligibleRows": 1550,
+       "populationRows": 1580,
+       "unknownGroupRows": 0,
+       "value": 0.981012658228,
+       "minimum": 0.95
+      },
+      "suppressedGroups": [
+       {
+        "group": "F/Z",
+        "n": 12
+       },
+       {
+        "group": "M/Z",
+        "n": 18
+       }
+      ],
+      "direction": "pass",
+      "pValue": 0.0223695394538,
+      "decidingMemberId": "selection_rate_difference:F/Y|M/X",
+      "unadjustedOutcome": "pass",
+      "reasons": [
+       "group_suppressed_below_minimum"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.0223695394538,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-23",
+   "category": "intersectional_suppression",
+   "title": "Same strata, default coverage 1.0 and one disparate stratum: suppression does not void the analysis, the fail stands",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "F/X",
+      "selected": 200,
+      "n": 400
+     },
+     {
+      "group": "F/Y",
+      "selected": 105,
+      "n": 350
+     },
+     {
+      "group": "M/X",
+      "selected": 214,
+      "n": 420
+     },
+     {
+      "group": "M/Y",
+      "selected": 190,
+      "n": 380
+     },
+     {
+      "group": "F/Z",
+      "selected": 5,
+      "n": 12
+     },
+     {
+      "group": "M/Z",
+      "selected": 8,
+      "n": 18
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "intersectional-parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "intersectional-parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:F/Y|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 105,
+          "n": 350
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.2,
+        "interval": {
+         "lower": -0.266781676912,
+         "upper": -0.13017938796,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.00520008835796,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.0833333333333,
+        "interval": {
+         "lower": -0.312000060576,
+         "upper": 0.184957800016,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/X|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/X",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 200,
+          "n": 400
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.00952380952381,
+        "interval": {
+         "lower": -0.0776039720775,
+         "upper": 0.0586769306564,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00892512359559,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/X|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/X",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 200,
+          "n": 400
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0698573999257,
+         "upper": 0.0698573999257,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00479797438284,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|F/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "F/X",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": -0.0555555555556,
+        "interval": {
+         "lower": -0.260297107392,
+         "upper": 0.168214140337,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|F/Z",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "F/Z",
+        "counts": {
+         "subject": {
+          "x": 105,
+          "n": 350
+         },
+         "comparator": {
+          "x": 5,
+          "n": 12
+         }
+        },
+        "estimate": -0.116666666667,
+        "interval": {
+         "lower": -0.384404929599,
+         "upper": 0.112259615892,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 105,
+          "n": 350
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.209523809524,
+        "interval": {
+         "lower": -0.275391508265,
+         "upper": -0.140457814565,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.00201840992417,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 105,
+          "n": 350
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.2,
+        "interval": {
+         "lower": -0.267703039285,
+         "upper": -0.129297616569,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.00576470792764,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:F/Y|M/Z",
+        "metric": "selection_rate_difference",
+        "subject": "F/Y",
+        "comparator": "M/Z",
+        "counts": {
+         "subject": {
+          "x": 105,
+          "n": 350
+         },
+         "comparator": {
+          "x": 8,
+          "n": 18
+         }
+        },
+        "estimate": -0.144444444444,
+        "interval": {
+         "lower": -0.367550970579,
+         "upper": 0.0605869525343,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.0928571428571,
+        "interval": {
+         "lower": -0.32125861727,
+         "upper": 0.175238597557,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.0833333333333,
+        "interval": {
+         "lower": -0.312270838572,
+         "upper": 0.185188623667,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:F/Z|M/Z",
+        "metric": "selection_rate_difference",
+        "subject": "F/Z",
+        "comparator": "M/Z",
+        "counts": {
+         "subject": {
+          "x": 5,
+          "n": 12
+         },
+         "comparator": {
+          "x": 8,
+          "n": 18
+         }
+        },
+        "estimate": -0.0277777777778,
+        "interval": {
+         "lower": -0.34019608995,
+         "upper": 0.302590332238,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:M/Y|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Y",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 190,
+          "n": 380
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.00952380952381,
+        "interval": {
+         "lower": -0.0785079938748,
+         "upper": 0.0595793750508,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00987214803681,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|M/X",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "M/X",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 214,
+          "n": 420
+         }
+        },
+        "estimate": -0.0650793650794,
+        "interval": {
+         "lower": -0.269524625271,
+         "upper": 0.158456024946,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       },
+       {
+        "memberId": "selection_rate_difference:M/Z|M/Y",
+        "metric": "selection_rate_difference",
+        "subject": "M/Z",
+        "comparator": "M/Y",
+        "counts": {
+         "subject": {
+          "x": 8,
+          "n": 18
+         },
+         "comparator": {
+          "x": 190,
+          "n": 380
+         }
+        },
+        "estimate": -0.0555555555556,
+        "interval": {
+         "lower": -0.260599483058,
+         "upper": 0.168490836866,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "suppressed",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": [
+         "group_below_minimum_size"
+        ]
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.209523809524,
+       "interval": {
+        "lower": 0.116147157923,
+        "upper": 0.275391508265,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1580,
+      "coverage": {
+       "eligibleRows": 1550,
+       "populationRows": 1580,
+       "unknownGroupRows": 0,
+       "value": 0.981012658228,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [
+       {
+        "group": "F/Z",
+        "n": 12
+       },
+       {
+        "group": "M/Z",
+        "n": 18
+       }
+      ],
+      "direction": "fail",
+      "pValue": 0.012110459545,
+      "decidingMemberId": "selection_rate_difference:F/Y|M/X",
+      "unadjustedOutcome": "fail",
+      "reasons": [
+       "group_suppressed_below_minimum",
+       "insufficient_coverage"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.012110459545,
+      "outcome": "fail"
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-24",
+   "category": "calibration",
+   "title": "Calibration gaps per probability bin with a 0.10 band: one sparse bin suppressed, the rest pass",
+   "type": "plan",
+   "data": {
+    "bins": [
+     {
+      "bin": 0,
+      "n": 1200,
+      "positives": 66,
+      "meanScore": 0.05
+     },
+     {
+      "bin": 1,
+      "n": 600,
+      "positives": 93,
+      "meanScore": 0.15
+     },
+     {
+      "bin": 2,
+      "n": 400,
+      "positives": 100,
+      "meanScore": 0.25
+     },
+     {
+      "bin": 3,
+      "n": 300,
+      "positives": 108,
+      "meanScore": 0.35
+     },
+     {
+      "bin": 4,
+      "n": 250,
+      "positives": 112,
+      "meanScore": 0.45
+     },
+     {
+      "bin": 5,
+      "n": 250,
+      "positives": 140,
+      "meanScore": 0.55
+     },
+     {
+      "bin": 6,
+      "n": 250,
+      "positives": 160,
+      "meanScore": 0.65
+     },
+     {
+      "bin": 7,
+      "n": 200,
+      "positives": 152,
+      "meanScore": 0.75
+     },
+     {
+      "bin": 8,
+      "n": 150,
+      "positives": 129,
+      "meanScore": 0.85
+     },
+     {
+      "bin": 9,
+      "n": 20,
+      "positives": 20,
+      "meanScore": 0.96
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "calibration-0.10",
+      "role": "confirmatory",
+      "kind": "calibration",
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 0.95
+     }
+    ]
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "calibration-0.10",
+      "role": "confirmatory",
+      "kind": "calibration",
+      "members": [
+       {
+        "memberId": "calibration_gap:bin0",
+        "metric": "calibration_gap",
+        "subject": "bin0",
+        "comparator": null,
+        "counts": {
+         "x": 66,
+         "n": 1200,
+         "meanScore": 0.05
+        },
+        "estimate": 0.005,
+        "interval": {
+         "lower": -0.00653641792714,
+         "upper": 0.0193764084636,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 3.07374853721e-20,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin1",
+        "metric": "calibration_gap",
+        "subject": "bin1",
+        "comparator": null,
+        "counts": {
+         "x": 93,
+         "n": 600,
+         "meanScore": 0.15
+        },
+        "estimate": 0.005,
+        "interval": {
+         "lower": -0.0217541488748,
+         "upper": 0.0361437225743,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 7.7003927457e-08,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin2",
+        "metric": "calibration_gap",
+        "subject": "bin2",
+        "comparator": null,
+        "counts": {
+         "x": 100,
+         "n": 400,
+         "meanScore": 0.25
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0399209857635,
+         "upper": 0.0446771329307,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 2.75120324962e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin3",
+        "metric": "calibration_gap",
+        "subject": "bin3",
+        "comparator": null,
+        "counts": {
+         "x": 108,
+         "n": 300,
+         "meanScore": 0.35
+        },
+        "estimate": 0.01,
+        "interval": {
+         "lower": -0.0422306648268,
+         "upper": 0.0657706967697,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00172795077417,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin4",
+        "metric": "calibration_gap",
+        "subject": "bin4",
+        "comparator": null,
+        "counts": {
+         "x": 112,
+         "n": 250,
+         "meanScore": 0.45
+        },
+        "estimate": -0.002,
+        "interval": {
+         "lower": -0.0623933241737,
+         "upper": 0.0599671873212,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00118788681393,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin5",
+        "metric": "calibration_gap",
+        "subject": "bin5",
+        "comparator": null,
+        "counts": {
+         "x": 140,
+         "n": 250,
+         "meanScore": 0.55
+        },
+        "estimate": 0.01,
+        "interval": {
+         "lower": -0.0519790177417,
+         "upper": 0.0701630218023,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0028499909025,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin6",
+        "metric": "calibration_gap",
+        "subject": "bin6",
+        "comparator": null,
+        "counts": {
+         "x": 160,
+         "n": 250,
+         "meanScore": 0.65
+        },
+        "estimate": -0.01,
+        "interval": {
+         "lower": -0.0712050472658,
+         "upper": 0.046967723407,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00423123289976,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin7",
+        "metric": "calibration_gap",
+        "subject": "bin7",
+        "comparator": null,
+        "counts": {
+         "x": 152,
+         "n": 200,
+         "meanScore": 0.75
+        },
+        "estimate": 0.01,
+        "interval": {
+         "lower": -0.053733409792,
+         "upper": 0.0639338400759,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00110825607873,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "calibration_gap:bin8",
+        "metric": "calibration_gap",
+        "subject": "bin8",
+        "comparator": null,
+        "counts": {
+         "x": 129,
+         "n": 150,
+         "meanScore": 0.85
+        },
+        "estimate": 0.01,
+        "interval": {
+         "lower": -0.0545520877595,
+         "upper": 0.0565735118145,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00186284629798,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_calibration_gap",
+       "estimate": 0.01,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0712050472658,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 3620,
+      "coverage": {
+       "eligibleRows": 3600,
+       "populationRows": 3620,
+       "unknownGroupRows": 0,
+       "value": 0.994475138122,
+       "minimum": 0.95
+      },
+      "suppressedGroups": [
+       {
+        "group": "bin9",
+        "n": 20
+       }
+      ],
+      "direction": "pass",
+      "pValue": 0.00423123289976,
+      "decidingMemberId": "calibration_gap:bin6",
+      "unadjustedOutcome": "pass",
+      "reasons": [
+       "group_suppressed_below_minimum"
+      ],
+      "expectedCalibrationError": 0.00602209944751,
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.00423123289976,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-25",
+   "category": "power",
+   "title": "Classic test of equality: 40% vs 50% at 80% power needs 388 per group",
+   "type": "power",
+   "input": {
+    "kind": "equality_test",
+    "p1": 0.4,
+    "p2": 0.5,
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "groupSizeExact": 387.338516699,
+    "groupSize": 388
+   }
+  },
+  {
+   "id": "GC-26",
+   "category": "power",
+   "title": "Classic test of equality: 8% vs 10% at 80% power needs 3,213 per group",
+   "type": "power",
+   "input": {
+    "kind": "equality_test",
+    "p1": 0.08,
+    "p2": 0.1,
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "groupSizeExact": 3212.9370625,
+    "groupSize": 3213
+   }
+  },
+  {
+   "id": "GC-27",
+   "category": "power",
+   "title": "Band-based check: at 388 per group and true parity, the four-fifths band passes with probability 0.75",
+   "type": "power",
+   "input": {
+    "kind": "ratio",
+    "baselineRate": 0.5,
+    "groupSize": 388,
+    "assumedRatio": 1.0,
+    "band": {
+     "lower": 0.8,
+     "upper": 1.25
+    },
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "passProbability": 0.749058697656,
+    "requiredGroupSizeForPass": 423,
+    "failMdeRatio": 0.619603166682
+   }
+  },
+  {
+   "id": "GC-28",
+   "category": "power",
+   "title": "Band-based check for a 0.05 parity band at 30% selection and 500 per group",
+   "type": "power",
+   "input": {
+    "kind": "difference",
+    "baselineRate": 0.3,
+    "groupSize": 500,
+    "assumedDifference": 0.0,
+    "band": {
+     "lower": -0.05,
+     "upper": 0.05
+    },
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "passProbability": 0.0,
+    "requiredGroupSizeForPass": 1766,
+    "failMdeDifference": 0.124611370067
+   }
+  },
+  {
+   "id": "GC-29",
+   "category": "power",
+   "title": "Single proportion: recall truly 0.80 against a 0.70 minimum with 50 positives",
+   "type": "power",
+   "input": {
+    "kind": "proportion",
+    "assumedValue": 0.8,
+    "n": 50,
+    "band": {
+     "lower": 0.7,
+     "upper": null
+    },
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "passProbability": 0.316448288756,
+    "failProbability": 2.99521100964e-05,
+    "requiredNForPass": 153
+   }
+  },
+  {
+   "id": "GC-30",
+   "category": "reference_group",
+   "title": "Fixed reference group with a one-sided ratio band",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 200,
+      "n": 400
+     },
+     {
+      "group": "B",
+      "selected": 150,
+      "n": 400
+     },
+     {
+      "group": "C",
+      "selected": 190,
+      "n": 400
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "impact-vs-A",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "reference",
+       "referenceGroup": "A"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": null
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "impact-vs-A",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:B|A",
+        "metric": "selection_rate_ratio",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 150,
+          "n": 400
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": 0.75,
+        "interval": {
+         "lower": 0.639088420036,
+         "upper": 0.880159900203,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 0.42927538718,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:C|A",
+        "metric": "selection_rate_ratio",
+        "subject": "C",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 190,
+          "n": 400
+         },
+         "comparator": {
+          "x": 200,
+          "n": 400
+         }
+        },
+        "estimate": 0.95,
+        "interval": {
+         "lower": 0.82408299952,
+         "upper": 1.09515667782,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0178462713711,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.75,
+       "interval": {
+        "lower": 0.639088420036,
+        "upper": 0.90061960179,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1200,
+      "coverage": {
+       "eligibleRows": 1200,
+       "populationRows": 1200,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "fail",
+      "pValue": 0.85855077436,
+      "decidingMemberId": "selection_rate_ratio:B|A",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.85855077436,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-31",
+   "category": "end_to_end",
+   "title": "Hosted suite on two groups: four confirmatory criteria with Holm",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "tp": 180,
+      "fp": 40,
+      "fn": 20,
+      "tn": 360
+     },
+     {
+      "group": "B",
+      "tp": 166,
+      "fp": 42,
+      "fn": 34,
+      "tn": 358
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        }
+       },
+       {
+        "metric": "recall",
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       }
+      ]
+     },
+     {
+      "id": "demographic_parity",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "disparate_impact",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "equalized_odds",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "equalized_odds",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 1064,
+         "n": 1200
+        },
+        "estimate": 0.886666666667,
+        "interval": {
+         "lower": 0.867483370222,
+         "upper": 0.903382255978,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 6.11695819865e-14,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 346,
+         "n": 400
+        },
+        "estimate": 0.865,
+        "interval": {
+         "lower": 0.828019015752,
+         "upper": 0.895037009384,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 5.96891375608e-13,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 346,
+         "positives": 400,
+         "tn": 718,
+         "negatives": 800
+        },
+        "estimate": 0.88125,
+        "interval": {
+         "lower": 0.859487519671,
+         "upper": 0.899062077258,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 3.52628462531e-161,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 1200,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 5.96891375608e-13,
+      "decidingMemberId": "recall",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 4,
+      "adjustedPValue": 2.38756550243e-12,
+      "outcome": "pass"
+     },
+     {
+      "id": "demographic_parity",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:B|A",
+        "metric": "selection_rate_difference",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 208,
+          "n": 600
+         },
+         "comparator": {
+          "x": 220,
+          "n": 600
+         }
+        },
+        "estimate": -0.02,
+        "interval": {
+         "lower": -0.0739691309735,
+         "upper": 0.0341330105681,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00353805285656,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.02,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0739691309735,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1200,
+      "coverage": {
+       "eligibleRows": 1200,
+       "populationRows": 1200,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.00353805285656,
+      "decidingMemberId": "selection_rate_difference:B|A",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 4,
+      "adjustedPValue": 0.0106141585697,
+      "outcome": "pass"
+     },
+     {
+      "id": "disparate_impact",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:B|A",
+        "metric": "selection_rate_ratio",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 208,
+          "n": 600
+         },
+         "comparator": {
+          "x": 220,
+          "n": 600
+         }
+        },
+        "estimate": 0.945454545455,
+        "interval": {
+         "lower": 0.812078646286,
+         "upper": 1.10073611911,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0313102830269,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.945454545455,
+       "interval": {
+        "lower": 0.812078646286,
+        "upper": 1.0,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1200,
+      "coverage": {
+       "eligibleRows": 1200,
+       "populationRows": 1200,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.0313102830269,
+      "decidingMemberId": "selection_rate_ratio:B|A",
+      "unadjustedOutcome": "pass",
+      "reasons": [
+       "multiplicity_adjustment"
+      ],
+      "adjustment": "holm",
+      "familySize": 4,
+      "adjustedPValue": 0.0626205660538,
+      "outcome": "inconclusive"
+     },
+     {
+      "id": "equalized_odds",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "tpr_difference:B|A",
+        "metric": "tpr_difference",
+        "subject": "B",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 166,
+          "n": 200
+         },
+         "comparator": {
+          "x": 180,
+          "n": 200
+         }
+        },
+        "estimate": -0.07,
+        "interval": {
+         "lower": -0.137534941566,
+         "upper": -0.00268479437961,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.379163690615,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "fpr_difference:A|B",
+        "metric": "fpr_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 40,
+          "n": 400
+         },
+         "comparator": {
+          "x": 42,
+          "n": 400
+         }
+        },
+        "estimate": -0.005,
+        "interval": {
+         "lower": -0.0475338330145,
+         "upper": 0.0374888485319,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 2.39559943847e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_tpr_or_fpr_difference",
+       "estimate": 0.07,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.137534941566,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 1200,
+      "coverage": {
+       "eligibleRows": 1200,
+       "populationRows": 1200,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.379163690615,
+      "decidingMemberId": "tpr_difference:B|A",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 4,
+      "adjustedPValue": 0.379163690615,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-32",
+   "category": "ll144",
+   "title": "NYC DCWP worked example (race/ethnicity selection rates) reproduced with intervals",
+   "type": "ll144",
+   "input": {
+    "unknownCount": 250,
+    "categories": [
+     {
+      "name": "Hispanic or Latino",
+      "n": 408,
+      "selected": 204
+     },
+     {
+      "name": "White",
+      "n": 797,
+      "selected": 412
+     },
+     {
+      "name": "Black or African American",
+      "n": 390,
+      "selected": 170
+     },
+     {
+      "name": "Native Hawaiian or Pacific Islander",
+      "n": 119,
+      "selected": 52
+     },
+     {
+      "name": "Asian",
+      "n": 616,
+      "selected": 302
+     },
+     {
+      "name": "Native American or Alaska Native",
+      "n": 41,
+      "selected": 18
+     },
+     {
+      "name": "Two or More Races",
+      "n": 213,
+      "selected": 96
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "referenceCategory": "White",
+    "totalAssessedKnown": 2584,
+    "unknownCategoryCount": 250,
+    "categories": [
+     {
+      "category": "Hispanic or Latino",
+      "n": 408,
+      "selected": 204,
+      "selectionRate": 0.5,
+      "selectionRateInterval": {
+       "lower": 0.451710460536,
+       "upper": 0.548289539464,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.157894736842,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 0.967233009709,
+      "impactRatioInterval": {
+       "lower": 0.859593018312,
+       "upper": 1.08835190042,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     },
+     {
+      "category": "White",
+      "n": 797,
+      "selected": 412,
+      "selectionRate": 0.516938519448,
+      "selectionRateInterval": {
+       "lower": 0.482247662341,
+       "upper": 0.551466875914,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.308436532508,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 1.0,
+      "impactRatioInterval": null
+     },
+     {
+      "category": "Black or African American",
+      "n": 390,
+      "selected": 170,
+      "selectionRate": 0.435897435897,
+      "selectionRateInterval": {
+       "lower": 0.387545479885,
+       "upper": 0.485499881693,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.15092879257,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 0.843228777695,
+      "impactRatioInterval": {
+       "lower": 0.739441685377,
+       "upper": 0.961583293983,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     },
+     {
+      "category": "Native Hawaiian or Pacific Islander",
+      "n": 119,
+      "selected": 52,
+      "selectionRate": 0.436974789916,
+      "selectionRateInterval": {
+       "lower": 0.351209795713,
+       "upper": 0.526681592553,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.0460526315789,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 0.845312882435,
+      "impactRatioInterval": {
+       "lower": 0.681982873722,
+       "upper": 1.04775925722,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     },
+     {
+      "category": "Asian",
+      "n": 616,
+      "selected": 302,
+      "selectionRate": 0.49025974026,
+      "selectionRateInterval": {
+       "lower": 0.450965471665,
+       "upper": 0.529674739103,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.238390092879,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 0.948390808221,
+      "impactRatioInterval": {
+       "lower": 0.854010250667,
+       "upper": 1.05320179051,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     },
+     {
+      "category": "Native American or Alaska Native",
+      "n": 41,
+      "selected": 18,
+      "selectionRate": 0.439024390244,
+      "selectionRateInterval": {
+       "lower": 0.298901317366,
+       "upper": 0.589594727779,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.015866873065,
+      "eligibleForTwoPercentExclusion": true,
+      "excluded": false,
+      "impactRatio": 0.849277764622,
+      "impactRatioInterval": {
+       "lower": 0.597008667961,
+       "upper": 1.20814447124,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     },
+     {
+      "category": "Two or More Races",
+      "n": 213,
+      "selected": 96,
+      "selectionRate": 0.450704225352,
+      "selectionRateInterval": {
+       "lower": 0.385346171903,
+       "upper": 0.517808879192,
+       "level": 0.95,
+       "method": "wilson"
+      },
+      "shareOfData": 0.0824303405573,
+      "eligibleForTwoPercentExclusion": false,
+      "excluded": false,
+      "impactRatio": 0.871872008752,
+      "impactRatioInterval": {
+       "lower": 0.740927616269,
+       "upper": 1.02595824876,
+       "level": 0.95,
+       "method": "katz_log"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "GC-33",
+   "category": "ll144",
+   "title": "DCWP example under the four-fifths screen: published ratios of 0.84 do not demonstrate a pass",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "Hispanic or Latino",
+      "selected": 204,
+      "n": 408
+     },
+     {
+      "group": "White",
+      "selected": 412,
+      "n": 797
+     },
+     {
+      "group": "Black or African American",
+      "selected": 170,
+      "n": 390
+     },
+     {
+      "group": "Native Hawaiian or Pacific Islander",
+      "selected": 52,
+      "n": 119
+     },
+     {
+      "group": "Asian",
+      "selected": 302,
+      "n": 616
+     },
+     {
+      "group": "Native American or Alaska Native",
+      "selected": 18,
+      "n": 41
+     },
+     {
+      "group": "Two or More Races",
+      "selected": 96,
+      "n": 213
+     }
+    ],
+    "unknownGroupRows": 250
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 0.9
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:Black or African American|Asian",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "Asian",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 302,
+          "n": 616
+         }
+        },
+        "estimate": 0.889115299711,
+        "interval": {
+         "lower": 0.77398429494,
+         "upper": 1.02137216653,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.135513281257,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Asian|Hispanic or Latino",
+        "metric": "selection_rate_ratio",
+        "subject": "Asian",
+        "comparator": "Hispanic or Latino",
+        "counts": {
+         "subject": {
+          "x": 302,
+          "n": 616
+         },
+         "comparator": {
+          "x": 204,
+          "n": 408
+         }
+        },
+        "estimate": 0.980519480519,
+        "interval": {
+         "lower": 0.864360747412,
+         "upper": 1.11228842188,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00156299294969,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native American or Alaska Native|Asian",
+        "metric": "selection_rate_ratio",
+        "subject": "Native American or Alaska Native",
+        "comparator": "Asian",
+        "counts": {
+         "subject": {
+          "x": 18,
+          "n": 41
+         },
+         "comparator": {
+          "x": 302,
+          "n": 616
+         }
+        },
+        "estimate": 0.895493458246,
+        "interval": {
+         "lower": 0.627737839821,
+         "upper": 1.27745769474,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.533858829816,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native Hawaiian or Pacific Islander|Asian",
+        "metric": "selection_rate_ratio",
+        "subject": "Native Hawaiian or Pacific Islander",
+        "comparator": "Asian",
+        "counts": {
+         "subject": {
+          "x": 52,
+          "n": 119
+         },
+         "comparator": {
+          "x": 302,
+          "n": 616
+         }
+        },
+        "estimate": 0.891312816517,
+        "interval": {
+         "lower": 0.715821504256,
+         "upper": 1.10982770448,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.333974374245,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Two or More Races|Asian",
+        "metric": "selection_rate_ratio",
+        "subject": "Two or More Races",
+        "comparator": "Asian",
+        "counts": {
+         "subject": {
+          "x": 96,
+          "n": 213
+         },
+         "comparator": {
+          "x": 302,
+          "n": 616
+         }
+        },
+        "estimate": 0.919317227871,
+        "interval": {
+         "lower": 0.776594366439,
+         "upper": 1.08826976087,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.106308612995,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Asian|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Asian",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 302,
+          "n": 616
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.948390808221,
+        "interval": {
+         "lower": 0.854010250667,
+         "upper": 1.05320179051,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00146506376188,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Black or African American|Hispanic or Latino",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "Hispanic or Latino",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 204,
+          "n": 408
+         }
+        },
+        "estimate": 0.871794871795,
+        "interval": {
+         "lower": 0.751209223428,
+         "upper": 1.01173717625,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.257851154045,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Black or African American|Native American or Alaska Native",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "Native American or Alaska Native",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 18,
+          "n": 41
+         }
+        },
+        "estimate": 0.992877492877,
+        "interval": {
+         "lower": 0.689969139296,
+         "upper": 1.42876783862,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.244765351737,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Black or African American|Native Hawaiian or Pacific Islander",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "Native Hawaiian or Pacific Islander",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 52,
+          "n": 119
+         }
+        },
+        "estimate": 0.997534516765,
+        "interval": {
+         "lower": 0.790114137528,
+         "upper": 1.25940679311,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0635366591984,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Black or African American|Two or More Races",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "Two or More Races",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 96,
+          "n": 213
+         }
+        },
+        "estimate": 0.967147435897,
+        "interval": {
+         "lower": 0.80271430353,
+         "upper": 1.16526410287,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0459787539851,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Black or African American|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Black or African American",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 170,
+          "n": 390
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.843228777695,
+        "interval": {
+         "lower": 0.739441685377,
+         "upper": 0.961583293983,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.432265949786,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native American or Alaska Native|Hispanic or Latino",
+        "metric": "selection_rate_ratio",
+        "subject": "Native American or Alaska Native",
+        "comparator": "Hispanic or Latino",
+        "counts": {
+         "subject": {
+          "x": 18,
+          "n": 41
+         },
+         "comparator": {
+          "x": 204,
+          "n": 408
+         }
+        },
+        "estimate": 0.878048780488,
+        "interval": {
+         "lower": 0.612989451235,
+         "upper": 1.25772092711,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.611644941035,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native Hawaiian or Pacific Islander|Hispanic or Latino",
+        "metric": "selection_rate_ratio",
+        "subject": "Native Hawaiian or Pacific Islander",
+        "comparator": "Hispanic or Latino",
+        "counts": {
+         "subject": {
+          "x": 52,
+          "n": 119
+         },
+         "comparator": {
+          "x": 204,
+          "n": 408
+         }
+        },
+        "estimate": 0.873949579832,
+        "interval": {
+         "lower": 0.69726973656,
+         "upper": 1.09539799025,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.442936550771,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Two or More Races|Hispanic or Latino",
+        "metric": "selection_rate_ratio",
+        "subject": "Two or More Races",
+        "comparator": "Hispanic or Latino",
+        "counts": {
+         "subject": {
+          "x": 96,
+          "n": 213
+         },
+         "comparator": {
+          "x": 204,
+          "n": 408
+         }
+        },
+        "estimate": 0.901408450704,
+        "interval": {
+         "lower": 0.755039963751,
+         "upper": 1.07615124233,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.186783311448,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Hispanic or Latino|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Hispanic or Latino",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 204,
+          "n": 408
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.967233009709,
+        "interval": {
+         "lower": 0.859593018312,
+         "upper": 1.08835190042,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00161305032802,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native Hawaiian or Pacific Islander|Native American or Alaska Native",
+        "metric": "selection_rate_ratio",
+        "subject": "Native Hawaiian or Pacific Islander",
+        "comparator": "Native American or Alaska Native",
+        "counts": {
+         "subject": {
+          "x": 52,
+          "n": 119
+         },
+         "comparator": {
+          "x": 18,
+          "n": 41
+         }
+        },
+        "estimate": 0.99533146592,
+        "interval": {
+         "lower": 0.666098488066,
+         "upper": 1.48729466408,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.286383868403,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native American or Alaska Native|Two or More Races",
+        "metric": "selection_rate_ratio",
+        "subject": "Native American or Alaska Native",
+        "comparator": "Two or More Races",
+        "counts": {
+         "subject": {
+          "x": 18,
+          "n": 41
+         },
+         "comparator": {
+          "x": 96,
+          "n": 213
+         }
+        },
+        "estimate": 0.974085365854,
+        "interval": {
+         "lower": 0.668520964261,
+         "upper": 1.41931569943,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.305300661379,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native American or Alaska Native|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Native American or Alaska Native",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 18,
+          "n": 41
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.849277764622,
+        "interval": {
+         "lower": 0.597008667961,
+         "upper": 1.20814447124,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.739587073917,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native Hawaiian or Pacific Islander|Two or More Races",
+        "metric": "selection_rate_ratio",
+        "subject": "Native Hawaiian or Pacific Islander",
+        "comparator": "Two or More Races",
+        "counts": {
+         "subject": {
+          "x": 52,
+          "n": 119
+         },
+         "comparator": {
+          "x": 96,
+          "n": 213
+         }
+        },
+        "estimate": 0.969537815126,
+        "interval": {
+         "lower": 0.753464704984,
+         "upper": 1.24757479513,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.135147488883,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Native Hawaiian or Pacific Islander|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Native Hawaiian or Pacific Islander",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 52,
+          "n": 119
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.845312882435,
+        "interval": {
+         "lower": 0.681982873722,
+         "upper": 1.04775925722,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.61499972725,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "selection_rate_ratio:Two or More Races|White",
+        "metric": "selection_rate_ratio",
+        "subject": "Two or More Races",
+        "comparator": "White",
+        "counts": {
+         "subject": {
+          "x": 96,
+          "n": 213
+         },
+         "comparator": {
+          "x": 412,
+          "n": 797
+         }
+        },
+        "estimate": 0.871872008752,
+        "interval": {
+         "lower": 0.740927616269,
+         "upper": 1.02595824876,
+         "level": 0.95,
+         "method": "katz_log"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.300147243528,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 0.843228777695,
+       "interval": {
+        "lower": 0.597008667961,
+        "upper": 1.0,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 2584,
+      "coverage": {
+       "eligibleRows": 2584,
+       "populationRows": 2834,
+       "unknownGroupRows": 250,
+       "value": 0.911785462244,
+       "minimum": 0.9
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.739587073917,
+      "decidingMemberId": "selection_rate_ratio:Native American or Alaska Native|White",
+      "unadjustedOutcome": "inconclusive",
+      "reasons": [
+       "interval_straddles_band"
+      ],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.739587073917,
+      "outcome": "inconclusive"
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-34",
+   "category": "multiclass",
+   "title": "Three-class confusion matrix: accuracy, macro recall (balanced accuracy) and macro F1",
+   "type": "plan",
+   "data": {
+    "kind": "multiclass",
+    "labels": [
+     "high",
+     "low",
+     "medium"
+    ],
+    "matrix": [
+     [
+      150,
+      10,
+      40
+     ],
+     [
+      8,
+      270,
+      22
+     ],
+     [
+      30,
+      25,
+      245
+     ]
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "multiclass-performance",
+      "role": "confirmatory",
+      "kind": "multiclass_performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        }
+       },
+       {
+        "metric": "macro_f1",
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "multiclass-performance",
+      "role": "confirmatory",
+      "kind": "multiclass_performance",
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 665,
+         "n": 800
+        },
+        "estimate": 0.83125,
+        "interval": {
+         "lower": 0.803727542936,
+         "upper": 0.855606451577,
+         "level": 0.95,
+         "method": "wilson"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.1130505569e-07,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 150,
+           "support": 200
+          },
+          {
+           "label": "low",
+           "tp": 270,
+           "support": 300
+          },
+          {
+           "label": "medium",
+           "tp": 245,
+           "support": 300
+          }
+         ]
+        },
+        "estimate": 0.822222222222,
+        "interval": {
+         "lower": 0.792503888873,
+         "upper": 0.8467967989,
+         "level": 0.95,
+         "method": "mover_wilson"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 1.14305767385e-05,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "macro_f1",
+        "metric": "macro_f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 150,
+           "tpPlusFpPlusFn": 238
+          },
+          {
+           "label": "low",
+           "tp": 270,
+           "tpPlusFpPlusFn": 335
+          },
+          {
+           "label": "medium",
+           "tp": 245,
+           "tpPlusFpPlusFn": 362
+          }
+         ]
+        },
+        "estimate": 0.824335541392,
+        "interval": {
+         "lower": 0.776995384747,
+         "upper": 0.86343597038,
+         "level": 0.95,
+         "method": "jaccard_wilson_bonferroni"
+        },
+        "band": {
+         "lower": 0.75,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000896751395328,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 800,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.000896751395328,
+      "decidingMemberId": "macro_f1",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.000896751395328,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-35",
+   "category": "regression",
+   "title": "Regression errors: MAE and RMSE with normal-approximation intervals",
+   "type": "plan",
+   "data": {
+    "kind": "regression",
+    "errors": [
+     0.8,
+     -1.1,
+     0.3,
+     2.2,
+     -0.4,
+     0.0,
+     1.5,
+     -0.9,
+     0.6,
+     -2.0,
+     0.2,
+     1.1,
+     -0.7,
+     0.4,
+     -1.6,
+     0.9,
+     -0.2,
+     1.8,
+     -1.3,
+     0.5,
+     -0.6,
+     1.0,
+     -0.1,
+     0.7,
+     -1.4,
+     0.3,
+     1.2,
+     -0.8,
+     0.1,
+     -0.5,
+     2.5,
+     -1.0,
+     0.6,
+     -0.3,
+     1.4,
+     -1.2,
+     0.2,
+     0.9,
+     -0.4,
+     1.6
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "role": "confirmatory",
+      "kind": "regression_performance",
+      "members": [
+       {
+        "metric": "mae",
+        "band": {
+         "lower": null,
+         "upper": 1.2
+        }
+       },
+       {
+        "metric": "rmse",
+        "band": {
+         "lower": null,
+         "upper": 1.5
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "role": "confirmatory",
+      "kind": "regression_performance",
+      "members": [
+       {
+        "memberId": "mae",
+        "metric": "mae",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 40,
+         "meanAbsoluteError": 0.8825,
+         "sdAbsoluteError": 0.612220632259
+        },
+        "estimate": 0.8825,
+        "interval": {
+         "lower": 0.692774346726,
+         "upper": 1.07222565327,
+         "level": 0.95,
+         "method": "normal_approximation"
+        },
+        "band": {
+         "lower": null,
+         "upper": 1.2
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00103829542049,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "rmse",
+        "metric": "rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 40,
+         "meanSquaredError": 1.14425,
+         "sdSquaredError": 1.41679828197
+        },
+        "estimate": 1.06969621856,
+        "interval": {
+         "lower": 0.839754566245,
+         "upper": 1.25829736886,
+         "level": 0.95,
+         "method": "normal_approximation_mse"
+        },
+        "band": {
+         "lower": null,
+         "upper": 1.5
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 7.97235938431e-07,
+        "smallCell": false,
+        "fisherExactP": null,
+        "reasons": []
+       }
+      ],
+      "headline": null,
+      "sampleSize": 40,
+      "coverage": null,
+      "suppressedGroups": null,
+      "direction": "pass",
+      "pValue": 0.00103829542049,
+      "decidingMemberId": "mae",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 1,
+      "adjustedPValue": 0.00103829542049,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-36",
+   "category": "small_cell",
+   "title": "Fisher's exact test reference values (two-sided; tables with probability <= the observed one)",
+   "type": "fisher",
+   "input": {
+    "tables": [
+     {
+      "subject": {
+       "x": 6,
+       "n": 20
+      },
+      "comparator": {
+       "x": 10,
+       "n": 20
+      }
+     },
+     {
+      "subject": {
+       "x": 0,
+       "n": 30
+      },
+      "comparator": {
+       "x": 5,
+       "n": 30
+      }
+     },
+     {
+      "subject": {
+       "x": 0,
+       "n": 40
+      },
+      "comparator": {
+       "x": 10,
+       "n": 40
+      }
+     },
+     {
+      "subject": {
+       "x": 2,
+       "n": 40
+      },
+      "comparator": {
+       "x": 4500,
+       "n": 9000
+      }
+     },
+     {
+      "subject": {
+       "x": 1,
+       "n": 10
+      },
+      "comparator": {
+       "x": 1,
+       "n": 10
+      }
+     },
+     {
+      "subject": {
+       "x": 3,
+       "n": 8
+      },
+      "comparator": {
+       "x": 7,
+       "n": 9
+      }
+     },
+     {
+      "subject": {
+       "x": 0,
+       "n": 50
+      },
+      "comparator": {
+       "x": 0,
+       "n": 50
+      }
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "pValues": [
+     0.333213079598,
+     0.0521855486173,
+     0.00102965634975,
+     1.40624756167e-09,
+     1.0,
+     0.153434800494,
+     1.0
+    ]
+   }
+  },
+  {
+   "id": "GC-37",
+   "category": "all_events",
+   "title": "Everyone selected in both groups: Katz-log degenerates to a zero-width interval, so the Koopman interval is used",
+   "type": "plan",
+   "data": {
+    "groups": [
+     {
+      "group": "A",
+      "selected": 40,
+      "n": 40
+     },
+     {
+      "group": "B",
+      "selected": 35,
+      "n": 35
+     }
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     },
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.1,
+       "upper": 0.1
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 40,
+          "n": 40
+         },
+         "comparator": {
+          "x": 35,
+          "n": 35
+         }
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.912378398803,
+         "upper": 1.10975596631,
+         "level": 0.95,
+         "method": "koopman_score"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00309602054996,
+        "smallCell": true,
+        "fisherExactP": 1.0,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "smallest_selection_rate_ratio",
+       "estimate": 1.0,
+       "interval": {
+        "lower": 0.901099007676,
+        "upper": 1.0,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 75,
+      "coverage": {
+       "eligibleRows": 75,
+       "populationRows": 75,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.00309602054996,
+      "decidingMemberId": "selection_rate_ratio:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.00619204109992,
+      "outcome": "pass"
+     },
+     {
+      "id": "parity-0.10",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 40,
+          "n": 40
+         },
+         "comparator": {
+          "x": 35,
+          "n": 35
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.0876216011973,
+         "upper": 0.0989009923244,
+         "level": 0.95,
+         "method": "newcombe_hybrid_score"
+        },
+        "band": {
+         "lower": -0.1,
+         "upper": 0.1
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0486065706735,
+        "smallCell": true,
+        "fisherExactP": 1.0,
+        "reasons": []
+       }
+      ],
+      "headline": {
+       "metric": "largest_selection_rate_difference",
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.0989009923244,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       }
+      },
+      "sampleSize": 75,
+      "coverage": {
+       "eligibleRows": 75,
+       "populationRows": 75,
+       "unknownGroupRows": 0,
+       "value": 1.0,
+       "minimum": 1.0
+      },
+      "suppressedGroups": [],
+      "direction": "pass",
+      "pValue": 0.0486065706735,
+      "decidingMemberId": "selection_rate_difference:A|B",
+      "unadjustedOutcome": "pass",
+      "reasons": [],
+      "adjustment": "holm",
+      "familySize": 2,
+      "adjustedPValue": 0.0486065706735,
+      "outcome": "pass"
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  }
+ ]
+}
