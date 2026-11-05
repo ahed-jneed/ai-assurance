@@ -1,0 +1,9 @@
+# Formatting-only commits for `git blame` to skip. GitHub's blame view reads this
+# file automatically; locally run:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style(site-app): apply Prettier formatting (#1)
+ef0286f9aebccb7df25e4d66e59e7d3ed063da73
+
+# chore(site-app): normalize doubled-CR line endings in three components (#1)
+65d95bba5241b435626afa8030b9dcb1e1a61eec

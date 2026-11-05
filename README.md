@@ -99,6 +99,8 @@ Run the diagnostics CLI with `python -m engine --data engine/examples/prediction
 
 `site-app/package-lock.json` is maintained with npm 11. Change dependencies with `npx npm@11 install …`: npm 10 (bundled with Node 22) rewrites unrelated lockfile entries.
 
+Formatting-only commits are listed in `.git-blame-ignore-revs`. Run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone so `git blame` skips them; GitHub's blame view does this automatically.
+
 ## Current legal snapshot
 
 Rule-pack version: `02024R1689-20260727`, researched 5 October 2026. Chapter III Sections 1–3, except Article 6(5), apply from 2 December 2027 for Article 6(2)/Annex III systems and 2 August 2028 for Article 6(1)/Annex I systems, subject to actor/provision/sector/transitional analysis. Transparency can overlap with high-risk duties. Article 4a and data-protection requirements must be reviewed before sensitive-category bias processing; a selected upload label is not authorization.
