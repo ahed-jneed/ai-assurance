@@ -1,5 +1,8 @@
-import { ApiError, bucket, sha256, type Context } from "./store";
+import { bucket } from "./bindings";
 import type { Engagement } from "./domain";
+import { ApiError } from "./http";
+import { sha256 } from "./ids";
+import type { Context } from "./tenancy";
 type Ref = { key: string; sha256: string };
 export async function dehydrate(ctx: Context, e: Engagement) {
   const copy = structuredClone(e) as Engagement & {
