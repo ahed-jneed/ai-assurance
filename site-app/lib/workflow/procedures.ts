@@ -1,8 +1,14 @@
 // Execution commands: performing, evaluating and submitting a procedure
 // of the approved program, its independent review or return, and the
-// working paper its work compiles into.
+// working paper its work compiles into. Work binds the procedure's plan
+// hash and the scope revision (see currentExecution), so it stays current
+// across other procedures' changes and assignment changes.
 import { z } from "zod";
-import { currentExecution } from "../workflow-state";
+import {
+  currentExecution,
+  executionPlanCurrent,
+  runBindsProcedure,
+} from "../workflow-state";
 import { fail, optional, short, text, type WorkflowHandler } from "./command";
 export const procedureCommands: Record<string, WorkflowHandler> = {
   async ensureProcedurePaper({ e, c, writer, procedure }, data) {
@@ -21,7 +27,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     return { paperId: q.id, procedureId: p.id };
   },
   async recordProcedureExecution(
-    { e, c, writer, procedure, accepted, ready, recordHistory },
+    { e, c, writer, procedure, accepted, ready, recordHistory, ensurePlanHash },
     data,
   ) {
     writer();
@@ -68,6 +74,8 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
       fail(400, "Record every planned step once; explain omitted work");
     if (p.method !== "manual" && !a.runIds.length)
       fail(400, "Include the planned automated evaluation");
+    // A run queued under an earlier program revision still counts while
+    // this procedure's plan revision and the scope are unchanged.
     for (const runId of a.runIds) {
       const r = e.runs.find((r) => r.id === runId);
       if (
@@ -76,13 +84,10 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         !r.procedureBinding ||
         (await c.sha256(JSON.stringify(r.procedureBinding))) !==
           r.provenance.inputHashes.auditBinding ||
-        r.procedureBinding?.procedureId !== p.id ||
-        r.procedureBinding.procedureRevision !== p.revision ||
+        !runBindsProcedure(e, p, r) ||
         r.modelId !== p.modelId ||
         r.datasetId !== p.datasetId ||
-        r.profileId !== p.profileId ||
-        r.procedureBinding.programRevision !== x.program.revision ||
-        r.procedureBinding.briefRevision !== x.brief!.revision
+        r.profileId !== p.profileId
       )
         fail(
           400,
@@ -96,6 +101,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
       id: c.id("EXEC"),
       revision: (p.execution?.revision ?? 0) + 1,
       procedureRevision: p.revision,
+      planHash: await ensurePlanHash(p),
       briefRevision: x.brief!.revision,
       programRevision: x.program.revision,
       actor: c.userId,
@@ -147,8 +153,8 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         .parse(data),
       p = procedure(a.procedureId);
     independent(p.contributors);
-    if (!p.execution || p.execution.procedureRevision !== p.revision)
-      fail(409, "Changed procedure steps require a new execution");
+    if (!p.execution || !executionPlanCurrent(p))
+      fail(409, "A changed procedure plan requires a new execution");
     accepted(p.execution.evidenceIds);
     recordHistory(p);
     p.execution.impactReview = {
@@ -304,7 +310,8 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     independent(p.contributors);
     if (p.reviewerId !== c.userId || p.state !== "submitted")
       fail(409, "The assigned reviewer can return submitted work");
-    recordHistory(p);
+    // Never limited: each return follows a submission of limited work.
+    recordHistory(p, false);
     p.state = p.execution?.assessment ? "evaluated" : "executed";
     p.review = undefined;
     const q = e.papers.find((q) => q.id === p.paperId);

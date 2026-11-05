@@ -1397,7 +1397,9 @@ try {
     procedureIds: [proc.id],
     patch: { dueDate: "2026-12-30" },
   });
-  assert.equal(e.workflow.program.revision, beforeBulk + 1);
+  // Drafting amends the program revision; only submissions are revisions.
+  assert.equal(e.workflow.program.revision, beforeBulk);
+  assert.equal(e.workflow.program.history.length, 0);
   const tasks = await request(
     "/api/work-inbox?" + new URLSearchParams({ tenantId }),
   );

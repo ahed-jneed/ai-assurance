@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { completionGates, finalReportGates, type Engagement } from "../domain";
+import { currentExecution } from "../workflow-state";
 import {
   approveProgram,
   approveScope,
@@ -113,11 +114,13 @@ describe("procedure execution", () => {
       w = workflowOf(e);
     const { procedureId: omitted, ...performed } = executionInput(e);
     expect(omitted).toBe(procedureId);
+    expect(p.planHash).toMatch(/^[0-9a-f]{64}$/);
     expect(p.execution).toEqual({
       ...performed,
       id: expect.stringMatching(/^EXEC-\d+$/),
       revision: 1,
       procedureRevision: p.revision,
+      planHash: p.planHash,
       briefRevision: w.brief?.revision,
       programRevision: w.program.revision,
       actor: "auditor",
@@ -292,11 +295,13 @@ describe("procedure execution", () => {
       await boundRun("RUN-stale-procedure", {
         procedureRevision: p.revision - 1,
       }),
-      await boundRun("RUN-stale-program", {
-        programRevision: w.program.revision - 1,
-      }),
       await boundRun("RUN-stale-brief", {
         briefRevision: w.brief!.revision - 1,
+      }),
+      // Program revisions do not bind runs: one queued under an earlier
+      // revision counts while this plan and the scope are unchanged.
+      await boundRun("RUN-earlier-program", {
+        programRevision: w.program.revision - 1,
       }),
       { ...bound, id: "RUN-other-model", modelId: "other" },
       { ...bound, id: "RUN-other-data", datasetId: "other" },
@@ -308,7 +313,6 @@ describe("procedure execution", () => {
       "RUN-forged",
       "RUN-other-procedure",
       "RUN-stale-procedure",
-      "RUN-stale-program",
       "RUN-stale-brief",
       "RUN-other-model",
       "RUN-other-data",
@@ -320,9 +324,10 @@ describe("procedure execution", () => {
         400,
         "Link completed runs bound to this approved procedure and scope",
       );
-    await record(e, { runIds: ["RUN-bound"] });
+    await record(e, { runIds: ["RUN-bound", "RUN-earlier-program"] });
     expect(procedureOf(e, procedureId).execution?.runIds).toEqual([
       "RUN-bound",
+      "RUN-earlier-program",
     ]);
   });
 
@@ -439,12 +444,9 @@ describe("scope change impact review", () => {
   });
 
   it("needs a new execution once the procedure plan changed", async () => {
+    const changed = "A changed procedure plan requires a new execution";
     const e = await ready();
-    await expectFailure(
-      reaffirm(e, "reviewer"),
-      409,
-      "Changed procedure steps require a new execution",
-    );
+    await expectFailure(reaffirm(e, "reviewer"), 409, changed);
     await record(e);
     await command(
       e,
@@ -460,11 +462,7 @@ describe("scope change impact review", () => {
       { revision: workflowOf(e).program.revision, reason: "Agreed" },
       "reviewer",
     );
-    await expectFailure(
-      reaffirm(e, "reviewer"),
-      409,
-      "Changed procedure steps require a new execution",
-    );
+    await expectFailure(reaffirm(e, "reviewer"), 409, changed);
   });
 });
 
@@ -764,5 +762,282 @@ describe("structured engagement completion", () => {
     paperOf(e).status = "signed";
     for (const opinion of ["Readiness assessment", "Adverse conclusion"])
       expect(finalReportGates(e, opinion)).toEqual([]);
+  });
+});
+
+describe("plan changes after execution", () => {
+  const other = "PROC-WP-A12-01";
+  const plan = (id: string, change: Record<string, unknown> = {}) => ({
+    procedureId: id,
+    plan: planInput(
+      id === other
+        ? { criterion: "Art. 12", population: "2026 event logs", ...change }
+        : change,
+    ),
+  });
+  const workOn = (e: Engagement, id: string) =>
+    executionInput(e, {
+      procedureId: id,
+      steps: procedureOf(e, id).instructions.map((i) => ({
+        id: i.id,
+        state: "performed",
+        notes: "",
+      })),
+    });
+  /**
+   * An approved program of two procedures: `procedureId` executed, reviewed
+   * and signed; WP-A12-01 executed and evaluated.
+   */
+  async function recorded() {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveScope(e);
+    await planProgram(e);
+    await command(e, "saveProcedurePlan", plan(other), "auditor");
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "approveProgram",
+      { revision: workflowOf(e).program.revision, reason: "Program agreed" },
+      "reviewer",
+    );
+    await record(e);
+    await evaluate(e);
+    await command(e, "submitProcedure", { procedureId }, "auditor");
+    await command(
+      e,
+      "reviewProcedure",
+      { procedureId, reason: "The evidence supports the conclusion" },
+      "reviewer",
+    );
+    // Signing is a working-paper command of the workspace route.
+    paperOf(e).status = "signed";
+    await command(e, "recordProcedureExecution", workOn(e, other), "auditor");
+    await command(
+      e,
+      "evaluateProcedure",
+      { ...assessmentInput, procedureId: other },
+      "auditor",
+    );
+    e.stage = "Sign-off";
+    return e;
+  }
+  const current = (e: Engagement) =>
+    workflowOf(e).procedures.filter(
+      (p) => p.execution && currentExecution(e, p),
+    );
+  const outstanding = (e: Engagement) =>
+    completionGates(e).map((g) => g.message);
+  const reviewed =
+    "WP-A12-01: current execution and independent review required";
+
+  it("keeps executions, reviews and the program approval across due-date and owner changes", async () => {
+    const e = await recorded();
+    const approved = structuredClone(workflowOf(e).program),
+      executions = workflowOf(e).procedures.map((p) => p.execution);
+    expect(current(e).map((p) => p.id)).toEqual([procedureId, other]);
+    expect(outstanding(e)).toEqual([reviewed]);
+    await command(
+      e,
+      "saveProcedurePlan",
+      plan(procedureId, { dueDate: "2026-12-15" }),
+      "lead",
+    );
+    await command(
+      e,
+      "bulkPlanProcedures",
+      {
+        procedureIds: [procedureId, other],
+        patch: { ownerId: "second-auditor" },
+      },
+      "lead",
+    );
+    // Pending review moves to another independent reviewer just as freely.
+    await command(
+      e,
+      "bulkPlanProcedures",
+      { procedureIds: [other], patch: { reviewerId: "second-reviewer" } },
+      "lead",
+    );
+    const w = workflowOf(e);
+    expect(w.program).toMatchObject({
+      status: "approved",
+      revision: approved.revision,
+      approval: approved.approval,
+      history: approved.history,
+    });
+    expect(w.procedures.map((p) => p.execution)).toEqual(executions);
+    expect(current(e).map((p) => p.id)).toEqual([procedureId, other]);
+    expect(procedureOf(e, procedureId)).toMatchObject({
+      state: "reviewed",
+      dueDate: "2026-12-15",
+      ownerId: "second-auditor",
+      review: { userId: "reviewer" },
+    });
+    expect(outstanding(e)).toEqual([reviewed]);
+    await command(e, "submitProcedure", { procedureId: other }, "auditor");
+    await command(
+      e,
+      "reviewProcedure",
+      { procedureId: other, reason: "The evidence supports the conclusion" },
+      "second-reviewer",
+    );
+    expect(outstanding(e)).toEqual([
+      "WP-A12-01: sign the procedure working-paper revision",
+      "WP-A12-01 is not signed",
+    ]);
+  });
+
+  it("invalidates only the procedure whose content changed", async () => {
+    const e = await recorded();
+    const revision = workflowOf(e).program.revision;
+    await command(
+      e,
+      "saveProcedurePlan",
+      plan(other, { sampling: "Stratified sample of 40 days" }),
+      "lead",
+    );
+    expect(workflowOf(e).program).toMatchObject({
+      status: "draft",
+      revision: revision + 1,
+    });
+    expect(current(e).map((p) => p.id)).toEqual([procedureId]);
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "approveProgram",
+      { revision: revision + 1, reason: "Revised sample agreed" },
+      "reviewer",
+    );
+    // The reviewed and signed procedure needs nothing more.
+    expect(outstanding(e)).toEqual([reviewed]);
+    expect(procedureOf(e, procedureId).review).toMatchObject({
+      userId: "reviewer",
+    });
+    await expectFailure(
+      command(
+        e,
+        "evaluateProcedure",
+        { ...assessmentInput, procedureId: other },
+        "auditor",
+      ),
+      409,
+      "Record current execution before evaluation",
+    );
+    await command(e, "recordProcedureExecution", workOn(e, other), "auditor");
+    expect(current(e).map((p) => p.id)).toEqual([procedureId, other]);
+    // Changing the reviewed procedure's content invalidates it in turn.
+    await command(
+      e,
+      "saveProcedurePlan",
+      plan(procedureId, { population: "Training datasets only" }),
+      "lead",
+    );
+    expect(current(e).map((p) => p.id)).toEqual([other]);
+    expect(procedureOf(e, procedureId).review).toBeUndefined();
+  });
+
+  describe("in an engagement saved before plan hashes", () => {
+    // The shape saved until November 2026: no plan hashes or assignment
+    // revisions, a program revision and history entry for every plan save,
+    // and executions bound to the program revision.
+    async function saved() {
+      const e = await recorded(),
+        w = workflowOf(e);
+      for (const p of w.procedures) {
+        delete p.planHash;
+        delete p.planAmended;
+        delete p.assignmentRevision;
+        if (p.execution) {
+          delete p.execution.planHash;
+          p.execution.programRevision = 151;
+        }
+      }
+      const revisions = w.procedures.map((p) => ({
+        id: p.id,
+        revision: p.revision,
+      }));
+      w.program.history = Array.from({ length: 150 }, (_, i) => ({
+        revision: i + 1,
+        briefRevision: 1,
+        status: "draft",
+        procedureRevisions: revisions,
+        at,
+        actor: "auditor",
+      }));
+      w.program.revision = 151;
+      w.program.approval!.revision = 151;
+      // As the workspace route loads it from storage.
+      return JSON.parse(JSON.stringify(e)) as Engagement;
+    }
+
+    it("keeps its executed and reviewed procedures valid", async () => {
+      const e = await saved();
+      expect(current(e).map((p) => p.id)).toEqual([procedureId, other]);
+      expect(outstanding(e)).toEqual([reviewed]);
+      await command(
+        e,
+        "bulkPlanProcedures",
+        {
+          procedureIds: [procedureId, other],
+          patch: { dueDate: "2026-12-15" },
+        },
+        "lead",
+      );
+      expect(workflowOf(e).program).toMatchObject({
+        status: "approved",
+        revision: 151,
+      });
+      expect(current(e).map((p) => p.id)).toEqual([procedureId, other]);
+      expect(outstanding(e)).toEqual([reviewed]);
+      // Their executions keep the revision binding they were saved with.
+      for (const p of current(e)) {
+        expect(p.planHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(p.execution?.planHash).toBeUndefined();
+      }
+    });
+
+    it("is no longer locked by its program history and invalidates only changed work", async () => {
+      const e = await saved();
+      await command(
+        e,
+        "saveProcedurePlan",
+        plan(other, { sampling: "Stratified sample of 40 days" }),
+        "lead",
+      );
+      expect(current(e).map((p) => p.id)).toEqual([procedureId]);
+      await command(e, "submitProgram", {}, "auditor");
+      await command(
+        e,
+        "returnProgram",
+        { reason: "Explain the strata" },
+        "reviewer",
+      );
+      await command(e, "submitProgram", {}, "auditor");
+      await command(
+        e,
+        "approveProgram",
+        { revision: 153, reason: "Revised sample agreed" },
+        "reviewer",
+      );
+      expect(
+        workflowOf(e)
+          .program.history.slice(150)
+          .map((h) => h.revision + " " + h.status),
+      ).toEqual([
+        "152 submitted",
+        "152 returned",
+        "153 submitted",
+        "153 approved",
+      ]);
+      expect(current(e).map((p) => p.id)).toEqual([procedureId]);
+      expect(outstanding(e)).toEqual([reviewed]);
+      await command(
+        e,
+        "saveProcedurePlan",
+        plan(procedureId, { population: "Training datasets only" }),
+        "lead",
+      );
+      expect(current(e)).toEqual([]);
+    });
   });
 });

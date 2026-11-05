@@ -1,5 +1,7 @@
-import type { Engagement, Report, Role } from "./domain";
-import type { Procedure, Workflow } from "./workflow-types";
+// Only type imports: scripts/paper-presentation-check.mjs and
+// scripts/work-inbox-check.mjs load this module without resolving imports.
+import type { Engagement, Report, Role, Run } from "./domain";
+import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
 export const isClientRole = (role: Role | string) =>
   role === "Client Viewer" || role === "Client Contributor";
 export const isInternalRole = (role: Role | string) =>
@@ -27,19 +29,116 @@ export function activeGrant(
     ) ?? []
   );
 }
-export function currentExecution(e: Engagement, p: Procedure) {
-  const x = p.execution,
-    w = e.workflow;
+/**
+ * Whether the procedure's execution was performed against its current plan:
+ * the plan hash it recorded or, for work recorded before plan hashes, its
+ * plan revision. Preparer, reviewer and due-date changes never change
+ * either; changes to other procedures are irrelevant.
+ */
+export function executionPlanCurrent(p: Procedure) {
+  const x = p.execution;
   return (
     !!x &&
-    !!w &&
-    ((x.briefRevision === w.brief?.revision &&
-      x.programRevision === w.program.revision &&
-      x.procedureRevision === p.revision) ||
-      (x.impactReview?.briefRevision === w.brief?.revision &&
-        x.impactReview?.programRevision === w.program.revision &&
-        x.procedureRevision === p.revision))
+    (x.planHash === undefined
+      ? x.procedureRevision === p.revision
+      : x.planHash === p.planHash)
   );
+}
+/**
+ * Whether the procedure's execution still counts: it binds the current plan
+ * and the current scope revision, directly or through an independent impact
+ * review after a scope change. Program revisions do not enter into it.
+ */
+export function currentExecution(e: Engagement, p: Procedure) {
+  const x = p.execution,
+    scope = e.workflow?.brief?.revision;
+  return (
+    !!x &&
+    scope !== undefined &&
+    executionPlanCurrent(p) &&
+    (x.briefRevision === scope || x.impactReview?.briefRevision === scope)
+  );
+}
+/** Whether a run was queued for this procedure's current plan and scope. */
+export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
+  const b = r.procedureBinding;
+  return (
+    !!b &&
+    b.procedureId === p.id &&
+    b.procedureRevision === p.revision &&
+    b.briefRevision === e.workflow?.brief?.revision
+  );
+}
+// History limits keep an engagement record bounded. Drafting never counts:
+// the brief and program count submissions, and a procedure counts its
+// history entries, which returns may exceed.
+export const revisionLimits = { brief: 40, program: 75, procedure: 30 };
+/** How close to a limit warnings start. */
+export const revisionWarningLevel = 5;
+/** Submitted scope revisions kept in the brief's history. */
+export const briefSubmissions = (b: Brief) =>
+  b.history.filter((h) => h.status !== "draft").length;
+export const programSubmissions = (p: Program) =>
+  p.history.filter((h) => h.status === "submitted").length;
+/** The brief, program and procedures close to or at their history limit. */
+export function revisionWarnings(w: Workflow | undefined) {
+  const warnings: {
+    id: string;
+    recordId?: string;
+    title: string;
+    message: string;
+  }[] = [];
+  const check = (
+    id: string,
+    title: string,
+    used: number,
+    limit: number,
+    message: (left: string) => string,
+    recordId?: string,
+  ) => {
+    const left = Math.max(0, limit - used);
+    if (left <= revisionWarningLevel)
+      warnings.push({
+        id,
+        ...(recordId && { recordId }),
+        title,
+        message: message(left + " of " + limit),
+      });
+  };
+  if (!w) return warnings;
+  if (w.brief)
+    check(
+      "brief",
+      "Engagement brief",
+      briefSubmissions(w.brief),
+      revisionLimits.brief,
+      (left) =>
+        left +
+        " scope submissions left. Drafting does not use them; at the limit, continue in a follow-up engagement.",
+    );
+  check(
+    "program",
+    "Audit program",
+    programSubmissions(w.program),
+    revisionLimits.program,
+    (left) =>
+      left +
+      " program submissions left. Drafting and returns do not use them; at the limit, continue in a follow-up engagement.",
+  );
+  for (const p of w.procedures)
+    check(
+      p.id,
+      p.title,
+      p.history.length,
+      revisionLimits.procedure,
+      (left) =>
+        p.templateId +
+        ": " +
+        left +
+        " history entries left. Executions, evaluations and the first plan change after each program submission use one; returns do not.",
+      p.id,
+    );
+  return warnings;
 }
 export function workflowRequirements(e: Engagement, final = false) {
   const w = e.workflow;

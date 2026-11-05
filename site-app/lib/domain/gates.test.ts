@@ -488,13 +488,15 @@ describe("structured engagements", () => {
   it("requires current execution and an independent review", () => {
     for (const invalidate of [
       (p: Procedure) => {
-        p.execution!.programRevision = 2;
-      },
-      (p: Procedure) => {
         p.execution!.briefRevision = 1;
       },
+      // An execution recorded before plan hashes binds the plan revision.
       (p: Procedure) => {
         p.execution!.procedureRevision = 3;
+      },
+      (p: Procedure) => {
+        p.planHash = "a".repeat(64);
+        p.execution!.planHash = "b".repeat(64);
       },
       (p: Procedure) => {
         p.execution = undefined;
@@ -512,10 +514,22 @@ describe("structured engagements", () => {
     }
   });
 
+  it("binds the plan and scope, not the program revision", () => {
+    // Other procedures' changes create program revisions.
+    const e = signed();
+    procedureOf(e).execution!.programRevision = 1;
+    expect(messages(e)).toEqual([]);
+    // An execution with a plan hash binds it instead of the plan revision.
+    const p = procedureOf(e);
+    p.planHash = p.execution!.planHash = "a".repeat(64);
+    p.revision = 5;
+    expect(messages(e)).toEqual([]);
+  });
+
   it("accepts an independent impact review of an earlier execution", () => {
     const e = signed();
     const x = procedureOf(e).execution!;
-    x.programRevision = 2;
+    x.briefRevision = 1;
     x.impactReview = {
       briefRevision: 2,
       programRevision: 3,

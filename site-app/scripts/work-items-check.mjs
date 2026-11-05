@@ -220,7 +220,7 @@ for (const invalidate of [
     e.workflow.program.briefRevision = 1;
   },
   (e) => {
-    e.workflow.procedures[0].execution.programRevision = 2;
+    e.workflow.procedures[0].execution.briefRevision = 1;
   },
   (e) => {
     e.workflow.procedures[0].execution.procedureRevision = 3;
@@ -258,7 +258,7 @@ assert.equal(
   "Reassess audit program",
 );
 const reassessed = fixture();
-reassessed.workflow.procedures[0].execution.programRevision = 2;
+reassessed.workflow.procedures[0].execution.briefRevision = 1;
 reassessed.workflow.procedures[0].execution.impactReview = {
   briefRevision: 2,
   programRevision: 3,
@@ -267,6 +267,13 @@ assert.equal(
   procedure(reassessed, "Reviewer", "reviewer").state,
   "review",
   "A valid independent scope impact assessment can reaffirm current execution",
+);
+const otherChange = fixture();
+otherChange.workflow.program.revision = 4;
+assert.equal(
+  procedure(otherChange, "Reviewer", "reviewer").state,
+  "review",
+  "A program revision for another procedure's change keeps this execution current",
 );
 console.log(
   "PASS current approved scope/program, execution bindings, compiled revision and accepted-evidence dependencies",

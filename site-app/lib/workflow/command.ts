@@ -3,6 +3,7 @@
 // guards and lookups bound to one engagement and caller.
 import { z } from "zod";
 import type { Engagement, Paper, Role } from "../domain";
+import { revisionLimits } from "../workflow-state";
 import type { Procedure, ProcedurePlan } from "../workflow-types";
 export class WorkflowError extends Error {
   constructor(
@@ -83,6 +84,33 @@ export function plan(p: Procedure): ProcedurePlan {
     profileId,
   };
 }
+/** The administrative part of a plan: who prepares and reviews, by when. */
+export const assignmentKeys = ["ownerId", "reviewerId", "dueDate"] as const;
+/**
+ * The substantive plan: what the procedure tests and how. Its hash binds
+ * executions, so only a change to it invalidates recorded work.
+ */
+export function substantivePlan(
+  p: ProcedurePlan & Pick<Procedure, "id" | "objective" | "instructions">,
+) {
+  return {
+    procedureId: p.id,
+    objective: p.objective,
+    instructions: p.instructions.map((i) => ({ id: i.id, text: i.text })),
+    selected: p.selected,
+    applicability: p.applicability,
+    rationale: p.rationale,
+    criterion: p.criterion,
+    sourceVersion: p.sourceVersion,
+    periodAnalysis: p.periodAnalysis,
+    population: p.population,
+    sampling: p.sampling,
+    method: p.method,
+    modelId: p.modelId,
+    datasetId: p.datasetId,
+    profileId: p.profileId,
+  };
+}
 /** The guards and lookups of one command: this engagement, this caller. */
 export function commandScope(e: Engagement, c: Context) {
   const writer = () => {
@@ -133,8 +161,9 @@ export function commandScope(e: Engagement, c: Context) {
       fail(409, "Approve the current scope and audit program before execution");
     return x;
   };
-  const recordHistory = (p: Procedure) => {
-    if (p.history.length >= 30)
+  /** Keeps the procedure's current state; returns are never limited. */
+  const recordHistory = (p: Procedure, limited = true) => {
+    if (limited && p.history.length >= revisionLimits.procedure)
       fail(
         413,
         "This procedure reached its revision limit; start a follow-up engagement",
@@ -150,29 +179,41 @@ export function commandScope(e: Engagement, c: Context) {
       actor: c.userId,
     });
   };
-  const programDraft = () => {
-    const x = w(),
-      p = x.program;
-    if (p.history.length >= 150) fail(413, "Program revision limit reached");
-    p.history.push({
-      revision: p.revision,
-      briefRevision: p.briefRevision,
-      status: p.status,
-      approval: p.approval,
-      procedureRevisions: x.procedures.map((q) => ({
-        id: q.id,
-        revision: q.revision,
-      })),
-      at: c.at,
-      actor: c.userId,
-    });
-    p.revision++;
-    p.status = "draft";
-    p.approval = undefined;
+  /** Records the caller as a contributor to the program. */
+  const programEdited = () => {
+    const p = w().program;
     p.contributors = [...new Set([...p.contributors, c.userId])];
     p.updatedBy = c.userId;
     p.updatedAt = c.at;
   };
+  /**
+   * A change to what the program tests: a submitted or approved program
+   * becomes the draft of its next revision, and a draft is amended. Neither
+   * uses a history entry; submissions and their outcomes do.
+   */
+  const programDraft = () => {
+    const p = w().program;
+    if (p.status !== "draft") {
+      p.revision++;
+      p.status = "draft";
+      p.approval = undefined;
+    }
+    programEdited();
+  };
+  const planHash = (p: Parameters<typeof substantivePlan>[0]) =>
+    c.sha256(JSON.stringify(substantivePlan(p)));
+  /** The plan hash, kept on first use for procedures planned without one. */
+  const ensurePlanHash = async (p: Procedure) =>
+    (p.planHash ??= await planHash(p));
+  /** Each procedure's plan revision and hash: what the program binds. */
+  const programBindings = () =>
+    Promise.all(
+      w().procedures.map(async (p) => ({
+        id: p.id,
+        revision: p.revision,
+        planHash: await ensurePlanHash(p),
+      })),
+    );
   return {
     e,
     c,
@@ -186,7 +227,11 @@ export function commandScope(e: Engagement, c: Context) {
     accepted,
     ready,
     recordHistory,
+    programEdited,
     programDraft,
+    planHash,
+    ensurePlanHash,
+    programBindings,
   };
 }
 export type CommandScope = ReturnType<typeof commandScope>;

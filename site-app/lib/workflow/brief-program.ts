@@ -1,17 +1,33 @@
 // Planning commands: the engagement brief (the agreed scope), the
 // procedure plans that make up the audit program, and the program's
 // submission, independent approval and return.
+//
+// Histories keep what was submitted, not drafting: a brief, program or
+// procedure plan is amended until its next submission, so saving drafts
+// never uses up a history limit, and returns never meet one. A procedure
+// plan has two parts. Its substantive plan (what is tested and how) carries
+// the plan revision and hash that bind executions and runs: changing it
+// returns the program to draft and invalidates that procedure's work only.
+// Its assignment (preparer, reviewer, due date) is versioned apart from it
+// and changes without renewed program approval or invalidating any work.
 import { z } from "zod";
 import { seedWorkflow } from "../workflow-seed";
 import {
+  briefSubmissions,
+  programSubmissions,
+  revisionLimits,
+} from "../workflow-state";
+import type { Procedure, ProcedurePlan } from "../workflow-types";
+import {
+  assignmentKeys,
   calendarDate,
   fail,
   optional,
-  plan,
   short,
   snapshot,
   text,
   uid,
+  type CommandScope,
   type WorkflowHandler,
 } from "./command";
 const briefFields = z
@@ -54,6 +70,88 @@ const planFields = z
     profileId: uid,
   })
   .strict();
+const procedureIds = z
+  .array(short)
+  .min(1)
+  .max(40)
+  .refine((v) => new Set(v).size === v.length, "Choose each procedure once");
+const inScope = (p: ProcedurePlan) =>
+  p.selected && ["applicable", "readiness"].includes(p.applicability);
+/**
+ * Changes procedure plans as one decision: every change is checked before
+ * any procedure changes. A procedure whose plan is unchanged is left alone.
+ */
+async function revisePlans(
+  { c, w, recordHistory, programEdited, programDraft, planHash }: CommandScope,
+  changes: { p: Procedure; plan: Partial<ProcedurePlan> }[],
+) {
+  const revisions: {
+    p: Procedure;
+    plan: Partial<ProcedurePlan>;
+    next: Procedure;
+    hash: string;
+    substantive: boolean;
+    assignment: boolean;
+  }[] = [];
+  for (const { p, plan } of changes) {
+    const next = { ...p, ...plan },
+      hash = await planHash(next),
+      substantive = hash !== (p.planHash ?? (await planHash(p))),
+      assignment = assignmentKeys.some((k) => next[k] !== p[k]);
+    if (substantive || assignment)
+      revisions.push({ p, plan, next, hash, substantive, assignment });
+  }
+  // Only a substantive change returns a submitted or approved program to
+  // draft. Without one, the program stays as approved and must stay
+  // complete.
+  const redraft = revisions.some((r) => r.substantive),
+    settled = w().program.status !== "draft" && !redraft;
+  for (const { p, next, substantive } of revisions) {
+    if (!p.planAmended && p.history.length >= revisionLimits.procedure)
+      fail(
+        413,
+        "This procedure reached its revision limit; start a follow-up engagement",
+      );
+    if (!substantive && p.review && next.reviewerId !== p.reviewerId)
+      fail(
+        409,
+        "The assigned reviewer already approved " +
+          p.title +
+          "; record new work before reassigning its review",
+      );
+    if (
+      settled &&
+      inScope(next) &&
+      (!next.ownerId || !next.reviewerId || !next.dueDate)
+    )
+      fail(
+        400,
+        p.templateId +
+          ": approved work needs a preparer, a reviewer and a deadline",
+      );
+  }
+  if (!revisions.length) return;
+  if (redraft) programDraft();
+  else programEdited();
+  for (const { p, plan, hash, substantive, assignment } of revisions) {
+    // The plan as submitted enters the history once, at its first change.
+    if (!p.planAmended) {
+      recordHistory(p);
+      p.planAmended = true;
+    }
+    Object.assign(p, plan, {
+      planHash: hash,
+      updatedBy: c.userId,
+      updatedAt: c.at,
+      contributors: [...new Set([...p.contributors, c.userId])],
+    });
+    if (substantive) {
+      p.revision++;
+      p.review = undefined;
+    }
+    if (assignment) p.assignmentRevision = (p.assignmentRevision ?? 1) + 1;
+  }
+}
 export const briefProgramCommands: Record<string, WorkflowHandler> = {
   async adoptWorkflow({ e, c, lead }) {
     lead();
@@ -77,10 +175,10 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     }
     if (old?.status === "submitted")
       fail(409, "Return the submitted scope before revising it");
-    if (old && old.history.length >= 40)
-      fail(413, "Scope revision limit reached");
-    const history = old ? [...old.history, snapshot(old)] : [];
-    // An open return stays with the draft that answers it.
+    // An approved revision enters the history when a Lead revises it, and a
+    // returned one did on its return; a draft that was never submitted is
+    // superseded without an entry. No limit applies to either. An open
+    // return stays with the draft that answers it.
     const returned =
       old?.returnReason === undefined
         ? {}
@@ -97,7 +195,10 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       updatedBy: c.userId,
       updatedAt: c.at,
       ...returned,
-      history,
+      history:
+        old?.status === "approved"
+          ? [...old.history, snapshot(old)]
+          : (old?.history ?? []),
     };
     if (x.program.status !== "draft") programDraft();
     return { briefRevision: String(x.brief.revision) };
@@ -106,6 +207,11 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     writer();
     const b = w().brief ?? fail(400, "Complete the engagement brief first");
     if (b.status !== "draft") fail(409, "Only a scope draft can be submitted");
+    if (briefSubmissions(b) >= revisionLimits.brief)
+      fail(
+        413,
+        "The scope reached its submission limit; start a follow-up engagement",
+      );
     b.status = "submitted";
     // The resubmission answers the return the history keeps.
     delete b.returnReason;
@@ -148,35 +254,24 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     b.status = "draft";
     return { reason: a.reason };
   },
-  async saveProcedurePlan(
-    {
-      e,
-      c,
-      writer,
-      lead,
-      authorized,
-      w,
-      procedure,
-      recordHistory,
-      programDraft,
-    },
-    data,
-  ) {
+  async saveProcedurePlan(scope, data) {
+    const { e, c, writer, lead, authorized, w, procedure } = scope;
     writer();
     const a = z
         .object({ procedureId: short, plan: planFields })
         .strict()
         .parse(data),
-      p = procedure(a.procedureId),
-      x = w();
-    if (x.program.status !== "draft") lead();
+      p = procedure(a.procedureId);
+    if (w().program.status !== "draft") lead();
     if (a.plan.ownerId)
       await authorized(a.plan.ownerId, ["Auditor", "Lead Auditor"]);
     if (a.plan.reviewerId) {
       await authorized(a.plan.reviewerId, ["Reviewer", "Lead Auditor"]);
+      // Saving makes the editor a contributor, who cannot review it either.
       if (
-        a.plan.reviewerId === a.plan.ownerId ||
-        p.contributors.includes(a.plan.reviewerId)
+        [a.plan.ownerId, c.userId, ...p.contributors].includes(
+          a.plan.reviewerId,
+        )
       )
         fail(
           400,
@@ -200,34 +295,16 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       !e.evaluationProfiles?.some((q) => q.id === a.plan.profileId)
     )
       fail(400, "Choose a protocol from this engagement");
-    recordHistory(p);
-    p.revision++;
-    Object.assign(p, a.plan, {
-      updatedBy: c.userId,
-      updatedAt: c.at,
-      contributors: [...new Set([...p.contributors, c.userId])],
-      review: undefined,
-    });
-    programDraft();
+    await revisePlans(scope, [{ p, plan: a.plan }]);
     return { procedureId: p.id };
   },
-  async bulkPlanProcedures(
-    { c, writer, lead, authorized, w, procedure, recordHistory, programDraft },
-    data,
-  ) {
+  async bulkPlanProcedures(scope, data) {
+    const { c, writer, lead, authorized, w, procedure } = scope;
     writer();
-    const x = w();
-    if (x.program.status !== "draft") lead();
+    if (w().program.status !== "draft") lead();
     const a = z
       .object({
-        procedureIds: z
-          .array(short)
-          .min(1)
-          .max(40)
-          .refine(
-            (v) => new Set(v).size === v.length,
-            "Choose each procedure once",
-          ),
+        procedureIds,
         patch: z
           .object({
             ownerId: uid.optional(),
@@ -240,11 +317,6 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       .strict()
       .parse(data);
     const targets = a.procedureIds.map(procedure);
-    if (
-      x.program.history.length >= 150 ||
-      targets.some((p) => p.history.length >= 30)
-    )
-      fail(413, "Revision limit reached");
     for (const p of targets) {
       const owner = a.patch.ownerId ?? p.ownerId,
         review = a.patch.reviewerId ?? p.reviewerId;
@@ -259,36 +331,19 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
           fail(400, "Choose an independent reviewer for " + p.title);
       }
     }
-    for (const p of targets) {
-      recordHistory(p);
-      Object.assign(p, a.patch, {
-        revision: p.revision + 1,
-        review: undefined,
-        updatedBy: c.userId,
-        updatedAt: c.at,
-        contributors: [...new Set([...p.contributors, c.userId])],
-      });
-    }
-    programDraft();
+    await revisePlans(
+      scope,
+      targets.map((p) => ({ p, plan: a.patch })),
+    );
     return { count: String(targets.length) };
   },
-  async scopeProgramCandidates(
-    { c, writer, lead, w, procedure, recordHistory, programDraft },
-    data,
-  ) {
+  async scopeProgramCandidates(scope, data) {
+    const { writer, lead, w, procedure } = scope;
     writer();
-    const x = w();
-    if (x.program.status !== "draft") lead();
+    if (w().program.status !== "draft") lead();
     const a = z
       .object({
-        procedureIds: z
-          .array(short)
-          .min(1)
-          .max(40)
-          .refine(
-            (v) => new Set(v).size === v.length,
-            "Choose each procedure once",
-          ),
+        procedureIds,
         selected: z.boolean(),
         applicability: z.enum(["applicable", "readiness", "not_applicable"]),
         rationale: text,
@@ -296,39 +351,36 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       })
       .strict()
       .parse(data);
-    for (const pid of a.procedureIds) {
-      const p = procedure(pid);
-      recordHistory(p);
-      Object.assign(p, {
-        selected: a.selected,
-        applicability: a.applicability,
-        rationale: a.rationale,
-        periodAnalysis: a.periodAnalysis,
-        criterion:
-          p.criterion || "Approved engagement methodology: " + p.objective,
-        revision: p.revision + 1,
-        review: undefined,
-        updatedBy: c.userId,
-        updatedAt: c.at,
-        contributors: [...new Set([...p.contributors, c.userId])],
-      });
-    }
-    programDraft();
-    return { count: String(a.procedureIds.length) };
+    const targets = a.procedureIds.map(procedure);
+    await revisePlans(
+      scope,
+      targets.map((p) => ({
+        p,
+        plan: {
+          selected: a.selected,
+          applicability: a.applicability,
+          rationale: a.rationale,
+          periodAnalysis: a.periodAnalysis,
+          criterion:
+            p.criterion || "Approved engagement methodology: " + p.objective,
+        },
+      })),
+    );
+    return { count: String(targets.length) };
   },
-  async submitProgram({ writer, authorized, w }) {
+  async submitProgram({ c, writer, authorized, w, programBindings }) {
     writer();
     const x = w();
     if (x.brief?.status !== "approved")
       fail(409, "Approve scope before the program");
     if (x.program.status !== "draft")
       fail(409, "Only a draft program can be submitted");
-    if (
-      !x.procedures.some(
-        (p) =>
-          p.selected && ["applicable", "readiness"].includes(p.applicability),
-      )
-    )
+    if (programSubmissions(x.program) >= revisionLimits.program)
+      fail(
+        413,
+        "The program reached its submission limit; start a follow-up engagement",
+      );
+    if (!x.procedures.some(inScope))
       fail(400, "Select at least one applicable or readiness procedure");
     for (const p of x.procedures) {
       if (
@@ -342,7 +394,7 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
           p.templateId +
             ": record applicability, criterion, period analysis and scope rationale",
         );
-      if (p.selected && ["applicable", "readiness"].includes(p.applicability)) {
+      if (inScope(p)) {
         if (!p.population.trim() || !p.sampling.trim() || !p.dueDate)
           fail(
             400,
@@ -365,9 +417,19 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     }
     x.program.status = "submitted";
     x.program.briefRevision = x.brief.revision;
+    // Each plan is now as submitted; its next change keeps it in the history.
+    for (const p of x.procedures) delete p.planAmended;
+    x.program.history.push({
+      revision: x.program.revision,
+      briefRevision: x.brief.revision,
+      status: "submitted",
+      procedureRevisions: await programBindings(),
+      at: c.at,
+      actor: c.userId,
+    });
     return { programRevision: String(x.program.revision) };
   },
-  async approveProgram({ c, independent, w }, data) {
+  async approveProgram({ c, independent, w, programBindings }, data) {
     const x = w();
     independent(x.program.contributors);
     const a = z
@@ -381,33 +443,48 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
       x.brief?.status !== "approved"
     )
       fail(409, "Review the current submitted program against approved scope");
+    // The approval binds each procedure's plan revision and hash, the list
+    // its history entry records.
+    const procedureRevisions = await programBindings();
     x.program.approval = {
       userId: c.userId,
       at: c.at,
       revision: x.program.revision,
-      hash: await c.sha256(
-        JSON.stringify(
-          x.procedures.map((p) => ({
-            id: p.id,
-            revision: p.revision,
-            plan: plan(p),
-          })),
-        ),
-      ),
+      hash: await c.sha256(JSON.stringify(procedureRevisions)),
       reason: a.reason,
     };
     x.program.status = "approved";
+    x.program.history.push({
+      revision: x.program.revision,
+      briefRevision: x.program.briefRevision,
+      status: "approved",
+      approval: x.program.approval,
+      procedureRevisions,
+      at: c.at,
+      actor: c.userId,
+    });
     return { programRevision: String(x.program.revision) };
   },
-  async returnProgram({ reviewer, w, programDraft }, data) {
+  async returnProgram({ c, reviewer, w, programBindings }, data) {
     reviewer();
     const a = z.object({ reason: text }).strict().parse(data),
-      x = w();
-    if (x.program.status !== "submitted")
-      fail(409, "Return a submitted program");
-    const contributors = [...x.program.contributors];
-    programDraft();
-    x.program.contributors = contributors;
+      p = w().program;
+    if (p.status !== "submitted") fail(409, "Return a submitted program");
+    // A return is never limited. Work continues on the next revision, and
+    // the reviewer does not become one of the program's preparers.
+    p.history.push({
+      revision: p.revision,
+      briefRevision: p.briefRevision,
+      status: "returned",
+      reason: a.reason,
+      procedureRevisions: await programBindings(),
+      at: c.at,
+      actor: c.userId,
+    });
+    p.revision++;
+    p.status = "draft";
+    p.updatedBy = c.userId;
+    p.updatedAt = c.at;
     return { reason: a.reason };
   },
 };
