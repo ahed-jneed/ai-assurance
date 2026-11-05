@@ -1769,6 +1769,243 @@ try {
     owner,
     400,
   );
+  // #17: past 1,000 assurance records an engagement keeps its workbench,
+  // access changes, report capture and release, and dossiers. The bulk goes
+  // straight into D1 (each op's own path is checked above and in
+  // assurance-integration-check.mjs): source locations, reviewed assessments,
+  // a superseded revision and unpinned events, in runs of seven records that
+  // share a timestamp so that page breaks fall inside a run.
+  const hex = async (bytes) =>
+    Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex");
+  const bulkSource = e.artifacts.find((a) => a.id === uploaded.artifactId),
+    bulkStart = Date.now() - 2 * 3600 * 1000,
+    bulk = [];
+  assert.equal(bulkSource.status, "accepted");
+  const bulkRecord = (kind, body, actor = owner) => {
+    const record = {
+      id: "AS-" + crypto.randomUUID().slice(0, 12),
+      kind,
+      body: JSON.stringify(body),
+      actor,
+      createdAt: new Date(
+        bulkStart + Math.floor(bulk.length / 7) * 1000,
+      ).toISOString(),
+    };
+    bulk.push(record);
+    return record;
+  };
+  const bulkLocations = Array.from({ length: 1100 }, (_, i) =>
+    bulkRecord("location", {
+      artifactId: bulkSource.id,
+      label: "Bulk source " + i,
+      kind: "dataset",
+      locator: "row " + (i + 1),
+      excerpt: "Synthetic excerpt " + i,
+      parser: "manual-transcription",
+      quality: "Synthetic scale fixture",
+      artifactSha256: bulkSource.sha256,
+      artifactName: bulkSource.name,
+      visibility: bulkSource.visibility,
+    }),
+  );
+  const superseded = bulkRecord("assertion", {
+    statement: "Superseded scale assertion",
+    criterion: "AIA-15-1",
+    relations: [],
+    missingEvidence: "",
+    assessment: "First revision",
+    conclusion: "unassessed",
+    status: "draft",
+    revision: 1,
+  });
+  for (let i = 0; i < 30; i++) {
+    const assertion = bulkRecord("assertion", {
+      ...(i === 0 ? { supersedesId: superseded.id } : {}),
+      statement: "Scale assertion " + i,
+      criterion: "AIA-15-1",
+      relations: [],
+      missingEvidence: "",
+      assessment: "Synthetic assessment",
+      conclusion: "supported",
+      status: "draft",
+      revision: i === 0 ? 2 : 1,
+    });
+    bulkRecord(
+      "assertion_review",
+      {
+        assertionId: assertion.id,
+        decision: "approve",
+        reason: "Synthetic independent review",
+      },
+      reviewer,
+    );
+  }
+  for (const [kind, review, body] of [
+    [
+      "obligation",
+      { decision: "confirmed" },
+      { code: "AIA-14-123", applicability: "readiness", outcome: "supported" },
+    ],
+    [
+      "impact",
+      { decision: "confirmed" },
+      { description: "Synthetic change", decision: "no_effect" },
+    ],
+  ])
+    for (let i = 0; i < 10; i++) {
+      const assessment = bulkRecord(kind, { ...body, rationale: "Scale " + i });
+      bulkRecord(
+        kind + "_review",
+        { [kind + "Id"]: assessment.id, ...review, reason: "Synthetic" },
+        reviewer,
+      );
+    }
+  for (let i = 0; i < 40; i++)
+    bulkRecord(["access_event", "worker_event", "assistant"][i % 3], {
+      reason: "Unpinned scale event " + i,
+    });
+  for (let i = 0; i < bulk.length; i += 100)
+    await testDb.batch(
+      await Promise.all(
+        bulk
+          .slice(i, i + 100)
+          .map(async (r) =>
+            testDb
+              .prepare(
+                "INSERT INTO assurance_records(tenant_id,engagement_id,id,kind,body,sha256,created_at,actor) VALUES(?,?,?,?,?,?,?,?)",
+              )
+              .bind(
+                tenantId,
+                e.id,
+                r.id,
+                r.kind,
+                r.body,
+                await hex(new TextEncoder().encode(r.body)),
+                r.createdAt,
+                r.actor,
+              ),
+          ),
+      ),
+    );
+  const recordIds = (
+    await testDb
+      .prepare(
+        "SELECT id FROM assurance_records WHERE tenant_id=? AND engagement_id=? ORDER BY created_at,id",
+      )
+      .bind(tenantId, e.id)
+      .all()
+  ).results.map((r) => r.id);
+  assert(recordIds.length > 1200);
+  // The workbench view answers the first page; its cursor walks the rest.
+  const assurancePath = (query = {}) =>
+    "/api/assurance?" +
+    new URLSearchParams({ tenantId, engagementId: e.id, ...query });
+  const workbench = await request(assurancePath());
+  assert.equal(workbench.total, recordIds.length);
+  assert.equal(workbench.records.length, 200);
+  assert(Array.isArray(workbench.jobs) && workbench.capabilities);
+  const listed = [...workbench.records],
+    pageBreaks = [];
+  for (let cursor = workbench.nextCursor; cursor;) {
+    const page = await request(assurancePath({ cursor }));
+    assert.deepEqual(Object.keys(page).sort(), ["nextCursor", "records"]);
+    assert(page.records.length > 0 && page.records.length <= 200);
+    pageBreaks.push(listed.at(-1).createdAt === page.records[0].createdAt);
+    listed.push(...page.records);
+    cursor = page.nextCursor;
+  }
+  assert.deepEqual(
+    listed.map((r) => r.id),
+    recordIds,
+  );
+  assert.equal(pageBreaks.length + 1, Math.ceil(recordIds.length / 200));
+  assert(pageBreaks.includes(true), "A page break splits equal timestamps");
+  const locations = [];
+  for (let page = { nextCursor: "" }; page.nextCursor !== null;) {
+    page = await request(
+      assurancePath({
+        kind: "location",
+        ...(page.nextCursor ? { cursor: page.nextCursor } : {}),
+      }),
+    );
+    locations.push(...page.records);
+  }
+  assert(locations.length >= 1100);
+  assert(locations.every((r) => r.kind === "location"));
+  assert(locations.some((r) => r.id === bulkLocations.at(-1).id));
+  assert.equal(
+    (await request(assurancePath({ cursor: "not-a-cursor" }), { status: 400 }))
+      .error,
+    "Invalid page cursor",
+  );
+  // Writes no longer load every record: an assessment citing a bulk source
+  // gates final capture until it is independently reviewed, and a briefing
+  // reads it and the source it cites.
+  const lateAssertion = (
+    await assurance("addAssertion", {
+      statement: "Scale sources remain covered",
+      criterion: "AIA-15-1",
+      relations: [
+        {
+          locationId: bulkLocations.at(-1).id,
+          relation: "supports",
+          rationale: "Synthetic citation of the newest bulk source",
+        },
+      ],
+      missingEvidence: "",
+      assessment: "Synthetic assessment past 1,000 records",
+      conclusion: "supported",
+    })
+  ).record;
+  assert.equal(
+    lateAssertion.body.relations[0].locationSha256,
+    await hex(new TextEncoder().encode(bulkLocations.at(-1).body)),
+  );
+  const ungated = await command(
+    "createReport",
+    {
+      kind: "final",
+      opinion: "Adverse conclusion",
+      summary: "Must wait for the independent review",
+    },
+    owner,
+    409,
+  );
+  assert.equal(
+    ungated.error,
+    "Independent review required: Scale sources remain covered",
+  );
+  await assurance(
+    "reviewAssertion",
+    {
+      assertionId: lateAssertion.id,
+      decision: "approve",
+      reason: "Independent review of the scale citation",
+    },
+    200,
+    reviewer,
+  );
+  const scaleBriefing = (
+    await assurance("assist", {
+      sourceIds: [lateAssertion.id],
+      action: "summary",
+    })
+  ).record;
+  assert.deepEqual(
+    scaleBriefing.body.citations.map((c) => c.recordId),
+    [lateAssertion.id, bulkLocations.at(-1).id],
+  );
+  await assurance(
+    "assist",
+    { sourceIds: [lateAssertion.id], action: "summary" },
+    403,
+    reviewer,
+  );
+  console.log(
+    "PASS " +
+      recordIds.length +
+      " assurance records: cursor-paged workbench and kind listings, record lookups, review gate and cited briefing",
+  );
   await command("createReport", {
     kind: "final",
     opinion: "Adverse conclusion",
@@ -1776,6 +2013,20 @@ try {
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
   const internalFinal = e.reports.at(-1);
+  // Every pinned record is captured, past the old 1,000-record limit.
+  const pinnedIds = (
+    await testDb
+      .prepare(
+        "SELECT id FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind NOT IN ('assistant','assistant_export','assistant_acceptance','key_rotation','dossier','access_event','worker_event') ORDER BY created_at,id",
+      )
+      .bind(tenantId, e.id)
+      .all()
+  ).results.map((r) => r.id);
+  assert(pinnedIds.length > 1100);
+  assert.deepEqual(
+    internalFinal.snapshot.assurancePins.map((p) => p.id),
+    pinnedIds,
+  );
   const immutableFinal = JSON.stringify({
     snapshot: internalFinal.snapshot,
     clientSnapshot: internalFinal.clientSnapshot,
@@ -1860,6 +2111,18 @@ try {
   console.log(
     "PASS inbox report release handoff and non-actionable approver dependency",
   );
+  // Revoking access past 1,000 records works, and the access event it records
+  // is not a pinned source, so the approved package can still be released.
+  await assurance("setAccess", {
+    userId: auditor,
+    active: false,
+    reason: "Preparer rotated off before release",
+  });
+  await request(assurancePath(), { user: auditor, status: 404 });
+  await request(
+    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+    { user: auditor, status: 404 },
+  );
   // Controlled ephemeral source revisions prove every captured technical collection blocks stale release.
   const approvedSource = structuredClone(e);
   for (const amend of [
@@ -1912,6 +2175,79 @@ try {
       clientSha256: e.reports.at(-1).clientSha256,
     }),
     immutableFinal,
+  );
+  // The released package seals into both audiences' dossiers; the internal
+  // one carries every pinned assurance record byte for byte.
+  const seals = {};
+  for (const audience of ["internal", "client"])
+    seals[audience] = (
+      await request("/api/dossier", {
+        method: "POST",
+        body: {
+          tenantId,
+          engagementId: e.id,
+          reportId: internalFinal.id,
+          audience,
+          withheld: [],
+        },
+      })
+    ).record;
+  const resealed = await request("/api/dossier", {
+    method: "POST",
+    body: { tenantId, engagementId: e.id, reportId: internalFinal.id },
+  });
+  assert.equal(resealed.existing, true);
+  assert.equal(resealed.record.id, seals.internal.id);
+  for (const [audience, user] of [
+    ["internal", owner],
+    ["client", viewer],
+  ]) {
+    const download = await transport(
+      base +
+        "/api/dossier?" +
+        new URLSearchParams({
+          tenantId,
+          engagementId: e.id,
+          reportId: internalFinal.id,
+          audience,
+        }),
+      { headers: h(user) },
+    );
+    assert.equal(download.status, 200);
+    const bytes = new Uint8Array(await download.arrayBuffer()),
+      hash = await hex(bytes),
+      dossier = JSON.parse(new TextDecoder().decode(bytes));
+    assert.equal(download.headers.get("X-Dossier-SHA256"), hash);
+    assert.equal(hash, seals[audience].body.sha256);
+    assert.equal(dossier.manifest.audience, audience);
+    for (const file of dossier.files)
+      assert.equal(
+        await hex(Buffer.from(file.contentBase64, "base64")),
+        dossier.manifest.files.find((leaf) => leaf.path === file.path).sha256,
+      );
+    const pinnedFiles = dossier.files.filter((f) =>
+      f.path.startsWith("assurance/"),
+    );
+    if (audience === "internal") {
+      assert.deepEqual(
+        pinnedFiles.map((f) => f.path),
+        pinnedIds.map((id) => "assurance/" + id + ".json"),
+      );
+      const newest = pinnedFiles.find(
+        (f) => f.path === "assurance/" + bulkLocations.at(-1).id + ".json",
+      );
+      assert.equal(
+        Buffer.from(newest.contentBase64, "base64").toString(),
+        bulkLocations.at(-1).body,
+      );
+    } else assert.equal(pinnedFiles.length, 0);
+  }
+  // Each seal is a saved engagement change.
+  await refresh();
+  console.log(
+    "PASS " +
+      pinnedIds.length +
+      " pinned records captured, released and sealed into verified internal and client dossiers",
   );
   const released = await request(
       "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
