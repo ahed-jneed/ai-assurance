@@ -1,6 +1,6 @@
 # Product direction
 
-Set on 5 November 2026 for the current roadmap cycle. It distils the [product-direction brief](../research/2026-11/synthesis.md) and its five research briefs; [ROADMAP.md](../../ROADMAP.md) is the plan that implements it. Claims marked *(secondary)*, and findings attributed to "the research", rest on secondary sources. The other external claims were checked against primary sources on 5 November 2026 (see [Sources and verification](#sources-and-verification)).
+Set on 5 November 2026 for the current roadmap cycle. It distils the [product-direction brief](../research/2026-11/synthesis.md) and its five research briefs; [ROADMAP.md](../../ROADMAP.md) is the plan that implements it, and the [decision log](decisions.md) records the decisions taken since. Claims marked *(secondary)*, and findings attributed to "the research", rest on secondary sources. The other external claims were checked against primary sources on 5 November 2026 (see [Sources and verification](#sources-and-verification)).
 
 ## 1. Who we serve
 
@@ -13,7 +13,7 @@ Set on 5 November 2026 for the current roadmap cycle. It distils the [product-di
 **Why this user.**
 
 - **Nobody builds their workflow.** The AI-governance platforms that lead the analyst rankings sell to the AI owner: IBM, ServiceNow and Truyo in Gartner's 2026 Magic Quadrant, Credo AI and IBM in Forrester's Q3 2025 Wave *(secondary)*. The research found none that offers independence checks, sampling, review and an opinion, and no AI testing method in audit tools such as Fieldguide, Caseware and TeamMate+.
-- **The profession is forming.** European accreditation bodies voted in November 2025 to make ISO/IEC 42006 mandatory for accrediting ISO/IEC 42001 certifiers *(secondary)*. AIUC-1 has had an authorised auditor since 3 February 2026, and the AICPA and AIUC announced a joint SOC 2 + AIUC-1 offering on 19 October 2026. NYC Local Law 144 requires a yearly bias audit by an independent auditor.
+- **The profession is forming.** European accreditation bodies voted in November 2025 to make ISO/IEC 42006 mandatory for accrediting ISO/IEC 42001 certifiers. AIUC-1 has had an authorised auditor since 3 February 2026, and the AICPA and AIUC announced a joint SOC 2 + AIUC-1 offering on 19 October 2026. NYC Local Law 144 requires a yearly bias audit by an independent auditor.
 - **Rigour is becoming a buying criterion.** From 1 June 2026 AICPA peer review targets SOC 2 work and checks for identical risk assessments, sample sizes and test procedures across engagements. The research found the same pressure on the first EU DSA audits and on LL144 audits.
 - **Our base already fits:** engagement-scoped roles with separation of duties, diagnostic results kept apart from auditor conclusions, immutable snapshots, hash-chained events, content-addressed evidence, signed dossiers and an external worker ([codebase map](../engineering/codebase-map.md)).
 
@@ -38,7 +38,7 @@ Two rules sit under all five:
 
 ## 3. What we will not build
 
-- **The AI owner's runtime stack:** AI discovery, runtime guardrails, LLM firewalls, MCP gateways, observability and monitoring, policy management, vendor risk. Large suites are absorbing these markets; on 3 November 2026 CrowdStrike agreed to acquire Fiddler and pitches agent observability as evidence for compliance and audits. We ingest such outputs instead.
+- **The AI owner's runtime stack:** AI discovery, runtime guardrails, LLM firewalls, MCP gateways, observability and monitoring, policy management, vendor risk. The research finds large suites absorbing these markets; on 3 November 2026, for example, CrowdStrike agreed to acquire Fiddler and pitches agent observability as evidence for compliance and audits. We ingest such outputs instead.
 - **Our own test infrastructure:** no native red-team runner, benchmark hosting or default LLM-judge service. Auditor re-runs go through the existing external worker.
 - **Unsafe ingestion:** we never execute ingested code or pickled models, never rescore logs that reference code, and never embed AGPL-licensed tools such as deepchecks.
 - **Overclaiming:** no "compliant" badges, nothing that resembles a certificate or regulator approval, no partial crosswalk shown as full coverage, and no vendor-steered auditor marketplace.
@@ -76,7 +76,7 @@ Two rules sit under all five:
 
 ## 6. Open questions
 
-- **Law and standards.** Legal content stays unverified against primary sources until [#8] lands, and [#18] labels what needs qualified legal review. EUR-Lex refused automated fetching, so the Official Journal references (Regulation (EU) 2026/1744, Implementing Decision (EU) 2026/2274) rest on secondary sources, which disagree on the EN 18286 citation date (14 or 19 October 2026). No AI Act notified body could be verified in NANDO.
+- **Law and standards.** The research for [#8] ([PR #43]) read the Official Journal texts of Regulation (EU) 2026/1744 and Implementing Decision (EU) 2026/2274 from the Publications Office, because EUR-Lex refuses automated fetches. The decision that cites EN 18286:2026 is dated 12 October 2026 and was published in the OJ on 14 October 2026; 19 October 2026 was the date of the Commission's news item. Ten points of interpretation, LR-01 to LR-10, await qualified legal review, which [#57] tracks; until then [#18] shows the affected content as pending legal review ([D-02](decisions.md)). No AI Act notified body could be verified in NANDO.
 - **Unconfirmed claims the design must not lean on:** the EEOC's rescission of its Uniform Guidelines' interpretive parts (the Justice Department's 9 June 2026 opinion against those guidelines is confirmed), and whether AIUC-1's "quarterly" means retests or revisions of the standard (plan for both). AIUC-1 content licensing is unconfirmed.
 - **Scope, decided on 5 November 2026:** the Art 4a record is [#60]; per-practice SSO and MFA, and Colorado and CCPA ADMT audits, are on the Later list; the other items once listed as not yet placed are placed as [ROADMAP.md](../../ROADMAP.md#placed-on-5-nov-2026) shows.
 
@@ -88,8 +88,9 @@ Two rules sit under all five:
 |---|---|---|
 | AI Act milestones on 2 Aug 2026, 2 Dec 2026 (new Art 5 prohibitions, end of the Art 50(2) transition), 2 Dec 2027 (Annex III) and 2 Aug 2028 (Annex I); Art 9(8) wording | [AI Act Service Desk timeline](https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act), [Article 9](https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-9) | Verified |
 | EN 18286:2026 is the first harmonised standard cited in the OJ for the AI Act | [CEN-CENELEC](https://www.cencenelec.eu/news-events/news/2026/en-in-the-spotlight/2026-10-15-en-18286-2026-published-in-ojeu/) | Verified |
-| Its decision number (EU) 2026/2274, the 14 Oct 2026 date, and a presumption limited to the requirements covered | [Orrick](https://www.orrick.com/en/Insights/2026/10/First-Harmonised-Technical-Standard-Published-Under-the-EU-AI-Act) | Secondary |
-| ISO/IEC 42006 vote of 20 Nov 2025; analyst placements | [Bright Defense](https://brightdefense.com/news/iso-42006-raises-the-bar-for-iso-42001-certifiers), [OneTrust](https://onetrust.com/resources/gartner-magic-quadrant-for-ai-governance-platforms-2026-report/), [Forrester](https://www.forrester.com/report/the-forrester-wave-tm-ai-governance-solutions-q3-2025/RES184849) | Secondary |
+| Regulation (EU) 2026/1744 (OJ of 24 Jul 2026); Implementing Decision (EU) 2026/2274 of 12 Oct 2026, published in the OJ and in force on 14 Oct 2026, with a presumption limited to the requirements the standard covers; the Commission's news item of 19 Oct 2026 | OJ texts via the Publications Office: [2026/1744](https://publications.europa.eu/resource/cellar/b459c07f-86fb-11f1-bf5e-01aa75ed71a1.0006.03/DOC_1), [2026/2274](https://publications.europa.eu/resource/cellar/05805dc1-c76c-11f1-a77b-01aa75ed71a1.0006.03/DOC_1); [Commission](https://digital-strategy.ec.europa.eu/en/library/first-harmonised-standard-supporting-ai-act-published-official-journal) | Verified |
+| ISO/IEC 42006 made mandatory for accrediting AI management-system certifiers (EA Resolution 2025 (59) 06, 20 Nov 2025) | [European co-operation for Accreditation](https://european-accreditation.org/wp-content/uploads/2025/11/AI-O-8-EAGA2511-O-08-GA59-Adopted-Resolutions-20Nov2025.pdf) | Verified |
+| Analyst placements | [OneTrust](https://onetrust.com/resources/gartner-magic-quadrant-for-ai-governance-platforms-2026-report/), [Forrester](https://www.forrester.com/report/the-forrester-wave-tm-ai-governance-solutions-q3-2025/RES184849) | Secondary |
 | First authorised AIUC-1 auditor (Schellman); the AICPA–AIUC offering | [Schellman](https://www.schellman.com/blog/news/schellman-becomes-the-first-accredited-auditor-for-aiuc-1), [AICPA release](https://www.prnewswire.com/news-releases/auditors-meet-urgent-demand-for-ai-assurance-with-new-offering-from-aicpa-and-aiuc-302912598.html) | Verified |
 | AICPA peer review of SOC 2 work from 1 Jun 2026 | [Journal of Accountancy](https://www.journalofaccountancy.com/issues/2026/may/aicpa-guides-peer-reviewers-to-address-soc-2-risks/) | Verified |
 | LL144 bias audit by an independent auditor, relied on for one year | [NYC DCWP](https://www.nyc.gov/site/dca/businesses/faq-automated-employment-decision-tools.page) | Verified |
@@ -122,4 +123,6 @@ Two rules sit under all five:
 [#31]: https://github.com/ahed-jneed/ai-assurance/issues/31
 [#32]: https://github.com/ahed-jneed/ai-assurance/issues/32
 [#33]: https://github.com/ahed-jneed/ai-assurance/issues/33
+[#57]: https://github.com/ahed-jneed/ai-assurance/issues/57
 [#60]: https://github.com/ahed-jneed/ai-assurance/issues/60
+[PR #43]: https://github.com/ahed-jneed/ai-assurance/pull/43
