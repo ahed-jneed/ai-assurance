@@ -38,9 +38,9 @@ node schemas/validate-run-schema.mjs --ajv-package path/to/package.json
 
 The fixture generator runs only synthetic local engine computations; reports get new execution timestamps. Regeneration never establishes a valid production custody chain. See `engine/RUNTIME_PACKAGE.md` for the source archive manifest and reproduction workflow.
 
-Hosted 1.1 runs may bind an approved audit procedure through `procedureBinding`: procedure ID/revision and brief/program revisions. A binding requires its own SHA-256 `auditBinding` pin. Execution verifies that pin, and procedure compilation accepts only succeeded runs matching the approved model, dataset, protocol and all scope revisions. `retryOf` links a newly queued run to its preserved failed/cancelled predecessor; a retry revalidates input integrity and rejects changed audit scope. Neither field upgrades saved predictions to independent model inference.
+Hosted 1.1 runs may bind an approved audit procedure through `procedureBinding`: procedure ID/revision and brief/program revisions. A binding requires its own SHA-256 `auditBinding` pin. Execution verifies that pin, and procedure compilation accepts only succeeded runs matching the approved model, dataset and protocol, the procedure's current plan revision and the current brief revision; the program revision is recorded but not compared, so another procedure's change does not invalidate the run. `retryOf` links a newly queued run to its preserved failed/cancelled predecessor; a retry revalidates input integrity and rejects changed audit scope. Neither field upgrades saved predictions to independent model inference.
 
-`procedure-execution.schema.json` covers the actual work performed, explicit step dispositions, scope revisions, evidence/run references and optional human assessment. Validate it and a fresh API execution with:
+`procedure-execution.schema.json` covers the actual work performed, explicit step dispositions, scope revisions, the plan hash it binds (optional for records made before plan hashes), evidence/run references and optional human assessment. Validate it and a fresh API execution with:
 
 ```powershell
 node schemas/validate-procedure-schema.mjs site-app/.sites-runtime/execution-schema-fixture.json
