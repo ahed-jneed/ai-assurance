@@ -29,7 +29,7 @@ Each file is under 100 KB. The `.gitattributes` in this directory switches off l
 Reference values:
 
 - `expected.json` holds the design-time values that the engine must reproduce: counts, estimates, standard errors (IID and clustered), Wilson intervals, attack-success rates per technique, pass^k, paired differences and kappa. Wilson, kappa, paired-difference and normal-quantile values were cross-checked against statsmodels 0.15.0 and scipy 1.17.1.
-- `normalized-examples.json` holds, for each fixture, the run metadata and the first per-item record produced by applying the design's mapping rules. Every record validates against `schemas/genai-evidence-item.schema.json` (110 items in total, checked with `jsonschema` Draft 2020-12).
+- `normalized-examples.json` holds, for each fixture, the run metadata and the first per-item record produced by applying the design's mapping rules. Every record validates against `schemas/genai-evidence-item.schema.json` (all 122 items the mapping produces from the fixtures, checked with `jsonschema` Draft 2020-12).
 
 Both files come from throwaway scripts, not from engine code. #32 must re-derive them independently and resolve any disagreement rather than copying the numbers.
 

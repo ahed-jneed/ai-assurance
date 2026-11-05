@@ -48,7 +48,7 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 10000,
-      "description": "1-based repeat index (Inspect epoch, promptfoo repeatIndex + 1, garak generation index + 1 when generations are expanded, otherwise 1)."
+      "description": "1-based repeat index: Inspect epoch, promptfoo repeatIndex + 1, garak generation index + 1; otherwise 1. Repeats of one test item share a groupKey and are reduced per the frozen plan before statistics."
     },
     "itemType": {
       "enum": [
@@ -239,39 +239,6 @@
           "description": "Whether post-run score edits were applied."
         }
       }
-    },
-    "generations": {
-      "type": [
-        "object",
-        "null"
-      ],
-      "additionalProperties": false,
-      "required": [
-        "count",
-        "scored",
-        "hits"
-      ],
-      "properties": {
-        "count": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 10000
-        },
-        "scored": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 10000
-        },
-        "hits": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 10000
-        }
-      },
-      "description": "For tools that score several outputs per prompt in one attempt (garak generations)."
     },
     "usage": {
       "type": [
