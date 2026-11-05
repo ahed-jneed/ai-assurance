@@ -171,12 +171,16 @@ class RunnerServer:
                 return True
 
             def do_POST(self):
+                # Read the body before replying, even with a 401. A socket closed
+                # with unread bytes resets the connection, which on Windows loses
+                # the reply; draining after replying races the client's own close.
+                # The checks below still run in route.ts's order.
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(length) if length <= 10*1024*1024 else None
                 if not self.authenticated():
                     return
-                length = int(self.headers.get("Content-Length") or 0)
-                if length > 10*1024*1024:
+                if raw is None:
                     return self.reject(413, "Request exceeds the permitted size")
-                raw = self.rfile.read(length)
                 try:
                     body = json.loads(raw.decode("utf-8"))
                 except ValueError:
