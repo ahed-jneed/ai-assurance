@@ -155,6 +155,8 @@ class ONNXAdapter(NumericAdapter):
         options.intra_op_num_threads = options.inter_op_num_threads = 1
         try:
             self.session = ort.InferenceSession(self.artifact_bytes, sess_options=options, providers=["CPUExecutionProvider"])
+        except MemoryError:
+            raise  # compute_resource_exhausted, not an invalid artifact
         except Exception as exc:
             raise EngineError("model_artifact_invalid", "ONNX Runtime could not load the model ("+type(exc).__name__+")") from exc
         inputs = self.session.get_inputs()
@@ -220,6 +222,8 @@ class PMMLAdapter(NumericAdapter):
             raise EngineError("model_interface_mismatch", "PMML requires explicit predictionOutput field")
         try:
             self.model = Model.load(str(self.path))
+        except MemoryError:
+            raise  # compute_resource_exhausted, not an invalid artifact
         except Exception as exc:
             raise EngineError("model_artifact_invalid", "pypmml could not load the model ("+type(exc).__name__+")") from exc
 

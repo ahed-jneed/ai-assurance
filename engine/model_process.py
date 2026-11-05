@@ -8,7 +8,7 @@ from .optional_adapters import NumericAdapter
 
 # Codes this child reports to NativeTreeAdapter as {"error": code} on stdout.
 # The parent maps anything else to model_inference_failed.
-FAILURE_CODES = frozenset({"model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch", "model_output_invalid", "model_inference_failed", "invalid_numeric_value", "missing_value", "dataset_limit_exceeded"})
+FAILURE_CODES = frozenset({"model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch", "model_output_invalid", "model_inference_failed", "invalid_numeric_value", "missing_value", "dataset_limit_exceeded", "compute_resource_exhausted"})
 OBJECTIVES = {
     "xgboost_json": {"binary_classification": {"binary:logistic"}, "multiclass_classification": {"multi:softprob"}, "regression": {"reg:squarederror", "reg:absoluteerror"}},
     "lightgbm_text": {"binary_classification": {"binary"}, "multiclass_classification": {"multiclass"}, "regression": {"regression", "regression_l1"}},
@@ -61,6 +61,8 @@ def score(payload):
         try:
             model.load_model(bytearray(adapter.artifact_bytes))
             objective = json.loads(model.save_config())["learner"]["objective"]["name"]
+        except MemoryError:
+            raise  # Reported by main(), not as an invalid artifact.
         except Exception as exc:
             raise EngineError("model_artifact_invalid", "XGBoost could not load the model ("+type(exc).__name__+")") from exc
         check_objective("xgboost_json", objective, task)
@@ -74,6 +76,8 @@ def score(payload):
         lgb = runtime("lightgbm")
         try:
             model = lgb.Booster(model_str=model_text)
+        except MemoryError:
+            raise  # Reported by main(), not as an invalid artifact.
         except Exception as exc:
             raise EngineError("model_artifact_invalid", "LightGBM could not load the model ("+type(exc).__name__+")") from exc
         values = model.predict(matrix, num_threads=1)
@@ -86,6 +90,11 @@ def score(payload):
 def main():
     try:
         output = score(json.load(sys.stdin))
+    except MemoryError:
+        # Re-raising would leave the parent an empty stdout, which it reports
+        # as model_inference_failed; name the exhausted resource instead.
+        print(json.dumps({"error": "compute_resource_exhausted"}))
+        return 2
     except Exception as error:
         # Only an allowed code reaches the parent; never a native message.
         print(json.dumps({"error": error.code if isinstance(error, EngineError) and error.code in FAILURE_CODES else "model_inference_failed"}))

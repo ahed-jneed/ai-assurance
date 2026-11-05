@@ -465,7 +465,8 @@ def _inference(call, records):
     """Score through an adapter; native runtimes raise their own error types."""
     try:
         return list(call(records))
-    except EngineError:
+    except (EngineError, MemoryError):
+        # MemoryError is compute_resource_exhausted, not a model defect.
         raise
     except Exception as exc:
         # Native messages can echo arbitrary content; keep only the type.

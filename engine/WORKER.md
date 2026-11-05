@@ -114,7 +114,7 @@ Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the 
 | `model_inference_failed` | Compute | The native runtime raised an error while scoring. |
 | `evidence_too_large` | Compute | The completed evidence envelope exceeds 8 MiB. |
 | `compute_timeout` | Compute | Computation, or native scoring, exceeded its time limit. |
-| `compute_resource_exhausted` | Compute | The compute process ran out of memory. |
+| `compute_resource_exhausted` | Compute | The compute process ran out of memory, including while a native runtime loaded or scored the model. |
 | `compute_internal_error` | Compute | An unexpected engine error; the operator log has its type. Report it as a worker defect. |
 | `compute_unavailable` | Compute supervision | The compute process or container could not be started. |
 | `compute_rejected` | Compute supervision | The compute process failed without a valid `error.json` (for example it was killed, or the image predates this protocol). |

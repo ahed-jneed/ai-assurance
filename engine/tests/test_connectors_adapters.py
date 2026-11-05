@@ -14,7 +14,7 @@ from engine import model_process
 from engine.adapters import Feature, ModelDescriptor
 from engine.connectors import readonly_sqlite, sqlite_snapshot
 from engine.contract import validate_report
-from engine.diagnostics import run, sha256, validate_config
+from engine.diagnostics import _inference, run, sha256, validate_config
 from engine.errors import EngineError
 from engine.model_diagnostics import permutation_importance, perturbation
 from engine.optional_adapters import NativeTreeAdapter, NumericAdapter, load_adapter, require_artifact, scoring_failure_code
@@ -53,6 +53,11 @@ class FakeOnnxSession:
 
     def run(self, names, feeds):
         return [self.outputs[names[0]](feeds["features"])]
+
+
+def out_of_memory(*_args, **_kwargs):
+    """A native runtime call that runs out of memory."""
+    raise MemoryError
 
 
 def fake_onnxruntime():
@@ -190,6 +195,30 @@ class ConnectorAdapterTests(unittest.TestCase):
             with self.assertRaises(EngineError) as error:
                 adapter.predict([{"x": 1.0}])
         self.assertEqual(error.exception.code, "model_objective_mismatch")
+
+    def test_running_out_of_memory_is_not_reported_as_a_model_defect(self):
+        # Loading: the ONNX and PMML wrappers let MemoryError through.
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"], "predictionOutput": "label"}
+        (self.directory/"model.onnx").write_bytes(b"fixture ONNX bytes")
+        (self.directory/"model.pmml").write_text("<PMML/>", encoding="utf-8")
+        runtimes = {"onnxruntime": types.SimpleNamespace(SessionOptions=types.SimpleNamespace, InferenceSession=out_of_memory), "pypmml": types.SimpleNamespace(Model=types.SimpleNamespace(load=out_of_memory))}
+        with patch.dict(sys.modules, runtimes):
+            for format_name in ("onnx", "pmml"):
+                with self.subTest(format_name), self.assertRaises(MemoryError):
+                    load_adapter(self.directory/("model."+format_name), format_name, spec, trusted_model=True)
+        # Scoring: _inference lets it through, so compute reports compute_resource_exhausted.
+        with self.assertRaises(MemoryError):
+            _inference(out_of_memory, [{"x": 1.0}])
+        # The native scoring child names the exhausted resource for its parent.
+        with patch.object(model_process, "score", side_effect=MemoryError), patch.object(sys, "stdin", io.StringIO("{}")), patch.object(sys, "stdout", new_callable=io.StringIO) as output:
+            self.assertEqual(model_process.main(), 2)
+        self.assertEqual(scoring_failure_code(output.getvalue()), "compute_resource_exhausted")
+
+    @requires_numpy
+    def test_native_tree_loading_lets_memory_errors_reach_the_child_main(self):
+        with patch.dict(sys.modules, {"lightgbm": types.SimpleNamespace(Booster=out_of_memory)}):
+            with self.assertRaises(MemoryError):
+                model_process.score(self.lightgbm_payload("binary sigmoid:1"))
 
     def numeric_adapter(self, labels, *, threshold=None, positive=None):
         path = self.directory/"threshold-model.txt"

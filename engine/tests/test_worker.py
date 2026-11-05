@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 import urllib.error
 import urllib.request
@@ -24,7 +25,7 @@ from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
 from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, ServerClock, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, stripped_compute_env, verify_result_bytes
 from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, WORKER_VERSION, Claim, MAX_RESULT_BYTES, completion_body, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_model_spec, validate_request
-from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, fake_onnxruntime, requires_numpy
+from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, FakeOnnxSession, fake_onnxruntime, out_of_memory, requires_numpy
 
 # Same shape as an enrolled platform token: two UUIDs, 72 characters.
 TOKEN = "00000000-0000-4000-8000-000000000001"+"00000000-0000-4000-8000-000000000002"
@@ -588,6 +589,18 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(next(m["value"] for m in performance["metrics"] if m["name"] == "accuracy"), 1.0)
         self.assertEqual(performance["outcome"], "pass")
         self.assertEqual(packet["provenance"]["inputHashes"]["modelArtifact"], sha256(model))
+
+    @requires_numpy
+    def test_running_out_of_memory_while_scoring_is_compute_resource_exhausted(self):
+        data, model = THRESHOLD_ROWS.encode(), b"fixture ONNX bytes; scored by a fake runtime"
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"], "predictionOutput": "probabilities", "predictionKind": "probability"}
+        _, inputs, outputs = self.inference_inputs(spec, data, model)
+        runtime = types.SimpleNamespace(SessionOptions=types.SimpleNamespace, InferenceSession=lambda *_args, **_kwargs: FakeOnnxSession({"probabilities": out_of_memory}))
+        # compute_main normally runs in a child; keep POSIX rlimits off the test runner.
+        with patch.dict(sys.modules, {"onnxruntime": runtime}), patch("engine.worker.enforce_compute_limits"):
+            self.assertEqual(compute_main(str(inputs), str(outputs)), 2)
+        # Not model_inference_failed: the model is not at fault.
+        self.assertEqual(compute_failure_code(outputs), "compute_resource_exhausted")
 
     def test_real_http_claim_download_process_and_signed_complete(self):
         with RunnerServer() as server:
