@@ -1,0 +1,5 @@
+# Test-only packages; the core runner stays standard-library only (see
+# requirements.txt). cryptography enables the Ed25519 signature tests in
+# engine/tests (skipped without it) and the trusted-signature verification in
+# site-app/scripts/assurance-integration-check.mjs.
+cryptography==50.0.2
