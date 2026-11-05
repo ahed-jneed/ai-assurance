@@ -9,9 +9,9 @@ The plan for the current cycle, set on 5 November 2026. The [product direction](
 | Milestone | Goal | Issues |
 |---|---|---|
 | [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene. Must land before parallel feature work. | 6, of which 4 merged |
-| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 27 |
+| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 28, of which 2 merged |
 | [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion. | 9 |
-| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification. | 10 |
+| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification. | 11 |
 
 In the tables below, rows are in dependency order: no row comes before an issue it depends on. "Depends on" lists the issues that must merge first, as each issue states. After a semicolon come softer orderings: issues to coordinate with or to decide a rule with, an issue to land after or before, a prerequisite for one part only, and another issue's "Blocks" line. "Findings" lists the codebase-review finding ids that the issue, or an orchestrator comment on it, quotes ([codebase map](docs/engineering/codebase-map.md) section 3.3 groups all of them by area). F-75, which asks every issue to delete the dead code it touches, is left out.
 
@@ -30,12 +30,12 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 
 | Issue | Scope | Priority | Depends on | Findings |
 |---|---|---|---|---|
-| [#8] | Research: verify EU AI Act milestones and EN 18286 status for rule pack 2026.11 | P0 | — | F-51 |
+| [#8] | Research: verify EU AI Act milestones and EN 18286 status for rule pack 2026.11. **Merged** with [PR #43] on 5 Nov 2026 | P0 | — | F-51 |
 | [#59] | Research: what an auditor tests for the Art 50 transparency obligations | P1 | [#8] | — |
 | [#9] | Design: audit-grade statistics specification with hand-computed golden cases | P0 | — | — |
 | [#10] | Engine: make the external worker robust to bad jobs, slow transfers and contract drift | P1 | — | F-10, F-21, F-34, F-35, F-36, F-37, F-39, F-59, F-67 |
 | [#11] | Security: identity adapter that rejects forged identity headers, plus dev personas and sign-out | P0 | [#4] | F-02, F-19, F-25, F-53 |
-| [#50] | Refactor: split the `/api/assurance` and `/api/management` command buses into command modules | P1 | [#4] | — |
+| [#50] | Refactor: split the `/api/assurance` and `/api/management` command buses into command modules. **Merged** with [PR #53] on 5 Nov 2026 | P1 | [#4] | — |
 | [#58] | External jobs: queue only jobs the worker can run, and explain failures to the auditor | P1 | [#10], [#50] | — |
 | [#12] | Security: access lifecycle — revoke cascades, practice admins, invitations, self-provisioning control | P1 | [#11]; [#50] blocks it | F-09, F-24, F-43, F-44, F-56 |
 | [#13] | Bug: plan edits invalidate all executed work, and program history caps lock engagements | P1 | [#6] | F-04, F-29, F-64 |
@@ -45,6 +45,7 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 | [#66] | Assurance API: aggregate imported external runs with `aggregateOutcome`, and reject blank rows in audit sampling | P2 | [#50], [#15] | F-63 |
 | [#67] | Testing lab: keep the dataset card pin on retries and planned evaluations, and refuse duplicate queued runs per procedure | P2 | [#15] | F-33 |
 | [#68] | Regression performance: compare RMSE with the mean-prediction baseline, so a constant predictor cannot pass | P2 | [#15]; decide the rule with [#9] and [#22] | — |
+| [#69] | Workflow: bind run retries, active-job guards and sample pins to the procedure plan, not the program revision | P2 | [#13], [#15] | — |
 | [#60] | Art 4a: record the legal basis before special-category data reaches the platform, and test fairness client-side by default | P1 | [#15], [#8]; coordinate with [#18] | F-58 |
 | [#16] | Performance and resilience: stop hydrating every engagement and isolate corrupt blobs | P2 | [#4]; [#50] blocks it | F-08, F-26, F-54 |
 | [#17] | Bug: more than 1,000 assurance records permanently breaks an engagement | P1 | [#1]; [#50] blocks it | F-03 |
@@ -83,38 +84,39 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 | [#62] | Engine packaging: one supported Python version, `cryptography` in the runtime image, signature tests that cannot skip in CI | P2 | [#10], [#3] | F-17 |
 | [#63] | Client data layer: one cached assurance query for the workspace views, and per-view memoisation | P2 | [#15], [#39] | F-47, F-48 |
 | [#52] | Test: move pure-module harness checks into Vitest and unit-test commands covered only over HTTP | P2 | [#6]; lands after [#13], [#14], [#23] and [#24] | F-16 |
+| [#70] | Refactor: retire the `lib/store.ts` barrel and import ids and bindings from their own modules | P3 | —; lands after [#12], [#16] and [#17], in a quiet window | — |
 | [#64] | Refactor: split `audit-program.tsx`, `assurance-workbench.tsx` and `testing-lab.tsx` along their views | P3 | [#15], [#33], [#39], [#58], [#60], [#63]; last in M3, before [#37] | — |
 | [#37] | Remove dead code, unused components and unused dependencies | P3 | All M1 and M2 feature work (run near the end); [#64] first | F-76 |
 | [#38] | Docs: capability matrix, README and status docs that match the code | P1 | All other roadmap issues (last) | F-52, F-78 |
 
 ## Dependency order
 
-Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line, a "lands after" or "before" instruction and a prerequisite for one part count as prerequisites; "coordinate with" and "decide the rule with" do not. The last column names every prerequisite that has not merged, and merged ones only for issues that wait for nothing else. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
+Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line, a "lands after" or "before" instruction and a prerequisite for one part count as prerequisites; "coordinate with" and "decide the rule with" do not. The last column names every prerequisite, except that merged M0 issues are named only for issues that wait for nothing else. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
 
 | Step | Issues | What they wait for |
 |---|---|---|
-| 0 | [#1] (merged), [#7], [#8], [#9], [#10], [#26], [#31] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/` |
+| 0 | [#1] (merged), [#7], [#8] (merged), [#9], [#10], [#26], [#31] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/` |
 | 1 | [#3], [#4] (merged), [#5] (merged), [#6] (merged), [#21], [#59] | #1, except #21, which needs #9 and #10, and #59, which needs #8 |
-| 2 | [#11], [#13], [#14], [#15], [#18], [#32], [#39], [#50], [#51], [#62] | #11, #13, #14, #15, #39 and #50 wait only for M0 splits, which have merged. #18 needs #3 and #8; #51 needs #3; #62 needs #3 and #10; #32 needs #21 and #31 |
-| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #68). Also #10 (for #58 and #65), #21 (for #22), #8 (for #60) and #39 (for #63) |
-| 4 | [#24], [#25], [#27] | #12 and #20 (for #24), #12 and #17 (for #25), #18, #19 and #26 (for #27) |
+| 2 | [#11], [#13], [#14], [#15], [#18], [#32], [#39], [#50] (merged), [#51], [#62] | #11, #13, #14, #15, #39 and #50 wait only for M0 splits, which have merged. #18 needs #3 and #8; #51 needs #3; #62 needs #3 and #10; #32 needs #21 and #31 |
+| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68], [#69] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #13 (for #69); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #69). Also #10 (for #58 and #65), #21 (for #22), #8 (for #60) and #39 (for #63) |
+| 4 | [#24], [#25], [#27], [#70] | #12 and #20 (for #24), #12 and #17 (for #25), #18, #19 and #26 (for #27), #12, #16 and #17 (for #70) |
 | 5 | [#28], [#30], [#33], [#35], [#52], [#61] | #27 (for #28, #30, #33 and #61); #23 and #24 (for #35); the M1 workflow fixes #13, #14, #23 and #24 (for #52). Also #20 (for #28, and for #61's report roll-up), #22 (for #30) and #32 (for #33) |
 | 6 | [#29], [#36], [#64] | #28 (for #29); #34 and #35 (for #36); #33, #58, #60 and #63 (for #64). Also #27 (for #29), and #15 and #39 (for #64) |
 | 7 | [#37] | All M1 and M2 feature work, and #64 |
 | 8 | [#38] | Everything else |
 
-- **Longest chain:** [#1] → [#3] and [#5] (with [#8]) → [#18] → [#19] → [#27] → [#28] → [#29], then [#37] → [#38]. [#27] → [#33] → [#64] → [#37] is as long. With #1 and #5 merged, the chain now starts at #3 and #8.
-- **Date-critical:** the obligations that start on 2 Dec 2026 (new Art 5 prohibitions and the end of the Art 50(2) transition) reach the product through [#8] → [#18] → [#19]. [#18] also waits for [#3]; [#5] and [#6], which #18 and #19 also need, have merged. The brief asks for #18's per-provision dates (R1.1) and the Art 5 and Art 50(2) parts of #19's classification v2 (R1.3) to ship before 2 Dec 2026 ([synthesis](docs/research/2026-11/synthesis.md) section 4). [#59] researches what an auditor tests for Art 50 and feeds #18 and #19.
+- **Longest chain:** [#1] → [#3] and [#5] (with [#8]) → [#18] → [#19] → [#27] → [#28] → [#29], then [#37] → [#38]. [#27] → [#33] → [#64] → [#37] is as long. With #1, #5 and #8 merged, the chain now starts at #3.
+- **Date-critical:** the obligations that start on 2 Dec 2026 (new Art 5 prohibitions and the end of the Art 50(2) transition) reach the product through [#8] → [#18] → [#19]. #8 ([PR #43]), #5 and #6 have merged, so [#18] now waits only for [#3], and #19 only for #18. The brief asks for #18's per-provision dates (R1.1) and the Art 5 and Art 50(2) parts of #19's classification v2 (R1.3) to ship before 2 Dec 2026 ([synthesis](docs/research/2026-11/synthesis.md) section 4). [#59] researches what an auditor tests for Art 50 and feeds #18 and #19.
 - **Lanes** (an arrow means "unblocks"):
   - content: #8 → #18 → #19 → #27 → #28 → #29; #8 → #59, which feeds #18 and #19; #27 → #61;
-  - workflow and reporting: #6 → #13; #4 and #6 → #14 → #20 and #23; #20 → #24 and #28; #3 and #6 → #51;
+  - workflow and reporting: #6 → #13; #13 and #15 → #69; #4 and #6 → #14 → #20 and #23; #20 → #24 and #28; #3 and #6 → #51;
   - statistics and GenAI evidence: #9 and #10 → #21 → #22 → #30; #21 and #31 → #32 → #33;
   - identity and security: #4 → #11 → #12 → #24 and #25; #11 → #34;
-  - API and worker: #4 → #50 → #12, #16 and #17; #10 and #50 → #58;
+  - API and worker: #4 → #50 → #12, #16 and #17 → #70; #10 and #50 → #58;
   - workspace UI: #5 → #15 → #22; #5 → #39; #15 and #8 → #60; #15 and #39 → #63; #23 and #24 → #35 → #36; #33, #58, #60 and #63 → #64;
   - evaluation follow-ups to #15: #10 and #15 → #65; #15 and #50 → #66; #15 → #67 and #68;
   - tests and packaging: #3 and #10 → #62; #13, #14, #23 and #24 → #52.
-- **Shared files.** The M0 splits have merged: `/api/workspace` ops live in `lib/commands/**`, the workspace UI in `app/workspace/**`, and `lib/store.ts`, `lib/domain.ts` and `lib/workflow-service.ts` are barrels over their new modules (under `site-app/`). [#50] splits `app/api/assurance/route.ts` and `app/api/management/route.ts` next, ahead of the issues that change them, and [#64] splits `app/audit-program.tsx`, `app/assurance-workbench.tsx` and `app/testing-lab.tsx` last. The other hot files and their rules are in [codebase map](docs/engineering/codebase-map.md) section 3.2. An issue that needs a D1 migration takes the next free number and renumbers on rebase.
+- **Shared files.** The M0 splits and [#50] have merged: the `/api/workspace`, `/api/assurance` and `/api/management` ops live in `lib/commands/**`, the assurance GET in `lib/read-models/assurance-view.ts`, the workspace UI in `app/workspace/**`, and `lib/store.ts`, `lib/domain.ts` and `lib/workflow-service.ts` are barrels over their new modules (under `site-app/`). [#70] retires the `lib/store.ts` barrel, and [#64] splits `app/audit-program.tsx`, `app/assurance-workbench.tsx` and `app/testing-lab.tsx` last. The other hot files and their rules are in [codebase map](docs/engineering/codebase-map.md) section 3.2. An issue that needs a D1 migration takes the next free number and renumbers on rebase.
 
 ## Placed on 5 Nov 2026
 
@@ -206,6 +208,7 @@ Facts the plan depends on that are still moving. On each date, re-check the item
 [PR #46]: https://github.com/ahed-jneed/ai-assurance/pull/46
 [PR #48]: https://github.com/ahed-jneed/ai-assurance/pull/48
 [PR #49]: https://github.com/ahed-jneed/ai-assurance/pull/49
+[PR #53]: https://github.com/ahed-jneed/ai-assurance/pull/53
 [#1]: https://github.com/ahed-jneed/ai-assurance/issues/1
 [#3]: https://github.com/ahed-jneed/ai-assurance/issues/3
 [#4]: https://github.com/ahed-jneed/ai-assurance/issues/4
@@ -259,3 +262,5 @@ Facts the plan depends on that are still moving. On each date, re-check the item
 [#66]: https://github.com/ahed-jneed/ai-assurance/issues/66
 [#67]: https://github.com/ahed-jneed/ai-assurance/issues/67
 [#68]: https://github.com/ahed-jneed/ai-assurance/issues/68
+[#69]: https://github.com/ahed-jneed/ai-assurance/issues/69
+[#70]: https://github.com/ahed-jneed/ai-assurance/issues/70
