@@ -89,17 +89,17 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 
 ## Dependency order
 
-Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line and a "lands after" or "before" instruction count as prerequisites; "coordinate with" and "decide the rule with" do not. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
+Each step holds the issues whose longest chain of prerequisites has that many links. Here a "Blocks" line, a "lands after" or "before" instruction and a prerequisite for one part count as prerequisites; "coordinate with" and "decide the rule with" do not. The last column names every prerequisite that has not merged, and merged ones only for issues that wait for nothing else. Issues in the same step can run in parallel once their own prerequisites, listed in the tables above, have merged.
 
 | Step | Issues | What they wait for |
 |---|---|---|
 | 0 | [#1] (merged), [#7], [#8], [#9], [#10], [#26], [#31] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/` |
 | 1 | [#3], [#4] (merged), [#5] (merged), [#6] (merged), [#21], [#59] | #1, except #21, which needs #9 and #10, and #59, which needs #8 |
 | 2 | [#11], [#13], [#14], [#15], [#18], [#32], [#39], [#50], [#51], [#62] | #11, #13, #14, #15, #39 and #50 wait only for M0 splits, which have merged. #18 needs #3 and #8; #51 needs #3; #62 needs #3 and #10; #32 needs #21 and #31 |
-| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #68), with #21 for #22, #39 for #63 and #10 for #65 |
+| 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #68). Also #10 (for #58 and #65), #21 (for #22), #8 (for #60) and #39 (for #63) |
 | 4 | [#24], [#25], [#27] | #12 and #20 (for #24), #12 and #17 (for #25), #18, #19 and #26 (for #27) |
-| 5 | [#28], [#30], [#33], [#35], [#52], [#61] | #27 (for #28, #30, #33 and #61); #23 and #24 (for #35); the M1 workflow fixes #13, #14, #23 and #24 (for #52) |
-| 6 | [#29], [#36], [#64] | #28 (for #29); #34 and #35 (for #36); #33, #58, #60 and #63 (for #64) |
+| 5 | [#28], [#30], [#33], [#35], [#52], [#61] | #27 (for #28, #30, #33 and #61); #23 and #24 (for #35); the M1 workflow fixes #13, #14, #23 and #24 (for #52). Also #20 (for #28, and for #61's report roll-up), #22 (for #30) and #32 (for #33) |
+| 6 | [#29], [#36], [#64] | #28 (for #29); #34 and #35 (for #36); #33, #58, #60 and #63 (for #64). Also #27 (for #29), and #15 and #39 (for #64) |
 | 7 | [#37] | All M1 and M2 feature work, and #64 |
 | 8 | [#38] | Everything else |
 
