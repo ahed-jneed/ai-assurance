@@ -65,7 +65,7 @@ CI (`.github/workflows/ci.yml`) runs two jobs on every pull request and on pushe
 | `npm run build` | Production Worker build; must stay warning-free |
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
 
-The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store. Fictional fixture identity headers are injected directly into the local Worker only; the harnesses refuse non-loopback URLs and do not exercise Sites' real authentication dispatcher.
+The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs.
 
 The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
 
