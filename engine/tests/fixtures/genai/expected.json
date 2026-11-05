@@ -753,6 +753,24 @@
     0.0
    ]
   },
+  "effectiveSampleSizeWilson": {
+   "clusters": 4,
+   "designEffect": 3.25,
+   "mean": 0.8,
+   "n": 40,
+   "nEff": 12.0,
+   "note": "C = 4 is below minimums.clusters = 10, so a criterion would be gated; the case pins the formula only",
+   "seCluster": 0.11547,
+   "seIid": 0.064051,
+   "wilson95OnNEff": [
+    0.517272,
+    0.937231
+   ],
+   "wilson95Unadjusted": [
+    0.652427,
+    0.895
+   ]
+  },
   "pairedDifference": {
    "A": [
     1,
