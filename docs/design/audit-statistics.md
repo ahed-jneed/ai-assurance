@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Issue | #9 (milestone M1, "Defensible core") |
-| Status | Proposed design. Statistics specification version **1.0.0** (revised after independent review; nothing implements it yet) |
+| Status | Proposed design. Statistics specification version **1.0.0** (revised after independent review and re-review; its questions were decided on 5 November 2026, section 15; nothing implements it yet) |
 | Date | 5 November 2026 |
 | Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`) |
 | Consumed by | #30 (NYC Local Law 144 pack), #15 (binary performance fixes) |
@@ -58,7 +58,7 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
     - A mutation test confirms that the cross-check catches each of 25 deliberately corrupted values.
     - Monte Carlo runs confirm interval coverage and the power formulas (section 13.3).
 
-**Where this design departs from the issue text** (also listed as open questions in section 15):
+**Where this design departs from the issue text** (each departure is also a question decided in section 15):
 
 - **Multiplicity.** The issue asked for Holm on the confirmatory family. This design uses Bonferroni there, because Holm's step-down is not valid for data-dependent pass/fail claims on one dataset (section 6, Q9). BH is kept for the exploratory family.
 - **Ratios.** The issue asked for Katz-log. Katz-log is kept, but it is incomputable when a group has zero selections and has zero width when everyone is selected. In those cases the design falls back to the Koopman score interval, following Fagerland, Lydersen & Laake (2015).
@@ -325,7 +325,7 @@ Per-class F1 values share rows, so their dependence is unknown.
 - The macro interval is the mean of the lower bounds and the mean of the upper bounds.
 - If every per-class interval covers, the mean is covered, so coverage is at least 1 − α without any independence assumption.
 
-Simulated coverage is 0.9989, which is conservative. GC-34 gives [0.7770, 0.8634]. A tighter delta-method interval is listed as a follow-up (Q7).
+Simulated coverage is 0.9989, which is conservative. GC-34 gives [0.7770, 0.8634]. A tighter delta-method interval is on the Later list (Q7).
 
 Macro precision uses the same construction on per-class Wilson intervals for TP_c out of the class's predicted count. GC-34 reports it descriptively as 0.8271, [0.7639, 0.8760]; its simulated coverage is 1.000.
 
@@ -443,7 +443,7 @@ The criterion `equalized_odds` has two members per pair of groups: `tpr_differen
 - **`_bootstrap_protocol` (E3).** It gains `purpose`:
   - `"decision"` accepts 1000–10000 replicates with the cluster-draw budget above;
   - `"descriptive"` accepts 100–10000 with the row budget. Today's procedures (`bootstrap_interval`, the descriptive part of `intersectional_slices`) use it.
-- **Not adopted in phase 1.** BCa is not used: it needs a jackknife, which is O(n²) for ECE, and bootstrap results never decide outside cluster designs. It may be added later as an engine option with a pinned definition.
+- **Not adopted in phase 1.** BCa is not used: it needs a jackknife, which is O(n²) for ECE, and bootstrap results never decide outside cluster designs. It may be added later as an engine option with a pinned definition (Q8; on the Later list).
 
 ### 5.12 Fisher's exact test (the small-cell rule)
 
@@ -467,7 +467,7 @@ The criterion `equalized_odds` has two members per pair of groups: `tpr_differen
 - Boschloo's test is more powerful, as the [scipy documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.fisher_exact.html) notes.
 - But it maximises over a nuisance parameter numerically (scipy evaluates a grid), so two implementations can differ at the fourth decimal.
 - Fisher is exact, deterministic and identical in both runners. Since it only gates fails, its conservatism errs on the safe side.
-- Boschloo may later be reported by the engine as a sensitivity statistic.
+- Boschloo may later be reported by the engine as a sensitivity statistic (Q8; on the Later list).
 
 ### 5.13 Numerical requirements (all runners)
 
@@ -914,7 +914,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns; until then one column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
 | Cluster bootstrap and descriptive bootstrap (ECE, R²) | not available; `clustered_design_requires_engine` | engine-only | copied |
-| Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (section 15) | – |
+| Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |
 
 ## 13. Golden cases and how they were verified
 
@@ -1171,20 +1171,27 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 
 Each PR adds its tests with the code. Nothing here changes runner code before #21 and #22.
 
-## 15. Open questions (each has a default, so implementation is not blocked)
+## 15. Decided questions (5 November 2026)
 
-| # | Question | Default in this specification |
+Every question below was decided on 5 November 2026, in the decision comments on [#21](https://github.com/ahed-jneed/ai-assurance/issues/21#issuecomment-6666624939) and [#22](https://github.com/ahed-jneed/ai-assurance/issues/22#issuecomment-6666625399):
+- Q1 keeps Katz-log with the Koopman fallback.
+- Q4 is resolved by the rule text.
+- For Q2, Q3, Q5, Q6, Q7, Q8, Q9 and Q10, the default of this specification is accepted.
+
+The decisions apply to the engine and the hosted runner alike, and none of them changes a method or a fixture value. The work they defer, interval-based drift decisions (Q6) and the methods of Q7 and Q8, is on the Later list in [`ROADMAP.md`](../../ROADMAP.md#later).
+
+| # | Question | Decision (5 Nov 2026) |
 |---|---|---|
-| Q1 | Ratios: keep Katz-log with the Koopman fallback (as here), or use Koopman everywhere as Fagerland et al. recommend? | Katz-log with the Koopman fallback. Katz is conservative, which errs safe for audits, and it is what the issue asked for. Switching is a local change in `ratio_method` plus regeneration of the cases that use Katz-log (GC-08, 09, 10, 12, 30, 31, 32, 33); `--cross-check` and `--mutation-test` then confirm the regenerated fixture. |
-| Q2 | Default `minimumCoverage` of 1.0 makes any unknown or suppressed group block a pass. Should LL144-style plans default to 0.95? | 1.0. A pass that covers part of the population must be a deliberate pre-registered choice with a rationale. |
-| Q3 | Pass claims, and fail claims under one-sided bands, have an error rate of at most α/2; fail claims under two-sided bands at most α (section 6). Should 90% intervals be offered, for a 5% one-sided pass error? | Allowed through `confidenceLevel: 0.90`. The default stays 0.95. |
-| Q4 | LL144 scoring rate: is the median taken over all scored applicants or only those with a known category? | **Resolved by the rule text.** § 5-301(c)(1) requires the median "for the full sample of applicants", so the default is the full sample, including the unknown category (section 10.2). #30 records this reading in the pack. |
-| Q5 | The EEOC's UGESP rescission is reported but its text is unpublished (verified only through a secondary source). Does the four-fifths entry need updating? | Keep it as a configurable screen. Its caveat states only what is stable; the rescission status lives in a dated status note that is updated without changing the entry version or frozen results. |
-| Q6 | Drift (PSI, KS, Wasserstein) is out of scope. Should drift tests stop contributing to the run outcome until they have intervals? | Not yet. #21 leaves drift computation unchanged and keeps drift results outside the families. They count in the run outcome as results without a `decision` (section 4.6), and carry the limitation "point-estimate screening; not interval-based". A follow-up issue should specify drift. |
-| Q7 | Macro F1 uses a conservative Bonferroni interval (coverage 0.999). Should a delta-method interval be specified ([Takahashi et al. 2022](https://doi.org/10.1007/s10489-021-02635-5))? | Keep the conservative interval for 1.0.0, and take this up as a follow-up. |
-| Q8 | Boschloo, BCa and beta-binomial shrinkage for small strata were not adopted. | Possible engine-only additions after 1.0.0. They would be reported, never deciding, until specified. |
-| Q9 | Could a step-down procedure regain power over Bonferroni in the confirmatory family? | Bonferroni in 1.0.0. A step-down would need either pre-registered claim directions (which give a fixed set of null hypotheses) or an independence argument that one dataset cannot supply (section 6). |
-| Q10 | Power for macro F1, macro precision and calibration criteria has no formula in 1.0.0. | `not_computed` with a reason; approval then needs the acknowledgement. A later version can add formulas once the per-class or per-bin assumptions are specified. |
+| Q1 | Ratios: keep Katz-log with the Koopman fallback (as here), or use Koopman everywhere as Fagerland et al. recommend? | **Decided: keep Katz-log with the Koopman fallback.** Katz is conservative, which errs safe for audit claims, and switching later is a local change: `ratio_method` plus regeneration of the cases that use Katz-log (GC-08, 09, 10, 12, 30, 31, 32, 33), which `--cross-check` and `--mutation-test` then confirm. |
+| Q2 | Default `minimumCoverage` of 1.0 makes any unknown or suppressed group block a pass. Should LL144-style plans default to 0.95? | **Default accepted: 1.0.** A pass that covers part of the population must be a deliberate pre-registered choice with a rationale. |
+| Q3 | Pass claims, and fail claims under one-sided bands, have an error rate of at most α/2; fail claims under two-sided bands at most α (section 6). Should 90% intervals be offered, for a 5% one-sided pass error? | **Default accepted.** 90% intervals are allowed through `confidenceLevel: 0.90`, and the default stays 0.95. |
+| Q4 | LL144 scoring rate: is the median taken over all scored applicants or only those with a known category? | **Resolved by the rule text.** § 5-301(c)(1) requires the median "for the full sample of applicants", so the median is taken over the full sample, including the unknown category (section 10.2). #30 records this reading in the pack. |
+| Q5 | The EEOC's UGESP rescission is reported but its text is unpublished (verified only through a secondary source). Does the four-fifths entry need updating? | **Default accepted.** The entry stays a configurable screen. Its caveat states only what is stable; the rescission status lives in a dated status note that is updated without changing the entry version or frozen results. |
+| Q6 | Drift (PSI, KS, Wasserstein) is out of scope. Should drift tests stop contributing to the run outcome until they have intervals? | **Default accepted: not yet.** Drift stays point-estimate screening. #21 leaves drift computation unchanged. Drift results carry no `decision` and stay outside the families; they count in the run outcome as results without a `decision` (section 4.6) and carry the limitation "point-estimate screening; not interval-based". Interval-based drift decisions are on the Later list in `ROADMAP.md`. |
+| Q7 | Macro F1 uses a conservative Bonferroni interval (coverage 0.999). Should a delta-method interval be specified ([Takahashi et al. 2022](https://doi.org/10.1007/s10489-021-02635-5))? | **Default accepted.** The conservative interval stays in 1.0.0. A delta-method interval is on the Later list in `ROADMAP.md`. |
+| Q8 | Boschloo, BCa and beta-binomial shrinkage for small strata were not adopted. | **Default accepted.** None of them is in 1.0.0. They are on the Later list in `ROADMAP.md` as possible engine-only additions, which would be reported, never deciding, until specified. |
+| Q9 | Could a step-down procedure regain power over Bonferroni in the confirmatory family? | **Default accepted: Bonferroni.** A step-down would need either pre-registered claim directions (which give a fixed set of null hypotheses) or an independence argument that one dataset cannot supply (section 6). |
+| Q10 | Power for macro F1, macro precision and calibration criteria has no formula in 1.0.0. | **Default accepted.** Power is `not_computed` with a reason, and approval then needs the acknowledgement. A later version can add formulas once the per-class or per-bin assumptions are specified. |
 
 ## 16. Sources
 
@@ -1202,7 +1209,7 @@ Statistics:
 - [Fagerland, Lydersen & Laake 2015](https://doi.org/10.1177/0962280211415469) (quotations from sections 6.2–6.3 and 8 of the [preprint](https://www.ms.uky.edu/~mai/sta635/FagerlandLydersenLaake2011---RecommendedCIsForTwoIndependent....pdf)).
 - [Zou & Donner 2008](https://doi.org/10.1002/sim.3095) (MOVER); [Berger 1982](https://doi.org/10.2307/1267823) (intersection–union tests); [Schuirmann 1987](https://doi.org/10.1007/BF01068419) (TOST).
 - [Holm 1979](https://www.jstor.org/stable/4615733); [Shaffer 1980](https://doi.org/10.1214/aos/1176345205) (directional errors in stagewise procedures); [Shaffer 1986](https://doi.org/10.1080/01621459.1986.10478341) (logically related hypotheses); [Benjamini & Hochberg 1995](https://doi.org/10.1111/j.2517-6161.1995.tb02031.x); [Benjamini & Yekutieli 2005](https://doi.org/10.1198/016214504000001907) (directional FDR).
-- [Wichura 1988, AS241](https://doi.org/10.2307/2347330); [Takahashi, Yamamoto, Kuchiba & Koyama 2022](https://doi.org/10.1007/s10489-021-02635-5) (macro-F1 intervals, follow-up Q7).
+- [Wichura 1988, AS241](https://doi.org/10.2307/2347330); [Takahashi, Yamamoto, Kuchiba & Koyama 2022](https://doi.org/10.1007/s10489-021-02635-5) (macro-F1 intervals; Q7, on the Later list).
 - Fleiss, Levin & Paik, *Statistical Methods for Rates and Proportions*, 3rd ed., Wiley 2003, for the sample-size formula. The formula was verified numerically against statsmodels, not against the book.
 
 Software and formats:
