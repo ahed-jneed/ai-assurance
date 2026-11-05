@@ -1,5 +1,5 @@
 {
-  "name": "site-creator-vinext-starter",
+  "name": "ai-assurance-workspace",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -13,7 +13,10 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:harnesses": "node scripts/run-checks.mjs",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build && npm run check:harnesses",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

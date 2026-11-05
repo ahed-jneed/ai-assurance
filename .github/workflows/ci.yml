@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: engine/requirements-dev.txt
+
+      - name: Install test dependencies
+        run: python -m pip install -r engine/requirements-dev.txt
+
+      - name: Python unit tests
+        run: python -m unittest discover -s engine/tests -v
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site-app/package-lock.json
+
+      # The schema validators load Ajv from site-app/node_modules.
+      - name: Install site-app dependencies for the validators
+        working-directory: site-app
+        run: npm ci --ignore-scripts
+
+      - name: Validate schemas
+        run: |
+          node schemas/validate-run-schema.mjs
+          node schemas/validate-procedure-schema.mjs
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: site-app
+    env:
+      # Interpreter for the Python-backed assurance harness.
+      ASSURANCE_TEST_PYTHON: python
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site-app/package-lock.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: engine/requirements-dev.txt
+
+      - name: Install Python test dependencies
+        run: python -m pip install -r ../engine/requirements-dev.txt
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The steps below are the parts of `npm run check`, in the same order.
+      - name: Format
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check harnesses
+        run: npm run check:harnesses
