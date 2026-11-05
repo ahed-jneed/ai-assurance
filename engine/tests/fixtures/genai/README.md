@@ -2,7 +2,7 @@
 
 Small real outputs of the evaluation tools that `docs/design/genai-evidence.md` (issue #31) supports. Issue #32 uses them for parser, recomputation and fuzz tests. Every file was produced on 2026-11-05 by running the tool itself in a throwaway virtualenv or npm prefix outside this repository, with no network access to any model provider and no API keys. Models are the tools' own offline test doubles (Inspect `mockllm`, lm-evaluation-harness `dummy`, promptfoo `echo` or a local stub, garak `test.Repeat`) or deterministic stubs written for this purpose (`generate/`). The fixtures are therefore format samples, not evidence about any real model.
 
-Each file is under 100 KB. The `.gitattributes` in this directory switches off line-ending conversion, because `expected.json` and `normalized-examples.json` pin the SHA-256 of these exact bytes.
+Each tool output is under 100 KB; the reference file `normalized-items.jsonl` is about 190 KB. The `.gitattributes` in this directory switches off line-ending conversion, because `expected.json`, `normalized-examples.json` and `normalized-items.jsonl` pin the SHA-256 of these exact bytes.
 
 ## Files
 
@@ -23,15 +23,16 @@ Each file is under 100 KB. The `.gitattributes` in this directory switches off l
 | `pyrit/attacks.pyrit-export.jsonl` | PyRIT 1.1.0 (MIT) | `generate/pyrit_tiny.py`: `PromptSendingAttack` with and without `Base64Converter`, `SubStringScorer`, a local deterministic target; exported with PyRIT's own pydantic `model_dump(mode="json")` | The `pyrit-export/1` contract defined in the design document (PyRIT 1.1.0 has no file exporter): `AttackResult`, `MessagePiece` (with `original_value_sha256`, `converted_value_sha256`), `Score` |
 | `deepeval/test_run_20261105_170925.json` | DeepEval 4.3.3 (Apache-2.0) | `generate/deepeval_tiny.py` with `DEEPEVAL_RESULTS_FOLDER`: `ExactMatchMetric`, `PatternMatchMetric` and `FaithfulnessMetric` judged by a deterministic stub model | `testCases[].metricsData[]` with `evaluationModel` and `verboseLogs`; the file records no DeepEval version and no system-under-test identity |
 | `ragas/results.jsonl` | Ragas 0.4.3 (Apache-2.0) | `generate/ragas_tiny.py`: `evaluate()` with non-LLM metrics, exported with `result.to_pandas().to_json(orient="records", lines=True)` | Per-row metric columns; no run metadata at all |
-| `judge_validation/judge_small_60.jsonl` | none (synthetic) | `generate/make_judge_validation.py` | The `genai-judge-validation/0.1` format; kappa 0.6739 with a 95% lower bound of 0.4786, so the judge is **not** validated under the default rule |
-| `judge_validation/judge_large_200.jsonl` | none (synthetic) | Same script | kappa 0.8225 with a 95% lower bound of 0.7419, so the judge **is** validated under the default rule |
+| `judge_validation/judge_small_60.jsonl` | none (synthetic) | `generate/make_judge_validation.py` | The `genai-judge-validation/0.1` format: a header line binding the labels to J1 of `inspect/judged_qa_30.eval` (judge model and snapshot, judge configuration hash, dataset fingerprint), then 60 label lines; kappa 0.6739 with a 95% lower bound of 0.4786, so the judge is **not** validated under the default rule |
+| `judge_validation/judge_large_200.jsonl` | none (synthetic) | Same script | The same header, then 200 label lines; kappa 0.8225 with a 95% lower bound of 0.7419, so the judge **is** validated under the default rule |
 
 Reference values:
 
-- `expected.json` holds the design-time values that the engine must reproduce: counts, estimates, standard errors (IID and clustered), Wilson intervals, attack-success rates per technique, pass^k, paired differences and kappa. Wilson, kappa, paired-difference and normal-quantile values were cross-checked against statsmodels 0.15.0 and scipy 1.17.1.
-- `normalized-examples.json` holds, for each fixture, the run metadata and the first per-item record produced by applying the design's mapping rules. Every record validates against `schemas/genai-evidence-item.schema.json` (all 122 items the mapping produces from the fixtures, checked with `jsonschema` Draft 2020-12).
+- `expected.json` holds the design-time values that the engine must reproduce: counts, estimates, standard errors (IID and clustered), Wilson intervals (including the degenerate clustered case), attack-success members per `groupBy`, pass^k, paired differences, kappa and the label-file binding. Wilson, kappa, paired-difference and normal-quantile values were cross-checked against statsmodels 0.15.0 and scipy 1.17.1, and the values added after review against statsmodels 0.14.0.
+- `normalized-items.jsonl` holds every per-item record (122) that the design's mapping rules produce from the fixtures: canonical JSON, one record per line, sorted by bundle and then `itemKey`. Every key in it follows the derivations of design section 6.2.
+- `normalized-examples.json` holds, for each bundle, the reference plan used (cluster, technique, task-type and primary-score keys), and for each run its run metadata, status counts and first record. All 122 records and all 13 run-metadata blocks validate against `schemas/genai-evidence-item.schema.json` with `jsonschema` (Draft 2020-12) and with Ajv 2020 in strict mode.
 
-Both files come from throwaway scripts, not from engine code. #32 must re-derive them independently and resolve any disagreement rather than copying the numbers.
+These files come from throwaway scripts that apply the design text, not from engine code. #32 must re-derive them independently and resolve any disagreement rather than copying the values.
 
 ## Modifications after generation
 
@@ -61,4 +62,4 @@ Observed while generating (5 November 2026):
 - promptfoo 0.125.1 requires Node.js 22.22 or later. The host had 22.21.1, so `dist/src/main.js` was run directly, bypassing only the version gate in `entrypoint.js`.
 - Ragas 0.4.3 fails to import with langchain-community 0.4.2 (`langchain_community.chat_models.vertexai` no longer exists). Pinning langchain-community 0.3.31 fixes it. Its string-similarity metric also needs `rapidfuzz`.
 - garak 0.17.1 deprecates `--probes` in favour of `--spec probes.<module>.<Class>`.
-- Regenerated logs differ in identifiers, timestamps and therefore hashes, so `expected.json` and `normalized-examples.json` must be regenerated with them.
+- Regenerated logs differ in identifiers, timestamps and therefore hashes, so `expected.json`, `normalized-examples.json` and `normalized-items.jsonl` must be regenerated with them. The judge-validation headers carry the judge configuration hash and dataset fingerprint of `inspect/judged_qa_30.eval`, so they must be updated when that log is regenerated.
