@@ -369,7 +369,7 @@ def compute_job(inputs, outputs):
             raise EngineError("model_input_pin_mismatch", "Model byte/hash mismatch")
         from .optional_adapters import load_adapter
         with failure_stage("model_artifact_invalid"):
-            adapter = load_adapter(model_path, format_name, spec, trusted_model=True)
+            adapter = load_adapter(model_path, format_name, spec, trusted_model=True, positive_label=native.get("positiveLabel"))
     elif request["executionMode"] == "auditor_model":
         raise EngineError("request_contract_rejected", "Model format is unsupported")
     # Data, label and model problems inside run() carry their own codes; an

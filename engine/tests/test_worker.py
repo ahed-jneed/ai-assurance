@@ -4,6 +4,7 @@ import hmac
 import json
 import os
 import re
+import sys
 import tempfile
 import threading
 import unittest
@@ -17,6 +18,7 @@ from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
 from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, runtime_readiness, stripped_compute_env, verify_result_bytes
 from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, Claim, MAX_RESULT_BYTES, completion_body, evidence_envelope, failure_code, hosted_results, json_bytes, result_signature, strict_json, translate_config, validate_request
+from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, fake_onnxruntime, requires_numpy
 
 TOKEN = "dummy-application-worker-token-for-tests"
 PLATFORM = "dummy-platform-service-token-for-tests"
@@ -276,6 +278,35 @@ class WorkerTests(unittest.TestCase):
             verify_result_bytes(json_bytes(tampered), claim, IMAGE)
         with self.assertRaises(FileExistsError):
             compute_job(inputs, outputs)
+
+    def inference_inputs(self, spec, data, model):
+        request = hosted_request(data, suite=["performance"])
+        request["executionMode"] = "auditor_model"
+        request["model"].update(format="ONNX", sha256=sha256(model), sourceSha256=sha256(model), size=len(model))
+        request["inputHashes"]["modelArtifact"] = sha256(model)
+        request["engineConfig"]["modelSpec"] = spec
+        claim = Claim.parse(claim_body(request))
+        inputs, outputs = self.root/"inputs", self.root/"outputs"
+        inputs.mkdir()
+        outputs.mkdir()
+        (inputs/"dataset.csv").write_bytes(data)
+        (inputs/"model.onnx").write_bytes(model)
+        execution = {"kind": "model_inference", "networkIsolation": "docker_network_none", "controller": "external_auditor_worker", "limitations": ["Fixture container boundary."]}
+        (inputs/"envelope.json").write_bytes(json_bytes({"claim": claim.transport_dict(), "imageDigest": IMAGE, "execution": execution, "approvedModelSha256": sha256(model)}))
+        return claim, inputs, outputs
+
+    @requires_numpy
+    def test_native_inference_applies_the_frozen_threshold_in_compute(self):
+        data, model = THRESHOLD_ROWS.encode(), b"fixture ONNX bytes; scored by a fake runtime"
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"], "decisionThreshold": .3, "predictionOutput": "probabilities", "predictionKind": "probability"}
+        claim, inputs, outputs = self.inference_inputs(spec, data, model)
+        with patch.dict(sys.modules, {"onnxruntime": fake_onnxruntime()}):
+            compute_job(inputs, outputs)
+        packet = verify_result_bytes((outputs/"result.json").read_bytes(), claim, IMAGE)
+        performance = packet["hostedResults"][0]
+        self.assertEqual(next(m["value"] for m in performance["metrics"] if m["name"] == "accuracy"), 1.0)
+        self.assertEqual(performance["outcome"], "pass")
+        self.assertEqual(packet["provenance"]["inputHashes"]["modelArtifact"], sha256(model))
 
     def test_real_http_claim_download_process_and_signed_complete(self):
         with RunnerServer() as server:

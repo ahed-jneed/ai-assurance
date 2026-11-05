@@ -483,6 +483,9 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
             raise EngineError("model_interface_mismatch", "Adapter task differs from frozen run configuration")
         if frozen.get("modelSpec") != adapter.spec:
             raise EngineError("model_interface_mismatch", "Adapter modelSpec must be bound into the frozen configuration")
+        # The decision threshold applies to this label's probability.
+        if frozen["task"] == "binary_classification" and getattr(adapter, "positive_label", None) not in (None, frozen["positiveLabel"]):
+            raise EngineError("label_set_mismatch", "Adapter favourable label differs from the frozen positiveLabel")
         absent = [feature.name for feature in adapter.descriptor.feature_schema if feature.name not in rows[0]]
         if absent:
             raise EngineError("missing_column", "Model feature columns are absent: "+", ".join(map(repr, absent)))
@@ -525,6 +528,7 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
                 for diagnostic in fairness_results:
                     diagnostic["limitations"].append(f"Excluded {omitted} input rows missing target or prediction before group comparison.")
             diagnostics.extend(fairness_results)
+    from_predictions = list(diagnostics)
     if "drift" in frozen["suite"]:
         diagnostics.extend(drift(rows, reference_rows, frozen))
     for suite in frozen["suite"]:
@@ -535,9 +539,15 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
                 else:
                     from .model_diagnostics import permutation_importance, perturbation
                     diagnostics.append((permutation_importance if suite == "permutation_importance" else perturbation)(rows, frozen, adapter))
+                from_predictions.append(diagnostics[-1])
                 continue
             test_id, label, article, reason = UNAVAILABLE_SUITES[suite]
             diagnostics.append(result(test_id, label, article, [], ["Capability unavailable in this runner: "+reason], "inconclusive"))
+    # How the adapter produced its predictions (for example class labels that
+    # bypass the frozen threshold) qualifies every result built on them.
+    adapter_notes = list(getattr(adapter, "limitations", None) or ()) if adapter is not None else []
+    for diagnostic in from_predictions:
+        diagnostic["limitations"].extend(adapter_notes)
     outcomes = [r["outcome"] for r in diagnostics]
     overall = "fail" if "fail" in outcomes else "inconclusive" if "inconclusive" in outcomes else "pass" if "pass" in outcomes else "not_applicable"
     input_hashes = {"data": current_meta["sha256"], "reference": reference_meta["sha256"] if reference_meta else None}
@@ -546,7 +556,7 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     dependencies, dependency_notes = runtime_dependencies(adapter, (current_meta, reference_meta))
     report = {"contractVersion": "1.0", "id": frozen["id"], "engagementId": frozen["engagementId"], "modelId": frozen["modelId"], "datasetId": frozen["datasetId"], "suite": frozen["suite"], "thresholds": frozen["thresholds"], "seed": frozen["seed"], "state": "succeeded", "outcome": overall, "overallOutcome": overall, "startedAt": started_at, "configuration": frozen, "provenance": {"runnerVersion": __version__, "inputHashes": input_hashes, "configSha256": sha256(canonical_bytes(frozen)), "inputs": {"data": current_meta, "reference": reference_meta}, "determinism": "No sampling or randomized computation; seed reserved for adapter protocols", "dependencies": dependencies}, "results": diagnostics, "limitations": ["This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.", "Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody."], "paperIds": [], "workingPapers": []}
     report["provenance"]["inputs"]["testDefinitions"] = definition_versions(diagnostic["testId"] for diagnostic in diagnostics)
-    report["limitations"].extend(dependency_notes)
+    report["limitations"].extend(dependency_notes+adapter_notes)
     report["workingPapers"] = [paper_for(report, diagnostic) for diagnostic in diagnostics]
     report["provenance"]["policyVersion"] = frozen["thresholds"]["policyVersion"]
     if adapter is not None:

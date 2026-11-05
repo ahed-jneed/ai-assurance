@@ -39,8 +39,14 @@ def require_artifact(path, format_name, trusted_model):
 
 
 class NumericAdapter:
+    """Shared validation for local numeric adapters.
+
+    For a binary model, positive_label is the frozen favourable label. The
+    decisionThreshold applies to that label's probability. It defaults to
+    outputLabels[1], the label a one-column native binary score refers to.
+    """
     runtime_packages = ("numpy",)
-    def __init__(self, path, format_name, spec, *, trusted_model=False):
+    def __init__(self, path, format_name, spec, *, trusted_model=False, positive_label=None):
         self.path, self.artifact_bytes = require_artifact(path, format_name, trusted_model)
         names = spec.get("featureColumns")
         if not isinstance(names, list) or not names or len(names) > 100 or any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(names):
@@ -55,6 +61,23 @@ class NumericAdapter:
         self.spec = dict(spec)
         self.descriptor = ModelDescriptor(sha256(self.artifact_bytes), format_name, spec["task"], tuple(Feature(name, "float64") for name in names), tuple(labels), "1.0.0")
         self.capabilities = frozenset({"predict"})
+        # Report-level notes about how this adapter's outputs were produced.
+        self.limitations = []
+        self.positive_label = None
+        if spec["task"] == "binary_classification":
+            self.positive_label = labels[1] if positive_label is None else positive_label
+            if self.positive_label not in labels:
+                raise EngineError("label_set_mismatch", "The favourable label is not one of the model's outputLabels")
+            threshold = spec.get("decisionThreshold", 0.5)
+            if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0 <= threshold <= 1:
+                raise EngineError("protocol_config_invalid", "decisionThreshold must be a number in [0, 1]")
+            self.decision_threshold = float(threshold)
+
+    def note_label_output(self):
+        """Record that a binary model's own labels bypass the frozen threshold."""
+        if self.descriptor.task == "binary_classification":
+            frozen = f"the frozen decisionThreshold ({self.spec['decisionThreshold']})" if "decisionThreshold" in self.spec else "a frozen decision threshold"
+            self.limitations.append(f"The binary model outputs class labels, so {frozen} could not be applied; the model's internal decision rule produced every prediction. Confirm that rule matches the deployed decision threshold.")
 
     def matrix(self, records):
         import numpy as np
@@ -89,21 +112,41 @@ class NumericAdapter:
             raise EngineError("model_output_invalid", "Model returned non-finite or non-numeric predictions")
         if self.descriptor.task == "regression":
             return array.reshape(-1).astype(float).tolist()
+        if self.descriptor.task == "binary_classification":
+            return self.binary_decisions(array)
         labels = self.descriptor.output_labels
-        if self.descriptor.task == "binary_classification" and array.ndim == 1:
-            cutoff = float(self.spec.get("decisionThreshold", 0.5))
-            if not 0 <= cutoff <= 1 or (array < 0).any() or (array > 1).any():
-                raise EngineError("model_output_invalid", "Binary native model must output probabilities with a threshold in [0,1]")
-            return [labels[int(value >= cutoff)] for value in array]
         if array.ndim != 2 or array.shape[1] != len(labels):
             raise EngineError("model_output_invalid", "Multiclass probability shape differs from declared class ordering")
         return [labels[int(index)] for index in array.argmax(axis=1)]
 
+    def binary_decisions(self, array):
+        """Classify positive when P(positive label) >= decisionThreshold.
+
+        Shape (n,) is P(outputLabels[1]), the native binary objective
+        convention; shape (n, 2) has one column per label in outputLabels
+        order. Any other shape is rejected rather than guessed.
+        """
+        import numpy as np
+        labels = self.descriptor.output_labels
+        positive = labels.index(self.positive_label)
+        if (array < 0).any() or (array > 1).any():
+            raise EngineError("model_output_invalid", "Binary model output must be probabilities in [0, 1]")
+        if array.ndim == 1:
+            probability = array if positive == 1 else 1-array
+        elif array.ndim == 2 and array.shape[1] == 2:
+            if not np.allclose(array.sum(axis=1), 1.0, rtol=0, atol=1e-5):
+                raise EngineError("model_output_invalid", "Binary class probabilities must sum to one")
+            probability = array[:, positive]
+        else:
+            raise EngineError("model_output_invalid", "Binary probability output must have shape (n,) or (n, 2)")
+        negative = labels[1-positive]
+        return [self.positive_label if value >= self.decision_threshold else negative for value in probability.tolist()]
+
 
 class ONNXAdapter(NumericAdapter):
     runtime_packages = ("numpy", "onnxruntime")
-    def __init__(self, path, spec, *, trusted_model=False):
-        super().__init__(path, "onnx", spec, trusted_model=trusted_model)
+    def __init__(self, path, spec, *, trusted_model=False, positive_label=None):
+        super().__init__(path, "onnx", spec, trusted_model=trusted_model, positive_label=positive_label)
         try:
             import onnxruntime as ort
         except ImportError as exc:
@@ -127,6 +170,8 @@ class ONNXAdapter(NumericAdapter):
             if self.probability_output not in output_names:
                 raise EngineError("model_interface_mismatch", "ONNX probabilityOutput is not present")
             self.capabilities = frozenset({"predict", "probability"})
+        if spec.get("predictionKind", "label") != "probability":
+            self.note_label_output()
 
     def execute(self, records, output):
         import numpy as np
@@ -163,8 +208,10 @@ class ONNXAdapter(NumericAdapter):
 
 class PMMLAdapter(NumericAdapter):
     runtime_packages = ("numpy", "pandas", "pypmml")
-    def __init__(self, path, spec, *, trusted_model=False):
-        super().__init__(path, "pmml", spec, trusted_model=trusted_model)
+    def __init__(self, path, spec, *, trusted_model=False, positive_label=None):
+        super().__init__(path, "pmml", spec, trusted_model=trusted_model, positive_label=positive_label)
+        # The PMML prediction field is a class label for classification.
+        self.note_label_output()
         try:
             from pypmml import Model
         except ImportError as exc:
@@ -195,8 +242,8 @@ class NativeTreeAdapter(NumericAdapter):
     This is process separation with a timeout, not an OS security sandbox.
     Production additionally requires the resource-limited worker isolation.
     """
-    def __init__(self, path, format_name, spec, *, trusted_model=False):
-        super().__init__(path, format_name, spec, trusted_model=trusted_model)
+    def __init__(self, path, format_name, spec, *, trusted_model=False, positive_label=None):
+        super().__init__(path, format_name, spec, trusted_model=trusted_model, positive_label=positive_label)
         if format_name not in {"xgboost_json", "lightgbm_text"}:
             raise ValueError("NativeTreeAdapter requires XGBoost JSON or LightGBM text")
         package = "xgboost" if format_name == "xgboost_json" else "lightgbm"
@@ -233,10 +280,10 @@ def scoring_failure_code(stdout):
     return code if code in FAILURE_CODES else "model_inference_failed"
 
 
-def load_adapter(path, format_name, spec, *, trusted_model=False):
+def load_adapter(path, format_name, spec, *, trusted_model=False, positive_label=None):
     require_artifact(path, format_name, trusted_model)
     if format_name == "onnx":
-        return ONNXAdapter(path, spec, trusted_model=trusted_model)
+        return ONNXAdapter(path, spec, trusted_model=trusted_model, positive_label=positive_label)
     if format_name == "pmml":
-        return PMMLAdapter(path, spec, trusted_model=trusted_model)
-    return NativeTreeAdapter(path, format_name, spec, trusted_model=trusted_model)
+        return PMMLAdapter(path, spec, trusted_model=trusted_model, positive_label=positive_label)
+    return NativeTreeAdapter(path, format_name, spec, trusted_model=trusted_model, positive_label=positive_label)

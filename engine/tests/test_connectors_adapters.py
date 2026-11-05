@@ -18,8 +18,8 @@ from engine.contract import validate_report
 from engine.diagnostics import run, sha256, validate_config
 from engine.errors import EngineError
 from engine.model_diagnostics import permutation_importance, perturbation
-from engine.optional_adapters import NativeTreeAdapter, load_adapter, require_artifact, scoring_failure_code
-from engine.tests.test_diagnostics import config
+from engine.optional_adapters import NativeTreeAdapter, NumericAdapter, load_adapter, require_artifact, scoring_failure_code
+from engine.tests.test_diagnostics import config, jsonschema, schema_violations
 
 try:
     import numpy
@@ -39,6 +39,32 @@ class FakeLightGBMBooster:
 
     def predict(self, matrix, num_threads):
         return numpy.asarray(matrix)[:, 0]
+
+
+class FakeOnnxSession:
+    """The part of onnxruntime.InferenceSession that ONNXAdapter uses."""
+    def __init__(self, outputs):
+        self.outputs = outputs
+
+    def get_inputs(self):
+        return [types.SimpleNamespace(name="features", type="tensor(double)", shape=[None, 1])]
+
+    def get_outputs(self):
+        return [types.SimpleNamespace(name=name) for name in self.outputs]
+
+    def run(self, names, feeds):
+        return [self.outputs[names[0]](feeds["features"])]
+
+
+def fake_onnxruntime():
+    """Scores P(class "1") = x, as labels (internal 0.5 rule) or as (n, 2) probabilities."""
+    outputs = {"label": lambda matrix: numpy.where(matrix[:, 0] >= .5, "1", "0"), "probabilities": lambda matrix: numpy.column_stack([1-matrix[:, 0], matrix[:, 0]])}
+    return types.SimpleNamespace(SessionOptions=types.SimpleNamespace, InferenceSession=lambda *_args, **_kwargs: FakeOnnxSession(outputs))
+
+
+# x is P(class "1"); with decisionThreshold 0.3 the deployed rule labels every
+# row correctly, while a 0.5 rule (argmax, or the model's own labels) misses x=0.35.
+THRESHOLD_ROWS = "actual,x\n"+"".join(f"{int(x >= .3)},{x}\n" for x in (.1, .35, .6, .9)*5)
 
 
 class TrustedThresholdAdapter:
@@ -165,6 +191,71 @@ class ConnectorAdapterTests(unittest.TestCase):
             with self.assertRaises(EngineError) as error:
                 adapter.predict([{"x": 1.0}])
         self.assertEqual(error.exception.code, "model_objective_mismatch")
+
+    def numeric_adapter(self, labels, *, threshold=None, positive=None):
+        path = self.directory/"threshold-model.txt"
+        path.write_text(LIGHTGBM_MODEL.format(objective="binary"), encoding="utf-8")
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": labels, **({"decisionThreshold": threshold} if threshold is not None else {})}
+        return NumericAdapter(path, "lightgbm_text", spec, trusted_model=True, positive_label=positive)
+
+    @requires_numpy
+    def test_binary_threshold_applies_to_the_positive_label_probability(self):
+        adapter = self.numeric_adapter(["0", "1"], threshold=.3)
+        probabilities = numpy.array([[.75, .25], [.6, .4], [.2, .8]])
+        # argmax would have given ["0", "0", "1"], ignoring the frozen threshold.
+        self.assertEqual(adapter.labels_from_values(probabilities), ["0", "1", "1"])
+        self.assertEqual(adapter.labels_from_values(probabilities[:, 1]), ["0", "1", "1"])
+        self.assertEqual(self.numeric_adapter(["0", "1"]).labels_from_values(probabilities), ["0", "0", "1"])
+        # A favourable label in the first column is thresholded on its own probability.
+        first = self.numeric_adapter(["approved", "denied"], threshold=.3, positive="approved")
+        self.assertEqual(first.labels_from_values(numpy.array([[.25, .75], [.4, .6]])), ["denied", "approved"])
+        self.assertEqual(first.labels_from_values(numpy.array([.75, .6])), ["denied", "approved"])
+        for values in (numpy.zeros((2, 3)), numpy.full((2, 1), .5), numpy.zeros((2, 2, 1)), numpy.array([[.6, .6], [.5, .5]]), numpy.array([1.2, .1]), numpy.array([[1.5, -.5]]), numpy.array(["0", "1"])):
+            with self.assertRaises(EngineError) as error:
+                adapter.labels_from_values(values)
+            self.assertEqual(error.exception.code, "model_output_invalid")
+        for labels, positive, threshold, code in ((["0", "1"], "yes", .5, "label_set_mismatch"), (["0", "1"], None, 1.5, "protocol_config_invalid"), (["0", "1"], None, True, "protocol_config_invalid")):
+            with self.assertRaises(EngineError) as error:
+                self.numeric_adapter(labels, threshold=threshold, positive=positive)
+            self.assertEqual(error.exception.code, code)
+
+    def onnx_run(self, prediction_output, prediction_kind):
+        model = self.directory/"model.onnx"
+        model.write_bytes(b"fixture ONNX bytes; scored by a fake runtime")
+        data = self.directory/"threshold.csv"
+        data.write_text(THRESHOLD_ROWS, encoding="utf-8")
+        spec = {"task": "binary_classification", "featureColumns": ["x"], "outputLabels": ["0", "1"], "decisionThreshold": .3, "predictionOutput": prediction_output, "predictionKind": prediction_kind}
+        cfg = config(suites=["performance", "inference"])
+        cfg["columns"] = {"target": "actual", "prediction": "predicted"}
+        cfg["modelSpec"] = spec
+        with patch.dict(sys.modules, {"onnxruntime": fake_onnxruntime()}):
+            adapter = load_adapter(model, "onnx", spec, trusted_model=True, positive_label="1")
+            return adapter, run(data, cfg, adapter=adapter)
+
+    @requires_numpy
+    def test_probability_outputs_use_the_frozen_threshold_end_to_end(self):
+        adapter, report = self.onnx_run("probabilities", "probability")
+        self.assertEqual(adapter.limitations, [])
+        performance = report["results"][0]
+        self.assertEqual(performance["metrics"][0]["value"], 1.0)
+        self.assertEqual(performance["metrics"][0]["details"]["confusionMatrix"], {"tp": 15, "fp": 0, "tn": 5, "fn": 0})
+        validate_report(report)
+        if jsonschema:
+            self.assertEqual(schema_violations(report), [])
+
+    @requires_numpy
+    def test_label_outputs_record_that_the_threshold_was_not_applied(self):
+        adapter, report = self.onnx_run("label", "label")
+        self.assertEqual(len(adapter.limitations), 1)
+        note = adapter.limitations[0]
+        self.assertIn("decisionThreshold (0.3) could not be applied", note)
+        self.assertEqual(report["results"][0]["metrics"][0]["value"], .75)
+        for diagnostic in report["results"]:
+            self.assertIn(note, diagnostic["limitations"])
+        self.assertIn(note, report["limitations"])
+        validate_report(report)
+        if jsonschema:
+            self.assertEqual(schema_violations(report), [])
 
     def test_actual_seeded_permutation_distinguishes_signal_and_noise(self):
         adapter = TrustedThresholdAdapter()

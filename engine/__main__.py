@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from .diagnostics import MAX_BYTES, run, write_report
+from .diagnostics import MAX_BYTES, run, validate_config, write_report
 from .contract import validate_report
 
 
@@ -28,7 +28,9 @@ def main() -> int:
             if not args.model_format or not isinstance(config.get("modelSpec"), dict):
                 raise ValueError("--model requires --model-format and frozen config.modelSpec")
             from .optional_adapters import load_adapter
-            adapter = load_adapter(args.model, args.model_format, config["modelSpec"], trusted_model=args.trusted_model)
+            # The same favourable label run() freezes, including its default.
+            positive_label = validate_config(config).get("positiveLabel")
+            adapter = load_adapter(args.model, args.model_format, config["modelSpec"], trusted_model=args.trusted_model, positive_label=positive_label)
         elif args.trusted_model or args.model_format:
             raise ValueError("Model flags require --model")
         report = run(args.data, config, args.reference, adapter=adapter)

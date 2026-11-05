@@ -149,6 +149,8 @@ The supported frozen `engineConfig.modelSpec` is:
 
 `featureColumns` is an ordered list of 1–100 complete numeric prepared columns. Classification requires explicit ordered `outputLabels` (exactly two for binary); regression uses an empty list. ONNX additionally requires `predictionOutput`, accepts `predictionKind:"label"|"probability"`, `labelEncoding:"label"|"class_index"`, and optional `probabilityOutput`. PMML requires `predictionOutput`. The native tree objective must be in the reviewed protocol and match the task: XGBoost's is read from the loaded model's configuration, LightGBM's from the `objective=` line in the model text header, because a Booster loaded from text has empty `params`. A mismatch fails with `model_objective_mismatch`. There is no raw text or arbitrary categorical/preprocessing pipeline execution.
 
+For a binary model, a row is classified as the frozen favourable label (`positiveLabel`) when that label's probability is at least `decisionThreshold` (default 0.5). A one-dimensional output is the probability of `outputLabels[1]`, the native binary objective convention, so when the favourable label is `outputLabels[0]` the worker uses 1 − p. An (n, 2) output has one column per label in `outputLabels` order, and each row must sum to one. Any other shape fails with `model_output_invalid`. When a binary model outputs class labels (ONNX `predictionKind:"label"`, PMML), the threshold cannot be applied: the model's own decision rule produces the predictions, and the report and every result built on those predictions carry a limitation saying so.
+
 Build the core image from the engine directory, replacing the base image with a reviewed immutable digest for production:
 
 ```bash
