@@ -265,7 +265,14 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     if (x.program.status !== "draft") lead();
     const a = z
       .object({
-        procedureIds: z.array(short).min(1).max(40),
+        procedureIds: z
+          .array(short)
+          .min(1)
+          .max(40)
+          .refine(
+            (v) => new Set(v).size === v.length,
+            "Choose each procedure once",
+          ),
         selected: z.boolean(),
         applicability: z.enum(["applicable", "readiness", "not_applicable"]),
         rationale: text,

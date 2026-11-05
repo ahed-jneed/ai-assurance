@@ -636,6 +636,28 @@ describe("program scoping", () => {
     expect(workflowOf(e).program.revision).toBe(2);
   });
 
+  it("decides each procedure once", async () => {
+    const e = structuredEngagement();
+    await expect(
+      command(
+        e,
+        "scopeProgramCandidates",
+        {
+          procedureIds: [procedureId, procedureId],
+          selected: true,
+          applicability: "applicable",
+          rationale: "Within the agreed scope",
+          periodAnalysis: "Covers the whole period",
+        },
+        "auditor",
+      ),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(procedureOf(e, procedureId)).toMatchObject({
+      revision: 1,
+      history: [],
+    });
+  });
+
   it("needs a decision, not a pending state, and a Lead after submission", async () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     const scope = (applicability: string, userId = "auditor") =>
