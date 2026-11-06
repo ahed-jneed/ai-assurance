@@ -2,7 +2,7 @@
 // combination, the ISAE 3000 (Revised) report elements (para. 69) and the
 // roll-up of results by criterion. The evidence gates of final issuance stay
 // in gates.ts.
-import type { Engagement } from "./types";
+import type { Engagement, Finding } from "./types";
 import {
   conclusionStatement,
   conclusionTypes,
@@ -55,8 +55,16 @@ export const criteriaPhrase = "the criteria set out in this report";
  * The selected, applicable procedures of the program grouped by the criterion
  * they test, with how far their results support it. A procedure without a
  * recorded criterion is grouped under its own template id.
+ *
+ * `counted` limits which findings the open-finding counts include: the client
+ * report counts only client-visible findings, so its counts match the
+ * findings it lists. The result still reflects every open High or Critical
+ * finding, because it states the practitioner's view of the criterion.
  */
-export function criterionRollup(e: Engagement) {
+export function criterionRollup(
+  e: Engagement,
+  counted: (f: Finding) => boolean = () => true,
+) {
   const groups = new Map<
     string,
     {
@@ -69,6 +77,7 @@ export function criterionRollup(e: Engagement) {
       openHighFindings: number;
     }
   >();
+  const highCriteria = new Set<string>();
   for (const p of e.workflow?.procedures ?? []) {
     if (!p.selected || p.applicability === "not_applicable") continue;
     const criterion = p.criterion.trim() || p.templateId;
@@ -92,15 +101,18 @@ export function criterionRollup(e: Engagement) {
     else g.notEvaluated++;
     for (const f of e.findings)
       if (f.status !== "closed" && f.support?.procedureId === p.id) {
+        const high = ["High", "Critical"].includes(f.severity);
+        if (high) highCriteria.add(criterion);
+        if (!counted(f)) continue;
         g.openFindings++;
-        if (["High", "Critical"].includes(f.severity)) g.openHighFindings++;
+        if (high) g.openHighFindings++;
       }
     groups.set(criterion, g);
   }
   return [...groups.values()].map((g) => ({
     ...g,
     result:
-      g.exceptions || g.openHighFindings
+      g.exceptions || highCriteria.has(g.criterion)
         ? ("exceptions" as const)
         : g.notEvaluated
           ? ("not_evaluated" as const)
@@ -192,7 +204,10 @@ export function reportElements(
     {
       id: "independence",
       label: "Independence and quality management",
-      value: (b?.independence ? b.independence + " " : "") + qualityStatement,
+      // The brief's competence, independence and conflicts assessment is an
+      // internal planning note: it gates the element, and the report states
+      // the firm's fixed statement instead.
+      value: qualityStatement,
       problem: fromBrief(
         b?.independence,
         "The approved brief must record the independence assessment",

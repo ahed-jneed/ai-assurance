@@ -11,8 +11,9 @@ import {
   submittedProcedure,
 } from "../workflow/test-fixtures";
 import { criterionRollup, reportElements } from "./report-gates";
-import type {
-  AssuranceLevel,
+import {
+  qualityStatement,
+  type AssuranceLevel,
   ReportParticulars,
   ReportTerms,
 } from "./report-model";
@@ -169,7 +170,7 @@ describe("ISAE 3000 report elements", () => {
     expect(value("standard")).toBe(
       "ISAE 3000 (Revised), attestation engagement",
     );
-    expect(value("independence")).toContain("ISQM 1");
+    expect(value("independence")).toBe(qualityStatement);
     expect(value("work")).toMatch(/^1 procedures under audit program revision/);
     expect(value("conclusion")).toMatch(/^In our opinion, except for/);
     expect(value("date")).toBe("2026-11-06T09:00:00.000Z");
@@ -223,5 +224,62 @@ describe("results by criterion", () => {
       openHighFindings: 1,
       result: "exceptions",
     });
+  });
+
+  it("counts only the findings a client report lists, keeping the result", async () => {
+    const e = await issuable();
+    const support = (findingId: string) => ({
+      findingId,
+      procedureId,
+      paperIds: [],
+      evidenceIds: [],
+      runIds: [],
+      actor: "auditor",
+      at: "2026-11-05T10:00:00.000Z",
+    });
+    e.findings.push(
+      finding({
+        id: "F-INTERNAL",
+        severity: "High",
+        visibility: "internal",
+        support: support("F-INTERNAL"),
+      }),
+      finding({
+        id: "F-CLIENT",
+        severity: "Medium",
+        visibility: "client",
+        support: support("F-CLIENT"),
+      }),
+    );
+    expect(criterionRollup(e)[0]).toMatchObject({
+      openFindings: 2,
+      openHighFindings: 1,
+      result: "exceptions",
+    });
+    expect(
+      criterionRollup(e, (f) => f.visibility === "client")[0],
+    ).toMatchObject({
+      openFindings: 1,
+      openHighFindings: 0,
+      result: "exceptions",
+    });
+  });
+});
+
+describe("independence element", () => {
+  it("prints the firm's statement, never the internal planning note", async () => {
+    const e = await issuable();
+    e.workflow!.brief!.independence = "Internal conflicts note: partner X";
+    const el = reportElements(e, terms("unmodified"), particulars).find(
+      (x) => x.id === "independence",
+    )!;
+    expect(el.value).toBe(qualityStatement);
+    expect(el.problem).toBe("");
+    e.workflow!.brief!.independence = " ";
+    expect(
+      reportElements(e, terms("unmodified"), particulars).find(
+        (x) => x.id === "independence",
+      )!.problem,
+    ).toBe("The approved brief must record the independence assessment");
   });
 });
