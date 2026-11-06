@@ -3,7 +3,7 @@ import catalog from "./catalog.json";
 import { classification } from "./commands/classification";
 import { reports } from "./commands/reports";
 import { caller } from "./commands/test-fixtures";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report, RulePackStamp } from "./domain";
 import { freshEngagement } from "./factories";
 import { sha256 } from "./ids";
 import { engagementRulePack } from "./rule-pack";
@@ -17,7 +17,7 @@ vi.mock("./assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
-const stamp2026_11_2 = {
+const stamp2026_11_2: RulePackStamp = {
   version: "2026.11.2",
   legalVersion: "02024R1689-20260727",
   researchedAsOf: "2026-11-05",
