@@ -8,7 +8,7 @@ import {
   uploadHeader,
   type SpecialColumn,
 } from "@/lib/special-category";
-import { isParquet, isZip } from "@/lib/dataset-header";
+import { endsParquet, isParquet, isZip } from "@/lib/dataset-header";
 import { PendingLegalReview } from "../../special-category";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
@@ -40,15 +40,18 @@ function UploadFields({
     if (!file || !e) return;
     try {
       // Text needs only its first bytes; Parquet keeps its schema in the
-      // footer and a spreadsheet its directory at the end.
+      // footer (which ends with its magic number) and a spreadsheet its
+      // directory at the end.
       const head = new Uint8Array(await file.slice(0, 4).arrayBuffer()),
+        tail = new Uint8Array(await file.slice(-12).arrayBuffer()),
+        whole =
+          isParquet(head) ||
+          isZip(head) ||
+          endsParquet(tail) ||
+          /\.(parquet|pq)$/i.test(file.name),
         headers = await uploadHeader(
           file.name,
-          await (
-            isParquet(head) || isZip(head)
-              ? file
-              : file.slice(0, headerScanBytes)
-          ).arrayBuffer(),
+          await (whole ? file : file.slice(0, headerScanBytes)).arrayBuffer(),
         );
       if (headers && "unreadable" in headers) setUnreadable(headers.unreadable);
       else setFound(headers ? specialColumns(headers, e) : []);

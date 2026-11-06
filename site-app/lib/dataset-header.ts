@@ -2,21 +2,32 @@
 // upload gate (#103): Parquet from its footer schema, and Office Open XML
 // spreadsheets (.xlsx, .xlsm) from the first non-empty row of each
 // worksheet. Both are parsed here byte by byte, without executing anything
-// the file holds (no macros, formulas or external links are evaluated), and
-// within fixed limits on the bytes read and decompressed.
+// the file holds (no macros, formulas or external links are evaluated),
+// within fixed limits on the bytes read and decompressed, and in time linear
+// in those bytes: the XML is read by a scanner that never backtracks, so
+// malformed markup (unclosed tags or quotes) cannot make the scan quadratic.
 
 /** Column names, or why a recognised format could not be read. */
 export type BinaryHeader = { columns: string[] } | { unreadable: string };
 
+/** The four bytes at `at` are Parquet's magic number (PAR1, or PARE). */
+function parquetMagic(b: Uint8Array, at: number) {
+  return (
+    at >= 0 &&
+    b.length >= at + 4 &&
+    b[at] === 0x50 &&
+    b[at + 1] === 0x41 &&
+    b[at + 2] === 0x52 &&
+    (b[at + 3] === 0x31 || b[at + 3] === 0x45)
+  );
+}
 /** The file starts with Parquet's magic number. */
 export function isParquet(b: Uint8Array) {
-  return (
-    b.length >= 4 &&
-    b[0] === 0x50 &&
-    b[1] === 0x41 &&
-    b[2] === 0x52 &&
-    (b[3] === 0x31 || b[3] === 0x45)
-  );
+  return parquetMagic(b, 0);
+}
+/** The file ends with Parquet's magic number, where its footer ends. */
+export function endsParquet(b: Uint8Array) {
+  return b.length >= 12 && parquetMagic(b, b.length - 4);
 }
 /** The file starts with a ZIP local file header. */
 export function isZip(b: Uint8Array) {
@@ -90,6 +101,8 @@ class CompactReader {
     return { type: h & 0x0f, size };
   }
   skip(type: number, depth: number): void {
+    // Nested lists, sets and maps recurse here; struct() checks its own.
+    if (depth > 32) throw new Malformed("nesting too deep");
     switch (type) {
       case 1:
       case 2:
@@ -337,127 +350,419 @@ export function xmlText(s: string) {
       String.fromCharCode(parseInt(h, 16)),
     );
 }
+
+/** An element tag: its local name (namespace prefix dropped). */
+export type XmlTag = {
+  name: string;
+  /** A closing tag (</c>). */
+  close: boolean;
+  /** An empty-element tag (<c/>). */
+  empty: boolean;
+  /** The raw attribute list. */
+  attributes: string;
+};
 /**
- * A regular expression over OOXML markup, where `~` stands for an optional
- * namespace prefix on an element name (x:row, x:c).
+ * A scanner over XML markup that grows as it is decompressed. Each call
+ * reads on from where the last one stopped and hands every complete tag and
+ * run of character data to the callbacks, in order; a construct whose end
+ * has not arrived yet waits for the next call, and the search for its end
+ * resumes where it stopped. Every character is therefore examined a bounded
+ * number of times, whatever the markup holds (unclosed tags, unbalanced
+ * quotes): the scan is linear, unlike regular expressions that retry from
+ * every opening tag. `tag` returns true to stop the scan.
  */
-function xml(source: string, flags = "") {
-  return new RegExp(
-    source.replaceAll("~", String.raw`(?:[A-Za-z_][\w.-]*:)?`),
-    flags,
-  );
+export function xmlScanner(
+  tag: (t: XmlTag) => boolean | void,
+  text: (s: string, cdata: boolean) => void,
+) {
+  let at = 0,
+    // Where the search for the end of the pending construct resumes.
+    search = 0,
+    // The quote open at `search` inside a pending tag (0 when none).
+    quote = 0,
+    stopped = false;
+  /** `ended`: the markup is complete, so trailing character data counts. */
+  return (markup: string, ended = false) => {
+    const n = markup.length;
+    while (!stopped && at < n) {
+      if (markup.charCodeAt(at) !== 0x3c) {
+        const lt = markup.indexOf("<", Math.max(search, at));
+        if (lt < 0) {
+          if (ended) text(markup.slice(at), false);
+          at = ended ? n : at;
+          search = n;
+          return stopped;
+        }
+        text(markup.slice(at, lt), false);
+        at = search = lt;
+        continue;
+      }
+      // Markup declarations and processing instructions.
+      const bang = markup.charCodeAt(at + 1) === 0x21;
+      if (at + 1 >= n || (bang && n - at < 9)) return stopped; // too short to tell
+      const special = !bang
+        ? markup.charCodeAt(at + 1) === 0x3f
+          ? "?>"
+          : ""
+        : markup.startsWith("<!--", at)
+          ? "-->"
+          : markup.startsWith("<![CDATA[", at)
+            ? "]]>"
+            : ">";
+      if (special) {
+        const from = Math.max(search, at + (special === "]]>" ? 9 : 2)),
+          end = markup.indexOf(special, from);
+        if (end < 0) {
+          search = Math.max(from, n - special.length + 1);
+          return stopped;
+        }
+        if (special === "]]>") text(markup.slice(at + 9, end), true);
+        at = search = end + special.length;
+        continue;
+      }
+      // An element tag: its end is the first '>' outside a quoted value.
+      let i = Math.max(search, at + 1),
+        end = -1;
+      for (; i < n; i++) {
+        const c = markup.charCodeAt(i);
+        if (quote) {
+          if (c === quote) quote = 0;
+        } else if (c === 0x22 || c === 0x27) quote = c;
+        else if (c === 0x3e) {
+          end = i;
+          break;
+        }
+      }
+      if (end < 0) {
+        search = n;
+        return stopped;
+      }
+      const close = markup.charCodeAt(at + 1) === 0x2f,
+        empty = !close && markup.charCodeAt(end - 1) === 0x2f,
+        inner = markup.slice(close ? at + 2 : at + 1, empty ? end - 1 : end),
+        nameEnd = inner.search(/[\s/]|$/),
+        qualified = inner.slice(0, nameEnd);
+      at = search = end + 1;
+      if (
+        tag({
+          name: qualified.slice(qualified.indexOf(":") + 1),
+          close,
+          empty,
+          attributes: inner.slice(nameEnd),
+        })
+      )
+        stopped = true;
+    }
+    return stopped;
+  };
 }
-const phoneticRun = xml(String.raw`<~rPh\b[\s\S]*?</~rPh>`, "g"),
-  textRun = xml(String.raw`<~t(?:\s[^>]*)?(?:/>|>([\s\S]*?)</~t>)`, "g"),
-  cellElement = xml(String.raw`<~c\b([^>]*?)(?:/>|>([\s\S]*?)</~c>)`, "g"),
-  valueElement = xml(String.raw`<~v(?:\s[^>]*)?>([\s\S]*?)</~v>`),
-  sheetDataEnd = xml(String.raw`</~sheetData>|<~sheetData\s*/>`);
-/** The concatenated <t> runs of an <si> or <is>, phonetic runs excluded. */
-function runsText(markup: string) {
-  let out = "";
-  for (const m of markup.replace(phoneticRun, "").matchAll(textRun))
-    out += xmlText(m[1] ?? "");
-  return out;
-}
-/** An attribute's value from an element's attribute list. */
-function attribute(attributes: string, name: string) {
-  const m = new RegExp(
-    String.raw`(?:^|\s)` + name + String.raw`\s*=\s*(?:"([^"]*)"|'([^']*)')`,
-  ).exec(attributes);
-  return m ? (m[1] ?? m[2]) : undefined;
+/**
+ * The attributes of an element, read left to right in one pass. Reading
+ * stops at the first malformed attribute.
+ */
+export function xmlAttributes(list: string) {
+  const out = new Map<string, string>(),
+    n = list.length;
+  let i = 0;
+  const space = () => {
+    while (i < n && /\s/.test(list[i])) i++;
+  };
+  for (;;) {
+    space();
+    const start = i;
+    while (i < n && !/[\s=]/.test(list[i])) i++;
+    const name = list.slice(start, i);
+    space();
+    if (!name || list[i] !== "=") return out;
+    i++;
+    space();
+    const q = list[i];
+    if (q !== '"' && q !== "'") return out;
+    const close = list.indexOf(q, i + 1);
+    if (close < 0) return out;
+    if (!out.has(name)) out.set(name, xmlText(list.slice(i + 1, close)));
+    i = close + 1;
+  }
 }
 
 type Cell = { shared: number } | { text: string };
-function rowCells(row: string): Cell[] {
-  const cells: Cell[] = [];
-  for (const c of row.matchAll(cellElement)) {
-    const type = attribute(c[1], "t") ?? "n",
-      body = c[2] ?? "",
-      v = valueElement.exec(body)?.[1];
-    if (type === "s") {
-      const index = Number(v?.trim());
-      if (v !== undefined && Number.isInteger(index) && index >= 0)
-        cells.push({ shared: index });
-    } else if (type === "inlineStr") {
-      const text = runsText(body);
-      if (text.trim()) cells.push({ text });
-    } else if (v !== undefined && xmlText(v).trim())
-      cells.push({ text: xmlText(v) });
-  }
-  return cells;
-}
 /**
  * A scanner for the cells of a worksheet's first row that holds a value.
- * Called with the sheet's markup as it grows, it reads each complete row
- * once. It returns undefined while more of the sheet is needed, and an
- * empty list when the sheet holds no value.
+ * Called with the sheet's markup as it grows, it reads each character once.
+ * It returns undefined while more of the sheet is needed, and an empty list
+ * when the sheet data ends without a value. Called with `ended` once the
+ * whole part was read, a row or cell the part leaves open counts as closed
+ * there; a part that still has neither a value nor the end of its sheet
+ * data stays undefined. Markup that is not well formed is read so that no
+ * cell is lost: a <row> or <c> opened inside an open one closes it.
  */
 export function firstRowScanner() {
-  const row = xml(String.raw`<~row\b[^>]*?(?:/>|>([\s\S]*?)</~row>)`, "g");
   let found: Cell[] | undefined,
-    position = 0;
-  return (markup: string): Cell[] | undefined => {
+    row: Cell[] | null = null,
+    cell: { type: string; v?: string; inline: string } | null = null,
+    value: string | null = null,
+    run: string | null = null,
+    inlineString = false,
+    phonetic = 0;
+  const endCell = () => {
+      if (!cell || !row) return;
+      const { type, v, inline } = cell;
+      cell = null;
+      value = run = null;
+      inlineString = false;
+      phonetic = 0;
+      if (type === "s") {
+        const index = Number(v?.trim());
+        if (
+          v !== undefined &&
+          v.trim() &&
+          Number.isInteger(index) &&
+          index >= 0
+        )
+          row.push({ shared: index });
+      } else if (type === "inlineStr") {
+        if (inline.trim()) row.push({ text: inline });
+      } else if (v !== undefined && v.trim()) row.push({ text: v });
+    },
+    endRow = () => {
+      endCell();
+      const cells = row;
+      row = null;
+      if (cells?.length) found = cells;
+      return found !== undefined;
+    },
+    scan = xmlScanner(
+      (t) => {
+        switch (t.name) {
+          case "sheetData":
+            if (t.close || t.empty) {
+              endRow();
+              found ??= [];
+              return true;
+            }
+            return;
+          case "row":
+            if (row && endRow()) return true;
+            if (!t.close && !t.empty) row = [];
+            return;
+          case "c":
+            if (!row) return;
+            endCell();
+            if (!t.close)
+              cell = {
+                type: xmlAttributes(t.attributes).get("t") ?? "n",
+                inline: "",
+              };
+            if (t.empty) endCell();
+            return;
+          case "v":
+            if (!cell) return;
+            if (t.close) {
+              if (value !== null && cell.v === undefined) cell.v = value;
+              value = null;
+            } else if (t.empty) cell.v ??= "";
+            else value = "";
+            return;
+          case "is":
+            if (cell) inlineString = !t.close && !t.empty;
+            return;
+          case "rPh":
+            if (cell && !t.empty)
+              phonetic = Math.max(0, phonetic + (t.close ? -1 : 1));
+            return;
+          case "t":
+            if (!cell || !inlineString || phonetic) return;
+            if (t.close) {
+              if (run !== null) cell.inline += run;
+              run = null;
+            } else if (!t.empty) run = "";
+            return;
+        }
+      },
+      (s, cdata) => {
+        if (value === null && run === null) return;
+        const decoded = cdata ? s : xmlText(s);
+        if (value !== null) value += decoded;
+        if (run !== null) run += decoded;
+      },
+    );
+  return (markup: string, ended = false): Cell[] | undefined => {
     if (found) return found;
-    row.lastIndex = position;
-    for (let m; (m = row.exec(markup));) {
-      position = row.lastIndex;
-      const cells = rowCells(m[1] ?? "");
-      if (cells.length) return (found = cells);
+    scan(markup, ended);
+    if (ended && !found) {
+      if (run !== null && cell) cell.inline += run;
+      if (value !== null && cell && cell.v === undefined) cell.v = value;
+      endRow();
     }
-    return sheetDataEnd.test(markup.slice(position)) ? (found = []) : undefined;
+    return found;
   };
 }
-/** Counts complete <si> elements as the shared strings table grows. */
-function sharedStringCounter() {
-  const end = xml(String.raw`</~si>|<~si\b[^>]*/>`, "g");
-  let count = 0,
-    position = 0;
-  return (markup: string) => {
-    end.lastIndex = position;
-    while (end.exec(markup)) {
-      count++;
-      position = end.lastIndex;
-    }
-    return count;
+/**
+ * The texts of the shared strings table, read as it grows until it holds
+ * more than `needed` items, phonetic runs excluded. Linear like
+ * firstRowScanner; an <si> opened inside an open one closes it.
+ */
+function sharedStringsScanner(needed: number) {
+  const strings: string[] = [];
+  let item: string | null = null,
+    run: string | null = null,
+    phonetic = 0;
+  const endItem = () => {
+      if (item !== null) strings.push(item);
+      item = run = null;
+      phonetic = 0;
+      return strings.length > needed;
+    },
+    scan = xmlScanner(
+      (t) => {
+        switch (t.name) {
+          case "sst":
+            return t.close || t.empty ? endItem() || true : undefined;
+          case "si":
+            if (endItem()) return true;
+            if (t.empty) {
+              item = "";
+              return endItem();
+            }
+            if (!t.close) item = "";
+            return;
+          case "rPh":
+            if (item !== null && !t.empty)
+              phonetic = Math.max(0, phonetic + (t.close ? -1 : 1));
+            return;
+          case "t":
+            if (item === null || phonetic) return;
+            if (t.close) {
+              if (run !== null) item += run;
+              run = null;
+            } else if (!t.empty) run = "";
+            return;
+        }
+      },
+      (s, cdata) => {
+        if (run !== null) run += cdata ? s : xmlText(s);
+      },
+    );
+  return {
+    strings,
+    /** Reads on; true once enough items, or the whole table, were read. */
+    feed: (markup: string) => scan(markup),
   };
 }
 
-function part(entries: ZipEntry[], name: string) {
-  const n = name.replace(/^\//, "");
-  return (
-    entries.find((e) => e.name === n) ??
-    entries.find((e) => e.name.toLowerCase() === n.toLowerCase())
-  );
+/** Entries of a ZIP archive by part name, exact names first. */
+function partIndex(entries: ZipEntry[]) {
+  const exact = new Map<string, ZipEntry>(),
+    folded = new Map<string, ZipEntry>();
+  for (const e of entries) {
+    if (!exact.has(e.name)) exact.set(e.name, e);
+    const k = e.name.toLowerCase();
+    if (!folded.has(k)) folded.set(k, e);
+  }
+  return (name: string) => {
+    const n = name.replace(/^\//, "");
+    let decoded = n;
+    try {
+      decoded = decodeURIComponent(n);
+    } catch {
+      // A malformed escape: the raw name is tried alone.
+    }
+    return (
+      exact.get(n) ??
+      exact.get(decoded) ??
+      folded.get(n.toLowerCase()) ??
+      folded.get(decoded.toLowerCase())
+    );
+  };
 }
+
+/** The Override and Default declarations of [Content_Types].xml. */
+function contentTypes(xml: string) {
+  const overrides: { name: string; type: string }[] = [],
+    defaults: { extension: string; type: string }[] = [];
+  xmlScanner(
+    (t) => {
+      if (t.close) return;
+      const a = xmlAttributes(t.attributes);
+      if (t.name === "Override")
+        overrides.push({
+          name: a.get("PartName") ?? "",
+          type: a.get("ContentType") ?? "",
+        });
+      else if (t.name === "Default")
+        defaults.push({
+          extension: (a.get("Extension") ?? "").toLowerCase(),
+          type: a.get("ContentType") ?? "",
+        });
+    },
+    () => {},
+  )(xml);
+  return { overrides, defaults };
+}
+/** A worksheet content type in XML (.xlsx, .xlsm) or not (.xlsb). */
+const worksheetType = /worksheet/i,
+  xmlType = /\+xml$/i;
 
 /**
  * The column names of an Office Open XML spreadsheet: the first non-empty
  * row of every worksheet, shared strings resolved. Null for a ZIP archive
- * that is not a spreadsheet.
+ * that is not a spreadsheet. A package recognised as a spreadsheet whose
+ * worksheets cannot all be read (binary .xlsb worksheets, a declared part
+ * that is missing, no worksheet at all) is reported unreadable.
  */
 export async function spreadsheetColumns(
   b: Uint8Array,
 ): Promise<BinaryHeader | null> {
   try {
     const entries = zipEntries(b),
-      types = part(entries, "[Content_Types].xml");
+      part = partIndex(entries),
+      types = part("[Content_Types].xml");
     if (!types) return null;
     const typesXml = await entryText(b, types, contentTypesLimit);
     if (typesXml === null) throw new Malformed("content types too large");
     if (!/spreadsheetml|ms-excel/i.test(typesXml)) return null;
-    const overrides = [
-        ...typesXml.matchAll(xml(String.raw`<~Override\b([^>]*)>`, "g")),
-      ].map((m) => ({
-        name: attribute(m[1], "PartName") ?? "",
-        type: attribute(m[1], "ContentType") ?? "",
-      })),
-      sheets = overrides
-        .filter((o) => /\.worksheet\+xml$/i.test(o.type))
-        .map((o) => part(entries, o.name))
-        .filter((e) => e !== undefined),
-      shared = overrides.find((o) => /\.sharedStrings\+xml$/i.test(o.type));
-    if (sheets.length > maxWorksheets)
+    const { overrides, defaults } = contentTypes(typesXml),
+      overridden = new Set(
+        overrides.map((o) => o.name.replace(/^\//, "").toLowerCase()),
+      ),
+      byExtension = new Map<string, string>();
+    for (const d of defaults)
+      if (!byExtension.has(d.extension)) byExtension.set(d.extension, d.type);
+    const declared = [
+      ...overrides.filter((o) => worksheetType.test(o.type)),
+      // Parts typed by their extension, where no Override types them.
+      ...entries.flatMap((e) => {
+        const name = e.name.toLowerCase(),
+          dot = name.lastIndexOf("."),
+          type = dot < 0 ? undefined : byExtension.get(name.slice(dot + 1));
+        return type &&
+          worksheetType.test(type) &&
+          !overridden.has(name) &&
+          name !== "[content_types].xml"
+          ? [{ name: e.name, type }]
+          : [];
+      }),
+    ];
+    if (declared.some((s) => !xmlType.test(s.type)))
+      return {
+        unreadable:
+          "the workbook has binary worksheets (.xlsb), which are not read",
+      };
+    if (declared.length > maxWorksheets)
       return { unreadable: "the workbook has more than 64 worksheets" };
+    if (!declared.length)
+      return { unreadable: "the workbook declares no worksheet" };
+    const sheets: ZipEntry[] = [];
+    for (const s of declared) {
+      const entry = part(s.name);
+      if (!entry)
+        return {
+          unreadable:
+            "worksheet " + s.name + " is declared but not in the workbook",
+        };
+      sheets.push(entry);
+    }
+    const shared = overrides.find((o) => /\.sharedStrings\+xml$/i.test(o.type));
     const rows: Cell[][] = [];
     for (const sheet of sheets) {
       const scan = firstRowScanner(),
@@ -467,41 +772,34 @@ export async function spreadsheetColumns(
           worksheetLimit,
           (t) => scan(t) !== undefined,
         ),
-        cells = markup === null ? undefined : scan(markup);
+        cells = markup === null ? undefined : scan(markup, true);
       if (!cells)
         return {
           unreadable:
-            "the first row of worksheet " +
-            sheet.name +
-            " is not within its first 4 MiB",
+            markup === null
+              ? "the first row of worksheet " +
+                sheet.name +
+                " is not within its first 4 MiB"
+              : "worksheet " + sheet.name + " ends before its sheet data",
         };
       rows.push(cells);
     }
-    const needed = Math.max(
-      -1,
-      ...rows.flat().map((c) => ("shared" in c ? c.shared : -1)),
-    );
+    const needed = rows
+      .flat()
+      .reduce((m, c) => ("shared" in c ? Math.max(m, c.shared) : m), -1);
     let strings: string[] = [];
     if (needed >= 0) {
-      const entry = shared && part(entries, shared.name);
+      const entry = shared && part(shared.name);
       if (!entry) return { unreadable: "the shared strings table is missing" };
-      const count = sharedStringCounter(),
-        markup = await entryText(
-          b,
-          entry,
-          sharedStringsLimit,
-          (t) => count(t) > needed,
-        );
+      const table = sharedStringsScanner(needed),
+        markup = await entryText(b, entry, sharedStringsLimit, table.feed);
       if (markup === null)
         return {
           unreadable:
             "the shared strings of the header rows are not within the first 16 MiB",
         };
-      strings = [
-        ...markup.matchAll(
-          xml(String.raw`<~si\b[^>]*?(?:/>|>([\s\S]*?)</~si>)`, "g"),
-        ),
-      ].map((m) => runsText(m[1] ?? ""));
+      table.feed(markup);
+      strings = table.strings;
       if (strings.length <= needed)
         return { unreadable: "the shared strings table is incomplete" };
     }

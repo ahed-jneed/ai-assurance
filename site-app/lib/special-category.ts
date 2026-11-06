@@ -11,6 +11,8 @@
 import { z } from "zod";
 import { calendarDate } from "./dataset-card";
 import {
+  type BinaryHeader,
+  endsParquet,
   isParquet,
   isZip,
   parquetColumns,
@@ -386,31 +388,51 @@ export function headerText(bytes: ArrayBuffer) {
  */
 export type UploadHeader = string[] | { unreadable: string } | null;
 /**
+ * What a binary reader found: its columns, or why they could not be read.
+ * A failure the reader did not anticipate (malformed input exhausting the
+ * stack, say) counts as unreadable too, so the gate fails closed with its
+ * declaration path instead of an internal error.
+ */
+async function binaryHeader(
+  format: string,
+  read: () => BinaryHeader | null | Promise<BinaryHeader | null>,
+): Promise<UploadHeader> {
+  try {
+    const header = await read();
+    return !header ? null : "columns" in header ? header.columns : header;
+  } catch {
+    return { unreadable: "the " + format + " could not be read" };
+  }
+}
+/**
  * The column names of an upload, whatever its name or encoding: the
  * external worker reads every Dataset as CSV, so a file without a .csv
  * extension is inspected too, and a file that is not UTF-8 still brings its
  * columns onto the platform although no run can read it. Text is
  * tab-separated when the name says so, or when the first line holds tabs
- * and no commas. Parquet files are read from their footer schema and
+ * and no commas. Parquet files (by their leading or trailing magic number,
+ * or a .parquet or .pq name) are read from their footer schema and
  * spreadsheets (.xlsx, .xlsm) from the first non-empty row of every
  * worksheet; neither is executed. Other binary formats (legacy .xls,
- * OpenDocument, archives) are not inspected.
+ * OpenDocument, archives) are not inspected; a binary .xlsb workbook is
+ * recognised and reported unreadable.
  */
 export async function uploadHeader(
   name: string,
   bytes: ArrayBuffer,
 ): Promise<UploadHeader> {
-  const b = new Uint8Array(bytes);
-  if (isParquet(b)) {
-    const read = parquetColumns(b);
-    return "columns" in read ? read.columns : read;
-  }
-  if (isZip(b)) {
-    const read = await spreadsheetColumns(b);
-    return !read ? null : "columns" in read ? read.columns : read;
-  }
+  const b = new Uint8Array(bytes),
+    parquet = () => binaryHeader("Parquet file", () => parquetColumns(b));
+  if (isParquet(b)) return parquet();
+  if (isZip(b)) return binaryHeader("spreadsheet", () => spreadsheetColumns(b));
+  // A file whose first bytes are not Parquet's magic number may still be
+  // Parquet: its footer ends with the magic number too, and the engine
+  // picks Parquet by a .parquet or .pq name (connectors.read_parquet).
+  const footer =
+    endsParquet(b) || /\.(parquet|pq)$/i.test(name) ? await parquet() : null;
+  if (Array.isArray(footer)) return footer;
   const text = headerText(bytes);
-  if (!text || text.includes("\u0000")) return null;
+  if (!text || text.includes("\u0000")) return footer;
   const first = text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
   return /\.tsv$/i.test(name) || (first.includes("\t") && !first.includes(","))
     ? first

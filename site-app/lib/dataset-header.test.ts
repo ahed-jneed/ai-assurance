@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { pyarrowParquet, workbook, zipArchive } from "./dataset-header.fixture";
 import {
+  endsParquet,
   firstRowScanner,
   isParquet,
   isZip,
@@ -44,6 +45,22 @@ describe("parquetColumns", () => {
     new DataView(footer.buffer).setUint32(cut.length, 3, true);
     footer.set([0x50, 0x41, 0x52, 0x31], cut.length + 4);
     expect(parquetColumns(footer)).toEqual({
+      unreadable: "the Parquet footer is malformed",
+    });
+  });
+
+  it("reports a footer of deeply nested lists instead of overflowing the stack", async () => {
+    // FileMetaData field 1 as a list of lists of lists ..., 200 KB deep.
+    const nested = new Uint8Array(200_000).fill(0x19),
+      b = new Uint8Array(4 + nested.length + 8);
+    b.set([0x50, 0x41, 0x52, 0x31]);
+    b.set(nested, 4);
+    new DataView(b.buffer).setUint32(4 + nested.length, nested.length, true);
+    b.set([0x50, 0x41, 0x52, 0x31], b.length - 4);
+    expect(parquetColumns(b)).toEqual({
+      unreadable: "the Parquet footer is malformed",
+    });
+    expect(await uploadHeader("deep.parquet", b.buffer)).toEqual({
       unreadable: "the Parquet footer is malformed",
     });
   });
@@ -185,6 +202,150 @@ describe("spreadsheetColumns", () => {
     });
   });
 
+  it("reports a recognised workbook whose worksheets it cannot read", async () => {
+    const types = (inner: string) => ({
+        name: "[Content_Types].xml",
+        text:
+          '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          inner +
+          "</Types>",
+      }),
+      sheet = {
+        name: "xl/worksheets/sheet1.xml",
+        text: '<worksheet><sheetData><row><c t="inlineStr"><is><t>ethnicity</t></is></c></row></sheetData></worksheet>',
+      };
+    // An .xlsb workbook: its worksheets are binary.
+    expect(
+      await spreadsheetColumns(
+        await zipArchive([
+          {
+            name: "[Content_Types].xml",
+            text: '<Types><Override PartName="/xl/workbook.bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/><Override PartName="/xl/worksheets/sheet1.bin" ContentType="application/vnd.ms-excel.worksheet"/></Types>',
+          },
+          { name: "xl/worksheets/sheet1.bin", text: "\u0000\u0001" },
+        ]),
+      ),
+    ).toEqual({
+      unreadable:
+        "the workbook has binary worksheets (.xlsb), which are not read",
+    });
+    // Worksheets typed by a Default content type are read.
+    expect(
+      await spreadsheetColumns(
+        await zipArchive([
+          types(
+            '<Default Extension="xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+          ),
+          { name: "xl/workbook.xml", text: "<workbook/>" },
+          sheet,
+        ]),
+      ),
+    ).toEqual({ columns: ["ethnicity"] });
+    // A declared worksheet that is missing, and no worksheet at all.
+    expect(
+      await spreadsheetColumns(
+        await zipArchive([
+          types(
+            '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+          ),
+          sheet,
+        ]),
+      ),
+    ).toEqual({
+      unreadable:
+        "worksheet /xl/worksheets/sheet2.xml is declared but not in the workbook",
+    });
+    expect(
+      await spreadsheetColumns(await zipArchive([types(""), sheet])),
+    ).toEqual({ unreadable: "the workbook declares no worksheet" });
+    // A worksheet that ends inside a tag, before its sheet data ends.
+    expect(
+      await spreadsheetColumns(
+        await workbook(['<row><c t="x'], undefined, { method: 0 }),
+      ),
+    ).toEqual({
+      unreadable:
+        "worksheet xl/worksheets/sheet1.xml ends before its sheet data",
+    });
+  });
+
+  it("reads malformed markup up to its limits in linear time", async () => {
+    // Unclosed elements and quotes made regular expressions that retry from
+    // every opening tag take time quadratic in the markup (#125 review).
+    const limit = 4 * 1024 * 1024,
+      fill = (unit: string, room = 256) =>
+        unit.repeat(Math.floor((limit - room) / unit.length));
+    const cases: [string, Promise<Uint8Array>, unknown][] = [
+      [
+        "unclosed <c>",
+        workbook(["<row>" + fill("<c>") + "</row>"]),
+        { columns: [] },
+      ],
+      ["unclosed <row>", workbook([fill("<row>")]), { columns: [] }],
+      [
+        "unclosed <t>",
+        workbook([
+          '<row><c t="inlineStr"><is>' +
+            fill("<t>", 320) +
+            "ethnicity</t></is></c></row>",
+        ]),
+        { columns: ["ethnicity"] },
+      ],
+      [
+        "unclosed <v>",
+        workbook(["<row><c>" + fill("<v>") + "religion</v></c></row>"]),
+        { columns: ["religion"] },
+      ],
+      [
+        "unclosed <si>",
+        workbook(['<row><c t="s"><v>9999999</v></c></row>'], [fill("<si><t>")]),
+        { unreadable: "the shared strings table is incomplete" },
+      ],
+      [
+        "unclosed quotes",
+        workbook(['<row><c t="' + fill("<c>") + "</row>"]),
+        {
+          unreadable:
+            "worksheet xl/worksheets/sheet1.xml ends before its sheet data",
+        },
+      ],
+      [
+        "unclosed comments and markup declarations",
+        workbook(["<row>" + fill("<!--") + "</row>"]),
+        {
+          unreadable:
+            "worksheet xl/worksheets/sheet1.xml ends before its sheet data",
+        },
+      ],
+      [
+        "past the limit",
+        workbook(["<row>" + "<c>".repeat(limit / 2)]),
+        {
+          unreadable:
+            "the first row of worksheet xl/worksheets/sheet1.xml is not within its first 4 MiB",
+        },
+      ],
+    ];
+    for (const [label, archive, expected] of cases) {
+      const b = await archive,
+        started = performance.now();
+      expect(await spreadsheetColumns(b), label).toEqual(expected);
+      expect(performance.now() - started, label).toBeLessThan(3000);
+    }
+    // [Content_Types].xml full of unclosed Override tags.
+    const types = await zipArchive([
+        {
+          name: "[Content_Types].xml",
+          text: "<Types>spreadsheetml" + "<Override ".repeat(100_000),
+        },
+      ]),
+      started = performance.now();
+    expect(await spreadsheetColumns(types)).toEqual({
+      unreadable: "the workbook declares no worksheet",
+    });
+    expect(performance.now() - started).toBeLessThan(3000);
+  });
+
   it("scans each complete row once as the sheet grows", () => {
     const scan = firstRowScanner();
     expect(scan('<row r="1"/><row r="2"><c><v>a')).toBeUndefined();
@@ -192,6 +353,11 @@ describe("spreadsheetColumns", () => {
       { text: "a" },
     ]);
     expect(firstRowScanner()("<sheetData/>")).toEqual([]);
+    // Once the whole part was read, an open row or cell counts as closed.
+    expect(
+      firstRowScanner()('<row><c t="inlineStr"><is><t>gender', true),
+    ).toEqual([{ text: "gender" }]);
+    expect(firstRowScanner()("<worksheet><row/>", true)).toBeUndefined();
     expect(xmlText("a&amp;b&#233;&#x20AC;_x0041_&bogus;")).toBe(
       "a&bé€A&bogus;",
     );
@@ -214,6 +380,33 @@ describe("uploadHeader on binary datasets", () => {
     expect(await uploadHeader("x.parquet", encrypted.buffer)).toEqual({
       unreadable: "the Parquet footer is encrypted",
     });
+    // Parquet whose first bytes were changed is still read, by the magic
+    // number ending its footer or by its name.
+    const headless = pyarrowParquet();
+    headless.fill(0, 0, 4);
+    expect(endsParquet(headless)).toBe(true);
+    for (const name of ["data.bin", "data.pq"])
+      expect(await uploadHeader(name, headless.slice().buffer), name).toEqual([
+        "id",
+        "Ethnicity",
+        "address.city",
+        "address.zip",
+        "score",
+      ]);
+    // A .parquet name on bytes that are neither Parquet nor text.
+    expect(
+      await uploadHeader(
+        "x.parquet",
+        new Uint8Array([0x08, 0x00, 0xff, 0xfe]).buffer,
+      ),
+    ).toEqual({ unreadable: "the Parquet file is truncated" });
+    // A CSV misnamed .parquet is read as the text it is.
+    expect(
+      await uploadHeader(
+        "x.parquet",
+        new TextEncoder().encode("id,religion\n1,x").buffer,
+      ),
+    ).toEqual(["id", "religion"]);
     // A ZIP that is not a spreadsheet is not inspected.
     expect(
       await uploadHeader(
