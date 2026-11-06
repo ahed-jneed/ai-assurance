@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { requestLabel } from "@/lib/evidence-requests";
 import type { EvidenceRequest } from "@/lib/domain";
+import { opinionLabel, snapshotTerms } from "@/lib/domain/report-model";
 import { humanLabel, readableResults } from "@/lib/presentation";
 import { legalDate } from "@/lib/rule-pack";
 type Row = Record<string, unknown>;
@@ -309,6 +310,22 @@ export function FrozenReportDetails({ value }: { value: Row }) {
   for (const run of runs)
     captured.set(text(run.id, ""), "Diagnostic run · " + date(run.createdAt));
   const resolve = (id: string) => captured.get(id) ?? id;
+  // Report model v2: the ISAE 3000 report elements, conclusion and results
+  // by criterion. Older snapshots render as they were issued.
+  const statement =
+      snapshotTerms(snapshot) && record(snapshot.conclusionStatement)
+        ? snapshot.conclusionStatement
+        : null,
+    elements = rows(snapshot.elements),
+    criteria = rows(snapshot.criteria),
+    particulars = record(snapshot.particulars) ? snapshot.particulars : {},
+    release = record(value.release) ? value.release : {},
+    supersededBy =
+      typeof value.supersededBy === "string"
+        ? value.supersededBy
+        : typeof release.supersededBy === "string"
+          ? release.supersededBy
+          : "";
   const [section, setSection] = useState("summary");
   const reportSections = [
     { value: "summary", label: "Summary" },
@@ -344,8 +361,13 @@ export function FrozenReportDetails({ value }: { value: Row }) {
       {Array.isArray(value.replaces) && value.replaces.length > 0 && (
         <p className="subtle report-replaces">
           Replaces {value.replaces.map((id) => text(id)).join(", ")}. A released
-          report is replaced when a newer one is released, so the earlier report
-          is no longer listed.
+          report is replaced when a newer one is released; the earlier report
+          stays readable, marked as superseded.
+        </p>
+      )}
+      {supersededBy && (
+        <p className="subtle report-replaces">
+          Superseded by {supersededBy}. This report remains as it was issued.
         </p>
       )}
       <Tabs
@@ -387,7 +409,7 @@ export function FrozenReportDetails({ value }: { value: Row }) {
             </div>
             <div>
               <dt>Opinion</dt>
-              <dd>{text(snapshot.opinion)}</dd>
+              <dd>{opinionLabel(snapshot)}</dd>
             </div>
             <div>
               <dt>Captured</dt>
@@ -400,6 +422,65 @@ export function FrozenReportDetails({ value }: { value: Row }) {
               </div>
             )}
           </dl>
+          {statement && (
+            <section className="readable-section assurance-statement">
+              <h3>{text(snapshot.reportTitle)}</h3>
+              {statement.notAssurance === true && (
+                <p className="badge amber">Not an assurance report</p>
+              )}
+              <dl className="document-properties">
+                {elements
+                  .filter((el) =>
+                    ["addressee", "standard", "signature", "location"].includes(
+                      text(el.id, ""),
+                    ),
+                  )
+                  .map((el) => (
+                    <div key={text(el.id, "")}>
+                      <dt>{text(el.label)}</dt>
+                      <dd>{text(el.value)}</dd>
+                    </div>
+                  ))}
+              </dl>
+              {text(statement.basisHeading, "") && (
+                <>
+                  <h4>{text(statement.basisHeading)}</h4>
+                  <p className="record-text">
+                    {text(particulars.basisForModification)}
+                  </p>
+                </>
+              )}
+              <h4>{text(statement.heading)}</h4>
+              <p className="record-text">{text(statement.text)}</p>
+              {text(statement.levelStatement, "") && (
+                <p className="record-text subtle">
+                  {text(statement.levelStatement)}
+                </p>
+              )}
+              {!!criteria.length && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Criterion</TableHead>
+                      <TableHead>Procedures</TableHead>
+                      <TableHead>Exceptions</TableHead>
+                      <TableHead>Result</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {criteria.map((c) => (
+                      <TableRow key={text(c.criterion, "")}>
+                        <TableCell>{text(c.criterion)}</TableCell>
+                        <TableCell>{text(c.procedures)}</TableCell>
+                        <TableCell>{text(c.exceptions, "0")}</TableCell>
+                        <TableCell>{humanLabel(text(c.result))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </section>
+          )}
           <section className="readable-section">
             <h3>Executive summary</h3>
             <p className="record-text">{text(snapshot.summary)}</p>

@@ -1,35 +1,53 @@
 import { z } from "zod";
 import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
-import { aggregateOutcome } from "../../diagnostic-decisions";
 import type { Outcome, Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
 import { assertExternalProtocol } from "../../evaluation-service";
 import {
   assertClaimFits,
+  assertDeclaredLabel,
   assertModelSpecLimits,
   frozenLabelPair,
 } from "../../external-worker-contract";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
+import { diagnosticNarrative } from "../../presentation";
 import { recordVersions } from "../../rule-pack-current";
+import { externalGate } from "../../special-category";
+import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
+const OUTCOMES = new Set(["pass", "fail", "inconclusive", "not_applicable"]);
 /**
- * The overall outcome of an imported external run, by the rule hosted runs
- * use (aggregateOutcome): any fail is a fail, and a missing or unknown outcome
- * is inconclusive, never a pass. A packet without results has nothing to
- * compile, so it is refused rather than recorded as a run.
+ * The hosted results of an imported packet. A packet without results has
+ * nothing to compile, so it is refused rather than recorded as a run.
  */
-export function importedOutcome(
-  results: readonly Pick<Result, "outcome">[] | undefined,
-): Outcome {
+export function hostedResults(results: unknown): Result[] {
   if (!Array.isArray(results) || !results.length)
     throw new ApiError(409, "The result holds no hosted results to compile");
-  return aggregateOutcome(results.map((r) => r?.outcome));
+  return results as Result[];
+}
+/**
+ * The overall outcome of an imported external run, by the rule hosted runs
+ * use (statistics `aggregate`, section 4.6): any fail is a fail, then
+ * inconclusive, then pass. The packet is untrusted, so a missing or unknown
+ * outcome counts as inconclusive, never as a pass. When the results carry
+ * decisions (run contract 1.5), only confirmatory criteria decide; a result
+ * whose role is not "exploratory" decides, so a missing role cannot drop it.
+ */
+export function importedOutcome(
+  results: readonly Pick<Result, "outcome" | "decision">[] | undefined,
+  decided = false,
+): Outcome {
+  return aggregate(
+    hostedResults(results)
+      .filter((r) => !decided || r?.decision?.role !== "exploratory")
+      .map((r) => (OUTCOMES.has(r?.outcome) ? r.outcome : "inconclusive")),
+  );
 }
 // Columns of a succeeded execution_jobs row as importJob reads them.
 type SucceededJobRow = {
@@ -67,7 +85,8 @@ export const execution: AssuranceModule = defineCommands({
             datasetCardRecordId: short.optional(),
             predictionId: short.optional(),
             securityReviewId: short.optional(),
-            // Empty: the system revision's other output class (D-12).
+            // Empty: the system revision's other output class (D-12). A 1.1
+            // protocol's declared label must also be that class.
             negativeLabel: short.optional(),
             predictionOutput: z.string().max(300).default(""),
             predictionKind: z.enum(["label", "probability"]).default("label"),
@@ -98,13 +117,16 @@ export const execution: AssuranceModule = defineCommands({
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
       assertExternalProtocol(profile);
-      const outputLabels: string[] = system.body.outputs.classOrder,
+      externalGate(profile, v.mode);
+      const plan = profile.statistics,
+        outputLabels: string[] = system.body.outputs.classOrder,
         labels = frozenLabelPair({
           task: m.task,
           classOrder: outputLabels,
           positiveLabel: profile.config.positiveLabel,
-          requested: v.negativeLabel,
+          requested: v.negativeLabel || undefined,
         });
+      assertDeclaredLabel(plan, profile.config.negativeLabel, labels);
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;
@@ -221,8 +243,10 @@ export const execution: AssuranceModule = defineCommands({
             system: system.sha256,
             protocol: await sha256(JSON.stringify(profile)),
           },
+          // engineConfig 1.4 carries a 1.1 protocol's plan and declared label
+          // pair; 1.1 lets the worker derive the plan (section 9.3).
           engineConfig: {
-            contractVersion: "1.1",
+            contractVersion: plan ? "1.4" : "1.1",
             id: jobId,
             engagementId: e.id,
             modelId: m.id,
@@ -230,6 +254,7 @@ export const execution: AssuranceModule = defineCommands({
             task: m.task,
             suite: profile.suite,
             config: profile.config,
+            ...(plan ? { statistics: plan } : {}),
             ...(labels ? { negativeLabel: labels.negativeLabel } : {}),
             policyId: profile.id,
             policyVersion: profile.version,
@@ -372,25 +397,43 @@ export const execution: AssuranceModule = defineCommands({
       if ((await sha256(bytes)) !== job.result_sha256)
         throw new ApiError(409, "Result integrity check failed");
       const packet = JSON.parse(new TextDecoder().decode(bytes)),
-        outcome = importedOutcome(packet.hostedResults),
+        results = hostedResults(packet.hostedResults),
         frozen = JSON.parse(job.request),
         p = templatePaper("WP-A15-01", ctx.user.userId);
       p.required = false;
       p.title = "External execution — " + v.jobId;
-      p.body.results = packet.hostedResults
-        .map(
-          (r: Result) =>
-            r.label +
-            ": " +
-            r.outcome +
-            "\n" +
-            r.metrics
-              .map((m) => m.name + ": " + (m.value ?? "not estimable"))
-              .join("\n") +
-            "\n" +
-            r.limitations.join("\n"),
+      // Worker 1.2.0 copies the engine's statistics 1.0.0 decision into every
+      // result, which compiles into run contract 1.5; results without
+      // decisions keep the frozen 1.2 projection.
+      const decided =
+        results.length > 0 && results.every((r) => r.decision !== undefined);
+      const plan: Plan | undefined =
+        packet.externalReport?.configuration?.statistics ?? undefined;
+      // A frozen plan (engineConfig 1.4) names results by criterion id, which
+      // only run contract 1.5 admits, so every result must carry a decision.
+      if (frozen.engineConfig.statistics && !decided)
+        throw new ApiError(
+          409,
+          "The protocol froze a statistics plan; every result must carry its decision",
+        );
+      if (decided) {
+        if (!plan)
+          throw new ApiError(409, "Decided results need the recorded plan");
+        if (
+          frozen.engineConfig.statistics &&
+          planSha256(plan) !== planSha256(frozen.engineConfig.statistics)
         )
-        .join("\n\n");
+          throw new ApiError(
+            409,
+            "The worker decided a plan other than the frozen protocol's",
+          );
+        if (
+          results.map((r) => r.testId).join("\n") !==
+          plan.criteria.map((c) => c.id).join("\n")
+        )
+          throw new ApiError(409, "Results must follow the recorded plan");
+      }
+      p.body.results = diagnosticNarrative(results);
       p.body.procedures =
         "Authenticated external execution " +
         job.id +
@@ -408,6 +451,9 @@ export const execution: AssuranceModule = defineCommands({
         briefRevision: frozen.procedure.briefRevision,
         programRevision: frozen.procedure.programRevision,
       };
+      // Section 4.6: confirmatory criteria decide a 1.5 run; failing
+      // exploratory criteria become review flags.
+      const outcome = importedOutcome(results, decided);
       const {
         sha256: declaredHash,
         size: declaredSize,
@@ -422,7 +468,7 @@ export const execution: AssuranceModule = defineCommands({
         .first<{ started_at: string }>();
       const run: Run = {
         externalJobId: job.id,
-        contractVersion: "1.2",
+        contractVersion: decided ? "1.5" : "1.2",
         id: job.id,
         engagementId: e.id,
         modelId: frozen.model.id,
@@ -443,7 +489,17 @@ export const execution: AssuranceModule = defineCommands({
         state: "succeeded",
         outcome,
         overallOutcome: outcome,
-        results: packet.hostedResults,
+        ...(decided
+          ? {
+              reviewFlags: results
+                .filter(
+                  (r) =>
+                    r.decision!.role === "exploratory" && r.outcome === "fail",
+                )
+                .map((r) => r.testId),
+            }
+          : {}),
+        results,
         paperIds: [p.id],
         createdAt: job.created_at,
         startedAt: attempt?.started_at ?? job.created_at,
@@ -456,6 +512,7 @@ export const execution: AssuranceModule = defineCommands({
             auditBinding: await sha256(JSON.stringify(binding)),
             externalRequest: job.request_sha256,
             externalResult: job.result_sha256,
+            ...(decided ? { statisticsPlan: planSha256(plan) } : {}),
           },
           runnerVersion: packet.provenance.workerVersion,
           policyVersion: frozen.profile.version,
@@ -481,6 +538,7 @@ export const execution: AssuranceModule = defineCommands({
           lineage: "authenticated_external_attempt",
           testDefinitionVersion: packet.provenance.translationVersion,
           limitations: frozen.limitations,
+          ...(decided ? { statistics: plan } : {}),
         },
       };
       e.artifacts.push({

@@ -351,30 +351,54 @@ export function assist(
     status: "proposal",
   };
 }
+/**
+ * The completed worker envelope the runner route checks. importJob stores the
+ * exact result bytes, so this parse admits the full statistics 1.0.0 shape:
+ * up to 2,451 metrics per result, metric names of up to 20,480 characters
+ * (two escaped group labels), and the copied `decision`
+ * (docs/design/audit-statistics.md section 11.5).
+ */
 export const resultEnvelope = z
   .object({
     schemaVersion: z.literal("1.0"),
     externalReport: z.record(z.unknown()),
     hostedResults: z
       .array(
-        z.object({
-          testId: short,
-          label: short,
-          article: z.enum(["10", "15"]),
-          outcome: z.enum(["pass", "fail", "inconclusive", "not_applicable"]),
-          metrics: z
-            .array(
-              z.object({
-                name: short,
-                value: z.number().finite().nullable(),
-                unit: z.string().max(100),
-                sampleSize: z.number().int().nonnegative(),
-                details: z.unknown().optional(),
-              }),
-            )
-            .max(100),
-          limitations: z.array(note).max(100),
-        }),
+        z
+          .object({
+            testId: short,
+            label: short,
+            article: z.enum(["10", "15"]),
+            outcome: z.enum(["pass", "fail", "inconclusive", "not_applicable"]),
+            metrics: z
+              .array(
+                z
+                  .object({
+                    name: z.string().trim().min(1).max(20480),
+                    value: z.number().finite().nullable(),
+                    unit: z.string().max(100),
+                    sampleSize: z.number().int().nonnegative(),
+                    details: z.unknown().optional(),
+                  })
+                  .passthrough(),
+              )
+              .max(2451),
+            limitations: z.array(note).max(100),
+            decision: z
+              .object({
+                kind: z.enum([
+                  "performance",
+                  "multiclass_performance",
+                  "regression_performance",
+                  "group_comparison",
+                  "calibration",
+                ]),
+                role: z.enum(["confirmatory", "exploratory"]),
+              })
+              .passthrough()
+              .optional(),
+          })
+          .passthrough(),
       )
       .max(30),
     provenance: z

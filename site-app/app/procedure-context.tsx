@@ -4,7 +4,7 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import { assuranceRecords } from "@/lib/assurance-store-client";
 import { CheckCircle2, Circle } from "lucide-react";
 import { procedureWork } from "@/lib/work-items";
-import { currentExecution } from "@/lib/workflow-state";
+import { currentExecution, planPinsCurrent } from "@/lib/workflow-state";
 import type { Engagement } from "@/lib/domain";
 import type { Procedure } from "@/lib/workflow-types";
 export function ProcedureContext({
@@ -146,8 +146,7 @@ export function ProcedureContext({
           >
             Sample · {s.body.method}
             <small>
-              {s.body.procedureRevision === p.revision &&
-              s.body.programRevision === e.workflow?.program.revision
+              {planPinsCurrent(e, p, s.body)
                 ? "Current planning pins"
                 : "Earlier planning pins"}{" "}
               · {new Date(s.createdAt).toLocaleString()}
