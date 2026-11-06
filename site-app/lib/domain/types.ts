@@ -120,6 +120,13 @@ export type Artifact = {
   visibility: "internal" | "client";
   status: "unverified" | "accepted" | "quarantined";
   mediaType: string;
+  /**
+   * "client": a client-held dataset pin (#102). The client keeps the file;
+   * the platform holds only its name, size and SHA-256, and `key` is empty.
+   */
+  custody?: "client";
+  /** Who at the client confirmed a client-held pin, when, and how it is kept. */
+  clientPin?: { confirmedBy: string; confirmedOn: string; custodyNote: string };
 };
 export type EvidenceRequest = {
   id: string;
@@ -377,6 +384,8 @@ export type Run = {
         sha256: string;
         card: Record<string, unknown>;
       };
+      /** External runs on a client-held pin: the bytes never left the client. */
+      custody?: "client";
     };
     profile: EvaluationProfile | null;
     executionMode:

@@ -86,6 +86,7 @@ export function EvidenceDetails({
   const current =
     engagement.artifacts.find((a) => a.id === artifact.id) ?? artifact;
   const previewAllowed =
+    current.custody !== "client" &&
     current.status === "accepted" &&
     current.size <= 256 * 1024 &&
     /\.(txt|md|csv|json|log)$/i.test(current.name);
@@ -159,20 +160,27 @@ export function EvidenceDetails({
             Link to paper
           </Button>
         )}
-        <a
-          className="download-link"
-          href={
-            "/api/evidence?" +
-            new URLSearchParams({
-              tenantId,
-              engagementId: engagement.id,
-              artifactId: current.id,
-            })
-          }
-        >
-          <Download size={15} />
-          Download file
-        </a>
+        {current.custody === "client" ? (
+          // A client-held pin has no bytes on the platform (#102).
+          <span className="subtle">
+            Held by the client: pinned by SHA-256 only
+          </span>
+        ) : (
+          <a
+            className="download-link"
+            href={
+              "/api/evidence?" +
+              new URLSearchParams({
+                tenantId,
+                engagementId: engagement.id,
+                artifactId: current.id,
+              })
+            }
+          >
+            <Download size={15} />
+            Download file
+          </a>
+        )}
       </div>
 
       {current.status === "unverified" && canWrite(role) && (

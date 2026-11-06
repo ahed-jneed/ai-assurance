@@ -31,8 +31,10 @@ type Details = {
 };
 type Slice = {
   slice: string;
-  n: number;
+  /** Null when a client-held run withholds a group below the minimum (#102). */
+  n: number | null;
   suppressed: boolean;
+  withheld?: boolean;
   selectionRate?: number | null;
   selectionConfidenceInterval?: { lower: number; upper: number } | null;
   tpr?: number | null;
@@ -293,10 +295,16 @@ export function StatisticsResult({ result }: { result: Result }) {
                 <TableCell>
                   {s.slice}
                   {s.suppressed && (
-                    <span className="subtle"> · suppressed, below minimum</span>
+                    <span className="subtle">
+                      {s.withheld
+                        ? " · withheld, below minimum"
+                        : " · suppressed, below minimum"}
+                    </span>
                   )}
                 </TableCell>
-                <TableCell>{s.n.toLocaleString()}</TableCell>
+                <TableCell>
+                  {s.n === null ? "withheld" : s.n.toLocaleString()}
+                </TableCell>
                 {(["selection", "tpr", "fpr"] as const).map((key) => {
                   const value = key === "selection" ? s.selectionRate : s[key];
                   const ci = s[`${key}ConfidenceInterval`];

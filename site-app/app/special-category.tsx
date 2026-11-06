@@ -282,6 +282,158 @@ export function SpecialCategoryRegister({
   );
 }
 
+const emptyPin = {
+  name: "",
+  sha256: "",
+  size: "",
+  confirmedBy: "",
+  confirmedOn: "",
+  custodyNote: "",
+};
+
+/**
+ * Datasets the client keeps (#102): the platform records each file's name,
+ * byte size and SHA-256 instead of its bytes. Only a client-local job can
+ * use such a pin; the client's own worker reads the file by its hash.
+ */
+export function ClientDatasetPins({
+  engagement: e,
+  writer,
+  busy,
+  act,
+}: {
+  engagement: Engagement;
+  writer: boolean;
+  busy: boolean;
+  act: Act;
+}) {
+  const pins = e.artifacts.filter((a) => a.custody === "client"),
+    [form, setForm] = useState<typeof emptyPin | null>(null),
+    [error, setError] = useState("");
+  async function submit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!form) return;
+    setError("");
+    try {
+      await act("pinClientDataset", {
+        ...form,
+        sha256: form.sha256.trim().toLowerCase(),
+        size: Number(form.size),
+      });
+      setForm(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+  const field = (
+    key: keyof typeof emptyPin,
+    label: string,
+    props: React.ComponentProps<typeof Input> = {},
+  ) => (
+    <label className="ml-field">
+      <span>{label}</span>
+      <Input
+        required
+        value={form?.[key] ?? ""}
+        onChange={(ev) => form && setForm({ ...form, [key]: ev.target.value })}
+        {...props}
+      />
+    </label>
+  );
+  return (
+    <section className="panel client-dataset-pins">
+      <div className="panel-head">
+        <h2>Client-held datasets</h2>
+        {writer && !form && (
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => setForm({ ...emptyPin })}
+          >
+            Pin client dataset
+          </Button>
+        )}
+      </div>
+      <p className="subtle">
+        A dataset the client keeps never reaches this platform: record its file
+        name, exact byte size and SHA-256 instead of uploading it, then accept
+        the pin in the evidence register. Only a client-local external job can
+        use it. The client&apos;s own worker finds the file in its client data
+        directory by the pin, refuses a changed file and returns only aggregate
+        results, withholding groups below the minimum group size. Groups at or
+        above it are reported exactly. Under the platform&apos;s current Art 4a
+        reading, a fairness protocol on a special-category column needs no
+        recorded basis on this route. <PendingLegalReview />
+      </p>
+      {pins.length ? (
+        <ul className="record-list">
+          {pins.map((a) => (
+            <li key={a.id}>
+              <b>{a.name}</b> · {a.size.toLocaleString("en")} bytes · SHA-256{" "}
+              <code>{a.sha256.slice(0, 12)}…</code> · {a.status}
+              {a.clientPin &&
+                " · confirmed by " +
+                  a.clientPin.confirmedBy +
+                  " on " +
+                  a.clientPin.confirmedOn}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="subtle">No client-held dataset pinned.</p>
+      )}
+      {form && (
+        <form onSubmit={submit} aria-label="Pin client dataset">
+          <fieldset disabled={busy}>
+            <div className="ml-form-grid">
+              {field("name", "File name at the client")}
+              {field("sha256", "SHA-256 (64 hex digits)", {
+                pattern: "[A-Fa-f0-9]{64}",
+                spellCheck: false,
+              })}
+              {field("size", "Size in bytes", {
+                type: "number",
+                min: 1,
+                step: 1,
+              })}
+              {field("confirmedBy", "Confirmed by (client name and role)")}
+              {field("confirmedOn", "Confirmed on", { type: "date" })}
+            </div>
+            <label className="ml-field">
+              <span>Where the client keeps the file and runs its worker</span>
+              <Textarea
+                required
+                value={form.custodyNote}
+                onChange={(ev) =>
+                  setForm({ ...form, custodyNote: ev.target.value })
+                }
+              />
+            </label>
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
+            )}
+            <div className="row-actions">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setForm(null);
+                  setError("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">Pin dataset</Button>
+            </div>
+          </fieldset>
+        </form>
+      )}
+    </section>
+  );
+}
+
 /** The declaration a new fairness protocol makes about its group column. */
 export function ProtocolDeclaration({
   engagement: e,

@@ -13,6 +13,7 @@ import { activeJobGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
 import { claimResponse } from "@/lib/external-worker-contract";
 import { requestedCriteria } from "@/lib/hosted-statistics";
+import { assertPlatformBytes } from "@/lib/special-category";
 import type { Artifact } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -145,12 +146,17 @@ export async function POST(request: Request) {
           .bind(w.tenant_id, w.engagement_id, now())
           .all<JobRow>()
       ).results;
+      // A client-held dataset (#102) goes only to a worker enrolled and
+      // claiming as the client's own, which reads it in the client's
+      // environment.
       const j = candidates.find((j) => {
         const r = JSON.parse(j.request);
         return formats.includes(
-          r.executionMode === "auditor_model"
-            ? r.model.format
-            : "provided_predictions",
+          r.dataset.custody === "client"
+            ? "client_local"
+            : r.executionMode === "auditor_model"
+              ? r.model.format
+              : "provided_predictions",
         );
       });
       if (!j) return Response.json({ idle: true });
@@ -315,6 +321,16 @@ export async function POST(request: Request) {
         r.provenance.executionMode !== frozen.executionMode
       )
         throw new ApiError(400, "Consumed input or runtime pins mismatch");
+      const execution = r.provenance.execution as
+        { datasetCustody?: unknown } | undefined;
+      if (
+        (frozen.dataset.custody === "client") !==
+        (execution?.datasetCustody === "client")
+      )
+        throw new ApiError(
+          400,
+          "Dataset custody differs from the frozen request",
+        );
       // Section 11.2: one result per criterion of the plan, in plan order,
       // the article following the criterion kind. A 1.4 request carries its
       // plan; a 1.1 request's derived plan has the suite names as ids.
@@ -463,6 +479,11 @@ export async function GET(request: Request) {
         403,
         "Model bytes are not authorized for this prediction-only request",
       );
+    if (input === "dataset" && r.dataset.custody === "client")
+      throw new ApiError(
+        403,
+        "This dataset stays in the client's environment; the platform holds only its SHA-256 pin",
+      );
     const body = await db()
         .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
         .bind(w.tenant_id, w.engagement_id)
@@ -477,6 +498,7 @@ export async function GET(request: Request) {
         r.inputHashes[input === "dataset" ? "dataset" : "modelArtifact"]
     )
       throw new ApiError(409, "Input artifact pin changed");
+    assertPlatformBytes(a);
     const o = await bucket().get(a.key);
     if (!o) throw new ApiError(404, "Pinned input bytes unavailable");
     return new Response(o.body, {
