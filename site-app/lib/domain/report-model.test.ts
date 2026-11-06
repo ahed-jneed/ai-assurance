@@ -2,15 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   conclusionStatement,
   conclusionTypes,
+  emptyReportSettings,
   engagementTypeIds,
   engagementTypes,
   legacyConclusion,
   normalizeTerms,
   opinionLabel,
+  parseReportSettings,
+  qualityStatement,
   reportTitle,
   requiresSupport,
+  resolveParticulars,
   snapshotConclusion,
+  snapshotParticulars,
   snapshotTerms,
+  statesBasis,
   termsLabel,
   termsProblem,
   type AssuranceLevel,
@@ -227,6 +233,106 @@ describe("ISAE 3000 conclusion wording", () => {
       }),
     ).toBe("Readiness assessment (not assurance)");
   });
+
+  it("offers a readiness output with gaps, labelled not assurance (#111)", () => {
+    const gaps: ReportTerms = {
+      engagementType: "readiness",
+      assuranceLevel: null,
+      conclusion: "readiness_gaps",
+    };
+    expect(engagementTypes.readiness.conclusions).toEqual([
+      "readiness",
+      "readiness_gaps",
+    ]);
+    expect(termsProblem(gaps)).toBe("");
+    expect(termsProblem({ ...gaps, engagementType: "attestation" })).toMatch(
+      /requires a limited or reasonable/,
+    );
+    expect(termsProblem(assurance("readiness_gaps", "limited"))).toMatch(
+      /cannot express/,
+    );
+    expect(termsLabel(gaps)).toBe(
+      "Readiness assessment, gaps identified (not assurance)",
+    );
+    expect(reportTitle(gaps)).toContain("not an assurance report");
+    const s = statement(gaps);
+    expect(s).toMatchObject({
+      notAssurance: true,
+      levelStatement: "",
+      basisHeading: "Gaps identified",
+    });
+    expect(s.heading).toContain("not an assurance engagement");
+    expect(s.text).toContain("the gaps we identified");
+    expect(s.text).toContain("does not state that the subject matter is ready");
+    expect(statesBasis("readiness_gaps")).toBe(true);
+    expect(statesBasis("readiness")).toBe(false);
+    expect(statesBasis("qualified")).toBe(true);
+    expect(normalizeTerms(gaps)).toEqual(gaps);
+  });
+});
+
+describe("practice report settings (#111)", () => {
+  const stated = {
+    addressee: "The board",
+    location: "",
+    signatory: "  ",
+    basisForModification: "",
+  };
+  const settings = {
+    signatory: "Lea & Partners",
+    location: "Vienna, Austria",
+    qualityStatement: "We apply ISQM 1.",
+  };
+
+  it("fills blank particulars from the settings, then the default statement", () => {
+    expect(resolveParticulars(stated, settings)).toEqual({
+      ...stated,
+      ...settings,
+    });
+    expect(resolveParticulars(stated)).toEqual({
+      ...stated,
+      signatory: "",
+      qualityStatement,
+    });
+  });
+
+  it("lets the report override every setting", () => {
+    expect(
+      resolveParticulars(
+        {
+          ...stated,
+          signatory: "M. Muster",
+          location: "Graz",
+          qualityStatement: "Own statement.",
+        },
+        settings,
+      ),
+    ).toMatchObject({
+      signatory: "M. Muster",
+      location: "Graz",
+      qualityStatement: "Own statement.",
+    });
+  });
+
+  it("reads stored settings and treats anything malformed as unset", () => {
+    expect(parseReportSettings(JSON.stringify(settings))).toEqual(settings);
+    expect(parseReportSettings("{}")).toEqual(emptyReportSettings);
+    expect(parseReportSettings("not json")).toEqual(emptyReportSettings);
+    expect(parseReportSettings(null)).toEqual(emptyReportSettings);
+    expect(
+      parseReportSettings(JSON.stringify({ signatory: 7, location: " X " })),
+    ).toEqual({ ...emptyReportSettings, location: "X" });
+  });
+
+  it("reads a snapshot captured before the settings with the default statement", () => {
+    expect(
+      snapshotParticulars({ particulars: { signatory: "S" } }).qualityStatement,
+    ).toBe(qualityStatement);
+    expect(
+      snapshotParticulars({ particulars: { qualityStatement: "Own." } })
+        .qualityStatement,
+    ).toBe("Own.");
+  });
 });
 
 describe("positive conclusions", () => {
@@ -236,7 +342,13 @@ describe("positive conclusions", () => {
         .filter(([, c]) => c.requiresSupport)
         .map(([id]) => id),
     ).toEqual(["unmodified", "readiness"]);
-    for (const c of ["qualified", "adverse", "disclaimer", "factual_findings"])
+    for (const c of [
+      "qualified",
+      "adverse",
+      "disclaimer",
+      "readiness_gaps",
+      "factual_findings",
+    ])
       expect(requiresSupport(c)).toBe(false);
     // An unknown value is held to the strict gates.
     expect(requiresSupport("Clean opinion")).toBe(true);

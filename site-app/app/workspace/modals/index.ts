@@ -24,6 +24,7 @@ import {
   invitationCancelModal,
   inviteModal,
   practiceRenameModal,
+  reportSettingsModal,
   signingKeyRotateModal,
 } from "./practice-access";
 import { reportModal } from "./report";
@@ -43,6 +44,7 @@ const modalDefinitions: Record<string, ModalDefinition> = {
   invite: inviteModal,
   invitationCancel: invitationCancelModal,
   practiceRename: practiceRenameModal,
+  reportSettings: reportSettingsModal,
   signingKeyRotate: signingKeyRotateModal,
   adminGrant: adminGrantModal,
   adminRevoke: adminRevokeModal,

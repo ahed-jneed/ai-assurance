@@ -117,7 +117,7 @@ export function RecordSheet({
               "category" in detail.value &&
               "sha256" in detail.value ? (
                 <EvidenceDetails
-                  artifact={detail.value as Artifact}
+                  artifact={liveDetail as Artifact}
                   engagement={e}
                   tenantId={data.tenantId}
                   role={role}
