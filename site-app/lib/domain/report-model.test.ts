@@ -121,8 +121,15 @@ describe("ISAE 3000 conclusion wording", () => {
       basisHeading: "Basis for qualified opinion",
     });
     expect(statement(assurance("qualified", "reasonable")).text).toMatch(
-      /^In our opinion, except for the effects of the matter/,
+      /^In our opinion, except for the effects, or possible effects, of the matter/,
     );
+  });
+
+  it("covers the possible effects of a scope limitation in either qualified wording", () => {
+    for (const level of ["limited", "reasonable"] as const)
+      expect(statement(assurance("qualified", level)).text).toContain(
+        "except for the effects, or possible effects, of the matter described",
+      );
   });
 
   it("words limited assurance as a negative-form conclusion", () => {

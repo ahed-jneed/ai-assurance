@@ -200,7 +200,7 @@ const assuranceWording: Record<
     qualified: {
       heading: "Qualified opinion",
       basis: "Basis for qualified opinion",
-      text: "In our opinion, except for the effects of the matter described in the Basis for qualified opinion section, {subject} is, in all material respects, in accordance with {criteria}.",
+      text: "In our opinion, except for the effects, or possible effects, of the matter described in the Basis for qualified opinion section, {subject} is, in all material respects, in accordance with {criteria}.",
     },
     adverse: {
       heading: "Adverse opinion",
@@ -221,7 +221,7 @@ const assuranceWording: Record<
     qualified: {
       heading: "Qualified conclusion",
       basis: "Basis for qualified conclusion",
-      text: "Based on the procedures we have performed and the evidence we have obtained, except for the effects of the matter described in the Basis for qualified conclusion section, nothing has come to our attention that causes us to believe that {subject} is not, in all material respects, in accordance with {criteria}.",
+      text: "Based on the procedures we have performed and the evidence we have obtained, except for the effects, or possible effects, of the matter described in the Basis for qualified conclusion section, nothing has come to our attention that causes us to believe that {subject} is not, in all material respects, in accordance with {criteria}.",
     },
     adverse: {
       heading: "Adverse conclusion",
