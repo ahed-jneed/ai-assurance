@@ -151,6 +151,23 @@ class LmEvalRecomputeTest(Close):
                 self.assertEqual(statuses[f"{metric}.stderr"], "match", metric)
             self.assertEqual(run["runMetadata"]["systemPrompt"]["sha256"], self.exp["tasks"][task]["systemPromptSha256"])
 
+    def test_unverified_format_version(self):
+        """lm_eval outside 0.4: rejected by default; with allowUnverifiedFormatVersion capped and warned like the other formats."""
+        import hashlib
+        inputs, manifest, plan = gs.bundle("lm_eval/*")
+        spec = next(s for s in manifest["inputs"] if s["name"].startswith("results_"))
+        data = inputs.pop(spec["sha256"])
+        data = data.replace(b'"lm_eval_version": "0.4.', b'"lm_eval_version": "0.5.', 1)
+        spec.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data))
+        inputs[spec["sha256"]] = data
+        with self.assertRaises(GenaiInputError) as ctx:
+            run_bundle(inputs, manifest, plan)
+        self.assertEqual(ctx.exception.code, "unsupported_format_version")
+        comp = gs.computation(run_bundle(inputs, manifest, {**plan, "allowUnverifiedFormatVersion": True}))
+        for run in comp["runs"]:
+            self.assertIn("unverified_format_version", {w["code"] for w in run["warnings"]})
+            self.assertNotEqual(run["evidenceLevel"], "L2")
+
     def test_default_primary_score(self):
         from engine.tests.test_genai_parsers import parse_reference_bundle
         runs = {r.run_key.rsplit(":", 1)[-1]: r for r in parse_reference_bundle("lm_eval/*")}
@@ -335,6 +352,21 @@ class JudgeValidationTest(Close):
             self.assertEqual(run["runMetadata"]["completeness"]["missing"], [])
             self.assertEqual(run["runMetadata"]["judges"][0]["validation"]["artifactSha256"], self.expected[path]["sha256"])
             self.assertNotIn("declaration_conflict", {w["code"] for w in comp["warnings"]})
+
+    def test_two_label_files_for_one_judge_are_rejected(self):
+        """A passing label file listed after a failing one must not hide the failing kappa: either order is manifest_invalid."""
+        declared = {"judges": [{"ref": "J1", "model": "mockllm/judge", "snapshot": "judge-2026-11-05", "family": "other-fixture-judge"}]}
+        small = gs.input_spec("judge_validation/judge_small_60.jsonl", "judge_validation_jsonl", role="judge_validation", judgeRef="J1")
+        large = gs.input_spec("judge_validation/judge_large_200.jsonl", "judge_validation_jsonl", role="judge_validation", judgeRef="J1")
+        for labels in ((small, large), (large, small)):
+            with self.subTest(order=[spec["name"] for spec, _ in labels]):
+                inputs, manifest, plan = gs.bundle("ragas/results.jsonl", declared=declared, extra_inputs=labels)
+                with self.assertRaises(GenaiInputError) as ctx:
+                    run_bundle(inputs, manifest, plan)
+                self.assertEqual(ctx.exception.code, "manifest_invalid")
+        # One label file per judge still ingests.
+        inputs, manifest, plan = gs.bundle("ragas/results.jsonl", declared=declared, extra_inputs=[large])
+        self.assertEqual(len(gs.computation(run_bundle(inputs, manifest, plan))["judgeValidation"]), 1)
 
     @unittest.skipUnless(gs.has_zstd(), "no zstd back-end")
     def test_same_family_judge_is_not_validated(self):

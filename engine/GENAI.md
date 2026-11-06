@@ -101,7 +101,7 @@ The memory and CPU measurements that design section 11.3 asks for inside the com
 
 ## Error codes
 
-Errors (`GenaiInputError.code`, `engine/genai/errors.py`): `input_too_large`, `bundle_too_large`, `line_too_long`, `too_many_items`, `too_many_scores`, `nesting_too_deep`, `invalid_utf8`, `invalid_json`, `duplicate_key`, `number_out_of_range`, `unknown_format`, `format_mismatch`, `unsupported_format`, `unsupported_format_version`, `zip_invalid`, `zip_entry_unsafe_name`, `zip_entry_too_large`, `zip_entry_size_mismatch`, `zip_ratio_exceeded`, `zip_method_unsupported`, `zip_encrypted`, `zip_crc_mismatch`, `zstd_unavailable`, `missing_required_entry`, `lm_eval_bundle_mismatch`, `duplicate_item_key`, `manifest_invalid`, `plan_invalid`, `input_hash_mismatch`, `evidence_too_large`. Warnings are listed in `WARNING_CODES` and reported as `{code, count, examples}`.
+Errors (`GenaiInputError.code`, `engine/genai/errors.py`): `input_too_large`, `bundle_too_large`, `line_too_long`, `too_many_items`, `too_many_scores`, `nesting_too_deep`, `invalid_utf8`, `invalid_json`, `duplicate_key`, `number_out_of_range`, `unknown_format`, `format_mismatch`, `unsupported_format`, `unsupported_format_version`, `zip_invalid`, `zip_entry_unsafe_name`, `zip_entry_too_large`, `zip_entry_size_mismatch`, `zip_ratio_exceeded`, `zip_method_unsupported`, `zip_encrypted`, `zip_crc_mismatch`, `zstd_unavailable`, `missing_required_entry`, `lm_eval_bundle_mismatch`, `duplicate_item_key`, `manifest_invalid`, `plan_invalid`, `input_hash_mismatch`, `evidence_too_large`. `run_bundle` reports the reader's code for an input the readers reject (an unsafe or duplicate zip entry, a duplicate key, `1e999`, deep nesting) rather than `unknown_format`, which is left for well-formed input that matches no format; only CLI `detect` never raises. Warnings are listed in `WARNING_CODES` and reported as `{code, count, examples}`.
 
 ## Where this implementation departs from the design text
 
@@ -110,6 +110,8 @@ Errors (`GenaiInputError.code`, `engine/genai/errors.py`): `input_too_large`, `b
 - DeepEval and Ragas inputs need a declared `harness.version` inside the verified series (the strict reading of section 7.10).
 - Unscored and error shares are computed over all item records of a run; a `genai_mean` criterion gates when any selected run has fewer scored groups than `minimums.sampleSize`.
 - The kappa table lists rows (human) and columns (judge) in `labelSet` order.
+- promptfoo is detected only with `results.version` 3, so another version is `unknown_format`, even with `allowUnverifiedFormatVersion`, where the section 7.10 table says `unsupported_format_version`: without the version, a promptfoo file cannot be told from other JSON documents with an `evalId`.
+- A manifest binds at most one label file to each declared judge: a second `inputs[].judgeRef` with the same value is `manifest_invalid`, so manifest order can never decide which kappa counts.
 
 ## Tests
 
@@ -126,7 +128,7 @@ Errors (`GenaiInputError.code`, `engine/genai/errors.py`): `input_too_large`, `b
 
 ## Follow-ups
 
-- **G5, worker job `genai_ingest`**: `validate_genai_request`, the `evidence` download, the branch in `Worker.execute` and `compute_job`, `verify_genai_result_bytes`, the codes in `COMPUTE_FAILURE_CODES` and `WORKER.md`, a hash-pinned `zstandard` in `engine/Dockerfile` (remove `genai/` from `engine/.dockerignore`), the `genaiIngest` readiness entry and the capability gate, plus the section 11.3 measurements in the compute image.
+- **G5, worker job `genai_ingest`**: `validate_genai_request`, the `evidence` download, the branch in `Worker.execute` and `compute_job`, `verify_genai_result_bytes`, the codes in `COMPUTE_FAILURE_CODES` and `WORKER.md`, a hash-pinned `zstandard` in `engine/Dockerfile` (`engine/genai/` already ships in the compute image through `COPY . /app/engine`; `engine/.dockerignore` excludes only `tests/fixtures/genai`), the `genaiIngest` readiness entry and the capability gate, plus the section 11.3 measurements in the compute image.
 - Signature verification of signed detection results (Code Sub-measure 2.1.2) and ingestion of C2PA validator reports as their own format (A50-ED-33).
 - Excerpts (`failures`, `all`) as inert text, if the workspace needs them.
 - An optional coverage-guided harness (`engine/tests/fuzz/genai_atheris.py`, design section 11.5).

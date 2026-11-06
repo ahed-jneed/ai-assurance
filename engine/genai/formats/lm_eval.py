@@ -101,6 +101,7 @@ def parse(files, plan, manifest_inputs=None):
     if not version.startswith("0.4.") and version != "0.4":
         require(plan.get("allowUnverifiedFormatVersion"), "unsupported_format_version", f"lm_eval_version {version}")
         caps.append("unverified_format_version")
+        warnings_.append("unverified_format_version")
     elif version != scorers.LM_EVAL_VERIFIED:
         warnings_.append("unverified_tool_version")
     configs = results.get("configs") if isinstance(results.get("configs"), dict) else {}
