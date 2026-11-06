@@ -1,5 +1,5 @@
 import type { Engagement, Paper, Role } from "./domain";
-import { canWrite } from "./domain";
+import { canWrite, paperCurrent } from "./domain";
 import {
   paperChecklist,
   paperNextAction,
@@ -160,6 +160,8 @@ export function paperRegisterRow(
     (p) => p.paperId === paper.id,
   );
   const bound = source?.paperRevision !== undefined;
+  // A superseded paper or retired memo is history: nothing is due on it.
+  const history = !paperCurrent(paper);
   const action = paperNextAction({
     paper,
     artifacts: engagement.artifacts,
@@ -191,6 +193,7 @@ export function paperRegisterRow(
         !source.contributors.includes(userId) &&
         sourceCurrent));
   const blocked =
+    !history &&
     paper.status !== "signed" &&
     (!!comments.length ||
       !sourceCurrent ||
@@ -202,7 +205,13 @@ export function paperRegisterRow(
   let label = action.label,
     reason = action.reason,
     target = action.target;
-  if (paper.status === "signed") {
+  if (history) {
+    label = "View paper history";
+    reason = paper.supersededBy
+      ? "Superseded by " + paper.supersededBy
+      : "Retired: its evidence request was reopened";
+    target = undefined;
+  } else if (paper.status === "signed") {
     label = "View signed paper";
     reason = "Signed revision " + paper.revision;
   } else if (comments.length) {
@@ -257,6 +266,7 @@ export function paperRegisterRow(
     reviewable,
     blocked,
     mine:
+      !history &&
       paper.status !== "signed" &&
       (owns ||
         ownComment ||
@@ -266,12 +276,14 @@ export function paperRegisterRow(
     reason,
     target,
     sourceAction:
+      !history &&
       !!source &&
       !comments.length &&
       ((bound && (paper.status === "draft" || !sourceCurrent || reviewable)) ||
         (!bound && paper.status === "in_review")),
     dueDate,
-    overdue: !!dueDate && dueDate < today && paper.status !== "signed",
+    overdue:
+      !history && !!dueDate && dueDate < today && paper.status !== "signed",
   };
 }
 export type PaperRegisterRow = ReturnType<typeof paperRegisterRow>;

@@ -15,7 +15,7 @@ import type { WorkItem } from "@/lib/work-items";
 import { NextSteps } from "./next-steps";
 import { AuditGateList, type GateAction } from "./audit-gates";
 import { Button } from "@/components/ui/button";
-import { stages, stageGates, paperRequired } from "@/lib/domain";
+import { stages, stageGates, paperCurrent, paperRequired } from "@/lib/domain";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
 
@@ -49,7 +49,8 @@ export function EngagementOverview({
 }) {
   const required = e.papers.filter(
       (p) =>
-        paperRequired(e, p) || p.body.conclusionStatus === "not_applicable",
+        paperRequired(e, p) ||
+        (paperCurrent(p) && p.body.conclusionStatus === "not_applicable"),
     ),
     signed = required.filter((p) => p.status === "signed").length;
   const paperView =

@@ -194,9 +194,18 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     if (paper?.comments.some((q) => !q.resolved))
       fail(400, "Respond to and resolve open review questions");
     if (!paper || paper.status === "signed") {
+      const signed = paper;
       paper = c.makePaper(p.templateId);
       e.papers.push(paper);
       p.paperId = paper.id;
+      // The signed paper stays as it was signed, as history: superseded, it
+      // is no longer required and counts towards no gate or snapshot.
+      if (signed) {
+        signed.supersededBy = paper.id;
+        signed.supersededAt = c.at;
+        signed.required = false;
+        paper.supersedes = signed.id;
+      }
     } else {
       paper.history.push({
         revision: paper.revision,

@@ -27,8 +27,14 @@ export type { AuditGate } from "./domain/gates";
 export {
   completionGates,
   finalReportGates,
+  gatesStage,
+  isReleaseTimeRecord,
+  paperCurrent,
   paperRequired,
+  releaseRequirements,
+  releaseTimeTemplates,
   reportBlockers,
   stageGates,
   stages,
+  workStage,
 } from "./domain/gates";

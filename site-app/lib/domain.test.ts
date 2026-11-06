@@ -19,12 +19,18 @@ describe("domain entry point", () => {
       "classify",
       "completionGates",
       "finalReportGates",
+      "gatesStage",
+      "isReleaseTimeRecord",
+      "paperCurrent",
       "paperRequired",
+      "releaseRequirements",
+      "releaseTimeTemplates",
       "reportBlockers",
       "risk",
       "roles",
       "stageGates",
       "stages",
+      "workStage",
     ]);
   });
 

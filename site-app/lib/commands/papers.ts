@@ -5,9 +5,26 @@ import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
+/**
+ * The paper a command changes. A superseded paper stays as it was signed and
+ * a retired limitation memo changes only when its evidence request is closed
+ * again, so neither can be changed here.
+ */
 function paper(e: Engagement, value: unknown) {
   const p = e.papers.find((p) => p.id === value);
   if (!p) throw new ApiError(404, "Working paper not found");
+  if (p.supersededBy)
+    throw new ApiError(
+      409,
+      "This signed paper was superseded by " +
+        p.supersededBy +
+        " and stays as it was signed",
+    );
+  if (p.retired)
+    throw new ApiError(
+      409,
+      "This limitation memo was retired when its evidence request was reopened; close the request again to revise it",
+    );
   return p;
 }
 function archive(p: Paper, actor: string) {
