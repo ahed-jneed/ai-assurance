@@ -232,10 +232,11 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    - **Watch F-04** (a later due-date edit invalidates every execution) and **F-29** (the 150-revision cap).
 
 6. **Classification** (qa-auditor, qa-reviewer)
-   1. Regulatory mapping → Assess classification → Save classification (`classify`). Status shows "provisional".
-   2. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
-   3. qa-reviewer approves (`approveClassification`). Status becomes "approved".
-   - **Watch F-31:** route "Unassessed" plus a purpose shows "Minimal risk".
+   1. Regulatory mapping → Assess classification → answer the facts in each section (yes, no or "needs information") → Save classification (`classify`). Status shows "provisional".
+   2. While a required fact is unknown the label reads "Needs information" and "Approve independently" stays disabled, listing what the approval waits for (#19).
+   3. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
+   4. qa-reviewer approves (`approveClassification`). Status becomes "approved".
+   - **F-31 (fixed in #19):** an "Unassessed" route reads "Unassessed" and blocks approval; contradictory route and fact combinations are rejected.
 
 7. **Evidence custody** (qa-auditor)
    1. Evidence vault → Files → Upload evidence, using `public/example-predictions.csv`, category Dataset, and a handling basis → Upload for acceptance. The row shows "Awaiting acceptance" and the response contains the SHA-256.

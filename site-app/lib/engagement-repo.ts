@@ -3,6 +3,7 @@
 // and hashes (ids.ts) are re-exported for the modules that import them here.
 import { db } from "./bindings";
 import type { Engagement } from "./domain";
+import { migrateClassification } from "./domain/classification";
 import { hydrate, dehydrate } from "./engagement-storage";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
@@ -51,6 +52,8 @@ export async function getEngagement(ctx: Context, engagementId: string) {
     throw new ApiError(404, "Engagement not found");
   const e = JSON.parse(row.body) as Engagement;
   e.version = row.version;
+  // A classification recorded before #19 loads with every fact unknown.
+  e.classification = migrateClassification(e.classification);
   if (
     ctx.role === "Client Contributor" &&
     activeGrant(
