@@ -444,9 +444,11 @@ export async function jobs(ctx: Context, engagementId: string) {
 /**
  * SQL that keeps an external job alive: its creator still holds auditor
  * access, the scope and the program are approved, and the job's procedure is
- * selected with the plan revision and scope revision the job was queued for.
- * The program revision is not compared, so a change to another procedure
- * does not stop an unchanged procedure's job (see runBindsProcedure).
+ * selected with the plan and scope revision the job was queued for. The plan
+ * is compared by the plan hash the job recorded or, for jobs queued without
+ * one, by the plan revision, the rule planPinsCurrent follows. The program
+ * revision is not compared, so a change to another procedure does not stop
+ * an unchanged procedure's job (see runBindsProcedure).
  */
 export const activeJobGuard =
-  "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') AND json_extract(p.value,'$.selected')=1)";
+  "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND (CASE WHEN json_extract(execution_jobs.request,'$.procedure.planHash') IS NOT NULL AND json_extract(p.value,'$.planHash') IS NOT NULL THEN json_extract(p.value,'$.planHash')=json_extract(execution_jobs.request,'$.procedure.planHash') ELSE json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') END) AND json_extract(p.value,'$.selected')=1)";
