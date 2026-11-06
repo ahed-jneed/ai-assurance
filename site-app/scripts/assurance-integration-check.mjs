@@ -1441,6 +1441,32 @@ try {
       [m.value, m.details.counts, m.confidenceInterval],
       [null, null, null],
     );
+  // The person's row is left out of every total too, so no total minus the
+  // eligible groups gives back group-gamma's size, label or prediction.
+  const withoutGamma = clientRows.length - 1;
+  assert.equal(
+    clientEnvelope.externalReport.provenance.inputs.data.rowCount,
+    withoutGamma,
+  );
+  for (const r of clientEnvelope.hostedResults) {
+    assert.equal(r.decision.sampleSize, withoutGamma, r.testId);
+    for (const m of r.metrics)
+      assert(m.sampleSize === null || m.sampleSize <= withoutGamma, r.testId);
+    if (r.decision.kind === "group_comparison") {
+      assert.equal(r.decision.coverage, null, r.testId);
+      assert.equal(
+        r.metrics[0].slices
+          .filter((s) => s.n !== null)
+          .reduce((sum, s) => sum + s.n, 0),
+        withoutGamma,
+        r.testId,
+      );
+    } else
+      assert(
+        r.limitations.some((note) => note.includes("are left out of every")),
+        r.testId,
+      );
+  }
   await assurance("importJob", { jobId: clientJob.jobId });
   const clientRun = e.runs.find((r) => r.externalJobId === clientJob.jobId);
   assert.equal(clientRun.manifest.executionMode, "client_local");
