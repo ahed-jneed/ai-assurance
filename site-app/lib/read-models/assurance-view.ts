@@ -1,20 +1,26 @@
-import { jobs, records } from "../assurance-store";
+import { jobs, recordCount, recordPage } from "../assurance-store";
 import { db } from "../bindings";
 import { getEngagement } from "../engagement-repo";
 import { ApiError } from "../http";
 import type { Context } from "../tenancy";
 import { isClientRole } from "../workflow-state";
-/**
- * What the assurance workbench loads for an internal member: the engagement's
- * assurance records and external jobs, its enrolled workers and access grants,
- * the members a Lead Auditor may grant access to, what the platform can and
- * cannot attest, and the external queue's telemetry. Client roles are refused.
- */
-export async function assuranceView(ctx: Context, engagementId: string) {
+// Client roles never read the assurance workbench.
+async function internalEngagement(ctx: Context, engagementId: string) {
   const e = await getEngagement(ctx, engagementId);
   if (isClientRole(ctx.role))
     throw new ApiError(403, "The assurance workbench is internal");
-  const all = await records(ctx, e.id),
+  return e;
+}
+/**
+ * What the assurance workbench loads for an internal member: the first page of
+ * the engagement's assurance records (with their total and the cursor of the
+ * next page), its external jobs, enrolled workers and access grants, the
+ * members a Lead Auditor may grant access to, what the platform can and cannot
+ * attest, and the external queue's telemetry. Client roles are refused.
+ */
+export async function assuranceView(ctx: Context, engagementId: string) {
+  const e = await internalEngagement(ctx, engagementId),
+    recent = await jobs(ctx, e.id),
     workers = (
       await db()
         .prepare(
@@ -32,8 +38,9 @@ export async function assuranceView(ctx: Context, engagementId: string) {
         .all()
     ).results;
   return {
-    records: all,
-    jobs: await jobs(ctx, e.id),
+    ...(await recordPage(ctx, e.id)),
+    total: await recordCount(ctx, e.id),
+    jobs: recent,
     workers,
     access,
     eligibleMembers:
@@ -59,13 +66,25 @@ export async function assuranceView(ctx: Context, engagementId: string) {
       anchor: "External timestamp anchor not configured",
     },
     telemetry: {
-      queued: (await jobs(ctx, e.id)).filter((j) => j.state === "queued")
-        .length,
-      stalled: (await jobs(ctx, e.id)).filter(
+      queued: recent.filter((j) => j.state === "queued").length,
+      stalled: recent.filter(
         (j) =>
           j.state === "running" &&
           Date.parse(String(j.lease_until)) < Date.now(),
       ).length,
     },
   };
+}
+/**
+ * One page of the engagement's assurance records, optionally of one kind:
+ * `{ records, nextCursor }`. The workbench follows `nextCursor` from its first
+ * page; views that need one kind of record page through that kind only.
+ */
+export async function assuranceRecordPage(
+  ctx: Context,
+  engagementId: string,
+  options: { kind?: string; cursor?: string },
+) {
+  const e = await internalEngagement(ctx, engagementId);
+  return recordPage(ctx, e.id, options);
 }

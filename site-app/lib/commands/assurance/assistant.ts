@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { assist, canonical } from "../../assurance-core";
-import { addRecord, recordStatement } from "../../assurance-store";
+import {
+  addRecord,
+  briefingExport,
+  recordStatement,
+} from "../../assurance-store";
 import { bucket } from "../../bindings";
 import { base64, signingKey, unbase64 } from "../../dossier";
 import { isReleaseTimeRecord, paperCurrent } from "../../domain";
@@ -17,7 +21,7 @@ import type { AssuranceModule } from "./target";
 export const assistant: AssuranceModule = defineCommands({
   exportBriefing: {
     roles: ["Auditor", "Lead Auditor"],
-    async handle({ e, find, accepted }, d, ctx) {
+    async handle({ e, lookup, pick, accepted }, d, ctx) {
       const v = z
         .object({
           sourceIds: z.array(short).min(1).max(30),
@@ -30,9 +34,10 @@ export const assistant: AssuranceModule = defineCommands({
       accepted(v.governanceArtifactId, "Governance");
       if (new Set(v.sourceIds).size !== v.sourceIds.length)
         throw new ApiError(400, "Source IDs must be unique");
-      const sources = [];
+      const sources = [],
+        locations = await lookup(v.sourceIds);
       for (const sourceId of v.sourceIds) {
-        const r = find(sourceId, "location"),
+        const r = pick(locations, sourceId, "location"),
           artifact = accepted(r.body.artifactId),
           o = await bucket().get(artifact.key);
         if (
@@ -131,7 +136,7 @@ export const assistant: AssuranceModule = defineCommands({
   },
   importBriefing: {
     roles: ["Auditor", "Lead Auditor"],
-    async handle({ e, all, find, accepted }, d, ctx) {
+    async handle({ e, lookup, pick, accepted }, d, ctx) {
       const v = z
           .object({ artifactId: short, assessment: note })
           .strict()
@@ -235,12 +240,11 @@ export const assistant: AssuranceModule = defineCommands({
         draft.engagementId !== e.id
       )
         throw new ApiError(409, "Briefing scope or immutable digest mismatch");
-      const exported = all.find(
-        (r) =>
-          r.kind === "assistant_export" &&
-          r.body.packetSha256 === draft.provenance.packetSha256 &&
-          r.body.processingDestination ===
-            draft.provenance.processingDestination,
+      const exported = await briefingExport(
+        ctx,
+        e.id,
+        draft.provenance.packetSha256,
+        draft.provenance.processingDestination,
       );
       if (
         !exported ||
@@ -251,6 +255,7 @@ export const assistant: AssuranceModule = defineCommands({
           403,
           "No authorized matching processing export for this principal",
         );
+      const pinned = await lookup(draft.retrievedPins.map((p) => p.id));
       if (
         new Set(draft.retrievedPins.map((p) => p.id)).size !==
           draft.retrievedPins.length ||
@@ -264,7 +269,7 @@ export const assistant: AssuranceModule = defineCommands({
                 s.excerptSha256 === p.excerptSha256 &&
                 s.sourceVersion === p.sourceVersion &&
                 s.location === p.location,
-            ) || !all.some((s) => s.id === p.id && s.sha256 === p.sha256),
+            ) || !pinned.some((s) => s.id === p.id && s.sha256 === p.sha256),
         )
       )
         throw new ApiError(
@@ -313,8 +318,8 @@ export const assistant: AssuranceModule = defineCommands({
           citations: draft.retrievedPins.map((p) => ({
             recordId: p.id,
             sha256: p.sha256,
-            location: find(p.id, "location").body.locator,
-            label: find(p.id, "location").body.label,
+            location: pick(pinned, p.id, "location").body.locator,
+            label: pick(pinned, p.id, "location").body.label,
           })),
           items: draft.draft.suggestions.map((s) => ({
             text: s.text,
@@ -330,8 +335,10 @@ export const assistant: AssuranceModule = defineCommands({
     },
   },
   assist: {
-    roles: ["Auditor", "Lead Auditor", "Reviewer"],
-    async handle({ e, all, accepted }, d, ctx) {
+    // Briefings are preparer work, as in the other assistant ops; a Reviewer
+    // reads them but does not add them.
+    roles: ["Auditor", "Lead Auditor"],
+    async handle({ e, lookup, accepted }, d, ctx) {
       const v = z
         .object({
           sourceIds: z.array(short).min(1).max(30),
@@ -344,6 +351,17 @@ export const assistant: AssuranceModule = defineCommands({
         })
         .strict()
         .parse(d);
+      // The briefing reads the selected records and the source locations
+      // their relations cite.
+      const selected = await lookup(v.sourceIds),
+        all = await lookup([
+          ...v.sourceIds,
+          ...selected.flatMap((x) =>
+            (x.body.relations ?? []).map(
+              (rel: { locationId: string }) => rel.locationId,
+            ),
+          ),
+        ]);
       const locations = all.filter(
         (r) =>
           r.kind === "location" &&
@@ -374,12 +392,12 @@ export const assistant: AssuranceModule = defineCommands({
   },
   acceptAssistant: {
     roles: ["Auditor", "Lead Auditor"],
-    async handle({ e, all, find, accepted }, d, ctx) {
+    async handle({ e, lookup, find, accepted }, d, ctx) {
       const v = z
           .object({ assistantId: short, editedText: note, paperId: short })
           .strict()
           .parse(d),
-        draft = find(v.assistantId, "assistant"),
+        draft = await find(v.assistantId, "assistant"),
         p = e.papers.find((x) => x.id === v.paperId);
       if (
         !p ||
@@ -392,8 +410,11 @@ export const assistant: AssuranceModule = defineCommands({
           409,
           "Select a supplementary draft paper; compiled procedure work must be recorded in its source procedure",
         );
+      const cited = await lookup(
+        draft.body.citations.map((c: { recordId: string }) => c.recordId),
+      );
       for (const citation of draft.body.citations) {
-        const source = all.find(
+        const source = cited.find(
           (r) => r.id === citation.recordId && r.sha256 === citation.sha256,
         );
         if (!source) throw new ApiError(409, "A cited revision is unavailable");

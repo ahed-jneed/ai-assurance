@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { records } from "../assurance-store";
+import { recordsById } from "../assurance-store";
 import { aggregateOutcome } from "../diagnostic-decisions";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain";
@@ -61,7 +61,7 @@ export const runs = defineCommands({
           "Use the approved procedure model, dataset and protocol",
         );
       const card = datasetCardRecordId
-        ? (await records(ctx, e.id)).find(
+        ? (await recordsById(ctx, e.id, [datasetCardRecordId])).find(
             (r) => r.id === datasetCardRecordId && r.kind === "dataset",
           )
         : undefined;
