@@ -3,6 +3,7 @@ import { finalReportGates, type Engagement } from "../domain";
 import {
   approvedWorkflow,
   command,
+  completedQualityReview,
   engagement,
   evidenceRequest,
   finding,
@@ -47,6 +48,7 @@ async function issuable() {
   const paperId = procedureOf(e, procedureId).paperId;
   e.papers.find((p) => p.id === paperId)!.status = "signed";
   e.stage = "Sign-off";
+  e.qualityReview = completedQualityReview();
   return e;
 }
 const kinds = (e: Engagement, t: ReportTerms, p = particulars) =>

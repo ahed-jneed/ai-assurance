@@ -5,6 +5,7 @@ import { ApiError } from "../http";
 import {
   artifact,
   command,
+  completedQualityReview,
   finding,
   paper,
   procedureId,
@@ -52,6 +53,7 @@ async function issuable() {
   const paperId = procedureOf(e, procedureId).paperId;
   e.papers.find((p) => p.id === paperId)!.status = "signed";
   e.stage = "Sign-off";
+  e.qualityReview = completedQualityReview();
   e.classification.approvedBy = "user-approver-7";
   e.artifacts.push(
     artifact({

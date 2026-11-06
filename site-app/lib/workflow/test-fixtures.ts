@@ -14,6 +14,10 @@ import type {
   Paper,
   Run,
 } from "../domain";
+import {
+  standBackChecklist,
+  type QualityReview,
+} from "../domain/quality-review";
 import { seedWorkflow } from "../workflow-seed";
 import { WorkflowError, workflowCommand } from "../workflow-service";
 import type { Procedure, ProcedureChange, Workflow } from "../workflow-types";
@@ -31,6 +35,11 @@ export const people: Record<string, Member> = {
   auditor: { role: "Auditor", client_id: null, status: "active" },
   "second-auditor": { role: "Auditor", client_id: null, status: "active" },
   reviewer: { role: "Reviewer", client_id: null, status: "active" },
+  "quality-reviewer": {
+    role: "Engagement Quality Reviewer",
+    client_id: null,
+    status: "active",
+  },
   "second-reviewer": { role: "Reviewer", client_id: null, status: "active" },
   "revoked-reviewer": { role: "Reviewer", client_id: null, status: "revoked" },
   viewer: { role: "Client Viewer", client_id: "client", status: "active" },
@@ -332,6 +341,31 @@ export function engagement(overrides: Partial<Engagement> = {}): Engagement {
     reports: [],
     eventHead: "0".repeat(64),
     createdAt: at,
+    ...overrides,
+  };
+}
+
+/**
+ * An engagement quality review by "quality-reviewer" whose stand-back
+ * checklist is complete: what an assurance engagement needs before capture.
+ */
+export function completedQualityReview(
+  overrides: Partial<QualityReview> = {},
+): QualityReview {
+  return {
+    reviewerId: "quality-reviewer",
+    appointedBy: "lead",
+    appointedAt: at,
+    reason: "Outside the engagement team",
+    coolingOffDays: 730,
+    revision: 2,
+    items: standBackChecklist.map((i) => ({
+      id: i.id,
+      status: "satisfied" as const,
+      notes: "Evaluated",
+    })),
+    signOffs: [],
+    history: [],
     ...overrides,
   };
 }

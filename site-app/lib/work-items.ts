@@ -1,4 +1,5 @@
 import type { Engagement, Role } from "./domain";
+import { checklistProblem } from "./domain/quality-review";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import { currentExecution } from "./workflow-state";
 import { stagePaperQueue } from "./auditor-workflow";
@@ -529,6 +530,44 @@ export function engagementWork(
       undefined,
       eligible,
     );
+  }
+  // The engagement quality review is the appointed reviewer's own work.
+  const eqr = e.qualityReview;
+  if (
+    eqr &&
+    role === "Engagement Quality Reviewer" &&
+    eqr.reviewerId === userId
+  ) {
+    const problem = checklistProblem(eqr),
+      unsigned = e.reports.filter(
+        (r) =>
+          r.kind === "final" &&
+          (!r.release || ["internal", "approved"].includes(r.release.state)) &&
+          !eqr.signOffs.some(
+            (s) =>
+              s.reportId === r.id &&
+              s.userId === userId &&
+              s.internalHash === r.sha256 &&
+              s.checklistRevision === eqr.revision,
+          ),
+      );
+    if (problem || unsigned.length)
+      add(
+        "report",
+        problem ? "quality-review" : unsigned[0].id,
+        "Engagement quality review",
+        problem
+          ? "Complete the stand-back checklist"
+          : "Sign off final package",
+        problem ||
+          "The captured final package needs your quality review sign-off before release.",
+        "Reports & sign-off",
+        userId,
+        e.dueDate,
+        "review",
+        1,
+        "quality",
+      );
   }
   return result;
 }
