@@ -22,7 +22,12 @@ class RuntimePackageTests(unittest.TestCase):
                 'engine/__pycache__/compiled.pyc': b'compiled',
                 'engine/worker-jobs/job-fixture/request.json': b'{}',
                 'engine/.test-tmp/temporary.py': b'# temporary',
+                'engine/tests/test_example.py': b'# test module',
+                'engine/tests/README.md': b'Test notes',
+                'engine/tests/fixtures/genai/README.md': b'Fixture notes',
+                'engine/tests/fixtures/genai/generate/make_fixture.py': b'# fixture generator',
                 'schemas/test-run.schema.json': b'{}',
+                'schemas/test-run.base.json': b'{}',
                 'schemas/private.json': b'{}',
                 'schemas/fixtures/external-runs.v1.2.json': b'[]',
             }.items():
@@ -30,7 +35,8 @@ class RuntimePackageTests(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
             expected = {'engine/diagnostics.py', 'engine/README.md', 'engine/examples/predictions.csv',
-                'schemas/test-run.schema.json', 'schemas/fixtures/external-runs.v1.2.json'}
+                'schemas/test-run.schema.json', 'schemas/test-run.base.json',
+                'schemas/fixtures/external-runs.v1.2.json'}
             self.assertEqual(set(sources(root)), expected)
             first = package(root, root/'one.zip')
             second = package(root, root/'two.zip')
@@ -44,6 +50,12 @@ class RuntimePackageTests(unittest.TestCase):
                     self.assertEqual(pin['bytes'], len(value))
             with self.assertRaises(FileExistsError):
                 package(root, root/'one.zip')
+
+    def test_repository_package_leaves_out_engine_tests(self):
+        root = Path(__file__).resolve().parents[2]
+        names = set(sources(root))
+        self.assertIn('engine/assurance.py', names)
+        self.assertFalse([name for name in names if name.startswith('engine/tests/')])
 
     def test_linked_source_is_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

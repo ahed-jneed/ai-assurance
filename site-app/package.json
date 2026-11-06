@@ -13,13 +13,17 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "sync": "node scripts/sync-generated.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:sync": "node scripts/sync-generated.mjs --check",
+    "check:build": "node scripts/strict-build.mjs",
     "check:harnesses": "node scripts/run-checks.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "db:migrate:local": "node scripts/db-migrate-local.mjs",
     "test:e2e": "playwright test",
-    "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build && npm run check:harnesses",
+    "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .sites-runtime/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json && node ../schemas/validate-procedure-schema.mjs .sites-runtime/execution-schema-fixture.json",
+    "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run check:sync && npm run check:build && npm run check:harnesses && npm run check:fixtures",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
