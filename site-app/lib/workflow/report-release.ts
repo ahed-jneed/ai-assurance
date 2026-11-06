@@ -4,6 +4,10 @@
 // before and records the client notification.
 import { z } from "zod";
 import { releaseRequirements, releaseTimeTemplates } from "../domain/gates";
+import {
+  currentClientSnapshot,
+  legacyPackageMessage,
+} from "../client-projection";
 import { releaseState } from "../workflow-state";
 import { fail, short, text, uid, type WorkflowHandler } from "./command";
 export const reportReleaseCommands: Record<string, WorkflowHandler> = {
@@ -31,6 +35,7 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
         409,
         "Prepare a current final package capturing the approved scope and audit program",
       );
+    if (!currentClientSnapshot(r)) fail(409, legacyPackageMessage);
     if (r.actor === c.userId)
       fail(403, "The report creator cannot approve its package");
     if (r.sha256 !== a.internalHash || r.clientSha256 !== a.clientHash)

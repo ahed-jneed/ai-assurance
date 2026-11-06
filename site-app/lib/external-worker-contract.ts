@@ -64,6 +64,26 @@ export function frozenLabelPair(input: {
 }
 
 /**
+ * A schemaVersion 1.1 protocol pre-registers its binary label pair with its
+ * statistics plan. The worker scores against the frozen pair, so the
+ * declared other label must be the system revision's other output class;
+ * otherwise the plan registered in advance would not describe the run.
+ * Protocols without a plan, and other tasks, declare no pair to check.
+ */
+export function assertDeclaredLabel(
+  plan: unknown,
+  declared: string | undefined,
+  frozen: { negativeLabel: string } | undefined,
+) {
+  if (!plan || !frozen || !declared || declared === frozen.negativeLabel)
+    return;
+  throw new ApiError(
+    400,
+    `The protocol declares the other binary class label '${declared}', but the system revision's other output class is '${frozen.negativeLabel}'. Use a protocol version that declares '${frozen.negativeLabel}', or a system revision whose output classes are the protocol's label pair.`,
+  );
+}
+
+/**
  * The worker's modelSpec limits for independent model inference
  * (validate_model_spec in engine/worker_contract.py).
  */

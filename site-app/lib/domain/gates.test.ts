@@ -394,7 +394,7 @@ describe("evidence request gates", () => {
   it("keeps unobtainable evidence from a readiness opinion only", () => {
     const e = withRequest({ status: "waived", disposition: "unobtainable" });
     expect(requestGates(e, "Readiness assessment")).toEqual([
-      "REQ-1: unavailable evidence prevents a readiness opinion",
+      "REQ-1: unavailable evidence prevents an unmodified or readiness conclusion",
     ]);
     for (const opinion of opinions)
       expect(requestGates(e, opinion)).toEqual([]);
@@ -604,7 +604,7 @@ describe("structured engagements", () => {
       },
     );
     expect(messages(e, "Readiness assessment")).toEqual([
-      "WP-A12-01: an applicable procedure outside audit scope prevents a readiness opinion",
+      "WP-A12-01: an applicable procedure outside audit scope prevents an unmodified or readiness conclusion",
     ]);
     for (const opinion of opinions) expect(messages(e, opinion)).toEqual([]);
   });

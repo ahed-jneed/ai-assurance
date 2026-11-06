@@ -1,7 +1,24 @@
 import type { Report, Role } from "./domain";
 
+/**
+ * The date a captured report states: its report date element, else the
+ * snapshot's capture time. Never the release time, which the client
+ * projection shows as the record's createdAt.
+ */
+export function reportDate(snapshot: Record<string, unknown>) {
+  const elements = Array.isArray(snapshot.elements) ? snapshot.elements : [],
+    element = elements.find(
+      (el): el is { id: string; value: string } =>
+        !!el && typeof el === "object" && el.id === "date",
+    );
+  return (
+    element?.value ||
+    (typeof snapshot.createdAt === "string" ? snapshot.createdAt : "")
+  );
+}
+
 export function packageStatus(report: Report, clientView = false) {
-  if (clientView) return "released";
+  if (clientView) return report.supersededBy ? "superseded" : "released";
   return report.kind === "draft"
     ? "draft"
     : (report.release?.state ?? "internal");
@@ -16,7 +33,11 @@ export function packageStatusLabel(report: Report, clientView = false) {
     superseded: "Superseded",
     withdrawn: "Withdrawn",
   };
-  return labels[packageStatus(report, clientView)] ?? "Internal package";
+  const state = packageStatus(report, clientView);
+  // The client projection names the successor on the report itself.
+  const successor = report.supersededBy ?? report.release?.supersededBy;
+  if (state === "superseded" && successor) return "Superseded by " + successor;
+  return labels[state] ?? "Internal package";
 }
 
 export function packageOpenLabel(report: Report, role: Role, userId: string) {

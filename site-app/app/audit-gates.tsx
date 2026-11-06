@@ -10,18 +10,33 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { paperAudience } from "@/lib/client-projection";
 import {
   finalReportGates,
+  paperCurrent,
   type AuditGate,
   type Engagement,
   type Role,
 } from "@/lib/domain";
+import {
+  assuranceLevelIds,
+  assuranceLevels,
+  conclusionTypes,
+  engagementTypeIds,
+  engagementTypes,
+  normalizeTerms,
+  requiresSupport,
+  termsLabel,
+  type ReportTerms,
+} from "@/lib/domain/report-model";
 import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
-export const reportOpinions = [
-  "Readiness assessment",
-  "Qualified conclusion",
-  "Adverse conclusion",
-  "Unable to conclude",
+/** Report elements the approved brief and program supply. */
+export const briefElements = [
+  "report:subject",
+  "report:criteria",
+  "report:responsibilities",
+  "report:independence",
+  "report:work",
 ];
 export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;
 
@@ -51,6 +66,7 @@ export function AuditGateList({
     "Conclusion exceptions",
     "Evaluations",
     "Findings",
+    "Report elements",
     "Engagement stage",
   ];
   const group = (g: AuditGate) =>
@@ -70,6 +86,7 @@ export function AuditGateList({
           stage: "Engagement stage",
           request: "Evidence collection",
           conclusion: "Conclusion exceptions",
+          report: "Report elements",
         }[g.kind];
   function row(g: AuditGate) {
     const p = ["paper", "conclusion"].includes(g.kind)
@@ -86,27 +103,31 @@ export function AuditGateList({
         ? `Current stage: ${e.stage}. A Lead Auditor advances one stage at a time from Overview.`
         : g.kind === "classification"
           ? g.id === "prohibited"
-            ? "Document the prohibited-practice assessment and use an appropriately scoped adverse or unable-to-conclude opinion."
+            ? "Document the prohibited-practice assessment and issue an adverse conclusion or a disclaimer, as the evidence supports."
             : e.classification.intendedPurpose
               ? "Independent classification approval required."
               : "Record the intended purpose and risk route, then obtain independent approval."
           : g.kind === "finding"
-            ? "An open High or Critical finding prevents a readiness opinion."
+            ? "An open High or Critical finding prevents an unmodified or readiness conclusion."
             : g.kind === "run"
               ? run?.state === "queued"
                 ? "An Auditor or Lead Auditor executes or cancels this queued evaluation."
                 : "Wait for execution to finish. A Lead Auditor can recover an interrupted run after two minutes."
-              : "");
+              : g.kind === "report"
+                ? briefElements.includes(g.id)
+                  ? "The report states this from the approved brief and audit program."
+                  : g.message
+                : "");
     const request =
       g.kind === "request"
         ? e.evidenceRequests?.find((r) => r.id === g.recordId)
         : undefined;
     const guidance =
       g.kind === "conclusion"
-        ? `Recorded conclusion: ${p?.body.conclusionStatus?.replaceAll("_", " ")}. Resolve and review a new revision, or select an opinion that reflects the exception.`
+        ? `Recorded conclusion: ${p?.body.conclusionStatus?.replaceAll("_", " ")}. Resolve and review a new revision, or select a modified conclusion that reflects the exception.`
         : g.kind === "request"
           ? request?.disposition === "unobtainable"
-            ? "Unavailable evidence requires a scoped qualified, adverse or unable-to-conclude opinion."
+            ? "Unavailable evidence is a scope limitation: issue a qualified conclusion, or a disclaimer where its possible effects are pervasive."
             : `Responsible party: ${request?.responsibleParty ?? "Not recorded"}. Due ${request?.dueDate ?? "not recorded"}. Record a response and assess it, or obtain a Lead-approved limitation/scope decision.`
           : detail || g.message;
     const action = p
@@ -129,6 +150,9 @@ export function AuditGateList({
           finding: "Review remediation",
           stage: "Open lifecycle",
           conclusion: "Assess conclusion",
+          report: briefElements.includes(g.id)
+            ? "Open scope & program"
+            : "Edit report terms",
         }[g.kind];
     const content = (
       <>
@@ -184,23 +208,115 @@ export function AuditGateList({
   );
 }
 
+/**
+ * The report terms: engagement type, assurance level (only where the type
+ * provides assurance) and the conclusions the type can express.
+ */
+export function ReportTermsPicker({
+  terms,
+  onTerms,
+}: {
+  terms: ReportTerms;
+  onTerms: (terms: ReportTerms) => void;
+}) {
+  const type = engagementTypes[terms.engagementType];
+  const pick = (patch: Partial<Record<keyof ReportTerms, string>>) =>
+    onTerms(normalizeTerms({ ...terms, ...patch }));
+  return (
+    <div className="report-terms">
+      <label>
+        Engagement type
+        <Select
+          value={terms.engagementType}
+          onValueChange={(engagementType) => pick({ engagementType })}
+        >
+          <SelectTrigger aria-label="Engagement type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {engagementTypeIds.map((t) => (
+              <SelectItem key={t} value={t}>
+                {engagementTypes[t].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <label>
+        Assurance level
+        <Select
+          disabled={!type.assurance}
+          value={terms.assuranceLevel ?? "none"}
+          onValueChange={(assuranceLevel) => pick({ assuranceLevel })}
+        >
+          <SelectTrigger aria-label="Assurance level">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {type.assurance ? (
+              assuranceLevelIds.map((l) => (
+                <SelectItem key={l} value={l}>
+                  {assuranceLevels[l].label}
+                </SelectItem>
+              ))
+            ) : (
+              <SelectItem value="none">Not applicable</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      </label>
+      <label>
+        Conclusion
+        <Select
+          value={terms.conclusion}
+          onValueChange={(conclusion) => pick({ conclusion })}
+        >
+          <SelectTrigger aria-label="Conclusion">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {type.conclusions.map((c) => (
+              <SelectItem key={c} value={c}>
+                {conclusionTypes[c].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <p className="report-terms-guidance">
+        <b>{termsLabel(terms)}.</b> {conclusionTypes[terms.conclusion].guidance}
+        {!type.assurance &&
+          " The report is labelled as not providing assurance."}
+      </p>
+    </div>
+  );
+}
+
 export function ReportReadiness({
   engagement: e,
   role,
   userId,
-  opinion,
-  onOpinion,
+  terms,
+  onTerms,
   onGate,
+  onAudience,
+  busy = false,
 }: {
   engagement: Engagement;
   role: Role;
   userId: string;
-  opinion: string;
-  onOpinion: (v: string) => void;
+  terms: ReportTerms;
+  onTerms: (terms: ReportTerms) => void;
   onGate: GateAction;
+  /** Sets who a signed paper is written for; Lead Auditors only. */
+  onAudience?: (paperId: string, audience: "internal" | "client") => void;
+  busy?: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const gates = finalReportGates(e, opinion),
+  const signed = e.papers.filter(
+    (p) => paperCurrent(p) && p.status === "signed",
+  );
+  const gates = finalReportGates(e, terms),
     exceptions = e.findings.filter(
       (f) => f.status !== "closed" && ["High", "Critical"].includes(f.severity),
     ).length;
@@ -217,30 +333,16 @@ export function ReportReadiness({
           <p className="subtle">
             {gates.length
               ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} before final capture`
-              : "Completion gates met for the selected opinion."}
+              : "Completion gates met for the selected conclusion."}
           </p>
         </div>
-        <label className="readiness-opinion">
-          Scoped opinion
-          <Select value={opinion} onValueChange={onOpinion}>
-            <SelectTrigger aria-label="Readiness opinion">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {reportOpinions.map((o) => (
-                <SelectItem key={o} value={o}>
-                  {o}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
       </div>
-      {opinion !== "Readiness assessment" && !!exceptions && (
+      <ReportTermsPicker terms={terms} onTerms={onTerms} />
+      {!requiresSupport(terms.conclusion) && !!exceptions && (
         <p className="readiness-context">
           {exceptions} open High or Critical{" "}
           {exceptions === 1 ? "finding must" : "findings must"} be addressed in
-          the scoped opinion and disclosures.
+          the conclusion and disclosures.
         </p>
       )}
       {!!gates.length && (
@@ -292,6 +394,51 @@ export function ReportReadiness({
             Classification, papers, evaluations and lifecycle are complete.
           </span>
         </div>
+      )}
+      {!!signed.length && (
+        <details className="client-report-content">
+          <summary>
+            Client report content
+            <span className="count-label">
+              {signed.filter((p) => paperAudience(p) === "client").length} of{" "}
+              {signed.length}
+            </span>
+          </summary>
+          <p className="subtle">
+            A released report publishes the conclusions of signed client papers.
+            Memos stay internal unless a Lead Auditor shares them.
+          </p>
+          <ul>
+            {signed.map((p) => (
+              <li key={p.id}>
+                <span>
+                  <b>{p.templateId}</b> {p.title}
+                </span>
+                {onAudience ? (
+                  <Select
+                    disabled={busy}
+                    value={paperAudience(p)}
+                    onValueChange={(v) =>
+                      onAudience(p.id, v === "client" ? "client" : "internal")
+                    }
+                  >
+                    <SelectTrigger aria-label={"Audience of " + p.templateId}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="client">Client</SelectItem>
+                      <SelectItem value="internal">Internal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="badge neutral">
+                    {paperAudience(p) === "client" ? "Client" : "Internal"}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </section>
   );

@@ -3,6 +3,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
 const base = process.argv[2] ?? "http://127.0.0.1:5173";
+// The report elements a final report states at capture (report model v2).
+const reportParticulars = {
+  addressee: "Fixture client board",
+  location: "Vienna, Austria",
+  signatory: "Fixture Assurance GmbH",
+  basisForModification:
+    "Synthetic unresolved nonconformity whose effects are material and pervasive.",
+};
 assert(
   ["127.0.0.1", "localhost", "::1"].includes(new URL(base).hostname),
   "This fixture identity test may run only against loopback development",
@@ -591,6 +599,8 @@ try {
       sensitiveDataBasis: "Synthetic groups; no personal data",
     },
     rationale: "Fixture acceptance rules assess arithmetic, not conformity",
+    // Synthetic groups hold no special-category data (#60).
+    specialCategory: { specialCategory: false },
   };
   await command(
     "createEvaluationProfile",
@@ -795,7 +805,12 @@ try {
     profileId,
   });
   const pinned = e.runs.at(-1);
-  assert.equal(pinned.contractVersion, "1.1");
+  assert.equal(pinned.contractVersion, "1.4");
+  assert.equal(
+    pinned.provenance.inputHashes.statisticsPlan.length,
+    64,
+    "the run freezes its statistics plan",
+  );
   assert.equal(pinned.manifest.model.version, "1");
   assert.equal(pinned.manifest.dataset.rowCount, 80);
   assert.equal(pinned.manifest.profile.name, "Binary acceptance");
@@ -831,6 +846,40 @@ try {
     await command("acceptEvidence", { artifactId: u.artifactId });
     return u.artifactId;
   }
+  // A dataset with a special-category column needs the client's recorded
+  // basis before upload (#60, D-11).
+  const specialUpload = () => {
+    const f = new FormData();
+    f.set("tenantId", tenantId);
+    f.set("engagementId", e.id);
+    f.set("expectedVersion", String(e.version));
+    f.set("category", "Dataset");
+    f.set("visibility", "internal");
+    f.set("handlingBasis", "synthetic");
+    f.set(
+      "file",
+      new File(["actual,predicted,ethnicity\n1,1,A\n0,0,B"], "special.csv", {
+        type: "text/csv",
+      }),
+    );
+    return f;
+  };
+  const refusedUpload = await request("/api/evidence", {
+    method: "POST",
+    body: specialUpload(),
+    status: 409,
+  });
+  assert.match(refusedUpload.error, /recorded basis before upload: ethnicity/);
+  await command("recordSpecialCategoryBasis", {
+    kind: "gdpr_art9",
+    point: "g",
+    statement: "Fixture: substantial public interest basis named by the client",
+    columns: ["ethnicity"],
+    confirmedBy: "Fixture DPO",
+    confirmedOn: "2026-11-01",
+  });
+  await request("/api/evidence", { method: "POST", body: specialUpload() });
+  await refresh();
   for (const item of [
     {
       task: "Regression",
@@ -882,8 +931,9 @@ try {
     assert.equal(tested.state, "succeeded", tested.error);
     assert(
       Math.abs(
-        tested.results[0].metrics[item.task === "Regression" ? 1 : 0].value -
-          item.expected,
+        tested.results[0].metrics.find(
+          (m) => m.name === (item.task === "Regression" ? "rmse" : "accuracy"),
+        ).value - item.expected,
       ) < 1e-12,
     );
   }
@@ -1178,7 +1228,8 @@ try {
   );
   await command("createReport", {
     kind: "draft",
-    opinion: "Readiness assessment",
+    engagementType: "readiness",
+    conclusion: "readiness",
     summary: "Fixture draft snapshot; internal evidence remains restricted.",
   });
   const report = e.reports.at(-1),
@@ -1225,7 +1276,10 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Adverse conclusion",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
       summary: "Blocked fixture final",
     },
     owner,
@@ -1677,6 +1731,67 @@ try {
     owner,
     409,
   );
+  // Retries bind the procedure's plan and the scope, not the program
+  // revision (#69): a change to another procedure, approved in a new program
+  // revision, leaves a cancelled run of this procedure retryable; a change
+  // to this procedure's own plan does not.
+  const planOf = (p, change = {}) => ({
+    selected: p.selected,
+    applicability: p.applicability,
+    rationale: p.rationale ?? "",
+    criterion: p.criterion ?? "",
+    sourceVersion: p.sourceVersion,
+    periodAnalysis: p.periodAnalysis ?? "",
+    population: p.population ?? "",
+    sampling: p.sampling ?? "",
+    ownerId: p.ownerId ?? "",
+    reviewerId: p.reviewerId ?? "",
+    dueDate: p.dueDate ?? "",
+    method: p.method,
+    modelId: p.modelId ?? "",
+    datasetId: p.datasetId ?? "",
+    profileId: p.profileId ?? "",
+    ...change,
+  });
+  const replan = async (p, change) => {
+    await command("saveProcedurePlan", {
+      procedureId: p.id,
+      assignmentRevision: p.assignmentRevision ?? 1,
+      plan: planOf(p, change),
+    });
+    await command("submitProgram", {});
+    await command(
+      "approveProgram",
+      {
+        revision: e.workflow.program.revision,
+        reason: "Changed plan independently reviewed",
+      },
+      reviewer,
+    );
+  };
+  const early = await command("queueRun", {
+    procedureId: proc.id,
+    modelId: runInput.modelId,
+    datasetId: uploaded.artifactId,
+    profileId,
+  });
+  assert.equal(e.runs.at(-1).procedureBinding.planHash, currentPlan().planHash);
+  await command("cancelRun", { runId: early.details.runId });
+  const neighbour = e.workflow.procedures.find(
+    (p) => p.id !== proc.id && !p.selected,
+  );
+  const programBefore = e.workflow.program.revision;
+  await replan(neighbour, {
+    rationale: neighbour.rationale + "; boundary confirmed again",
+  });
+  assert(e.workflow.program.revision > programBefore);
+  const retried = await command("retryRun", { runId: early.details.runId });
+  assert.equal(e.runs.at(-1).retryOf, early.details.runId);
+  await command("cancelRun", { runId: retried.details.runId });
+  await replan(currentPlan(), {
+    sampling: currentPlan().sampling + "; source manifest reconciled",
+  });
+  await command("retryRun", { runId: early.details.runId }, owner, 409);
   const planned = await command("queueRun", {
     procedureId: proc.id,
     modelId: runInput.modelId,
@@ -2127,7 +2242,8 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Readiness assessment",
+      engagementType: "readiness",
+      conclusion: "readiness",
       summary: "Positive readiness blocked by unresolved high finding",
     },
     owner,
@@ -2329,7 +2445,10 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Adverse conclusion",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
       summary: "Must wait for the independent review",
     },
     owner,
@@ -2372,7 +2491,10 @@ try {
   );
   await command("createReport", {
     kind: "final",
-    opinion: "Adverse conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "reasonable",
+    conclusion: "adverse",
+    ...reportParticulars,
     summary:
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
@@ -2706,7 +2828,25 @@ try {
   );
   assert.equal(print.status, 200);
   const html = await print.text();
-  assert(html.includes("Adverse conclusion"));
+  // The client's print view shows the ISAE 3000 report elements (#20).
+  for (const element of [
+    "Independent reasonable assurance report",
+    "To: Fixture client board",
+    "ISAE 3000 (Revised), attestation engagement",
+    "Basis for adverse opinion",
+    "Adverse opinion",
+    "In our opinion, because of the significance",
+    "Signed: Fixture Assurance GmbH",
+    "Location: Vienna, Austria",
+    "Results by criterion",
+    "Executive summary",
+    // The report date is the capture date, not the release date.
+    new Date(internalFinal.createdAt).toLocaleDateString("en-GB", {
+      timeZone: "Europe/Vienna",
+      dateStyle: "long",
+    }),
+  ])
+    assert(html.includes(element), element);
   assert(!html.includes("Internal restriction secret"));
   assert(!html.includes("Internal unavailable evidence fixture"));
   assert(!html.includes("predictions.csv"));
@@ -2749,7 +2889,10 @@ try {
   // A newer final report supersedes the released one automatically.
   await command("createReport", {
     kind: "final",
-    opinion: "Adverse conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "reasonable",
+    conclusion: "adverse",
+    ...reportParticulars,
     summary: "Synthetic amended adverse report replacing the first release.",
   });
   const replacement = e.reports.at(-1);
@@ -2791,12 +2934,17 @@ try {
     "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
     { user: viewer },
   );
+  // The superseded report stays readable to the client, which was issued
+  // that opinion, labelled with its successor.
   assert.deepEqual(
-    clientReports.engagement.reports.map((r) => r.id),
-    [replacement.id],
+    clientReports.engagement.reports.map((r) => [r.id, r.supersededBy]),
+    [
+      [internalFinal.id, replacement.id],
+      [replacement.id, undefined],
+    ],
   );
   // The client sees which earlier report the released one replaced.
-  assert.deepEqual(clientReports.engagement.reports[0].replaces, [
+  assert.deepEqual(clientReports.engagement.reports[1].replaces, [
     internalFinal.id,
   ]);
   // The release-time records are recorded by the release, never prepared.
@@ -2974,13 +3122,31 @@ try {
     "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
     { user: viewer },
   );
-  assert.equal(afterWithdrawal.engagement.reports.length, 0);
-  for (const reportId of [internalFinal.id, replacement.id])
-    await request(
-      "/api/report-package?" +
-        new URLSearchParams({ tenantId, engagementId: e.id, reportId }),
-      { user: viewer, status: 404 },
-    );
+  // The withdrawn report leaves the client's view; the report it superseded
+  // was issued to the client and stays readable, labelled as superseded
+  // without naming the withdrawn successor the client cannot read.
+  assert.deepEqual(
+    afterWithdrawal.engagement.reports.map((r) => [r.id, r.supersededBy]),
+    [[internalFinal.id, "a later report, since withdrawn"]],
+  );
+  await request(
+    "/api/report-package?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: internalFinal.id,
+      }),
+    { user: viewer },
+  );
+  await request(
+    "/api/report-package?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: replacement.id,
+      }),
+    { user: viewer, status: 404 },
+  );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );
@@ -2997,7 +3163,8 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Readiness assessment",
+      engagementType: "readiness",
+      conclusion: "readiness",
       summary: "Must reject a positive prohibited-practice opinion",
     },
     owner,

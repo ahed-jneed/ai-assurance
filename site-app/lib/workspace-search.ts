@@ -1,4 +1,5 @@
 import type { WorkspaceData } from "@/app/workspace-types";
+import { opinionLabel } from "./domain/report-model";
 
 export type SearchItem = {
   kind:
@@ -178,7 +179,7 @@ export function workspaceSearch(
           (report.kind === "final" ? "Final report" : "Draft report") +
           " · " +
           new Date(report.createdAt).toLocaleDateString(),
-        context: String(report.snapshot.opinion ?? ""),
+        context: opinionLabel(report.snapshot),
         terms: report.id + " " + String(report.snapshot.summary ?? ""),
       });
 

@@ -4,6 +4,7 @@
 // first load and for back/forward.
 import { useEffect, useRef, useState } from "react";
 import type { Role } from "@/lib/domain";
+import { defaultTerms, type ReportTerms } from "@/lib/domain/report-model";
 import { readEvidenceQuery } from "@/lib/evidence-presentation";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import {
@@ -66,7 +67,7 @@ export function useUrlState(data: WorkspaceData | null) {
     [requestFilter, setRequestFilter] = useState("all");
   const [inboxQuery, setInboxQuery] = useState(defaultInboxQuery),
     [workbenchQuery, setWorkbenchQuery] = useState(defaultWorkbenchQuery);
-  const [reportOpinion, setReportOpinion] = useState("Readiness assessment"),
+  const [reportTerms, setReportTerms] = useState<ReportTerms>(defaultTerms),
     [reportSection, setReportSection] = useState("packages");
   const [procedureContext, setProcedureContext] = useState<
       string | undefined
@@ -167,8 +168,8 @@ export function useUrlState(data: WorkspaceData | null) {
     setInboxQuery,
     workbenchQuery,
     setWorkbenchQuery,
-    reportOpinion,
-    setReportOpinion,
+    reportTerms,
+    setReportTerms,
     reportSection,
     setReportSection,
     procedureContext,

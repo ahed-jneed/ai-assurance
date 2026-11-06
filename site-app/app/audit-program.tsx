@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Engagement, Paper, Report, Role, Finding } from "@/lib/domain";
 import { isReleaseTimeRecord } from "@/lib/domain";
+import { opinionLabel } from "@/lib/domain/report-model";
 import type {
   BriefFields,
   Procedure,
@@ -873,7 +874,7 @@ export function AuditProgram({
               label:
                 new Date(r.createdAt).toLocaleDateString() +
                 " · " +
-                String(r.snapshot.opinion),
+                opinionLabel(r.snapshot),
             })),
           "",
           true,
@@ -2319,7 +2320,7 @@ export function ReportRelease({
                         label:
                           new Date(q.createdAt).toLocaleDateString() +
                           " · " +
-                          String(q.snapshot.opinion),
+                          opinionLabel(q.snapshot),
                       })),
                     "",
                     true,

@@ -627,7 +627,7 @@ export function AssuranceWorkbench({
       {
         name: "negativeLabel",
         label: "Other binary class label",
-        help: "Leave empty to use the system revision's other output class. The pair must be exactly the system's two output classes.",
+        help: "Leave empty to use the system revision's other output class. The pair must be exactly the system's two output classes, and a protocol with a statistics plan must declare the same other label. Leave it empty for multiclass and regression models.",
       },
       { name: "predictionOutput", label: "Named adapter output (ONNX / PMML)" },
       {

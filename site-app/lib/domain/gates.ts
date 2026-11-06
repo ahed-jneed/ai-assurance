@@ -12,6 +12,12 @@ import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
 import { acceptanceGates } from "../workflow/acceptance";
 import type { Engagement, Paper } from "./types";
+import { reportElements } from "./report-gates";
+import {
+  requiresSupport,
+  type ReportParticulars,
+  type ReportTerms,
+} from "./report-model";
 export const stages = [
   "Planning",
   "Fieldwork",
@@ -30,7 +36,8 @@ export type AuditGate = {
     | "request"
     | "conclusion"
     | "workflow"
-    | "acceptance";
+    | "acceptance"
+    | "report";
   recordId?: string;
   title: string;
   message: string;
@@ -88,22 +95,26 @@ const procedureScope = (target?: string) => (p: Procedure) =>
 const paperScope = (target?: string) => (p: Paper) =>
   paperCurrent(p) && gatesStage(p.stage, p.templateId, target);
 /**
- * What must hold before final issuance with this opinion or, with `target`,
- * the opinion-neutral part for entering that lifecycle stage: then only the
- * work of earlier stages counts.
+ * What must hold before final issuance with this conclusion or, with
+ * `target`, the conclusion-neutral part for entering that lifecycle stage:
+ * then only the work of earlier stages counts. `conclusion` is a report-model
+ * conclusion id or a legacy opinion string; a positive one (unmodified or
+ * readiness) also needs every in-scope conclusion supported, no open High or
+ * Critical finding, no scope limitation and no prohibited practice.
  */
 export function completionGates(
   e: Engagement,
-  opinion = "Readiness assessment",
+  conclusion = "readiness",
   target?: string,
 ): AuditGate[] {
-  const inScope = paperScope(target);
+  const inScope = paperScope(target),
+    positive = requiresSupport(conclusion);
   return [
     ...workflowRequirements(e, true, procedureScope(target)).map((g) => ({
       ...g,
       kind: "workflow" as const,
     })),
-    ...(opinion === "Readiness assessment"
+    ...(positive
       ? (e.workflow?.procedures ?? [])
           .filter(
             (p) =>
@@ -118,7 +129,7 @@ export function completionGates(
             title: p.title,
             message:
               p.templateId +
-              ": an applicable procedure outside audit scope prevents a readiness opinion",
+              ": an applicable procedure outside audit scope prevents an unmodified or readiness conclusion",
           }))
       : []),
     ...(e.classification.status !== "approved"
@@ -133,14 +144,15 @@ export function completionGates(
           },
         ]
       : []),
-    ...(opinion === "Readiness assessment" && e.classification.prohibited
+    ...(positive && e.classification.prohibited
       ? [
           {
             id: "prohibited",
             kind: "classification" as const,
-            title: "Prohibited practice prevents a readiness opinion",
+            title:
+              "Prohibited practice prevents an unmodified or readiness conclusion",
             message:
-              "A prohibited practice cannot receive a positive readiness opinion",
+              "A prohibited practice cannot receive an unmodified or readiness conclusion",
           },
         ]
       : []),
@@ -162,7 +174,7 @@ export function completionGates(
     ...e.papers
       .filter(
         (p) =>
-          opinion === "Readiness assessment" &&
+          positive &&
           inScope(p) &&
           paperRequired(e, p) &&
           p.status === "signed" &&
@@ -174,12 +186,13 @@ export function completionGates(
         recordId: p.id,
         title: p.templateId + " · " + p.title,
         message:
-          p.templateId + ": conclusion does not support a readiness opinion",
+          p.templateId +
+          ": conclusion does not support an unmodified or readiness conclusion",
       })),
     ...e.findings
       .filter(
         (f) =>
-          opinion === "Readiness assessment" &&
+          positive &&
           f.status !== "closed" &&
           ["Critical", "High"].includes(f.severity),
       )
@@ -226,35 +239,36 @@ export function completionGates(
           r.id + ": required evidence request needs a documented disposition",
       })),
     ...(e.evidenceRequests ?? [])
-      .filter(
-        (r) =>
-          opinion === "Readiness assessment" &&
-          r.disposition === "unobtainable",
-      )
+      .filter((r) => positive && r.disposition === "unobtainable")
       .map((r) => ({
         id: r.id,
         kind: "request" as const,
         recordId: r.id,
         title: r.subject,
-        message: r.id + ": unavailable evidence prevents a readiness opinion",
+        message:
+          r.id +
+          ": unavailable evidence prevents an unmodified or readiness conclusion",
       })),
   ];
 }
-export function reportBlockers(
-  e: Engagement,
-  opinion = "Readiness assessment",
-) {
-  return completionGates(e, opinion).map((g) => g.message);
+export function reportBlockers(e: Engagement, conclusion = "readiness") {
+  return completionGates(e, conclusion).map((g) => g.message);
 }
+/** A final report as it is prepared: its terms and, at capture, particulars. */
+export type FinalReport = ReportTerms & { particulars?: ReportParticulars };
 /**
  * What must hold before a final report is captured or released: the
  * engagement is in Sign-off and every stage's work is complete, except the
- * release-time records the release itself records.
+ * release-time records the release itself records. With full report terms
+ * the terms must also be a valid combination and the report elements
+ * complete; a bare conclusion (or the opinion of a legacy report, captured
+ * before report elements existed) checks the evidence gates only.
  */
 export function finalReportGates(
   e: Engagement,
-  opinion = "Readiness assessment",
+  report: FinalReport | string = "readiness",
 ): AuditGate[] {
+  const conclusion = typeof report === "string" ? report : report.conclusion;
   return [
     ...(e.stage !== "Sign-off"
       ? [
@@ -267,7 +281,17 @@ export function finalReportGates(
           },
         ]
       : []),
-    ...completionGates(e, opinion),
+    ...completionGates(e, conclusion),
+    ...(typeof report === "string"
+      ? []
+      : reportElements(e, report, report.particulars)
+          .filter((el) => el.problem)
+          .map((el) => ({
+            id: "report:" + el.id,
+            kind: "report" as const,
+            title: el.label,
+            message: el.problem,
+          }))),
   ];
 }
 /**
@@ -328,11 +352,11 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
         })),
     ];
   if (target === "Evidence evaluation")
-    return completionGates(e, "Adverse conclusion")
+    return completionGates(e, "adverse")
       .filter((g) => g.kind === "run")
       .map((g) => ({
         ...g,
         message: "Complete diagnostic runs before evidence evaluation",
       }));
-  return completionGates(e, "Adverse conclusion", target);
+  return completionGates(e, "adverse", target);
 }
