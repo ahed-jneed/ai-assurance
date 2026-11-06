@@ -5,6 +5,7 @@ import { expectAccessible } from "./a11y";
 import {
   DEMO,
   expect,
+  runCommand,
   test,
   workspacePath,
   type Api,
@@ -101,13 +102,15 @@ test("the reviewer records the checklist but cannot edit papers", async ({
   await item
     .getByLabel("Notes")
     .fill("Read the brief, the classification and the audit program.");
-  await panel.getByRole("button", { name: "Save checklist" }).click();
-  await expect
-    .poll(async () => {
-      const now = await eqr.workspace(demo.tenantId, demo.engagementId);
-      return now.engagement.qualityReview.items.find(
-        (i: { id: string }) => i.id === "understanding",
-      )?.status;
-    })
-    .toBe("satisfied");
+  // Read through the API only once the Worker has answered the UI's command,
+  // never while its save is still in flight (#119).
+  await runCommand(page, "saveQualityReview", () =>
+    panel.getByRole("button", { name: "Save checklist" }).click(),
+  );
+  const now = await eqr.workspace(demo.tenantId, demo.engagementId);
+  expect(
+    now.engagement.qualityReview.items.find(
+      (i: { id: string }) => i.id === "understanding",
+    )?.status,
+  ).toBe("satisfied");
 });
