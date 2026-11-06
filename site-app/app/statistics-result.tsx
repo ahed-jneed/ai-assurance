@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { Metric, Result } from "@/lib/domain";
-import { REASON_TEXT, bandText, explainResult } from "@/lib/hosted-statistics";
+import { REASON_TEXT, explainResult } from "@/lib/hosted-statistics";
 import { humanLabel } from "@/lib/presentation";
 import { THRESHOLD_LIBRARY, type Band } from "@/lib/statistics";
 
@@ -67,6 +67,35 @@ const p = (value: number | null | undefined) =>
       : value.toFixed(4);
 const pct = (v: number | null | undefined) =>
   v === null || v === undefined ? "–" : (v * 100).toFixed(1) + "%";
+/** A band in the metric's own unit, for example "≤ 10.0 pp" or "≥ 80.0%". */
+function bandShown(m: Metric, band: Band | null | undefined) {
+  if (!band) return "no band";
+  const { lower, upper } = band;
+  if (lower !== null && upper !== null)
+    return details(m).metric !== "selection_rate_ratio" && lower === -upper
+      ? `within ±${show(m, upper)}`
+      : `within [${show(m, lower)}, ${show(m, upper)}]`;
+  return lower !== null ? `≥ ${show(m, lower)}` : `≤ ${show(m, upper)}`;
+}
+/** Where the point estimate lies against the band; the interval decides. */
+const POSITION: Record<string, string> = {
+  pass: "Estimate within band",
+  fail: "Estimate outside band",
+  none: "Estimate on the band edge",
+};
+const METHOD_NAMES: Record<string, string> = {
+  wilson: "Wilson score",
+  wilson_bonferroni_mean: "Wilson, Bonferroni-adjusted mean",
+  newcombe_hybrid_score: "Newcombe hybrid score",
+  katz_log: "Katz log",
+  koopman_score: "Koopman score",
+  mover_wilson: "MOVER (Wilson)",
+  jaccard_wilson: "Jaccard–Wilson",
+  jaccard_wilson_bonferroni: "Jaccard–Wilson, Bonferroni-adjusted",
+  worst_member_bounds: "worst member bounds",
+};
+const methodName = (method: string) =>
+  METHOD_NAMES[method] ?? humanLabel(method);
 const range = (ci: { lower: number; upper: number } | null | undefined) =>
   ci ? `${pct(ci.lower)} – ${pct(ci.upper)}` : "";
 
@@ -97,7 +126,7 @@ function MetricRow({ m }: { m: Metric }) {
             {show(m, ci.lower)} to {show(m, ci.upper)}
             <span className="subtle">
               {" "}
-              · {Math.round(ci.level * 100)}% {humanLabel(ci.method)}
+              · {Math.round(ci.level * 100)}% {methodName(ci.method)}
             </span>
           </>
         ) : (
@@ -105,9 +134,11 @@ function MetricRow({ m }: { m: Metric }) {
         )}
       </TableCell>
       <TableCell>{(m.denominator ?? m.sampleSize).toLocaleString()}</TableCell>
-      <TableCell>{d.band ? bandText(d.metric, d.band) : "–"}</TableCell>
+      <TableCell>{d.band ? bandShown(m, d.band) : "–"}</TableCell>
       <TableCell>
-        {d.status === "evaluated" ? d.direction : humanLabel(d.status)}
+        {d.status === "evaluated"
+          ? (POSITION[d.direction] ?? humanLabel(d.direction))
+          : humanLabel(d.status)}
         {d.role !== "descriptive" && m.pValue !== null && (
           <span className="subtle"> · p {p(m.pValue)}</span>
         )}
@@ -141,14 +172,11 @@ export function StatisticsResult({ result }: { result: Result }) {
   );
   const bands = headline
     ? [
-        `${humanLabel(details(headline).metric)} ${bandText(details(headline).metric, details(headline).band)}`,
+        `${humanLabel(details(headline).metric)} ${bandShown(headline, details(headline).band)}`,
       ]
     : members
         .filter((m) => details(m).subject === null)
-        .map(
-          (m) =>
-            `${humanLabel(m.name)} ${bandText(details(m).metric, details(m).band)}`,
-        );
+        .map((m) => `${humanLabel(m.name)} ${bandShown(m, details(m).band)}`);
   const slices = (headline?.slices ?? []) as Slice[];
   const reasons = [...new Set(decision.reasons)].filter((r) => REASON_TEXT[r]);
   return (
@@ -213,11 +241,16 @@ export function StatisticsResult({ result }: { result: Result }) {
       <Table>
         <TableHeader>
           <TableRow>
-            {["Metric", "Estimate", "Interval", "n", "Band", "Direction"].map(
-              (v) => (
-                <TableHead key={v}>{v}</TableHead>
-              ),
-            )}
+            {[
+              "Metric",
+              "Estimate",
+              "Interval",
+              "n",
+              "Band",
+              "Point estimate",
+            ].map((v) => (
+              <TableHead key={v}>{v}</TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
