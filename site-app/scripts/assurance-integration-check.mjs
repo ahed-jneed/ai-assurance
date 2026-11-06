@@ -27,6 +27,8 @@ const mf = new Miniflare({
   bindings: {
     IDENTITY_MODE: "trusted-headers",
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    // First sign-ins provision the fixture practices (lib/access-policy.ts).
+    SELF_SIGNUP: "open",
   },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
@@ -609,6 +611,62 @@ try {
   console.log(
     "PASS exact population pin and reproducible stratified sample manifest",
   );
+  // A binary model labelled "no"/"yes": queueExternal derives the other
+  // class from the system's output classes instead of freezing "0" (D-12).
+  const labelledCsv = csv
+      .split("\n")
+      .map((line, i) =>
+        !i || !line.trim()
+          ? line
+          : line
+              .split(",")
+              .map((cell, c) => (c < 2 ? (cell === "1" ? "yes" : "no") : cell))
+              .join(","),
+      )
+      .join("\n"),
+    labelledDatasetId = await upload("labelled-predictions.csv", labelledCsv);
+  await cmd("createModel", {
+    name: "Labelled fixture predictor",
+    version: "1",
+    task: "Binary classification",
+    format: "Prediction file",
+    intendedPurpose: "Synthetic tests only",
+    artifactId: labelledDatasetId,
+  });
+  const labelledModelId = e.models.at(-1).id;
+  await cmd("createEvaluationProfile", {
+    name: "Labelled acceptance",
+    version: "1",
+    task: "Binary classification",
+    suite: ["performance"],
+    config: { ...config, positiveLabel: "yes" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+  });
+  const labelledProfileId = e.evaluationProfiles.at(-1).id;
+  const labelledSystem = (
+    await assurance("registerSystem", {
+      ...system.body,
+      modelPins: undefined,
+      artifactPins: undefined,
+      name: "Labelled fixture system",
+      modelIds: [labelledModelId],
+      outputs: { ...system.body.outputs, classOrder: ["no", "yes"] },
+    })
+  ).record;
+  const labelledPrediction = (
+    await assurance("registerPrediction", {
+      modelId: labelledModelId,
+      systemId: labelledSystem.id,
+      datasetId: labelledDatasetId,
+      sourceDatasetId: labelledDatasetId,
+      producedAt: new Date().toISOString(),
+      producingRun: "synthetic-generation",
+      inferenceConfiguration: "Fixture deterministic predictions",
+      mode: "provided_predictions",
+      limitations: "Declared lineage only",
+    })
+  ).record;
   await cmd("adoptWorkflow", {});
   // Approved planning fixture isolates job/runtime tests; full approval transitions are exercised in integration-check.mjs.
   e.workflow.brief = {
@@ -666,11 +724,31 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
-  await testDb
-    .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
-    .bind(JSON.stringify(e), tenantId, e.id)
-    .run();
-  await refresh();
+  const labelledProcedure = e.workflow.procedures.find(
+    (p) => p.templateId === "WP-A15-03",
+  );
+  Object.assign(labelledProcedure, {
+    selected: true,
+    applicability: "readiness",
+    ownerId: owner,
+    reviewerId: reviewer,
+    method: "automated",
+    modelId: labelledModelId,
+    datasetId: labelledDatasetId,
+    profileId: labelledProfileId,
+    rationale: "Synthetic",
+    population: "Fixture",
+    sampling: "Full fixture",
+  });
+  // Writes the fixture engagement as edited here, bypassing the commands.
+  const writeEngagement = async () => {
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(e), tenantId, e.id)
+      .run();
+    await refresh();
+  };
+  await writeEngagement();
   const datasetCard = (
     await assurance("registerDataset", {
       schemaVersion: "1.0",
@@ -717,20 +795,114 @@ try {
     refused.error,
     /recall on the favourable label '1' only, so it cannot apply this protocol's performance positive class '0'/,
   );
-  const job = await assurance("queueExternal", plan);
-  const runtime = await processRun(
-    [
-      "-c",
-      "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'4'*64,heartbeat=1); print(json.dumps(w.once()))",
-    ],
-    {
-      ASSURANCE_WORKER_TOKEN: worker.token,
-      ASSURANCE_TEST_ORIGIN: origin,
-      ASSURANCE_TEST_WORKER: worker.workerId,
-    },
+  // Jobs the worker would refuse are refused at queue time (#58).
+  const jobCount = async () =>
+    (await testDb.prepare("SELECT COUNT(*) AS n FROM execution_jobs").first())
+      .n;
+  const jobsBefore = await jobCount();
+  const wrongOther = await assurance(
+    "queueExternal",
+    { ...plan, negativeLabel: "no" },
+    owner,
+    400,
   );
-  assert.equal(runtime.code, 0, runtime.out + runtime.error);
-  assert.equal(JSON.parse(runtime.out.trim()).state, "completed");
+  assert.match(
+    wrongOther.error,
+    /must be '0', the system revision's other output class; the worker would refuse 'no'/,
+  );
+  const systemRevision = async (version, changes) =>
+    (
+      await assurance("registerSystem", {
+        ...system.body,
+        modelPins: undefined,
+        artifactPins: undefined,
+        version,
+        ...changes,
+      })
+    ).record;
+  const threeClass = await systemRevision("1-three-classes", {
+    outputs: { ...system.body.outputs, classOrder: ["0", "1", "2"] },
+  });
+  const notBinary = await assurance(
+    "queueExternal",
+    { ...plan, systemId: threeClass.id },
+    owner,
+    400,
+  );
+  assert.match(
+    notBinary.error,
+    /declare exactly two output classes; it declares 3 \('0', '1', '2'\)/,
+  );
+  const wide = await systemRevision("1-wide", {
+    features: Array.from({ length: 101 }, (_, i) => ({
+      name: "feature_" + i,
+      type: "number",
+      unit: "unitless",
+      nullable: false,
+      nullHandling: "reject",
+      categories: [],
+    })),
+  });
+  const securityId = await upload(
+    "adapter-review.txt",
+    "Synthetic adapter security review",
+    "Security",
+  );
+  // Model inference needs a portable model format; the fixture model is a
+  // prediction file, so it poses as ONNX for this refusal only.
+  const patchModel = async (changes) => {
+    Object.assign(
+      e.models.find((m) => m.id === modelId),
+      changes,
+    );
+    await writeEngagement();
+  };
+  await patchModel({ format: "ONNX" });
+  const tooWide = await assurance(
+    "queueExternal",
+    {
+      ...plan,
+      predictionId: undefined,
+      systemId: wide.id,
+      mode: "auditor_model",
+      securityReviewId: securityId,
+      predictionOutput: "label",
+    },
+    owner,
+    400,
+  );
+  assert.match(
+    tooWide.error,
+    /accepts 1 to 100 feature columns; this system revision declares 101/,
+  );
+  await patchModel({ format: "Prediction file" });
+  // A claim repeats the frozen request twice, so about 1.1 MB of model
+  // metadata makes a claim response the worker cannot read (2 MiB).
+  await patchModel({ intendedPurpose: "x".repeat(1100000) });
+  const tooLarge = await assurance("queueExternal", plan, owner, 413);
+  assert.match(tooLarge.error, /over its 2 MiB limit for a claim/);
+  await patchModel({ intendedPurpose: "Synthetic tests only" });
+  assert.equal(await jobCount(), jobsBefore);
+  console.log(
+    "PASS queue refuses a wrong other label, a non-binary system, more than 100 features and an oversized claim",
+  );
+  const runWorker = async () => {
+    const runtime = await processRun(
+      [
+        "-c",
+        "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'4'*64,heartbeat=1); print(json.dumps(w.once()))",
+      ],
+      {
+        ASSURANCE_WORKER_TOKEN: worker.token,
+        ASSURANCE_TEST_ORIGIN: origin,
+        ASSURANCE_TEST_WORKER: worker.workerId,
+      },
+    );
+    assert.equal(runtime.code, 0, runtime.out + runtime.error);
+    return JSON.parse(runtime.out.trim());
+  };
+  const job = await assurance("queueExternal", plan);
+  assert.equal((await runWorker()).state, "completed");
   const jobRow = await testDb
     .prepare("SELECT * FROM execution_jobs WHERE id=?")
     .bind(job.jobId)
@@ -807,6 +979,41 @@ try {
   });
   console.log(
     "PASS actual HTTP worker → pinned input → Python diagnostics → authenticated result → bound audit procedure",
+  );
+  // No other label given: the platform freezes the system's other class.
+  const labelled = await assurance("queueExternal", {
+      systemId: labelledSystem.id,
+      modelId: labelledModelId,
+      datasetId: labelledDatasetId,
+      profileId: labelledProfileId,
+      procedureId: labelledProcedure.id,
+      mode: "provided_predictions",
+      predictionId: labelledPrediction.id,
+    }),
+    labelledFrozen = JSON.parse(
+      (
+        await testDb
+          .prepare("SELECT request FROM execution_jobs WHERE id=?")
+          .bind(labelled.jobId)
+          .first()
+      ).request,
+    );
+  assert.equal(labelledFrozen.engineConfig.config.positiveLabel, "yes");
+  assert.equal(labelledFrozen.engineConfig.negativeLabel, "no");
+  assert.equal((await runWorker()).state, "completed");
+  const labelledRow = await testDb
+    .prepare("SELECT state,result_key FROM execution_jobs WHERE id=?")
+    .bind(labelled.jobId)
+    .first();
+  assert.equal(labelledRow.state, "succeeded");
+  assert.equal(
+    JSON.parse(
+      await (await testBucket.get(labelledRow.result_key)).text(),
+    ).hostedResults[0].metrics.find((m) => m.name === "accuracy").value,
+    0.85,
+  );
+  console.log(
+    "PASS non-numeric binary labels: derived other class, accepted and run by the worker",
   );
   const next = await assurance("queueExternal", plan),
     claim = await api("/api/runner", {

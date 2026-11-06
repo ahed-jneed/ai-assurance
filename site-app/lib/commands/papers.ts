@@ -1,13 +1,46 @@
 import { z } from "zod";
-import type { Engagement, Paper } from "../domain";
+import {
+  isReleaseTimeRecord,
+  releaseTimeMessage,
+  type Engagement,
+  type Paper,
+} from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
+/**
+ * The paper a command changes. A superseded paper stays as it was signed and
+ * a retired limitation memo changes only when its evidence request is closed
+ * again, so neither can be changed here.
+ */
 function paper(e: Engagement, value: unknown) {
   const p = e.papers.find((p) => p.id === value);
   if (!p) throw new ApiError(404, "Working paper not found");
+  if (p.supersededBy)
+    throw new ApiError(
+      409,
+      "This signed paper was superseded by " +
+        p.supersededBy +
+        " and stays as it was signed",
+    );
+  if (p.retired)
+    throw new ApiError(
+      409,
+      "This limitation memo was retired when its evidence request was reopened; close the request again to revise it",
+    );
+  return p;
+}
+/**
+ * A paper that is prepared, reviewed and signed here. The release-time
+ * records are recorded by the release against the approved package hashes,
+ * so a change to them after capture would change the captured package.
+ */
+function workingPaper(e: Engagement, value: unknown) {
+  const p = paper(e, value);
+  if (isReleaseTimeRecord(p.templateId))
+    throw new ApiError(409, releaseTimeMessage(p.templateId));
   return p;
 }
 function archive(p: Paper, actor: string) {
@@ -35,6 +68,8 @@ export const papers = defineCommands({
     roles: ["Auditor", "Lead Auditor"],
     handle(e, d, ctx) {
       const a = z.object({ templateId: short }).parse(d);
+      if (isReleaseTimeRecord(a.templateId))
+        throw new ApiError(409, releaseTimeMessage(a.templateId));
       const p = templatePaper(a.templateId, ctx.user.userId);
       e.papers.push(p);
       return { details: { paperId: p.id } };
@@ -67,7 +102,7 @@ export const papers = defineCommands({
             required: z.boolean(),
           })
           .parse(d),
-        p = paper(e, a.paperId);
+        p = workingPaper(e, a.paperId);
       if (
         e.workflow?.procedures.some(
           (q) => q.paperId === p.id && q.paperRevision !== undefined,
@@ -120,7 +155,7 @@ export const papers = defineCommands({
   reopenPaper: {
     roles: ["Lead Auditor"],
     handle(e, d, ctx) {
-      const p = paper(e, d.paperId),
+      const p = workingPaper(e, d.paperId),
         authorId = p.authorId;
       if (
         e.workflow?.procedures.some(
@@ -139,7 +174,7 @@ export const papers = defineCommands({
   submitPaper: {
     roles: ["Auditor", "Lead Auditor"],
     handle(e, d) {
-      const p = paper(e, d.paperId);
+      const p = workingPaper(e, d.paperId);
       if (
         e.workflow?.procedures.some(
           (q) => q.paperId === p.id && q.paperRevision !== undefined,
@@ -170,7 +205,7 @@ export const papers = defineCommands({
   reviewPaper: {
     roles: ["Reviewer", "Lead Auditor"],
     handle(e, d, ctx) {
-      const p = paper(e, d.paperId);
+      const p = workingPaper(e, d.paperId);
       if (e.workflow?.procedures.some((q) => q.paperId === p.id))
         throw new ApiError(
           409,
@@ -197,7 +232,7 @@ export const papers = defineCommands({
   signPaper: {
     roles: ["Lead Auditor"],
     async handle(e, d, ctx) {
-      const p = paper(e, d.paperId);
+      const p = workingPaper(e, d.paperId);
       if (
         p.status !== "reviewed" ||
         !p.reviews.some(

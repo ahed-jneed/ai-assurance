@@ -17,6 +17,14 @@ import { linkEvidenceModal } from "./link-evidence";
 import { memberEditModal, memberModal } from "./member";
 import { memberRevokeModal } from "./member-revoke";
 import { paperModal } from "./paper";
+import {
+  adminGrantModal,
+  adminRevokeModal,
+  adminTransferModal,
+  invitationCancelModal,
+  inviteModal,
+  practiceRenameModal,
+} from "./practice-access";
 import { reportModal } from "./report";
 import type { ModalDefinition } from "./types";
 import { uploadModal } from "./upload";
@@ -31,6 +39,12 @@ const modalDefinitions: Record<string, ModalDefinition> = {
   member: memberModal,
   memberEdit: memberEditModal,
   memberRevoke: memberRevokeModal,
+  invite: inviteModal,
+  invitationCancel: invitationCancelModal,
+  practiceRename: practiceRenameModal,
+  adminGrant: adminGrantModal,
+  adminRevoke: adminRevokeModal,
+  adminTransfer: adminTransferModal,
   upload: uploadModal,
   classification: classificationModal,
   finding: findingModal,

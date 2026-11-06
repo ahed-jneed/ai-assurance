@@ -31,6 +31,8 @@ export function MemberOnboarding({
 }) {
   const [step, setStep] = useState(0),
     [userId, setUserId] = useState(""),
+    [byEmail, setByEmail] = useState(true),
+    [email, setEmail] = useState(""),
     [name, setName] = useState(""),
     [role, setRole] = useState("Auditor"),
     [clientId, setClientId] = useState(""),
@@ -50,6 +52,8 @@ export function MemberOnboarding({
       // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the wizard each time the dialog opens
       setStep(0);
       setUserId("");
+      setByEmail(true);
+      setEmail("");
       setName("");
       setRole("Auditor");
       setClientId(data.clients[0]?.id ?? "");
@@ -76,13 +80,17 @@ export function MemberOnboarding({
     e = data.engagement;
   function close() {
     if (saving || busy) return;
-    if (userId || name || completed.length) setDiscard(true);
+    if (userId || email || name || completed.length) setDiscard(true);
     else onClose();
   }
   function next() {
     setError("");
-    if (step === 0 && (!userId.trim() || !name.trim())) {
-      setError("Enter the signed-in account ID and display name.");
+    if (step === 0 && (!(byEmail ? email : userId).trim() || !name.trim())) {
+      setError(
+        byEmail
+          ? "Enter the email address and display name."
+          : "Enter the signed-in account ID and display name.",
+      );
       return;
     }
     if (step === 1 && client && !clientId) {
@@ -106,13 +114,26 @@ export function MemberOnboarding({
     setError("");
     const done = [...completed];
     try {
+      if (!done.includes("membership") && byEmail) {
+        // The invitee joins at their next sign-in with this email.
+        await manage("inviteMember", {
+          email: email.trim(),
+          displayName: name.trim(),
+          role,
+          ...(client
+            ? { clientId }
+            : { engagementIds: canAssign ? engagements : [] }),
+        });
+        done.push("membership");
+        setCompleted([...done]);
+      }
       if (!done.includes("membership")) {
         await manage("grantMember", {
           userId: userId.trim(),
           displayName: name.trim(),
           role,
           clientId: client ? clientId : null,
-          engagementIds: client ? [] : engagements,
+          engagementIds: client || !canAssign ? [] : engagements,
         });
         done.push("membership");
         setCompleted([...done]);
@@ -181,17 +202,52 @@ export function MemberOnboarding({
                 maxLength={300}
               />
             </label>
-            <label>
-              Signed-in account ID
-              <Input
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                maxLength={300}
-                autoComplete="off"
-              />
-            </label>
+            <fieldset className="check-row">
+              <label>
+                <input
+                  type="radio"
+                  name="onboarding-identity"
+                  checked={byEmail}
+                  onChange={() => setByEmail(true)}
+                />
+                Invite by email
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="onboarding-identity"
+                  checked={!byEmail}
+                  onChange={() => setByEmail(false)}
+                />
+                They have signed in and shared their account ID
+              </label>
+            </fieldset>
+            {byEmail ? (
+              <label>
+                Email
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  maxLength={320}
+                  autoComplete="off"
+                />
+              </label>
+            ) : (
+              <label>
+                Signed-in account ID
+                <Input
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  maxLength={300}
+                  autoComplete="off"
+                />
+              </label>
+            )}
             <p className="subtle">
-              The person signs in and copies their ID from Members & access.
+              {byEmail
+                ? "They join this practice the next time they sign in with this email. The platform sends no email, so let them know."
+                : "The person signs in and copies their ID from Members & access."}{" "}
               Private Site sharing must also be arranged by the Site owner.
             </p>
             <label className="check-row">
@@ -300,7 +356,12 @@ export function MemberOnboarding({
                 explicitly shared material.
               </p>
             )}
-            {role === "Client Contributor" && (
+            {role === "Client Contributor" && byEmail && (
+              <p className="subtle">
+                Assign evidence requests after they accept the invitation.
+              </p>
+            )}
+            {role === "Client Contributor" && !byEmail && (
               <>
                 <h3>Evidence requests</h3>
                 {(!canAssign || !e?.workflow || e.clientId !== clientId) && (
@@ -389,7 +450,10 @@ export function MemberOnboarding({
           <section className="onboarding-summary">
             <dl>
               <dt>Person</dt>
-              <dd>{name}</dd>
+              <dd>
+                {name}
+                {byEmail && email ? " · " + email : ""}
+              </dd>
               <dt>Role</dt>
               <dd>{role}</dd>
               <dt>Scope</dt>
@@ -409,7 +473,9 @@ export function MemberOnboarding({
               <dt>Application setup</dt>
               <dd>
                 {completed.includes("membership")
-                  ? "Membership saved"
+                  ? byEmail
+                    ? "Invitation saved"
+                    : "Membership saved"
                   : "Pending"}
                 {requests.length
                   ? " · " +

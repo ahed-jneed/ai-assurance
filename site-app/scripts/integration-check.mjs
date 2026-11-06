@@ -26,6 +26,8 @@ const mf = new Miniflare({
   bindings: {
     IDENTITY_MODE: "trusted-headers",
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    // First sign-ins provision the fixture practices (lib/access-policy.ts).
+    SELF_SIGNUP: "open",
   },
   d1Databases: { DB: "audit-integration" },
   r2Buckets: { BUCKET: "audit-integration-evidence" },
@@ -447,6 +449,9 @@ try {
     displayName: "Independent Reviewer",
     role: "Auditor",
     clientId: null,
+    // A role change withdraws earlier grants; the engagement is kept by
+    // listing it (F-24).
+    engagementIds: [e.id],
   });
   await command("reviewPaper", { paperId: e.papers[0].id }, reviewer, 403);
   await management("updateMember", {
@@ -454,6 +459,9 @@ try {
     displayName: "Independent Reviewer",
     role: "Reviewer",
     clientId: null,
+    // A role change withdraws earlier grants; the engagement is kept by
+    // listing it (F-24).
+    engagementIds: [e.id],
   });
   await management("revokeMember", { userId: viewer });
   await request("/api/workspace?tenantId=" + tenantId, {
@@ -1237,20 +1245,163 @@ try {
     "PASS review independence, exact revision sign-off, immutable draft and client redaction",
   );
 
-  await command("classify", {
-    prohibited: false,
-    highRisk: true,
-    transparency: true,
-    profiling: false,
+  // #19: tri-state facts. Every required fact unknown keeps the
+  // classification at "Needs information" and blocks the approval.
+  const art5Facts = (answer) =>
+    Object.fromEntries(
+      workspace.catalog.regulatorySnapshot.prohibitedPractices.map((p) => [
+        "art5_" +
+          p.point
+            .replace(/^Art\s*5/, "")
+            .replace(/[()]+/g, "_")
+            .replace(/^_+|_+$/g, ""),
+        answer,
+      ]),
+    );
+  const providerFacts = {
+    ...art5Facts("no"),
+    annexIIIProfiling: "no",
+    gpaiModelProvider: "no",
+    gpaiDownstreamProvider: "no",
+    smeStatus: "neither",
+    interactsDirectlyWithNaturalPersons: "yes",
+    scientificResearchOnly: "no",
+    authorisedByLawForCriminalOffences: "no",
+    generatesSyntheticText: "no",
+    generatesSyntheticImage: "no",
+    generatesSyntheticAudio: "no",
+    generatesSyntheticVideo: "no",
+    placedOnMarketDate: "2026-03-01",
+  };
+  const scoring = {
     annexRoute: "Annex III — sensitive use case",
     operatorRole: "Provider",
     intendedPurpose: "Synthetic scoring fixture",
     rationale: "Fixture-only classification record for workflow validation.",
-  });
+  };
+  await command("classify", { ...scoring, facts: {} });
+  assert.equal(e.classification.assessment.label, "Needs information");
+  assert(
+    JSON.stringify(
+      await command("approveClassification", {}, reviewer, 400),
+    ).includes("Integrates a general-purpose AI model"),
+    "Unknown required facts block the approval",
+  );
+  assert(
+    JSON.stringify(
+      await command(
+        "classify",
+        {
+          ...scoring,
+          annexRoute: "Outside high-risk scope",
+          facts: { annexIIIProfiling: "yes" },
+        },
+        owner,
+        400,
+      ),
+    ).includes("applies only on"),
+    "Contradictory route and facts are rejected",
+  );
+  await command("classify", { ...scoring, facts: providerFacts });
+  assert.equal(e.classification.assessment.label, "High risk");
+  assert.equal(e.classification.highRisk, true);
+  assert.equal(e.classification.transparency, true);
+  assert.equal(
+    e.classification.answers.placedOnMarketDate.legalVersion,
+    rulePack.celex,
+  );
   await command("approveClassification", {}, owner, 403);
   await command("approveClassification", {}, reviewer);
+  assert.equal(e.classification.status, "approved");
+  // An engagement whose classification predates #19 still loads: its facts
+  // are unknown and its earlier approval stays readable.
+  {
+    const row = await testDb
+      .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+      .bind(tenantId, e.id)
+      .first();
+    const body = JSON.parse(row.body);
+    const current = body.classification;
+    body.classification = {
+      prohibited: false,
+      highRisk: true,
+      transparency: true,
+      profiling: false,
+      annexRoute: "Annex III point 5(b)",
+      operatorRole: "Provider",
+      intendedPurpose: "Legacy scoring",
+      rationale: "Approved under four flags",
+      status: "approved",
+      approvedBy: reviewer,
+      version: rulePack.celex,
+      asOf: "2026-10-05",
+    };
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(body), tenantId, e.id)
+      .run();
+    await refresh();
+    assert.equal(e.classification.model, 2);
+    assert.equal(e.classification.status, "provisional");
+    assert.deepEqual(e.classification.answers, {});
+    assert.equal(e.classification.legacy.approvedBy, reviewer);
+    assert.equal(e.classification.history[0].action, "approved_v1");
+    body.classification = current;
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(body), tenantId, e.id)
+      .run();
+    await refresh();
+    assert.equal(e.classification.status, "approved");
+  }
+  console.log(
+    "PASS tri-state classification: unknown facts block approval, contradictions rejected, legacy classification loads",
+  );
+  // Reopening a closed request retires its limitation memo; closing it again
+  // revises the same memo instead of adding a second one.
+  const memoCount = e.papers.length;
+  await command("reopenEvidenceRequest", {
+    requestId: unavailableRequest,
+    reason: "Synthetic provider located further records",
+  });
+  const retiredMemo = e.papers.find((p) => p.id === limitationMemo.id);
+  assert.equal(retiredMemo.retired.requestId, unavailableRequest);
+  assert.equal(retiredMemo.required, false);
+  await command(
+    "editPaper",
+    {
+      paperId: limitationMemo.id,
+      body: retiredMemo.body,
+      evidenceIds: [],
+      required: true,
+    },
+    owner,
+    409,
+  );
+  const reclosed = await command("closeEvidenceRequest", {
+    requestId: unavailableRequest,
+    disposition: "unobtainable",
+    assessment:
+      "Internal restriction secret; the located records do not cover the period, so the limitation remains.",
+  });
+  assert.equal(reclosed.details.paperId, limitationMemo.id);
+  assert.equal(e.papers.length, memoCount);
+  const revisedMemo = e.papers.find((p) => p.id === limitationMemo.id);
+  assert.equal(revisedMemo.retired, undefined);
+  assert.equal(revisedMemo.required, true);
+  assert.equal(revisedMemo.revision, limitationMemo.revision + 1);
+  console.log(
+    "PASS reopened limitation memo is retired and revised, not duplicated, on re-close",
+  );
+  // The release-time records (WP-RP-02, MEM-SO-01) are recorded by the
+  // release and refuse preparation and signing.
+  const releaseTime = ["WP-RP-02", "MEM-SO-01"];
   for (const id of e.papers.filter((p) => p.required).map((p) => p.id)) {
     const current = e.papers.find((p) => p.id === id);
+    if (releaseTime.includes(current.templateId)) {
+      await command("submitPaper", { paperId: id }, owner, 409);
+      continue;
+    }
     if (current.status === "signed") continue;
     await command("editPaper", {
       paperId: id,
@@ -1693,6 +1844,58 @@ try {
   console.log(
     "PASS versioned engagement brief, return/rework, explicit program selection, actual execution, evidence evaluation and assigned review/sign-off",
   );
+  // Sign → recompile: new work on a procedure whose paper is signed compiles a
+  // new paper and supersedes the signed one instead of orphaning it.
+  await command("recordProcedureExecution", {
+    ...actual,
+    results: actual.results + "; re-performed after sign-off",
+  });
+  await command("evaluateProcedure", {
+    procedureId: proc.id,
+    relevance: "Evidence addresses the fixture criterion",
+    reliability: "Hash-pinned synthetic source inspected again",
+    coverage: "Complete fixture population and period",
+    contradictions: "No contradictions in the fixture; limitations documented",
+    conclusion: "Synthetic fixture procedure supported after re-performance",
+    outcome: "supported",
+  });
+  const recompile = await command("submitProcedure", { procedureId: proc.id });
+  const recompiledPaper = recompile.details.paperId;
+  assert.notEqual(recompiledPaper, procedurePaper);
+  const supersededPaper = e.papers.find((p) => p.id === procedurePaper);
+  assert.equal(supersededPaper.status, "signed");
+  assert.equal(supersededPaper.supersededBy, recompiledPaper);
+  assert.equal(supersededPaper.required, false);
+  assert.equal(
+    e.papers.find((p) => p.id === recompiledPaper).supersedes,
+    procedurePaper,
+  );
+  for (const [op, data] of [
+    ["reopenPaper", { paperId: procedurePaper }],
+    ["comment", { paperId: procedurePaper, text: "Must stay as signed" }],
+    [
+      "editPaper",
+      {
+        paperId: procedurePaper,
+        body: supersededPaper.body,
+        evidenceIds: supersededPaper.evidenceIds,
+        required: true,
+      },
+    ],
+  ])
+    await command(op, data, owner, 409);
+  await command(
+    "reviewProcedure",
+    {
+      procedureId: proc.id,
+      reason: "Re-performed work and conclusion independently inspected",
+    },
+    reviewer,
+  );
+  await command("signPaper", { paperId: recompiledPaper });
+  console.log(
+    "PASS sign → recompile supersedes the signed paper, which stays immutable",
+  );
   const contributor = "fixture-contributor-" + stamp,
     crossContributor = "fixture-cross-contributor-" + stamp;
   await management("grantMember", {
@@ -1713,7 +1916,7 @@ try {
   );
   await command("createEvidenceRequest", {
     ...requestSpec,
-    paperIds: [procedurePaper],
+    paperIds: [recompiledPaper],
     subject: "INTERNAL_REQUEST_SECRET",
     description: "INTERNAL_PROCEDURE_SECRET",
   });
@@ -2495,6 +2698,99 @@ try {
   assert(!html.includes("Internal unavailable evidence fixture"));
   assert(!html.includes("predictions.csv"));
   assert(!html.includes("Unresolved synthetic high-risk finding"));
+  // The sign → recompile → issue scenario: only the current paper is captured.
+  const capturedIds = (papers) => papers.map((p) => p.id);
+  assert(capturedIds(internalFinal.snapshot.papers).includes(recompiledPaper));
+  assert(!capturedIds(internalFinal.snapshot.papers).includes(procedurePaper));
+  assert(
+    !capturedIds(internalFinal.clientSnapshot.papers).includes(procedurePaper),
+  );
+  // The adopted legacy WP-A09-01 paper was signed, so the first compilation
+  // already superseded it; the recompile superseded the first compilation.
+  const adoptedPaper = supersededPaper.supersedes;
+  assert(adoptedPaper);
+  assert.deepEqual(
+    internalFinal.snapshot.supersededPapers.map((p) => [p.id, p.supersededBy]),
+    [
+      [adoptedPaper, procedurePaper],
+      [procedurePaper, recompiledPaper],
+    ],
+  );
+  assert(!capturedIds(internalFinal.snapshot.papers).includes(adoptedPaper));
+  assert(
+    internalFinal.snapshot.annexIV.every(
+      (s) => !s.paperIds.includes(procedurePaper),
+    ),
+  );
+  const firstRelease = e.reports.find((r) => r.id === internalFinal.id).release;
+  assert.deepEqual(firstRelease.completion.templateIds, [
+    "WP-RP-02",
+    "MEM-SO-01",
+  ]);
+  assert.equal(firstRelease.completion.internalHash, internalFinal.sha256);
+  assert.equal(firstRelease.completion.clientHash, internalFinal.clientSha256);
+  assert.deepEqual(firstRelease.history.map((h) => h.action).slice(-2), [
+    "release",
+    "notify_client",
+  ]);
+  // A newer final report supersedes the released one automatically.
+  await command("createReport", {
+    kind: "final",
+    opinion: "Adverse conclusion",
+    summary: "Synthetic amended adverse report replacing the first release.",
+  });
+  const replacement = e.reports.at(-1);
+  await command(
+    "approveReportPackage",
+    {
+      reportId: replacement.id,
+      internalHash: replacement.sha256,
+      clientHash: replacement.clientSha256,
+      reason: "Amended packages independently reviewed",
+    },
+    reviewer,
+  );
+  const replaced = await command("releaseReport", {
+    reportId: replacement.id,
+    recipientScope: "Authorized fixture client members",
+    reason: "Lead releases the amended package",
+  });
+  assert.equal(replaced.details.supersedes, internalFinal.id);
+  const supersededRelease = e.reports.find(
+    (r) => r.id === internalFinal.id,
+  ).release;
+  assert.equal(supersededRelease.state, "superseded");
+  assert.equal(supersededRelease.supersededBy, replacement.id);
+  assert.equal(e.reports.at(-1).release.supersedes, internalFinal.id);
+  assert(
+    e.reports
+      .at(-1)
+      .release.history.some(
+        (h) =>
+          h.action === "notify_client" && h.reason.includes(internalFinal.id),
+      ),
+  );
+  assert.equal(
+    e.reports.filter((r) => r.release?.state === "released").length,
+    1,
+  );
+  const clientReports = await request(
+    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+    { user: viewer },
+  );
+  assert.deepEqual(
+    clientReports.engagement.reports.map((r) => r.id),
+    [replacement.id],
+  );
+  // The client sees which earlier report the released one replaced.
+  assert.deepEqual(clientReports.engagement.reports[0].replaces, [
+    internalFinal.id,
+  ]);
+  // The release-time records are recorded by the release, never prepared.
+  await command("createPaper", { templateId: "WP-RP-02" }, undefined, 409);
+  console.log(
+    "PASS sign → recompile → issue captures only current papers; a newer release supersedes the older one with a client notification",
+  );
   // Verify independently assessed remediation and linked reassessment without rewriting the baseline report.
   const findingId = e.findings.find(
     (f) => f.title === "Unresolved synthetic high-risk finding",
@@ -2502,7 +2798,7 @@ try {
   await command("linkFindingSupport", {
     findingId,
     procedureId: proc.id,
-    paperIds: [procedurePaper],
+    paperIds: [recompiledPaper],
     evidenceIds: [uploaded.artifactId],
     runIds: [],
   });
@@ -2610,14 +2906,55 @@ try {
     e.workflow.monitoring.find((c) => c.id === caseId).state,
     "closed",
   );
+  // A case assessed without evidence is closed once an assessment links it;
+  // concluding that no reassessment is needed requires the evidence upfront.
+  const nextCycle = e.workflow.monitoring.at(-1).id;
+  const assessCycle = (decision, evidenceIds, status) =>
+    command(
+      "assessMonitoringCase",
+      {
+        caseId: nextCycle,
+        decision,
+        assessment: "Quarterly fixture monitoring assessed",
+        evidenceIds,
+        dueDate: "2027-03-31",
+      },
+      owner,
+      status,
+    );
+  await assessCycle("no_reassessment", [], 400);
+  await assessCycle("follow_up", [], 200);
+  await command(
+    "closeMonitoringCase",
+    { caseId: nextCycle, closure: "Must wait for evidence" },
+    reviewer,
+    400,
+  );
+  await assessCycle("no_reassessment", [uploaded.artifactId], 200);
+  await command(
+    "closeMonitoringCase",
+    { caseId: nextCycle, closure: "Evidence shows no reassessment is needed" },
+    reviewer,
+  );
+  assert.equal(
+    e.workflow.monitoring.find((c) => c.id === nextCycle).state,
+    "closed",
+  );
   assert.equal(
     JSON.stringify(e.reports.find((r) => r.id === internalFinal.id).snapshot),
     JSON.parse(immutableFinal).snapshot
       ? JSON.stringify(JSON.parse(immutableFinal).snapshot)
       : "",
   );
+  // A superseded report is no longer released, so it cannot be withdrawn.
+  await command(
+    "withdrawReport",
+    { reportId: internalFinal.id, reason: "Superseded already" },
+    owner,
+    409,
+  );
   await command("withdrawReport", {
-    reportId: internalFinal.id,
+    reportId: replacement.id,
     reason: "Synthetic test withdrawal; preserve all captured bytes",
   });
   const afterWithdrawal = await request(
@@ -2625,28 +2962,23 @@ try {
     { user: viewer },
   );
   assert.equal(afterWithdrawal.engagement.reports.length, 0);
-  await request(
-    "/api/report-package?" +
-      new URLSearchParams({
-        tenantId,
-        engagementId: e.id,
-        reportId: internalFinal.id,
-      }),
-    { user: viewer, status: 404 },
-  );
+  for (const reportId of [internalFinal.id, replacement.id])
+    await request(
+      "/api/report-package?" +
+        new URLSearchParams({ tenantId, engagementId: e.id, reportId }),
+      { user: viewer, status: 404 },
+    );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );
   await command("classify", {
-    prohibited: true,
-    highRisk: false,
-    transparency: false,
-    profiling: false,
-    annexRoute: "Prohibited practice fixture",
+    annexRoute: "Outside high-risk scope",
     operatorRole: "Provider",
     intendedPurpose: "Synthetic prohibited-use fixture",
     rationale: "Fixture-only prohibited route for positive-opinion rejection.",
+    facts: { ...providerFacts, annexIIIProfiling: "unknown", art5_1_c: "yes" },
   });
+  assert.equal(e.classification.prohibited, true);
   await command("approveClassification", {}, reviewer);
   const prohibitedReadiness = await command(
     "createReport",

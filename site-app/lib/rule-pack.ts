@@ -5,6 +5,21 @@
 // catalog import, so client views can use it with the catalog the workspace
 // API sends (lib/rule-pack-current.ts binds the build's own catalog).
 import type { Engagement, RulePackStamp } from "./domain";
+import { classificationFactValues } from "./domain/classification";
+import {
+  select,
+  type Facts,
+  type Predicate,
+  type Selection,
+} from "./predicates";
+export { annexRouteFacts } from "./domain/classification";
+export {
+  conjunction,
+  select,
+  type Facts,
+  type Predicate,
+  type Selection,
+} from "./predicates";
 
 export type Verification = {
   status: "verified" | "secondary_only";
@@ -16,11 +31,6 @@ export type Approval = {
   status: "pending_legal_review" | "approved";
   reviewer: string | null;
   approvedAt: string | null;
-};
-export type Predicate = {
-  fact: string;
-  op: "eq" | "in" | "before" | "onOrAfter";
-  value: unknown;
 };
 /** An inline transitional rule, or a link to the entry that states it. */
 export type TransitionalRule = {
@@ -394,82 +404,12 @@ export function periodStatus(
 }
 
 /**
- * Facts the date predicates can read from an engagement today. Until
- * classification records them (#19), only highRiskRoute is known, mapped from
- * the reviewed classification route (RD-27); every other fact is unknown.
+ * Facts the date predicates can read from an engagement: the classification's
+ * answered tri-state facts, the derived facts and highRiskRoute, from the
+ * reviewed route and the Art 6(3) derogation (#19). An unknown fact is absent.
  */
-export const annexRouteFacts: Readonly<Record<string, string>> = {
-  "Annex III — sensitive use case": "annex_iii",
-  "Annex I Section A — regulated product": "annex_i_section_a",
-  "Annex I Section B — sector-specific review": "annex_i_section_b",
-  "Article 50 only": "not_high_risk",
-  "Outside high-risk scope": "not_high_risk",
-};
-export type Facts = Readonly<Record<string, unknown>>;
 export function engagementFacts(e: Pick<Engagement, "classification">): Facts {
-  const route = Object.hasOwn(annexRouteFacts, e.classification.annexRoute)
-    ? annexRouteFacts[e.classification.annexRoute]
-    : undefined;
-  return route ? { highRiskRoute: route } : {};
-}
-
-type Truth = boolean | "unknown";
-function truth(p: Predicate, facts: Facts): Truth {
-  const v = Object.hasOwn(facts, p.fact) ? facts[p.fact] : undefined;
-  if (v === undefined || v === null || v === "unknown") return "unknown";
-  switch (p.op) {
-    case "eq":
-      return v === p.value;
-    case "in":
-      return Array.isArray(p.value) && p.value.includes(v);
-    case "before":
-      return typeof v === "string" && typeof p.value === "string"
-        ? v < p.value
-        : "unknown";
-    case "onOrAfter":
-      return typeof v === "string" && typeof p.value === "string"
-        ? v >= p.value
-        : "unknown";
-  }
-}
-/** A conjunction in three-valued logic; an absent list counts as `absent`. */
-export function conjunction(
-  predicates: Predicate[] | undefined,
-  facts: Facts,
-  absent: boolean,
-): Truth {
-  if (!predicates?.length) return absent;
-  let unknown = false;
-  for (const p of predicates) {
-    const t = truth(p, facts);
-    if (t === false) return false;
-    if (t === "unknown") unknown = true;
-  }
-  return unknown ? "unknown" : true;
-}
-/**
- * Candidate selection (predicateRule): a candidate needs appliesIf true and
- * exceptIf false; any unknown yields needs_information. Selection never
- * approves applicability, which stays a reviewed human decision.
- */
-export type Selection = "candidate" | "not_selected" | "needs_information";
-export function select(
-  rule: Pick<TransitionalRule, "appliesIf" | "exceptIf">,
-  facts: Facts,
-): { selection: Selection; missingFacts: string[] } {
-  const applies = conjunction(rule.appliesIf, facts, true),
-    excepted = conjunction(rule.exceptIf, facts, false);
-  if (applies === false || excepted === true)
-    return { selection: "not_selected", missingFacts: [] };
-  if (applies === true && excepted === false)
-    return { selection: "candidate", missingFacts: [] };
-  const missing = [...(rule.appliesIf ?? []), ...(rule.exceptIf ?? [])]
-    .filter((p) => truth(p, facts) === "unknown")
-    .map((p) => p.fact);
-  return {
-    selection: "needs_information",
-    missingFacts: [...new Set(missing)],
-  };
+  return classificationFactValues(e.classification);
 }
 
 /**

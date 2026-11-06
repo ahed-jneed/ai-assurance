@@ -233,7 +233,30 @@ export function evidenceRequestCommand(
       r = byId(a.requestId);
     if (requestClosed(r))
       fail(409, "Reopen this request before replacing its disposition");
-    const memo = ctx.makeLimitationPaper();
+    // Closing a reopened request again revises its retired memo, so each
+    // request keeps one limitation memo with the earlier revisions as history.
+    const previous = e.papers.find((p) => p.id === r.limitationPaperId),
+      memo = previous ?? ctx.makeLimitationPaper();
+    if (previous) {
+      memo.history.push({
+        revision: memo.revision,
+        body: { ...memo.body },
+        authorId: memo.authorId,
+        at: memo.updatedAt,
+        evidenceIds: [...memo.evidenceIds],
+        runIds: [...memo.runIds],
+        reviews: [...memo.reviews],
+        signatures: [...memo.signatures],
+        contributors: [...(memo.contributors ?? [])],
+      });
+      memo.revision++;
+      memo.authorId = ctx.userId;
+      memo.updatedAt = ctx.at;
+      memo.status = "draft";
+      memo.reviews = [];
+      memo.signatures = [];
+      delete memo.retired;
+    }
     memo.required = true;
     memo.title =
       a.disposition === "unobtainable"
@@ -254,7 +277,7 @@ export function evidenceRequestCommand(
       assessment: a.assessment,
       limitationPaperId: memo.id,
     });
-    e.papers.push(memo);
+    if (!previous) e.papers.push(memo);
     return { requestId: r.id, status: r.status, paperId: memo.id };
   }
   if (op === "reopenEvidenceRequest") {
@@ -270,6 +293,18 @@ export function evidenceRequestCommand(
       assessment: a.reason,
       disposition: undefined,
     });
+    // The limitation no longer applies while the request is open again: its
+    // memo is retired until closing the request again revises it.
+    const memo = e.papers.find((p) => p.id === r.limitationPaperId);
+    if (memo) {
+      memo.retired = {
+        requestId: r.id,
+        actor: ctx.userId,
+        at: ctx.at,
+        reason: a.reason,
+      };
+      memo.required = false;
+    }
     return { requestId: r.id, status: r.status };
   }
   return fail(400, "Unknown evidence request command");

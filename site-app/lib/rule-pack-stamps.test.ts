@@ -70,14 +70,11 @@ describe("the engagement rule-pack stamp", () => {
       e,
       "classify",
       {
-        prohibited: false,
-        highRisk: true,
-        transparency: false,
-        profiling: false,
         annexRoute: "Annex III — sensitive use case",
         operatorRole: "Provider",
         intendedPurpose: "Credit scoring",
         rationale: "Annex III point 5(b)",
+        facts: { smeStatus: "sme" },
       },
       caller("Auditor"),
     );
@@ -85,6 +82,11 @@ describe("the engagement rule-pack stamp", () => {
       annexRoute: "Annex III — sensitive use case",
       version: "02024R1689-20260727",
       asOf: "2026-10-05",
+    });
+    // Each answer records the legal version and rule pack it was given under.
+    expect(e.classification.answers?.smeStatus).toMatchObject({
+      legalVersion: "02024R1689-20260727",
+      rulePackVersion: "2026.11.1",
     });
     expect(e.rulePack).toBeUndefined();
     expect(engagementRulePack(e, currentRulePack)).toEqual({

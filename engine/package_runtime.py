@@ -14,10 +14,10 @@ from .worker_contract import WORKER_VERSION, TRANSLATION_VERSION
 EXCLUDED = {'__pycache__', '.test-tmp', '.venv', 'worker-jobs', 'node_modules', '.git'}
 ENGINE_SPECIAL = {'Dockerfile', '.dockerignore', '.gitignore'}
 EXAMPLES = {'predictions.csv', 'reference.csv', 'config.json', 'report.json', 'report-v1.1.json',
-    'report-v1.1.1.json', 'generate_fixture.py'}
+    'report-v1.1.1.json', 'report-v1.3.json', 'generate_fixture.py'}
 # Hand-maintained input that schemas/.build-run-schema.py generates test-run.schema.json from.
 SCHEMA_INPUTS = {'test-run.base.json'}
-SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'external-runs.v1.2.json', 'procedure-execution.json'}
+SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'external-runs.v1.2.json', 'external-runs.v1.5.json', 'procedure-execution.json'}
 # Engine tests, their fixtures and the scripts that generate those fixtures stay
 # in the repository; the runtime package ships source, examples and schemas only.
 EXCLUDED_ENGINE_FOLDERS = {'tests'}
@@ -65,7 +65,7 @@ def package(root, output):
     entries = sources(root)
     manifest = {'schemaVersion': '1.0', 'distribution': 'assurance-runtime-source',
         'runnerVersion': __version__, 'workerVersion': WORKER_VERSION,
-        'translationVersion': TRANSLATION_VERSION, 'runContracts': ['1.0', '1.1', '1.2'],
+        'translationVersion': TRANSLATION_VERSION, 'runContracts': ['1.0', '1.1', '1.2', '1.3', '1.5'],
         'scope': 'Source and synthetic fixtures only; no qualified native/runtime image or credentials.',
         'files': {name: {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
             for name, data in sorted(entries.items())}}

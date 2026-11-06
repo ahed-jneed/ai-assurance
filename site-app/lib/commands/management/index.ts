@@ -8,12 +8,18 @@ import type {
 } from "./batch";
 import { clients } from "./clients";
 import { engagements } from "./engagements";
+import { admins } from "./admins";
+import { invitations } from "./invitations";
 import { members } from "./members";
+import { practice } from "./practice";
 /** Every op POST /api/management accepts, each listed by exactly one module. */
 export const managementModules: readonly ManagementModule[] = [
   clients,
   engagements,
   members,
+  admins,
+  invitations,
+  practice,
 ];
 /**
  * The ops in module order, which is also the order the envelope's

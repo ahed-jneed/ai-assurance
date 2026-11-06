@@ -1,6 +1,8 @@
 """Regenerate test-run.schema.json from its committed sources: the hand-maintained
 test-run.base.json (legacy 1.0 run body and shared definitions), the definitions built
-here (legacy 1.0 and hosted 1.1) and external 1.2 via .extend-assurance-schema.py.
+here (legacy 1.0 and hosted 1.1), external 1.2 via .extend-assurance-schema.py, and
+engine report 1.3 and external run 1.5 (statistics 1.0.0) via .statistics-schema.py,
+which embeds statistics-plan.schema.json.
 The generated file is never read back. Usage: python schemas/.build-run-schema.py [--check]
 
 --check rebuilds the schema in memory and fails, without writing, when the committed
@@ -72,7 +74,12 @@ configProps = {'labelColumn': st(1, 300), 'predictionColumn': st(1, 300), 'group
 # performancePositiveLabel is optional: test definitions 2.1.0 freeze the class
 # binary recall is measured on; earlier runs do not have it.
 defs['hostedConfig'] = obj({**configProps, 'performancePositiveLabel': st(0, 300)}, list(configProps))
-defs['hostedTranslation'] = obj({'version': st(1, 300), 'sourceContract': {'const': '1.1'}, 'selectedTests': arr(en('performance', 'regression', 'demographic_parity', 'disparate_impact', 'equalized_odds', 'drift', 'permutation', 'perturbation', 'explainability', 'cross_validation'), 1, 10, True), 'sourceConfiguration': ref('hostedConfig'), 'minimumClassCount': it(1, 1000), 'supplementalMetricPolicy': st(1, 5000)})
+# engineConfig 1.4 (statistics 1.0.0) keeps only the column mappings and the declared label pair in config.
+defs['hostedPlanConfig'] = obj({'labelColumn': st(1, 300), 'predictionColumn': st(1, 300), 'groupColumn': st(0, 300), 'positiveLabel': st(0, 300), 'negativeLabel': st(0, 300), 'performancePositiveLabel': st(0, 300)}, ['labelColumn', 'predictionColumn', 'positiveLabel'])
+appliedMinimums = obj({'sampleSize': it(30, 1000000), 'groupSize': it(30, 1000000), 'classCount': it(10, 1000000)})
+configuredMinimums = obj({'sampleSize': nullable(it(1, 1000000)), 'groupSize': nullable(it(1, 1000000)), 'classCount': nullable(it(1, 1000000))})
+# Translation 1.1.0 recorded minimumClassCount; 2.0.0 records the configured and applied minimums (section 7).
+defs['hostedTranslation'] = obj({'version': st(1, 300), 'sourceContract': en('1.1', '1.4'), 'selectedTests': arr(en('performance', 'regression', 'demographic_parity', 'disparate_impact', 'equalized_odds', 'drift', 'permutation', 'perturbation', 'explainability', 'cross_validation'), 1, 10, True), 'sourceConfiguration': {'anyOf': [ref('hostedConfig'), ref('hostedPlanConfig')]}, 'minimumClassCount': it(1, 1000), 'minimums': obj({'configured': nullable(configuredMinimums), 'applied': appliedMinimums}), 'supplementalMetricPolicy': st(1, 5000)}, ['version', 'sourceContract', 'selectedTests', 'sourceConfiguration', 'supplementalMetricPolicy'])
 defs['pythonConfig']['properties']['hostedTranslation'] = ref('hostedTranslation')
 legacyConfigProps = copy.deepcopy(configProps)
 legacyConfigProps['minimumGroupSize'] = it(1, 1000)
@@ -146,8 +153,11 @@ run['properties']['methodologyVersion'] = methodologyVersion
 run['allOf'].append({'if': {'required': ['procedureBinding']}, 'then': {'properties': {'provenance': {'properties': {'inputHashes': {'required': ['auditBinding']}}}}}, 'else': {'properties': {'provenance': {'properties': {'inputHashes': {'not': {'required': ['auditBinding']}}}}}}})
 defs['hostedRun'] = run
 output = {'$schema': 'https://json-schema.org/draft/2020-12/schema', '$id': 'urn:ai-assurance:test-run:1.1', 'title': 'AI Assurance common diagnostic run contract', 'description': 'Version-discriminated contract: v1.0 Python/legacy interactive runs and v1.1 hosted saved-prediction runs. Frozen internal policies and diagnostic outcomes provide audit evidence; they do not certify EU AI Act conformity. Application validation must verify hashes, cross-field bindings, timestamp order and evidence custody.', 'oneOf': [ref('legacyRun'), ref('hostedRun')], '$defs': defs}
+statistics = runpy.run_path(str(Path(__file__).with_name('.statistics-schema.py')))
+output = statistics['add_statistics'](output)
 extend = runpy.run_path(str(Path(__file__).with_name('.extend-assurance-schema.py')))['extend_schema']
 output = extend(output)
+output = statistics['add_external_run'](output)
 text = json.dumps(output, indent=2, ensure_ascii=False) + '\n'
 if '--check' in sys.argv[1:]:
     if p.read_bytes() != text.encode('utf-8'):

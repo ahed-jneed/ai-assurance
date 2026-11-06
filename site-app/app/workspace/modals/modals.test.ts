@@ -10,6 +10,7 @@ vi.mock("@/lib/domain", async (original) => ({
 }));
 
 import { classificationDefaults } from "./classification";
+import { classificationPayload, formRules } from "./classification-form";
 import { requestFormDefaults } from "./evidence-request";
 import { procedureFindingDefaults } from "./finding";
 import { remediationDefaults } from "./finding-edit";
@@ -42,6 +43,12 @@ const engagement = {
     highRisk: true,
     transparency: true,
     profiling: false,
+    answers: {
+      deployerGeneratesDeepFakes: { value: true },
+      deployerUsesEmotionRecognition: { value: false },
+      smeStatus: { value: "sme" },
+      placedOnMarketDate: { value: "2026-05-01" },
+    },
   },
 } as unknown as Engagement;
 const data = {
@@ -102,6 +109,15 @@ describe("modal definitions", () => {
       member: ["Add member", "Add member"],
       memberEdit: ["Edit access", "Update access"],
       memberRevoke: ["Revoke practice access", "Revoke access"],
+      invite: ["Invite by email", "Save invitation"],
+      invitationCancel: ["Cancel invitation", "Cancel invitation"],
+      practiceRename: ["Rename practice", "Save name"],
+      adminGrant: ["Grant practice administration", "Grant administration"],
+      adminRevoke: ["Remove practice administration", "Remove administration"],
+      adminTransfer: [
+        "Transfer practice administration",
+        "Transfer administration",
+      ],
       upload: ["Upload evidence", "Upload for acceptance"],
       classification: [
         "Guided regulatory classification",
@@ -248,9 +264,15 @@ describe("form submission", () => {
       displayName: "Avery",
       role: "Auditor",
       clientId: null,
+      engagementIds: [],
     });
     const update = context("memberEdit", {
-      choices: { userId: "u9", role: "Client Viewer", clientId: "c1" },
+      choices: {
+        userId: "u9",
+        role: "Client Viewer",
+        originalRole: "Auditor",
+        clientId: "c1",
+      },
       values: { displayName: "Avery" },
     });
     await submit("memberEdit", update);
@@ -260,6 +282,77 @@ describe("form submission", () => {
       role: "Client Viewer",
       clientId: "c1",
     });
+  });
+
+  // F-24: a restore or a role change lists the engagements explicitly; an
+  // edit of the name alone sends none, so grants are kept.
+  it("lists engagements only when access starts afresh", async () => {
+    const restore = context("member", {
+      choices: { userId: "u9", role: "Reviewer" },
+      checks: { "engagement:e1": true, "engagement:e2": false },
+      values: { displayName: "Avery" },
+    });
+    await submit("member", restore);
+    expect(restore.manage).toHaveBeenCalledWith("grantMember", {
+      userId: "u9",
+      displayName: "Avery",
+      role: "Reviewer",
+      clientId: null,
+      engagementIds: ["e1"],
+    });
+    const rename = context("memberEdit", {
+      choices: { userId: "u9", role: "Auditor", originalRole: "Auditor" },
+      checks: { "engagement:e1": true },
+      values: { displayName: "Avery B." },
+    });
+    await submit("memberEdit", rename);
+    expect(rename.manage).toHaveBeenCalledWith("updateMember", {
+      userId: "u9",
+      displayName: "Avery B.",
+      role: "Auditor",
+      clientId: null,
+    });
+    const promote = context("memberEdit", {
+      choices: { userId: "u9", role: "Reviewer", originalRole: "Auditor" },
+      checks: {},
+      values: { displayName: "Avery" },
+    });
+    await submit("memberEdit", promote);
+    expect(promote.manage).toHaveBeenCalledWith("updateMember", {
+      userId: "u9",
+      displayName: "Avery",
+      role: "Reviewer",
+      clientId: null,
+      engagementIds: [],
+    });
+  });
+
+  it("invites by email with the role's scope", async () => {
+    const internal = context("invite", {
+      choices: { role: "Auditor" },
+      checks: { "engagement:e1": true },
+      values: { email: "nia@example.test", displayName: " " },
+    });
+    await submit("invite", internal);
+    expect(internal.manage).toHaveBeenCalledWith("inviteMember", {
+      email: "nia@example.test",
+      role: "Auditor",
+      engagementIds: ["e1"],
+    });
+    const viewer = context("invite", {
+      choices: { role: "Client Viewer", clientId: "c1" },
+      values: { email: "v@example.test", displayName: "Vic" },
+    });
+    await submit("invite", viewer);
+    expect(viewer.manage).toHaveBeenCalledWith("inviteMember", {
+      email: "v@example.test",
+      displayName: "Vic",
+      role: "Client Viewer",
+      clientId: "c1",
+    });
+    expect(() =>
+      validate("invite", { choices: { role: "Client Viewer" } }),
+    ).toThrow("Choose the client this person belongs to.");
   });
 
   it("opens a created paper and a created engagement", async () => {
@@ -370,19 +463,73 @@ describe("form defaults", () => {
   });
 
   it("opens the classification from the engagement's current one", () => {
+    // Tri-state answers open as choices; dates are named fields.
     expect(classificationDefaults(engagement)).toEqual({
-      choices: { operatorRole: "Deployer", annexRoute: "Article 50 only" },
-      checks: {
-        prohibited: false,
-        highRisk: true,
-        transparency: true,
-        profiling: false,
+      choices: {
+        operatorRole: "Deployer",
+        annexRoute: "Article 50 only",
+        "fact:deployerGeneratesDeepFakes": "yes",
+        "fact:deployerUsesEmotionRecognition": "no",
+        "fact:smeStatus": "sme",
       },
+      checks: {},
     });
     expect(classificationDefaults(undefined)).toEqual({
       choices: { operatorRole: "Provider", annexRoute: "Unassessed" },
       checks: {},
     });
+    // A free-text route from before #19 opens as Unassessed.
+    expect(
+      classificationDefaults({
+        ...engagement,
+        classification: {
+          ...engagement.classification,
+          annexRoute: "Annex III point 5(b)",
+        },
+      }).choices.annexRoute,
+    ).toBe("Unassessed");
+  });
+
+  it("submits only the facts the form asks for the role and answers", () => {
+    const rules = formRules(null);
+    const payload = classificationPayload(
+      rules,
+      {
+        operatorRole: "Deployer",
+        annexRoute: "Article 50 only",
+        "fact:deployerGeneratesDeepFakes": "yes",
+        "fact:personalNonProfessionalUseOnly": "yes",
+        // A provider fact left over from an earlier role is not sent.
+        "fact:interactsDirectlyWithNaturalPersons": "yes",
+        // Hidden while emotion recognition is answered no.
+        "fact:lawEnforcementPermittedErBc": "yes",
+        "fact:deployerUsesEmotionRecognition": "no",
+      },
+      {
+        intendedPurpose: "Marketing videos",
+        rationale: "Deep fakes in campaigns",
+        "evidence:personalNonProfessionalUseOnly": "EV-2",
+        "date:placedOnMarketDate": "2026-05-01",
+      },
+    );
+    expect(payload).toMatchObject({
+      operatorRole: "Deployer",
+      annexRoute: "Article 50 only",
+      evidence: { personalNonProfessionalUseOnly: "EV-2" },
+    });
+    expect(payload.facts).toMatchObject({
+      deployerGeneratesDeepFakes: "yes",
+      deployerUsesEmotionRecognition: "no",
+      deployerUsesBiometricCategorisation: "unknown",
+      placedOnMarketDate: "2026-05-01",
+      putIntoServiceDate: "",
+      smeStatus: "unknown",
+    });
+    expect(payload.facts).not.toHaveProperty(
+      "interactsDirectlyWithNaturalPersons",
+    );
+    expect(payload.facts).not.toHaveProperty("lawEnforcementPermittedErBc");
+    expect(payload.derogation).toBeUndefined();
   });
 
   it("prefills a procedure exception's finding", () => {

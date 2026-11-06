@@ -109,7 +109,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 **Production.** OpenAI Sites dispatch injects `oai-authenticated-user-id`, `-email` and (optionally) `-full-name`. `app/chatgpt-auth.ts` trusts these headers without any signature, JWT or session check, and the Worker entry passes them through unchanged. `context()` (`lib/store.ts`) then works as follows:
 1. Missing headers return 401.
-2. If the user has no membership at all, it creates `tenant-<sha256(userId)[:24]>`, named "Assurance practice", with the user as Lead Auditor plus an "Example client" and engagement `ENG-default`. If the user has only revoked memberships, it returns 403 "access revoked" instead.
+2. Without an active membership it first accepts the pending invitations for the user's email (`lib/invitations.ts`). If the user has no membership at all and self-signup is allowed (`SELF_SIGNUP`, open only on the development server by default; see `docs/security/identity.md`), it creates `tenant-<sha256(userId)[:24]>`, named after the user ("<name> practice"), with the user as Lead Auditor plus an "Example client" and engagement `ENG-default`; otherwise it returns 403. If the user has only revoked memberships, it returns 403 "access revoked" instead.
 3. It loads the active membership.
 4. It runs a legacy access-adoption write batch on every request.
 5. It sets the `practiceAdmin` flag.
@@ -198,7 +198,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
 
 1. **First sign-in and provisioning** (local_seedy or qa-lead)
    1. Open `/`.
-   2. Expect the sidebar to show "Assurance practice", the engagement "Example client / New AI assurance engagement", and the identity "… · Lead Auditor". Overview shows the legacy engagement with a paper sign-off counter (0 / 32) and "Set up audit program".
+   2. Expect the sidebar to show "<name> practice" (for example "QA Lead practice"), the engagement "Example client / New AI assurance engagement", and the identity "… · Lead Auditor". Overview shows the legacy engagement with a paper sign-off counter (0 / 32) and "Set up audit program".
    3. `GET /api/workspace` returns `identity.role:"Lead Auditor"`, `identity.practiceAdmin:true` and `engagement.id:"ENG-default"`.
    4. Reload. The `tenantId` is unchanged.
    - **Negative:** without identity headers (`npm start`), the request returns 401.
@@ -226,16 +226,17 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    1. Audit program → Engagement brief → Complete brief → Save scope draft → Submit for review (`saveBrief`, `submitBrief`).
    2. qa-auditor's own approval is blocked with 403 (contributors cannot approve).
    3. qa-reviewer: Request changes (`returnBrief`). qa-auditor resubmits. qa-reviewer: Approve scope (`approveBrief`).
-   4. Program tab → Assess candidates → Save scope decisions (`scopeProgramCandidates`). To keep later flows short, mark 2–3 procedures applicable and the rest not applicable with a rationale. Leave WP-RP-01 and WP-RP-02 unselected (see F-30).
+   4. Program tab → Assess candidates → Save scope decisions (`scopeProgramCandidates`). To keep later flows short, mark 2–3 procedures applicable and the rest not applicable with a rationale. WP-RP-02 is a release-time record and never gates capture (F-30 fixed in #14).
    5. Select the rows → Assign & schedule: preparer qa-auditor, reviewer qa-reviewer, due date (`bulkPlanProcedures`) → Submit program → qa-reviewer: Approve program (`approveProgram`).
    - **Expect:** execution is refused until both brief and program are approved.
    - **Watch F-04** (a later due-date edit invalidates every execution) and **F-29** (the 150-revision cap).
 
 6. **Classification** (qa-auditor, qa-reviewer)
-   1. Regulatory mapping → Assess classification → Save classification (`classify`). Status shows "provisional".
-   2. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
-   3. qa-reviewer approves (`approveClassification`). Status becomes "approved".
-   - **Watch F-31:** route "Unassessed" plus a purpose shows "Minimal risk".
+   1. Regulatory mapping → Assess classification → answer the facts in each section (yes, no or "needs information") → Save classification (`classify`). Status shows "provisional".
+   2. While a required fact is unknown the label reads "Needs information" and "Approve independently" stays disabled, listing what the approval waits for (#19).
+   3. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
+   4. qa-reviewer approves (`approveClassification`). Status becomes "approved".
+   - **F-31 (fixed in #19):** an "Unassessed" route reads "Unassessed" and blocks approval; contradictory route and fact combinations are rejected.
 
 7. **Evidence custody** (qa-auditor)
    1. Evidence vault → Files → Upload evidence, using `public/example-predictions.csv`, category Dataset, and a handling basis → Upload for acceptance. The row shows "Awaiting acceptance" and the response contains the SHA-256.
@@ -294,7 +295,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
     5. qa-reviewer trying to release gets 403 (role). qa-lead: Release to client (`releaseReport`).
     6. qa-viewer sees the package and can Print (`/report?tenantId&engagementId&reportId`). `/api/report-package?download=1` returns `proof.valid:true`.
     7. qa-lead: Withdraw (`withdrawReport`). The client loses access.
-    - **Watch F-30** (circular gate on WP-RP-02) and **F-32** (a second release without supersession is accepted).
+    - **Expect:** a second release supersedes the first automatically and records a client notification (F-32, fixed in #14); WP-RP-02 and MEM-SO-01 never gate capture (F-30).
 
 13. **Client and tenant isolation** (qa-viewer, qa-outsider)
     1. qa-viewer sees only Acme engagements; client-visible accepted evidence only; no Requests tab.

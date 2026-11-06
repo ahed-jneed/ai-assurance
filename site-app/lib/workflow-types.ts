@@ -318,6 +318,21 @@ export type Release = {
   releasedAt?: string;
   supersedes?: string;
   supersededBy?: string;
+  /**
+   * The release-time completion records (WP-RP-02 and MEM-SO-01), bound to
+   * the exact package hashes the independent approval and the release cover.
+   * Their evidence is the final package itself, so they are recorded at
+   * release instead of gating its capture.
+   */
+  completion?: {
+    templateIds: string[];
+    internalHash: string;
+    clientHash: string;
+    approvedBy: string;
+    approvedAt: string;
+    releasedBy: string;
+    releasedAt: string;
+  };
   history: {
     actor: string;
     at: string;

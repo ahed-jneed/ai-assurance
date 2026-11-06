@@ -53,19 +53,20 @@ import {
 import { AssuranceRecordDetails } from "./assurance-record-details";
 
 import { ExecutionPlanner } from "./testing-readiness";
+import {
+  ExternalJobDetail,
+  type ExternalJobFields,
+} from "./external-job-detail";
 
 import { AssuranceRegister, recordTitle } from "./assurance-register";
 
 // Rows of GET /api/assurance, as selected in lib/read-models/assurance-view.ts
 // and lib/assurance-store.ts (jobs).
-type ExecutionJob = {
+type ExecutionJob = ExternalJobFields & {
   id: string;
-  state: string;
   system_name: string;
-  mode: string;
   fence: number;
   created_at: string;
-  error: string | null;
 };
 type RunnerWorker = {
   id: string;
@@ -484,9 +485,9 @@ export function AssuranceWorkbench({
       },
       {
         name: "threshold",
-        label: "Decision threshold",
+        label: "Decision threshold on the favourable class",
         type: "number",
-        help: "Optional probability threshold from 0 to 1.",
+        help: "From 0 to 1. Model inference decides for the evaluation protocol's favourable (positive) label when that label's probability is at least this value, so give the threshold on that class's probability, not the other class's.",
       },
       {
         name: "humanDecision",
@@ -626,7 +627,7 @@ export function AssuranceWorkbench({
       {
         name: "negativeLabel",
         label: "Other binary class label",
-        initial: "0",
+        help: "Leave empty to use the system revision's other output class. The pair must be exactly the system's two output classes.",
       },
       { name: "predictionOutput", label: "Named adapter output (ONNX / PMML)" },
       {
@@ -1664,7 +1665,7 @@ export function AssuranceWorkbench({
                         {label(j.mode)} · attempt {j.fence} ·{" "}
                         {new Date(j.created_at).toLocaleString()}
                       </small>
-                      {j.error && <p className="form-error">{j.error}</p>}
+                      <ExternalJobDetail job={j} />
                     </div>
                     <span
                       className={

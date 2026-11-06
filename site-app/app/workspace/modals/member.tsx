@@ -11,8 +11,69 @@ import type {
 const clientRole = (role: string) =>
   ["Client Viewer", "Client Contributor"].includes(role);
 
-/** Member access, shared by the add-member and edit-access forms. */
-function MemberFields({ kind, choices, choice, data }: ModalFieldsProps) {
+/** The engagement checkboxes' flag names: "engagement:<id>". */
+const engagementFlag = "engagement:";
+/** The engagements ticked in a form that lists them. */
+export const checkedEngagements = (checks: Record<string, boolean>) =>
+  Object.keys(checks)
+    .filter((key) => key.startsWith(engagementFlag) && checks[key])
+    .map((key) => key.slice(engagementFlag.length));
+/** Pre-ticks the given engagements when a form opens. */
+export const engagementFlags = (ids: string[]) =>
+  Object.fromEntries(ids.map((id) => [engagementFlag + id, true]));
+
+/**
+ * Whether the form starts a fresh grant, which withdraws every earlier
+ * engagement grant: a new member, a restored one, or a change of role.
+ */
+const freshGrant = (kind: string, choices: Record<string, string>) =>
+  kind === "member" || choices.role !== choices.originalRole;
+
+/**
+ * Engagements to grant with a membership or invitation. Only a Lead Auditor
+ * may assign them; the list holds the engagements the caller can open.
+ */
+export function EngagementChecks({
+  data,
+  checks,
+  check,
+  role,
+  legend,
+}: Pick<ModalFieldsProps, "data" | "checks" | "check" | "role"> & {
+  legend: string;
+}) {
+  const engagements = data?.engagements ?? [];
+  return (
+    <fieldset className="onboarding-options">
+      <legend>{legend}</legend>
+      {role !== "Lead Auditor" && (
+        <p className="subtle">
+          Only a Lead Auditor can assign engagements. A Lead can grant them in
+          Assurance workbench → Team & runtime.
+        </p>
+      )}
+      {engagements.map((g) => (
+        <label key={g.id}>
+          <input
+            type="checkbox"
+            disabled={role !== "Lead Auditor"}
+            checked={!!checks[engagementFlag + g.id]}
+            onChange={(ev) => check(engagementFlag + g.id, ev.target.checked)}
+          />
+          <span>{g.title}</span>
+        </label>
+      ))}
+      {!engagements.length && (
+        <p className="subtle">You have no engagements to assign.</p>
+      )}
+    </fieldset>
+  );
+}
+
+/** Member access, shared by the add, restore and edit-access forms. */
+function MemberFields(props: ModalFieldsProps) {
+  const { kind, choices, choice, data } = props;
+  const restoring = kind === "member" && !!choices.userId;
   return (
     <>
       {kind === "member" && (
@@ -26,8 +87,9 @@ function MemberFields({ kind, choices, choice, data }: ModalFieldsProps) {
             maxLength={300}
           />
           <small className="subtle">
-            Ask your colleague to copy this from Members & access after signing
-            in.
+            {restoring
+              ? "Restoring access grants nothing from before the revocation."
+              : "Ask your colleague to copy this from Members & access after signing in, or invite them by email instead."}
           </small>
         </label>
       )}
@@ -64,10 +126,22 @@ function MemberFields({ kind, choices, choice, data }: ModalFieldsProps) {
             onChange={(v) => choice("clientId", v)}
           />
         </label>
+      ) : freshGrant(kind, choices) ? (
+        <EngagementChecks
+          {...props}
+          legend={
+            kind === "memberEdit"
+              ? "Engagements kept with the new role (all others are withdrawn)"
+              : restoring
+                ? "Engagements to grant again"
+                : "Engagement access"
+          }
+        />
       ) : (
         <p className="subtle">
           Assign this member to specific engagements in Assurance workbench →
-          Team & runtime.
+          Team & runtime. Changing the role withdraws their engagement access
+          and the runner workers they sponsored.
         </p>
       )}
       <p className="subtle">
@@ -86,12 +160,17 @@ function validateMember({ choices }: ModalSubmitContext) {
 }
 const saveMember =
   (op: "grantMember" | "updateMember") =>
-  ({ manage, choices, values: v }: ModalSubmitContext) =>
+  ({ manage, choices, checks, values: v, kind }: ModalSubmitContext) =>
     manage(op, {
       userId: choices.userId || v.userId,
       displayName: v.displayName,
       role: choices.role,
-      clientId: choices.clientId || null,
+      clientId: clientRole(choices.role) ? choices.clientId || null : null,
+      // A fresh grant lists its engagements explicitly; nothing earlier is
+      // restored (F-24).
+      ...(!clientRole(choices.role) && freshGrant(kind, choices)
+        ? { engagementIds: checkedEngagements(checks) }
+        : {}),
     });
 export const memberModal: ModalDefinition = {
   title: "Add member",

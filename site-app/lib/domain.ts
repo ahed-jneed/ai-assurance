@@ -21,15 +21,25 @@ export type {
   Run,
 } from "./domain/types";
 export { canWrite, roles } from "./domain/types";
-export type { Classification } from "./domain/classification";
+export type {
+  Classification,
+  ClassificationLabel,
+} from "./domain/classification";
 export { articleNames, classify } from "./domain/classification";
 export { risk } from "./domain/risk";
 export type { AuditGate } from "./domain/gates";
 export {
   completionGates,
   finalReportGates,
+  gatesStage,
+  isReleaseTimeRecord,
+  paperCurrent,
   paperRequired,
+  releaseRequirements,
+  releaseTimeMessage,
+  releaseTimeTemplates,
   reportBlockers,
   stageGates,
   stages,
+  workStage,
 } from "./domain/gates";
