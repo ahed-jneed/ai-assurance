@@ -1,8 +1,10 @@
 // The structured engagement workflow's commands, dispatched by name for the
 // workspace route. They live in lib/workflow/ by area: scope and program
-// planning, procedure execution and review, client request grants, report
-// release, follow-up monitoring and finding assurance.
+// planning, acceptance and independence, procedure execution and review,
+// client request grants, report release, follow-up monitoring and finding
+// assurance.
 import type { Engagement } from "./domain";
+import { acceptanceCommands } from "./workflow/acceptance-commands";
 import { briefProgramCommands } from "./workflow/brief-program";
 import { clientGrantCommands } from "./workflow/client-grants";
 import {
@@ -49,11 +51,17 @@ export const workflowOps = [
   "linkFindingSupport",
   "recordFindingRetest",
   "reopenFinding",
+  "saveAcceptance",
+  "approveAcceptance",
+  "saveDeclaration",
+  "resolveDeclaredThreat",
+  "withdrawDeclaredExclusion",
 ];
 // A Map, so inherited object keys such as `constructor` stay unknown.
 const commands = new Map<string, WorkflowHandler>(
   Object.entries({
     ...briefProgramCommands,
+    ...acceptanceCommands,
     ...procedureCommands,
     ...clientGrantCommands,
     ...reportReleaseCommands,

@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { FrozenReportDetails } from "./report-details";
 import { FindingActions } from "./finding-actions";
 import { SpecialCategoryRecord } from "./special-category";
-import { performancePositiveLabel, protocolConfigKeys } from "@/lib/evaluation";
+import {
+  performanceBaselines,
+  performancePositiveLabel,
+  protocolConfigKeys,
+} from "@/lib/evaluation";
 import { humanLabel, readableResults } from "@/lib/presentation";
 import { describePlan } from "@/lib/hosted-statistics";
 import { StatisticsResult } from "./statistics-result";
@@ -397,7 +401,10 @@ function Criterion({ result, run }: { result: Result; run: Run }) {
                 "' ≥ " +
                 (c.minimumRecall * 100).toFixed(1) +
                 "%"
-              : "")
+              : "") +
+          performanceBaselines(run)
+            .map((baseline) => " · " + baseline)
+            .join("")
         : result.testId === "regression"
           ? "RMSE ≤ " + c.maximumRmse + " target units"
           : result.testId === "disparate_impact"

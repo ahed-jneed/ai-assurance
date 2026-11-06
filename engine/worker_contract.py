@@ -22,7 +22,11 @@ from .errors import EngineError
 WORKER_VERSION = "1.2.0"
 # 2.0.0: hosted engineConfig 1.1 (derived plan) and 1.4 (explicit plan) become engine configuration 1.3,
 # and hostedResults copy the engine's statistics 1.0.0 decisions (docs/design/audit-statistics.md E4).
-TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.0.0"
+# 2.1.0: the performance rules of test definitions traditional-ml-2.1.0 (#65): binary performance is measured
+# on the frozen performancePositiveLabel while fairness counts the favourable label, and performance results
+# report prevalence, the majority-class baseline accuracy, a per-class table and predicted labels absent
+# from the reference column.
+TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.1.0"
 ENGINE_CONFIG_VERSIONS = {"1.1", "1.4"}
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
@@ -379,12 +383,24 @@ def translate_config(request, rows):
     native = {"contractVersion": "1.3", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "statistics": plan, "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": {}}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": hosted["contractVersion"], "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimums": {"configured": configured, "applied": applied}, "supplementalMetricPolicy": "Every result is a criterion of the recorded statistics plan; metrics without a band are descriptive and never decide."}}
     if task == "binary_classification":
         native.update(binary_labels(hosted, rows, columns, inference=inference))
+        if any(criterion["kind"] == "performance" for criterion in plan["criteria"]):
+            native["performancePositiveLabel"] = performance_positive_label(hosted, native)
     if "modelSpec" in hosted:
         native["modelSpec"] = copy.deepcopy(hosted["modelSpec"])
     try:
         return validate_config(native)
     except stats.StatisticsError as exc:
         raise EngineError("protocol_config_invalid", str(exc)) from exc
+
+
+def performance_positive_label(hosted, labels):
+    """The class binary performance is measured on (test definitions traditional-ml-2.1.0): the frozen
+    performancePositiveLabel, empty or absent meaning the favourable positiveLabel. It must be one of the
+    frozen label pair; fairness criteria keep counting the favourable label."""
+    value = hosted["config"].get("performancePositiveLabel") or labels["positiveLabel"]
+    if not isinstance(value, str) or value.strip() not in {labels["positiveLabel"], labels["negativeLabel"]}:
+        raise EngineError("protocol_config_invalid", f"performancePositiveLabel {value!r} is not one of the frozen labels {[labels['positiveLabel'], labels['negativeLabel']]!r}")
+    return value.strip()
 
 
 def binary_labels(hosted, rows=None, columns=None, *, inference):
@@ -409,6 +425,10 @@ def binary_labels(hosted, rows=None, columns=None, *, inference):
             raise EngineError("protocol_config_invalid", "engineConfig 1.4 declares negativeLabel")
         # Requests frozen without negativeLabel: derive the other label.
         names = declared if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
+        performance = hosted["config"].get("performancePositiveLabel")
+        if isinstance(performance, str) and performance.strip() and performance.strip() != positive:
+            # A separate performance positive class is the other label of the frozen pair.
+            names = names | {performance.strip()}
         others = names-{positive}
         if len(others) != 1 or inference and positive not in names:
             raise EngineError("label_set_mismatch", "Freeze engineConfig.negativeLabel; the other binary label cannot be derived from these labels")

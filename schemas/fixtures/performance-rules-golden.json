@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Binary performance with a frozen performance positive class (#65): the same saved predictions and hosted protocol run through the hosted runner (site-app/lib/diagnostics.ts evaluate, interactive-predictions 3.0.0) and through the external worker (engine/worker_contract.py translate_config 2.1.0, the engine, then hosted_results). Both runners derive the same statistics 1.0.0 plan and decide by its intervals, so each case has one outcome and one decision (direction, deciding member, reasons and p-value) that both must report, with the same values for the shared metrics. engineMetrics are the engine's supplementary descriptive entries, which a hosted 1.4 result does not carry. Rows are [actual, predicted, count].",
+  "columns": ["actual", "predicted"],
+  "cases": [
+    {
+      "id": "always-approve",
+      "description": "Issue #65 reproduction 1: 34 approved and 6 declined, every prediction approved. Accuracy 0.85 and recall 1.0 meet their thresholds and balanced accuracy is exactly 50%; six declined rows are below the minimum class count, so neither runner decides.",
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "approved",
+        "performancePositiveLabel": "",
+        "minimumGroupSize": 30,
+        "maximumParityGap": 0.1,
+        "minimumImpactRatio": 0.8,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 20,
+        "minimumClassCount": 5,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.7,
+        "maximumRmse": 1
+      },
+      "negativeLabel": "declined",
+      "rows": [
+        ["approved", "approved", 34],
+        ["declined", "approved", 6]
+      ],
+      "outcome": "inconclusive",
+      "decision": {
+        "direction": "pass",
+        "decidingMemberId": null,
+        "reasons": ["below_minimum_class_count"],
+        "pValue": 1
+      },
+      "metrics": {
+        "accuracy": 0.85,
+        "recall": 1,
+        "precision": 0.85,
+        "f1": 0.918918918918919,
+        "specificity": 0,
+        "balanced_accuracy": 0.5
+      },
+      "engineMetrics": {
+        "prevalence": 0.85,
+        "majority_baseline_accuracy": 0.85
+      }
+    },
+    {
+      "id": "fraud-positive-class",
+      "description": "Issue #65 reproduction 2: favourable label ok, performance positive class fraud. Fraud 5 caught and 5 missed, ok 29 right and 1 flagged: recall of fraud 0.5, whose interval straddles 0.7 at 40 rows. Measured on the favourable label, recall would be 0.9667.",
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "ok",
+        "performancePositiveLabel": "fraud",
+        "minimumGroupSize": 30,
+        "maximumParityGap": 0.1,
+        "minimumImpactRatio": 0.8,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 20,
+        "minimumClassCount": 5,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.7,
+        "maximumRmse": 1
+      },
+      "negativeLabel": "fraud",
+      "rows": [
+        ["fraud", "fraud", 5],
+        ["fraud", "ok", 5],
+        ["ok", "ok", 29],
+        ["ok", "fraud", 1]
+      ],
+      "outcome": "inconclusive",
+      "decision": {
+        "direction": "fail",
+        "decidingMemberId": "recall",
+        "reasons": ["interval_straddles_band"],
+        "pValue": 0.502638832465852
+      },
+      "metrics": {
+        "accuracy": 0.85,
+        "recall": 0.5,
+        "precision": 0.8333333333333334,
+        "f1": 0.625,
+        "specificity": 0.9666666666666667,
+        "balanced_accuracy": 0.7333333333333334
+      },
+      "engineMetrics": {
+        "prevalence": 0.25,
+        "majority_baseline_accuracy": 0.75
+      }
+    },
+    {
+      "id": "fraud-positive-class-x10",
+      "description": "Reproduction 2 with ten times the rows: recall of fraud 0.5, whose interval lies below 0.7, so both runners fail. Measured on the favourable label the worker passed it before #65.",
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "ok",
+        "performancePositiveLabel": "fraud",
+        "minimumGroupSize": 30,
+        "maximumParityGap": 0.1,
+        "minimumImpactRatio": 0.8,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 20,
+        "minimumClassCount": 5,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.7,
+        "maximumRmse": 1
+      },
+      "negativeLabel": "fraud",
+      "rows": [
+        ["fraud", "fraud", 50],
+        ["fraud", "ok", 50],
+        ["ok", "ok", 290],
+        ["ok", "fraud", 10]
+      ],
+      "outcome": "fail",
+      "decision": {
+        "direction": "fail",
+        "decidingMemberId": "recall",
+        "reasons": [],
+        "pValue": 3.824902476329153e-5
+      },
+      "metrics": {
+        "accuracy": 0.85,
+        "recall": 0.5,
+        "precision": 0.8333333333333334,
+        "f1": 0.625,
+        "specificity": 0.9666666666666667,
+        "balanced_accuracy": 0.7333333333333334
+      },
+      "engineMetrics": {
+        "prevalence": 0.25,
+        "majority_baseline_accuracy": 0.75
+      }
+    },
+    {
+      "id": "fraud-positive-class-pass",
+      "description": "A separate performance positive class that both runners pass: recall of fraud 0.9, accuracy 0.9375 and balanced accuracy 0.925 clear their bands.",
+      "config": {
+        "labelColumn": "actual",
+        "predictionColumn": "predicted",
+        "groupColumn": "",
+        "positiveLabel": "ok",
+        "performancePositiveLabel": "fraud",
+        "minimumGroupSize": 30,
+        "maximumParityGap": 0.1,
+        "minimumImpactRatio": 0.8,
+        "minimumAccuracy": 0.8,
+        "minimumSampleSize": 20,
+        "minimumClassCount": 5,
+        "maximumOddsGap": 0.1,
+        "minimumRecall": 0.7,
+        "minimumMacroF1": 0.7,
+        "maximumRmse": 1
+      },
+      "negativeLabel": "fraud",
+      "rows": [
+        ["fraud", "fraud", 90],
+        ["fraud", "ok", 10],
+        ["ok", "ok", 285],
+        ["ok", "fraud", 15]
+      ],
+      "outcome": "pass",
+      "decision": {
+        "direction": "pass",
+        "decidingMemberId": "recall",
+        "reasons": [],
+        "pValue": 1.2749674921097064e-5
+      },
+      "metrics": {
+        "accuracy": 0.9375,
+        "recall": 0.9,
+        "precision": 0.8571428571428571,
+        "f1": 0.8780487804878049,
+        "specificity": 0.95,
+        "balanced_accuracy": 0.925
+      },
+      "engineMetrics": {
+        "prevalence": 0.25,
+        "majority_baseline_accuracy": 0.75
+      }
+    }
+  ]
+}

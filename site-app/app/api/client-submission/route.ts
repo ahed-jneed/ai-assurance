@@ -8,6 +8,7 @@ import {
   getEngagement,
   id,
   now,
+  parseJsonBody,
   readBounded,
   requireRole,
   responseError,
@@ -44,9 +45,7 @@ export async function POST(request: Request) {
           },
           body: bytes,
         }).formData();
-    const raw = json
-        ? JSON.parse(new TextDecoder().decode(bytes))
-        : Object.fromEntries(form!),
+    const raw = json ? parseJsonBody(bytes) : Object.fromEntries(form!),
       a = base.parse(raw),
       ctx = await context(a.tenantId);
     requireRole(ctx, ["Client Contributor"]);

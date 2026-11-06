@@ -26,6 +26,8 @@ KIND_METRICS = {
     "regression_performance": {"mae", "rmse", "r2"},
     "calibration": {"maximum_calibration_gap", "brier_score", "expected_calibration_error"},
 }
+# Supplementary descriptive entries of test definitions traditional-ml-2.1.0 (#65): reported, never members.
+KIND_SUPPLEMENTARY = {"performance": {"prevalence", "majority_baseline_accuracy"}, "multiclass_performance": {"majority_baseline_accuracy"}}
 GROUP_NAMES = {"selection_rate_difference": ("demographic_parity_difference", ("selection_rate_difference",)), "selection_rate_ratio": ("disparate_impact_ratio", ("selection_rate_ratio",)), "equalized_odds": ("equalized_odds_difference", ("tpr_difference", "fpr_difference"))}
 
 
@@ -236,7 +238,7 @@ def _validate_names(criterion, metrics, expect):
         elif kind == "calibration":
             allowed = name in KIND_METRICS[kind] or role == "member" and name.startswith("calibration_gap:bin")
         else:
-            allowed = name in KIND_METRICS[kind]
+            allowed = name in KIND_METRICS[kind] or role == "descriptive" and name in KIND_SUPPLEMENTARY.get(kind, ())
         expect(allowed, f"metric name {name[:80]!r} does not belong to a {kind} criterion")
 
 

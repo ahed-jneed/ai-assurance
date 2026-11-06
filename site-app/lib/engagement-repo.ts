@@ -4,7 +4,12 @@
 import { db } from "./bindings";
 import type { Engagement } from "./domain";
 import { migrateClassification } from "./domain/classification";
-import { hydrate, dehydrate } from "./engagement-storage";
+import {
+  dehydrate,
+  hydrate,
+  IntegrityError,
+  type HydrateParts,
+} from "./engagement-storage";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import { assertSaveQuota } from "./access-policy";
@@ -31,7 +36,19 @@ const stored = new WeakMap<
 const byteLength = (body: string) => new TextEncoder().encode(body).byteLength;
 /** The bytes the engagement occupies as stored, when it was loaded here. */
 export const storedSize = (e: Engagement) => stored.get(e)?.bytes;
-export async function getEngagement(ctx: Context, engagementId: string) {
+/**
+ * Engagements loaded without all their immutable parts (loadEngagement, or
+ * getEngagement with `parts`): for reading only, never for save().
+ */
+const partial = new WeakSet<Engagement>();
+/**
+ * Loads the engagement's D1 record for a caller who may open it, without its
+ * immutable R2 parts (report snapshots stay empty objects, paper histories and
+ * run results empty lists): enough for access checks, workflow state and work
+ * items, and never saved. A body that is not JSON raises IntegrityError (for a
+ * Client Contributor, whose grant it would hold, 404).
+ */
+export async function loadEngagement(ctx: Context, engagementId: string) {
   const row = await db()
     .prepare(
       "SELECT body,version,client_id FROM engagements WHERE tenant_id=? AND id=?",
@@ -50,7 +67,17 @@ export async function getEngagement(ctx: Context, engagementId: string) {
       .first())
   )
     throw new ApiError(404, "Engagement not found");
-  const e = JSON.parse(row.body) as Engagement;
+  let e: Engagement;
+  try {
+    e = JSON.parse(row.body) as Engagement;
+  } catch {
+    // A Client Contributor's access rests on a grant inside the body, so an
+    // unreadable body cannot show one: 404, as the directory decides it
+    // (engagementList), before anything about the record is revealed.
+    if (ctx.role === "Client Contributor")
+      throw new ApiError(404, "Engagement not found");
+    throw new IntegrityError(engagementId, "unreadable", "body");
+  }
   e.version = row.version;
   // A classification recorded before #19 loads with every fact unknown.
   e.classification = migrateClassification(e.classification);
@@ -69,7 +96,23 @@ export async function getEngagement(ctx: Context, engagementId: string) {
     bytes: byteLength(row.body),
     approval: approvalStatus(e.workflow),
   });
-  return hydrate(e);
+  partial.add(e);
+  return e;
+}
+/**
+ * Loads the engagement for a caller who may open it, with its immutable parts
+ * read from R2 in parallel (or only the `parts` named, which leaves it for
+ * reading only). A missing, unavailable or altered part raises IntegrityError.
+ */
+export async function getEngagement(
+  ctx: Context,
+  engagementId: string,
+  parts?: HydrateParts,
+) {
+  const e = await loadEngagement(ctx, engagementId);
+  await hydrate(e, ctx, parts);
+  if (!parts) partial.delete(e);
+  return e;
 }
 /**
  * Stores the engagement with its snapshot and audit event in one D1 batch,
@@ -90,6 +133,8 @@ export async function save(
   extra: (commandId: string) => D1PreparedStatement[] = () => [],
 ) {
   refuseReadOnly(ctx);
+  if (partial.has(e))
+    throw new Error("A partially loaded engagement cannot be saved");
   if (
     ctx.role === "Client Contributor" &&
     !(
