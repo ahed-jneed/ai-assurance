@@ -1,5 +1,11 @@
 // Follow-up commands: monitoring, change, incident and remediation cases
 // after the engagement, their assessment and independent closure.
+//
+// Closure rests on accepted evidence, except a reassessment decision, which
+// the linked successor engagement carries. Deciding that no reassessment is
+// needed concludes the case, so it needs its evidence when it is recorded; a
+// follow-up decision may be recorded first and its evidence in a later
+// assessment, before closure.
 import { z } from "zod";
 import type { MonitoringCase } from "../workflow-types";
 import {
@@ -97,6 +103,11 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
         fail(404, "Follow-up case not found");
     if (m.state === "closed")
       fail(409, "Create a new case for subsequent work");
+    if (a.decision === "no_reassessment" && !a.evidenceIds.length)
+      fail(
+        400,
+        "Link the accepted evidence that shows no reassessment is needed",
+      );
     if (a.evidenceIds.length) accepted(a.evidenceIds);
     m.history.push({
       at: c.at,
@@ -125,12 +136,19 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
       !m.assessment.trim()
     )
       fail(409, "Assess the case before independent closure");
-    accepted(m.evidenceIds);
-    if (m.decision === "reassessment_required" && !m.successorEngagementId)
+    if (m.decision === "reassessment_required") {
+      if (!m.successorEngagementId)
+        fail(
+          400,
+          "Open a successor engagement before closing the reassessment case",
+        );
+      if (m.evidenceIds.length) accepted(m.evidenceIds);
+    } else if (!m.evidenceIds.length)
       fail(
         400,
-        "Open a successor engagement before closing the reassessment case",
+        "Record an assessment with the accepted evidence before independent closure",
       );
+    else accepted(m.evidenceIds);
     m.history.push({
       at: c.at,
       actor: c.userId,
