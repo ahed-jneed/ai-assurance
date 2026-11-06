@@ -88,6 +88,10 @@ export function packDocument(r: Registry, id: string, version: string) {
   const e = entryOf(r, "pack", id, version);
   return e ? (r.documents.get(keyOf(e)) as PackDocument) : undefined;
 }
+export function crosswalkDocument(r: Registry, id: string, version: string) {
+  const e = entryOf(r, "crosswalk", id, version);
+  return e ? (r.documents.get(keyOf(e)) as CrosswalkDocument) : undefined;
+}
 export function frameworkDocument(
   r: Registry,
   id: string,

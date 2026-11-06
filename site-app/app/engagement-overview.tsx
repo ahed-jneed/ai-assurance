@@ -217,7 +217,7 @@ export function EngagementOverview({
             <div
               className="overview-progress-track"
               role="progressbar"
-              aria-label="Reviewed procedure coverage"
+              aria-label="Reviewed procedure progress"
               aria-valuemin={0}
               aria-valuemax={selectedProcedures.length || 1}
               aria-valuenow={reviewedProcedures}
@@ -258,7 +258,7 @@ export function EngagementOverview({
           <div
             className="overview-progress-track"
             role="progressbar"
-            aria-label="Signed working paper coverage"
+            aria-label="Signed working paper progress"
             aria-valuemin={0}
             aria-valuemax={required.length || 1}
             aria-valuenow={signed}

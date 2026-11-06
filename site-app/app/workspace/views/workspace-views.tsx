@@ -326,6 +326,15 @@ export function WorkspaceViews({
       {view === "Regulatory mapping" && (
         <RegulatoryMapping
           features={packFeatures(data)}
+          coverage={
+            viewer
+              ? undefined
+              : {
+                  tenantId: data.tenantId,
+                  engagementId: e.id,
+                  version: e.version,
+                }
+          }
           engagement={e}
           catalog={data.catalog}
           reviewer={reviewer}

@@ -16,7 +16,7 @@ import {
   packFeatures,
   recordVersions,
   resolveNew,
-  useRegistry,
+  injectRegistry,
 } from "./pin";
 import { registry, selectablePacks } from "./registry";
 
@@ -29,7 +29,7 @@ vi.mock("../assurance-store", async (importOriginal) => ({
 
 let restore: () => void;
 beforeAll(() => {
-  restore = useRegistry(registry(withSamplePack()));
+  restore = injectRegistry(registry(withSamplePack()));
 });
 afterAll(() => restore());
 
@@ -216,7 +216,7 @@ describe("pack #1 keeps today's behaviour", () => {
       at: "2026-12-01",
     });
     entry.legalReview = "completed";
-    const back = useRegistry(registry(reviewed));
+    const back = injectRegistry(registry(reviewed));
     try {
       expect(criteriaView(e).frameworks[0].legalReviewPending).toBe(false);
       const later = await capture(e);

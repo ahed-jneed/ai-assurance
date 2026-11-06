@@ -32,7 +32,7 @@ let active: Registry | undefined;
 /** The registry the server uses: the generated bundle, or one a test injected. */
 export const criteriaRegistry = () => (active ??= registry());
 /** Injects a registry (tests only). Returns a function that restores the previous one. */
-export function useRegistry(r: Registry) {
+export function injectRegistry(r: Registry) {
   const previous = active;
   active = r;
   return () => {

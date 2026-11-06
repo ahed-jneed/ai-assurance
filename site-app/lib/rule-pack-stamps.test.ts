@@ -7,7 +7,7 @@ import type { Engagement, Report, RulePackStamp } from "./domain";
 import { freshEngagement } from "./factories";
 import { sha256 } from "./ids";
 import { engagementRulePack } from "./rule-pack";
-import { recordVersions, resolveNew, useRegistry } from "./criteria/pin";
+import { recordVersions, resolveNew, injectRegistry } from "./criteria/pin";
 import { packRulePack } from "./criteria/projection";
 import { registry } from "./criteria/registry";
 import generated from "./criteria/bundle.generated.json";
@@ -200,7 +200,7 @@ describe("version stamps on captured records", () => {
     Object.assign(pack.compat!.catalog!.regulatorySnapshot, {
       researchedAsOf: "2026-12-05",
     });
-    const restore = useRegistry(registry(later));
+    const restore = injectRegistry(registry(later));
     try {
       const recaptured = await capture(e);
       expect(recaptured.snapshot.rulePack).toMatchObject({

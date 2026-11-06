@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { reports } from "@/lib/commands/reports";
 import { caller } from "@/lib/commands/test-fixtures";
-import { resolveNew, useRegistry } from "@/lib/criteria/pin";
+import { resolveNew, injectRegistry } from "@/lib/criteria/pin";
 import { registry } from "@/lib/criteria/registry";
 import { withSamplePack } from "@/lib/criteria/test-bundles";
 import type { Engagement, Report } from "@/lib/domain";
@@ -23,7 +23,7 @@ vi.mock("@/lib/assurance-store", async (importOriginal) => ({
 
 let restore: () => void;
 beforeAll(() => {
-  restore = useRegistry(registry(withSamplePack()));
+  restore = injectRegistry(registry(withSamplePack()));
 });
 afterAll(() => restore());
 
