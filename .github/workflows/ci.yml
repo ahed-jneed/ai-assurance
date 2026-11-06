@@ -124,8 +124,9 @@ jobs:
       - name: Check harnesses
         run: npm run check:harnesses
 
-      # Run, procedure and external records the harnesses just produced
-      # through the API (including dataset-card pins) against the schemas.
+      # Run, procedure and external records and the internal dossier's
+      # working papers the harnesses just produced through the API (including
+      # dataset-card pins) against the schemas.
       - name: Validate fresh harness fixtures
         run: npm run check:fixtures
 
