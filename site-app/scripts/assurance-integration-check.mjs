@@ -613,6 +613,42 @@ try {
   console.log(
     "PASS exact population pin and reproducible stratified sample manifest",
   );
+  // A sampling frame never loses records silently (F-63): a blank row is
+  // refused with its row number, and a malformed population or column choice
+  // is a 400 rather than a server failure. Line breaks that end the file are
+  // not rows.
+  const sampleOf = async (name, content, status, extra = {}) => {
+    const datasetId = await upload(name, content);
+    return assurance(
+      "sample",
+      { ...sampleInput, datasetId, ...extra },
+      owner,
+      status,
+    );
+  };
+  assert.equal(
+    (await sampleOf("blank-row.csv", "id,stratum\nr1,A\n\nr2,B\n", 400)).error,
+    "Blank data row 2: remove empty rows; missing values are not silently dropped",
+  );
+  assert.equal(
+    (await sampleOf("malformed.csv", 'id,stratum\nr1,"A\nr2,B\n', 400)).error,
+    "Unclosed CSV field",
+  );
+  assert.equal(
+    (
+      await sampleOf("bad-column.csv", "id,stratum\nr1,A\nr2,B\n", 400, {
+        idColumn: "missing",
+      })
+    ).error,
+    "Choose an existing unique record-ID column",
+  );
+  const trailing = (
+    await sampleOf("trailing.csv", "id,stratum\r\nr1,A\r\nr2,B\r\n\r\n", 200)
+  ).record;
+  assert.equal(trailing.body.selected.length, 2);
+  console.log(
+    "PASS sampling rejects blank rows and malformed populations with 400 and accepts trailing line breaks",
+  );
   // A binary model labelled "no"/"yes": queueExternal derives the other
   // class from the system's output classes instead of freezing "0" (D-12).
   const labelledCsv = csv
