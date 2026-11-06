@@ -1158,7 +1158,10 @@ export function AssuranceWorkbench({
       scope={scope}
       query={{ kinds, q: query, review: reviewFilter }}
       refreshKey={loaded}
-      hasRecords={all.some((r) => kinds.includes(r.kind))}
+      // The snapshot may be loading or stale while the register already
+      // answers; until it settles, a filtered register without matches says
+      // so (and offers to clear the filters) instead of calling it empty.
+      hasRecords={refreshing || all.some((r) => kinds.includes(r.kind))}
       onOpen={(r) => setSelected(r)}
       empty={empty}
       person={person}

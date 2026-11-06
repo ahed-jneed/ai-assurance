@@ -70,7 +70,7 @@ type SearchState = {
  * The first page of records that match `query`, and `more()` to append the
  * next. A changed query or `refreshKey` starts again from the first page;
  * typing is debounced. The previous rows stay visible while a new query
- * loads.
+ * loads, and are dropped if it fails.
  */
 export function useRecordSearch(
   scope: SearchScope,
@@ -106,15 +106,19 @@ export function useRecordSearch(
               error: "",
             }),
           (x: unknown) => {
+            // The previous query's rows do not answer this one: drop them.
             if (!abort.signal.aborted)
-              setState((v) => ({
-                ...v,
+              setState({
+                key,
+                records: [],
+                nextCursor: null,
+                total: 0,
                 loading: false,
                 error:
                   x instanceof Error
                     ? x.message
                     : "Assurance records unavailable",
-              }));
+              });
           },
         );
       },
