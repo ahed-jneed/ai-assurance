@@ -4,6 +4,7 @@ import { loadEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
 import { isClientRole } from "../../workflow-state";
+import { accessConflict } from "../../workflow/acceptance";
 import { short } from "../fields";
 import type { ManagementBatch } from "./batch";
 /**
@@ -23,12 +24,16 @@ export const engagementIds = z
 /**
  * Checks that the caller may assign these engagements with a membership: only
  * a Lead Auditor, only to internal roles, and only engagements the caller can
- * open.
+ * open. For a known member (`userId`), an engagement where they declared a
+ * disqualifying relationship or an unresolved threat is refused, as
+ * assigning them to its team is (lib/workflow/acceptance.ts); an invitation
+ * is checked when it is accepted (lib/invitations.ts).
  */
 export async function checkAssignable(
   ctx: Context,
   role: string,
   ids: readonly string[],
+  userId?: string,
 ) {
   if (!ids.length) return;
   if (ctx.role !== "Lead Auditor" || isClientRole(role))
@@ -37,7 +42,11 @@ export async function checkAssignable(
       "Only a Lead Auditor may assign internal engagement access",
     );
   // Access is decided by the D1 record; its R2 parts are never needed here.
-  for (const engagementId of ids) await loadEngagement(ctx, engagementId);
+  for (const engagementId of ids) {
+    const e = await loadEngagement(ctx, engagementId);
+    const conflict = userId && accessConflict(e, userId);
+    if (conflict) throw new ApiError(409, conflict + " (" + e.title + ")");
+  }
 }
 
 /** Activates the user's access to each listed engagement. */
