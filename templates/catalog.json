@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "methodologyVersion": "2026.11.1",
+  "methodologyVersion": "2026.11.2",
   "regulatorySnapshot": {
-    "rulePackVersion": "2026.11.1",
+    "rulePackVersion": "2026.11.2",
     "jurisdiction": "EU",
     "celex": "02024R1689-20260727",
     "consolidatedAsOf": "2026-07-27",
@@ -11,7 +11,45 @@
     "research": {
       "issue": "https://github.com/ahed-jneed/ai-assurance/issues/8",
       "report": "docs/research/rule-pack-2026-11.md",
-      "data": "docs/research/rule-pack-2026-11.json"
+      "data": "docs/research/rule-pack-2026-11.json",
+      "revisions": [
+        {
+          "rulePackVersion": "2026.11.2",
+          "issue": "https://github.com/ahed-jneed/ai-assurance/issues/77",
+          "report": "docs/research/art50-transparency-2026-11.md",
+          "data": "docs/research/art50-transparency-2026-11.json",
+          "edits": [
+            "A50-ED-10",
+            "A50-ED-11",
+            "A50-ED-12",
+            "A50-ED-13",
+            "A50-ED-14",
+            "A50-ED-15"
+          ],
+          "amendments": [
+            {
+              "edit": "A50-ED-12",
+              "target": "aia-2026-08-02-art50-transparency",
+              "fields": [
+                "notes",
+                "sourceIds",
+                "legalReview"
+              ]
+            },
+            {
+              "edit": "A50-ED-12",
+              "target": "LR-03",
+              "fields": [
+                "question"
+              ]
+            }
+          ],
+          "resolvesUnverified": [
+            "UV-05",
+            "UV-07"
+          ]
+        }
+      ]
     },
     "approval": {
       "status": "pending_legal_review",
@@ -139,7 +177,7 @@
     "automatedAccessUrl": "https://publications.europa.eu/resource/celex/32026R1744",
     "explorerUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act-explorer",
     "timelineUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act",
-    "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law. From 2 December 2026, screen Art 5(1), first subparagraph, points (ba) and (bb) (non-consensual intimate imagery of an identifiable person; child sexual abuse material) under the provider and deployer conditions of Art 5(1a) and Art 5(1b). Art 4a(1) covers providers of high-risk systems under six cumulative conditions; Art 4a(2) extends the same safeguards to other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection. Entries flagged for legal review are pending qualified legal review and must not be presented as settled law.",
+    "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law. From 2 December 2026, screen Art 5(1), first subparagraph, points (ba) and (bb) (non-consensual intimate imagery of an identifiable person; child sexual abuse material) under the provider and deployer conditions of Art 5(1a) and Art 5(1b). Art 4a(1) covers providers of high-risk systems under six cumulative conditions; Art 4a(2) extends the same safeguards to other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection. Art 50: the Commission guidelines C(2026) 7702 final are non-binding; the Code of Practice of 10 Jun 2026 is assessed adequate for Art 50(2), (4) and (5), but adherence is not conclusive evidence of compliance and gives no presumption of conformity. Entries flagged for legal review are pending qualified legal review and must not be presented as settled law.",
     "predicateRule": "Predicates select candidate rules only. Each predicate list is a conjunction evaluated in three-valued logic: false if any predicate is false, true if all are true, otherwise unknown. An entry or transitional record is a candidate when appliesIf is true (an absent list counts as true) and exceptIf is false (an absent list counts as false). An unknown result yields needs_information, never a pass or a not-applicable decision. obligationsApplyOnlyIf states when the obligations reach a legacy system. Applicability remains a reviewed human decision.",
     "crossReferenceRule": "A transitional record with entryId restates the standalone applicationDates or authorityDeadlines entry it names and carries the same deadline and predicates. List the rule once, under that entry, and show the record as a cross-reference. In prohibitedPractices, entryId names the applicationDates entry that dates the point.",
     "applicationDates": [
@@ -529,12 +567,14 @@
           "reference": "Art 113, second paragraph",
           "amendedBy": "Art 50(7) replaced by Regulation (EU) 2026/1744, Art 1, point (20); Art 50(1) to (6) unchanged."
         },
+        "notes": "Commission guidelines C(2026) 7702 final, point 153: Art 50 applies from 2 Aug 2026 to every in-scope system whatever its placing date, and only Art 50(2) is transitioned (Art 111(4)). Point 154: outputs generated before 2 Aug 2026 need no retroactive marking or labelling, but a text generated earlier and published on or after that date is labelled under Art 50(4). Recital (41) of Regulation (EU) 2026/1744: codes of practice under Art 50(7) give no presumption of conformity. The Art 111(4) transition keeps its predicate on placedOnMarketDate; the guidelines' reading that also covers systems only put into service is pending legal review (LR-A50-01). The Commission's view (footnote 50) that Art 111(2) does not defer Art 50 for legacy high-risk systems is pending legal review (LR-A50-10).",
         "effectiveFrom": "2026-08-02",
         "effectiveTo": null,
         "sourceIds": [
           "SRC-CONS-2024-1689-20260727",
           "SRC-OJ-2026-1744",
-          "SRC-AISD-TIMELINE"
+          "SRC-AISD-TIMELINE",
+          "SRC-EC-A50-GUIDELINES"
         ],
         "verification": {
           "status": "verified",
@@ -544,7 +584,9 @@
           "required": true,
           "itemIds": [
             "LR-03",
-            "LR-04"
+            "LR-04",
+            "LR-A50-01",
+            "LR-A50-10"
           ]
         },
         "approval": {
@@ -562,6 +604,11 @@
             "rulePackVersion": "2026.11.1",
             "change": "revised",
             "note": "Date unchanged. Names the Art 111(4) deadline of 2 Dec 2026 for Art 50(2) and the provider and deployer split of Art 50(1) to (4)."
+          },
+          {
+            "rulePackVersion": "2026.11.2",
+            "change": "revised",
+            "note": "Date and predicates unchanged. Adds guidelines points 153 and 154 and recital (41) of Regulation (EU) 2026/1744 to the notes, and LR-A50-01 and LR-A50-10 (Art 50 research, A50-ED-12)."
           }
         ]
       },
@@ -2439,13 +2486,75 @@
       },
       {
         "id": "GUID-ART50-TRANSPARENCY",
-        "title": "Guidelines on transparency obligations for providers and deployers of AI systems",
-        "status": "published",
-        "listedDate": "2026-07-20",
+        "title": "Commission Guidelines on the implementation of the transparency obligations for certain AI systems under Article 50 AI Act",
+        "status": "adopted",
+        "reference": "C(2026) 7702 final",
+        "legalEffect": "Non-binding (point 5); only the CJEU gives an authoritative interpretation. The Commission will review them as experience grows (point 155).",
+        "dates": [
+          {
+            "event": "Draft published for targeted consultation",
+            "date": "2026-05-08"
+          },
+          {
+            "event": "Consultation closed",
+            "date": "2026-06-03"
+          },
+          {
+            "event": "Content approved by Communication to the Commission C(2026) 5054 final and published (English)",
+            "date": "2026-07-20"
+          },
+          {
+            "event": "Formally adopted as Communication from the Commission C(2026) 7702 final; 23 language versions listed (no Romanian version listed)",
+            "date": "2026-11-05"
+          }
+        ],
         "url": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
-        "note": "Listing verified; content not reviewed in this research.",
+        "researchRef": "GUID-A50-GUIDELINES",
+        "note": "The July communication says the guidelines apply only from formal adoption. The adopted text matches the approved Annex apart from layout and two cross-reference corrections, so analyses made on the July text stay valid.",
         "sourceIds": [
-          "SRC-EC-AI-ACT-PAGE"
+          "SRC-EC-A50-GUIDELINES",
+          "SRC-EC-A50-GUIDELINES-PAGE",
+          "SRC-EC-A50-APPROVAL-2026-07",
+          "SRC-WAYBACK-A50-GUIDELINES-PAGE",
+          "SRC-EC-A50-CONSULTATION"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "id": "GUID-ART50-COP",
+        "title": "Code of Practice on Transparency of AI-Generated Content",
+        "status": "published",
+        "reference": "Final code, 10 June 2026",
+        "legalEffect": "Voluntary. Adherence is not conclusive evidence of compliance (Code, Section 1 and Section 2 objectives (a); Opinion para (52)). Codes under Art 50(7) give no presumption of conformity (Regulation (EU) 2026/1744, recital (41)).",
+        "dates": [
+          {
+            "event": "Kick-off plenary",
+            "date": "2025-11-05"
+          },
+          {
+            "event": "First draft published",
+            "date": "2025-12-17"
+          },
+          {
+            "event": "Second draft published",
+            "date": "2026-03-03"
+          },
+          {
+            "event": "Final code published",
+            "date": "2026-06-10"
+          }
+        ],
+        "url": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "researchRef": "GUID-A50-COP",
+        "note": "Covers Art 50(2), (4) and (5) only; nothing in it addresses Art 50(1) or (3).",
+        "sourceIds": [
+          "SRC-EC-COP-TEXT",
+          "SRC-EC-COP-PAGE",
+          "SRC-EC-COP-OPINION",
+          "SRC-OJ-2026-1744"
         ],
         "verification": {
           "status": "verified",
@@ -2454,14 +2563,57 @@
       },
       {
         "id": "GUID-ART50-COP-OPINION",
-        "title": "Commission opinion on the assessment of the Code of Practice on Transparency of AI-generated Content",
-        "status": "published",
-        "listedDate": "2026-07-09",
+        "title": "Adequacy assessments of the Code: Commission Opinion C(2026) 4839 final and AI Board conclusion",
+        "status": "assessed_adequate",
+        "reference": "C(2026) 4839 final; AI Board conclusion",
+        "legalEffect": "Both find the Code adequate for Art 50(2), (4) and (5). Both were made under the pre-Omnibus procedure and say they stay valid under the amended Art 50(7) and 56(6) while their conclusions agree (Opinion para (5); Board assessment). Neither prevents a later finding of inadequacy.",
+        "dates": [
+          {
+            "event": "Commission Opinion adopted",
+            "date": "2026-07-08"
+          },
+          {
+            "event": "Commission Opinion published",
+            "date": "2026-07-09"
+          },
+          {
+            "event": "AI Board adopted its adequacy assessment",
+            "date": "2026-07-09"
+          }
+        ],
         "url": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
-        "note": "Listing verified; content not reviewed. Under Art 50(7) as replaced, the Commission assesses whether adherence to such codes is adequate for Art 50(2) and (4).",
+        "researchRef": "GUID-A50-COP-ADEQUACY",
         "sourceIds": [
-          "SRC-EC-AI-ACT-PAGE",
-          "SRC-OJ-2026-1744"
+          "SRC-EC-COP-OPINION",
+          "SRC-EC-COP-OPINION-PAGE",
+          "SRC-AIB-COP-ASSESSMENT"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "id": "GUID-ART50-COP-SIGNATORIES",
+        "title": "List of signatories of the Code",
+        "status": "published",
+        "reference": "Commission news item of 31 July 2026",
+        "legalEffect": "Evidence of signature per section; the list is updated on an ongoing basis.",
+        "dates": [
+          {
+            "event": "Announcement: about 190 organisations signed",
+            "date": "2026-07-31"
+          },
+          {
+            "event": "Last update of the list (95 Section 1, 192 Section 2 signatories)",
+            "date": "2026-09-24"
+          }
+        ],
+        "url": "https://digital-strategy.ec.europa.eu/en/news/strong-backing-code-practice-transparency-ai-generated-content",
+        "researchRef": "GUID-A50-COP-SIGNATORIES",
+        "sourceIds": [
+          "SRC-EC-COP-SIGNATORIES",
+          "SRC-EC-COP-PAGE"
         ],
         "verification": {
           "status": "verified",
@@ -2509,7 +2661,7 @@
       {
         "id": "LR-03",
         "topic": "Art 111(1) and (2) legacy systems",
-        "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route, set by the first unit of the type and model under recital (39) of Regulation (EU) 2026/1744); whether the 2 Aug 2027 date in Art 111(1) is also set by the first unit of the type and model (recital (39) states that rule only for Art 111(2); the data assumes it is, in the 31 Dec 2030 entry and in the exceptIf lists that leave out the Art 111(1) systems); what counts as 'significant changes in their designs' (recital (177) of Regulation (EU) 2024/1689 treats it as equivalent in substance to a substantial modification); whether the 2 Aug 2030 sentence, like the first sentence, excludes the Art 111(1) systems (recital (177) gives the two groups their deadlines 'respectively'; the data assumes it does); and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems.",
+        "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route, set by the first unit of the type and model under recital (39) of Regulation (EU) 2026/1744); whether the 2 Aug 2027 date in Art 111(1) is also set by the first unit of the type and model (recital (39) states that rule only for Art 111(2); the data assumes it is, in the 31 Dec 2030 entry and in the exceptIf lists that leave out the Art 111(1) systems); what counts as 'significant changes in their designs' (recital (177) of Regulation (EU) 2024/1689 treats it as equivalent in substance to a substantial modification); whether the 2 Aug 2030 sentence, like the first sentence, excludes the Art 111(1) systems (recital (177) gives the two groups their deadlines 'respectively'; the data assumes it does); and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems. The Commission's Art 50 guidelines (C(2026) 7702 final, footnote 50) take the view that Art 111(2) does not defer Art 50, which applies cumulatively; that view is also pending legal review (LR-A50-10).",
         "relatedIds": [
           "aia-2027-12-02-high-risk-annex-iii",
           "aia-2028-08-02-high-risk-annex-i",
@@ -2595,6 +2747,29 @@
         ],
         "status": "pending",
         "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
+      },
+      {
+        "id": "LR-A50-01",
+        "topic": "Art 111(4) and systems only put into service",
+        "question": "The OJ text and recital (38) cover systems placed on the market before 2 August 2026; the guidelines (point 153) add systems put into service, the Commission Q&A does not. Which reading should the platform apply to in-house systems, and do new versions or channels after 2 August 2026 count as a new placing? (Extends LR-04.)",
+        "relatedIds": [
+          "CC-03",
+          "aia-2026-12-02-art50-2-legacy-transition",
+          "putIntoServiceDate"
+        ],
+        "status": "pending",
+        "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
+      },
+      {
+        "id": "LR-A50-10",
+        "topic": "Art 111(2) and Art 50",
+        "question": "Confirm the Commission's view (footnote 50) that the Art 111(2) grandfathering of legacy high-risk systems does not defer Art 50. (Relates to LR-03.)",
+        "relatedIds": [
+          "CC-10",
+          "A50-OBL-6"
+        ],
+        "status": "pending",
+        "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
       }
     ],
     "unverified": [
@@ -2626,22 +2801,10 @@
         "reason": "Not verified and not needed by #18; the request in force is C(2025) 3871 of 23 June 2025 (verified from the Decision)."
       },
       {
-        "id": "UV-05",
-        "claim": "Final Code of Practice on marking and labelling published 10 Jun 2026 (earlier research)",
-        "status": "secondary_only",
-        "reason": "Not fetched. Only the Commission opinion of 9 Jul 2026 is verified, as a listing."
-      },
-      {
         "id": "UV-06",
         "claim": "EUR-Lex pages for the cited acts",
         "status": "secondary_only",
         "reason": "EUR-Lex returned an AWS WAF challenge to automated requests. The same OJ documents were read from the Publications Office CELLAR repository; the EUR-Lex URLs themselves were not machine-checked."
-      },
-      {
-        "id": "UV-07",
-        "claim": "Contents of the transparency guidelines (20 Jul 2026) and of the Commission opinion on the transparency code (9 Jul 2026)",
-        "status": "secondary_only",
-        "reason": "Listings verified; documents not read."
       }
     ],
     "sources": [
@@ -2895,6 +3058,113 @@
         "accessUrl": "https://regulations.ai/regulations/RAI-EU-NA-CLASSIF-2026",
         "retrievedOn": "2026-11-05",
         "notes": "Says the guidelines remain a draft and that final adoption is expected by the end of 2026. Cites no source for that date: its listed sources are the Commission consultation page, the Service Desk page and Art 6. The footer says the page was created on 27 May 2026 and reviewed against official sources on 7 Sep 2026 with AI tools. Cited only by UV-03."
+      },
+      {
+        "id": "SRC-EC-A50-GUIDELINES",
+        "title": "Commission Guidelines on the implementation of the transparency obligations for certain AI systems under Article 50 AI Act, C(2026) 7702 final, 5.11.2026 (English)",
+        "publisher": "European Commission",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/131215",
+        "sha256": "9198d83876dcdffadce77078a468a426cb2fb9859aefcb6080aee6f9fe089bf3",
+        "retrievedOn": "2026-11-05",
+        "notes": "Communication from the Commission. Points (1) to (155) and footnotes read in full. Point (5): non-binding. Cited below by point number."
+      },
+      {
+        "id": "SRC-EC-A50-GUIDELINES-PAGE",
+        "title": "Commission library page: Guidelines on transparency obligations for providers and deployers of AI systems",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 20 July 2026; last update 5 November 2026; lists the adopted guidelines in 23 language versions (no Romanian version was listed on 2026-11-05). The approval communication of July is no longer listed."
+      },
+      {
+        "id": "SRC-EC-A50-APPROVAL-2026-07",
+        "title": "Communication to the Commission C(2026) 5054 final of 20.7.2026: approval of the content of the draft guidelines, with the guidelines as Annex",
+        "publisher": "European Commission",
+        "kind": "web_archive",
+        "accessUrl": "https://web.archive.org/web/20260722191113id_/https://ec.europa.eu/newsroom/dae/redirection/document/131214",
+        "sha256": "ea1a6d960a52d8532a068b8338622d1868616ce6b5bf2540dfef7a2378eb7c8c",
+        "retrievedOn": "2026-11-05",
+        "notes": "sha256 is of the communication PDF; the Annex PDF hashes to 30861fc5de31205846f023068069c92fabc7271ebeac6af7bef68b97f0a33f66. The communication says the guidelines would be formally adopted once all language versions exist and would apply only from then. A word-level diff of the Annex against C(2026) 7702 final found layout, footnote-placement and two cross-reference corrections only."
+      },
+      {
+        "id": "SRC-WAYBACK-A50-GUIDELINES-PAGE",
+        "title": "Internet Archive capture of the guidelines library page, 20 July 2026",
+        "publisher": "Internet Archive",
+        "kind": "web_archive",
+        "accessUrl": "https://web.archive.org/web/20260720143259/https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "retrievedOn": "2026-11-05",
+        "notes": "Shows publication 20 July 2026 with two downloads (guidelines; communication approving their content) and the press release of 20 July 2026."
+      },
+      {
+        "id": "SRC-EC-A50-CONSULTATION",
+        "title": "Commission consultation on the draft guidelines on transparency obligations under the AI Act",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/consultations/consultation-draft-guidelines-transparency-obligations-under-ai-act",
+        "retrievedOn": "2026-11-05",
+        "notes": "Opening 8 May 2026, closing 3 June 2026; last update 3 June 2026."
+      },
+      {
+        "id": "SRC-EC-COP-TEXT",
+        "title": "Code of Practice on Transparency of AI-Generated Content (final, Sections 1 and 2 with Glossary and Annex 1)",
+        "publisher": "European Commission (AI Office); drawn up by independent chairs",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/129555",
+        "sha256": "7bd22c5a3c56eaefda27a5bf7a6118198ef2a9c9255241bd97abf7cdedf9bc28",
+        "retrievedOn": "2026-11-05",
+        "notes": "Cited by Section, Commitment and Measure number. 'will' marks mandatory measures, 'encouraged' and 'may' optional ones (Section 1 and Section 2 introductions)."
+      },
+      {
+        "id": "SRC-EC-COP-PAGE",
+        "title": "Commission policy page: Code of Practice on Transparency of AI-generated Content",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Last update 19 October 2026. Timeline: kick-off 5 Nov 2025; first draft 17 Dec 2025; second draft 3 Mar 2026; draft guidelines 8 May 2026; final code 10 Jun 2026. About 190 signatories by end of July 2026."
+      },
+      {
+        "id": "SRC-EC-COP-OPINION",
+        "title": "Commission Opinion C(2026) 4839 final of 8.7.2026 on the assessment of the Code of Practice on Transparency of AI-generated content (Arts 50(7) and 56(6))",
+        "publisher": "European Commission",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/130913",
+        "sha256": "e9b85373cde28a6081fab307fa17fa4c90c2560a1c9a145fb461f696bca424ce",
+        "retrievedOn": "2026-11-05",
+        "notes": "Cited by paragraph number. Paragraph (52): adequate for Art 50(2), (4) and (5); adherence is not conclusive evidence of compliance."
+      },
+      {
+        "id": "SRC-EC-COP-OPINION-PAGE",
+        "title": "Commission library page for the opinion and the AI Board assessment",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 9 July 2026; last update 31 July 2026. States the Commission concluded on 8 July and the AI Board adopted its assessment the following day."
+      },
+      {
+        "id": "SRC-AIB-COP-ASSESSMENT",
+        "title": "Conclusion of the AI Board on the assessment of the Code of Practice on Transparency of AI-generated Content (Art 50(7))",
+        "publisher": "European Artificial Intelligence Board",
+        "kind": "ai_board",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/130916",
+        "sha256": "a01d832e0d4b10ebb66d27d0e8cf621aabb18aa56e5c24d39d6b4000a9adfcd2",
+        "retrievedOn": "2026-11-05",
+        "notes": "Undated in the document; dated 9 July 2026 by SRC-EC-COP-OPINION-PAGE. Notes that the Art 50 guidelines were still a draft at the time. Will examine the interoperability solutions due by 2 February 2027."
+      },
+      {
+        "id": "SRC-EC-COP-SIGNATORIES",
+        "title": "Commission news: Strong backing for the Code of Practice on Transparency of AI-generated Content (with the list of signatories)",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/news/strong-backing-code-practice-transparency-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 31 July 2026; last update 24 September 2026; Section 1 signatories: 95, Section 2 signatories: 192; list updated on an ongoing basis."
       }
     ]
   },
