@@ -5,6 +5,8 @@ export function seedWorkflow(userId: string, at: string): Workflow {
     schemaVersion: "1.0",
     adoptedBy: userId,
     adoptedAt: at,
+    // New workflows leave Planning only through the acceptance gate.
+    acceptanceRequired: true,
     program: {
       revision: 1,
       briefRevision: 0,
