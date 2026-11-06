@@ -19,7 +19,7 @@ import sys
 import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 TOOL_VERSION = "1.0.0"
 MAX_RECORDS = 100_000
@@ -627,6 +627,25 @@ def build_dossier(files, *, report_id, report_path, audience="internal", created
     return result
 
 
+def _pack_source(base, source):
+    """Read one pack source confined to base; a dossier may reach a client."""
+    _text(source, "pack source", 4096)
+    _expect(not PureWindowsPath(source).anchor and not PurePosixPath(source).is_absolute(), "Pack sources must be relative to the specification directory or --base-dir")
+    parts = [part for part in re.split(r"[\\/]", source) if part not in {"", "."}]
+    _expect(bool(parts) and ".." not in parts, "Pack sources cannot leave the base directory")
+    candidate = base
+    for part in parts:
+        candidate = candidate / part
+        _expect(not candidate.is_symlink(), "Pack sources cannot be or pass through symbolic links")
+    resolved = candidate.resolve(strict=True)
+    # Also catches links is_symlink() misses, such as Windows junctions.
+    _expect(resolved.is_relative_to(base), "Pack sources cannot leave the base directory")
+    _expect(resolved.is_file() and resolved.stat().st_size <= MAX_FILE_BYTES, "Pack source path or size invalid")
+    data = resolved.read_bytes()
+    _expect(len(data) <= MAX_FILE_BYTES, "Pack source grew beyond its size limit")
+    return data
+
+
 def _b64(value, name, limit):
     _expect(isinstance(value, str) and len(value) <= 4 * ((limit + 2) // 3), name + " exceeds its encoded bound")
     try:
@@ -752,7 +771,7 @@ def _write(value, path):
         print(data, end="")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description="Portable local assurance evidence procedures; no production model inference")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("sample", "quality", "bootstrap", "slices"):
@@ -771,6 +790,7 @@ def main():
     pack = sub.add_parser("pack")
     pack.add_argument("--spec", required=True)
     pack.add_argument("--output", required=True)
+    pack.add_argument("--base-dir", help="Directory every source must stay inside (default: the specification's directory)")
     for name in ("verify", "sign"):
         command = sub.add_parser(name)
         command.add_argument("--dossier", required=True)
@@ -781,7 +801,7 @@ def main():
         else:
             command.add_argument("--private-key", required=True)
             command.add_argument("--key-id", required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         if args.command in {"sample", "quality", "bootstrap", "slices"}:
             config = read_json(args.config, 1024 * 1024) if args.config else {}
@@ -797,12 +817,12 @@ def main():
             _keys(spec, ("reportId", "reportPath", "audience", "createdAt", "files", "withheld", "custody"), ("reportId", "reportPath", "audience", "createdAt", "files"), "pack specification")
             _expect(isinstance(spec["files"], list) and 1 <= len(spec["files"]) <= MAX_FILES, "Bounded files required")
             files, types = {}, {}
+            base = Path(args.base_dir or Path(args.spec).resolve().parent).resolve(strict=True)
+            _expect(base.is_dir(), "Pack base directory is invalid")
             for entry in spec["files"]:
                 _keys(entry, ("path", "source", "mediaType"), ("path", "source"), "pack source")
                 _expect(entry["path"] not in files, "Duplicate pack path")
-                source = Path(args.spec).resolve().parent / entry["source"]
-                _expect(source.is_file() and source.stat().st_size <= MAX_FILE_BYTES, "Pack source path or size invalid")
-                files[entry["path"]] = source.read_bytes()
+                files[entry["path"]] = _pack_source(base, entry["source"])
                 if "mediaType" in entry:
                     types[entry["path"]] = entry["mediaType"]
             result = build_dossier(files, report_id=spec["reportId"], report_path=spec["reportPath"], audience=spec["audience"], created_at=spec["createdAt"], withheld=spec.get("withheld", ()), custody=spec.get("custody", ()), media_types=types)

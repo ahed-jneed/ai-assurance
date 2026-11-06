@@ -11,6 +11,7 @@ engine's copied decision, and the run outcome aggregates confirmatory criteria
 differ from the suite names. schemas/fixtures/external-runs.v1.2.json stays as
 the frozen fixture of the 1.2 branch; this script writes external-runs.v1.5.json.
 """
+import argparse
 import copy
 import json
 import sys
@@ -86,7 +87,11 @@ def project(request, packet, request_text, result_text):
             'statistics': plan}}
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description='Regenerate the synthetic external 1.5 fixtures (external-runs.v1.2.json stays frozen).')
+    parser.add_argument('--output', type=Path, default=ROOT/'schemas/fixtures/external-runs.v1.5.json',
+        help='Destination; defaults to the committed fixture file.')
+    output = parser.parse_args(argv).output
     fixtures = []
     with tempfile.TemporaryDirectory() as temp:
         for name, task, data, suite, mode, plan in CASES:
@@ -137,9 +142,10 @@ def main():
             result_text = json_bytes(packet).decode()+'\n'
             fixtures.append({'fixture': name, 'requestJSON': request_text, 'resultJSON': result_text,
                 'run': project(request, packet, request_text, result_text)})
-    output = ROOT/'schemas/fixtures/external-runs.v1.5.json'
+    # newline='\n' keeps the output LF on Windows too, so it matches Git and the runtime zip.
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(fixtures, indent=2, ensure_ascii=False)+'\n', encoding='utf-8', newline='\n')
-    print('Created', len(fixtures), 'synthetic external fixtures')
+    print('Created', len(fixtures), 'synthetic external fixtures in', output)
 
 
 if __name__ == '__main__':

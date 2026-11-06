@@ -1714,6 +1714,201 @@
         "maximumRmse"
       ]
     },
+    "hostedPlanConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "labelColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "predictionColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "groupColumn": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "positiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "negativeLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "labelColumn",
+        "predictionColumn",
+        "positiveLabel"
+      ]
+    },
+    "hostedTranslation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "sourceContract": {
+          "enum": [
+            "1.1",
+            "1.4"
+          ]
+        },
+        "selectedTests": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "performance",
+              "regression",
+              "demographic_parity",
+              "disparate_impact",
+              "equalized_odds",
+              "drift",
+              "permutation",
+              "perturbation",
+              "explainability",
+              "cross_validation"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "sourceConfiguration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/hostedConfig"
+            },
+            {
+              "$ref": "#/$defs/hostedPlanConfig"
+            }
+          ]
+        },
+        "minimumClassCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "minimums": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "configured": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "sampleSize": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "groupSize": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "classCount": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "sampleSize",
+                    "groupSize",
+                    "classCount"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "applied": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "sampleSize": {
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 1000000
+                },
+                "groupSize": {
+                  "type": "integer",
+                  "minimum": 30,
+                  "maximum": 1000000
+                },
+                "classCount": {
+                  "type": "integer",
+                  "minimum": 10,
+                  "maximum": 1000000
+                }
+              },
+              "required": [
+                "sampleSize",
+                "groupSize",
+                "classCount"
+              ]
+            }
+          },
+          "required": [
+            "configured",
+            "applied"
+          ]
+        },
+        "supplementalMetricPolicy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        }
+      },
+      "required": [
+        "version",
+        "sourceContract",
+        "selectedTests",
+        "sourceConfiguration",
+        "supplementalMetricPolicy"
+      ]
+    },
     "legacyInteractiveConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -2551,6 +2746,27 @@
           "minItems": 1,
           "maxItems": 200,
           "uniqueItems": true
+        },
+        "cardPin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recordId",
+            "sha256",
+            "card"
+          ],
+          "properties": {
+            "recordId": {
+              "$ref": "#/$defs/id"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "card": {
+              "type": "object",
+              "description": "Frozen dataset governance card; application validation enforces its version, artifact hash, and engagement."
+            }
+          }
         }
       },
       "required": [
@@ -3700,6 +3916,36 @@
         }
       ]
     },
+    "procedureBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "procedureId": {
+          "$ref": "#/$defs/id"
+        },
+        "procedureRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "briefRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "programRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "procedureId",
+        "procedureRevision",
+        "briefRevision",
+        "programRevision"
+      ]
+    },
     "hostedRun": {
       "type": "object",
       "additionalProperties": false,
@@ -4464,1322 +4710,6 @@
           }
         }
       ]
-    },
-    "procedureBinding": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "procedureId": {
-          "$ref": "#/$defs/id"
-        },
-        "procedureRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        },
-        "briefRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        },
-        "programRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        }
-      },
-      "required": [
-        "procedureId",
-        "procedureRevision",
-        "briefRevision",
-        "programRevision"
-      ]
-    },
-    "externalPredictionDataset": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/id"
-        },
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 5000
-        },
-        "sha256": {
-          "$ref": "#/$defs/sha256"
-        },
-        "size": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 104857600
-        },
-        "rowCount": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000
-        },
-        "columns": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 300
-          },
-          "minItems": 1,
-          "maxItems": 200,
-          "uniqueItems": true
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "sha256",
-        "size",
-        "rowCount",
-        "columns"
-      ],
-      "description": "External immutable input snapshot. rowCount is the maximum reported metric sample size in this projection, not a verified source-population census."
-    },
-    "externalRunManifest": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "schemaVersion": {
-          "const": "1.0"
-        },
-        "model": {
-          "$ref": "#/$defs/registeredModel"
-        },
-        "dataset": {
-          "$ref": "#/$defs/externalPredictionDataset"
-        },
-        "profile": {
-          "$ref": "#/$defs/evaluationProfile"
-        },
-        "executionMode": {
-          "enum": [
-            "provided_predictions",
-            "auditor_model",
-            "client_local"
-          ]
-        },
-        "lineage": {
-          "const": "authenticated_external_attempt"
-        },
-        "testDefinitionVersion": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "limitations": {
-          "$ref": "#/$defs/stringNotes"
-        }
-      },
-      "required": [
-        "schemaVersion",
-        "model",
-        "dataset",
-        "profile",
-        "executionMode",
-        "lineage",
-        "testDefinitionVersion",
-        "limitations"
-      ]
-    },
-    "externalHostedResult": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "testId",
-        "label",
-        "article",
-        "outcome",
-        "metrics",
-        "limitations"
-      ],
-      "properties": {
-        "testId": {
-          "enum": [
-            "performance",
-            "regression",
-            "demographic_parity",
-            "disparate_impact",
-            "equalized_odds"
-          ]
-        },
-        "label": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "article": {
-          "enum": [
-            "10",
-            "15"
-          ]
-        },
-        "outcome": {
-          "enum": [
-            "pass",
-            "fail",
-            "inconclusive",
-            "not_applicable"
-          ]
-        },
-        "metrics": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/externalMetric"
-          },
-          "maxItems": 100
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 10000
-          },
-          "maxItems": 100
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "enum": [
-                  "pass",
-                  "fail"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "metrics": {
-                "minItems": 1
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "enum": [
-                  "inconclusive",
-                  "not_applicable"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "limitations": {
-                "minItems": 1
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "testId": {
-                "enum": [
-                  "performance",
-                  "regression"
-                ]
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "article": {
-                "const": "15"
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "article": {
-                "const": "10"
-              }
-            }
-          }
-        }
-      ]
-    },
-    "externalAuditRun": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "contractVersion": {
-          "const": "1.2"
-        },
-        "id": {
-          "$ref": "#/$defs/id"
-        },
-        "engagementId": {
-          "$ref": "#/$defs/id"
-        },
-        "modelId": {
-          "$ref": "#/$defs/id"
-        },
-        "datasetId": {
-          "$ref": "#/$defs/id"
-        },
-        "suite": {
-          "type": "array",
-          "items": {
-            "enum": [
-              "performance",
-              "regression",
-              "demographic_parity",
-              "disparate_impact",
-              "equalized_odds"
-            ]
-          },
-          "minItems": 1,
-          "maxItems": 5,
-          "uniqueItems": true
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 4294967295
-        },
-        "thresholds": {
-          "$ref": "#/$defs/hostedThresholds"
-        },
-        "state": {
-          "const": "succeeded"
-        },
-        "outcome": {
-          "enum": [
-            null,
-            "pass",
-            "fail",
-            "inconclusive",
-            "not_applicable"
-          ]
-        },
-        "overallOutcome": {
-          "enum": [
-            "pass",
-            "fail",
-            "inconclusive",
-            "not_applicable"
-          ]
-        },
-        "results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/externalHostedResult"
-          },
-          "minItems": 0,
-          "maxItems": 5
-        },
-        "paperIds": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "minItems": 0,
-          "maxItems": 5,
-          "uniqueItems": true
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "startedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "completedAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "error": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 10000
-        },
-        "provenance": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "inputHashes",
-            "runnerVersion",
-            "policyVersion"
-          ],
-          "properties": {
-            "inputHashes": {
-              "type": "object",
-              "required": [
-                "dataset",
-                "modelArtifact",
-                "system",
-                "protocol",
-                "auditBinding",
-                "externalRequest",
-                "externalResult"
-              ],
-              "additionalProperties": {
-                "$ref": "#/$defs/sha256"
-              }
-            },
-            "runnerVersion": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 300
-            },
-            "policyVersion": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 300
-            }
-          }
-        },
-        "config": {
-          "$ref": "#/$defs/hostedConfig"
-        },
-        "task": {
-          "enum": [
-            "Binary classification",
-            "Multiclass classification",
-            "Regression"
-          ]
-        },
-        "profileId": {
-          "$ref": "#/$defs/id"
-        },
-        "manifest": {
-          "$ref": "#/$defs/externalRunManifest"
-        },
-        "procedureBinding": {
-          "$ref": "#/$defs/procedureBinding"
-        },
-        "retryOf": {
-          "$ref": "#/$defs/id"
-        },
-        "externalJobId": {
-          "$ref": "#/$defs/id"
-        }
-      },
-      "required": [
-        "contractVersion",
-        "id",
-        "engagementId",
-        "modelId",
-        "datasetId",
-        "suite",
-        "seed",
-        "thresholds",
-        "state",
-        "outcome",
-        "results",
-        "paperIds",
-        "createdAt",
-        "provenance",
-        "config",
-        "task",
-        "manifest",
-        "externalJobId",
-        "procedureBinding",
-        "profileId",
-        "startedAt",
-        "completedAt"
-      ],
-      "description": "Authenticated external attempt projected into an audit run. Exact external report bytes remain preserved separately; application validation enforces request, lease, nonce, input and authority bindings.",
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Binary classification"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "suite": {
-                "items": {
-                  "enum": [
-                    "performance",
-                    "demographic_parity",
-                    "disparate_impact",
-                    "equalized_odds"
-                  ]
-                }
-              },
-              "config": {
-                "properties": {
-                  "positiveLabel": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Multiclass classification"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "suite": {
-                "items": {
-                  "const": "performance"
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Regression"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "suite": {
-                "items": {
-                  "const": "regression"
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "suite": {
-                "contains": {
-                  "enum": [
-                    "demographic_parity",
-                    "disparate_impact",
-                    "equalized_odds"
-                  ]
-                }
-              }
-            },
-            "required": [
-              "suite"
-            ]
-          },
-          "then": {
-            "properties": {
-              "config": {
-                "properties": {
-                  "groupColumn": {
-                    "minLength": 1
-                  },
-                  "positiveLabel": {
-                    "minLength": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "queued"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "outcome": {
-                "type": "null"
-              },
-              "results": {
-                "maxItems": 0
-              },
-              "paperIds": {
-                "maxItems": 0
-              }
-            },
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "startedAt"
-                  ]
-                },
-                {
-                  "required": [
-                    "completedAt"
-                  ]
-                },
-                {
-                  "required": [
-                    "overallOutcome"
-                  ]
-                },
-                {
-                  "required": [
-                    "error"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "running"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "required": [
-              "startedAt"
-            ],
-            "properties": {
-              "outcome": {
-                "type": "null"
-              },
-              "results": {
-                "maxItems": 0
-              },
-              "paperIds": {
-                "maxItems": 0
-              }
-            },
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "completedAt"
-                  ]
-                },
-                {
-                  "required": [
-                    "overallOutcome"
-                  ]
-                },
-                {
-                  "required": [
-                    "error"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "succeeded"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "required": [
-              "startedAt",
-              "completedAt",
-              "overallOutcome"
-            ],
-            "properties": {
-              "outcome": {
-                "enum": [
-                  "pass",
-                  "fail",
-                  "inconclusive",
-                  "not_applicable"
-                ]
-              },
-              "results": {
-                "minItems": 1
-              },
-              "paperIds": {
-                "minItems": 1
-              }
-            },
-            "not": {
-              "required": [
-                "error"
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "enum": [
-                  "failed",
-                  "cancelled"
-                ]
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "required": [
-              "completedAt",
-              "overallOutcome"
-            ],
-            "properties": {
-              "outcome": {
-                "const": "inconclusive"
-              },
-              "overallOutcome": {
-                "const": "inconclusive"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "state": {
-                "const": "failed"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "required": [
-              "error"
-            ]
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "manifest": {
-                "properties": {
-                  "profile": {
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "profile"
-                ]
-              }
-            },
-            "required": [
-              "manifest"
-            ]
-          },
-          "then": {
-            "required": [
-              "profileId"
-            ],
-            "properties": {
-              "provenance": {
-                "properties": {
-                  "inputHashes": {
-                    "required": [
-                      "protocol"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "else": {
-            "not": {
-              "required": [
-                "profileId"
-              ]
-            },
-            "properties": {
-              "provenance": {
-                "properties": {
-                  "inputHashes": {
-                    "not": {
-                      "required": [
-                        "protocol"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "const": "pass"
-              }
-            },
-            "required": [
-              "outcome"
-            ]
-          },
-          "then": {
-            "properties": {
-              "overallOutcome": {
-                "const": "pass"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "const": "fail"
-              }
-            },
-            "required": [
-              "outcome"
-            ]
-          },
-          "then": {
-            "properties": {
-              "overallOutcome": {
-                "const": "fail"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "const": "inconclusive"
-              }
-            },
-            "required": [
-              "outcome"
-            ]
-          },
-          "then": {
-            "properties": {
-              "overallOutcome": {
-                "const": "inconclusive"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "outcome": {
-                "const": "not_applicable"
-              }
-            },
-            "required": [
-              "outcome"
-            ]
-          },
-          "then": {
-            "properties": {
-              "overallOutcome": {
-                "const": "not_applicable"
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Binary classification"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "manifest": {
-                "properties": {
-                  "model": {
-                    "properties": {
-                      "task": {
-                        "const": "Binary classification"
-                      }
-                    }
-                  },
-                  "profile": {
-                    "anyOf": [
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "properties": {
-                          "task": {
-                            "const": "Binary classification"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                }
-              },
-              "results": {
-                "items": {
-                  "properties": {
-                    "testId": {
-                      "enum": [
-                        "performance",
-                        "demographic_parity",
-                        "disparate_impact",
-                        "equalized_odds"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Multiclass classification"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "manifest": {
-                "properties": {
-                  "model": {
-                    "properties": {
-                      "task": {
-                        "const": "Multiclass classification"
-                      }
-                    }
-                  },
-                  "profile": {
-                    "anyOf": [
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "properties": {
-                          "task": {
-                            "const": "Multiclass classification"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                }
-              },
-              "results": {
-                "items": {
-                  "properties": {
-                    "testId": {
-                      "enum": [
-                        "performance"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "task": {
-                "const": "Regression"
-              }
-            },
-            "required": [
-              "task"
-            ]
-          },
-          "then": {
-            "properties": {
-              "manifest": {
-                "properties": {
-                  "model": {
-                    "properties": {
-                      "task": {
-                        "const": "Regression"
-                      }
-                    }
-                  },
-                  "profile": {
-                    "anyOf": [
-                      {
-                        "type": "null"
-                      },
-                      {
-                        "properties": {
-                          "task": {
-                            "const": "Regression"
-                          }
-                        }
-                      }
-                    ]
-                  }
-                }
-              },
-              "results": {
-                "items": {
-                  "properties": {
-                    "testId": {
-                      "enum": [
-                        "regression"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "procedureBinding"
-            ]
-          },
-          "then": {
-            "properties": {
-              "provenance": {
-                "properties": {
-                  "inputHashes": {
-                    "required": [
-                      "auditBinding"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "provenance": {
-                "properties": {
-                  "inputHashes": {
-                    "not": {
-                      "required": [
-                        "auditBinding"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    "hostedTranslation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "sourceContract": {
-          "enum": [
-            "1.1",
-            "1.4"
-          ]
-        },
-        "selectedTests": {
-          "type": "array",
-          "items": {
-            "enum": [
-              "performance",
-              "regression",
-              "demographic_parity",
-              "disparate_impact",
-              "equalized_odds",
-              "drift",
-              "permutation",
-              "perturbation",
-              "explainability",
-              "cross_validation"
-            ]
-          },
-          "minItems": 1,
-          "maxItems": 10,
-          "uniqueItems": true
-        },
-        "sourceConfiguration": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/hostedConfig"
-            },
-            {
-              "$ref": "#/$defs/hostedPlanConfig"
-            }
-          ]
-        },
-        "minimumClassCount": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "minimums": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "configured": {
-              "anyOf": [
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "sampleSize": {
-                      "anyOf": [
-                        {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 1000000
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "groupSize": {
-                      "anyOf": [
-                        {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 1000000
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "classCount": {
-                      "anyOf": [
-                        {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 1000000
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "sampleSize",
-                    "groupSize",
-                    "classCount"
-                  ]
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "applied": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "sampleSize": {
-                  "type": "integer",
-                  "minimum": 30,
-                  "maximum": 1000000
-                },
-                "groupSize": {
-                  "type": "integer",
-                  "minimum": 30,
-                  "maximum": 1000000
-                },
-                "classCount": {
-                  "type": "integer",
-                  "minimum": 10,
-                  "maximum": 1000000
-                }
-              },
-              "required": [
-                "sampleSize",
-                "groupSize",
-                "classCount"
-              ]
-            }
-          },
-          "required": [
-            "configured",
-            "applied"
-          ]
-        },
-        "supplementalMetricPolicy": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 5000
-        }
-      },
-      "required": [
-        "version",
-        "sourceContract",
-        "selectedTests",
-        "sourceConfiguration",
-        "supplementalMetricPolicy"
-      ]
-    },
-    "externalMetric": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "name",
-        "value",
-        "unit",
-        "sampleSize"
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "value": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unit": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        },
-        "sampleSize": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000
-        },
-        "numerator": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "denominator": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "threshold": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/thresholdRule"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "confidenceInterval": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "lower",
-            "upper",
-            "level",
-            "method"
-          ],
-          "properties": {
-            "lower": {
-              "type": "number"
-            },
-            "upper": {
-              "type": "number"
-            },
-            "level": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "exclusiveMaximum": 1
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "slices": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "details": {},
-        "outcome": {
-          "enum": [
-            "pass",
-            "fail",
-            "inconclusive",
-            "not_applicable"
-          ]
-        },
-        "pValue": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 1
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
     },
     "planId": {
       "type": "string",
@@ -7944,6 +6874,66 @@
         }
       ]
     },
+    "undecidedResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "testId",
+        "label",
+        "article",
+        "outcome",
+        "metrics",
+        "limitations"
+      ],
+      "properties": {
+        "testId": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "article": {
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/metric"
+              },
+              {
+                "properties": {
+                  "details": {
+                    "not": {
+                      "type": "object",
+                      "required": [
+                        "role"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "engineReport": {
       "type": "object",
       "additionalProperties": false,
@@ -8476,48 +7466,236 @@
       ],
       "description": "Engine report under statistics 1.0.0: every performance, calibration and group criterion of the recorded plan is one result with a decision; drift, unavailable capabilities and model-backed procedures keep the 1.0 result shape without one."
     },
-    "hostedPlanConfig": {
+    "externalPredictionDataset": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "labelColumn": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 300
+          "maxLength": 5000
         },
-        "predictionColumn": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
+        "sha256": {
+          "$ref": "#/$defs/sha256"
         },
-        "groupColumn": {
-          "type": "string",
-          "minLength": 0,
-          "maxLength": 300
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 104857600
         },
-        "positiveLabel": {
-          "type": "string",
-          "minLength": 0,
-          "maxLength": 300
+        "rowCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
         },
-        "negativeLabel": {
-          "type": "string",
-          "minLength": 0,
-          "maxLength": 300
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "minItems": 1,
+          "maxItems": 200,
+          "uniqueItems": true
         },
-        "performancePositiveLabel": {
-          "type": "string",
-          "minLength": 0,
-          "maxLength": 300
+        "cardPin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recordId",
+            "sha256",
+            "card"
+          ],
+          "properties": {
+            "recordId": {
+              "$ref": "#/$defs/id"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "card": {
+              "type": "object",
+              "description": "Frozen dataset governance card; application validation enforces its version, artifact hash, and engagement."
+            }
+          }
         }
       },
       "required": [
-        "labelColumn",
-        "predictionColumn",
-        "positiveLabel"
+        "id",
+        "name",
+        "sha256",
+        "size",
+        "rowCount",
+        "columns"
+      ],
+      "description": "External immutable input snapshot. rowCount is the maximum reported metric sample size in this projection, not a verified source-population census."
+    },
+    "externalRunManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "model": {
+          "$ref": "#/$defs/registeredModel"
+        },
+        "dataset": {
+          "$ref": "#/$defs/externalPredictionDataset"
+        },
+        "profile": {
+          "$ref": "#/$defs/evaluationProfile"
+        },
+        "executionMode": {
+          "enum": [
+            "provided_predictions",
+            "auditor_model",
+            "client_local"
+          ]
+        },
+        "lineage": {
+          "const": "authenticated_external_attempt"
+        },
+        "testDefinitionVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringNotes"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "model",
+        "dataset",
+        "profile",
+        "executionMode",
+        "lineage",
+        "testDefinitionVersion",
+        "limitations"
       ]
     },
-    "undecidedResult": {
+    "externalMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value",
+        "unit",
+        "sampleSize"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "sampleSize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "denominator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/thresholdRule"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidenceInterval": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper",
+            "level",
+            "method"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            },
+            "level": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "slices": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "details": {},
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "pValue": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "externalHostedResult": {
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -8530,14 +7708,24 @@
       ],
       "properties": {
         "testId": {
-          "$ref": "#/$defs/id"
+          "enum": [
+            "performance",
+            "regression",
+            "demographic_parity",
+            "disparate_impact",
+            "equalized_odds"
+          ]
         },
         "label": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 300
         },
         "article": {
-          "type": "string"
+          "enum": [
+            "10",
+            "15"
+          ]
         },
         "outcome": {
           "enum": [
@@ -8550,32 +7738,886 @@
         "metrics": {
           "type": "array",
           "items": {
-            "allOf": [
-              {
-                "$ref": "#/$defs/metric"
+            "$ref": "#/$defs/externalMetric"
+          },
+          "maxItems": 100
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "maxItems": 100
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "metrics": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "inconclusive",
+                  "not_applicable"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "limitations": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "testId": {
+                "enum": [
+                  "performance",
+                  "regression"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "article": {
+                "const": "15"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "article": {
+                "const": "10"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "externalAuditRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "1.2"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "engagementId": {
+          "$ref": "#/$defs/id"
+        },
+        "modelId": {
+          "$ref": "#/$defs/id"
+        },
+        "datasetId": {
+          "$ref": "#/$defs/id"
+        },
+        "suite": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "performance",
+              "regression",
+              "demographic_parity",
+              "disparate_impact",
+              "equalized_odds"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "thresholds": {
+          "$ref": "#/$defs/hostedThresholds"
+        },
+        "state": {
+          "const": "succeeded"
+        },
+        "outcome": {
+          "enum": [
+            null,
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "overallOutcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/externalHostedResult"
+          },
+          "minItems": 0,
+          "maxItems": 5
+        },
+        "paperIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inputHashes",
+            "runnerVersion",
+            "policyVersion"
+          ],
+          "properties": {
+            "inputHashes": {
+              "type": "object",
+              "required": [
+                "dataset",
+                "modelArtifact",
+                "system",
+                "protocol",
+                "auditBinding",
+                "externalRequest",
+                "externalResult"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "runnerVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        },
+        "config": {
+          "$ref": "#/$defs/hostedConfig"
+        },
+        "task": {
+          "enum": [
+            "Binary classification",
+            "Multiclass classification",
+            "Regression"
+          ]
+        },
+        "profileId": {
+          "$ref": "#/$defs/id"
+        },
+        "manifest": {
+          "$ref": "#/$defs/externalRunManifest"
+        },
+        "procedureBinding": {
+          "$ref": "#/$defs/procedureBinding"
+        },
+        "retryOf": {
+          "$ref": "#/$defs/id"
+        },
+        "externalJobId": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "required": [
+        "contractVersion",
+        "id",
+        "engagementId",
+        "modelId",
+        "datasetId",
+        "suite",
+        "seed",
+        "thresholds",
+        "state",
+        "outcome",
+        "results",
+        "paperIds",
+        "createdAt",
+        "provenance",
+        "config",
+        "task",
+        "manifest",
+        "externalJobId",
+        "procedureBinding",
+        "profileId",
+        "startedAt",
+        "completedAt"
+      ],
+      "description": "Authenticated external attempt projected into an audit run. Exact external report bytes remain preserved separately; application validation enforces request, lease, nonce, input and authority bindings.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Binary classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "enum": [
+                    "performance",
+                    "demographic_parity",
+                    "disparate_impact",
+                    "equalized_odds"
+                  ]
+                }
               },
-              {
+              "config": {
                 "properties": {
-                  "details": {
+                  "positiveLabel": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Multiclass classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "const": "performance"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Regression"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "const": "regression"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "suite": {
+                "contains": {
+                  "enum": [
+                    "demographic_parity",
+                    "disparate_impact",
+                    "equalized_odds"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "suite"
+            ]
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "properties": {
+                  "groupColumn": {
+                    "minLength": 1
+                  },
+                  "positiveLabel": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "queued"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "type": "null"
+              },
+              "results": {
+                "maxItems": 0
+              },
+              "paperIds": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "startedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "completedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "overallOutcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "error"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "running"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "startedAt"
+            ],
+            "properties": {
+              "outcome": {
+                "type": "null"
+              },
+              "results": {
+                "maxItems": 0
+              },
+              "paperIds": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "completedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "overallOutcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "error"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "succeeded"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "startedAt",
+              "completedAt",
+              "overallOutcome"
+            ],
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "inconclusive",
+                  "not_applicable"
+                ]
+              },
+              "results": {
+                "minItems": 1
+              },
+              "paperIds": {
+                "minItems": 1
+              }
+            },
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "failed",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "completedAt",
+              "overallOutcome"
+            ],
+            "properties": {
+              "outcome": {
+                "const": "inconclusive"
+              },
+              "overallOutcome": {
+                "const": "inconclusive"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "profile": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "profile"
+                ]
+              }
+            },
+            "required": [
+              "manifest"
+            ]
+          },
+          "then": {
+            "required": [
+              "profileId"
+            ],
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "required": [
+                      "protocol"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "profileId"
+              ]
+            },
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
                     "not": {
-                      "type": "object",
                       "required": [
-                        "role"
+                        "protocol"
                       ]
                     }
                   }
                 }
               }
-            ]
+            }
           }
         },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string"
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "pass"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "fail"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "inconclusive"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "inconclusive"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "not_applicable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Binary classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Binary classification"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Binary classification"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "testId": {
+                      "enum": [
+                        "performance",
+                        "demographic_parity",
+                        "disparate_impact",
+                        "equalized_odds"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Multiclass classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Multiclass classification"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Multiclass classification"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "testId": {
+                      "enum": [
+                        "performance"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Regression"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Regression"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Regression"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "testId": {
+                      "enum": [
+                        "regression"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "procedureBinding"
+            ]
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "required": [
+                      "auditBinding"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "not": {
+                      "required": [
+                        "auditBinding"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-      }
+      ]
     },
     "evaluationProfilePlan": {
       "type": "object",

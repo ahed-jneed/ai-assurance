@@ -9,7 +9,7 @@ The plan for the current cycle, set on 5 November 2026. The [product direction](
 | Milestone | Goal | Issues |
 |---|---|---|
 | [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene. Must land before parallel feature work. | 6, of which 4 merged |
-| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 28, of which 2 merged |
+| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review. | 29, of which 2 merged |
 | [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion. | 9 |
 | [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification. | 11 |
 
@@ -32,6 +32,7 @@ In the tables below, rows are in dependency order: no row comes before an issue 
 |---|---|---|---|---|
 | [#8] | Research: verify EU AI Act milestones and EN 18286 status for rule pack 2026.11. **Merged** with [PR #43] on 5 Nov 2026 | P0 | — | F-51 |
 | [#59] | Research: what an auditor tests for the Art 50 transparency obligations | P1 | [#8] | — |
+| [#74] | Docs: record decisions D-15 to D-24 and the new Later items | P1 | — | — |
 | [#9] | Design: audit-grade statistics specification with hand-computed golden cases | P0 | — | — |
 | [#10] | Engine: make the external worker robust to bad jobs, slow transfers and contract drift | P1 | — | F-10, F-21, F-34, F-35, F-36, F-37, F-39, F-59, F-67 |
 | [#11] | Security: identity adapter that rejects forged identity headers, plus dev personas and sign-out | P0 | [#4] | F-02, F-19, F-25, F-53 |
@@ -95,7 +96,7 @@ Each step holds the issues whose longest chain of prerequisites has that many li
 
 | Step | Issues | What they wait for |
 |---|---|---|
-| 0 | [#1] (merged), [#7], [#8] (merged), [#9], [#10], [#26], [#31] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/` |
+| 0 | [#1] (merged), [#7], [#8] (merged), [#9], [#10], [#26], [#31], [#74] | Nothing. #8, #9, #26 and #31 are research or design; #10 changes only `engine/`; #74 changes only the decision log and this file |
 | 1 | [#3], [#4] (merged), [#5] (merged), [#6] (merged), [#21], [#59] | #1, except #21, which needs #9 and #10, and #59, which needs #8 |
 | 2 | [#11], [#13], [#14], [#15], [#18], [#32], [#39], [#50] (merged), [#51], [#62] | #11, #13, #14, #15, #39 and #50 wait only for M0 splits, which have merged. #18 needs #3 and #8; #51 needs #3; #62 needs #3 and #10; #32 needs #21 and #31 |
 | 3 | [#12], [#16], [#17], [#19], [#20], [#22], [#23], [#34], [#58], [#60], [#63], [#65], [#66], [#67], [#68], [#69] | #11 (for #12 and #34); #50 (for #12, #16, #17, #58 and #66); #13 (for #69); #14 (for #20 and #23); #18 (for #19); #15 (for #22, #60, #63 and #65 to #69). Also #10 (for #58 and #65), #21 (for #22), #8 (for #60) and #39 (for #63) |
@@ -162,14 +163,15 @@ Deferred on 5 Nov 2026, each with the reason it waits:
   - interval-based drift decisions (PSI, KS, Wasserstein): drift has no interval specification yet, so it stays point-estimate screening outside the families ([decision D-06](docs/product/decisions.md));
   - a delta-method macro-F1 interval, and engine-only Boschloo, BCa and shrinkage: the conservative 1.0.0 methods already decide safely, and these would only be reported until specified;
   - fairness for multiclass and regression models, counterfactual flip-rate and monotonicity tests, and bootstrap stability for permutation importance (R3.5): the specification defines group criteria for binary outcomes only and none of these tests;
-  - an engine validation dossier for each release (R3.8): the [#9] golden cases are its start.
+  - an engine validation dossier for each release (R3.8): the [#9] golden cases are its start;
+  - an exact (Fisher lower-tail) gate on chance-baseline fails, decided on 6 Nov 2026 ([decision D-21](docs/product/decisions.md)): a fail never lets a model that ignores the truth pass, and section 6 of the specification documents how often such a model fails.
 - **Criteria model** (the design for [#26], [PR #45]):
   - phase 3, repin with diff, impact review and revert, and reviewed links for pack #1: it builds on phases 1 and 2 ([#27], [#61]), and until then a pin never moves and pack #1's migrated links stay conservative;
   - phase 6, OSCAL export, a tenant default pack, engagement-level link tailoring and tenant-authored packs: no pack this cycle needs them, and tenant-authored packs would need a new D1 table.
 - **GenAI evidence** (the design for [#31], [PR #49]):
   - signed L3 attestations and worker-executed re-runs (R6.4): they come after [#25], which provides the signing keys;
-  - multi-gigabyte agent logs: they exceed the 50 MB upload and parse limits and need chunked upload and a streaming parser;
-  - an unpaired two-sample criterion for prompt-variant comparisons: the first version compares systems on the same inputs only.
+  - multi-gigabyte agent logs (design Q9): they exceed the 50 MB upload and parse limits and need chunked or streamed upload and an incremental parser;
+  - an unpaired two-sample criterion for prompt-variant comparisons (design Q13): the first version compares systems on the same inputs only.
 - **Identity and roles:**
   - per-practice SSO and MFA (R5.1): they come through the hosting identity provider, and [#11]'s adapter is the seam;
   - an external-specialist role and break-glass access (R5.2): they reuse the role plumbing that [#24] adds for the EQR.
@@ -264,3 +266,4 @@ Facts the plan depends on that are still moving. On each date, re-check the item
 [#68]: https://github.com/ahed-jneed/ai-assurance/issues/68
 [#69]: https://github.com/ahed-jneed/ai-assurance/issues/69
 [#70]: https://github.com/ahed-jneed/ai-assurance/issues/70
+[#74]: https://github.com/ahed-jneed/ai-assurance/issues/74

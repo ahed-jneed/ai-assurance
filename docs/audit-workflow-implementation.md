@@ -54,3 +54,13 @@ Release rejects source records changed after capture, including procedure execut
 The integration fixture runs against ephemeral Miniflare D1/R2 storage, with fictional identities and synthetic evidence. It exercises the full journey, negative permissions, concurrent management commands, role revocation, exact input pins, compiled-paper boundaries, partial receipts, report release/withdrawal/projection, package verification, finding retest and linked successor creation. No production audit records or access grants are created for QA.
 
 The current hosted aggregate has a 1.5 MB per-engagement limit and bounded histories. The normalized production architecture and separate Python execution service remain documented separately. Native binary adapters, isolated asynchronous external workers, SQL credentials, automated monitoring schedules and external notifications are not newly deployed by this increment. Monitoring recurrence is an explicit planning action. Current legal applicability, evidence sufficiency and assurance opinion require competent human decisions using the recorded regulatory source and audit-period analysis.
+
+## Business workspace usability
+
+The personal work inbox derives actions from procedures and their dependencies across authorized engagements, with server-stored views and reminder preferences. Procedure workspaces connect accepted evidence, client requests, sampling records, current diagnostic runs, findings, and saved review comparisons. Private recoverable drafts remain separate from audit revisions and require explicit saving; stale drafts cannot overwrite a changed audit basis.
+
+Member onboarding combines role selection, engagement assignments, and a review step. Client request packages support required-item checklists, multiple files, clarification threads, and separate receipt acknowledgment and evidence acceptance. Site access remains a separate host permission. Reminders are in-app; no email delivery is configured.
+
+Dataset cards are immutable versions tied to accepted artifact hashes and optional baseline pins. Testing readiness evaluates the exact procedure, protocol, input, execution mode, and native execution approvals before queue handoff. Bulk planning checks assignments and reviewer independence before revising a program. Permission-checked links and contextual text previews preserve engagement access boundaries.
+
+Shared form grids align labels and controls consistently, including native date fields, wrapped labels, and optional field guidance. Mobile forms stack and use 44px controls.
