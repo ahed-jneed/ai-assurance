@@ -10,5 +10,5 @@ Closes #
 
 - [ ] `cd site-app && npm run check` (format, typecheck, lint, unit tests, generated-file sync, warning-free build, check harnesses, fresh fixtures)
 - [ ] `python -m unittest discover -s engine/tests -v` (when `engine/` changed)
-- [ ] `node schemas/validate-run-schema.mjs`, `node schemas/validate-procedure-schema.mjs schemas/fixtures/procedure-execution.json` and `node schemas/validate-working-paper-schema.mjs` (when `schemas/` changed)
+- [ ] `node schemas/validate-run-schema.mjs`, `node schemas/validate-procedure-schema.mjs` and `node schemas/validate-working-paper-schema.mjs` (when `schemas/` changed)
 - [ ] Checked the change in the running app (UI changes: say what you checked)

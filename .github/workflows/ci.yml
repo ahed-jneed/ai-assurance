@@ -46,7 +46,7 @@ jobs:
       - name: Validate schemas
         run: |
           node schemas/validate-run-schema.mjs
-          node schemas/validate-procedure-schema.mjs schemas/fixtures/procedure-execution.json
+          node schemas/validate-procedure-schema.mjs
           node schemas/validate-working-paper-schema.mjs
 
       # The committed external fixtures carry fixed timestamps; recompute a

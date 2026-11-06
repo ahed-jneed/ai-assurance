@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ai-assurance:working-paper:1.0",
+  "$id": "urn:ai-assurance:working-paper:2.0",
   "title": "AI Assurance working paper or memo revision",
   "description": "Single working-paper contract with two distinct artifacts: a catalog working-paper or memo revision (paperRevision) and an engine-generated diagnostic draft (generatedDraft). Schema validity does not establish reviewer independence, tenant access, evidence truthfulness or legal sufficiency; the workflow service enforces those.",
   "oneOf": [

@@ -52,11 +52,15 @@ if (withTemplates) {
   positive('Blank catalog template (draft)', blank);
   negative('revision unknown field', blank, paper => { paper.arbitrary = true; });
   negative('revision unknown stage', blank, paper => { paper.stage = 'fieldwork'; });
-  negative('submitted without evaluation rationale', blank, paper => { paper.status = 'submitted'; });
   const digest = 'd'.repeat(64);
   const approval = (actorId, role, approvedAt) => ({ actorId, role, decision: 'approve', revision: 1, contentDigest: digest, approvedAt, signatureReference: `SIG-${actorId}` });
-  const sealed = structuredClone(blank);
-  Object.assign(sealed.evaluation, { evidenceSufficiency: 'sufficient', auditorConclusion: 'supported', rationale: 'Synthetic fixture rationale covering the approved criteria.' });
+  // A complete submitted paper; each negative case breaks exactly one gate.
+  const submitted = structuredClone(blank);
+  Object.assign(submitted.evaluation, { evidenceSufficiency: 'sufficient', auditorConclusion: 'supported', rationale: 'Synthetic fixture rationale covering the approved criteria.' });
+  submitted.status = 'submitted';
+  positive('Submitted catalog revision', submitted);
+  negative('submitted without evaluation rationale', submitted, paper => { paper.evaluation.rationale = ''; });
+  const sealed = structuredClone(submitted);
   sealed.approvals = [approval('fixture-reviewer', 'reviewer', '2026-10-06T09:00:00Z'), approval('fixture-lead', 'lead_auditor', '2026-10-06T10:00:00Z')];
   sealed.status = 'sealed';
   sealed.provenance.contentDigest = digest;

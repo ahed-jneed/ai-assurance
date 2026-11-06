@@ -4,11 +4,14 @@ import { spawn } from "node:child_process";
 import { stripVTControlCharacters } from "node:util";
 
 // vinext's route legend ("? Unknown", "? Some routes could not be classified")
-// is informational and matches none of these patterns.
+// is informational and matches none of these patterns. The generic pattern is
+// anchored to the start of a line (after symbols such as "⚠" or "["), so a
+// route row like "├ λ /api/warnings" or an "npm warn" line from a developer's
+// own npmrc is not reported.
 const WARNINGS = [
   /\(!\)/, // Vite, e.g. "(!) Some chunks are larger than 500 kB"
   /\[[A-Z][A-Z0-9_]{2,}\]/, // Rolldown log codes, e.g. [PLUGIN_TIMINGS], [EVAL]
-  /\bwarn(?:ing)?s?\b/i, // "Warning:", "[WARNING]", "npm warn", ...
+  /^[^\p{L}\p{N}]*warn(?:ing)?s?\b/iu, // "Warning:", "[WARNING]", "⚠ warn", ...
 ];
 
 const build = spawn("npm run build", {
