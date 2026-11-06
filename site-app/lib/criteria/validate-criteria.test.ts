@@ -30,12 +30,24 @@ const fixture = (name: string): Json =>
 const aiActSample = fixture("criteria-pack.eu-ai-act-amended.sample.json");
 const newPack = fixture("criteria-pack.en18286-iso42001.sample.json");
 
-/** The committed criteria plus the section 12 documents as drafts. */
+/** The ids of the section 12 sample, which #28 also uses for its drafts. */
+const sampleIds = new Set<string>(
+  newPack.documents.map((d: Json) => d.id as string),
+);
+/**
+ * The committed criteria plus the section 12 documents as drafts. The
+ * committed #28 drafts share the sample's ids, so they are left out here:
+ * the rule cases mutate the sample, and the committed drafts have their own
+ * test below.
+ */
 function criteria() {
   const { index, documents } = readCriteria();
   const copy = structuredClone(index) as Json;
+  copy.documents = copy.documents.filter((e: Json) => !sampleIds.has(e.id));
   const docs = new Map<string, Json>(
-    [...documents].map(([k, v]) => [k, structuredClone(v)]),
+    [...documents]
+      .filter(([k]) => copy.documents.some((e: Json) => e.path === k))
+      .map(([k, v]) => [k, structuredClone(v)]),
   );
   newPack.index.documents.forEach((entry: Json, i: number) => {
     copy.documents.push(structuredClone(entry));
@@ -1007,7 +1019,7 @@ describe("JCS digests", () => {
   });
   it("matches the digests in the index and the design's sample", () => {
     const { index, documents } = readCriteria();
-    for (const e of index.documents)
+    for (const e of index.documents.filter((e: Json) => e.status !== "draft"))
       expect(digest(documents.get(e.path))).toBe(e.sha256);
     expect(digest(aiActSample.documents[0])).toBe(
       aiActSample.index.documents[0].sha256,

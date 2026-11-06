@@ -1,0 +1,75 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "en-18286",
+  "edition": "2026",
+  "version": "2026.11.1",
+  "title": "EN 18286:2026 Artificial intelligence - Quality management system for EU AI Act regulatory purposes",
+  "shortTitle": "EN 18286:2026",
+  "kind": "harmonised_standard",
+  "publisher": "CEN-CENELEC",
+  "jurisdiction": "EU",
+  "status": "cited_in_oj",
+  "sources": [
+    {
+      "role": "publisher_page",
+      "url": "https://www.cencenelec.eu/news-events/news/2026/en-in-the-spotlight/2026-10-15-en-18286-2026-published-in-ojeu/"
+    },
+    {
+      "role": "authentic_text",
+      "url": "https://eur-lex.europa.eu/eli/dec_impl/2026/2274/oj",
+      "title": "Commission Implementing Decision (EU) 2026/2274 (publication of the reference)"
+    }
+  ],
+  "licence": {
+    "holder": "CEN-CENELEC and the national standards bodies",
+    "textPolicy": "paraphrased_titles",
+    "status": "unconfirmed",
+    "basis": "Clause numbers and our own short titles of at most 80 characters only; no text, tables or figures of the standard (D-03). Release waits for counsel to confirm this policy (open question Q1, #57)."
+  },
+  "defaultProvenance": {
+    "source": "https://docs.modulos.ai/frameworks/eu-ai-act/harmonized-standards/en-18286",
+    "sourceKind": "secondary",
+    "verification": "secondary_only",
+    "legalReview": "required",
+    "note": "Clause number and topic from a competitor-authored summary; confirm the clause structure against the purchased standard (Q8, #57)."
+  },
+  "requirements": [
+    {
+      "id": "4",
+      "ref": "4",
+      "title": "QMS, its context and scope",
+      "type": "requirement"
+    },
+    {
+      "id": "5",
+      "ref": "5",
+      "title": "Leadership and roles",
+      "type": "requirement"
+    },
+    {
+      "id": "6",
+      "ref": "6",
+      "title": "Planning",
+      "type": "requirement"
+    },
+    {
+      "id": "8",
+      "ref": "8",
+      "title": "AI system realisation across the life cycle",
+      "type": "requirement"
+    },
+    {
+      "id": "9",
+      "ref": "9",
+      "title": "Market, supply chain and monitoring",
+      "type": "requirement"
+    },
+    {
+      "id": "10",
+      "ref": "10",
+      "title": "Management review and planned changes",
+      "type": "requirement"
+    }
+  ]
+}

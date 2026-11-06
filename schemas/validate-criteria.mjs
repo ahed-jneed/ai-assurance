@@ -99,6 +99,12 @@ export function compareVersions(a, b) {
   for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
   return 0;
 }
+/** The ids of a node's groups, nearest first (cycles are reported by rule 2). */
+function ancestors(nodes, node) {
+  const out = [];
+  for (let p = node.parent === undefined ? undefined : nodes.get(node.parent); p && !out.includes(p.id); p = p.parent === undefined ? undefined : nodes.get(p.parent)) out.push(p.id);
+  return out;
+}
 const entryName = e => `${e.documentType} ${e.id}${e.edition ? '@' + e.edition : ''} ${e.version}`;
 const personKey = by => String(by).trim().toLowerCase();
 const expectedPath = doc =>
@@ -280,6 +286,23 @@ export function checkCriteria({ index, documents, validate = loadValidator(), an
         for (const paperId of section.paperIds ?? []) if (!itemIds.has(paperId)) fail(8, `${name}: annexIvIndex needs ${paperId} of the Annex IV map as an item`);
     const aiAct = sets.get('eu-ai-act');
     if ((features.aiActClassification || features.obligationAssessments) && !aiAct) fail(8, `${name}: AI Act features need an eu-ai-act criteria set`);
+    // The management-system features (#28).
+    if (features.statementOfApplicability !== true && pack.soaControls !== undefined) fail(8, `${name}: soaControls needs features.statementOfApplicability`);
+    if (features.statementOfApplicability) {
+      const [framework, group] = (pack.soaControls ?? '').split(':');
+      const set = sets.get(framework);
+      const node = set?.nodes.get(group);
+      if (!node || node.type !== 'group') fail(8, `${name}: statementOfApplicability needs soaControls naming a group of a criteria set`);
+      else {
+        const below = id => [...set.nodes.values()].some(n => n.type === 'requirement' && ancestors(set.nodes, n).includes(id));
+        if (!below(group)) fail(8, `${name}: soaControls ${pack.soaControls} has no requirement below it`);
+      }
+    }
+    if (features.certificationRecommendation) {
+      if (!features.nonconformityGrading || !features.statementOfApplicability)
+        fail(8, `${name}: certificationRecommendation needs nonconformityGrading and statementOfApplicability`);
+      if (!(pack.engagementTypes ?? []).includes('certification_audit')) fail(8, `${name}: certificationRecommendation needs the certification_audit engagement type`);
+    }
     if (features.obligationAssessments && aiAct) {
       const order = aiAct.fw.compat?.obligations?.order;
       if (!order) fail(8, `${name}: obligationAssessments needs compat.obligations on the eu-ai-act framework`);
@@ -485,9 +508,17 @@ export function legacyCheck({ index, documents }, output) {
  * The generated loader bundle: the index restricted to the documents it
  * carries, and every released or withdrawn document in index order (drafts
  * too with includeDrafts). Serialise it with `canonicalize`.
+ *
+ * A local draft preview (includeDrafts, never committed: check:sync compares
+ * with the bundle built without drafts) gives each draft entry the JCS digest
+ * of its document, so that an engagement can be pinned to a draft pack for
+ * local development and browser checks. The loader labels such pins as
+ * drafts, and coverage clamps every draft link to partial.
  */
 export function buildBundle({ index, documents }, { includeDrafts = false } = {}) {
-  const kept = index.documents.filter(e => includeDrafts || isReleased(e));
+  const kept = index.documents
+    .filter(e => includeDrafts || isReleased(e))
+    .map(e => (e.status === 'draft' && documents.has(e.path) ? { ...e, sha256: digest(documents.get(e.path)) } : e));
   return {
     documentType: 'bundle',
     schemaVersion: '1.0.0',

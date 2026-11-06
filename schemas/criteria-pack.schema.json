@@ -783,8 +783,24 @@
             "obligationAssessments": {
               "description": "Engagements can record AI Act obligation-subitem assessments (assurance records of kind obligation), which coverage reads as direct requirement assessments. Requires an eu-ai-act criteria set whose framework carries compat.obligations (validator rule).",
               "type": "boolean"
+            },
+            "statementOfApplicability": {
+              "description": "Engagements record the organisation's Statement of Applicability: an inclusion or exclusion decision, its justification and the implementation status of every control under soaControls, reviewed independently (#28). Requires soaControls (validator rule).",
+              "type": "boolean"
+            },
+            "nonconformityGrading": {
+              "description": "Findings are graded as major or minor nonconformities or opportunities for improvement, and nonconformities carry corrective action plans that are accepted independently (#28).",
+              "type": "boolean"
+            },
+            "certificationRecommendation": {
+              "description": "Reports may state an audit recommendation to a certification decision (report model engagement type certification). Requires nonconformityGrading, statementOfApplicability and the certification_audit engagement type (validator rule).",
+              "type": "boolean"
             }
           }
+        },
+        "soaControls": {
+          "description": "The group whose requirement descendants are the controls of the Statement of Applicability, as <framework-id>:<group-id> of a criteria set (for ISO/IEC 42001, its Annex A). Only with features.statementOfApplicability.",
+          "$ref": "#/$defs/requirementRef"
         },
         "reporting": {
           "description": "Report snapshot texts that today are constants in createReport.",

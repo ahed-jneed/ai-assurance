@@ -36,6 +36,44 @@
       "releasedAt": "2026-11-06",
       "selectable": true,
       "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
+    },
+    {
+      "documentType": "framework",
+      "id": "iso-iec-42001",
+      "edition": "2023",
+      "version": "2026.11.1",
+      "path": "frameworks/iso-iec-42001/2023/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "framework",
+      "id": "en-18286",
+      "edition": "2026",
+      "version": "2026.11.1",
+      "path": "frameworks/en-18286/2026/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "pack",
+      "id": "en18286-iso42001",
+      "version": "2026.11.1",
+      "path": "packs/en18286-iso42001/2026.11.1.json",
+      "status": "draft",
+      "selectable": true
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "iso-iec-42001-to-eu-ai-act",
+      "version": "2026.11.1",
+      "path": "crosswalks/iso-iec-42001-to-eu-ai-act/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "en-18286-to-eu-ai-act",
+      "version": "2026.11.1",
+      "path": "crosswalks/en-18286-to-eu-ai-act/2026.11.1.json",
+      "status": "draft"
     }
   ],
   "defaults": {

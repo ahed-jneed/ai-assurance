@@ -1334,6 +1334,13 @@ Commit order for phase 1:
 - **Article headings.** Only the four headings the design checked are marked verified; the other 34 are from the converter's table and marked unverified, legal review required.
 - **Not yet built:** heatmap filters by actor and date and their persistence in workspace preferences, the CSV export, and requirement-level `applicability` rows derived from #18's dated entries (follow-ups).
 
+**Phase 4 as built (#28), with its release blocked on #57.**
+
+- **Data as drafts.** The pack, its two frameworks and its two crosswalks are data version 2026.11.1 under `templates/criteria/`, listed as `draft`. Rule 12b refuses a framework with an unconfirmed licence and rule 10 a legal effect without a completed legal review, so releasing them waits for Q1 and Q8; `templates/criteria/README.md` lists the owner's steps. The section 12 sample stays the fixture of the validator tests.
+- **Three features, as pack data.** `statementOfApplicability` (with the new pack field `soaControls`, the group whose requirements are the controls), `nonconformityGrading` and `certificationRecommendation`; rule 8 checks that each has what it needs. Engagements record the Statement of Applicability (`Engagement.statementOfApplicability`, reviewed by someone who recorded none of its decisions), finding grades and corrective action plans (accepted by someone other than their recorder), and programme phases gate paper sign-off: a paper of a later phase is signed only once every required paper of the earlier phases is.
+- **The recommendation is report model data.** The `certification` engagement type of #20 now gives no ISAE 3000 assurance level and ends in `certification_recommended`, `certification_deferred` or `certification_not_recommended`; it is offered only on packs with the feature and still needs the engagement quality review. `lib/domain/management-system.ts` holds the gates: an unresolved major nonconformity blocks a recommendation (and an unmodified or readiness conclusion), a minor one needs an accepted plan, a deferral needs a major one with an accepted plan, and every certification conclusion needs a complete, reviewed Statement of Applicability. The report snapshot captures the Statement of Applicability, and release compares it.
+- **Local draft preview.** With `CRITERIA_INCLUDE_DRAFTS=1` the bundle gives each draft entry its digest, so a draft pack can be pinned and selected locally; it is labelled a draft and section 9.2 clamps its links to partial. `check:sync` keeps that bundle out of the repository.
+
 The refactor commit uses the module layout that #4, #5 and #6 put on `main` (`lib/factories.ts`, `lib/commands/*`, `lib/domain/*`, `lib/workflow/*` and `app/workspace/**`).
 
 ## 18. Open questions and risks

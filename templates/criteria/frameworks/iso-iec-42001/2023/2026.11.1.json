@@ -1,0 +1,666 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "iso-iec-42001",
+  "edition": "2023",
+  "version": "2026.11.1",
+  "title": "ISO/IEC 42001:2023 Information technology - Artificial intelligence - Management system",
+  "shortTitle": "ISO/IEC 42001:2023",
+  "kind": "international_standard",
+  "publisher": "ISO/IEC JTC 1/SC 42",
+  "jurisdiction": "international",
+  "status": "published",
+  "editionDate": "2023-12-18",
+  "sources": [
+    {
+      "role": "catalogue_entry",
+      "url": "https://www.iso.org/standard/42001"
+    }
+  ],
+  "licence": {
+    "holder": "ISO and IEC",
+    "textPolicy": "paraphrased_titles",
+    "status": "unconfirmed",
+    "basis": "Clause numbers and our own short titles of at most 80 characters only; no text, tables or figures of the standard (D-03). Release waits for counsel to confirm this policy (open question Q1, #57)."
+  },
+  "defaultProvenance": {
+    "source": "https://www.iso.org/standard/42001",
+    "sourceKind": "secondary",
+    "verification": "unverified",
+    "legalReview": "not_required",
+    "note": "Clause and Annex A control numbers as the team knows edition 1; not yet checked against a licensed copy. Titles are our own. Confirm every number before release (#57)."
+  },
+  "requirements": [
+    {
+      "id": "4",
+      "ref": "4",
+      "title": "Context of the organisation",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "4.1",
+      "ref": "4.1",
+      "title": "Organisation's context and issues relevant to AI",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.2",
+      "ref": "4.2",
+      "title": "Interested parties and their relevant requirements",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.3",
+      "ref": "4.3",
+      "title": "Scope of the AI management system",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.4",
+      "ref": "4.4",
+      "title": "Establishing and maintaining the AI management system",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "5",
+      "ref": "5",
+      "title": "Leadership",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "5.1",
+      "ref": "5.1",
+      "title": "Top management commitment to the AI management system",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "5.2",
+      "ref": "5.2",
+      "title": "AI policy set by top management",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "5.3",
+      "ref": "5.3",
+      "title": "Assigned roles, responsibilities and authorities",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "6",
+      "ref": "6",
+      "title": "Planning",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "6.1",
+      "ref": "6.1",
+      "title": "Addressing risks and opportunities",
+      "type": "group",
+      "parent": "6",
+      "exhaustive": false
+    },
+    {
+      "id": "6.1.1",
+      "ref": "6.1.1",
+      "title": "Planning for AI risks and opportunities",
+      "type": "requirement",
+      "parent": "6.1"
+    },
+    {
+      "id": "6.1.2",
+      "ref": "6.1.2",
+      "title": "AI risk assessment (planning)",
+      "type": "requirement",
+      "parent": "6.1",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "6.1.3",
+      "ref": "6.1.3",
+      "title": "AI risk treatment and the Statement of Applicability",
+      "type": "requirement",
+      "parent": "6.1"
+    },
+    {
+      "id": "6.1.4",
+      "ref": "6.1.4",
+      "title": "AI system impact assessment (planning)",
+      "type": "requirement",
+      "parent": "6.1",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "6.2",
+      "ref": "6.2",
+      "title": "AI objectives and plans to reach them",
+      "type": "requirement",
+      "parent": "6"
+    },
+    {
+      "id": "6.3",
+      "ref": "6.3",
+      "title": "Planned changes to the AI management system",
+      "type": "requirement",
+      "parent": "6"
+    },
+    {
+      "id": "7",
+      "ref": "7",
+      "title": "Support",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "7.1",
+      "ref": "7.1",
+      "title": "Resources provided for the AI management system",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.2",
+      "ref": "7.2",
+      "title": "Competence of the people doing AI-related work",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.3",
+      "ref": "7.3",
+      "title": "Awareness of the AI policy and of one's contribution",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.4",
+      "ref": "7.4",
+      "title": "Internal and external communication",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.5",
+      "ref": "7.5",
+      "title": "Control of documented information",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "8",
+      "ref": "8",
+      "title": "Operation",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "8.1",
+      "ref": "8.1",
+      "title": "Operational planning and control",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "8.2",
+      "ref": "8.2",
+      "title": "AI risk assessment (operation)",
+      "type": "requirement",
+      "parent": "8",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "8.3",
+      "ref": "8.3",
+      "title": "AI risk treatment (operation)",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "8.4",
+      "ref": "8.4",
+      "title": "AI system impact assessment (operation)",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "9",
+      "ref": "9",
+      "title": "Performance evaluation",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "9.1",
+      "ref": "9.1",
+      "title": "Monitoring, measurement, analysis and evaluation",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "9.2",
+      "ref": "9.2",
+      "title": "Internal audit programme",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "9.3",
+      "ref": "9.3",
+      "title": "Management review",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "10",
+      "ref": "10",
+      "title": "Improvement",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "10.1",
+      "ref": "10.1",
+      "title": "Continual improvement",
+      "type": "requirement",
+      "parent": "10"
+    },
+    {
+      "id": "10.2",
+      "ref": "10.2",
+      "title": "Nonconformity and corrective action",
+      "type": "requirement",
+      "parent": "10"
+    },
+    {
+      "id": "A",
+      "ref": "A",
+      "title": "Reference controls (Annex A)",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "A.2",
+      "ref": "A.2",
+      "title": "AI-related policies",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.2.2",
+      "ref": "A.2.2",
+      "title": "Documented AI policy",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.2.3",
+      "ref": "A.2.3",
+      "title": "AI policy aligned with other organisational policies",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.2.4",
+      "ref": "A.2.4",
+      "title": "Planned review of the AI policy",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.3",
+      "ref": "A.3",
+      "title": "Internal organisation",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.3.2",
+      "ref": "A.3.2",
+      "title": "Defined AI roles and responsibilities",
+      "type": "requirement",
+      "parent": "A.3"
+    },
+    {
+      "id": "A.3.3",
+      "ref": "A.3.3",
+      "title": "Process for reporting concerns",
+      "type": "requirement",
+      "parent": "A.3"
+    },
+    {
+      "id": "A.4",
+      "ref": "A.4",
+      "title": "Resources for AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.4.2",
+      "ref": "A.4.2",
+      "title": "Documented resources",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.3",
+      "ref": "A.4.3",
+      "title": "Data resources",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.4",
+      "ref": "A.4.4",
+      "title": "Tooling resources",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.5",
+      "ref": "A.4.5",
+      "title": "System and computing resources",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.6",
+      "ref": "A.4.6",
+      "title": "Human resources and competences",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.5",
+      "ref": "A.5",
+      "title": "Impact assessment of AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.5.2",
+      "ref": "A.5.2",
+      "title": "Impact assessment process",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.3",
+      "ref": "A.5.3",
+      "title": "Recorded impact assessments",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.4",
+      "ref": "A.5.4",
+      "title": "Impacts on individuals and groups",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.5",
+      "ref": "A.5.5",
+      "title": "Societal impacts",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.6",
+      "ref": "A.6",
+      "title": "AI system life cycle",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.1",
+      "ref": "A.6.1",
+      "title": "Management direction for AI development",
+      "type": "group",
+      "parent": "A.6",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.1.2",
+      "ref": "A.6.1.2",
+      "title": "Objectives for responsible development",
+      "type": "requirement",
+      "parent": "A.6.1"
+    },
+    {
+      "id": "A.6.1.3",
+      "ref": "A.6.1.3",
+      "title": "Responsible design and development processes",
+      "type": "requirement",
+      "parent": "A.6.1"
+    },
+    {
+      "id": "A.6.2",
+      "ref": "A.6.2",
+      "title": "Life cycle stages",
+      "type": "group",
+      "parent": "A.6",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.2.2",
+      "ref": "A.6.2.2",
+      "title": "Requirements and specification",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.3",
+      "ref": "A.6.2.3",
+      "title": "Design and development records",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.4",
+      "ref": "A.6.2.4",
+      "title": "Verification and validation",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.5",
+      "ref": "A.6.2.5",
+      "title": "Deployment",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.6",
+      "ref": "A.6.2.6",
+      "title": "Operation and monitoring",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.7",
+      "ref": "A.6.2.7",
+      "title": "Technical documentation",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.8",
+      "ref": "A.6.2.8",
+      "title": "Event logging",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.7",
+      "ref": "A.7",
+      "title": "Data for AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.7.2",
+      "ref": "A.7.2",
+      "title": "Data for development and enhancement",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.3",
+      "ref": "A.7.3",
+      "title": "Data acquisition",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.4",
+      "ref": "A.7.4",
+      "title": "Data quality",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.5",
+      "ref": "A.7.5",
+      "title": "Data provenance",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.6",
+      "ref": "A.7.6",
+      "title": "Data preparation",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.8",
+      "ref": "A.8",
+      "title": "Information for interested parties",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.8.2",
+      "ref": "A.8.2",
+      "title": "Documentation and information for users",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.3",
+      "ref": "A.8.3",
+      "title": "External reporting",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.4",
+      "ref": "A.8.4",
+      "title": "Communication of incidents",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.5",
+      "ref": "A.8.5",
+      "title": "Information duties to interested parties",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.9",
+      "ref": "A.9",
+      "title": "Use of AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.9.2",
+      "ref": "A.9.2",
+      "title": "Processes for responsible use",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.9.3",
+      "ref": "A.9.3",
+      "title": "Objectives for responsible use",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.9.4",
+      "ref": "A.9.4",
+      "title": "Intended use",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.10",
+      "ref": "A.10",
+      "title": "Third-party and customer relationships",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.10.2",
+      "ref": "A.10.2",
+      "title": "Allocation of responsibilities",
+      "type": "requirement",
+      "parent": "A.10"
+    },
+    {
+      "id": "A.10.3",
+      "ref": "A.10.3",
+      "title": "Suppliers",
+      "type": "requirement",
+      "parent": "A.10"
+    },
+    {
+      "id": "A.10.4",
+      "ref": "A.10.4",
+      "title": "Customers",
+      "type": "requirement",
+      "parent": "A.10"
+    }
+  ]
+}
