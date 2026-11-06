@@ -56,6 +56,7 @@ jobs:
           node schemas/validate-run-schema.mjs
           node schemas/validate-procedure-schema.mjs
           node schemas/validate-working-paper-schema.mjs
+          node schemas/validate-dataset-card-schema.mjs
           node schemas/validate-genai-schema.mjs
 
       # The committed external fixtures carry fixed timestamps; recompute a

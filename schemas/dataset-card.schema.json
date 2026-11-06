@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:dataset-card:1.0",
+  "title": "AI Assurance dataset governance card",
+  "description": "The dataset governance card a run pins as manifest.dataset.cardPin.card: the card an auditor registers (declaredCard; the zod schema datasetCardFields in site-app/lib/dataset-card.ts) with the accepted bytes it describes (registeredCard; registeredDatasetCardSchema). Text is stored trimmed. periodStart must not follow periodEnd: JSON Schema cannot compare dates, so the application and schemas/validate-dataset-card-schema.mjs check it. Schema validity does not establish that the card describes the dataset truthfully.",
+  "$ref": "#/$defs/registeredCard",
+  "$defs": {
+    "declaredCard": {
+      "title": "Declared dataset card",
+      "description": "The fields an auditor declares in registerDataset (datasetCardFields). baselineRationale is absent only on cards stored before regression baselines (#68).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "name",
+        "version",
+        "artifactId",
+        "owner",
+        "split",
+        "population",
+        "periodStart",
+        "periodEnd",
+        "collectionMethod",
+        "independence",
+        "sensitiveDataBasis",
+        "limitations"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "split": {
+          "enum": [
+            "training",
+            "validation",
+            "test",
+            "reference",
+            "unknown"
+          ]
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "periodStart": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "periodEnd": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "collectionMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "independence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "sensitiveDataBasis": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineDatasetRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineRationale": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "baselineDatasetRecordId"
+            ]
+          },
+          "then": {
+            "required": [
+              "baselineRationale"
+            ],
+            "properties": {
+              "baselineRationale": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "registeredCard": {
+      "title": "Registered dataset card",
+      "description": "The stored card body (registeredDatasetCardSchema): the declared fields with the SHA-256, name and size of the accepted dataset bytes and, with a baseline, the baseline card's record pin.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "name",
+        "version",
+        "artifactId",
+        "owner",
+        "split",
+        "population",
+        "periodStart",
+        "periodEnd",
+        "collectionMethod",
+        "independence",
+        "sensitiveDataBasis",
+        "limitations",
+        "artifactSha256",
+        "artifactName",
+        "artifactSize"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "split": {
+          "enum": [
+            "training",
+            "validation",
+            "test",
+            "reference",
+            "unknown"
+          ]
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "periodStart": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "periodEnd": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "collectionMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "independence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "sensitiveDataBasis": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineDatasetRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineRationale": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifactName": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "artifactSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baselinePin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recordId",
+            "sha256",
+            "artifactSha256"
+          ],
+          "properties": {
+            "recordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "artifactSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "baselineDatasetRecordId"
+            ]
+          },
+          "then": {
+            "required": [
+              "baselineRationale"
+            ],
+            "properties": {
+              "baselineRationale": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
