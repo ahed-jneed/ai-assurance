@@ -1342,6 +1342,61 @@ input {
 .regulatory-detail > p {
   margin-top: 18px;
 }
+.rule-pack-status {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.rule-pack-status .context-strip {
+  margin: 0;
+}
+.rule-pack-intro {
+  margin: 12px 0;
+}
+.rule-pack-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.rule-pack-list {
+  margin: 10px 0;
+  padding-left: 18px;
+  list-style: disc;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.obligation-date {
+  white-space: nowrap;
+  vertical-align: top;
+}
+.obligation-date small {
+  display: block;
+  color: #787774;
+}
+.obligation-cell {
+  min-width: 280px;
+  white-space: normal;
+}
+.obligation-detail > summary {
+  cursor: pointer;
+}
+.obligation-detail > summary .reference-cell {
+  display: block;
+}
+.obligation-detail h4 {
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.obligation-detail > p,
+.obligation-detail > dl,
+.special-category-data > p {
+  margin-top: 10px;
+}
+.verified-on {
+  display: block;
+  margin-top: 4px;
+}
 .stat-grid {
   display: flex;
   gap: 36px;

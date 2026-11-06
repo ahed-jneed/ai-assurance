@@ -783,6 +783,8 @@ try {
   assert.equal(run.results.length, 4);
   assert.equal(run.manifest.dataset.cardPin.recordId, datasetCard.id);
   assert.equal(run.manifest.dataset.cardPin.sha256, datasetCard.sha256);
+  assert.deepEqual(run.rulePack, e.rulePack);
+  assert.equal(run.methodologyVersion, e.rulePack.version);
   await fs.mkdir(path.resolve("../tmp/assurance-worker-fixture"), {
     recursive: true,
   });
@@ -896,6 +898,29 @@ try {
     dossier.files.some((f) => f.path.startsWith("evidence/" + documentId)),
   );
   assert.equal(dossier.signature.algorithm, "Ed25519");
+  // The readable rendition and the hashed report carry the captured versions.
+  const dossierFile = (name) =>
+    Buffer.from(
+      dossier.files.find((f) => f.path === name).contentBase64,
+      "base64",
+    ).toString("utf8");
+  const reportHtml = dossierFile("report.html"),
+    reportJson = JSON.parse(dossierFile("report.json"));
+  assert.deepEqual(reportJson.rulePack, e.rulePack);
+  assert.equal(reportJson.methodologyVersion, e.rulePack.version);
+  assert(
+    reportHtml.includes(
+      "Rule pack " +
+        e.rulePack.version +
+        " (legal text " +
+        e.rulePack.legalVersion,
+    ),
+    "report.html names the rule pack",
+  );
+  assert(
+    reportHtml.includes("· methodology " + e.rulePack.version),
+    "report.html names the methodology version",
+  );
   const temp = path.resolve("../tmp/assurance-verifier-fixture");
   await fs.mkdir(temp, { recursive: true });
   const dossierPath = path.join(temp, "dossier.json"),
