@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FrozenReportDetails } from "./report-details";
 import { FindingActions } from "./finding-actions";
+import { SpecialCategoryRecord } from "./special-category";
 import { performancePositiveLabel, protocolConfigKeys } from "@/lib/evaluation";
 import { humanLabel, readableResults } from "@/lib/presentation";
 import type {
@@ -514,6 +515,17 @@ export function RunDetails({
                   ))}
                 </ul>
               </section>
+              {run.manifest.profile?.specialCategory && (
+                <section className="readable-section">
+                  <h3>Special-category data</h3>
+                  <SpecialCategoryRecord
+                    declaration={run.manifest.profile.specialCategory}
+                    acknowledgement={
+                      run.manifest.specialCategoryAcknowledgement
+                    }
+                  />
+                </section>
+              )}
               {run.manifest.profile && (
                 <details className="ml-more">
                   <summary>Captured dataset declarations & criteria</summary>

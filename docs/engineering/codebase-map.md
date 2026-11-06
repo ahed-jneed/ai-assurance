@@ -260,7 +260,8 @@ Each flow lists the steps, the expected results, negative checks, and the known 
       - protocol: create new;
       - columns and favourable label;
       - procedures: performance, demographic parity, disparate impact, equalized odds;
-      - thresholds, protected-group column, handling basis.
+      - thresholds, protected-group column, handling basis;
+      - the sample's `group` column is synthetic: untick "holds special-category data", or record a client basis under Datasets and choose the hosted route (#60).
 
       Then Save protocol & run (`createEvaluationProfile`, `queueRun`, `executeRun`).
    4. Evaluations → Results show per-test outcomes, the overall outcome, group tables and auto-drafted Article 10/15 papers.
