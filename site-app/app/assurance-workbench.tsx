@@ -43,13 +43,21 @@ import { assuranceRecords } from "@/lib/assurance-store-client";
 
 import obligations from "@/lib/obligation-subitems.json";
 
+import type {
+  ReviewQueueSummary,
+  SearchedRecord,
+} from "@/lib/assurance-search";
+
 import {
   workbenchSections,
   workbenchReviewStates,
-  workbenchReviewQueue,
-  selectWorkbenchRecords,
   type WorkbenchQuery,
 } from "@/lib/workbench-presentation";
+import {
+  RecordPicker,
+  RecordRegister,
+  type SearchScope,
+} from "./assurance-record-search";
 import { AssuranceRecordDetails } from "./assurance-record-details";
 
 import { ExecutionPlanner } from "./testing-readiness";
@@ -58,7 +66,7 @@ import {
   type ExternalJobFields,
 } from "./external-job-detail";
 
-import { AssuranceRegister, recordTitle } from "./assurance-register";
+import { recordTitle } from "./assurance-register";
 
 // Rows of GET /api/assurance, as selected in lib/read-models/assurance-view.ts
 // and lib/assurance-store.ts (jobs).
@@ -86,9 +94,13 @@ type EngagementAccess = {
 
 type Snapshot = {
   // Every record of the engagement: the view answers the first page and the
-  // total, and load() follows the cursor through the rest.
+  // total, and load() follows the cursor through the rest. Record details,
+  // form options and the execution planner read them; the registers, the
+  // record pickers, the search and the review queue read the server instead.
   records: AssuranceRecord[];
   total: number;
+  // The caller's review queue, computed on the server over every record.
+  queue: ReviewQueueSummary;
   jobs: ExecutionJob[];
   workers: RunnerWorker[];
   access: EngagementAccess[];
@@ -185,6 +197,10 @@ export function AssuranceWorkbench({
       total: number;
     } | null>(null),
     [form, setForm] = useState(""),
+    // Bumped after each load, so the server-backed registers read again.
+    [loaded, setLoaded] = useState(0),
+    // The record last opened from a register, until the snapshot holds it.
+    [opened, setOpened] = useState<AssuranceRecord | null>(null),
     [dirty, setDirty] = useState(false),
     [sourceIds, setSourceIds] = useState<string[]>([]),
     [affectedIds, setAffectedIds] = useState<string[]>([]),
@@ -238,6 +254,7 @@ export function AssuranceWorkbench({
       });
       if (generation !== requestRef.current.generation) return;
       setSnapshot({ ...value, records });
+      setLoaded((n) => n + 1);
       setLoadError("");
     } catch (x) {
       if (
@@ -309,8 +326,11 @@ export function AssuranceWorkbench({
   }, [location.recordId]);
 
   const all = snapshot?.records ?? [],
-    selected = all.find((r) => r.id === location.recordId) ?? null,
-    queue = workbenchReviewQueue(all, data.identity.role, data.identity.id),
+    selected =
+      all.find((r) => r.id === location.recordId) ??
+      (opened?.id === location.recordId ? opened : null),
+    queue = snapshot?.queue,
+    scope: SearchScope = { tenantId: data.tenantId, engagementId: e.id },
     kind = (k: string) => all.filter((r) => r.kind === k),
     options = (k: string) =>
       kind(k).map((r) => ({
@@ -1126,42 +1146,33 @@ export function AssuranceWorkbench({
     setDirty(false);
     setError("");
     setDetailSection(section);
+    setOpened(record);
     onLocation({ ...location, recordId: record?.id ?? "" });
   };
-  const list = (
-    rows: AssuranceRecord[],
-    empty: string,
-    emptyAction?: ReactNode,
-  ) => {
-    const filteredRows = selectWorkbenchRecords(
-      rows,
-      all,
-      query,
-      reviewFilter,
-      recordTitle,
-      person,
-    );
-    return (
-      <AssuranceRegister
-        rows={filteredRows}
-        all={all}
-        onOpen={(r) => setSelected(r)}
-        empty={empty}
-        filtered={rows.length > 0 && (!!query.trim() || reviewFilter !== "all")}
-        person={person}
-        onReset={clearFilters}
-        emptyAction={emptyAction}
-      />
-    );
-  };
-  const nextAssessment =
-    queue.reviewable[0] ??
-    queue.revisable[0] ??
-    queue.awaiting[0] ??
-    queue.returned[0];
-  const nextAction = queue.reviewable.length
+  // A register of the records of `kinds` that match the search and review
+  // filter, read from the server one page at a time.
+  const list = (kinds: string[], empty: string, emptyAction?: ReactNode) => (
+    <RecordRegister
+      scope={scope}
+      query={{ kinds, q: query, review: reviewFilter }}
+      refreshKey={loaded}
+      hasRecords={all.some((r) => kinds.includes(r.kind))}
+      onOpen={(r) => setSelected(r)}
+      empty={empty}
+      person={person}
+      onReset={clearFilters}
+      emptyAction={emptyAction}
+    />
+  );
+  const nextAssessment: SearchedRecord | null = queue
+    ? (queue.next.reviewable ??
+      queue.next.revisable ??
+      queue.next.awaiting ??
+      queue.next.returned)
+    : null;
+  const nextAction = queue?.reviewable
     ? "Review next assessment"
-    : queue.revisable.length
+    : queue?.revisable
       ? "Revise returned assessment"
       : "View next assessment";
   const canLinkPredictions =
@@ -1404,7 +1415,7 @@ export function AssuranceWorkbench({
           />
         </Button>
       </div>
-      {snapshot && (queue.awaiting.length > 0 || queue.returned.length > 0) && (
+      {queue && (queue.awaiting > 0 || queue.returned > 0) && (
         <section
           className="workbench-review-queue"
           aria-label="Assessment review queue"
@@ -1413,32 +1424,33 @@ export function AssuranceWorkbench({
             <h2>Assessment review</h2>
             {queue.canReview && (
               <span className="subtle">
-                {queue.reviewable.length} available for your independent review
+                {queue.reviewable.toLocaleString()} available for your
+                independent review
               </span>
             )}
           </div>
           <div className="workbench-queue-counts">
-            {queue.awaiting.length > 0 && (
+            {queue.awaiting > 0 && (
               <button
                 type="button"
                 onClick={() =>
                   setSelected(
-                    queue.reviewable[0] ?? queue.awaiting[0],
-                    queue.reviewable.length ? "review" : "overview",
+                    queue.next.reviewable ?? queue.next.awaiting,
+                    queue.reviewable ? "review" : "overview",
                   )
                 }
               >
-                <b>{queue.awaiting.length}</b>
+                <b>{queue.awaiting.toLocaleString()}</b>
                 <span>Awaiting review</span>
                 <ChevronRight size={14} aria-hidden="true" />
               </button>
             )}
-            {queue.returned.length > 0 && (
+            {queue.returned > 0 && (
               <button
                 type="button"
-                onClick={() => setSelected(queue.returned[0], "review")}
+                onClick={() => setSelected(queue.next.returned, "review")}
               >
-                <b>{queue.returned.length}</b>
+                <b>{queue.returned.toLocaleString()}</b>
                 <span>Returned for revision</span>
                 <ChevronRight size={14} aria-hidden="true" />
               </button>
@@ -1457,6 +1469,43 @@ export function AssuranceWorkbench({
               <ChevronRight size={16} aria-hidden="true" />
             </button>
           )}
+          <details className="workbench-queue-list">
+            <summary>List the review queue</summary>
+            {queue.awaiting > 0 && (
+              <>
+                <h3>
+                  {queue.canReview
+                    ? "Available for your independent review"
+                    : "Awaiting review"}
+                </h3>
+                <RecordRegister
+                  scope={scope}
+                  query={{ queue: queue.canReview ? "reviewable" : "awaiting" }}
+                  refreshKey={loaded}
+                  hasRecords
+                  onOpen={(r) =>
+                    setSelected(r, queue.canReview ? "review" : "overview")
+                  }
+                  empty="None of the assessments awaiting review is yours to review."
+                  person={person}
+                />
+              </>
+            )}
+            {queue.returned > 0 && (
+              <>
+                <h3>Returned for revision</h3>
+                <RecordRegister
+                  scope={scope}
+                  query={{ queue: "returned" }}
+                  refreshKey={loaded}
+                  hasRecords
+                  onOpen={(r) => setSelected(r, "review")}
+                  empty="No assessment is returned for revision."
+                  person={person}
+                />
+              </>
+            )}
+          </details>
         </section>
       )}
       {(loadError || error) && (
@@ -1587,7 +1636,7 @@ export function AssuranceWorkbench({
                 </div>
               )}
               {list(
-                kind("system"),
+                ["system"],
                 "Register a system to define its inputs, outputs and decision process.",
               )}
               <div className="section-toolbar">
@@ -1603,7 +1652,7 @@ export function AssuranceWorkbench({
                 )}
               </div>
               {list(
-                kind("prediction"),
+                ["prediction"],
                 canLinkPredictions
                   ? "No prediction lineage recorded"
                   : "Linking predictions requires a system revision, model version and accepted dataset.",
@@ -1627,7 +1676,7 @@ export function AssuranceWorkbench({
                   </Button>
                 )}
               </div>
-              {list(kind("registry"), "No registry snapshots imported")}
+              {list(["registry"], "No registry snapshots imported")}
             </>
           )}
 
@@ -1748,10 +1797,10 @@ export function AssuranceWorkbench({
                   </div>
                 )}
               </div>
-              {list(kind("assertion"), "No assertions recorded")}
+              {list(["assertion"], "No assertions recorded")}
               <h2 className="workbench-subhead">Source locations</h2>
               {list(
-                kind("location"),
+                ["location"],
                 artifacts.length
                   ? "No source locations recorded"
                   : "Accept source evidence in the vault before locating it.",
@@ -1795,9 +1844,7 @@ export function AssuranceWorkbench({
                 )}
               </div>
               {list(
-                all.filter((r) =>
-                  ["sample", "operational", "statistics"].includes(r.kind),
-                ),
+                ["sample", "operational", "statistics"],
                 "No reproducible samples or collection packets yet",
               )}
               <details className="help-panel">
@@ -1854,33 +1901,27 @@ export function AssuranceWorkbench({
                 )}
               </div>
               <div className="briefing-sources">
-                {all
-                  .filter((r) => ["location", "assertion"].includes(r.kind))
-                  .map((r) => (
-                    <label className="check-row" key={r.id}>
-                      <input
-                        type="checkbox"
-                        checked={sourceIds.includes(r.id)}
-                        disabled={
-                          busy ||
-                          (!sourceIds.includes(r.id) && sourceIds.length >= 30)
-                        }
-                        onChange={(ev) =>
-                          setSourceIds(
-                            ev.target.checked
-                              ? [...sourceIds, r.id]
-                              : sourceIds.filter((x) => x !== r.id),
-                          )
-                        }
-                      />
-                      <span>
-                        {r.body.label ?? r.body.statement}
-                        <small className="block subtle">
-                          {r.body.locator ?? r.body.criterion}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
+                <RecordPicker
+                  scope={scope}
+                  kinds={["location", "assertion"]}
+                  refreshKey={loaded}
+                  selected={sourceIds}
+                  onChange={setSourceIds}
+                  max={30}
+                  disabled={busy}
+                  label="Briefing sources"
+                  empty="No source locations or assertions recorded yet."
+                  title={(r) =>
+                    String(r.body.label ?? r.body.statement ?? r.id)
+                  }
+                  detail={(r) =>
+                    String(r.body.locator ?? r.body.criterion ?? "")
+                  }
+                  describe={(id) => {
+                    const r = all.find((x) => x.id === id);
+                    return r ? recordTitle(r) : id;
+                  }}
+                />
               </div>
               {writer && (
                 <div className="briefing-actions">
@@ -1907,7 +1948,7 @@ export function AssuranceWorkbench({
                 </div>
               )}
               {list(
-                kind("assistant"),
+                ["assistant"],
                 "No evidence briefings prepared yet",
                 !all.some((r) => ["location", "assertion"].includes(r.kind)) ? (
                   <button
@@ -1978,9 +2019,9 @@ export function AssuranceWorkbench({
                   </div>
                 )}
               </div>
-              {list(kind("impact"), "No change assessments recorded")}
+              {list(["impact"], "No change assessments recorded")}
               <h2 className="workbench-subhead">Obligation assessments</h2>
-              {list(kind("obligation"), "No subitem assessments recorded")}
+              {list(["obligation"], "No subitem assessments recorded")}
               <details className="help-panel">
                 <summary>
                   Obligation subitems · {obligations.items.length} review
@@ -2437,34 +2478,28 @@ export function AssuranceWorkbench({
               {form === "impact" && (
                 <section>
                   <h3>Affected assurance records</h3>
-                  {all
-                    .filter((r) =>
-                      [
-                        "system",
-                        "assertion",
-                        "obligation",
-                        "location",
-                      ].includes(r.kind),
-                    )
-                    .map((r) => (
-                      <label key={r.id} className="check-row">
-                        <input
-                          type="checkbox"
-                          checked={affectedIds.includes(r.id)}
-                          onChange={(ev) =>
-                            setAffectedIds(
-                              ev.target.checked
-                                ? [...affectedIds, r.id]
-                                : affectedIds.filter((x) => x !== r.id),
-                            )
-                          }
-                        />
-                        {r.body.name ??
+                  <RecordPicker
+                    scope={scope}
+                    kinds={["system", "assertion", "obligation", "location"]}
+                    refreshKey={loaded}
+                    selected={affectedIds}
+                    onChange={setAffectedIds}
+                    label="Affected assurance records"
+                    empty="No systems, assertions, obligations or source locations recorded yet."
+                    title={(r) =>
+                      String(
+                        r.body.name ??
                           r.body.statement ??
                           r.body.label ??
-                          r.body.code}
-                      </label>
-                    ))}
+                          r.body.code ??
+                          r.id,
+                      )
+                    }
+                    describe={(id) => {
+                      const r = all.find((x) => x.id === id);
+                      return r ? recordTitle(r) : id;
+                    }}
+                  />
                 </section>
               )}
               {form === "enrollWorker" && (
