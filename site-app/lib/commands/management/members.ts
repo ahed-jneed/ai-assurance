@@ -106,7 +106,7 @@ const saveMember: ManagementHandler = {
         "Remove practice administration before giving this member a client role",
       );
     const ids = isClientRole(a.role) ? [] : (a.engagementIds ?? []);
-    await checkAssignable(ctx, a.role, a.engagementIds ?? []);
+    await checkAssignable(ctx, a.role, a.engagementIds ?? [], a.userId);
     let withdrawn: { engagementIds: string[]; workerIds: string[] } = {
       engagementIds: [],
       workerIds: [],

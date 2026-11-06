@@ -10,6 +10,8 @@ import { roles, type Role } from "@/lib/domain";
 import { loadEngagement } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import { context, type Context } from "@/lib/tenancy";
+import { at, declaration } from "@/lib/workflow/test-fixtures";
+import { seedWorkflow } from "@/lib/workflow-seed";
 import {
   caller,
   fakeD1,
@@ -305,6 +307,58 @@ describe("POST /api/management", () => {
     expect(response.status).toBe(200);
     expect(loadEngagement).toHaveBeenCalledWith(ctx, "ENG-1");
     expect(tables(own(d1))).toEqual(["memberships", "engagement_access"]);
+  });
+
+  it("refuses engagement access to a member with a declared conflict (#112)", async () => {
+    const e = stored();
+    e.title = "Credit model audit";
+    e.workflow = {
+      ...seedWorkflow("user-lead", at),
+      declarations: [
+        declaration("auditor", {
+          userId: "user-2",
+          exclusions: ["financial_interest"],
+        }),
+      ],
+    };
+    vi.mocked(loadEngagement).mockResolvedValue(e);
+    signIn(caller());
+    for (const op of ["updateMember", "grantMember"]) {
+      const d1 = practice();
+      const response = await post(op, {
+        userId: "user-2",
+        displayName: "Ada",
+        role: "Reviewer",
+        engagementIds: ["ENG-1"],
+      });
+      expect(await refusal(response), op).toEqual({
+        status: 409,
+        error:
+          "This person declared a disqualifying relationship with the engagement and cannot be assigned (Credit model audit)",
+      });
+      expect(d1.batches, op).toEqual([]);
+    }
+    // Another member, and the same member without that engagement, pass.
+    practice();
+    expect(
+      (
+        await post("grantMember", {
+          ...valid.grantMember,
+          engagementIds: ["ENG-1"],
+        })
+      ).status,
+    ).toBe(200);
+    practice();
+    expect(
+      (
+        await post("updateMember", {
+          userId: "user-2",
+          displayName: "Ada",
+          role: "Reviewer",
+          engagementIds: [],
+        })
+      ).status,
+    ).toBe(200);
   });
 });
 
