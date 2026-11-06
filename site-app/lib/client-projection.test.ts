@@ -155,6 +155,43 @@ describe("client projection of the live engagement", () => {
     expect(client.papers).toEqual([]);
   });
 
+  it("strips user ids and evidence from classification v2 answers and history", () => {
+    const e = stored();
+    e.classification = {
+      ...e.classification,
+      model: 2,
+      approvedBy: "user-reviewer",
+      answers: {
+        smeStatus: {
+          value: "no",
+          evidence: "Internal register extract",
+          legalVersion: "32024R1689",
+          rulePackVersion: "2026.11.1",
+          answeredAt: "2026-11-05T10:00:00.000Z",
+          answeredBy: "user-answerer",
+        },
+      },
+      history: [
+        {
+          action: "approved",
+          at: "2026-11-05T10:00:00.000Z",
+          by: "user-reviewer",
+          label: "Minimal risk",
+          legalVersion: "32024R1689",
+        },
+      ],
+    };
+    const client = sanitize(e, caller("Client Viewer", false));
+    const json = JSON.stringify(client.classification);
+    for (const id of ["user-reviewer", "user-answerer"])
+      expect(json).not.toContain(id);
+    expect(json).not.toContain("Internal register extract");
+    expect(client.classification.answers?.smeStatus.value).toBe("no");
+    expect(client.classification.history?.[0].label).toBe("Minimal risk");
+    // The stored record keeps its actors.
+    expect(e.classification.history?.[0].by).toBe("user-reviewer");
+  });
+
   it("defaults memos to internal and working papers to client", () => {
     expect(paperAudience(paper({ kind: "memo" }))).toBe("internal");
     expect(paperAudience(paper({ kind: "working_paper" }))).toBe("client");

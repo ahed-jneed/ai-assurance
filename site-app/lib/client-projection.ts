@@ -15,6 +15,38 @@ import type { Context } from "./tenancy";
 import { isClientRole, isClientVisible } from "./workflow-state";
 import type { Brief } from "./workflow-types";
 
+/**
+ * The classification as the client sees it: the label and answers without the
+ * auditor's rationale, intended-purpose analysis, evidence references or any
+ * internal user id (approver, answering auditor, history actors).
+ */
+export function clientClassification(c: Classification): Classification {
+  const client: Classification = {
+    ...c,
+    rationale: "",
+    intendedPurpose: "",
+    ...(c.answers
+      ? {
+          answers: Object.fromEntries(
+            Object.entries(c.answers).map(([id, a]) => [
+              id,
+              { ...a, evidence: undefined, answeredBy: "" },
+            ]),
+          ),
+        }
+      : {}),
+    ...(c.derogation
+      ? { derogation: { rationale: "", registrationEvidence: "" } }
+      : {}),
+    // Copies, so removing the actors below leaves the record untouched.
+    ...(c.history ? { history: c.history.map((h) => ({ ...h })) } : {}),
+    ...(c.legacy ? { legacy: { ...c.legacy } } : {}),
+  };
+  delete client.approvedBy;
+  if (client.history) for (const h of client.history) delete h.by;
+  if (client.legacy) delete client.legacy.approvedBy;
+  return client;
+}
 /** A client finding must not inherit new internal fields when the audit model grows. */
 export function clientFinding(f: Finding): Finding {
   return {
@@ -37,25 +69,6 @@ export function clientFinding(f: Finding): Finding {
     retestEvidenceIds: [],
     createdBy: "",
     visibility: "client",
-  };
-}
-/**
- * The classification a client sees: the outcome, without the internal
- * rationale, the intended-purpose working notes or the approver's user id.
- */
-export function clientClassification(c: Classification): Classification {
-  return {
-    prohibited: c.prohibited,
-    highRisk: c.highRisk,
-    transparency: c.transparency,
-    profiling: c.profiling,
-    annexRoute: c.annexRoute,
-    operatorRole: c.operatorRole,
-    intendedPurpose: "",
-    rationale: "",
-    status: c.status,
-    version: c.version,
-    asOf: c.asOf,
   };
 }
 /** Evidence a client sees: no storage key and no uploader's user id. */

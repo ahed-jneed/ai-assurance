@@ -352,16 +352,36 @@ export const assistant: AssuranceModule = defineCommands({
         .strict()
         .parse(d);
       // The briefing reads the selected records and the source locations
-      // their relations cite.
+      // their relations cite. Every selected id must name an existing
+      // location or assertion of this engagement: anything else is the
+      // caller's mistake (400), not a server fault.
       const selected = await lookup(v.sourceIds),
-        all = await lookup([
-          ...v.sourceIds,
-          ...selected.flatMap((x) =>
-            (x.body.relations ?? []).map(
-              (rel: { locationId: string }) => rel.locationId,
-            ),
+        unknown = v.sourceIds.filter(
+          (id) => !selected.some((r) => r.id === id),
+        ),
+        notSources = selected.filter(
+          (r) => r.kind !== "location" && r.kind !== "assertion",
+        );
+      if (unknown.length)
+        throw new ApiError(
+          400,
+          "Select existing evidence locations or assertions; unknown record: " +
+            [...new Set(unknown)].join(", "),
+        );
+      if (notSources.length)
+        throw new ApiError(
+          400,
+          "Select evidence locations or assertions only; not a source record: " +
+            notSources.map((r) => r.id + " (" + r.kind + ")").join(", "),
+        );
+      const all = await lookup([
+        ...v.sourceIds,
+        ...selected.flatMap((x) =>
+          (x.body.relations ?? []).map(
+            (rel: { locationId: string }) => rel.locationId,
           ),
-        ]);
+        ),
+      ]);
       const locations = all.filter(
         (r) =>
           r.kind === "location" &&
