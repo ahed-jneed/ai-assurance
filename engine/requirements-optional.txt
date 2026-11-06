@@ -8,3 +8,5 @@ pypmml==1.5.8
 xgboost==3.4.1
 lightgbm==4.6.0
 pyarrow==25.0.1
+# Inspect .eval logs (GenAI evidence, engine/genai): zstd entries below Python 3.14.
+zstandard==0.25.0
