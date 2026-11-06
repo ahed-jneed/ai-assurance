@@ -2,6 +2,11 @@
 // roles people act in.
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
+import type {
+  SpecialCategoryAcknowledgement,
+  SpecialCategoryBasis,
+  SpecialCategoryDeclaration,
+} from "../special-category";
 export type Role =
   | "Auditor"
   | "Lead Auditor"
@@ -198,6 +203,8 @@ export type EvaluationProfile = {
     sensitiveDataBasis: string;
   };
   rationale: string;
+  /** Fairness protocols: whether the group column is special-category data. */
+  specialCategory?: SpecialCategoryDeclaration;
   createdAt: string;
   createdBy: string;
 };
@@ -335,6 +342,11 @@ export type Run = {
       "registered_prediction_artifact" | "authenticated_external_attempt";
     testDefinitionVersion: string;
     limitations: string[];
+    /**
+     * A hosted run on special-category data: who acknowledged it, when, and
+     * on a retry the run whose acknowledgement it carries over.
+     */
+    specialCategoryAcknowledgement?: SpecialCategoryAcknowledgement;
   };
 };
 export type Report = {
@@ -371,6 +383,8 @@ export type Engagement = {
   evidenceRequests?: EvidenceRequest[];
   models: Model[];
   evaluationProfiles?: EvaluationProfile[];
+  /** The client's recorded bases for special-category data (#60). */
+  specialCategoryBases?: SpecialCategoryBasis[];
   findings: Finding[];
   runs: Run[];
   reports: Report[];
