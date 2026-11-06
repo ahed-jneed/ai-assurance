@@ -688,7 +688,7 @@ describe("independence and competence declarations", () => {
         "lead",
       ),
       409,
-      "Evaluate the person's current declaration",
+      "Withdraw from the person's latest declaration",
     );
     await withdraw("employment", "lead");
     await expectFailure(approve(e), 409, conflicted);
@@ -704,9 +704,85 @@ describe("independence and competence declarations", () => {
       },
     ]);
     expect(await approve(e)).toEqual({ acceptanceRevision: "1" });
-    // After the withdrawal, a renewal without the relationship is allowed.
+    // After the withdrawal, a renewal without the relationship is allowed,
+    // and the withdrawals carry forward so the record keeps showing them.
     await declare(e, "reviewer");
     expect(declarationStatus(workflowOf(e), "reviewer")).toBe("current");
+    expect(workflowOf(e).declarations!.at(-1)!.exclusionWithdrawals).toEqual(
+      d.exclusionWithdrawals,
+    );
+  });
+
+  it("a period change does not clear a disqualifying relationship", async () => {
+    const e = await accepted(["lead", "auditor"]);
+    await declare(e, "lead");
+    await declare(e, "auditor", { exclusions: ["employment"] });
+    // The conflicted Auditor moves the draft's period, so they have no
+    // declaration for the new one yet: the relationship still stands.
+    const moved = { ...acceptanceInput, team: ["lead", "auditor"] };
+    moved.periodEnd = "2026-10-31";
+    const assign =
+      "This person declared a disqualifying relationship with the engagement and cannot be assigned";
+    await expectFailure(
+      command(e, "saveAcceptance", moved, "auditor"),
+      400,
+      assign,
+    );
+    // The Lead moves it instead (with someone else on the team); the
+    // Auditor's relationship carries over to the new period.
+    await command(e, "saveAcceptance", { ...moved, team: ["lead"] }, "lead");
+    const w = workflowOf(e);
+    expect(declarationStatus(w, "auditor", ["lead", "auditor"])).toBe(
+      "excluded",
+    );
+    await expectFailure(
+      declare(e, "auditor", { exclusions: [] }),
+      409,
+      "A renewal cannot remove a disqualifying relationship you declared; a Lead Auditor or Reviewer other than you withdraws it with a reason",
+    );
+    await expectFailure(
+      command(e, "saveAcceptance", moved, "lead"),
+      400,
+      assign,
+    );
+    await expectFailure(
+      command(
+        e,
+        "saveProcedurePlan",
+        planSave(e, { reviewerId: "auditor" }),
+        "lead",
+      ),
+      400,
+      assign,
+    );
+    // Declaring for the new period with the relationship keeps it, and the
+    // Lead cannot approve with the Auditor on the team.
+    await declare(e, "lead");
+    await declare(e, "auditor", { exclusions: ["employment"] });
+    expect(w.declarations!.at(-1)!.periodEnd).toBe("2026-10-31");
+    w.acceptance!.team = ["lead", "auditor"];
+    await expectFailure(approve(e), 409, conflicted);
+    // Back to the first period: the stale declaration there does not matter
+    // once someone else withdraws the relationship from the latest one.
+    await command(
+      e,
+      "withdrawDeclaredExclusion",
+      {
+        declarationId: w.declarations!.at(-1)!.id,
+        kind: "employment",
+        reason: "Declared in error",
+      },
+      "lead",
+    );
+    expect(declarationStatus(w, "auditor")).toBe("current");
+    await command(
+      e,
+      "saveAcceptance",
+      { ...moved, periodEnd: acceptanceInput.periodEnd },
+      "lead",
+    );
+    expect(declarationStatus(w, "auditor")).toBe("current");
+    expect(await approve(e)).toEqual({ acceptanceRevision: "3" });
   });
 
   it("a renewal cannot drop an unresolved threat and keeps unchanged evaluations", async () => {

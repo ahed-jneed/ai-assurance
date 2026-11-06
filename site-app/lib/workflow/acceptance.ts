@@ -7,7 +7,9 @@
 // team member. The team is the people the acceptance record names plus the
 // preparers and reviewers of the selected procedures. A declaration is per
 // person and per engagement period, dated, and stays current only while
-// nobody outside the team it was made for joins the team.
+// nobody outside the team it was made for joins the team. A disqualifying
+// relationship is not tied to a period: it stands, whatever the period, until
+// someone other than the declarant withdraws it.
 //
 // Keep this module free of runtime imports other than relative pure modules:
 // the check harnesses load lib/domain.ts, and so this file, through
@@ -60,12 +62,23 @@ export function currentDeclaration(
   );
 }
 
+/**
+ * A person's latest declaration on the engagement in any period. It carries
+ * every disqualifying relationship they declared and nobody withdrew,
+ * because a declaration may not drop one (saveDeclaration).
+ */
+export const latestDeclaration = (
+  w: Workflow,
+  userId: string,
+): Declaration | undefined =>
+  (w.declarations ?? []).findLast((d) => d.userId === userId);
+
+/** The disqualifying relationships that stand for a person, in any period. */
+export const standingExclusions = (w: Workflow, userId: string) =>
+  latestDeclaration(w, userId)?.exclusions ?? [];
+
 export const unresolvedThreats = (d: Declaration) =>
   d.threats.filter((t) => !t.resolution);
-
-/** A disqualifying relationship or a threat nobody has resolved. */
-export const declarationConflicted = (d: Declaration) =>
-  d.exclusions.length > 0 || unresolvedThreats(d).length > 0;
 
 export type DeclarationStatus =
   "missing" | "excluded" | "unresolved" | "outdated" | "current";
@@ -76,9 +89,9 @@ export function declarationStatus(
   userId: string,
   team = engagementTeam(w),
 ): DeclarationStatus {
+  if (standingExclusions(w, userId).length) return "excluded";
   const d = currentDeclaration(w, userId);
   if (!d) return "missing";
-  if (d.exclusions.length) return "excluded";
   if (unresolvedThreats(d).length) return "unresolved";
   if (team.some((id) => !d.team.includes(id))) return "outdated";
   return "current";
@@ -99,19 +112,22 @@ export const declarationMessages: Record<
 };
 
 /**
- * Why this person cannot be assigned to the engagement, if their current
- * declaration (for `period`, by default the current one) is conflicted.
+ * Why this person cannot be assigned to the engagement, if any: a
+ * disqualifying relationship they declared in any period and nobody
+ * withdrew, or a threat in their declaration for `period` (by default the
+ * current one) that nobody has resolved.
  */
 export function assignmentConflict(
   w: Workflow,
   userId: string,
   period?: Period,
 ) {
+  if (standingExclusions(w, userId).length)
+    return "This person declared a disqualifying relationship with the engagement and cannot be assigned";
   const d = currentDeclaration(w, userId, period ?? engagementPeriod(w));
-  if (!d || !declarationConflicted(d)) return undefined;
-  return d.exclusions.length
-    ? "This person declared a disqualifying relationship with the engagement and cannot be assigned"
-    : "This person declared an unresolved independence threat; resolve it before assigning them";
+  if (d && unresolvedThreats(d).length)
+    return "This person declared an unresolved independence threat; resolve it before assigning them";
+  return undefined;
 }
 
 /**

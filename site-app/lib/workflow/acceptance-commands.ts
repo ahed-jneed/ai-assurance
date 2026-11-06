@@ -17,8 +17,8 @@ import {
 import {
   assignmentConflict,
   currentDeclaration,
-  declarationConflicted,
   engagementTeam,
+  latestDeclaration,
   unresolvedThreats,
   type Period,
 } from "./acceptance";
@@ -102,9 +102,9 @@ const declarationFields = z
   .strict();
 
 /**
- * Refuses to assign a person whose current declaration (for `period`, by
- * default the current one) declares a disqualifying relationship or an
- * unresolved threat. Without a declaration, assignment is allowed: the
+ * Refuses to assign a person with a disqualifying relationship declared in
+ * any period and not withdrawn, or with an unresolved threat in their
+ * declaration for `period` (by default the current one). Without a declaration, assignment is allowed: the
  * Planning-exit gate then asks for one.
  */
 export function assignable(w: Workflow, userId: string, period?: Period) {
@@ -167,10 +167,10 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
       );
     if (!r.team.includes(c.userId))
       fail(400, "Name yourself on the engagement team before accepting it");
-    // A Lead cannot accept an engagement while a declared threat is open.
+    // A Lead cannot accept an engagement while a declared threat is open or
+    // a declared relationship stands, whichever period it was declared for.
     for (const id of engagementTeam(x)) {
-      const d = currentDeclaration(x, id);
-      if (d && declarationConflicted(d))
+      if (assignmentConflict(x, id))
         fail(
           409,
           "A team member declared an unresolved independence threat or a disqualifying relationship; resolve it before accepting the engagement",
@@ -213,12 +213,15 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
         413,
         "This engagement reached its declaration limit; continue in a follow-up engagement",
       );
-    // A renewal for the same period never clears a conflict: the declarant
-    // cannot drop a disqualifying relationship or an unresolved threat by
-    // declaring again. Someone else withdraws the one and evaluates the
-    // other. An evaluation carries forward while the threat is unchanged.
-    const prior = currentDeclaration(x, c.userId, period);
-    if (prior?.exclusions.some((k) => !a.exclusions.includes(k)))
+    // A renewal never clears a conflict: the declarant cannot drop a
+    // disqualifying relationship (declared for any period) or an unresolved
+    // threat (for this period) by declaring again, so changing the period
+    // does not help either. Someone else withdraws the one and evaluates the
+    // other. An evaluation carries forward while the threat is unchanged, and
+    // withdrawals carry forward so the record keeps showing them.
+    const latest = latestDeclaration(x, c.userId),
+      prior = currentDeclaration(x, c.userId, period);
+    if (latest?.exclusions.some((k) => !a.exclusions.includes(k)))
       fail(
         409,
         "A renewal cannot remove a disqualifying relationship you declared; a Lead Auditor or Reviewer other than you withdraws it with a reason",
@@ -260,6 +263,9 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
         priorWork: a.priorWork,
         threats,
         exclusions: a.exclusions,
+        ...(latest?.exclusionWithdrawals?.length
+          ? { exclusionWithdrawals: latest.exclusionWithdrawals }
+          : {}),
         competence: a.competence,
         expertField: a.expertField,
       },
@@ -310,8 +316,10 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
         403,
         "Someone other than the declarant must withdraw a disqualifying relationship",
       );
-    if (currentDeclaration(x, d.userId) !== d)
-      fail(409, "Evaluate the person's current declaration");
+    // Relationships stand across periods, so the person's latest declaration
+    // in any period holds them.
+    if (latestDeclaration(x, d.userId) !== d)
+      fail(409, "Withdraw from the person's latest declaration");
     if (!d.exclusions.includes(a.kind))
       fail(404, "This relationship is not declared");
     // A correction, not a safeguard: the relationship was declared in error

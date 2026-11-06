@@ -11,6 +11,7 @@ import {
   currentDeclaration,
   declarationStatus,
   engagementTeam,
+  latestDeclaration,
   type DeclarationStatus,
 } from "@/lib/workflow/acceptance";
 import {
@@ -246,7 +247,8 @@ export function AcceptancePanel({
   }
 
   function declarationForm() {
-    const d = currentDeclaration(w, uid);
+    const d = currentDeclaration(w, uid),
+      latest = latestDeclaration(w, uid);
     const threat = (k: ThreatKind) => d?.threats.find((t) => t.kind === k);
     const fields: Field[] = [
       {
@@ -293,7 +295,9 @@ export function AcceptancePanel({
           value: k,
           label: exclusionLabels[k],
         })),
-        ids: d?.exclusions ?? [],
+        // Relationships stand across periods: start from the latest
+        // declaration in any period, which holds the ones not withdrawn.
+        ids: latest?.exclusions ?? [],
         hint: "Modelled on the NYC Local Law 144 independent-auditor exclusions and applied to every engagement; pending legal review. No safeguard resolves them, and a renewal cannot remove one: a Lead Auditor or Reviewer other than you withdraws a relationship declared in error. A renewal also keeps every threat nobody has resolved.",
       },
       ...competenceAreas.map((k): Field => ({
@@ -590,7 +594,10 @@ export function AcceptancePanel({
             </thead>
             <tbody>
               {declarants.map((id) => {
+                // Threats are per period; relationships and their
+                // withdrawals stand across periods on the latest declaration.
                 const d = currentDeclaration(w, id),
+                  latest = latestDeclaration(w, id),
                   status = team.includes(id)
                     ? declarationStatus(w, id, team)
                     : undefined;
@@ -616,27 +623,27 @@ export function AcceptancePanel({
                     </td>
                     <td>{d ? day(d.declaredAt) : "—"}</td>
                     <td>
-                      {d && !d.threats.length && !d.exclusions.length && (
+                      {d && !d.threats.length && !latest?.exclusions.length && (
                         <span className="subtle">None declared</span>
                       )}
-                      {d?.exclusions.map((k) => (
+                      {latest?.exclusions.map((k) => (
                         <div key={k} className="acceptance-threat">
                           <p className="record-text">
                             <b>Disqualifying:</b> {exclusionLabels[k]}
                           </p>
-                          {reviewer && d.userId !== uid && (
+                          {reviewer && latest.userId !== uid && (
                             <Button
                               size="sm"
                               variant="outline"
                               disabled={busy}
-                              onClick={() => withdrawForm(d, k)}
+                              onClick={() => withdrawForm(latest, k)}
                             >
                               Withdraw as declared in error
                             </Button>
                           )}
                         </div>
                       ))}
-                      {d?.exclusionWithdrawals?.map((x, i) => (
+                      {latest?.exclusionWithdrawals?.map((x, i) => (
                         <small key={x.kind + i} className="subtle block">
                           Withdrawn: {exclusionLabels[x.kind]} · by{" "}
                           {name(x.userId)} · {day(x.at)}: {x.reason}
