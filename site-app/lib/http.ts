@@ -8,9 +8,34 @@ export class ApiError extends Error {
     super(message);
   }
 }
+/**
+ * A D1 (or SQLite) constraint violation: a unique key or check another
+ * request won the race for.
+ */
+const constraintFailure = (error: unknown) =>
+  error instanceof Error &&
+  /SQLITE_CONSTRAINT|constraint failed/i.test(error.message);
+/**
+ * The response for a failed request: an ApiError as it says, a request body
+ * that is not JSON as 400, a constraint race as 409 (F-54), and anything else
+ * as a logged 500 that does not reveal its cause.
+ */
 export function responseError(error: unknown) {
   if (error instanceof ApiError)
     return Response.json({ error: error.message }, { status: error.status });
+  if (error instanceof SyntaxError)
+    return Response.json(
+      { error: "The request body is not valid JSON" },
+      { status: 400 },
+    );
+  if (constraintFailure(error))
+    return Response.json(
+      {
+        error:
+          "Another change was saved at the same time. Reload and apply your changes again.",
+      },
+      { status: 409 },
+    );
   console.error(
     "Audit workspace request failed",
     error instanceof Error ? error.message : "Unknown failure",
