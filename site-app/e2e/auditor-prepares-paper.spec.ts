@@ -46,8 +46,8 @@ test("the Auditor prepares a working paper and submits it for review", async ({
     name: "New working paper or memo",
   });
   await choose(dialog, "Template", TEMPLATE);
-  // Every API read below follows the Worker's answer to the UI's command: a
-  // read sent while that save is still in flight races it (#119).
+  // Every API read below follows the Worker's answer to the UI's command,
+  // never a save still in flight (#119).
   const created = await runCommand(page, "createPaper", () =>
     dialog.getByRole("button", { name: "Create paper" }).click(),
   );

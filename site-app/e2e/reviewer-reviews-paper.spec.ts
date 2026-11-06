@@ -108,8 +108,8 @@ test("the Reviewer reviews a paper and the Lead Auditor signs it off", async ({
   const editor = page.getByRole("dialog", { name: new RegExp(TITLE) });
   await expect(editor).toBeVisible();
   await expectAccessible(page, "Working paper review");
-  // Read through the API only once the Worker has answered the UI's command:
-  // a read sent while that save is still in flight races it (#119).
+  // Read through the API only once the Worker has answered the UI's command,
+  // never while its save is still in flight (#119).
   await runCommand(page, "reviewPaper", () =>
     editor.getByRole("button", { name: "Approve review" }).click(),
   );

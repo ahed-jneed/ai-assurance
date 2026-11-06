@@ -248,7 +248,7 @@ export function paperPath(demo: Demo, paperId: string) {
  * Runs `action` (a click that sends one workspace command) and waits for the
  * Worker's answer to that command, so the spec reads the result only after
  * the save is complete. Never read through the API while the UI's command is
- * still in flight: such a read races the save (#119).
+ * still in flight: that is the read that hung in #119.
  */
 export async function runCommand(
   page: Page,
