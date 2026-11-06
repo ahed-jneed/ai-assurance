@@ -1028,6 +1028,49 @@ try {
       headers: { Authorization: "Bearer " + worker.token },
     });
   assert.equal(claim.jobId, next.jobId);
+  // The job guard binds the procedure's plan revision and the scope, not the
+  // program revision (#69): another procedure's approved change keeps this
+  // job running; a change to its own plan or to the scope stops it.
+  const heartbeat = (status = 200) =>
+    api("/api/runner", {
+      body: {
+        op: "heartbeat",
+        jobId: claim.jobId,
+        attemptId: claim.attemptId,
+        fence: claim.fence,
+        nonce: claim.nonce,
+        requestSha256: claim.requestSha256,
+      },
+      headers: { Authorization: "Bearer " + worker.token },
+      status,
+    });
+  const { body: planned } = await testDb
+    .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+    .bind(tenantId, e.id)
+    .first();
+  const replanned = async (change) => {
+    const b = JSON.parse(planned);
+    change(b.workflow, (id) => b.workflow.procedures.find((p) => p.id === id));
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(b), tenantId, e.id)
+      .run();
+  };
+  await replanned((wf, p) => {
+    p(classProcedure.id).revision++;
+    wf.program.revision++;
+  });
+  await heartbeat();
+  await replanned((wf, p) => {
+    p(procedure.id).revision++;
+    wf.program.revision++;
+  });
+  await heartbeat(409);
+  await replanned((wf) => wf.brief.revision++);
+  await heartbeat(409);
+  await replanned(() => {});
+  await refresh();
+  await heartbeat();
   await assurance("cancelJob", {
     jobId: next.jobId,
     reason: "Cancellation fence fixture",
