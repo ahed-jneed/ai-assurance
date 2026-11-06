@@ -5,7 +5,7 @@
 - **1.0:** Frozen external Python reports and legacy hosted evaluations, validated with their original rules. Runner version and report contract version are separate.
 - **1.1:** Hosted saved-prediction evaluations. These require a frozen model card, dataset metadata, normalized configuration, protocol when selected, test-definition version and SHA-256 input bindings. Queued, running, succeeded, failed and cancelled states have distinct rules.
 - **1.3:** Engine reports under statistics 1.0.0 (`docs/design/audit-statistics.md`, runner 1.3.0). Every performance, calibration and group criterion of the recorded plan is one result with a `decision` and the shared metric shape (headline, members, descriptive entries); the plan is `configuration.statistics` and its RFC 8785 SHA-256 is `provenance.statisticsPlanSha256`. Drift, unavailable capabilities and model-backed procedures keep the 1.0 result shape without a decision. `statistics-plan.schema.json` is the live plan contract, embedded as `$defs.statisticsPlan`.
-- **1.4:** Hosted saved-prediction runs under statistics 1.0.0 (runner interactive-predictions 3.0.0): one result per criterion of the plan frozen in `manifest.statistics` (a schemaVersion 1.1 protocol's stored plan, or the derivation of a 1.0 protocol), each with its `decision` and the shared metric shape; the plan hash is `provenance.inputHashes.statisticsPlan` and failing exploratory criteria are `reviewFlags`. `fixtures/hosted-runs.v1.4.json` holds runs the real queue and evaluation path produce (`site-app/lib/hosted-runs-fixture.test.ts` keeps it current), including an explicit plan whose criterion ids differ from the suite names. `fixtures/hosted-runs.v1.1.json` stays frozen.
+- **1.4:** Hosted saved-prediction runs under statistics 1.0.0 (runner interactive-predictions 3.0.0): one result per criterion of the plan frozen in `manifest.statistics` (a schemaVersion 1.1 protocol's stored plan, or the derivation of a 1.0 protocol), each with its `decision` and the shared metric shape; the plan hash is `provenance.inputHashes.statisticsPlan` and failing exploratory criteria are `reviewFlags`. `fixtures/hosted-runs.v1.4.json` holds runs the real queue and evaluation path produce (`site-app/lib/hosted-runs-fixture.test.ts` keeps it current), including an explicit plan whose criterion ids differ from the suite names. `fixtures/hosted-api-runs.v1.4.json` holds the card-pinned runs (a cancelled run, its retry and a succeeded run) that the Site integration harness made through the real API, captured with `node schemas/capture-api-fixtures.mjs` and frozen like `fixtures/hosted-runs.v1.1.json`.
 - **1.5:** Compiled external audit runs under statistics 1.0.0: results keyed by criterion id, each with the engine decision the worker copied, the plan in `manifest.statistics` and its hash in `provenance.inputHashes.statisticsPlan`, and `reviewFlags`. The run outcome aggregates confirmatory criteria only. `fixtures/external-runs.v1.5.json` comes from actual worker computations; one fixture uses an explicit plan (engineConfig 1.4). The platform compiles worker results that carry copied decisions into 1.5 (`importJob`, #22 H4); a 1.2 result carries no decision. `fixtures/performance-rules-golden.json` holds binary performance cases (#65) that the hosted runner (`site-app/lib/performance-rules-golden.test.ts`) and the worker path (`engine/tests/test_performance_rules.py`) must decide alike, with the same metrics.
 - **1.2:** Completed authenticated external attempts compiled by the platform. These require an external job ID, approved procedure revisions, non-null frozen protocol, original request/result digest pins, system/model/dataset declarations, and the complete worker metrics including counts, confidence intervals, thresholds and slices. The original envelope and engine report remain unchanged.
 
@@ -29,7 +29,9 @@ The validator checks the schema itself, legacy compatibility, current Python rep
 
 A fairness protocol frozen in a 1.1 or 1.2 run may carry `specialCategory`: whether its group column holds special-category data, its route (`client_side` or `hosted`) and a copy of the client's recorded Art 4a or GDPR Art 9(2) basis. A hosted run on such data also records `manifest.specialCategoryAcknowledgement`; a retry carries the source run's acknowledgement over unchanged and adds `inheritedFrom`, the source run ID. Both are optional, since earlier runs have neither; the application enforces the basis and the acknowledgement (#60).
 
-Hosted 1.1 and external 1.2 runs may pin the frozen dataset governance card as `manifest.dataset.cardPin` (record ID, SHA-256 and card body). The schema checks its shape; the application checks that the card version matches the accepted dataset bytes and the engagement.
+Hosted 1.1 and 1.4 and external 1.2 and 1.5 runs may pin the frozen dataset governance card as `manifest.dataset.cardPin` (record ID, SHA-256 and card body). The card body is the registered card of `dataset-card.schema.json`, embedded as `$defs/datasetCard`. The validator also checks that the pin's SHA-256 is that of the card text as the records API stores it, that the card describes the evaluated bytes and that its period runs forwards; the application checks that the card belongs to the engagement. The binary fixture of `fixtures/external-runs.v1.5.json` pins the API's card, re-issued for its own bytes.
+
+A schema's `$id` versions the schema document, not the run contracts it accepts: `urn:ai-assurance:test-run:2.0` (#51) accepts only well-formed dataset cards in a pin, where 1.2 accepted any object.
 
 In the current external projection, `manifest.dataset.rowCount` is the maximum reported metric sample size, with zero permitted for missing evidence; this must not be interpreted as a source-population census. One supplementary paper compiles the attempt, even when results map to multiple articles. Cross-field validation aggregates fail, then inconclusive, then pass, then not_applicable; no missing or inapplicable evidence defaults to pass.
 
@@ -57,13 +59,39 @@ The execution schema checks record shape; accepted evidence, authorized actors, 
 
 ## Working papers
 
-`working-paper.schema.json` is the single working-paper contract. `paperRevision` describes a revision of a `templates/catalog.json` working paper or memo; its status gates require procedures and an evaluation rationale once submitted, approvals and an auditor conclusion once reviewed, and two approvals plus a content digest once sealed. `templates/working-paper.blank.json` is its draft specimen. `generatedDraft` describes the drafts that `engine/diagnostics.py` derives from diagnostic results: they always require review and carry no sign-offs.
+`working-paper.schema.json` (`urn:ai-assurance:working-paper:2.1`) is the single working-paper contract. `paperRevision` describes a revision of a `templates/catalog.json` working paper or memo; its status gates require procedures and a non-blank evaluation rationale once submitted, approvals and an auditor conclusion once reviewed, and two approvals plus a content digest once sealed. `templates/working-paper.blank.json` is its draft specimen. `generatedDraft` describes the drafts that `engine/diagnostics.py` derives from diagnostic results: they always require review and carry no sign-offs.
+
+**What the application exports.** Papers leave the application as `paperRevision` documents of `schemaVersion` 1.1.0 (`site-app/lib/papers/`). Report capture projects every captured paper into `snapshot.workingPapers`; an internal dossier files each document as `papers/<id>-r<revision>.json`, and the internal report package (contract 1.2) lists them as `workingPapers`. Client dossiers and packages keep each paper's conclusion only, since a contract document names the preparer and approvers, and packages captured before the contract keep their captured papers. Revision 1.1.0 requires `kind` and `narrative`, and maps the app's record as follows:
+
+| App record | Document |
+|---|---|
+| `kind`, `templateId`, `title`, `stage`, `revision`, `audience` | `kind`, `catalogId`, `title`, `stage`, `revision`, `audience` |
+| `status` draft, in_review, reviewed, signed; a superseded paper | `status` draft, submitted, reviewed, sealed; superseded |
+| `body` sections and `conclusionStatus` | `narrative`, unchanged; `evaluation.rationale` is the conclusion and `auditorConclusion` its status (not_supported is deficiency) |
+| reviews and signatures | `approvals` (reviewer, lead_auditor), bound to the revision's content digest, the SHA-256 that signPaper signs |
+| linked evidence and runs | `evidence` (artifact hash and status) and `runReferences` (manifest digest; the hosted runner records no environment digest, so it is null) |
+| review comments and responses | `reviewComments`, each on the revision it was raised on |
+
+Evidence counts as sufficient once a paper is submitted, since submission asserts it; a non-empty limitations section makes it `limited`. A paper whose linked evidence or run the engagement no longer holds names it in `evaluation.limitations` instead of inventing a reference. `site-app/lib/papers/revision.test.ts` projects every catalog item in each state and validates the documents with this validator; `paperFromRevision` reads a document back, and the round-trip test checks that it returns the paper's fields.
+
+**Memos.** Memos use the same eight narrative sections as working papers, because that is how the application records them; the memo templates' headings map onto them (background to objective and scope, the issue to criteria, analysis and alternatives to procedures, sampling and results, recommendation and management position to the conclusion). Splitting the text into the six memo headings would invent a division the auditor never made. What a memo adds is the structured record it decides on, in `records` (not allowed on working papers): the acceptance or continuance record and the independence and competence declarations for MEM-AC-01 (#23), and for MEM-SO-01 the engagement quality reviewer's sign-offs of the package (#24) and the release completion. MEM-SO-01 is recorded at release rather than prepared as a paper, so once a final package is released its exports add the memo as a sealed document composed from the release record (`contentOrigin` hybrid): the independent approval, the quality reviewer's sign-off and the release, each bound to the internal package hash, with both package hashes as its evidence.
 
 ```powershell
 node schemas/validate-working-paper-schema.mjs
+node schemas/validate-working-paper-schema.mjs --documents path/to/papers.json   # an array, or { documents }
 ```
 
-The validator checks the engine example drafts, the blank template and the status gates. The extracted runtime package has no `templates/` folder, so there it checks the engine drafts only.
+The validator checks the engine example drafts, the blank template, 1.0.0 revisions, the status gates and memo records, and with `--documents` the documents an export wrote. The extracted runtime package has no `templates/` folder, so there it checks the engine drafts only.
+
+## Dataset card
+
+`dataset-card.schema.json` (`urn:ai-assurance:dataset-card:1.0`) is the dataset governance card. `$defs/declaredCard` is what an auditor declares in registerDataset; `$defs/registeredCard`, the schema's root, is the stored body a run pins, with the SHA-256, name and size of the accepted bytes and a baseline's pin. It is the language-neutral form of the zod schemas `datasetCardFields` and `registeredDatasetCardSchema` in `site-app/lib/dataset-card.ts`, and `site-app/lib/dataset-card-contract.test.ts` fails when the two disagree on a field, a constraint or a sample card. Text is stored trimmed. JSON Schema cannot compare dates, so the application and the validators check the period order.
+
+```powershell
+node schemas/validate-dataset-card-schema.mjs [--cards path/to/cards.json]
+```
+
+The validator checks the schema in Ajv strict mode, the card the API pinned in `fixtures/hosted-api-runs.v1.4.json`, a card stored before regression baselines, a card with a baseline, and that malformed cards are rejected.
 
 ## GenAI evaluation evidence
 
