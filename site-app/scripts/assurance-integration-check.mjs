@@ -22,6 +22,12 @@ const mf = new Miniflare({
   modulesRoot: path.resolve("dist/server"),
   compatibilityDate: "2026-05-15",
   compatibilityFlags: ["nodejs_compat"],
+  // The fixture identity headers below are trusted only because this opts in
+  // to the loopback-only test mode (docs/security/identity.md).
+  bindings: {
+    IDENTITY_MODE: "trusted-headers",
+    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+  },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
   d1Persist: false,

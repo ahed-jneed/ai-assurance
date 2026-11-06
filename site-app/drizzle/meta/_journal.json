@@ -36,6 +36,13 @@
       "when": 1791539841707,
       "tag": "0004_ambiguous_tempest",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793902796409,
+      "tag": "0005_legacy_access_adoption",
+      "breakpoints": true
     }
   ]
 }
