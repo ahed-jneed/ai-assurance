@@ -2,6 +2,7 @@ import {
   ApiError,
   db,
   bucket,
+  parseJsonBody,
   readBounded,
   now,
   id,
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
   try {
     const { w, tokenHash } = await worker(request),
       bytes = await readBounded(request, 10 * 1024 * 1024),
-      d = JSON.parse(new TextDecoder().decode(bytes));
+      d = parseJsonBody(bytes) as { op?: string };
     if (d.op === "claim") {
       const v = z
         .object({
@@ -249,7 +250,7 @@ export async function POST(request: Request) {
       if (!r.meta.changes) throw new ApiError(409, "Attempt no longer active");
       return Response.json({ leaseUntil });
     }
-    if (!["complete", "fail"].includes(d.op))
+    if (d.op !== "complete" && d.op !== "fail")
       throw new ApiError(400, "Unknown runner operation");
     const p = pins
         .extend({

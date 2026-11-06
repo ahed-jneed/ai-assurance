@@ -11,7 +11,7 @@ import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import type { Context } from "./tenancy";
 
-type RecordRow = {
+export type RecordRow = {
   id: string;
   kind: string;
   body: string;
@@ -19,7 +19,7 @@ type RecordRow = {
   created_at: string;
   actor: string;
 };
-function parsed(r: RecordRow): AssuranceRecord {
+export function parsed(r: RecordRow): AssuranceRecord {
   return {
     id: r.id,
     kind: r.kind,
@@ -39,7 +39,7 @@ export type AssuranceRecordPage = {
 };
 // A cursor is the (created_at, id) of the last record of a page, opaque to
 // callers: base64url of a JSON pair.
-function encodeCursor(r: AssuranceRecord) {
+export function encodeCursor(r: Pick<AssuranceRecord, "createdAt" | "id">) {
   const bytes = new TextEncoder().encode(JSON.stringify([r.createdAt, r.id]));
   return btoa(String.fromCharCode(...bytes))
     .replaceAll("+", "-")
@@ -58,7 +58,7 @@ function readCursor(cursor: string): unknown {
     return undefined;
   }
 }
-function decodeCursor(cursor: string): [string, string] {
+export function decodeCursor(cursor: string): [string, string] {
   const v = cursor.length <= 1000 ? readCursor(cursor) : undefined;
   if (
     !Array.isArray(v) ||
@@ -165,7 +165,7 @@ export async function storedBodies(
     : [];
   return new Map(rows.map((r) => [r.id, { body: r.body, sha256: r.sha256 }]));
 }
-const assessmentKinds = "('assertion','impact','obligation')";
+export const assessmentKinds = "('assertion','impact','obligation')";
 export type AssessmentKind = "assertion" | "impact" | "obligation";
 /** Whether an assessment of `kind` already supersedes the record `recordId`. */
 export async function hasSuccessor(
