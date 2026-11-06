@@ -8,18 +8,23 @@ import {
   approveScope,
   at,
   briefInput,
+  changeScope,
   command,
   engagement,
+  executionInput,
   expectFailure,
   model,
   planInput,
   planProgram,
+  planSave,
+  procedureEntries,
   procedureId,
   procedureOf,
   profile,
   artifact,
   sha256,
   structuredEngagement,
+  submittedProcedure,
   templatePaper,
   workflowOf,
 } from "./test-fixtures";
@@ -30,6 +35,31 @@ const reviewerOnly = "An independent Reviewer or Lead Auditor must approve";
 const ownWork = "A preparer or contributor cannot approve their own work";
 const unauthorized =
   "Select an active authorized person with the required role";
+const scopeLimit =
+  "The scope reached its return limit; start a follow-up engagement";
+const programLimit =
+  "The program reached its return limit; start a follow-up engagement";
+/** Returned scope revisions as returnBrief keeps them. */
+function scopeReturns(e: Engagement, length: number) {
+  const { history, ...revision } = workflowOf(e).brief!;
+  return Array.from({ length }, () => ({
+    ...revision,
+    status: "submitted" as const,
+    returnReason: "Date the change",
+    returnedBy: "reviewer",
+    returnedAt: at,
+  }));
+}
+/** Program history entries of one status, to fill a history. */
+const programEntries = (length: number, status: string) =>
+  Array.from({ length }, () => ({
+    revision: 1,
+    briefRevision: 1,
+    status,
+    procedureRevisions: [],
+    at,
+    actor: "auditor",
+  }));
 // The fields an approved program hashes, in the order it hashes them.
 const planKeys = [
   "selected",
@@ -50,6 +80,27 @@ const planKeys = [
 ] as const;
 const planOf = (p: Procedure) =>
   Object.fromEntries(planKeys.map((key) => [key, p[key]])) as ProcedurePlan;
+// The plan hash: the procedure and its plan without the preparer, reviewer
+// and due date, in this order.
+const planHashOf = (p: Procedure) =>
+  sha256(
+    JSON.stringify({
+      procedureId: p.id,
+      objective: p.objective,
+      instructions: p.instructions,
+      ...Object.fromEntries(
+        planKeys
+          .filter((key) => !["ownerId", "reviewerId", "dueDate"].includes(key))
+          .map((key) => [key, p[key]]),
+      ),
+    }),
+  );
+const bindingsOf = (e: Engagement) =>
+  workflowOf(e).procedures.map((p) => ({
+    id: p.id,
+    revision: p.revision,
+    planHash: p.planHash,
+  }));
 
 describe("adoptWorkflow", () => {
   it("lets only a Lead adopt the workflow, once", async () => {
@@ -152,7 +203,7 @@ describe("engagement brief", () => {
     expect(workflowOf(e).brief).toBeUndefined();
   });
 
-  it("keeps each earlier revision in the history", async () => {
+  it("supersedes a draft that was never submitted without a history entry", async () => {
     const e = structuredEngagement();
     await command(e, "saveBrief", briefInput, "auditor");
     expect(
@@ -171,29 +222,76 @@ describe("engagement brief", () => {
       contributors: ["auditor", "second-auditor"],
       updatedBy: "second-auditor",
     });
-    expect(brief.history).toEqual([
-      {
-        ...briefInput,
-        revision: 1,
-        status: "draft",
-        contributors: ["auditor"],
-        updatedBy: "auditor",
-        updatedAt: at,
-      },
-    ]);
+    expect(brief.history).toEqual([]);
   });
 
-  it("caps the scope revision history", async () => {
-    const e = structuredEngagement();
-    await command(e, "saveBrief", briefInput, "auditor");
-    const brief = workflowOf(e).brief!;
-    const { history, ...snapshot } = brief;
-    brief.history = Array.from({ length: 40 }, () => ({ ...snapshot }));
-    await expectFailure(
-      command(e, "saveBrief", briefInput, "auditor"),
-      413,
-      "Scope revision limit reached",
-    );
+  it("counts scope returns only, so an approved scope can always be revised and approved again", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    const brief = () => workflowOf(e).brief!;
+    // 39 returns, besides approved revisions a Lead revised, and the drafts
+    // and returned revisions without a reason that older histories keep.
+    const { history, ...revision } = brief();
+    brief().history = [
+      ...scopeReturns(e, 39),
+      ...(["approved", "draft", "submitted"] as const).flatMap((status) =>
+        Array.from({ length: 40 }, () => ({ ...revision, status })),
+      ),
+    ];
+    // A Lead revises the approved scope, which is submitted and approved
+    // again, and the program binds it.
+    await changeScope(e);
+    expect(brief()).toMatchObject({ revision: 2, status: "approved" });
+    expect(workflowOf(e).program).toMatchObject({
+      status: "approved",
+      briefRevision: 2,
+    });
+    expect(
+      await command(
+        e,
+        "recordProcedureExecution",
+        executionInput(e),
+        "auditor",
+      ),
+    ).toEqual({ procedureId });
+    // The 40th return is not refused either. A scope returned 40 times can
+    // still be drafted, but not submitted again.
+    const revised = { ...briefInput, changeImpact: "Appeals are out of scope" };
+    await command(e, "saveBrief", revised, "lead");
+    await command(e, "submitBrief", {}, "lead");
+    await command(e, "returnBrief", { reason: "Date the change" }, "reviewer");
+    await command(e, "saveBrief", { ...revised, audience: "Board" }, "lead");
+    await expectFailure(command(e, "submitBrief", {}, "lead"), 413, scopeLimit);
+    expect(brief()).toMatchObject({ revision: 4, status: "draft" });
+  });
+
+  it("refuses to revise an approved scope that could not be submitted again", async () => {
+    // Commands never leave a scope or program in force without a submission,
+    // since only returns count; a lowered limit could.
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    const w = workflowOf(e),
+      approved = structuredClone(w);
+    const revise = () =>
+      command(
+        e,
+        "saveBrief",
+        { ...briefInput, changeImpact: "Appeals are now in scope" },
+        "lead",
+      );
+    w.brief!.history = scopeReturns(e, 40);
+    await expectFailure(revise(), 413, scopeLimit);
+    // A scope change also needs the program submitted again.
+    w.brief!.history = [];
+    w.program.history.push(...programEntries(75, "returned"));
+    await expectFailure(revise(), 413, programLimit);
+    // The scope and the program stay approved.
+    expect(w.brief).toEqual(approved.brief);
+    expect(w.program).toMatchObject({
+      status: "approved",
+      revision: approved.program.revision,
+      approval: approved.program.approval,
+    });
   });
 
   it("freezes a submitted scope until it is returned", async () => {
@@ -269,27 +367,35 @@ describe("engagement brief", () => {
     );
   });
 
-  it("returns a submitted scope with the reason as its change impact", async () => {
+  it("returns a submitted scope with the reason kept apart from the preparer's text", async () => {
     const e = structuredEngagement();
+    const prepared = { ...briefInput, changeImpact: "No earlier work exists" };
     const send = (userId: string) =>
       command(e, "returnBrief", { reason: "Clarify the boundary" }, userId);
     await expectFailure(send("reviewer"), 400, "Complete the brief first");
-    await command(e, "saveBrief", briefInput, "auditor");
+    await command(e, "saveBrief", prepared, "auditor");
     await expectFailure(send("reviewer"), 409, "Return a submitted scope");
     await command(e, "submitBrief", {}, "auditor");
     await expectFailure(send("auditor"), 403, reviewerOnly);
     expect(await send("reviewer")).toEqual({ reason: "Clarify the boundary" });
+    const returned = {
+      returnReason: "Clarify the boundary",
+      returnedBy: "reviewer",
+      returnedAt: at,
+    };
     const brief = workflowOf(e).brief!;
     expect(brief).toMatchObject({
+      ...returned,
       revision: 1,
       status: "draft",
-      changeImpact: "Clarify the boundary",
+      changeImpact: "No earlier work exists",
       contributors: ["auditor"],
     });
     expect(brief.approval).toBeUndefined();
     expect(brief.history).toEqual([
       {
-        ...briefInput,
+        ...prepared,
+        ...returned,
         revision: 1,
         status: "submitted",
         contributors: ["auditor"],
@@ -297,6 +403,28 @@ describe("engagement brief", () => {
         updatedAt: at,
       },
     ]);
+    // The revision answering the return shows it until it is resubmitted,
+    // in the preparer's own words.
+    await command(
+      e,
+      "saveBrief",
+      { ...prepared, boundary: "Scoring service only" },
+      "auditor",
+    );
+    expect(workflowOf(e).brief).toMatchObject({
+      ...returned,
+      revision: 2,
+      changeImpact: "No earlier work exists",
+    });
+    await command(e, "submitBrief", {}, "auditor");
+    const resubmitted = workflowOf(e).brief!;
+    expect(resubmitted).toMatchObject({
+      status: "submitted",
+      changeImpact: "No earlier work exists",
+    });
+    for (const key of ["returnReason", "returnedBy", "returnedAt"])
+      expect(resubmitted).not.toHaveProperty(key);
+    expect(resubmitted.history).toHaveLength(1);
   });
 
   it("lets only a Lead revise an approved scope, explaining its impact", async () => {
@@ -335,25 +463,20 @@ describe("engagement brief", () => {
       revision: 1,
       status: "approved",
     });
-    // The approved program no longer binds the current scope.
+    // The approved program no longer binds the current scope: it becomes
+    // the draft of its next revision, and its history keeps the approval.
     expect(w.program).toMatchObject({
       revision: approved.revision + 1,
       status: "draft",
       contributors: ["lead", "auditor"],
       updatedBy: "lead",
+      history: approved.history,
     });
     expect(w.program.approval).toBeUndefined();
-    expect(w.program.history.at(-1)).toEqual({
+    expect(w.program.history.at(-1)).toMatchObject({
       revision: approved.revision,
-      briefRevision: 1,
       status: "approved",
       approval: approved.approval,
-      procedureRevisions: w.procedures.map((p) => ({
-        id: p.id,
-        revision: p.revision,
-      })),
-      at,
-      actor: "lead",
     });
   });
 });
@@ -363,15 +486,9 @@ describe("procedure planning", () => {
     e: Engagement,
     plan: Record<string, unknown> = {},
     userId = "auditor",
-  ) =>
-    command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput(plan) },
-      userId,
-    );
+  ) => command(e, "saveProcedurePlan", planSave(e, plan), userId);
 
-  it("plans a procedure, keeps its prior plan and redrafts the program", async () => {
+  it("plans a procedure, keeps its prior plan once and amends the draft program", async () => {
     const e = structuredEngagement();
     const before = structuredClone(procedureOf(e, procedureId));
     expect(await save(e)).toEqual({ procedureId });
@@ -379,19 +496,137 @@ describe("procedure planning", () => {
     expect(p).toMatchObject({
       ...planInput(),
       revision: 2,
+      assignmentRevision: 2,
+      planHash: await planHashOf(p),
+      planAmended: true,
       contributors: ["lead", "auditor"],
       updatedBy: "auditor",
       updatedAt: at,
     });
     expect(p.review).toBeUndefined();
     expect(p.history).toEqual([
-      { plan: planOf(before), revision: 1, at, actor: "auditor" },
+      {
+        action: "plan",
+        plan: planOf(before),
+        revision: 1,
+        at,
+        actor: "auditor",
+      },
     ]);
+    // Drafting further revises the plan or its assignment, each counted
+    // apart, without history entries.
+    await save(e, { sampling: "Stratified sample of 40" });
+    await save(e, { sampling: "Stratified sample of 40", dueDate: "" });
+    expect(p).toMatchObject({
+      revision: 3,
+      assignmentRevision: 3,
+      planHash: await planHashOf(p),
+      dueDate: "",
+    });
+    expect(p.history).toHaveLength(1);
     expect(workflowOf(e).program).toMatchObject({
-      revision: 2,
+      revision: 1,
       status: "draft",
       contributors: ["lead", "auditor"],
+      history: [],
     });
+  });
+
+  it("leaves an unchanged plan alone", async () => {
+    const e = structuredEngagement();
+    await save(e);
+    const saved = structuredClone(workflowOf(e));
+    expect(await save(e, {}, "second-auditor")).toEqual({ procedureId });
+    expect(workflowOf(e)).toEqual(saved);
+  });
+
+  it("refuses a plan read before another change to its assignment, instead of reverting it", async () => {
+    const resample = { sampling: "Stratified sample of 40" };
+    for (const reassignment of [
+      { ownerId: "second-auditor" },
+      { reviewerId: "second-reviewer" },
+      { dueDate: "2026-12-15" },
+    ]) {
+      const e = structuredEngagement();
+      await approveProgram(e);
+      const p = procedureOf(e, procedureId),
+        revision = p.revision;
+      // A Lead opens the plan to change the sample while another Lead
+      // reassigns the work, which leaves the plan revision as it was.
+      const opened = planSave(e, resample);
+      await command(
+        e,
+        "bulkPlanProcedures",
+        { procedureIds: [procedureId], patch: reassignment },
+        "second-lead",
+      );
+      expect(p).toMatchObject({
+        ...reassignment,
+        revision,
+        assignmentRevision: opened.assignmentRevision + 1,
+      });
+      const reassigned = structuredClone(workflowOf(e));
+      await expectFailure(
+        command(e, "saveProcedurePlan", opened, "lead"),
+        409,
+        "The preparer, reviewer or due date of " +
+          p.title +
+          " changed after this plan was opened. Reload and apply your changes again.",
+      );
+      expect(workflowOf(e)).toEqual(reassigned);
+      // Read again, the plan keeps the other Lead's change.
+      await command(
+        e,
+        "saveProcedurePlan",
+        planSave(e, { ...resample, ...reassignment }),
+        "lead",
+      );
+      expect(p).toMatchObject({ ...resample, ...reassignment });
+      expect(workflowOf(e).program.status).toBe("draft");
+    }
+  });
+
+  it("lets 200 draft saves amend the program and its plans without using their history", async () => {
+    const e = structuredEngagement();
+    await approveScope(e);
+    await planProgram(e);
+    for (let i = 0; i < 200; i++)
+      await save(e, {
+        sampling: "Sample design " + i,
+        dueDate: i % 2 ? "2026-11-30" : "2026-12-15",
+      });
+    const p = procedureOf(e, procedureId),
+      program = workflowOf(e).program;
+    expect(program).toMatchObject({ revision: 1, status: "draft" });
+    expect(program.history).toEqual([]);
+    expect(p.history).toHaveLength(1);
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "returnProgram",
+      { reason: "Size the sample" },
+      "reviewer",
+    );
+    for (let i = 0; i < 200; i++)
+      await save(e, { sampling: "Sample of " + (40 + i) });
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "approveProgram",
+      { revision: 2, reason: "Program agreed" },
+      "reviewer",
+    );
+    expect(program.history.map((h) => h.revision + " " + h.status)).toEqual([
+      "1 submitted",
+      "1 returned",
+      "2 submitted",
+      "2 approved",
+    ]);
+    // The seed plan, then the plan as returned.
+    expect(p.history.map((h) => h.plan.sampling)).toEqual([
+      "",
+      "Sample design 199",
+    ]);
   });
 
   it("is recorded by an Auditor or Lead for a known procedure", async () => {
@@ -401,7 +636,11 @@ describe("procedure planning", () => {
       command(
         e,
         "saveProcedurePlan",
-        { procedureId: "PROC-unknown", plan: planInput() },
+        {
+          procedureId: "PROC-unknown",
+          assignmentRevision: 1,
+          plan: planInput(),
+        },
         "auditor",
       ),
       404,
@@ -489,28 +728,71 @@ describe("procedure planning", () => {
   it("lets only a Lead replan a submitted or approved program", async () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveProgram(e);
+    const approved = structuredClone(workflowOf(e).program),
+      p = procedureOf(e, procedureId),
+      plan = { revision: p.revision, planHash: p.planHash };
     const later = { dueDate: "2026-12-15" };
     await expectFailure(save(e, later), 403, leadOnly);
+    // An assignment change keeps the plan revision and the approval.
     await save(e, later, "lead");
-    expect(procedureOf(e, procedureId).dueDate).toBe("2026-12-15");
-    expect(workflowOf(e).program.status).toBe("draft");
+    expect(p).toMatchObject({ ...plan, dueDate: "2026-12-15" });
+    expect(workflowOf(e).program).toMatchObject({
+      revision: approved.revision,
+      status: "approved",
+      approval: approved.approval,
+      contributors: ["lead", "auditor"],
+    });
+    // A substantive change returns the program to draft as its next revision.
+    await save(e, { ...later, sampling: "Stratified sample of 40" }, "lead");
+    expect(p.revision).toBe(plan.revision + 1);
+    expect(workflowOf(e).program).toMatchObject({
+      revision: approved.revision + 1,
+      status: "draft",
+    });
     expect(workflowOf(e).program.approval).toBeUndefined();
   });
 
-  it("caps the procedure revision history", async () => {
-    const e = structuredEngagement();
+  it("keeps approved work assigned and scheduled", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    for (const change of [{ ownerId: "" }, { reviewerId: "" }, { dueDate: "" }])
+      await expectFailure(
+        save(e, change, "lead"),
+        400,
+        "WP-A10-01: approved work needs a preparer, a reviewer and a deadline",
+      );
+    // A program back in draft can be incomplete until it is submitted.
+    await save(e, { dueDate: "", sampling: "Stratified sample of 40" }, "lead");
+    expect(procedureOf(e, procedureId).dueDate).toBe("");
+  });
+
+  it("never refuses a plan change for a procedure's history limit", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
     const p = procedureOf(e, procedureId);
-    p.history = Array.from({ length: 30 }, () => ({
-      plan: planOf(p),
-      revision: 1,
-      at,
-      actor: "auditor",
-    }));
-    await expectFailure(
-      save(e),
-      413,
-      "This procedure reached its revision limit; start a follow-up engagement",
+    // Work recorded up to the limit, and the entries without an action that
+    // older draft saves kept.
+    p.history = [
+      ...procedureEntries(p, 30, "execute"),
+      ...procedureEntries(p, 30),
+    ];
+    // A Lead can still reassign the procedure and change its plan. Each
+    // program submission adds at most one plan entry.
+    await save(e, { reviewerId: "second-reviewer" }, "lead");
+    await save(
+      e,
+      { reviewerId: "second-reviewer", sampling: "Stratified sample of 40" },
+      "lead",
     );
+    expect(p).toMatchObject({
+      reviewerId: "second-reviewer",
+      sampling: "Stratified sample of 40",
+    });
+    expect(p.history).toHaveLength(61);
+    expect(p.history.at(-1)).toMatchObject({
+      action: "plan",
+      plan: { reviewerId: "reviewer", sampling: planInput().sampling },
+    });
   });
 });
 
@@ -523,7 +805,7 @@ describe("bulk planning", () => {
     procedureIds = ids,
   ) => command(e, "bulkPlanProcedures", { procedureIds, patch }, userId);
 
-  it("assigns owners, reviewers and deadlines in one program revision", async () => {
+  it("assigns owners, reviewers and deadlines without revising the plans", async () => {
     const e = structuredEngagement();
     expect(
       await bulk(e, {
@@ -537,12 +819,29 @@ describe("bulk planning", () => {
         ownerId: "auditor",
         reviewerId: "reviewer",
         dueDate: "2026-11-30",
-        revision: 2,
+        revision: 1,
+        assignmentRevision: 2,
         contributors: ["lead", "auditor"],
         updatedBy: "auditor",
       });
-    expect(procedureOf(e, "PROC-WP-A11-01").revision).toBe(1);
-    expect(workflowOf(e).program.revision).toBe(2);
+    expect(procedureOf(e, "PROC-WP-A11-01").assignmentRevision).toBeUndefined();
+    expect(workflowOf(e).program).toMatchObject({
+      revision: 1,
+      contributors: ["lead", "auditor"],
+    });
+  });
+
+  it("keeps an approved program approved", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    const approved = structuredClone(workflowOf(e).program);
+    await bulk(e, { ownerId: "second-auditor" }, "lead");
+    expect(procedureOf(e, procedureId).ownerId).toBe("second-auditor");
+    expect(workflowOf(e).program).toMatchObject({
+      revision: approved.revision,
+      status: "approved",
+      approval: approved.approval,
+    });
   });
 
   it("validates the whole batch before changing any procedure", async () => {
@@ -551,7 +850,7 @@ describe("bulk planning", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId: "PROC-WP-A12-01", plan: planInput() },
+      planSave(e, {}, "PROC-WP-A12-01"),
       "second-lead",
     );
     await expectFailure(
@@ -560,8 +859,9 @@ describe("bulk planning", () => {
       "Choose an independent reviewer for " +
         procedureOf(e, "PROC-WP-A12-01").title,
     );
-    expect(procedureOf(e, procedureId).revision).toBe(1);
-    expect(workflowOf(e).program.revision).toBe(2);
+    const untouched = procedureOf(e, procedureId);
+    expect(untouched.reviewerId).toBe("");
+    expect(untouched.assignmentRevision).toBeUndefined();
     await expectFailure(bulk(e, { ownerId: "reviewer" }), 400, unauthorized);
   });
 
@@ -587,16 +887,43 @@ describe("bulk planning", () => {
       ).rejects.toBeInstanceOf(ZodError);
   });
 
-  it("needs a Lead once the program left draft and respects revision limits", async () => {
+  it("needs a Lead once the program left draft, however full the histories", async () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveProgram(e);
     await expectFailure(bulk(e, { dueDate: "2026-12-01" }), 403, leadOnly);
-    workflowOf(e).program.history.length = 150;
-    await expectFailure(
-      bulk(e, { dueDate: "2026-12-01" }, "lead"),
-      413,
-      "Revision limit reached",
+    const full = procedureOf(e, "PROC-WP-A12-01"),
+      program = workflowOf(e).program;
+    full.history = procedureEntries(full, 30, "execute");
+    program.history.push(
+      ...programEntries(150, "draft"),
+      ...programEntries(75, "submitted"),
     );
+    await bulk(e, { dueDate: "2026-12-01" }, "lead");
+    for (const id of ids) expect(procedureOf(e, id).dueDate).toBe("2026-12-01");
+    expect(full.history).toHaveLength(31);
+    expect(program.status).toBe("approved");
+  });
+
+  it("keeps the reviewer of reviewed work", async () => {
+    const e = await submittedProcedure();
+    await command(
+      e,
+      "reviewProcedure",
+      { procedureId, reason: "The evidence supports the conclusion" },
+      "reviewer",
+    );
+    await expectFailure(
+      bulk(e, { reviewerId: "second-reviewer" }, "lead", [procedureId]),
+      409,
+      "The assigned reviewer already approved " +
+        procedureOf(e, procedureId).title +
+        "; record new work before reassigning its review",
+    );
+    await bulk(e, { dueDate: "2026-12-01" }, "lead", [procedureId]);
+    expect(procedureOf(e, procedureId)).toMatchObject({
+      state: "reviewed",
+      review: { userId: "reviewer" },
+    });
   });
 });
 
@@ -633,7 +960,29 @@ describe("program scoping", () => {
       contributors: ["lead", "auditor"],
     });
     expect(procedureOf(e, procedureId).criterion).toBe(cited);
-    expect(workflowOf(e).program.revision).toBe(2);
+    expect(workflowOf(e).program).toMatchObject({ revision: 1, history: [] });
+  });
+
+  it("decides each procedure once", async () => {
+    const e = structuredEngagement();
+    await expect(
+      command(
+        e,
+        "scopeProgramCandidates",
+        {
+          procedureIds: [procedureId, procedureId],
+          selected: true,
+          applicability: "applicable",
+          rationale: "Within the agreed scope",
+          periodAnalysis: "Covers the whole period",
+        },
+        "auditor",
+      ),
+    ).rejects.toBeInstanceOf(ZodError);
+    expect(procedureOf(e, procedureId)).toMatchObject({
+      revision: 1,
+      history: [],
+    });
   });
 
   it("needs a decision, not a pending state, and a Lead after submission", async () => {
@@ -666,12 +1015,7 @@ describe("program submission", () => {
     const e = structuredEngagement();
     await approveScope(e);
     await planProgram(e);
-    await command(
-      e,
-      "saveProcedurePlan",
-      { procedureId, plan: planInput(plan) },
-      userId,
-    );
+    await command(e, "saveProcedurePlan", planSave(e, plan), userId);
     return e;
   };
   const submit = (e: Engagement) => command(e, "submitProgram", {}, "auditor");
@@ -686,17 +1030,65 @@ describe("program submission", () => {
       403,
       writerOnly,
     );
-    expect(await submit(e)).toEqual({ programRevision: "3" });
-    expect(workflowOf(e).program).toMatchObject({
+    expect(await submit(e)).toEqual({ programRevision: "1" });
+    const w = workflowOf(e);
+    expect(w.program).toMatchObject({
       status: "submitted",
-      revision: 3,
+      revision: 1,
       briefRevision: 1,
     });
+    // The submission records every plan it binds; each plan's next change
+    // keeps it in that procedure's history.
+    for (const p of w.procedures) {
+      expect(p.planHash).toBe(await planHashOf(p));
+      expect(p.planAmended).toBeUndefined();
+    }
+    expect(w.program.history).toEqual([
+      {
+        revision: 1,
+        briefRevision: 1,
+        status: "submitted",
+        procedureRevisions: bindingsOf(e),
+        at,
+        actor: "auditor",
+      },
+    ]);
     await expectFailure(
       submit(e),
       409,
       "Only a draft program can be submitted",
     );
+  });
+
+  it("counts program returns only", async () => {
+    const e = structuredEngagement();
+    await approveScope(e);
+    await planProgram(e);
+    const program = workflowOf(e).program;
+    // 74 returns, besides submissions, approvals and withdrawals, and the
+    // drafts that older histories keep.
+    program.history = [
+      ...programEntries(74, "returned"),
+      ...["submitted", "approved", "withdrawn", "draft"].flatMap((status) =>
+        programEntries(100, status),
+      ),
+    ];
+    expect(await submit(e)).toEqual({ programRevision: "1" });
+    // The 75th return is not refused. A program returned 75 times can still
+    // be drafted, but not submitted again.
+    await command(
+      e,
+      "returnProgram",
+      { reason: "Size the sample" },
+      "reviewer",
+    );
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, { sampling: "Stratified sample of 40" }),
+      "auditor",
+    );
+    await expectFailure(submit(e), 413, programLimit);
   });
 
   it("needs a procedure in scope and a documented decision for every candidate", async () => {
@@ -710,7 +1102,7 @@ describe("program submission", () => {
     await command(
       e,
       "saveProcedurePlan",
-      { procedureId, plan: planInput({ applicability: "readiness" }) },
+      planSave(e, { applicability: "readiness" }),
       "auditor",
     );
     await expectFailure(
@@ -736,14 +1128,19 @@ describe("program submission", () => {
     );
   });
 
-  it("rechecks reviewer independence at submission", async () => {
-    // A Lead who names themselves reviewer while editing the plan becomes
-    // one of its contributors. saveProcedurePlan accepts this today: it
-    // checks independence before it adds the editor to the contributors, so
-    // only submission rejects it. Update this test once saveProcedurePlan
-    // rejects self-review.
+  it("checks reviewer independence when planning and again at submission", async () => {
+    // Saving makes the editor a contributor, so a Lead cannot name
+    // themselves reviewer: assignment changes need no renewed approval.
     await expectFailure(
-      submit(await prepared({ reviewerId: "second-lead" }, "second-lead")),
+      prepared({ reviewerId: "second-lead" }, "second-lead"),
+      400,
+      "Choose a reviewer independent of this procedure's preparers",
+    );
+    // Submission rechecks the plans it binds.
+    const e = await prepared();
+    procedureOf(e, procedureId).contributors.push("reviewer");
+    await expectFailure(
+      submit(e),
       400,
       "WP-A10-01: reviewer must be independent",
     );
@@ -764,7 +1161,7 @@ describe("program approval", () => {
     const e = structuredEngagement();
     await approveScope(e);
     await planProgram(e);
-    const approve = (userId: string, revision = 3) =>
+    const approve = (userId: string, revision = 1) =>
       command(
         e,
         "approveProgram",
@@ -777,24 +1174,27 @@ describe("program approval", () => {
     await expectFailure(approve("auditor"), 403, reviewerOnly);
     await expectFailure(approve("lead"), 403, ownWork);
     await expectFailure(approve("reviewer", 2), 409, stale);
-    expect(await approve("reviewer")).toEqual({ programRevision: "3" });
+    expect(await approve("reviewer")).toEqual({ programRevision: "1" });
     const w = workflowOf(e);
     expect(w.program.status).toBe("approved");
-    // The approval hashes every procedure's revision and plan.
-    expect(w.program.approval).toEqual({
+    // The approval hashes every procedure's plan revision and plan hash,
+    // the bindings its history entry records.
+    const approval = {
       userId: "reviewer",
       at,
-      revision: 3,
-      hash: await sha256(
-        JSON.stringify(
-          w.procedures.map((p) => ({
-            id: p.id,
-            revision: p.revision,
-            plan: planOf(p),
-          })),
-        ),
-      ),
+      revision: 1,
+      hash: await sha256(JSON.stringify(bindingsOf(e))),
       reason: "Program agreed",
+    };
+    expect(w.program.approval).toEqual(approval);
+    expect(w.program.history.at(-1)).toEqual({
+      revision: 1,
+      briefRevision: 1,
+      status: "approved",
+      approval,
+      procedureRevisions: bindingsOf(e),
+      at,
+      actor: "reviewer",
     });
     await expectFailure(approve("reviewer"), 409, stale);
   });
@@ -812,7 +1212,7 @@ describe("program approval", () => {
         command(
           e,
           "approveProgram",
-          { revision: 3, reason: "Agreed" },
+          { revision: 1, reason: "Agreed" },
           "reviewer",
         ),
         409,
@@ -836,13 +1236,17 @@ describe("program approval", () => {
     const program = workflowOf(e).program;
     expect(program).toMatchObject({
       status: "draft",
-      revision: 4,
+      revision: 2,
       contributors: ["lead", "auditor"],
       updatedBy: "reviewer",
     });
-    expect(program.history.at(-1)).toMatchObject({
-      revision: 3,
-      status: "submitted",
+    expect(program.history.at(-1)).toEqual({
+      revision: 1,
+      briefRevision: 1,
+      status: "returned",
+      reason: "Add the sampling basis",
+      procedureRevisions: bindingsOf(e),
+      at,
       actor: "reviewer",
     });
     await command(e, "submitProgram", {}, "auditor");
@@ -850,9 +1254,152 @@ describe("program approval", () => {
       await command(
         e,
         "approveProgram",
-        { revision: 4, reason: "Program agreed" },
+        { revision: 2, reason: "Program agreed" },
         "reviewer",
       ),
-    ).toEqual({ programRevision: "4" });
+    ).toEqual({ programRevision: "2" });
+  });
+
+  it("never refuses a return", async () => {
+    const e = structuredEngagement();
+    await approveScope(e);
+    await planProgram(e);
+    await command(e, "submitProgram", {}, "auditor");
+    // More returns than the limit, as a lowered limit could leave them.
+    const program = workflowOf(e).program;
+    program.history.unshift(...programEntries(200, "returned"));
+    await command(
+      e,
+      "returnProgram",
+      { reason: "Size the sample" },
+      "reviewer",
+    );
+    expect(program).toMatchObject({ status: "draft", revision: 2 });
+    expect(program.history).toHaveLength(202);
+  });
+});
+
+describe("changes to a program in force", () => {
+  const replan = (e: Engagement, plan: Record<string, unknown>) =>
+    command(e, "saveProcedurePlan", planSave(e, plan), "lead");
+  const resample = { sampling: "Stratified sample of 40" };
+
+  it("can be submitted and approved again one return short of the limit", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    const program = workflowOf(e).program;
+    program.history.unshift(
+      ...programEntries(74, "returned"),
+      ...programEntries(100, "submitted"),
+      ...programEntries(100, "approved"),
+    );
+    await replan(e, resample);
+    expect(program).toMatchObject({ status: "draft", revision: 2 });
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "approveProgram",
+      { revision: 2, reason: "Revised sample agreed" },
+      "reviewer",
+    );
+    expect(program.status).toBe("approved");
+    expect(
+      await command(
+        e,
+        "recordProcedureExecution",
+        executionInput(e),
+        "auditor",
+      ),
+    ).toEqual({ procedureId });
+  });
+
+  it("completes an approved scope change one return short of each limit", async () => {
+    const e = structuredEngagement({ artifacts: [artifact()] });
+    await approveProgram(e);
+    const w = workflowOf(e);
+    w.brief!.history = scopeReturns(e, 39);
+    w.program.history.unshift(...programEntries(74, "returned"));
+    await changeScope(e);
+    expect(w).toMatchObject({
+      brief: { revision: 2, status: "approved" },
+      program: { status: "approved", briefRevision: 2 },
+    });
+    expect(
+      await command(
+        e,
+        "recordProcedureExecution",
+        executionInput(e),
+        "auditor",
+      ),
+    ).toEqual({ procedureId });
+  });
+
+  it("is refused before it lands when the program could not be submitted again", async () => {
+    // Commands never leave a program in force without a submission, since
+    // only returns count; a lowered limit could. An assignment change needs
+    // no submission.
+    for (const status of ["approved", "submitted"]) {
+      const e = structuredEngagement({ artifacts: [artifact()] });
+      await approveScope(e);
+      await planProgram(e);
+      await command(e, "submitProgram", {}, "auditor");
+      if (status === "approved")
+        await command(
+          e,
+          "approveProgram",
+          { revision: 1, reason: "Program agreed" },
+          "reviewer",
+        );
+      const program = workflowOf(e).program,
+        p = procedureOf(e, procedureId),
+        before = structuredClone({ program, p });
+      program.history.push(...programEntries(75, "returned"));
+      await expectFailure(replan(e, resample), 413, programLimit);
+      expect(p).toEqual(before.p);
+      await replan(e, { dueDate: "2026-12-15" });
+      expect(program).toMatchObject({ status, revision: 1 });
+      expect(program.approval).toEqual(before.program.approval);
+      expect(p).toMatchObject({
+        dueDate: "2026-12-15",
+        revision: before.p.revision,
+      });
+    }
+  });
+
+  it("records a submission that a Lead's change withdraws", async () => {
+    const e = structuredEngagement();
+    await approveScope(e);
+    await planProgram(e);
+    await command(e, "submitProgram", {}, "auditor");
+    const submitted = bindingsOf(e),
+      program = workflowOf(e).program;
+    // An assignment change leaves the submission pending.
+    await replan(e, { dueDate: "2026-12-15" });
+    expect(program.status).toBe("submitted");
+    await replan(e, { dueDate: "2026-12-15", ...resample });
+    expect(program).toMatchObject({ status: "draft", revision: 2 });
+    expect(program.history.at(-1)).toEqual({
+      revision: 1,
+      briefRevision: 1,
+      status: "withdrawn",
+      procedureRevisions: submitted,
+      at,
+      actor: "lead",
+    });
+    // A scope change withdraws a pending submission too.
+    await command(e, "submitProgram", {}, "auditor");
+    await command(
+      e,
+      "saveBrief",
+      { ...briefInput, changeImpact: "Appeals are now in scope" },
+      "lead",
+    );
+    expect(program).toMatchObject({ status: "draft", revision: 3 });
+    expect(program.history.map((h) => h.revision + " " + h.status)).toEqual([
+      "1 submitted",
+      "1 withdrawn",
+      "2 submitted",
+      "2 withdrawn",
+    ]);
   });
 });
