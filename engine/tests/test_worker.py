@@ -46,6 +46,14 @@ def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": profile, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite, "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
 
 
+def client_request(data=CSV, **kwargs):
+    """A client-local request whose dataset stays with the client (#102): the platform holds only its pin."""
+    request = hosted_request(data, **kwargs)
+    request["executionMode"] = "client_local"
+    request["dataset"]["custody"] = "client"
+    return request
+
+
 def translated_report(path, legacy):
     """Run a golden hosted_config case (section 13.1) through the worker translation: an engineConfig 1.1
     request with the legacy profile, as the platform freezes it, translated and run by the engine."""
@@ -236,7 +244,7 @@ class RunnerServer:
                     return self.reject(409, "No compatible enrolled capability")
                 for index, queued in enumerate(fixture.queue):
                     frozen = json.loads(queued["requestJSON"])
-                    if (frozen.get("model", {}).get("format") if frozen.get("executionMode") == "auditor_model" else "provided_predictions") in accepted:
+                    if ("client_local" if frozen.get("dataset", {}).get("custody") == "client" else frozen.get("model", {}).get("format") if frozen.get("executionMode") == "auditor_model" else "provided_predictions") in accepted:
                         fixture.start(fixture.queue.pop(index))
                         return self.respond(fixture.issued[-1], headers=(("Content-Type", "application/json"), ("Cache-Control", "no-store")))
                 return self.respond({"idle": True})
@@ -305,6 +313,8 @@ class RunnerServer:
                     return self.reject(500, REQUEST_FAILED)
                 if first["input"] == "model" and json.loads(job["claim"]["requestJSON"]).get("executionMode") != "auditor_model":
                     return self.reject(403, "Model bytes are not authorized for this prediction-only request")
+                if first["input"] == "dataset" and json.loads(job["claim"]["requestJSON"])["dataset"].get("custody") == "client":
+                    return self.reject(403, "This dataset stays in the client's environment; the platform holds only its SHA-256 pin")
                 if first["input"] == "model":
                     return self.reject(404, "Pinned input bytes unavailable")
                 headers = (("Content-Type", "application/octet-stream"), ("Cache-Control", "private, no-store"), ("X-Evidence-SHA256", sha256(fixture.data)))
@@ -365,6 +375,8 @@ class RunnerServer:
         frozen, provenance = json.loads(job["claim"]["requestJSON"]), packet["provenance"]
         if provenance["requestSha256"] != job["claim"]["requestSha256"] or provenance["inputHashes"].get("dataset") != frozen["inputHashes"]["dataset"] or frozen["executionMode"] == "auditor_model" and provenance["inputHashes"].get("modelArtifact") != frozen["inputHashes"]["modelArtifact"] or provenance.get("imageDigest") != IMAGE or provenance.get("executionMode") != frozen["executionMode"]:
             return 400, "Consumed input or runtime pins mismatch"
+        if (frozen["dataset"].get("custody") == "client") != (provenance.get("execution", {}).get("datasetCustody") == "client"):
+            return 400, "Dataset custody differs from the frozen request"
         suite, results = frozen["profile"]["suite"], packet["hostedResults"]
         if len({result["testId"] for result in results}) != len(results) or len(suite) != len(results) or any(result["testId"] not in suite or result["article"] != ("15" if result["testId"] in {"performance", "regression"} else "10") for result in results):
             return 400, "Result definitions do not match requested tests"
@@ -708,6 +720,113 @@ class WorkerTests(unittest.TestCase):
                 self.assertNotIn("tampered", json.dumps(result))
             # Rejected bytes never receive the dataset's name, even partially.
             self.assertEqual(list((self.root/option).glob("job-*/inputs/dataset.csv*")), [])
+
+    def client_worker(self, transport, client_data, workspace="jobs"):
+        return self.worker(transport, workspace=workspace, client_data=client_data)
+
+    def client_files(self, *files, directory="client-data"):
+        folder = self.root/directory
+        folder.mkdir()
+        for name, raw in files:
+            (folder/name).write_bytes(raw)
+        return folder
+
+    def test_client_local_job_reads_the_pinned_local_file_and_sends_no_dataset_bytes(self):
+        # The client names its file as it likes; a file of another size is never read.
+        folder = self.client_files(("applicants-2026-q3.csv", CSV), ("other.csv", CSV+b"1,1,C\n"))
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed", server.errors)
+            # Nothing was downloaded: the platform holds no bytes to send.
+            self.assertEqual(server.gets, [])
+            self.assertEqual(server.errors, [])
+            claim = next(body for body, _ in server.posts if body["op"] == "claim")
+            self.assertEqual(claim["formats"], ["provided_predictions", "client_local"])
+            complete, raw = next((body, raw) for body, raw in server.posts if body["op"] == "complete")
+            packet = json.loads(complete["resultJSON"])
+            execution = packet["provenance"]["execution"]
+            self.assertEqual((execution["controller"], execution["datasetCustody"]), ("client_local_worker", "client"))
+            self.assertTrue(any("stayed in the client's environment" in note for note in execution["limitations"]))
+            self.assertEqual(packet["provenance"]["inputHashes"]["dataset"], sha256(CSV))
+            # Only aggregates travel: no data row, and no group cell beside its outcome.
+            for line in CSV.decode().splitlines()[1:]:
+                self.assertNotIn(line.encode(), raw)
+            # Every request the worker made is accounted for; none carried the dataset.
+            self.assertTrue(all(CSV not in raw for _, raw in server.posts))
+        inputs = Path(result["resultFile"]).parent.parent/"inputs"
+        self.assertEqual((inputs/"dataset.csv").read_bytes(), CSV)
+        self.assertEqual(list(inputs.glob("*.partial")), [])
+        # The client's files are left as they were.
+        self.assertEqual(sorted(p.name for p in folder.iterdir()), ["applicants-2026-q3.csv", "other.csv"])
+
+    def test_client_local_mismatched_or_missing_file_is_refused_without_a_download(self):
+        changed = CSV[:-2]+b"1\n"  # Same size, different SHA-256.
+        for name, files, code in (
+            ("changed", (("data.csv", changed),), "dataset_input_pin_mismatch"),
+            ("missing", (("data.csv", CSV+b"0,0,A\n"),), "client_dataset_unavailable"),
+            ("empty", (), "client_dataset_unavailable"),
+        ):
+            with self.subTest(name):
+                folder = self.client_files(*files, directory="client-"+name)
+                with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+                    result = self.client_worker(server.transport(), folder, workspace=name).once()
+                    self.assertEqual((result["state"], result["error"]), ("failed", code))
+                    self.assertEqual(server.gets, [])
+                    self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
+                    self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], [code])
+                # A refused file never receives the dataset's name in the job, even partially.
+                self.assertEqual(list((self.root/name).glob("job-*/inputs/dataset.csv*")), [])
+
+    def test_client_local_jobs_need_the_clients_own_worker(self):
+        # Without a client data directory the worker does not offer client_local, so the job is not served.
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            self.assertEqual(self.worker(server.transport()).once(), {"state": "idle"})
+            self.assertEqual(next(body for body, _ in server.posts if body["op"] == "claim")["formats"], ["provided_predictions"])
+        # A platform that serves it anyway gets the job failed before anything is read or downloaded.
+        claim = Claim.parse(claim_body(client_request()))
+        with self.assertRaises(ProtocolError) as refused:
+            self.worker(None, workspace="no-client-data").execute(claim, time.monotonic()+60)
+        self.assertEqual(refused.exception.code, "client_dataset_unavailable")
+        # Only a client-local request may pin a client-held dataset.
+        for mode in ("provided_predictions", "auditor_model"):
+            request = client_request()
+            request["executionMode"] = mode
+            with self.assertRaises(ValueError):
+                validate_request(request)
+        request = client_request()
+        request["dataset"]["custody"] = "platform"
+        with self.assertRaises(ValueError):
+            validate_request(request)
+
+    def test_client_data_directory_must_be_separate_from_the_workspace(self):
+        workspace = self.root/"jobs"
+        workspace.mkdir()
+        for value in (self.root/"absent", workspace, self.root, workspace/"inner"):
+            if value.name == "inner":
+                value.mkdir()
+            with self.subTest(str(value)), self.assertRaises((ValueError, OSError)):
+                self.worker(None, client_data=value)
+        file = self.root/"file.csv"
+        file.write_bytes(CSV)
+        with self.assertRaises(ValueError):
+            self.worker(None, workspace="jobs-2", client_data=file)
+        credentials = {"ASSURANCE_WORKER_TOKEN": TOKEN}
+        code, stdout, stderr = self.cli(["--site", "https://runner.example", "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--client-data-dir", str(self.root/"absent"), "--once"], credentials)
+        self.assertEqual((code, stdout), (2, ""))
+        self.assertEqual(json.loads(stderr), {"state": "configuration_rejected", "error": "invalid_worker_configuration_or_runtime"})
+
+    def test_a_result_must_state_the_frozen_dataset_custody(self):
+        folder = self.client_files(("data.csv", CSV))
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed")
+            claim = Claim.parse(server.issued[0])
+        raw = Path(result["resultFile"]).read_bytes()
+        verify_result_bytes(raw, claim, IMAGE)
+        packet = json.loads(raw)
+        packet["provenance"]["execution"]["datasetCustody"] = "platform"
+        with self.assertRaises(ValueError):
+            verify_result_bytes(json_bytes(packet), claim, IMAGE)
 
     def operator_log(self):
         return [json.loads(line) for line in (self.root/"jobs"/"operator-log.jsonl").read_text(encoding="utf-8").splitlines()]

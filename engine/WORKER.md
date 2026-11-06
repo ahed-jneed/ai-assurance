@@ -17,6 +17,7 @@ Provision these values using your secret manager or service environment; do not 
 | `ASSURANCE_WORKER_IMAGE_DIGEST` | Enrolled compute identity, `sha256:<64 lowercase hex>` |
 | `ASSURANCE_COMPUTE_IMAGE` | For Docker: locally available `repository@sha256:<digest>` |
 | `ASSURANCE_APPROVED_MODEL_HASHES` | Comma-separated hashes approved locally by the worker operator |
+| `ASSURANCE_CLIENT_DATA_DIR` | The client's own worker only: the directory of client-held datasets for [client-local jobs](#client-held-datasets) (or `--client-data-dir`) |
 
 From the repository root:
 
@@ -25,6 +26,8 @@ python -m engine.worker --readiness
 python -m engine.worker --workspace D:\AssuranceWorker\jobs --once
 python -m engine.worker --workspace D:\AssuranceWorker\jobs
 ```
+
+A client's own worker adds `--client-data-dir D:\ClientData\assurance` (see [Client-held datasets](#client-held-datasets)).
 
 `--once` exits after one attempt or an idle response. Long-running mode polls every five seconds by default. `--heartbeat-seconds` defaults to ten; `--compute-timeout` to 300 (maximum 600); `--maximum-jobs` to 100; `--transport-timeout`, the per-read idle timeout described under [Verification and current limits](#verification-and-current-limits), to 15 (maximum 120). Use a dedicated workspace owned by the service account, an encrypted filesystem with a disk quota, and retention/archival procedures. The worker stops acquiring leases when its retained-job count reaches the configured limit. It preserves inputs, request bytes, exact results and completion bodies for reconciliation; it never silently deletes evidence. Local create-once files do not provide object-lock retention or independent custody attestation.
 
@@ -37,6 +40,8 @@ Application authorization uses `Authorization: Bearer <application token>`. The 
 ```json
 {"op":"claim","workerId":"worker-001","imageDigest":"sha256:...","formats":["provided_predictions"]}
 ```
+
+A worker started with a client data directory adds `"client_local"` to `formats`; the platform serves a job whose dataset stays with the client only to a worker that claims, and was enrolled for, that capability.
 
 CLI/runtime model formats are normalized `onnx`, `xgboost_json`, `lightgbm_text`, `pmml`. Their corresponding enrollment/claim wire names are `ONNX`, `XGBoost`, `LightGBM`, `PMML`. They appear only when explicitly selected with `--formats`, the selected executor provides no-network model isolation, the runtime probe succeeds, and the local model-hash allowlist is nonempty. Package imports establish availability, not successful native inference or artifact safety. Validate golden native fixtures before approving enrollment. `--readiness` reports absent distributions and Java separately.
 
@@ -67,7 +72,7 @@ The platform refuses to queue the jobs it can tell this worker would refuse (`si
 }
 ```
 
-Input retrieval is `GET /api/runner?jobId=...&attemptId=...&fence=...&input=dataset|model` with the same authorization headers. The worker verifies the actual dataset byte count and SHA-256 before computation and again in the compute process. Native model bytes must match `inputHashes.modelArtifact`, the model's `sha256` or `sourceSha256`, and the local approval allowlist. An optional declared model byte count is checked. Dataset names and request identifiers never become input filesystem paths: filenames are application-owned `dataset.csv` and `model.<approved suffix>`.
+Input retrieval is `GET /api/runner?jobId=...&attemptId=...&fence=...&input=dataset|model` with the same authorization headers. A client-held dataset (`dataset.custody:"client"`) is never retrieved: the platform holds no bytes for it and refuses the request with 403. The worker verifies the actual dataset byte count and SHA-256 before computation and again in the compute process. Native model bytes must match `inputHashes.modelArtifact`, the model's `sha256` or `sourceSha256`, and the local approval allowlist. An optional declared model byte count is checked. Dataset names and request identifiers never become input filesystem paths: filenames are application-owned `dataset.csv` and `model.<approved suffix>`.
 
 Heartbeat posts `{op:"heartbeat",jobId,attemptId,fence,nonce,requestSha256}`; its response must contain a `leaseUntil` that has not yet passed. A nonretryable heartbeat rejection or expired lease stops computation. The server must independently reject stale fences, nonces, cancelled jobs and expired leases at publication. A fail operation uses the same pins and `error` set to one code from [Failure codes](#failure-codes); rows, column names, token values, file paths and raw native errors are never sent.
 
@@ -89,13 +94,14 @@ Every per-job failure is posted as `{op:"fail", ...pins, error:<code>}` and the 
 | `executable_preprocessing_unsupported` | Local eligibility | The request declares preprocessing that this worker would have to execute. Supply already prepared columns. |
 | `workspace_job_limit` | Local eligibility | The retained job directories reached `--maximum-jobs` while the attempt was being prepared. Archive evidence. |
 | `workspace_unavailable` | Local files | A job file could not be created or written (permissions, disk space). |
+| `client_dataset_unavailable` | Client-local input | The job's dataset stays with the client, but this worker has no client data directory, the directory cannot be read, or it holds no regular file of the pinned size. Place the client's file there, unchanged, and queue a new job. |
 | `transport_unavailable` | Input transfer | The connection failed or reset during download, after the allowed retries. |
 | `transport_idle_timeout` | Input transfer | No byte arrived within `--transport-timeout` seconds, after the allowed retries. |
 | `response_deadline_exceeded` | Input transfer | A download used up its size-scaled time budget, after the allowed retries. |
 | `response_truncated` | Input transfer | The connection closed before the declared `Content-Length` arrived, after the allowed retries. |
 | `response_size_rejected` | Input transfer | The platform sent, or declared, more bytes than the pinned size or limit. |
 | `http_<status>` | Input transfer or completion | The platform answered a download or a completion with this HTTP status, for example `http_404`. |
-| `dataset_input_pin_mismatch` | Input transfer or compute | The dataset's size or SHA-256 differs from the frozen pin. |
+| `dataset_input_pin_mismatch` | Input transfer, client-local input or compute | The dataset's size or SHA-256 differs from the frozen pin. For a client-held dataset: files of the pinned size are in the client data directory, but none has the pinned SHA-256 (the file changed after it was pinned). |
 | `model_input_pin_mismatch` | Input transfer or compute | The model's SHA-256 differs from the frozen pin. |
 | `model_input_size_mismatch` | Input transfer | The model's byte count differs from the declared size. |
 | `dataset_malformed` | Compute | The dataset is not well-formed UTF-8 CSV: empty or duplicate headers, ragged rows, or no observations. |
@@ -127,9 +133,22 @@ On a compute failure the compute process writes `outputs/error.json` (`{"schemaV
 
 The worker appends every job outcome (completed, failed with code and whether the fail was acknowledged, lease lost, completion uncertain) to `<workspace>/operator-log.jsonl`, including that operator detail. It creates the log owner-only (mode 0600, like the 0700 job directories), because entries can name columns and labels. The log stays on the worker host and is never sent to the platform; rotate it with the job evidence.
 
+## Client-held datasets
+
+Special-category fairness data stay with the client by default (decision D-11, #60). For such data the platform records a **client-held dataset pin** instead of an upload (`pinClientDataset`: file name, byte size, SHA-256 and who at the client confirmed them); the platform never receives the file's bytes, so it never receives the special-category column. A pin is accepted like other evidence and is selected for procedures, prediction lineage and dataset cards by its ID like an uploaded dataset. Only a client-local job can use it: `queueExternal` refuses every other mode, the hosted runner refuses it, and the evidence and runner download routes have nothing to return. A fairness protocol whose group column is special-category runs without a recorded Art 4a or GDPR Art 9(2) basis only as a client-local job on a client-held pin; on bytes held by the platform, or on the auditor's own worker, it needs the basis.
+
+The frozen request marks the dataset `"custody":"client"`. Worker 1.3.0 runs such a job only when it was started with a client data directory (`--client-data-dir` or `ASSURANCE_CLIENT_DATA_DIR`), which is how the client's own worker is configured; without one it does not offer `client_local`. For the job it:
+
+1. downloads nothing: it never calls the input route;
+2. looks at the regular top-level files of the client data directory (no symlinks, at most 10,000 entries) whose size equals the pin; names do not matter and request fields never become paths;
+3. copies each such file into the job's `inputs/dataset.csv` while hashing the bytes it copies, and keeps the first copy whose SHA-256 equals the pin. A changed file is refused with `dataset_input_pin_mismatch`, a missing one with `client_dataset_unavailable`, and nothing is computed. The compute process checks the size and SHA-256 again;
+4. computes as for provided predictions and returns the usual envelope: the engine report and `hostedResults` hold metrics, counts, intervals and per-group or per-class slices, which are aggregates; no row leaves the client. `provenance.execution` records `"controller":"client_local_worker"` and `"datasetCustody":"client"` with a limitation saying that only aggregates reached the platform, and the platform rejects a completion whose custody differs from the frozen request.
+
+The client data directory must be an existing directory apart from the workspace; the worker reads it and never writes to it. The client keeps the pinned file unchanged until the job completes. Group-level aggregates still describe the special-category attribute: per-group sample sizes and rates reach the platform, and the statistics floors (30 rows per group) limit, but do not remove, what a small group's aggregates can reveal. Whether the client may share even these aggregates under its basis, and the Art 4a reading behind the default route, remain pending legal review (LR-06, #57).
+
 ## Hosted and external report translation
 
-The server freezes hosted `engineConfig.contractVersion:"1.1"`, human-readable task, selected individual test IDs, flat column/threshold configuration, policy identity and seed. The worker (translation `hosted-1.1-1.4-to-engine-1.3/2.1.0`, worker 1.2.0) translates that snapshot into engine configuration `contractVersion:"1.3"`: machine task IDs, suite families, typed column roles and the hosted statistics plan derived under `docs/design/audit-statistics.md` section 9.3. Each selected test becomes a confirmatory criterion with the test's id (`performance` adds the chance baseline balanced accuracy ≥ 0.5, or macro recall ≥ 1/k with k from the target column), and the configured minimums are raised to the floors of 30 rows, 30 per group and 10 per class, with both recorded in the plan and in `hostedTranslation.minimums`. `engineConfig` 1.4 instead carries an explicit `statistics` plan, keeps only the column mappings and the declared label pair in `config`, and its suite must equal the families of the plan's criteria; its top-level `negativeLabel` must equal `config.negativeLabel`. The source snapshot and translation version are retained in the engine configuration hash.
+The server freezes hosted `engineConfig.contractVersion:"1.1"`, human-readable task, selected individual test IDs, flat column/threshold configuration, policy identity and seed. The worker (translation `hosted-1.1-1.4-to-engine-1.3/2.1.0`, worker 1.3.0) translates that snapshot into engine configuration `contractVersion:"1.3"`: machine task IDs, suite families, typed column roles and the hosted statistics plan derived under `docs/design/audit-statistics.md` section 9.3. Each selected test becomes a confirmatory criterion with the test's id (`performance` adds the chance baseline balanced accuracy ≥ 0.5, or macro recall ≥ 1/k with k from the target column), and the configured minimums are raised to the floors of 30 rows, 30 per group and 10 per class, with both recorded in the plan and in `hostedTranslation.minimums`. `engineConfig` 1.4 instead carries an explicit `statistics` plan, keeps only the column mappings and the declared label pair in `config`, and its suite must equal the families of the plan's criteria; its top-level `negativeLabel` must equal `config.negativeLabel`. The source snapshot and translation version are retained in the engine configuration hash.
 
 The worker accepts exactly the five tests a platform evaluation profile can select (`suiteSchema` in `site-app/lib/evaluation.ts`): `performance`, `regression`, `demographic_parity`, `disparate_impact` and `equalized_odds`. The platform never sends any other test and its import contract accepts only these results, so any other test fails the claim with `request_contract_rejected`. A test keeps the two catalogs identical.
 
@@ -150,7 +169,7 @@ The completion envelope is:
 
 Until the platform's intake follows statistics 1.0.0 (#22, H4), the platform compiles these results into a 1.2 run, whose result schema admits the copied `decision` for that reason, and a result must stay within today's `resultEnvelope` limits of 100 metrics and 300-character metric names: an all-pairs group criterion over many groups (more than 14 groups for parity, more than 10 for equalized odds) or very long group labels exceeds them. The worker rejects missing mapped input cells instead of silently excluding them on the hosted translation path.
 
-`provided_predictions` and `client_local` evaluate the pinned prediction dataset, including when it is associated with separately registered native model metadata. Neither mode downloads or loads a model artifact. `auditor_model` requires actual native inference; it cannot run a prediction file and claim independent scoring. `client_local` identifies client-origin provided-prediction evidence. A signed client-origin result does not establish independent auditor reproduction or ground-truth validity. Controller and execution kind remain separate from metadata declarations.
+`provided_predictions` and `client_local` evaluate the pinned prediction dataset, including when it is associated with separately registered native model metadata. Neither mode downloads or loads a model artifact. A `client_local` job on a client-held pin reads the dataset in the client's environment (see [Client-held datasets](#client-held-datasets)); one on an uploaded dataset downloads it like `provided_predictions`. `auditor_model` requires actual native inference; it cannot run a prediction file and claim independent scoring. `client_local` identifies client-origin provided-prediction evidence. A signed client-origin result does not establish independent auditor reproduction or ground-truth validity. Controller and execution kind remain separate from metadata declarations.
 
 ## Native inference and container execution
 

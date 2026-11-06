@@ -2,7 +2,9 @@
 
 Default execution is provided predictions in a bounded child process. Native
 inference requires an explicitly selected, digest-pinned Docker executor with
-network disabled and a local artifact SHA-256 allowlist.
+network disabled and a local artifact SHA-256 allowlist. A client's own worker
+with a client data directory also runs client-local jobs whose dataset never
+leaves the client: it reads the file locally by its SHA-256 pin.
 """
 from __future__ import annotations
 
@@ -31,7 +33,7 @@ from pathlib import Path
 from .contract import validate_report
 from .diagnostics import MAX_BYTES, read_csv, run, sha256
 from .errors import EngineError
-from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, claim_pins, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
+from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, claim_pins, client_held, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
 
 # Compute writes the sanitized code to ERROR_FILE and a local-only message to
 # DETAIL_FILE; the control plane appends every job outcome to OPERATOR_LOG.
@@ -45,6 +47,10 @@ IMAGE_DIGEST = re.compile(r"^sha256:[a-f0-9]{64}$")
 # dataset gets the idle timeout plus about 13 minutes per attempt.
 MIN_TRANSFER_RATE = 128 * 1024
 MAX_TRANSPORT_TIMEOUT = 120
+# A client data directory is searched only at its top level, up to this many
+# entries; only regular files of the pinned size are read.
+MAX_CLIENT_DATA_ENTRIES = 10000
+CLIENT_COPY_CHUNK = 1024 * 1024
 
 
 class ProtocolError(Exception):
@@ -593,7 +599,7 @@ def compute_failure_detail(outputs):
 
 
 class Worker:
-    def __init__(self, transport, executor, workspace, *, worker_id, image_digest, formats=(), approved_hashes=(), heartbeat=10, compute_timeout=300, maximum_jobs=100):
+    def __init__(self, transport, executor, workspace, *, worker_id, image_digest, formats=(), approved_hashes=(), heartbeat=10, compute_timeout=300, maximum_jobs=100, client_data=None):
         valid_id(worker_id, "workerId")
         if not IMAGE_DIGEST.fullmatch(image_digest):
             raise ValueError("Worker image identity must be sha256:<64 lowercase hex>")
@@ -618,8 +624,11 @@ class Worker:
         unavailable = [f for f in requested if not readiness.get("modelFormats", {}).get(f, {}).get("runtimePresent")]
         if unavailable:
             raise ValueError("Selected model runtimes are unavailable: "+", ".join(sorted(unavailable)))
+        self.client_data = client_data_directory(client_data, self.workspace) if client_data is not None else None
         self.formats = ["provided_predictions", *sorted(requested)]
-        self.wire_formats = ["provided_predictions", *(WIRE_FORMATS[name] for name in sorted(requested))]
+        # "client_local" asks for jobs whose dataset stays with the client;
+        # only a worker that can read the client's files offers it.
+        self.wire_formats = ["provided_predictions", *(WIRE_FORMATS[name] for name in sorted(requested)), *(["client_local"] if self.client_data else [])]
         self.heartbeat, self.compute_timeout, self.maximum_jobs = heartbeat, compute_timeout, maximum_jobs
 
     def request_claim(self):
@@ -663,10 +672,16 @@ class Worker:
         if request.get("preprocessing") or request["model"].get("preprocessingArtifactId"):
             if request.get("inputPreparation") != "already_preprocessed":
                 raise ProtocolError("executable_preprocessing_unsupported")
-        execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "limitations": ["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."]}
+        local = client_held(request)
+        if local and self.client_data is None:
+            raise ProtocolError("client_dataset_unavailable")
+        execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "datasetCustody": "client" if local else "platform", "limitations": (["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."])+(["The dataset stayed in the client's environment: the worker read it there by its SHA-256 pin, and only the aggregate results in this envelope reached the platform."] if local else [])}
         with LeaseKeeper(self.transport, claim, deadline, interval=self.heartbeat) as lease:
             lease.valid()
-            self.fetch(claim, "dataset", inputs/"dataset.csv", lease, digest=request["inputHashes"]["dataset"], size=request["dataset"]["size"], digest_code="dataset_input_pin_mismatch", size_code="dataset_input_pin_mismatch")
+            if local:
+                self.stage_client_dataset(request, inputs/"dataset.csv", lease)
+            else:
+                self.fetch(claim, "dataset", inputs/"dataset.csv", lease, digest=request["inputHashes"]["dataset"], size=request["dataset"]["size"], digest_code="dataset_input_pin_mismatch", size_code="dataset_input_pin_mismatch")
             if inference:
                 self.fetch(claim, "model", inputs/("model"+MODEL_SUFFIXES[format_name]), lease, digest=request["inputHashes"]["modelArtifact"], size=request["model"].get("size"), digest_code="model_input_pin_mismatch", size_code="model_input_size_mismatch")
             envelope = {"claim": claim.transport_dict(), "imageDigest": self.image_digest, "execution": execution, "approvedModelSha256": request["inputHashes"].get("modelArtifact") if inference else None}
@@ -702,6 +717,68 @@ class Worker:
                 pass  # The pin mismatch, not the cleanup, is the failure to report.
             raise ProtocolError(failure)
         local_write(lambda: promote(partial, destination))
+
+    def stage_client_dataset(self, request, destination, lease):
+        """Copy the client-held file whose size and SHA-256 equal the pin into the job; nothing is downloaded.
+
+        The pin, not a name, selects the file: request fields never become
+        paths. Each regular top-level file of the pinned size is hashed while
+        it is copied, so the job receives exactly the bytes that were hashed.
+        """
+        digest, size = request["inputHashes"]["dataset"], request["dataset"]["size"]
+        candidates = []
+        try:
+            with os.scandir(self.client_data) as entries:
+                for index, entry in enumerate(entries):
+                    if index >= MAX_CLIENT_DATA_ENTRIES:
+                        break
+                    if not entry.is_symlink() and entry.is_file(follow_symlinks=False) and entry.stat(follow_symlinks=False).st_size == size:
+                        candidates.append(entry.name)
+        except OSError as exc:
+            raise ProtocolError("client_dataset_unavailable") from exc
+        if not candidates:
+            raise ProtocolError("client_dataset_unavailable")
+        partial = destination.with_name(destination.name+".partial")
+        for name in sorted(candidates):
+            lease.valid()
+            if self.copy_pinned(self.client_data/name, partial, digest, size, lease):
+                local_write(lambda: promote(partial, destination))
+                return
+        # Files of the pinned size exist, but none has the pinned SHA-256.
+        raise ProtocolError("dataset_input_pin_mismatch")
+
+    def copy_pinned(self, source, partial, digest, size, lease):
+        """Copy `source` to `partial` while hashing; True when the copy matches the pin, else it is deleted."""
+        hasher, copied = hashlib.sha256(), 0
+        try:
+            with local_write(lambda: partial.open("xb")) as handle:
+                try:
+                    reader = open(os.open(source, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)), "rb")
+                except OSError as exc:
+                    raise ProtocolError("client_dataset_unavailable") from exc
+                with reader:
+                    # Read at most one byte past the pin: a grown file fails without being copied whole.
+                    while copied <= size:
+                        try:
+                            chunk = reader.read(min(CLIENT_COPY_CHUNK, size+1-copied))
+                        except OSError as exc:
+                            raise ProtocolError("client_dataset_unavailable") from exc
+                        if not chunk:
+                            break
+                        copied += len(chunk)
+                        hasher.update(chunk)
+                        local_write(lambda: handle.write(chunk))
+                        lease.valid()
+        except BaseException:
+            try:
+                partial.unlink(missing_ok=True)
+            except OSError:
+                pass  # The copy's own failure is the one to report.
+            raise
+        if copied == size and hasher.hexdigest() == digest:
+            return True
+        local_write(lambda: partial.unlink(missing_ok=True))
+        return False
 
     def once(self):
         if self.at_capacity():
@@ -780,6 +857,19 @@ class Worker:
             print(json.dumps({"state": "operator_log_unavailable"}), file=sys.stderr, flush=True)
 
 
+def client_data_directory(value, workspace):
+    """The operator's client data directory: an existing directory, no symlinks, apart from the workspace."""
+    original = Path(value).absolute()
+    if any(part.is_symlink() for part in (original, *original.parents)):
+        raise ValueError("Client data directory and its existing ancestors cannot be symlinks")
+    path = original.resolve(strict=True)
+    if not path.is_dir():
+        raise ValueError("Client data directory must be a directory")
+    if path == workspace or path in workspace.parents or workspace in path.parents:
+        raise ValueError("Client data directory and workspace must be separate")
+    return path
+
+
 def job_failure_code(error):
     """Map a per-job exception to its sanitized, documented failure code."""
     if isinstance(error, (ProtocolError, EngineError)):
@@ -806,6 +896,8 @@ def verify_result_bytes(result_bytes, claim, image_digest):
     provenance = result.get("provenance", {})
     if provenance.get("requestSha256") != claim.request_sha256 or provenance.get("imageDigest") != image_digest or provenance.get("executionMode") != claim.request["executionMode"]:
         raise ValueError("Result request/worker identity mismatch")
+    if (provenance.get("execution", {}).get("datasetCustody") == "client") != client_held(claim.request):
+        raise ValueError("Result dataset custody differs from request")
     if provenance.get("externalReportSha256") != report["reportSha256"]:
         raise ValueError("Embedded report digest mismatch")
     if provenance.get("inputHashes", {}).get("dataset") != claim.request["inputHashes"]["dataset"] or report["provenance"]["inputHashes"]["data"] != claim.request["inputHashes"]["dataset"]:
@@ -833,6 +925,7 @@ def main(argv=None):
     parser.add_argument("--compute-image", default=os.environ.get("ASSURANCE_COMPUTE_IMAGE"))
     parser.add_argument("--formats", default="", help="Explicit reviewed native formats, e.g. onnx,xgboost_json; default provided predictions only")
     parser.add_argument("--approved-model-hashes", default=os.environ.get("ASSURANCE_APPROVED_MODEL_HASHES", ""), help="Local reviewed SHA-256 allowlist; never take this from claimed jobs")
+    parser.add_argument("--client-data-dir", default=os.environ.get("ASSURANCE_CLIENT_DATA_DIR"), help="The client's own worker: directory of client-held datasets, read locally by SHA-256 pin for client-local jobs")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=5)
     parser.add_argument("--heartbeat-seconds", type=float, default=10)
@@ -853,7 +946,7 @@ def main(argv=None):
             raise ValueError("ASSURANCE_WORKER_TOKEN must be provided through the environment/secret manager")
         transport = Transport(args.site, token, os.environ.get("ASSURANCE_SITE_SERVICE_TOKEN"), timeout=args.transport_timeout)
         executor = DockerExecutor(args.compute_image) if args.executor == "docker" else ProcessExecutor()
-        worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs)
+        worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs, client_data=args.client_data_dir or None)
         while True:
             try:
                 result = worker.once()
