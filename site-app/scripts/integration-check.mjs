@@ -1245,18 +1245,118 @@ try {
     "PASS review independence, exact revision sign-off, immutable draft and client redaction",
   );
 
-  await command("classify", {
-    prohibited: false,
-    highRisk: true,
-    transparency: true,
-    profiling: false,
+  // #19: tri-state facts. Every required fact unknown keeps the
+  // classification at "Needs information" and blocks the approval.
+  const art5Facts = (answer) =>
+    Object.fromEntries(
+      workspace.catalog.regulatorySnapshot.prohibitedPractices.map((p) => [
+        "art5_" +
+          p.point
+            .replace(/^Art\s*5/, "")
+            .replace(/[()]+/g, "_")
+            .replace(/^_+|_+$/g, ""),
+        answer,
+      ]),
+    );
+  const providerFacts = {
+    ...art5Facts("no"),
+    annexIIIProfiling: "no",
+    gpaiModelProvider: "no",
+    gpaiDownstreamProvider: "no",
+    smeStatus: "neither",
+    interactsDirectlyWithNaturalPersons: "yes",
+    scientificResearchOnly: "no",
+    authorisedByLawForCriminalOffences: "no",
+    generatesSyntheticText: "no",
+    generatesSyntheticImage: "no",
+    generatesSyntheticAudio: "no",
+    generatesSyntheticVideo: "no",
+    placedOnMarketDate: "2026-03-01",
+  };
+  const scoring = {
     annexRoute: "Annex III — sensitive use case",
     operatorRole: "Provider",
     intendedPurpose: "Synthetic scoring fixture",
     rationale: "Fixture-only classification record for workflow validation.",
-  });
+  };
+  await command("classify", { ...scoring, facts: {} });
+  assert.equal(e.classification.assessment.label, "Needs information");
+  assert(
+    JSON.stringify(
+      await command("approveClassification", {}, reviewer, 400),
+    ).includes("Integrates a general-purpose AI model"),
+    "Unknown required facts block the approval",
+  );
+  assert(
+    JSON.stringify(
+      await command(
+        "classify",
+        {
+          ...scoring,
+          annexRoute: "Outside high-risk scope",
+          facts: { annexIIIProfiling: "yes" },
+        },
+        owner,
+        400,
+      ),
+    ).includes("applies only on"),
+    "Contradictory route and facts are rejected",
+  );
+  await command("classify", { ...scoring, facts: providerFacts });
+  assert.equal(e.classification.assessment.label, "High risk");
+  assert.equal(e.classification.highRisk, true);
+  assert.equal(e.classification.transparency, true);
+  assert.equal(
+    e.classification.answers.placedOnMarketDate.legalVersion,
+    rulePack.celex,
+  );
   await command("approveClassification", {}, owner, 403);
   await command("approveClassification", {}, reviewer);
+  assert.equal(e.classification.status, "approved");
+  // An engagement whose classification predates #19 still loads: its facts
+  // are unknown and its earlier approval stays readable.
+  {
+    const row = await testDb
+      .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+      .bind(tenantId, e.id)
+      .first();
+    const body = JSON.parse(row.body);
+    const current = body.classification;
+    body.classification = {
+      prohibited: false,
+      highRisk: true,
+      transparency: true,
+      profiling: false,
+      annexRoute: "Annex III point 5(b)",
+      operatorRole: "Provider",
+      intendedPurpose: "Legacy scoring",
+      rationale: "Approved under four flags",
+      status: "approved",
+      approvedBy: reviewer,
+      version: rulePack.celex,
+      asOf: "2026-10-05",
+    };
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(body), tenantId, e.id)
+      .run();
+    await refresh();
+    assert.equal(e.classification.model, 2);
+    assert.equal(e.classification.status, "provisional");
+    assert.deepEqual(e.classification.answers, {});
+    assert.equal(e.classification.legacy.approvedBy, reviewer);
+    assert.equal(e.classification.history[0].action, "approved_v1");
+    body.classification = current;
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(body), tenantId, e.id)
+      .run();
+    await refresh();
+    assert.equal(e.classification.status, "approved");
+  }
+  console.log(
+    "PASS tri-state classification: unknown facts block approval, contradictions rejected, legacy classification loads",
+  );
   // Reopening a closed request retires its limitation memo; closing it again
   // revises the same memo instead of adding a second one.
   const memoCount = e.papers.length;
@@ -2811,15 +2911,13 @@ try {
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );
   await command("classify", {
-    prohibited: true,
-    highRisk: false,
-    transparency: false,
-    profiling: false,
-    annexRoute: "Prohibited practice fixture",
+    annexRoute: "Outside high-risk scope",
     operatorRole: "Provider",
     intendedPurpose: "Synthetic prohibited-use fixture",
     rationale: "Fixture-only prohibited route for positive-opinion rejection.",
+    facts: { ...providerFacts, annexIIIProfiling: "unknown", art5_1_c: "yes" },
   });
+  assert.equal(e.classification.prohibited, true);
   await command("approveClassification", {}, reviewer);
   const prohibitedReadiness = await command(
     "createReport",
