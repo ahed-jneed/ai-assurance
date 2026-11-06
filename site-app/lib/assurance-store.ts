@@ -433,7 +433,7 @@ export async function jobs(ctx: Context, engagementId: string) {
   return (
     await db()
       .prepare(
-        "SELECT id,state,request_sha256,created_at,created_by,worker_id,attempt_id,fence,lease_until,result_sha256,error,completed_at,json_extract(request,'$.system.name') AS system_name,json_extract(request,'$.executionMode') AS mode FROM execution_jobs WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 100",
+        "SELECT id,state,request_sha256,created_at,created_by,worker_id,attempt_id,fence,lease_until,result_sha256,error,completed_at,json_extract(request,'$.system.name') AS system_name,json_extract(request,'$.executionMode') AS mode,json_extract(request,'$.model.format') AS model_format,json_extract(request,'$.engineConfig.config.positiveLabel') AS positive_label,json_extract(request,'$.engineConfig.negativeLabel') AS negative_label,json_extract(request,'$.engineConfig.modelSpec.decisionThreshold') AS decision_threshold,json_extract(request,'$.engineConfig.modelSpec.predictionKind') AS prediction_kind FROM execution_jobs WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 100",
       )
       .bind(ctx.tenantId, engagementId)
       .all()
