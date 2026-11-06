@@ -71,6 +71,13 @@
       "when": 1793971648186,
       "tag": "0009_dossier_signing_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793999204735,
+      "tag": "0010_quality_review_policy",
+      "breakpoints": true
     }
   ]
 }
