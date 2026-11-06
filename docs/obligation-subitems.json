@@ -1,9 +1,9 @@
 {
   "schemaVersion": "1.0",
-  "catalogVersion": "2026.11.05-proposed",
+  "catalogVersion": "2026.11.06-proposed",
   "rulePackVersion": "2026.11.1",
   "status": "proposed_for_methodology_review",
-  "scope": "Selective audit prompts for Articles 9-15, Annex IV and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
+  "scope": "Selective audit prompts for Articles 9-15, Annex IV, Article 50 and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
   "source": {
     "legalSource": "EUR-Lex",
     "version": "02024R1689-20260727",
@@ -63,12 +63,56 @@
     "significantDesignChangeOnOrAfterChapterIIIDate": "boolean_or_unknown",
     "intendedForUseByPublicAuthorities": "boolean_or_unknown",
     "annexXLargeScaleItComponent": "boolean_or_unknown",
-    "gpaiModelPlacedOnMarketDate": "date_or_unknown"
+    "gpaiModelPlacedOnMarketDate": "date_or_unknown",
+    "generatesSyntheticText": "boolean_or_unknown",
+    "generatesSyntheticImage": "boolean_or_unknown",
+    "generatesSyntheticAudio": "boolean_or_unknown",
+    "generatesSyntheticVideo": "boolean_or_unknown",
+    "putIntoServiceDate": "date_or_unknown",
+    "interactsDirectlyWithNaturalPersons": "boolean_or_unknown",
+    "obviousToReasonablyWellInformedPerson": "boolean_or_unknown",
+    "authorisedByLawForCriminalOffences": "boolean_or_unknown",
+    "availableToPublicToReportCriminalOffence": "boolean_or_unknown",
+    "scientificResearchOnly": "boolean_or_unknown",
+    "isAiAgent": "boolean_or_unknown",
+    "interactsWithChildrenOrVulnerableGroups": "boolean_or_unknown",
+    "onlyAssistiveStandardEditing": "boolean_or_unknown",
+    "noSubstantialAlterationOfInput": "boolean_or_unknown",
+    "outputsOnlyOutOfScopeContent": "boolean_or_unknown",
+    "b2bIndustrialConditionsMet": "boolean_or_unknown",
+    "closedPhysicalProductEnvironment": "boolean_or_unknown",
+    "ephemeralRealTimeOnly": "boolean_or_unknown",
+    "builtOnOwnGpaiModel": "boolean_or_unknown",
+    "integratedIntoVlopOrVlose": "boolean_or_unknown",
+    "art75ExceptedSystem": "boolean_or_unknown",
+    "deployerIsProviderOrSameUndertaking": "boolean_or_unknown",
+    "codeSignatorySection1": "boolean_or_unknown",
+    "codeSignatorySection2": "boolean_or_unknown",
+    "deployerUsesEmotionRecognition": "boolean_or_unknown",
+    "deployerUsesBiometricCategorisation": "boolean_or_unknown",
+    "deployerOperatesErOrBcSystem": "boolean_or_unknown",
+    "lawEnforcementPermittedErBc": "boolean_or_unknown",
+    "personalNonProfessionalUseOnly": "boolean_or_unknown",
+    "deployerGeneratesDeepFakes": "boolean_or_unknown",
+    "evidentlyArtisticCreativeSatiricalFictional": "boolean_or_unknown",
+    "deployerPublishesAiTextOnPublicInterest": "boolean_or_unknown",
+    "editorialExceptionReliedOn": "boolean_or_unknown",
+    "art50DisclosureApplies": "boolean_or_unknown"
   },
   "factValues": {
     "highRiskRoute": ["annex_iii", "annex_i_section_a", "annex_i_section_b", "not_high_risk"]
   },
-  "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use the last eight facts. highRiskRoute derives from the reviewed classification route until classification records it; the other seven are not captured yet, so a predicate that needs them yields needs_information. Dates are YYYY-MM-DD.",
+  "factDerivations": {
+    "rule": "A derived fact is true if any listed fact is true, false if all are false, otherwise unknown (docs/research/art50-transparency-2026-11.json, vocabularies.derivationRule). Classification never asks a derived fact directly. For art50DisclosureApplies, the facts of a role the operator does not hold (provider: interactsDirectlyWithNaturalPersons, generatesSyntheticContent; deployer: the other three) count as false.",
+    "generatesSyntheticContent": {"anyOf": ["generatesSyntheticText", "generatesSyntheticImage", "generatesSyntheticAudio", "generatesSyntheticVideo"]},
+    "deployerOperatesErOrBcSystem": {"anyOf": ["deployerUsesEmotionRecognition", "deployerUsesBiometricCategorisation"]},
+    "art50DisclosureApplies": {"anyOf": ["interactsDirectlyWithNaturalPersons", "generatesSyntheticContent", "deployerOperatesErOrBcSystem", "deployerGeneratesDeepFakes", "deployerPublishesAiTextOnPublicInterest"]}
+  },
+  "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use eight facts: generatesSyntheticContent, placedOnMarketDate, highRiskRoute, firstPlacedOnMarketOrPutIntoServiceDate, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent and gpaiModelPlacedOnMarketDate. The guided classification records each of them as true, false or unknown (dates as YYYY-MM-DD or unknown): highRiskRoute from the reviewed route and the Article 6(3) derogation, generatesSyntheticContent from the four modality facts. A predicate that reads an unknown fact yields needs_information.",
+  "exclusionType": {
+    "exclusions": "A triggered item is excluded when the ifAll list of any of its exclusions is true; if none is true and one is unknown, the item needs information. An exclusion takes effect only with fact values the independent classification review approved; exclusions with basis 'guidance' rest on non-binding guidelines and stay pending legal review.",
+    "exceptionsTestedPerItem": "Decision of 6 November 2026 (option a): a statutory exception claimed under Article 50(1), (3) or (4) never excludes the item. It is tested per output, channel or deployment in fieldwork (the model is criterion A50-P-04B-C01: label present or exception supported), so the item stays a candidate."
+  },
   "triggerType": {
     "profile": "key_of_triggerProfiles",
     "conditions": "array_of_fact_equals_predicates",
@@ -82,7 +126,10 @@
     "deployer_high_risk": {"actor": "Deployer", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Deployer"},
     "importer_high_risk": {"actor": "Importer", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Importer"},
     "distributor_high_risk": {"actor": "Distributor", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Distributor"},
-    "operator_role_change": {"anyRole": ["Importer", "Distributor", "Deployer", "Other operator"], "all": [{"fact": "roleChangeCandidate", "equals": true}], "scopeNote": "Review branding, substantial modification and intended-purpose changes against Article 25(1), including relevant contractual qualifications. Do not automatically reassign provider duties."}
+    "operator_role_change": {"anyRole": ["Importer", "Distributor", "Deployer", "Other operator"], "all": [{"fact": "roleChangeCandidate", "equals": true}], "scopeNote": "Review branding, substantial modification and intended-purpose changes against Article 25(1), including relevant contractual qualifications. Do not automatically reassign provider duties."},
+    "provider_art50": {"actor": "Provider", "all": [], "roleRequired": "Provider", "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."},
+    "deployer_art50": {"actor": "Deployer", "all": [], "roleRequired": "Deployer", "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."},
+    "operator_art50": {"anyRole": ["Provider", "Deployer"], "all": [], "scopeNote": "Article 50(5) attaches to the information duties of providers and deployers alike."}
   },
   "evidenceCategories": ["Dataset", "Model", "Training log", "Validation", "Pipeline code", "Governance", "Instructions", "Oversight", "Security", "Other"],
   "items": [
@@ -161,6 +208,13 @@
     {"code":"AIA-26-4","article":"26(4)","title":"Controlled input-data relevance and coverage","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"deployerControlsInputData","equals":true}]},"evidenceCategories":["Dataset","Validation","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
     {"code":"AIA-26-5","article":"26(5)","title":"Operational monitoring and risk/incident response","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[]},"evidenceCategories":["Other","Governance","Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess triggering events, recipient/escalation duties and actor/sector exceptions; no notification is sent automatically by catalog selection."},
     {"code":"AIA-26-6","article":"26(6)","title":"Retention of controlled system logs","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"deployerControlsLogs","equals":true}]},"evidenceCategories":["Other","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Purpose-appropriate period of at least six months unless applicable law provides otherwise; assess data-protection and financial-sector qualifications."},
-    {"code":"AIA-26-11","article":"26(11)","title":"Notice to affected natural persons","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"annexIIIDecisionsAboutPersons","equals":true}]},"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex III use and law-enforcement qualifications; Article 50 obligations remain separately applicable."}
+    {"code":"AIA-26-11","article":"26(11)","title":"Notice to affected natural persons","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"annexIIIDecisionsAboutPersons","equals":true}]},"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex III use and law-enforcement qualifications; Article 50 obligations remain separately applicable."},
+
+    {"code":"AIA-50-1","article":"50(1)","title":"AI-interaction disclosure by design","actor":["Provider"],"trigger":{"profile":"provider_art50","conditions":[{"fact":"interactsDirectlyWithNaturalPersons","equals":true}]},"exclusions":[{"id":"EX-SCOPE-RD","label":"Sole purpose of scientific research and development (Art 2(6))","basis":"statutory","ifAll":[{"fact":"scientificResearchOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-1-OBVIOUS","label":"Interaction obvious to a reasonably well-informed, observant and circumspect person","basis":"statutory","ifAll":[{"fact":"obviousToReasonablyWellInformedPerson","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-06"]}},{"id":"EX-50-1-LE","label":"Authorised by law for criminal offences and not available to the public to report crime","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true},{"fact":"availableToPublicToReportCriminalOffence","equals":false}]}],"procedureIds":["A50-P-00","A50-P-01"],"evidenceCategories":["Instructions","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
+    {"code":"AIA-50-2","article":"50(2)","title":"Machine-readable marking and detectability of synthetic outputs","actor":["Provider"],"trigger":{"profile":"provider_art50","conditions":[{"fact":"generatesSyntheticContent","equals":true}]},"exclusions":[{"id":"EX-50-2-LE","label":"Authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]},{"id":"EX-50-2-EDIT","label":"Only assistive functions for standard editing (system-wide)","basis":"statutory","ifAll":[{"fact":"onlyAssistiveStandardEditing","equals":true}]},{"id":"EX-50-2-NOSUB","label":"No substantial alteration of the deployer's input or its semantics (system-wide)","basis":"statutory","ifAll":[{"fact":"noSubstantialAlterationOfInput","equals":true}]},{"id":"EX-50-2-OUTOFSCOPE","label":"Only outputs the guidelines place outside Art 50(2)","basis":"guidance","ifAll":[{"fact":"outputsOnlyOutOfScopeContent","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-50-2-B2B","label":"Industrial or business-to-business application meeting guidelines point 87","basis":"guidance","ifAll":[{"fact":"b2bIndustrialConditionsMet","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-50-2-EPHEMERAL","label":"Real-time ephemeral content where marking is infeasible and persons are told","basis":"guidance","ifAll":[{"fact":"ephemeralRealTimeOnly","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-SCOPE-RD","label":"Sole purpose of scientific research and development (Art 2(6))","basis":"statutory","ifAll":[{"fact":"scientificResearchOnly","equals":true}]}],"exceptionsTestedPerItem":[],"procedureIds":["A50-P-00","A50-P-02A","A50-P-02B","A50-P-02C","A50-P-02D","A50-P-02E","A50-P-02F"],"evidenceCategories":["Pipeline code","Validation","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Article 111(4): systems placed on the market before 2 August 2026 mark their outputs from 2 December 2026 (rule-pack entry aia-2026-12-02-art50-2-legacy-transition); systems only put into service before that date are pending legal review (LR-A50-01)."},
+    {"code":"AIA-50-3","article":"50(3)","title":"Notice of emotion recognition or biometric categorisation","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerOperatesErOrBcSystem","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-3-LE","label":"Permitted by law to detect, prevent or investigate criminal offences, with safeguards","basis":"statutory","ifAll":[{"fact":"lawEnforcementPermittedErBc","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-11"]}}],"procedureIds":["A50-P-00","A50-P-03"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Screen Article 5(1)(f) and (g) first: a notice under Article 50(3) does not make a prohibited use lawful."},
+    {"code":"AIA-50-4-DF","article":"50(4), first subparagraph","title":"Deep-fake disclosure","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerGeneratesDeepFakes","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-4-LE","label":"Use authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]}],"procedureIds":["A50-P-00","A50-P-04A"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"An evidently artistic, creative, satirical or fictional work changes the form of the disclosure, not whether it applies (LR-A50-08)."},
+    {"code":"AIA-50-4-TXT","article":"50(4), second subparagraph","title":"Disclosure of AI-generated text on matters of public interest","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerPublishesAiTextOnPublicInterest","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-4T-LE","label":"Use authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]},{"id":"EX-50-4T-EDITORIAL","label":"Human review or editorial control with editorial responsibility for the publication","basis":"statutory","ifAll":[{"fact":"editorialExceptionReliedOn","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-09"]}}],"procedureIds":["A50-P-00","A50-P-04B"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
+    {"code":"AIA-50-5","article":"50(5)","title":"Clear, distinguishable, timely and accessible information","actor":["Provider","Deployer"],"trigger":{"profile":"operator_art50","conditions":[{"fact":"art50DisclosureApplies","equals":true}]},"exclusions":[],"exceptionsTestedPerItem":[],"procedureIds":["A50-P-05"],"evidenceCategories":["Instructions","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"}
   ]
 }
