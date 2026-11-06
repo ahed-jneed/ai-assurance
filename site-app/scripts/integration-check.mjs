@@ -2839,13 +2839,30 @@ try {
     "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
     { user: viewer },
   );
-  assert.equal(afterWithdrawal.engagement.reports.length, 0);
-  for (const reportId of [internalFinal.id, replacement.id])
-    await request(
-      "/api/report-package?" +
-        new URLSearchParams({ tenantId, engagementId: e.id, reportId }),
-      { user: viewer, status: 404 },
-    );
+  // The withdrawn report leaves the client's view; the report it superseded
+  // was issued to the client and stays readable, labelled as superseded.
+  assert.deepEqual(
+    afterWithdrawal.engagement.reports.map((r) => [r.id, r.supersededBy]),
+    [[internalFinal.id, replacement.id]],
+  );
+  await request(
+    "/api/report-package?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: internalFinal.id,
+      }),
+    { user: viewer },
+  );
+  await request(
+    "/api/report-package?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: replacement.id,
+      }),
+    { user: viewer, status: 404 },
+  );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );
