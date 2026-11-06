@@ -69,6 +69,27 @@ describe("positionLabel", () => {
     ).toBe("Not decided");
   });
 
+  it("reads a headline as its deciding member on the band edge", () => {
+    const headline = {
+      role: "headline" as const,
+      band,
+      status: "evaluated",
+      direction: "none",
+      reasons: [],
+    };
+    expect(
+      positionLabel(headline, { reasons: ["estimate_on_band_boundary"] }),
+    ).toBe("Estimate on the band edge");
+    expect(positionLabel(headline, { reasons: [] })).toBe("Not decided");
+    // A member never borrows another entry's band edge.
+    expect(
+      positionLabel(
+        { ...member, direction: "none" },
+        { reasons: ["estimate_on_band_boundary"] },
+      ),
+    ).toBe("Not decided");
+  });
+
   it("names a status other than evaluated", () => {
     expect(positionLabel({ ...member, status: "suppressed" })).toBe(
       "Suppressed",

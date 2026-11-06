@@ -101,7 +101,7 @@ function metricLabel(m: Metric) {
   return humanLabel(m.name);
 }
 
-function MetricRow({ m }: { m: Metric }) {
+function MetricRow({ m, deciding }: { m: Metric; deciding?: Metric | null }) {
   const d = details(m);
   const ci = m.confidenceInterval;
   return (
@@ -131,7 +131,7 @@ function MetricRow({ m }: { m: Metric }) {
       <TableCell>{(m.denominator ?? m.sampleSize).toLocaleString()}</TableCell>
       <TableCell>{d.band ? bandShown(m, d.band) : "–"}</TableCell>
       <TableCell>
-        {positionLabel(d)}
+        {positionLabel(d, deciding ? details(deciding) : null)}
         {d.role !== "descriptive" && m.pValue !== null && (
           <span className="subtle"> · p {p(m.pValue)}</span>
         )}
@@ -160,6 +160,18 @@ export function StatisticsResult({ result }: { result: Result }) {
             pairwise.indexOf(m) < PAIRS_SHOWN,
         )
       : members;
+  // The headline reads as its deciding member only when both carry the
+  // same estimate; it never borrows a band edge from another value.
+  const decidingMember = members.find(
+    (m) => m.name === decision.decidingMemberId,
+  );
+  const headlineDeciding =
+    headline &&
+    decidingMember &&
+    headline.value !== null &&
+    headline.value === decidingMember.value
+      ? decidingMember
+      : null;
   const descriptive = result.metrics.filter(
     (m) => details(m).role === "descriptive",
   );
@@ -252,7 +264,11 @@ export function StatisticsResult({ result }: { result: Result }) {
             ...shownMembers,
             ...descriptive,
           ].map((m) => (
-            <MetricRow key={m.name} m={m} />
+            <MetricRow
+              key={m.name}
+              m={m}
+              deciding={m === headline ? headlineDeciding : null}
+            />
           ))}
         </TableBody>
       </Table>
