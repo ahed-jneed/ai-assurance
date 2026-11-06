@@ -93,6 +93,20 @@ function zipEntries(archive) {
   return entries;
 }
 
+// The files Git tracks under the given folders, or undefined outside a Git
+// checkout (for example an extracted source archive).
+function trackedFiles(folders) {
+  const result = spawnSync("git", ["ls-files", "-z", "--", ...folders], {
+    cwd: repo,
+    encoding: "utf8",
+  });
+  if (result.error || result.status !== 0) {
+    console.log("Not a Git checkout; skipping the untracked-file check.");
+    return undefined;
+  }
+  return new Set(result.stdout.split("\0").filter(Boolean));
+}
+
 function changedEntries(before, after) {
   const names = [...new Set([...before.keys(), ...after.keys()])].sort();
   return names.flatMap((name) => {
@@ -138,6 +152,18 @@ try {
   const freshBytes = readFileSync(fresh);
   const freshEntries = zipEntries(freshBytes);
   const crlf = [...freshEntries].filter(([, entry]) => entry.crlf);
+  // The package must not ship engine tests, their fixtures or generators.
+  const tests = [...freshEntries.keys()].filter((name) =>
+    name.startsWith("engine/tests/"),
+  );
+  // package_runtime walks the working tree, so name any packaged file that Git
+  // does not track (a scratch note, a pytest cache) instead of shipping it.
+  const untracked = trackedFiles(["engine", "schemas"]);
+  const stray = untracked
+    ? [...freshEntries.keys()].filter(
+        (name) => name !== "RUNTIME-MANIFEST.json" && !untracked.has(name),
+      )
+    : [];
   const committed = existsSync(absolute(RUNTIME_ZIP))
     ? readFileSync(absolute(RUNTIME_ZIP))
     : undefined;
@@ -147,7 +173,15 @@ try {
     : committed
       ? changedEntries(zipEntries(committed), freshEntries)
       : ["missing"];
-  if (crlf.length)
+  if (tests.length)
+    drift.push(
+      `${RUNTIME_ZIP}: engine.package_runtime packaged test files (${tests.join(", ")}); engine/tests/** must stay out of the runtime package.`,
+    );
+  else if (stray.length)
+    drift.push(
+      `${RUNTIME_ZIP}: files that Git does not track would be packaged (${stray.join(", ")}); commit or remove them, then run \`npm run sync\`.`,
+    );
+  else if (crlf.length)
     drift.push(
       `${RUNTIME_ZIP}: the checkout has CRLF line endings in ${crlf.map(([name]) => name).join(", ")}; ` +
         "build the archive from an LF checkout (see .gitattributes).",

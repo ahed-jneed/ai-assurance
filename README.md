@@ -75,7 +75,7 @@ The `engine` job runs, from the repository root (the validators load Ajv from `s
 python -m pip install -r engine/requirements-dev.txt
 python -m unittest discover -s engine/tests -v
 node schemas/validate-run-schema.mjs
-node schemas/validate-procedure-schema.mjs schemas/fixtures/procedure-execution.json
+node schemas/validate-procedure-schema.mjs
 node schemas/validate-working-paper-schema.mjs
 python schemas/generate-external-fixtures.py --output tmp/external-runs.v1.2.json
 node schemas/validate-run-schema.mjs --external-fixtures tmp/external-runs.v1.2.json
@@ -90,8 +90,8 @@ The root `docs/`, `engine/`, `schemas/` and `templates/` folders are canonical. 
 | `site-app/lib/catalog.json`, `site-app/lib/annex-iv-map.json` | `templates/` (byte copies) |
 | `site-app/lib/obligation-subitems.json` | `docs/obligation-subitems.json` |
 | `site-app/public/tools/assurance-verifier.py` | `engine/assurance.py` |
-| `site-app/public/tools/assurance-runtime.zip` | `engine/` and `schemas/`, via `python -m engine.package_runtime` (see `engine/RUNTIME_PACKAGE.md`) |
-| `schemas/test-run.schema.json` | `schemas/.build-run-schema.py` and `.extend-assurance-schema.py` |
+| `site-app/public/tools/assurance-runtime.zip` | `engine/` (without `engine/tests/`) and `schemas/`, via `python -m engine.package_runtime` (see `engine/RUNTIME_PACKAGE.md`) |
+| `schemas/test-run.schema.json` | `schemas/test-run.base.json` (hand-maintained legacy run body and shared definitions), `schemas/.build-run-schema.py` and `.extend-assurance-schema.py` |
 
 The working-paper contract is `schemas/working-paper.schema.json`; `templates/working-paper.blank.json` is its draft specimen.
 
