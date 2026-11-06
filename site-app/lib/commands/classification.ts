@@ -1,38 +1,82 @@
 import { z } from "zod";
+import catalog from "../catalog.json";
+import { classificationRules } from "../classification-rules";
+import {
+  approveClassification,
+  ClassificationError,
+  recordClassification,
+  type Classification,
+} from "../domain/classification";
 import { db } from "../engagement-repo";
 import { ApiError } from "../http";
+import { now } from "../ids";
+import { asRulePack } from "../rule-pack";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
-/** The AI Act classification of the system and its independent approval. */
+
+/** The classification rules of the rule pack this build serves. */
+export const currentClassificationRules = classificationRules(
+  asRulePack(catalog.regulatorySnapshot)!,
+);
+const key = z.string().min(1).max(80);
+const input = z.object({
+  operatorRole: short,
+  annexRoute: short,
+  intendedPurpose: text,
+  rationale: text,
+  facts: z.record(key, z.string().max(40)),
+  evidence: z.record(key, z.string().max(500)).optional(),
+  checkedOn: z.record(key, z.string().max(20)).optional(),
+  derogation: z
+    .object({
+      rationale: z.string().max(5000).optional(),
+      registrationEvidence: z.string().max(500).optional(),
+    })
+    .optional(),
+});
+function rejected(error: unknown): never {
+  if (error instanceof ClassificationError)
+    throw new ApiError(400, error.message);
+  throw error;
+}
+/** What the audit trail keeps of a classification: every answer and the label. */
+function trail(c: Classification) {
+  return {
+    label: c.assessment?.label,
+    route: c.annexRoute,
+    operatorRole: c.operatorRole,
+    rulePackVersion: c.rulePackVersion,
+    legalVersion: c.version,
+    answers: Object.fromEntries(
+      Object.entries(c.answers ?? {}).map(([id, a]) => [id, a.value]),
+    ),
+  };
+}
+
+/**
+ * The AI Act classification of the system (#19: tri-state facts, the Art 5
+ * screen, GPAI roles, Art 50 triggers) and its independent approval.
+ */
 export const classification = defineCommands({
   classify: {
     roles: ["Auditor", "Lead Auditor"],
-    handle(e, d) {
-      const a = z
-        .object({
-          prohibited: z.boolean(),
-          highRisk: z.boolean(),
-          transparency: z.boolean(),
-          profiling: z.boolean(),
-          annexRoute: short,
-          operatorRole: z.enum([
-            "Provider",
-            "Deployer",
-            "Provider and deployer",
-            "Importer / distributor",
-          ]),
-          intendedPurpose: text,
-          rationale: text,
-        })
-        .parse(d);
-      e.classification = {
-        ...e.classification,
-        ...a,
-        highRisk: a.highRisk || a.profiling,
-        status: "provisional",
-        approvedBy: undefined,
+    handle(e, d, ctx) {
+      const a = input.parse(d);
+      try {
+        e.classification = recordClassification(e.classification, a, {
+          rules: currentClassificationRules,
+          user: ctx.user.userId,
+          at: now(),
+        });
+      } catch (error) {
+        rejected(error);
+      }
+      return {
+        details: {
+          classification: "provisional",
+          ...trail(e.classification),
+        },
       };
-      return { details: { classification: "provisional" } };
     },
   },
   approveClassification: {
@@ -51,11 +95,18 @@ export const classification = defineCommands({
           403,
           "An independent reviewer must approve a completed classification",
         );
-      if (!e.classification.rationale || !e.classification.intendedPurpose)
-        throw new ApiError(400, "Record classification facts and rationale");
-      e.classification.status = "approved";
-      e.classification.approvedBy = ctx.user.userId;
-      return { details: { classification: "approved" } };
+      try {
+        e.classification = approveClassification(e.classification, {
+          rules: currentClassificationRules,
+          user: ctx.user.userId,
+          at: now(),
+        });
+      } catch (error) {
+        rejected(error);
+      }
+      return {
+        details: { classification: "approved", ...trail(e.classification) },
+      };
     },
   },
 });

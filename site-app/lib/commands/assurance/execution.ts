@@ -4,6 +4,12 @@ import { bucket, db } from "../../bindings";
 import type { Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
 import { assertExternalProtocol } from "../../evaluation-service";
+import {
+  assertClaimFits,
+  assertDeclaredLabel,
+  assertModelSpecLimits,
+  frozenLabelPair,
+} from "../../external-worker-contract";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
@@ -50,9 +56,9 @@ export const execution: AssuranceModule = defineCommands({
             datasetCardRecordId: short.optional(),
             predictionId: short.optional(),
             securityReviewId: short.optional(),
-            // A 1.1 protocol declares its label pair; a request may restate
-            // the other label but not change it.
-            negativeLabel: z.string().max(300).optional(),
+            // Empty: the system revision's other output class (D-12). A 1.1
+            // protocol's declared label must also be that class.
+            negativeLabel: short.optional(),
             predictionOutput: z.string().max(300).default(""),
             predictionKind: z.enum(["label", "probability"]).default("label"),
           })
@@ -82,16 +88,15 @@ export const execution: AssuranceModule = defineCommands({
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
       assertExternalProtocol(profile);
-      const plan = profile.statistics;
-      if (
-        plan &&
-        v.negativeLabel !== undefined &&
-        v.negativeLabel !== (profile.config.negativeLabel ?? "")
-      )
-        throw new ApiError(
-          400,
-          `The protocol declares the other class label '${profile.config.negativeLabel}'; use a protocol version that declares '${v.negativeLabel}'`,
-        );
+      const plan = profile.statistics,
+        outputLabels: string[] = system.body.outputs.classOrder,
+        labels = frozenLabelPair({
+          task: m.task,
+          classOrder: outputLabels,
+          positiveLabel: profile.config.positiveLabel,
+          requested: v.negativeLabel || undefined,
+        });
+      assertDeclaredLabel(plan, profile.config.negativeLabel, labels);
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;
@@ -152,6 +157,11 @@ export const execution: AssuranceModule = defineCommands({
           );
         if (["ONNX", "PMML"].includes(m.format) && !v.predictionOutput)
           throw new ApiError(400, "Specify the adapter prediction output name");
+        assertModelSpecLimits({
+          task: m.task,
+          featureCount: system.body.features.length,
+          outputLabels,
+        });
       }
       const pending = await jobs(ctx, e.id);
       if (
@@ -215,11 +225,7 @@ export const execution: AssuranceModule = defineCommands({
             suite: profile.suite,
             config: profile.config,
             ...(plan ? { statistics: plan } : {}),
-            ...(!plan
-              ? { negativeLabel: v.negativeLabel ?? "0" }
-              : m.task === "Binary classification"
-                ? { negativeLabel: profile.config.negativeLabel }
-                : {}),
+            ...(labels ? { negativeLabel: labels.negativeLabel } : {}),
             policyId: profile.id,
             policyVersion: profile.version,
             seed: 42,
@@ -235,7 +241,7 @@ export const execution: AssuranceModule = defineCommands({
                     featureColumns: system.body.features.map(
                       (f: { name: string }) => f.name,
                     ),
-                    outputLabels: system.body.outputs.classOrder,
+                    outputLabels,
                     decisionThreshold: system.body.outputs.threshold ?? 0.5,
                     ...(v.predictionOutput
                       ? { predictionOutput: v.predictionOutput }
@@ -253,14 +259,15 @@ export const execution: AssuranceModule = defineCommands({
           ],
         };
       const text = JSON.stringify(requestBody),
-        hash = await sha256(text),
-        log = await recordStatement(ctx, e.id, "execution_request", {
-          jobId,
-          requestSha256: hash,
-          systemId: system.id,
-          procedureId: p.id,
-          mode: v.mode,
-        });
+        hash = await sha256(text);
+      assertClaimFits(jobId, hash, text);
+      const log = await recordStatement(ctx, e.id, "execution_request", {
+        jobId,
+        requestSha256: hash,
+        systemId: system.id,
+        procedureId: p.id,
+        mode: v.mode,
+      });
       await save(
         ctx,
         e,
@@ -372,6 +379,13 @@ export const execution: AssuranceModule = defineCommands({
         results.length > 0 && results.every((r) => r.decision !== undefined);
       const plan: Plan | undefined =
         packet.externalReport?.configuration?.statistics ?? undefined;
+      // A frozen plan (engineConfig 1.4) names results by criterion id, which
+      // only run contract 1.5 admits, so every result must carry a decision.
+      if (frozen.engineConfig.statistics && !decided)
+        throw new ApiError(
+          409,
+          "The protocol froze a statistics plan; every result must carry its decision",
+        );
       if (decided) {
         if (!plan)
           throw new ApiError(409, "Decided results need the recorded plan");
