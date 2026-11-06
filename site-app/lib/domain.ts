@@ -32,6 +32,7 @@ export {
   paperCurrent,
   paperRequired,
   releaseRequirements,
+  releaseTimeMessage,
   releaseTimeTemplates,
   reportBlockers,
   stageGates,

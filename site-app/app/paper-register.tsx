@@ -17,6 +17,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import type { Engagement, Paper, Role } from "@/lib/domain";
+import { isReleaseTimeRecord } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import {
   paperViews,
@@ -184,11 +185,14 @@ export function WorkingPaperRegister({
                       ? " · Superseded"
                       : row.paper.retired
                         ? " · Retired"
-                        : !row.paper.required
-                          ? row.paper.body.conclusionStatus === "not_applicable"
-                            ? " · Applicability exclusion"
-                            : " · Supplementary"
-                          : ""}
+                        : isReleaseTimeRecord(row.paper.templateId)
+                          ? " · Recorded at release"
+                          : !row.paper.required
+                            ? row.paper.body.conclusionStatus ===
+                              "not_applicable"
+                              ? " · Applicability exclusion"
+                              : " · Supplementary"
+                            : ""}
                   </small>
                 </TableCell>
                 <TableCell data-label="Prepared by">

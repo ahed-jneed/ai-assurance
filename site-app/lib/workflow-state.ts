@@ -1,6 +1,7 @@
 // Only type imports: scripts/paper-presentation-check.mjs and
 // scripts/work-inbox-check.mjs load this module without resolving imports.
 import type { Engagement, Report, Role, Run } from "./domain";
+import { isReleaseTimeRecord } from "./domain/release-time";
 import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
 import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
@@ -458,6 +459,7 @@ export function procedureLabel(e: Engagement, p: Procedure) {
       ? "Outside agreed scope"
       : "Outside proposed scope";
   if (p.applicability === "not_applicable") return "Not applicable";
+  if (isReleaseTimeRecord(p.templateId)) return "Recorded at release";
   if (p.execution && !currentExecution(e, p))
     return "Scope or plan reassessment needed";
   const paper = e.papers.find((q) => q.id === p.paperId);

@@ -33,18 +33,12 @@ export type AuditGate = {
   title: string;
   message: string;
 };
-/**
- * The completion and issue records (WP-RP-02 and MEM-SO-01). Their evidence
- * is the final package itself, so requiring them before capture would be
- * circular: the release records them, bound to the captured package hashes
- * (Release.completion), and no gate asks for their papers or procedures.
- */
-export const releaseTimeTemplates: readonly string[] = [
-  "WP-RP-02",
-  "MEM-SO-01",
-];
-export const isReleaseTimeRecord = (templateId: string) =>
-  releaseTimeTemplates.includes(templateId);
+import { isReleaseTimeRecord } from "./release-time";
+export {
+  isReleaseTimeRecord,
+  releaseTimeMessage,
+  releaseTimeTemplates,
+} from "./release-time";
 /**
  * The index in `stages` of the lifecycle stage a paper's or procedure's
  * work belongs to, matched without case (the catalog says "Evidence

@@ -15,12 +15,27 @@ import {
   executionPlanCurrent,
   runBindsProcedure,
 } from "../workflow-state";
+import {
+  isReleaseTimeRecord,
+  releaseTimeMessage,
+} from "../domain/release-time";
+import type { Procedure } from "../workflow-types";
 import { fail, optional, short, text, type WorkflowHandler } from "./command";
+/**
+ * A procedure whose work is performed here. The release-time records are
+ * recorded by the release against the approved package hashes, so work on
+ * them after capture would change the captured package; they refuse it.
+ */
+function executable(p: Procedure) {
+  if (isReleaseTimeRecord(p.templateId))
+    fail(409, releaseTimeMessage(p.templateId));
+  return p;
+}
 export const procedureCommands: Record<string, WorkflowHandler> = {
   async ensureProcedurePaper({ e, c, writer, procedure }, data) {
     writer();
     const a = z.object({ procedureId: short }).strict().parse(data),
-      p = procedure(a.procedureId);
+      p = executable(procedure(a.procedureId));
     let q = e.papers.find((q) => q.id === p.paperId);
     if (!q) {
       q = c.makePaper(p.templateId);
@@ -60,7 +75,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         })
         .strict()
         .parse(data),
-      p = procedure(a.procedureId);
+      p = executable(procedure(a.procedureId));
     if (!p.selected || !["applicable", "readiness"].includes(p.applicability))
       fail(409, "This procedure is outside the approved execution program");
     if (p.ownerId !== c.userId && c.role !== "Lead Auditor")
@@ -136,7 +151,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         })
         .strict()
         .parse(data),
-      p = procedure(a.procedureId);
+      p = executable(procedure(a.procedureId));
     if (!p.execution || !currentExecution(e, p) || p.state === "submitted")
       fail(409, "Record current execution before evaluation");
     accepted(p.execution.evidenceIds);
@@ -157,7 +172,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         .object({ procedureId: short, reason: text })
         .strict()
         .parse(data),
-      p = procedure(a.procedureId);
+      p = executable(procedure(a.procedureId));
     independent(p.contributors);
     if (!p.execution || !executionPlanCurrent(p))
       fail(409, "A changed procedure plan requires a new execution");
@@ -178,7 +193,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
     writer();
     ready();
     const a = z.object({ procedureId: short }).strict().parse(data),
-      p = procedure(a.procedureId),
+      p = executable(procedure(a.procedureId)),
       v = p.execution;
     if (p.state !== "evaluated" || !v?.assessment || !currentExecution(e, p))
       fail(409, "Evaluate current execution before review");
@@ -277,7 +292,7 @@ export const procedureCommands: Record<string, WorkflowHandler> = {
         .object({ procedureId: short, reason: text })
         .strict()
         .parse(data),
-      p = procedure(a.procedureId);
+      p = executable(procedure(a.procedureId));
     independent(p.contributors);
     if (p.reviewerId !== c.userId)
       fail(

@@ -1395,3 +1395,71 @@ describe("plan changes after execution", () => {
     });
   });
 });
+
+describe("release-time procedures", () => {
+  // WP-RP-02 and MEM-SO-01 are recorded by the release against the approved
+  // package hashes; work on them after capture would change the package.
+  it("refuse execution, evaluation, submission, review and evidence papers", async () => {
+    const e = await ready();
+    // MEM-SO-01 is a memo, not a program procedure.
+    expect(workflowOf(e).procedures.map((p) => p.templateId)).not.toContain(
+      "MEM-SO-01",
+    );
+    for (const templateId of ["WP-RP-02"]) {
+      const p = procedureOf(e, "PROC-" + templateId);
+      p.selected = true;
+      p.applicability = "applicable";
+      const paperId = p.paperId;
+      const expectRefused = async (result: Promise<unknown>) => {
+        const error = await result.then(
+          () => new Error("Expected the command to fail"),
+          (error: unknown) => error,
+        );
+        expect(error).toMatchObject({ status: 409 });
+        expect(String((error as Error).message)).toContain(
+          templateId + " is recorded at release",
+        );
+      };
+      await expectRefused(
+        command(
+          e,
+          "recordProcedureExecution",
+          executionInput(e, {
+            procedureId: p.id,
+            steps: p.instructions.map((i) => ({
+              id: i.id,
+              state: "performed",
+              notes: "",
+            })),
+          }),
+          "lead",
+        ),
+      );
+      await expectRefused(
+        command(
+          e,
+          "evaluateProcedure",
+          { ...assessmentInput, procedureId: p.id },
+          "lead",
+        ),
+      );
+      await expectRefused(
+        command(e, "submitProcedure", { procedureId: p.id }, "lead"),
+      );
+      await expectRefused(
+        command(
+          e,
+          "reviewProcedure",
+          { procedureId: p.id, reason: "Reviewed" },
+          "reviewer",
+        ),
+      );
+      await expectRefused(
+        command(e, "ensureProcedurePaper", { procedureId: p.id }, "lead"),
+      );
+      expect(p.execution).toBeUndefined();
+      expect(p.paperId).toBe(paperId);
+      expect(procedureLabel(e, p)).toBe("Recorded at release");
+    }
+  });
+});

@@ -14,7 +14,7 @@ const asURL = (js) =>
   "data:text/javascript;base64," + Buffer.from(js, "utf8").toString("base64");
 // Use the actual domain and workflow predicates so register eligibility stays aligned
 // with the independent-review and current-execution rules used elsewhere.
-const workflowURL = asURL(await compiled("lib/workflow-state.ts"));
+const workflowURL = await sourceURL("lib/workflow-state.ts");
 const domainURL = await sourceURL("lib/domain.ts");
 const paperWorkflowURL = asURL(
   (await compiled("lib/paper-workflow.ts")).replace(

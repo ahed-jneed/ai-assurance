@@ -1,5 +1,5 @@
 import type { Engagement, Paper, Role } from "./domain";
-import { canWrite, paperCurrent } from "./domain";
+import { canWrite, isReleaseTimeRecord, paperCurrent } from "./domain";
 import {
   paperChecklist,
   paperNextAction,
@@ -160,8 +160,10 @@ export function paperRegisterRow(
     (p) => p.paperId === paper.id,
   );
   const bound = source?.paperRevision !== undefined;
-  // A superseded paper or retired memo is history: nothing is due on it.
-  const history = !paperCurrent(paper);
+  // A superseded paper or retired memo is history, and a release-time record
+  // is recorded by the release: nothing is due on either.
+  const releaseTime = isReleaseTimeRecord(paper.templateId),
+    history = !paperCurrent(paper) || releaseTime;
   const action = paperNextAction({
     paper,
     artifacts: engagement.artifacts,
@@ -205,7 +207,12 @@ export function paperRegisterRow(
   let label = action.label,
     reason = action.reason,
     target = action.target;
-  if (history) {
+  if (history && releaseTime && paperCurrent(paper)) {
+    label = "View record";
+    reason =
+      "Recorded at release against the approved package hashes; not prepared or signed here";
+    target = undefined;
+  } else if (history) {
     label = "View paper history";
     reason = paper.supersededBy
       ? "Superseded by " + paper.supersededBy

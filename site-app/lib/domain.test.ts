@@ -24,6 +24,7 @@ describe("domain entry point", () => {
       "paperCurrent",
       "paperRequired",
       "releaseRequirements",
+      "releaseTimeMessage",
       "releaseTimeTemplates",
       "reportBlockers",
       "risk",

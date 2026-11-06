@@ -1268,8 +1268,15 @@ try {
   console.log(
     "PASS reopened limitation memo is retired and revised, not duplicated, on re-close",
   );
+  // The release-time records (WP-RP-02, MEM-SO-01) are recorded by the
+  // release and refuse preparation and signing.
+  const releaseTime = ["WP-RP-02", "MEM-SO-01"];
   for (const id of e.papers.filter((p) => p.required).map((p) => p.id)) {
     const current = e.papers.find((p) => p.id === id);
+    if (releaseTime.includes(current.templateId)) {
+      await command("submitPaper", { paperId: id }, owner, 409);
+      continue;
+    }
     if (current.status === "signed") continue;
     await command("editPaper", {
       paperId: id,
@@ -2227,6 +2234,12 @@ try {
     clientReports.engagement.reports.map((r) => r.id),
     [replacement.id],
   );
+  // The client sees which earlier report the released one replaced.
+  assert.deepEqual(clientReports.engagement.reports[0].replaces, [
+    internalFinal.id,
+  ]);
+  // The release-time records are recorded by the release, never prepared.
+  await command("createPaper", { templateId: "WP-RP-02" }, undefined, 409);
   console.log(
     "PASS sign → recompile → issue captures only current papers; a newer release supersedes the older one with a client notification",
   );

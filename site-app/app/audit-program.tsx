@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Engagement, Paper, Report, Role, Finding } from "@/lib/domain";
+import { isReleaseTimeRecord } from "@/lib/domain";
 import type {
   BriefFields,
   Procedure,
@@ -1864,8 +1865,16 @@ export function AuditProgram({
                         No execution has been recorded.
                       </p>
                     )}
+                    {isReleaseTimeRecord(p.templateId) && (
+                      <p className="subtle">
+                        Recorded at release. Approving and releasing the final
+                        package records {p.templateId} against both package
+                        hashes, so it is not executed or signed here and counts
+                        towards no gate.
+                      </p>
+                    )}
                     <div className="row-actions">
-                      {writer && (
+                      {writer && !isReleaseTimeRecord(p.templateId) && (
                         <Button
                           disabled={
                             busy ||
@@ -1887,7 +1896,7 @@ export function AuditProgram({
                             : "Record work performed"}
                         </Button>
                       )}
-                      {writer && (
+                      {writer && !isReleaseTimeRecord(p.templateId) && (
                         <Button
                           variant="outline"
                           disabled={busy}

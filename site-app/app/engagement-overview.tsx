@@ -15,7 +15,13 @@ import type { WorkItem } from "@/lib/work-items";
 import { NextSteps } from "./next-steps";
 import { AuditGateList, type GateAction } from "./audit-gates";
 import { Button } from "@/components/ui/button";
-import { stages, stageGates, paperCurrent, paperRequired } from "@/lib/domain";
+import {
+  stages,
+  stageGates,
+  isReleaseTimeRecord,
+  paperCurrent,
+  paperRequired,
+} from "@/lib/domain";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
 
@@ -50,7 +56,9 @@ export function EngagementOverview({
   const required = e.papers.filter(
       (p) =>
         paperRequired(e, p) ||
-        (paperCurrent(p) && p.body.conclusionStatus === "not_applicable"),
+        (paperCurrent(p) &&
+          !isReleaseTimeRecord(p.templateId) &&
+          p.body.conclusionStatus === "not_applicable"),
     ),
     signed = required.filter((p) => p.status === "signed").length;
   const paperView =
@@ -67,10 +75,16 @@ export function EngagementOverview({
     in_review: "Open papers awaiting independent review",
     draft: "Open papers needing preparation",
   }[paperView];
-  const selectedProcedures =
-    e.workflow?.procedures.filter(
-      (p) => p.selected && p.applicability !== "not_applicable",
-    ) ?? [];
+  // The release-time records are recorded by the release, not reviewed as
+  // procedures, so they count towards no progress.
+  const inProgram =
+      e.workflow?.procedures.filter(
+        (p) => p.selected && p.applicability !== "not_applicable",
+      ) ?? [],
+    selectedProcedures = inProgram.filter(
+      (p) => !isReleaseTimeRecord(p.templateId),
+    ),
+    atRelease = inProgram.length - selectedProcedures.length;
   const reviewedProcedures = selectedProcedures.filter(
     (p) => p.state === "reviewed" && currentExecution(e, p),
   ).length;
@@ -193,6 +207,7 @@ export function EngagementOverview({
             <p>
               Scope {e.workflow.brief?.status ?? "not recorded"} · Program{" "}
               {e.workflow.program.status}
+              {atRelease > 0 && " · " + atRelease + " recorded at release"}
             </p>
           </button>
         )}
