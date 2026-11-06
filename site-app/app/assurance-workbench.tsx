@@ -487,7 +487,7 @@ export function AssuranceWorkbench({
         name: "threshold",
         label: "Decision threshold on the favourable class",
         type: "number",
-        help: "Optional, from 0 to 1. Model inference decides for the evaluation protocol's favourable (positive) label when that label's probability is at least this value, so give the threshold on that class's probability, not the other class's.",
+        help: "From 0 to 1. Model inference decides for the evaluation protocol's favourable (positive) label when that label's probability is at least this value, so give the threshold on that class's probability, not the other class's.",
       },
       {
         name: "humanDecision",
@@ -626,7 +626,7 @@ export function AssuranceWorkbench({
       },
       {
         name: "negativeLabel",
-        label: "Other binary class label (optional)",
+        label: "Other binary class label",
         help: "Leave empty to use the system revision's other output class. The pair must be exactly the system's two output classes.",
       },
       { name: "predictionOutput", label: "Named adapter output (ONNX / PMML)" },
