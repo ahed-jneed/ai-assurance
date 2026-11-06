@@ -69,6 +69,7 @@ export function AuditGateList({
     "Evaluations",
     "Findings",
     "Report elements",
+    "Quality review",
     "Engagement stage",
   ];
   const group = (g: AuditGate) =>
@@ -89,6 +90,7 @@ export function AuditGateList({
           request: "Evidence collection",
           conclusion: "Conclusion exceptions",
           report: "Report elements",
+          quality_review: "Quality review",
         }[g.kind];
   function row(g: AuditGate) {
     const p = ["paper", "conclusion"].includes(g.kind)
@@ -155,6 +157,7 @@ export function AuditGateList({
           report: briefElements.includes(g.id)
             ? "Open scope & program"
             : "Edit report terms",
+          quality_review: "Open quality review",
         }[g.kind];
     const content = (
       <>

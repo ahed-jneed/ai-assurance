@@ -32,6 +32,7 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
+import { assertReviewerIndependent } from "../quality-review-records";
 import { recordVersions } from "../rule-pack-current";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
@@ -124,6 +125,7 @@ export const reports = defineCommands({
               .map((g) => g.message)
               .join("; "),
           );
+        await assertReviewerIndependent(ctx, e);
       }
       const createdAt = now(),
         annexIV = annexIVIndex(e);
@@ -292,6 +294,7 @@ export async function assertReleasable(
     );
   const gates = finalReportGates(e, report);
   if (gates.length) throw new ApiError(409, gates[0].message);
+  await assertReviewerIndependent(ctx, e);
   const frozen = r.snapshot.workflow as Engagement["workflow"];
   if (
     !frozen ||
