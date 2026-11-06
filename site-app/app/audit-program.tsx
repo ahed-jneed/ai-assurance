@@ -54,11 +54,13 @@ import {
   type DraftScope,
 } from "./recoverable-draft";
 import { procedureWork } from "@/lib/work-items";
+import { acceptanceGates } from "@/lib/workflow/acceptance";
+import { AcceptancePanel } from "./audit-program/acceptance-panel";
 type Option = {
   value: string;
   label: string;
 };
-type Field = {
+export type Field = {
   name: string;
   label: string;
   value?: string;
@@ -75,7 +77,7 @@ export type WorkflowAct = (
   engagement: Engagement;
   details?: Record<string, string>;
 }>;
-type Form = {
+export type Form = {
   title: string;
   draft?: DraftScope;
   description?: string;
@@ -323,7 +325,13 @@ const programViewMemory = new Map<
   }
 >();
 const procedureSections = ["plan", "execute", "evaluate", "review"];
-const programSections = ["brief", "program", "review", "followup"];
+const programSections = [
+  "acceptance",
+  "brief",
+  "program",
+  "review",
+  "followup",
+];
 // The change that replaced a procedure history entry's state.
 const procedureChanges: Record<ProcedureChange, string> = {
   plan: "Plan changed",
@@ -514,7 +522,7 @@ export function AuditProgram({
   }
   function brief() {
     const b = w?.brief;
-    const labels: Record<keyof BriefFields, string> = {
+    const labels: Record<Exclude<keyof BriefFields, "independence">, string> = {
       systemName: "AI system and version",
       intendedUse: "Intended use and decision context",
       boundary: "Audit boundary and exclusions",
@@ -526,7 +534,6 @@ export function AuditProgram({
       deliverables: "Deliverables and assurance limitations",
       basis: "Regulatory source, applicable dates and assurance criteria",
       constraints: "Access, data rights and engagement constraints",
-      independence: "Competence, independence and conflicts assessment",
       changeImpact: "Scope change and impact on earlier work",
     };
     setForm({
@@ -546,7 +553,10 @@ export function AuditProgram({
         value: b?.[name as keyof BriefFields] ?? "",
         optional: name === "changeImpact",
       })),
-      save: (v) => act("saveBrief", v),
+      // Competence and independence are declared per person in the
+      // acceptance panel; the brief no longer records them as free text.
+      save: (v) =>
+        act("saveBrief", { ...v, independence: b?.independence ?? "" }),
     });
   }
   function planForm(p: Procedure) {
@@ -922,6 +932,7 @@ export function AuditProgram({
     ).length,
     inScope = w.procedures.filter((p) => p.selected).length;
   const b = w.brief,
+    acceptanceGaps = acceptanceGates(e).length,
     warnings = revisionWarnings(w, data.metadataBytes),
     lastProgramEntry = w.program.history.at(-1),
     programReturn =
@@ -941,20 +952,32 @@ export function AuditProgram({
       <div className="workflow-spine">
         <WorkflowStep
           number="1"
+          title="Acceptance"
+          status={
+            w.acceptance
+              ? w.acceptance.status +
+                (acceptanceGaps ? " · " + acceptanceGaps + " open" : "")
+              : "Not started"
+          }
+          done={w.acceptance?.status === "approved" && !acceptanceGaps}
+          onClick={() => setTab("acceptance")}
+        />
+        <WorkflowStep
+          number="2"
           title="Engagement brief"
           status={b?.status ?? "Not started"}
           done={b?.status === "approved"}
           onClick={() => setTab("brief")}
         />
         <WorkflowStep
-          number="2"
+          number="3"
           title="Audit program"
           status={w.program.status}
           done={w.program.status === "approved"}
           onClick={() => setTab("program")}
         />
         <WorkflowStep
-          number="3"
+          number="4"
           title="Execute & evaluate"
           status={completed + " / " + inScope + " reviewed"}
           onClick={() => {
@@ -963,7 +986,7 @@ export function AuditProgram({
           }}
         />
         <WorkflowStep
-          number="4"
+          number="5"
           title="Independent review"
           status={
             w.procedures.filter((p) => p.state === "submitted").length +
@@ -972,7 +995,7 @@ export function AuditProgram({
           onClick={() => setTab("review")}
         />
         <WorkflowStep
-          number="5"
+          number="6"
           title="Report & release"
           status="Open reports"
           onClick={() => onNavigate("Reports & sign-off")}
@@ -981,10 +1004,14 @@ export function AuditProgram({
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="program">Program</TabsTrigger>
+          <TabsTrigger value="acceptance">Acceptance</TabsTrigger>
           <TabsTrigger value="brief">Engagement brief</TabsTrigger>
           <TabsTrigger value="review">Review inbox</TabsTrigger>
           <TabsTrigger value="followup">Follow-up</TabsTrigger>
         </TabsList>
+        <TabsContent value="acceptance">
+          <AcceptancePanel data={data} busy={busy} act={act} onForm={setForm} />
+        </TabsContent>
         <TabsContent value="brief">
           <section className="panel workflow-document">
             <div className="panel-head">
@@ -1035,7 +1062,10 @@ export function AuditProgram({
                   ["deliverables", "Deliverables"],
                   ["audience", "Report audience"],
                   ["constraints", "Constraints"],
-                  ["independence", "Competence and independence"],
+                  [
+                    "independence",
+                    "Competence and independence (free text recorded before declarations)",
+                  ],
                   ["changeImpact", "Change impact"],
                 ].map(
                   ([k, t]) =>

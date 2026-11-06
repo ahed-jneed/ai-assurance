@@ -2149,6 +2149,80 @@ try {
   console.log(
     "PASS scoped client grants, safe request projection, own-file downloads, partial deliveries, client role isolation and revocation",
   );
+  // Planning exit: acceptance, independence and competence (#23).
+  await command("setStage", { stage: "Fieldwork" }, owner, 400);
+  const met = (basis) => ({ met: true, basis });
+  await command("saveAcceptance", {
+    decision: "acceptance",
+    preconditions: {
+      subjectMatter: met("Synthetic scoring v1 is identifiable"),
+      criteria: met("Fixture methodology criteria"),
+      evidence: met("Synthetic evidence access agreed"),
+      purpose: met("Fixture readiness decision"),
+    },
+    scope: "Synthetic fixture readiness engagement",
+    periodStart: brief.periodStart,
+    periodEnd: brief.periodEnd,
+    systemBoundary: brief.boundary,
+    accessLevel: "grey",
+    engagementLetter: "EL-FIXTURE-1",
+    team: [owner],
+    competenceConclusion: "Fixture team covers assurance and statistics",
+    changeReason: "",
+  });
+  const competence = {
+    assurance: "proficient",
+    ai_systems: "foundation",
+    statistics: "proficient",
+    regulation: "foundation",
+    management_systems: "none",
+    data_protection: "foundation",
+    security: "none",
+    domain: "none",
+  };
+  const declaration = {
+    priorWork: "",
+    threats: [],
+    exclusions: [],
+    competence,
+    expertField: "",
+    confirmed: true,
+  };
+  await command("saveDeclaration", declaration);
+  await command(
+    "saveDeclaration",
+    {
+      ...declaration,
+      threats: [
+        {
+          kind: "familiarity",
+          description: "Fixture: earlier joint project with the provider",
+          safeguards: "Fixture: review rotated",
+        },
+      ],
+    },
+    reviewer,
+  );
+  await command(
+    "approveAcceptance",
+    { revision: e.workflow.acceptance.revision, reason: "Blocked by threat" },
+    owner,
+    409,
+  );
+  // Declaring again cannot clear the declarant's own unresolved threat.
+  await command("saveDeclaration", declaration, reviewer, 409);
+  await command("resolveDeclaredThreat", {
+    declarationId: e.workflow.declarations.at(-1).id,
+    kind: "familiarity",
+    reason: "Rotation reduces the threat to an acceptable level",
+  });
+  await command("approveAcceptance", {
+    revision: e.workflow.acceptance.revision,
+    reason: "Preconditions met and declarations current",
+  });
+  console.log(
+    "PASS acceptance record, per-person declarations and threat resolution gate Fieldwork",
+  );
   await command("setStage", { stage: "Fieldwork" });
   await command("setStage", { stage: "Evidence evaluation" });
   await command("setStage", { stage: "Reporting" }, owner, 400);
