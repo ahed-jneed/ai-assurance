@@ -2458,6 +2458,29 @@ try {
     ).error,
     "Select an active member with the Engagement Quality Reviewer role",
   );
+  // A team member who is given the role is still on the team: the reviewer
+  // commented on and reviewed this engagement's papers above.
+  const asRole = (role) =>
+    management("updateMember", {
+      userId: reviewer,
+      displayName: "Independent Reviewer",
+      role,
+      clientId: null,
+      engagementIds: [e.id],
+    });
+  await asRole("Engagement Quality Reviewer");
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: reviewer, reason: "A former team member is not eligible" },
+        owner,
+        409,
+      )
+    ).error,
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+  );
+  await asRole("Reviewer");
   await command("appointQualityReviewer", {
     userId: quality,
     reason: "Independent of the fixture engagement team",
@@ -2504,7 +2527,7 @@ try {
       quality,
     );
   console.log(
-    "PASS engagement quality reviewer: role grant, eligible appointment, no paper edits, stand-back checklist",
+    "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
   );
   await command("createReport", {
     kind: "final",
