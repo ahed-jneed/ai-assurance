@@ -261,7 +261,8 @@ class ZipArchive:
         require(len(infos) <= limits.MAX_ZIP_ENTRIES, "zip_invalid", "too many entries")
         self.entries = {}
         for info in infos:
-            require(safe_entry_name(info.filename), "zip_entry_unsafe_name")
+            # orig_filename: zipfile maps a backslash to "/" in `filename` on Windows.
+            require(safe_entry_name(info.orig_filename) and safe_entry_name(info.filename), "zip_entry_unsafe_name")
             require(info.filename not in self.entries, "zip_invalid", "duplicate entry name")
             self.entries[info.filename] = info
         self._decompressed = 0

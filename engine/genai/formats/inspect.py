@@ -162,8 +162,8 @@ def parse(files, plan, manifest_inputs=None):
     task_version = None if task_version is None or isinstance(task_version, (dict, list)) else str(task_version)
     eval_model = ev.get("model") if isinstance(ev.get("model"), str) else None
     policy = plan["scorePolicy"]
-    scorer_specs = [s for s in (ev.get("scorers") or []) if isinstance(s, dict)]
-    headline = ((header.get("results") or {}).get("headline") or {}) if isinstance(header.get("results"), dict) else {}
+    scorer_specs = [s for s in common.seq(ev.get("scorers")) if isinstance(s, dict)]
+    headline = common.obj(common.obj(header.get("results")).get("headline"))
     run.primary_default = headline.get("scorer") if isinstance(headline.get("scorer"), str) else (scorer_specs[0].get("name") if scorer_specs else None)
     primary = plan.get("primaryScore") or run.primary_default
     task_types = plan.get("taskTypes") or {}
@@ -321,12 +321,10 @@ def parse(files, plan, manifest_inputs=None):
         if len(agent_models) > 1:
             run.warnings.add("snapshot_changed_during_run")
     meta["systemUnderTest"] = common.model_ref(eval_model, common.source("extracted", ctx.hp("/eval/model")) if eval_model else None, snapshot)
-    if snapshot is None and eval_model:
-        run.warnings.add("moving_model_alias")
     if snapshot is not None:
         meta["systemUnderTest"]["_snapshotSource"] = common.source("extracted", ctx.sp("/events[event=model,origin=agent]/output/model"))
     common.apply_system_prompt(run, ctx.sp("/messages[role=system]"))
-    plan_config = (header.get("plan") or {}).get("config") if isinstance(header.get("plan"), dict) else None
+    plan_config = common.obj(header.get("plan")).get("config")
     generate = dict(ev.get("model_generate_config") or {}) if isinstance(ev.get("model_generate_config"), dict) else {}
     if isinstance(plan_config, dict):
         generate.update(plan_config)
@@ -370,7 +368,7 @@ def parse(files, plan, manifest_inputs=None):
 def _aggregates(header):
     out = []
     results = header.get("results") if isinstance(header.get("results"), dict) else {}
-    for entry in results.get("scores") or []:
+    for entry in common.seq(results.get("scores")):
         if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
             continue
         metrics = entry.get("metrics") if isinstance(entry.get("metrics"), dict) else {}
@@ -387,11 +385,11 @@ def _aggregates(header):
 
 def _post_run_edits(header, score_edits, invalidations, ctx):
     updates = []
-    for update in header.get("log_updates") or []:
+    for update in common.seq(header.get("log_updates")):
         if not isinstance(update, dict):
             continue
         prov = update.get("provenance") if isinstance(update.get("provenance"), dict) else {}
-        kinds = [e.get("type") for e in update.get("edits") or [] if isinstance(e, dict) and isinstance(e.get("type"), str)]
+        kinds = [e.get("type") for e in common.seq(update.get("edits")) if isinstance(e, dict) and isinstance(e.get("type"), str)]
         updates.append({
             "at": prov.get("timestamp") if isinstance(prov.get("timestamp"), str) else None,
             "author": hashing.clean(prov["author"])[:300] if isinstance(prov.get("author"), str) else None,

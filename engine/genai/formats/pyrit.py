@@ -44,7 +44,7 @@ def parse(files, plan, manifest_inputs=None):
     name = spec["name"]
     rows = load_jsonl(data, name)
     require(rows and all(detect(r) for _, r in rows), "format_mismatch", name)
-    versions = {r.get("pyritVersion") for _, r in rows}
+    versions = {r.get("pyritVersion") if isinstance(r.get("pyritVersion"), str) else None for _, r in rows}
     require(len(versions) == 1, "format_mismatch", "one PyRIT version per export")
     version = versions.pop()
     version = version if isinstance(version, str) else None
@@ -88,7 +88,7 @@ def parse(files, plan, manifest_inputs=None):
         locator = f"{name}:{number}"
         group_key = hashing.compose(hashing.c(technique), hashing.c(variant), hashing.t16(objective_sha), str(occurrence[result_id]))
         item = common.new_item(run_key, group_key, 1, "attack", FORMAT, spec["sha256"], locator, result_id, technique, version)
-        pieces = sorted([p for p in (row.get("messagePieces") or []) if isinstance(p, dict)], key=lambda p: p.get("sequence") if isinstance(p.get("sequence"), int) else 0)
+        pieces = sorted([p for p in common.seq(row.get("messagePieces")) if isinstance(p, dict)], key=lambda p: p.get("sequence") if isinstance(p.get("sequence"), int) and not isinstance(p.get("sequence"), bool) else 0)
         users = [p for p in pieces if p.get("role") == "user"]
         assistants = [p for p in pieces if p.get("role") == "assistant"]
         systems = [p for p in pieces if p.get("role") == "system"]
@@ -149,7 +149,6 @@ def parse(files, plan, manifest_inputs=None):
             break
     if model:
         meta["systemUnderTest"] = common.model_ref(hashing.redact(model, run.warnings), common.source("extracted", "#/attackResult/atomic_attack_identifier/.../objective_target/model_name"))
-        run.warnings.add("moving_model_alias")
     common.apply_system_prompt(run, "#/messagePieces[role=system]")
     pairs = sorted({f"{i['technique']}/{i['variant']}" for i in run.items})
     meta["attackSet"] = common.versioned(",".join(pairs)[:300] if pairs else None, version, None, common.source("extracted", "#/attackResult/atomic_attack_identifier"))

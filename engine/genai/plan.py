@@ -222,6 +222,8 @@ def normalize_plan(plan):
         out["judgeValidation"].update(jv)
     if "excerpts" in plan:
         require(plan["excerpts"] in ("none", "failures", "all"), "plan_invalid", "plan.excerpts")
+        # Engine 0.1.0 produces no excerpts: raw text stays in the hashed source logs (design Q12).
+        require(plan["excerpts"] == "none", "plan_invalid", "plan.excerpts: engine 0.1.0 produces no excerpts")
         out["excerpts"] = plan["excerpts"]
     if "allowUnverifiedFormatVersion" in plan:
         require(isinstance(plan["allowUnverifiedFormatVersion"], bool), "plan_invalid", "plan.allowUnverifiedFormatVersion")

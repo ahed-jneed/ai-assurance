@@ -119,7 +119,7 @@ def parse(files, plan, manifest_inputs=None):
         kinds = []
         if grading is not None:
             names = {}
-            for component in grading.get("componentResults") or []:
+            for component in common.seq(grading.get("componentResults")):
                 if not isinstance(component, dict):
                     continue
                 assertion = component.get("assertion") if isinstance(component.get("assertion"), dict) else {}
@@ -190,8 +190,6 @@ def parse(files, plan, manifest_inputs=None):
         pid, plabel = run.extra["provider"]
         model = hashing.redact(hashing.clean(pid), run.warnings, "#/results/results/*/provider/id") if pid else None
         meta["systemUnderTest"] = common.model_ref(model, common.source("extracted", "#/results/results/*/provider/id") if model else None)
-        if model:
-            run.warnings.add("moving_model_alias")
         common.apply_system_prompt(run, "#/results/results/*/prompt/raw")
         entry = next((p for p in providers if p.get("id") == pid and (p.get("label") or "") == plabel), None)
         pconfig = entry.get("config") if isinstance(entry, dict) and isinstance(entry.get("config"), dict) else {}
@@ -211,7 +209,7 @@ def parse(files, plan, manifest_inputs=None):
         if version is not None and version != scorers.PROMPTFOO_VERIFIED and version != "0.118.0":
             run.warnings.add("unverified_tool_version")
         run.tool_aggregates = [{"metric": f"stats.{k}", "scope": "file", "tool": common._int(stats.get(k)), "ours": counts[k]} for k in ("successes", "failures", "errors") if k in stats]
-        for group in stability.get("groups") or []:
+        for group in common.seq(stability.get("groups")):
             if not isinstance(group, dict):
                 continue
             gprov = group.get("provider") if isinstance(group.get("provider"), dict) else {}

@@ -22,6 +22,8 @@ SAMPLES_NAME = re.compile(r"^samples_(?P<task>.+)_(?P<date>\d{4}-\d{2}-\d{2}T\d{
 RESULTS_NAME = re.compile(r"^results_(?P<date>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.json$")
 SAMPLE_KEYS = ("doc_id", "doc", "target", "arguments", "resps", "filtered_resps", "filter", "metrics", "doc_hash", "prompt_hash", "target_hash")
 RESULT_KEYS = ("results", "configs", "versions", "n-samples", "lm_eval_version")
+MAX_EPOCH_SECONDS = 32503680000.0  # 3000-01-01: later dates are not timestamps
+MAX_DURATION_SECONDS = 10 * 365 * 86400
 REVISION = re.compile(r"(?:^|,)\s*revision=([0-9a-f]{7,40})\s*(?:,|$)")
 
 
@@ -177,7 +179,7 @@ def parse(files, plan, manifest_inputs=None):
             entry = docs[doc_id]
             row = entry["row"]
             locator = f"{spec['name']}:{entry['line']}"
-            arg0 = ((row.get("arguments") or {}).get("gen_args_0") or {}).get("arg_0") if isinstance(row.get("arguments"), dict) else None
+            arg0 = common.obj(common.obj(row.get("arguments")).get("gen_args_0")).get("arg_0")
             recomputed_doc = doc_hash(row.get("doc"))
             group_key = hashing.compose(hashing.c(task), hashing.t16(recomputed_doc), str(occurrence[doc_id]))
             item = common.new_item(run_key, group_key, 1, "qa", FORMAT, spec["sha256"], locator, str(doc_id), task, None if versions.get(task) is None else str(versions.get(task)))
@@ -187,7 +189,7 @@ def parse(files, plan, manifest_inputs=None):
             item["targetSha256"] = hashing.sha256_value(target if not isinstance(target, NonFinite) else _py_str(target))
             doc_h, prompt_h, target_h = entry["hashes"]
             item["toolHashes"] = {k: v for k, v in (("lm_eval.doc_hash", doc_h), ("lm_eval.prompt_hash", prompt_h), ("lm_eval.target_hash", target_h)) if hashing.SHA256.match(v)}
-            if doc_h != recomputed_doc or (arg0 is None or prompt_h != hashing.sha256_text(arg0)) or target_h not in target_hashes(target):
+            if doc_h != recomputed_doc or (not isinstance(arg0, str) or prompt_h != hashing.sha256_text(arg0)) or target_h not in target_hashes(target):
                 mismatch = True
                 run.warnings.add("tool_hash_mismatch", locator)
             resps = row.get("resps")
@@ -196,7 +198,7 @@ def parse(files, plan, manifest_inputs=None):
             null_reasons = {}
             for filt in filters:
                 frow = entry["filters"][filt]
-                for metric in frow.get("metrics") or []:
+                for metric in common.seq(frow.get("metrics")):
                     if not isinstance(metric, str):
                         continue
                     name = f"{metric},{filt}"
@@ -248,8 +250,6 @@ def parse(files, plan, manifest_inputs=None):
         meta["systemUnderTest"] = common.model_ref(model if isinstance(model, str) else None, common.source("extracted", model_pointer) if isinstance(model, str) else None, snapshot)
         if snapshot:
             meta["systemUnderTest"]["_snapshotSource"] = common.source("extracted", f"{rname}#/config/model_args")
-        elif isinstance(model, str):
-            run.warnings.add("moving_model_alias")
         sys_sha = results.get("system_instruction_sha")
         if isinstance(sys_sha, str) and hashing.SHA256.match(sys_sha):
             meta["systemPrompt"] = {"sha256": sys_sha, "distinctCount": 1, "source": common.source("extracted", f"{rname}#/system_instruction_sha")}
@@ -279,7 +279,7 @@ def parse(files, plan, manifest_inputs=None):
                                            common.source("extracted", f"{rname}#/configs/{task}/dataset_path"))
         meta["epochs"] = {"value": 1, "source": common.source("computed")}
         date = common.number(results.get("date"))
-        if date is not None:
+        if date is not None and 0.0 <= date <= MAX_EPOCH_SECONDS:
             start = _timestamp(date)
             completed = None
             total = results.get("total_evaluation_time_seconds")
@@ -287,7 +287,7 @@ def parse(files, plan, manifest_inputs=None):
                 seconds = Decimal(str(total)) if isinstance(total, (str, int, float)) and not isinstance(total, bool) else None
             except InvalidOperation:
                 seconds = None
-            if seconds is not None and seconds.is_finite() and seconds >= 0:
+            if seconds is not None and seconds.is_finite() and 0 <= seconds <= MAX_DURATION_SECONDS:
                 completed = _iso(start + timedelta(seconds=float(seconds)))
             meta["dates"] = {"runStartedAt": _iso(start), "runCompletedAt": completed, "source": common.source("computed", f"{rname}#/date + #/total_evaluation_time_seconds")}
         run.extra = {"aggregations": aggregations, "namedMetrics": named, "primaryScale": primary_scale}

@@ -63,7 +63,7 @@ def parse(files, plan, manifest_inputs=None):
         if case.get("expectedOutput") is not None:
             item["targetSha256"] = hashing.sha256_value(case["expectedOutput"])
         null_reasons = {}
-        for metric in case.get("metricsData") or []:
+        for metric in common.seq(case.get("metricsData")):
             if not isinstance(metric, dict) or not isinstance(metric.get("name"), str):
                 continue
             mname = metric["name"]

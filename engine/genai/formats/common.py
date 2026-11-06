@@ -55,6 +55,15 @@ class ParsedRun:
         self.contexts.append(ctx)
 
 
+def obj(value):
+    """The value when it is a JSON object, else an empty one: hostile files put anything anywhere."""
+    return value if isinstance(value, dict) else {}
+
+
+def seq(value):
+    return value if isinstance(value, list) else []
+
+
 def string_value(value):
     """clusterId, technique and variant as strings (section 7.1)."""
     if value is None or isinstance(value, NonFinite) or isinstance(value, (dict, list)):
@@ -391,12 +400,23 @@ def finalize(run):
     check("epochs", meta["epochs"]["value"] is not None, meta["epochs"]["source"])
     check("dates", meta["dates"]["runStartedAt"] is not None or meta["dates"]["runCompletedAt"] is not None, meta["dates"]["source"])
     meta["completeness"] = {"missing": missing, "declaredOnly": declared}
-    for key in ("_snapshotSource", "_familySource"):
-        sut.pop(key, None)
-    for judge in meta["judges"]:
-        judge["model"].pop("_familySource", None)
-        judge.pop("_templateSource", None)
     return meta
+
+
+def finalize_counts(run):
+    """Counts and fingerprint only: judge-label binding needs the fingerprint before completeness is final."""
+    items = run.items
+    run.meta["n"] = {"items": len(items), "groups": len({i["groupKey"] for i in items}), "scored": sum(1 for i in items if i["status"] == "scored")}
+    run.meta["datasetFingerprint"] = fingerprint(items)
+
+
+def strip_private(value):
+    """Drop the engine's internal `_` keys before a value is written into the envelope."""
+    if isinstance(value, dict):
+        return {k: strip_private(v) for k, v in value.items() if not (isinstance(k, str) and k.startswith("_"))}
+    if isinstance(value, list):
+        return [strip_private(v) for v in value]
+    return value
 
 
 def _judge_source(judges, field):
@@ -417,7 +437,7 @@ def _judge_source(judges, field):
 
 def ordered_metadata(meta):
     keys = ("runKey", "format", "harness", "systemUnderTest", "systemPrompt", "decoding", "tools", "dataset", "datasetFingerprint", "attackSet", "judges", "epochs", "n", "dates", "completeness")
-    return {k: meta[k] for k in keys}
+    return strip_private({k: meta[k] for k in keys})
 
 
 def require_unique_keys(items):

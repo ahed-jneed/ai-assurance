@@ -111,7 +111,7 @@ def parse(files, plan, manifest_inputs=None, declared=None):
     per_detector = {}
     for probe, prompt_sha, seq, number, uuid, row, normalized in prepared:
         probe_info = cache["probes"].get(f"probes.{probe}", {})
-        tags = [t for t in (probe_info.get("tags") or []) if isinstance(t, str)]
+        tags = [t for t in common.seq(probe_info.get("tags")) if isinstance(t, str)]
         categories, uncategorised = garak_categories(probe, tags)
         if uncategorised:
             run.warnings.add("uncategorised_probe", f"{name}:{number}")
@@ -135,7 +135,7 @@ def parse(files, plan, manifest_inputs=None, declared=None):
                 values = results[detector] if isinstance(results[detector], list) else []
                 raw = values[g] if g < len(values) else None
                 value = common.number(raw)
-                params = dict((cache["detectors"].get(f"detectors.{detector}") or {}).get("DEFAULT_PARAMS") or {})
+                params = dict(common.obj(common.obj(cache["detectors"].get(f"detectors.{detector}")).get("DEFAULT_PARAMS")))
                 kind = scorers.garak_kind(detector, params)
                 judge_ref = None
                 if kind == "model_graded":
@@ -177,8 +177,6 @@ def parse(files, plan, manifest_inputs=None, declared=None):
     model = target_name if isinstance(target_name, str) and target_name else (target_type if isinstance(target_type, str) else None)
     meta["systemUnderTest"] = common.model_ref(hashing.redact(model, run.warnings) if model else None,
                                                common.source("extracted", src1 + ("/plugins.target_name" if model == target_name else "/plugins.target_type")) if model else None)
-    if model:
-        run.warnings.add("moving_model_alias")
     system_prompt = setup.get("run.system_prompt")
     if isinstance(system_prompt, str):
         meta["systemPrompt"] = {"sha256": hashing.sha256_text(system_prompt), "distinctCount": 1, "source": common.source("extracted", src1 + "/run.system_prompt")}
@@ -186,7 +184,7 @@ def parse(files, plan, manifest_inputs=None, declared=None):
         common.apply_system_prompt(run, f"{name}:*#/prompt/turns[role=system]")
     generations = common._int(setup.get("run.generations"))
     generator = cache["generators"].get(f"generators.{target_type}", {}) if isinstance(target_type, str) else {}
-    gparams = generator.get("DEFAULT_PARAMS") if isinstance(generator.get("DEFAULT_PARAMS"), dict) else {}
+    gparams = common.obj(common.obj(generator).get("DEFAULT_PARAMS"))
     meta["decoding"] = common.decoding({"temperature": gparams.get("temperature"), "topP": gparams.get("top_p"), "topK": gparams.get("top_k"), "maxTokens": gparams.get("max_tokens"), "seed": setup.get("run.seed")},
                                        common.source("extracted", src1 + "/run.*"), generations if generations and generations >= 1 else None)
     probes = sorted(p for p in (setup.get("transient.active_probes") or []) if isinstance(p, str)) if isinstance(setup.get("transient.active_probes"), list) else []
@@ -220,7 +218,7 @@ def parse(files, plan, manifest_inputs=None, declared=None):
     for number, row in rows:
         if row.get("entry_type") != "eval":
             continue
-        key = (row.get("probe"), row.get("detector"))
+        key = tuple(v if isinstance(v, str) else None for v in (row.get("probe"), row.get("detector")))
         ours = per_detector.get(key, {"passed": 0, "fails": 0, "nones": 0, "attempts": {}})
         label = f"{key[0]}|{key[1]}"
         for field in ("passed", "fails", "nones"):
