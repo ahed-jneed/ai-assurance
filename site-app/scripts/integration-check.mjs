@@ -84,6 +84,16 @@ try {
   let workspace = await request("/api/workspace");
   let e = workspace.engagement;
   const tenantId = workspace.tenantId;
+  // #18: a new engagement carries the stamp of the rule pack the catalog serves.
+  const rulePack = workspace.catalog.regulatorySnapshot;
+  assert.deepEqual(e.rulePack, {
+    version: workspace.catalog.methodologyVersion,
+    legalVersion: rulePack.celex,
+    researchedAsOf: rulePack.researchedAsOf,
+    legalReview: "pending",
+  });
+  assert.equal(e.classification.version, rulePack.celex);
+  assert.equal(e.classification.asOf, rulePack.researchedAsOf);
   async function refresh(user = owner) {
     workspace = await request(
       "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
@@ -885,6 +895,7 @@ try {
   assert.equal(e.runs.at(-1).results.length, 0);
   assert(e.runs.at(-1).error.includes("integrity"));
   await evidenceBucket.put(pinnedArtifact.key, originalBytes);
+  for (const run of e.runs) assert.deepEqual(run.rulePack, e.rulePack);
   await fs.mkdir(".sites-runtime", { recursive: true });
   await fs.writeFile(
     ".sites-runtime/run-schema-fixtures.json",
@@ -1165,6 +1176,12 @@ try {
   const report = e.reports.at(-1),
     frozen = JSON.stringify(report.snapshot);
   assert.equal(report.snapshot.evidenceRequests.length, 2);
+  assert.deepEqual(report.snapshot.rulePack, e.rulePack);
+  assert.equal(
+    report.snapshot.methodologyVersion,
+    workspace.catalog.methodologyVersion,
+  );
+  assert.deepEqual(report.clientSnapshot.rulePack, e.rulePack);
   await command(
     "reopenEvidenceRequest",
     { requestId: sufficientRequest, reason: "Synthetic coverage change" },

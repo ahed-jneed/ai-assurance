@@ -51,6 +51,7 @@ python schemas/.build-run-schema.py --check
 node schemas/validate-run-schema.mjs --ajv-package path/to/package.json
 node schemas/validate-procedure-schema.mjs --ajv-package path/to/package.json
 node schemas/validate-working-paper-schema.mjs --ajv-package path/to/package.json
+node schemas/validate-rule-pack.mjs --ajv-package path/to/package.json
 ```
 
 The run-schema validator accepts `--external-run path/to/imported-run.json` for

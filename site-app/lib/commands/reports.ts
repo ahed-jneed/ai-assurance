@@ -5,6 +5,7 @@ import { clientFinding } from "../client-projection";
 import { finalReportGates, type Engagement } from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
+import { recordVersions } from "../rule-pack-current";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
 import { text } from "./fields";
@@ -118,9 +119,10 @@ export const reports = defineCommands({
         annexMapVersion: annexMap.mapVersion,
         auditEventHead: e.eventHead,
         createdAt: now(),
+        ...recordVersions(),
         regulatorySource: "https://eur-lex.europa.eu/eli/reg/2024/1689",
         limitations:
-          "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification.",
+          "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification. The platform's diagnostics evaluate traditional ML systems; they do not yet evaluate generative AI outputs, so conclusions on generative systems rest on the auditor's own procedures and evidence.",
       };
       Object.assign(snapshot, {
         assurancePins: await assurancePins(ctx, e.id),
@@ -178,6 +180,8 @@ export const reports = defineCommands({
             ? " Evidence availability limitations were recorded; refer to the scoped opinion and executive summary."
             : ""),
         regulatorySource: snapshot.regulatorySource,
+        rulePack: snapshot.rulePack,
+        methodologyVersion: snapshot.methodologyVersion,
       };
       Object.assign(r, {
         clientSnapshot,

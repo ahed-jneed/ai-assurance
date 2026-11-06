@@ -43,6 +43,11 @@ jobs:
         working-directory: site-app
         run: npm ci --ignore-scripts
 
+      # The rule pack in templates/catalog.json: schema, references, legal-review
+      # flags and agreement with the verified research (docs/research).
+      - name: Validate the rule pack
+        run: node schemas/validate-rule-pack.mjs
+
       - name: Validate schemas
         run: |
           node schemas/validate-run-schema.mjs

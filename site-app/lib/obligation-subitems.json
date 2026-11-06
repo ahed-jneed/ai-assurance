@@ -1,22 +1,28 @@
 {
   "schemaVersion": "1.0",
-  "catalogVersion": "2026.10.07-proposed",
+  "catalogVersion": "2026.11.05-proposed",
+  "rulePackVersion": "2026.11.1",
   "status": "proposed_for_methodology_review",
   "scope": "Selective audit prompts for Articles 9-15, Annex IV and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
   "source": {
     "legalSource": "EUR-Lex",
     "version": "02024R1689-20260727",
     "consolidatedAsOf": "2026-07-27",
-    "researchedAsOf": "2026-10-07",
+    "researchedAsOf": "2026-11-05",
     "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
-    "authenticAmendment": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744"
+    "authenticAmendment": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744",
+    "baseActEli": "http://data.europa.eu/eli/reg/2024/1689/oj",
+    "authenticAmendmentEli": "http://data.europa.eu/eli/reg/2026/1744/oj",
+    "consolidatedAccessUrl": "https://publications.europa.eu/resource/celex/02024R1689-20260727",
+    "authenticAmendmentAccessUrl": "https://publications.europa.eu/resource/celex/32026R1744",
+    "accessNote": "EUR-Lex challenges automated clients; automated source checks read the same Official Journal documents from the Publications Office (CELLAR) access URLs."
   },
   "applicationContext": {
-    "legalSource": "Article 113(c), version 02024R1689-20260727",
+    "legalSource": "Article 113, third paragraph, point (c)(i) and (ii), as replaced by Regulation (EU) 2026/1744, Art 1, point (40)(b)",
     "annexIIIArticle6_2": "2027-12-02",
     "annexIArticle6_1": "2028-08-02",
     "covers": "Chapter III Sections 1, 2 and 3 except Article 6(5)",
-    "approvalRule": "Dates inform review; they do not automatically approve applicability. Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules. Annex I Section B requires sectoral-route analysis under Article 2(2), rather than automatic direct Section 2 application.",
+    "approvalRule": "Dates inform review; they do not automatically approve applicability. Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules. Article 111(2), as replaced: for high-risk systems placed on the market or put into service before the Chapter III date of their route (2 December 2027 for Annex III, 2 August 2028 for Annex I), the Regulation applies only if their design changes significantly from that date, and the first unit of the type and model sets the date (recital (39) of Regulation (EU) 2026/1744); the cut-off is no longer the fixed 2 August 2026. Legacy systems intended for use by public authorities comply by 2 August 2030 whatever their design changes; components of the Annex X large-scale IT systems placed on the market or put into service before 2 August 2027 sit outside Article 111(2) and comply by 31 December 2030 (Article 111(1)). Article 5 applies to legacy systems. Annex I Section B requires sectoral-route analysis under Article 2(2), rather than automatic direct Section 2 application. These rules are pending legal review (LR-03, LR-10).",
     "sourceCurrencyRule": "Source publication, research and application dates have different meanings. A new source version creates an impact-review candidate and never rewrites a historical decision."
   },
   "decisionPolicy": {
@@ -29,7 +35,7 @@
     "unknownFacts": "needs_information_not_false_or_minimal_risk",
     "automatedOutputs": "diagnostic_or_collection_signals_never_legal_approval",
     "providerResponsibility": "Articles 9-15 are system requirements; provider responsibility is linked through Article 16(a). A deployer may inspect provider evidence but does not thereby assume every provider duty. Article 25 role changes need separate review.",
-    "dataScope": "Under Article 10(1), datasets used for data-trained models are assessed; Article 10(6) limits Article 10(2)-(4) and Article 4a(1) to testing datasets for systems without model training. Article 10(5) was deleted; special-category processing is a separate Article 4a/data-protection assessment, not an upload permission.",
+    "dataScope": "Under Article 10(1), datasets used for data-trained models are assessed; Article 10(6) limits Article 10(2)-(4) and Article 4a(1) to testing datasets for systems without model training. Article 10(5) was deleted; special-category processing is a separate Article 4a/data-protection assessment, not an upload permission. Article 4a(2) extends the same conditions and safeguards to providers and deployers of other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection and correction.",
     "retention": "Retention is actor, control, purpose and law dependent. Article 26(6) is not one universal evidence-vault retention policy.",
     "excludedActorDuties": "Other provider, deployer, representative, importer, distributor, sectoral, conformity, registration and fundamental-rights duties must be added where applicable. This selective catalog does not waive them."
   },
@@ -49,8 +55,20 @@
     "deployerControlsInputData": "boolean_or_unknown",
     "deployerControlsLogs": "boolean_or_unknown",
     "annexIIIDecisionsAboutPersons": "boolean_or_unknown",
-    "roleChangeCandidate": "boolean_or_unknown"
+    "roleChangeCandidate": "boolean_or_unknown",
+    "generatesSyntheticContent": "boolean_or_unknown",
+    "placedOnMarketDate": "date_or_unknown",
+    "highRiskRoute": "enumeration_or_unknown",
+    "firstPlacedOnMarketOrPutIntoServiceDate": "date_or_unknown",
+    "significantDesignChangeOnOrAfterChapterIIIDate": "boolean_or_unknown",
+    "intendedForUseByPublicAuthorities": "boolean_or_unknown",
+    "annexXLargeScaleItComponent": "boolean_or_unknown",
+    "gpaiModelPlacedOnMarketDate": "date_or_unknown"
   },
+  "factValues": {
+    "highRiskRoute": ["annex_iii", "annex_i_section_a", "annex_i_section_b", "not_high_risk"]
+  },
+  "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use the last eight facts. highRiskRoute derives from the reviewed classification route until classification records it; the other seven are not captured yet, so a predicate that needs them yields needs_information. Dates are YYYY-MM-DD.",
   "triggerType": {
     "profile": "key_of_triggerProfiles",
     "conditions": "array_of_fact_equals_predicates",
@@ -90,7 +108,7 @@
     {"code":"AIA-10-4","article":"10(4)","title":"Intended-context data coverage","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
     {"code":"AIA-10-6","article":"10(6)","title":"Non-training testing-data scope","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"trainingUsesData","equals":false}]},"evidenceCategories":["Dataset","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","dependencies":["10(2)-(4)","4a(1)"]},
 
-    {"code":"AIA-11-1","article":"11(1)","title":"Pre-market and current technical documentation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs. A generated audit report is not automatically the provider's complete technical documentation."},
+    {"code":"AIA-11-1","article":"11(1)","title":"Pre-market and current technical documentation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs. A simplified submission uses the Commission's form, which notified bodies must accept (Article 11(1), second subparagraph, as replaced). A generated audit report is not automatically the provider's complete technical documentation."},
     {"code":"AIA-11-2","article":"11(2)","title":"Combined product technical documentation","actor":["Provider"],"trigger":{"profile":"provider_annex_i_a","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
 
     {"code":"AIA-12-1","article":"12(1)","title":"Automatic lifecycle event recording","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Pipeline code","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
@@ -132,8 +150,8 @@
     {"code":"AIA-AIV-5","article":"Annex IV, point 5","title":"Risk-management description","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
     {"code":"AIA-AIV-6","article":"Annex IV, point 6","title":"Provider lifecycle changes","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
     {"code":"AIA-AIV-7","article":"Annex IV, point 7","title":"Standards and alternative solutions","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-8","article":"Annex IV, point 8; Article 47","title":"Actual EU declaration of conformity","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","specificDocumentRequired":"EU declaration of conformity","categoryMatchIsInsufficient":true},
-    {"code":"AIA-AIV-9","article":"Annex IV, point 9; Article 72","title":"Post-market evaluation and monitoring plan","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
+    {"code":"AIA-AIV-8","article":"Annex IV, point 8; Article 47","title":"Actual EU declaration of conformity","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","specificDocumentRequired":"EU declaration of conformity","categoryMatchIsInsufficient":true,"reviewNote":"Pending legal review (LR-02): Article 47 sits in Chapter III Section 5, which applies from the 2 August 2026 general date on the text, but the declaration attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).","legalReview":{"required":true,"itemIds":["LR-02"]}},
+    {"code":"AIA-AIV-9","article":"Annex IV, point 9; Article 72","title":"Post-market evaluation and monitoring plan","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Pending legal review (LR-02): Article 72 sits in Chapter IX, which applies from the 2 August 2026 general date on the text, but the plan attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).","legalReview":{"required":true,"itemIds":["LR-02"]}},
 
     {"code":"AIA-23-1B","article":"23(1)(b)","title":"Importer technical-documentation verification","actor":["Importer"],"trigger":{"profile":"importer_high_risk","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
     {"code":"AIA-24-1","article":"24(1)","title":"Distributor markings, declaration and instructions checks","actor":["Distributor"],"trigger":{"profile":"distributor_high_risk","conditions":[]},"evidenceCategories":["Governance","Instructions","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},

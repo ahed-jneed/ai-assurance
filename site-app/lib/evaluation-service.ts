@@ -13,6 +13,7 @@ import {
   testDefinitionVersion,
 } from "./evaluation";
 import { inspectCSV, validateEvaluation } from "./diagnostics";
+import { recordVersions } from "./rule-pack-current";
 const short = z.string().trim().min(1).max(300),
   notes = z.string().trim().max(5000);
 const cardSchema = z
@@ -352,6 +353,7 @@ async function freezeRun(
     results: [],
     paperIds: [],
     createdAt: now(),
+    ...recordVersions(),
     provenance: {
       inputHashes: {
         dataset: dataset.sha256,
