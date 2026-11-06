@@ -47,8 +47,14 @@ export function ObligationSuggestions({
 }) {
   const all = obligationSuggestions(c, rules, obligationItems),
     suggested = all.filter((s) => s.status === "candidate"),
-    open = all.filter((s) => s.status === "needs_information"),
-    other = all.length - suggested.length - open.length;
+    waiting = all.filter((s) => s.status === "needs_information"),
+    // Until the classification is approved every role-held subitem waits for
+    // the high-risk route: those are counted, not listed one by one.
+    awaitingApproval = waiting.filter((s) =>
+      s.missingFacts.includes("highRiskConfirmed"),
+    ).length,
+    open = waiting.filter((s) => !s.missingFacts.includes("highRiskConfirmed")),
+    other = all.length - suggested.length - waiting.length;
   const row = (s: ObligationSuggestion) => {
     const flags = reviewFlags.get(s.code);
     return (
@@ -114,9 +120,15 @@ export function ObligationSuggestions({
           {suggested.map(row)}
           {open.map(row)}
         </div>
-      ) : (
+      ) : awaitingApproval ? null : (
         <p className="subtle">
           No Article 9 to 26 subitem is suggested by the recorded facts.
+        </p>
+      )}
+      {awaitingApproval > 0 && (
+        <p className="subtle" data-testid="obligation-suggestions-awaiting">
+          {awaitingApproval} subitem{awaitingApproval === 1 ? "" : "s"} for the
+          operator&apos;s role wait for an approved high-risk classification.
         </p>
       )}
       {other > 0 && (
