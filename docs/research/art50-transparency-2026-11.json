@@ -27,7 +27,8 @@
   ],
   "legalReviewIds": [
    "LR-03",
-   "LR-04"
+   "LR-04",
+   "LR-08"
   ],
   "unverifiedIds": [
    "UV-05",
@@ -282,11 +283,14 @@
    },
    "builtOnOwnGpaiModel": {
     "type": "boolean_or_unknown",
-    "definition": "The AI system is based on a general-purpose AI model developed by the same provider or its undertaking (Art 75(1)(a); AI Office competence for Art 50(1) and (2), guidelines footnote 47).",
+    "definition": "The AI system is based on a general-purpose AI model, and the model and the system are provided by the same provider or within the same undertaking (Art 75(1), point (a)). The exceptions in point (a)(i) to (iv) are captured by art75ExceptedSystem.",
     "definedIn": "art50-transparency-2026-11",
     "sourceIds": [
      "SRC-CONS-2024-1689-20260727",
-     "SRC-EC-A50-GUIDELINES"
+     "REPO-RULE-PACK-2026-11"
+    ],
+    "legalReviewItemIds": [
+     "LR-08"
     ]
    },
    "integratedIntoVlopOrVlose": {
@@ -295,6 +299,30 @@
     "definedIn": "art50-transparency-2026-11",
     "sourceIds": [
      "SRC-CONS-2024-1689-20260727"
+    ]
+   },
+   "art75ExceptedSystem": {
+    "type": "boolean_or_unknown",
+    "definition": "The system falls under an exception to Art 75(1), point (a), as the rule-pack entry aia-2026-08-02-ai-office-competence lists them: systems related to products under Annex I, Annex III point 2 systems, systems of law enforcement, border management and financial institutions within Art 74(6), and Annex III point 8 systems for the administration of justice. Such systems stay with the national authorities even when built on the provider's own general-purpose AI model.",
+    "definedIn": "art50-transparency-2026-11",
+    "sourceIds": [
+     "SRC-CONS-2024-1689-20260727",
+     "REPO-RULE-PACK-2026-11"
+    ],
+    "legalReviewItemIds": [
+     "LR-08"
+    ]
+   },
+   "deployerIsProviderOrSameUndertaking": {
+    "type": "boolean_or_unknown",
+    "definition": "The deployer is also the provider of the system or forms part of the same undertaking as the provider (Art 75(1), second subparagraph). Only then does the AI Office competence reach the deployer's Art 50(3) and (4) duties.",
+    "definedIn": "art50-transparency-2026-11",
+    "sourceIds": [
+     "SRC-CONS-2024-1689-20260727",
+     "REPO-RULE-PACK-2026-11"
+    ],
+    "legalReviewItemIds": [
+     "LR-08"
     ]
    },
    "codeSignatorySection1": {
@@ -413,9 +441,9 @@
      "SRC-EC-A50-GUIDELINES"
     ]
    },
-   "allAiTextUnderEditorialControl": {
+   "editorialExceptionReliedOn": {
     "type": "boolean_or_unknown",
-    "definition": "Every such text undergoes human review or editorial control and a natural or legal person holds editorial responsibility for its publication (Art 50(4); guidelines points 133 to 140). If only some texts do, the exception is tested per text.",
+    "definition": "For at least one in-scope text, the deployer relies on the exception for texts that underwent human review or editorial control with a natural or legal person holding editorial responsibility for their publication (Art 50(4), second subparagraph; guidelines points 133 to 140), instead of labelling them. It does not exclude A50-P-04B: the exception is tested text by text (A50-P-04B-S03 to S06 and criterion A50-P-04B-C01).",
     "definedIn": "art50-transparency-2026-11",
     "sourceIds": [
      "SRC-CONS-2024-1689-20260727",
@@ -450,7 +478,7 @@
    "onOrAfter": "date fact is on or after value"
   },
   "predicateRule": "As in rule-pack-2026-11: each predicate list is a conjunction in three-valued logic (false if any predicate is false, true if all are true, otherwise unknown); an absent or empty appliesIf counts as true. Unknown yields needs_information, never a pass or a not-applicable decision. Applicability stays a reviewed human decision.",
-  "exclusionRule": "A candidate procedure is excluded when the ifAll list of any of its exclusions is true. If none is true and at least one is unknown, the result is needs_information. Exclusions with basis 'guidance' rest on non-binding guidelines and carry a legal-review flag.",
+  "exclusionRule": "A candidate procedure is excluded when the ifAll list of any of its exclusions is true. If none is true and at least one is unknown, the result is needs_information. An exclusion takes effect only with fact values approved after the steps that test it: A50-P-00-S05 for the scope exclusions, A50-P-00-S10 to S12 for the Art 50(1), (3) and (4) exceptions, and A50-P-02F for the Art 50(2) exceptions and carve-outs. These steps therefore sit outside the procedures the exceptions exclude; when a test does not support an exception, the fact is recorded as false and the procedure applies. Exclusions with basis 'guidance' rest on non-binding guidelines and carry a legal-review flag.",
   "derivationRule": "A fact with derivation.anyOf is true if any listed fact is true, false if all are false, otherwise unknown.",
   "stepConditionRule": "A test step with onlyIf is performed when that conjunction is true, skipped with the reason recorded when it is false, and kept pending when it is unknown.",
   "statisticsRule": "See sampling.method.",
@@ -1809,10 +1837,9 @@
    "actor": [
     "deployer"
    ],
-   "summary": "Deployers of systems generating or manipulating text published to inform the public on matters of public interest disclose that it is artificially generated or manipulated, unless it underwent human review or editorial control and a person holds editorial responsibility.",
+   "summary": "Deployers of systems generating or manipulating text published to inform the public on matters of public interest disclose that it is artificially generated or manipulated, unless it underwent human review or editorial control and a person holds editorial responsibility. The editorial exception is tested text by text in A50-P-04B, not applied as an exclusion.",
    "exceptionIds": [
     "EX-50-4T-LE",
-    "EX-50-4-EDITORIAL",
     "EX-SCOPE-PERSONAL"
    ],
    "appliesFrom": "2026-08-02",
@@ -1883,7 +1910,7 @@
     "provider",
     "deployer"
    ],
-   "summary": "Paragraphs 1 to 4 do not affect Chapter III and are without prejudice to other Union or national transparency duties; Art 50 and high-risk duties apply cumulatively (guidelines point 25 and footnote 50).",
+   "summary": "Paragraphs 1 to 4 do not affect Chapter III and are without prejudice to other transparency obligations for deployers of AI systems under Union or national law; Art 50 and high-risk duties apply cumulatively (guidelines point 25 and footnote 50).",
    "exceptionIds": [],
    "appliesFrom": "2026-08-02",
    "ruleEntryId": "aia-2026-08-02-art50-transparency",
@@ -1913,10 +1940,10 @@
     "commission",
     "ai_board"
    ],
-   "summary": "The Commission encourages codes of practice on detection, marking and labelling, assesses with utmost account of the Board's opinion whether adherence is adequate for paragraphs 2 and 4 (procedure of Art 56(6)), and may adopt an implementing act with common rules if a code is inadequate.",
+   "summary": "The Commission encourages codes of practice on detection, marking and labelling, assesses with utmost account of the Board's opinion whether adherence is adequate for paragraphs 2 and 4 (procedure of Art 56(6)), and may adopt an implementing act with common rules if a code is inadequate. The replacement entered into force on 27 July 2026 (TL-09); like the rest of Chapter IV it applies from 2 August 2026 (Art 113).",
    "exceptionIds": [],
-   "appliesFrom": "2026-07-27",
-   "ruleEntryId": "aia-2026-07-27-omnibus-entry-into-force",
+   "appliesFrom": "2026-08-02",
+   "ruleEntryId": "aia-2026-08-02-art50-transparency",
    "codeOfPractice": "The adequacy assessments of 8 and 9 July 2026.",
    "procedureIds": [
     "A50-P-00"
@@ -2320,7 +2347,7 @@
     },
     {
      "id": "A50-P-00-S08",
-     "description": "Identify the competent authority per paragraph: national market surveillance authority; the AI Office for systems built on the provider's own general-purpose AI model (subject to the exceptions in Art 75(1)(a)(i) to (iv)) or integrated into a very large online platform or search engine, covering Art 50(1) and (2), and Art 50(3) and (4) only when that provider is also the deployer; the EDPS for Union institutions.",
+     "description": "Identify the competent authority per paragraph from Art 75(1) as replaced (rule-pack entry aia-2026-08-02-ai-office-competence): the national market surveillance authority by default; the AI Office for systems based on a general-purpose AI model where model and system come from the same provider or undertaking (except the systems in Art 75(1)(a)(i) to (iv)) and for systems that constitute or are integrated into a very large online platform or search engine. That competence covers the provider's Art 50(1) and (2) duties, and the deployer's Art 50(3) and (4) duties only where the deployer is the provider or part of the same undertaking. Guidelines footnote 47 omits the same-undertaking limb and the exceptions; the OJ text governs. The EDPS supervises Union institutions.",
      "method": "analytical_review",
      "evidenceItemIds": [
       "EV-A50-39"
@@ -2329,6 +2356,10 @@
       {
        "sourceId": "SRC-CONS-2024-1689-20260727",
        "pinpoint": "Art 75(1)"
+      },
+      {
+       "sourceId": "REPO-RULE-PACK-2026-11",
+       "pinpoint": "aia-2026-08-02-ai-office-competence"
       },
       {
        "sourceId": "SRC-EC-A50-GUIDELINES",
@@ -2355,12 +2386,97 @@
      "samplingRuleId": null,
      "codeMeasureIds": [],
      "automatable": false
+    },
+    {
+     "id": "A50-P-00-S10",
+     "description": "Where the Art 50(1) obviousness exception is relied on: inspect the audience analysis (target and foreseeable audience, vulnerable groups, literacy, context) and the obviousness factors, and re-perform any access restriction it depends on, for example that a professional-only tool cannot be reached by the public. If the evidence does not support it, record obviousToReasonablyWellInformedPerson as false, so that A50-P-01 applies.",
+     "method": "inspection",
+     "evidenceItemIds": [
+      "EV-A50-04",
+      "EV-A50-12"
+     ],
+     "sourceRefs": [
+      {
+       "sourceId": "SRC-CONS-2024-1689-20260727",
+       "pinpoint": "Art 50(1)"
+      },
+      {
+       "sourceId": "SRC-EC-A50-GUIDELINES",
+       "pinpoint": "points 42 to 45"
+      }
+     ],
+     "samplingRuleId": null,
+     "codeMeasureIds": [],
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "obviousToReasonablyWellInformedPerson",
+       "op": "eq",
+       "value": true
+      }
+     ]
+    },
+    {
+     "id": "A50-P-00-S11",
+     "description": "Where a law-enforcement exception is relied on under Art 50(1) or (4): inspect the law, its purposes and safeguards, and the deployment it covers (other uses of the same system stay in scope); for Art 50(1), also confirm that the system is not available to the public to report a criminal offence. If the evidence does not support it, record the facts accordingly, so that A50-P-01, A50-P-04A or A50-P-04B applies.",
+     "method": "inspection",
+     "evidenceItemIds": [
+      "EV-A50-30"
+     ],
+     "sourceRefs": [
+      {
+       "sourceId": "SRC-CONS-2024-1689-20260727",
+       "pinpoint": "Art 50(1), (4)"
+      },
+      {
+       "sourceId": "SRC-EC-A50-GUIDELINES",
+       "pinpoint": "points 46 to 49, 125 and 139"
+      }
+     ],
+     "samplingRuleId": null,
+     "codeMeasureIds": [],
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "authorisedByLawForCriminalOffences",
+       "op": "eq",
+       "value": true
+      }
+     ]
+    },
+    {
+     "id": "A50-P-00-S12",
+     "description": "Where the Art 50(3) law-enforcement exception is relied on: inspect the law permitting non-transparent use of the emotion recognition or biometric categorisation system and its safeguards. If the evidence does not support it, record lawEnforcementPermittedErBc as false, so that A50-P-03 applies.",
+     "method": "inspection",
+     "evidenceItemIds": [
+      "EV-A50-30"
+     ],
+     "sourceRefs": [
+      {
+       "sourceId": "SRC-CONS-2024-1689-20260727",
+       "pinpoint": "Art 50(3)"
+      },
+      {
+       "sourceId": "SRC-EC-A50-GUIDELINES",
+       "pinpoint": "point 109"
+      }
+     ],
+     "samplingRuleId": null,
+     "codeMeasureIds": [],
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "lawEnforcementPermittedErBc",
+       "op": "eq",
+       "value": true
+      }
+     ]
     }
    ],
    "criteria": [],
    "passCriteria": [
     "Every system and paragraph has an approved applicability decision with no unknown fact that a not-applicable or exception decision depends on.",
-    "Every exception relied on has a documented assessment and evidence, and the reviewer approved it."
+    "Every exception relied on has a documented assessment and evidence, its test step (A50-P-00-S05 and S10 to S12 here, A50-P-02F for Art 50(2)) supports it, and the reviewer approved it."
    ],
    "failCriteria": [
     "An operator role is misclassified, so a duty is not tested.",
@@ -2391,7 +2507,10 @@
      "LR-A50-10",
      "LR-A50-14",
      "LR-03",
-     "LR-04"
+     "LR-04",
+     "LR-A50-06",
+     "LR-A50-11",
+     "LR-08"
     ]
    }
   },
@@ -2654,55 +2773,6 @@
      "samplingRuleId": "SR-A50-01",
      "codeMeasureIds": [],
      "automatable": false
-    },
-    {
-     "id": "A50-P-01-S08",
-     "description": "Where the obviousness exception is relied on: inspect the audience analysis (target and foreseeable audience, vulnerable groups, literacy, context) and the obviousness factors, and re-perform any access restriction it depends on, for example that a professional-only tool cannot be reached by the public.",
-     "method": "inspection",
-     "evidenceItemIds": [
-      "EV-A50-04",
-      "EV-A50-12"
-     ],
-     "sourceRefs": [
-      {
-       "sourceId": "SRC-EC-A50-GUIDELINES",
-       "pinpoint": "points 42 to 45"
-      }
-     ],
-     "samplingRuleId": null,
-     "codeMeasureIds": [],
-     "automatable": false,
-     "onlyIf": [
-      {
-       "fact": "obviousToReasonablyWellInformedPerson",
-       "op": "eq",
-       "value": true
-      }
-     ]
-    },
-    {
-     "id": "A50-P-01-S09",
-     "description": "Where the law-enforcement exception is relied on: inspect the law, its purposes and safeguards, and confirm no public crime-reporting function exists.",
-     "method": "inspection",
-     "evidenceItemIds": [
-      "EV-A50-30"
-     ],
-     "sourceRefs": [
-      {
-       "sourceId": "SRC-EC-A50-GUIDELINES",
-       "pinpoint": "points 46 to 49"
-      }
-     ],
-     "samplingRuleId": null,
-     "codeMeasureIds": [],
-     "automatable": false,
-     "onlyIf": [
-      {
-       "fact": "authorisedByLawForCriminalOffences",
-       "op": "eq",
-       "value": true
-      }
-     ]
     }
    ],
    "criteria": [
@@ -2722,14 +2792,12 @@
    "passCriteria": [
     "Every tested channel, locale and entry point shows a compliant notice at or before the first interaction.",
     "A50-P-01-C01 passes: the Wilson interval of the truthful-disclosure rate lies wholly inside the band for every member.",
-    "No probe answer claims or implies that the system is human, or each such answer is evaluated as a deviation and found not to indicate a design failure.",
-    "Every exception relied on is supported by its assessment and evidence."
+    "No probe answer claims or implies that the system is human, or each such answer is evaluated as a deviation and found not to indicate a design failure."
    ],
    "failCriteria": [
     "A tested in-scope channel, locale or entry point has no notice, or only an insufficient one (point 38), at the first interaction.",
     "A50-P-01-C01 fails: the interval lies wholly below the band for a member.",
-    "A notice is not perceivable with assistive technology where accessibility requirements apply.",
-    "An exception is relied on without a supporting assessment."
+    "A notice is not perceivable with assistive technology where accessibility requirements apply."
    ],
    "inconclusiveCriteria": [
     "A50-P-01-C01 straddles its band.",
@@ -3118,7 +3186,7 @@
     },
     {
      "id": "A50-P-02A-S07",
-     "description": "Where a single layer is used, inspect its justification: a closed physical product with effective export prevention (metadata only), or free-form text (watermark only), or demonstrated equivalence of an alternative technique.",
+     "description": "Where a single layer is used, inspect its justification: a closed physical product with effective export prevention (metadata only; closedPhysicalProductEnvironment), or free-form text (watermark only), or demonstrated equivalence of an alternative technique. Where two layers are used, record that.",
      "method": "inspection",
      "evidenceItemIds": [
       "EV-A50-04",
@@ -3138,14 +3206,7 @@
      "codeMeasureIds": [
       "COP-S1-M1.1"
      ],
-     "automatable": false,
-     "onlyIf": [
-      {
-       "fact": "closedPhysicalProductEnvironment",
-       "op": "eq",
-       "value": true
-      }
-     ]
+     "automatable": false
     },
     {
      "id": "A50-P-02A-S08",
@@ -3521,7 +3582,7 @@
     },
     {
      "id": "A50-P-02B-S04",
-     "description": "Where text-watermark or forensic detection is restricted to verified experts, inspect the access process and request access as the auditor; confirm the listed expert groups can obtain access.",
+     "description": "Where text-watermark detection or forensic detection of any modality is restricted to verified experts, inspect the access process and request access as the auditor; confirm the listed expert groups can obtain access. Where no detection is restricted, record that.",
      "method": "inspection",
      "evidenceItemIds": [
       "EV-A50-17"
@@ -3537,14 +3598,7 @@
       "COP-S1-M2.1",
       "COP-S1-M2.2"
      ],
-     "automatable": false,
-     "onlyIf": [
-      {
-       "fact": "generatesSyntheticText",
-       "op": "eq",
-       "value": true
-      }
-     ]
+     "automatable": false
     },
     {
      "id": "A50-P-02B-S05",
@@ -3676,7 +3730,7 @@
    "actor": [
     "provider"
    ],
-   "catalogItemId": "WP-XC-10",
+   "catalogItemId": "WP-XC-12",
    "applicability": {
     "roleRequired": "provider",
     "appliesIf": [
@@ -4486,7 +4540,7 @@
    "actor": [
     "provider"
    ],
-   "catalogItemId": "WP-XC-10",
+   "catalogItemId": "WP-XC-12",
    "applicability": {
     "roleRequired": "provider",
     "appliesIf": [
@@ -4823,7 +4877,7 @@
    "actor": [
     "provider"
    ],
-   "catalogItemId": "WP-XC-10",
+   "catalogItemId": "WP-XC-12",
    "applicability": {
     "roleRequired": "provider",
     "appliesIf": [
@@ -5263,30 +5317,6 @@
      "samplingRuleId": "SR-A50-07",
      "codeMeasureIds": [],
      "automatable": false
-    },
-    {
-     "id": "A50-P-03-S07",
-     "description": "Where the law-enforcement exception is relied on, inspect the law permitting non-transparent use and its safeguards.",
-     "method": "inspection",
-     "evidenceItemIds": [
-      "EV-A50-30"
-     ],
-     "sourceRefs": [
-      {
-       "sourceId": "SRC-EC-A50-GUIDELINES",
-       "pinpoint": "point 109"
-      }
-     ],
-     "samplingRuleId": null,
-     "codeMeasureIds": [],
-     "automatable": false,
-     "onlyIf": [
-      {
-       "fact": "lawEnforcementPermittedErBc",
-       "op": "eq",
-       "value": true
-      }
-     ]
     }
    ],
    "criteria": [],
@@ -5698,34 +5728,6 @@
       }
      },
      {
-      "id": "EX-50-4-EDITORIAL",
-      "label": "All such texts under human review or editorial control with editorial responsibility",
-      "basis": "statutory",
-      "ifAll": [
-       {
-        "fact": "allAiTextUnderEditorialControl",
-        "op": "eq",
-        "value": true
-       }
-      ],
-      "sourceRefs": [
-       {
-        "sourceId": "SRC-CONS-2024-1689-20260727",
-        "pinpoint": "Art 50(4)"
-       },
-       {
-        "sourceId": "SRC-EC-A50-GUIDELINES",
-        "pinpoint": "points 133 to 140"
-       }
-      ],
-      "legalReview": {
-       "required": true,
-       "itemIds": [
-        "LR-A50-09"
-       ]
-      }
-     },
-     {
       "id": "EX-SCOPE-PERSONAL",
       "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
       "basis": "statutory",
@@ -5758,7 +5760,7 @@
      "transitional": []
     }
    },
-   "objective": "Establish that every AI-generated or manipulated text published to inform the public on matters of public interest is either labelled clearly at the start of exposure, or qualifies for the human-review and editorial-responsibility exception.",
+   "objective": "Establish that every AI-generated or manipulated text published to inform the public on matters of public interest is either labelled clearly at the start of exposure, or qualifies for the human-review and editorial-responsibility exception, tested text by text.",
    "testSteps": [
     {
      "id": "A50-P-04B-S01",
@@ -5844,7 +5846,14 @@
      "codeMeasureIds": [
       "COP-S2-C4"
      ],
-     "automatable": false
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "editorialExceptionReliedOn",
+       "op": "eq",
+       "value": true
+      }
+     ]
     },
     {
      "id": "A50-P-04B-S05",
@@ -5861,7 +5870,14 @@
      ],
      "samplingRuleId": "SR-A50-06",
      "codeMeasureIds": [],
-     "automatable": false
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "editorialExceptionReliedOn",
+       "op": "eq",
+       "value": true
+      }
+     ]
     },
     {
      "id": "A50-P-04B-S06",
@@ -5884,7 +5900,14 @@
      "codeMeasureIds": [
       "COP-S2-C4"
      ],
-     "automatable": false
+     "automatable": false,
+     "onlyIf": [
+      {
+       "fact": "editorialExceptionReliedOn",
+       "op": "eq",
+       "value": true
+      }
+     ]
     },
     {
      "id": "A50-P-04B-S07",
@@ -6136,7 +6159,6 @@
    "origin": "auditee",
    "usedBy": [
     "A50-P-00",
-    "A50-P-01",
     "A50-P-02A",
     "A50-P-02F"
    ]
@@ -6218,7 +6240,7 @@
    "description": "Target and reasonably foreseeable audience, vulnerable groups, literacy and context, for the obviousness exception and deep-fake assessments.",
    "origin": "auditee",
    "usedBy": [
-    "A50-P-01"
+    "A50-P-00"
    ]
   },
   {
@@ -6391,9 +6413,8 @@
    "description": "The law relied on, its purposes, circumstances and safeguards.",
    "origin": "auditee",
    "usedBy": [
-    "A50-P-01",
-    "A50-P-02F",
-    "A50-P-03"
+    "A50-P-00",
+    "A50-P-02F"
    ]
   },
   {
@@ -6493,7 +6514,11 @@
     "band": {
      "lower": 0.95
     },
-    "range": "0.90 to 0.999",
+    "range": {
+     "parameter": "lower",
+     "min": 0.9,
+     "max": 0.999
+    },
     "legalStatus": "no_legal_safe_harbour",
     "rationale": "Marking is applied by deterministic pipelines, so any confirmed unmarked in-scope output is investigated as a deviation; 0.95 is a floor, raise it to 0.99 where outputs are cheap to generate (text, images)."
    },
@@ -6501,9 +6526,16 @@
     "id": "MD-A50-02",
     "metric": "detection_rate_unaltered",
     "band": {
-     "lower": "declared - 0.02"
+     "bound": "lower",
+     "derivation": "declared_minus_tolerance",
+     "tolerance": 0.02,
+     "defaultIfUndeclared": 0.95
     },
-    "range": "tolerance 0 to 0.05",
+    "range": {
+     "parameter": "tolerance",
+     "min": 0,
+     "max": 0.05
+    },
     "legalStatus": "no_legal_safe_harbour",
     "rationale": "Tests the provider's own declared reliability (Code Measure 3.2 requires it to be measured); 0.95 when nothing is declared, together with a finding that it was not declared."
    },
@@ -6511,9 +6543,16 @@
     "id": "MD-A50-03",
     "metric": "false_positive_rate",
     "band": {
-     "upper": "declared + 0.005"
+     "bound": "upper",
+     "derivation": "declared_plus_tolerance",
+     "tolerance": 0.005,
+     "defaultIfUndeclared": 0.01
     },
-    "range": "0.001 to 0.05",
+    "range": {
+     "parameter": "upper",
+     "min": 0.001,
+     "max": 0.05
+    },
     "legalStatus": "no_legal_safe_harbour",
     "rationale": "False attributions harm human creators; 0.01 when nothing is declared."
    },
@@ -6523,7 +6562,11 @@
     "band": {
      "lower": 0.98
     },
-    "range": "0.95 to 0.999",
+    "range": {
+     "parameter": "lower",
+     "min": 0.95,
+     "max": 0.999
+    },
     "legalStatus": "no_legal_safe_harbour",
     "rationale": "The guidelines expect disclosure in all situations where the system is asked about its nature (point 40)."
    },
@@ -6533,7 +6576,11 @@
     "band": {
      "lower": 0.95
     },
-    "range": "0.90 to 0.99",
+    "range": {
+     "parameter": "lower",
+     "min": 0.9,
+     "max": 0.99
+    },
     "legalStatus": "no_legal_safe_harbour",
     "rationale": "Conventional 5 % tolerable deviation for attribute tests; every deviation is still evaluated individually."
    }
@@ -7054,11 +7101,12 @@
    "rulePackRef": "aia-2026-08-02-ai-office-competence",
    "topic": "AI Office competence for Art 50",
    "finding": "consistent",
-   "detail": "Guidelines footnote 47 matches Art 75(1): the AI Office covers Art 50(1) and (2) for systems built on the provider's own general-purpose AI model, and Art 50(3) and (4) only where that provider is also the deployer.",
-   "action": "#19 derives the competence flag per paragraph.",
+   "detail": "The rule-pack entry matches Art 75(1) as replaced. Guidelines footnote 47 is narrower than the OJ text for deployers: it extends the AI Office's competence to Art 50(3) and (4) only where the provider is also the deployer, whereas the second subparagraph of Art 75(1) also covers deployers that form part of the same undertaking as the provider; the footnote also does not repeat the exceptions in point (a)(i) to (iv). The OJ text governs.",
+   "action": "#19 derives the competence flag per paragraph from the rule-pack entry, with the exceptions and the same-undertaking limb (A50-ED-06), not from footnote 47.",
    "sourceIds": [
     "SRC-EC-A50-GUIDELINES",
-    "SRC-CONS-2024-1689-20260727"
+    "SRC-CONS-2024-1689-20260727",
+    "REPO-RULE-PACK-2026-11"
    ],
    "verification": {
     "status": "verified",
@@ -7151,7 +7199,7 @@
    "target": "#19",
    "file": "docs/obligation-subitems.json",
    "location": "/triggerProfiles and /items",
-   "current": "Profiles all require highRiskConfirmed; no Art 50 item",
+   "current": "Every profile except operator_role_change requires highRiskConfirmed; no Art 50 item",
    "change": "Add profiles provider_art50 and deployer_art50 without highRiskConfirmed, and items AIA-50-1, AIA-50-2, AIA-50-3, AIA-50-4-DF, AIA-50-4-TXT and AIA-50-5 whose conditions are the procedures' appliesIf predicates and whose exclusions are listed for review.",
    "basis": [
     "A50-P-01",
@@ -7188,9 +7236,10 @@
    "file": "site-app/lib/domain/classification.ts",
    "location": "AI Office competence flag",
    "current": "None",
-   "change": "Derive per paragraph from builtOnOwnGpaiModel and integratedIntoVlopOrVlose: Art 50(1) and (2) for the provider; Art 50(3) and (4) only where the provider is also the deployer.",
+   "change": "Derive the flag per paragraph from the rule-pack entry aia-2026-08-02-ai-office-competence: the AI Office is competent when (builtOnOwnGpaiModel = true and art75ExceptedSystem = false) or integratedIntoVlopOrVlose = true. For Art 50(1) and (2) this covers the provider; for Art 50(3) and (4) only where deployerIsProviderOrSameUndertaking = true. An unknown fact leaves the authority needs_information; show the flag as pending legal review (LR-08). Do not derive it from guidelines footnote 47, which omits the same-undertaking limb.",
    "basis": [
-    "CC-12"
+    "CC-12",
+    "A50-P-00"
    ],
    "beforeDec2": false,
    "sourceIds": [
@@ -7321,7 +7370,7 @@
    "file": "templates/catalog.json",
    "location": "Item WP-XC-07",
    "current": "Title 'Specific transparency obligations'; 3 manual steps",
-   "change": "Retitle 'Transparency: applicability, AI interaction and exposure notices'; regulatoryRefs Art.50 and Art.111; automationMode hybrid; steps from A50-P-00, A50-P-01, A50-P-03 and A50-P-05 (at most 30); evidenceRequired from their evidence items.",
+   "change": "Retitle 'Transparency: applicability, AI interaction and exposure notices'; regulatoryRefs Art.50 and Art.111; automationMode hybrid; the 29 steps of A50-P-00 (12), A50-P-01 (7), A50-P-03 (6) and A50-P-05 (4); evidenceRequired from their evidence items.",
    "basis": [
     "A50-P-00",
     "A50-P-01",
@@ -7338,9 +7387,9 @@
    "id": "A50-ED-21",
    "target": "catalog",
    "file": "templates/catalog.json",
-   "location": "New item WP-XC-10",
+   "location": "New items WP-XC-10 and WP-XC-12",
    "current": "None",
-   "change": "'Machine-readable marking and detection of synthetic content' (Art.50, Art.111), hybrid, steps from A50-P-02A to A50-P-02F, sign-off gate as for the other cross-cutting papers.",
+   "change": "WP-XC-10 'Marking, detection and interoperability of synthetic content' (Art.50, Art.111), hybrid, the 21 steps of A50-P-02A, A50-P-02B and A50-P-02D. WP-XC-12 'Marking reliability, robustness, process and exceptions' (Art.50, Art.111), hybrid, the 17 steps of A50-P-02C, A50-P-02E and A50-P-02F. Two papers, because recordProcedureExecution accepts at most 30 steps per paper and requires every planned step; sign-off gate as for the other cross-cutting papers.",
    "basis": [
     "A50-P-02A",
     "A50-P-02B",
@@ -7352,7 +7401,8 @@
    "beforeDec2": true,
    "sourceIds": [
     "REPO-CATALOG",
-    "REPO-CRITERIA-DESIGN"
+    "REPO-CRITERIA-DESIGN",
+    "REPO-PROCEDURES"
    ]
   },
   {
@@ -7361,7 +7411,7 @@
    "file": "templates/catalog.json",
    "location": "New item WP-XC-11",
    "current": "None",
-   "change": "'Deep-fake and public-interest text disclosure' (Art.50, Art.3), hybrid, steps from A50-P-04A and A50-P-04B.",
+   "change": "'Deep-fake and public-interest text disclosure' (Art.50, Art.3), hybrid, the 15 steps of A50-P-04A and A50-P-04B.",
    "basis": [
     "A50-P-04A",
     "A50-P-04B"
@@ -7460,7 +7510,7 @@
    "file": "docs/design/genai-evidence.md",
    "location": "Section 9.2 and WP-GA-07 (section 12.4)",
    "current": "synthetic_content_marking: testing belongs to R6.5; WP-GA-07 covers Art 50(1), (2), (4)",
-   "change": "Map synthetic_content_marking to WP-XC-10 and ai_interaction_disclosure to WP-XC-07; WP-GA-07 cross-references those papers instead of duplicating Art 50 conclusions.",
+   "change": "Map synthetic_content_marking to WP-XC-10 and WP-XC-12, and ai_interaction_disclosure to WP-XC-07; WP-GA-07 cross-references those papers instead of duplicating Art 50 conclusions.",
    "basis": [
     "A50-P-01",
     "A50-P-02A"
@@ -7581,7 +7631,8 @@
    "question": "What evidence establishes obviousness for the target and foreseeable audience, given the restrictive reading (point 45) and the consumer-law 'average consumer' analogy (point 43)?",
    "relatedIds": [
     "EX-50-1-OBVIOUS",
-    "A50-P-01"
+    "A50-P-01",
+    "A50-P-00-S10"
    ]
   },
   {
@@ -7609,8 +7660,8 @@
    "question": "The Code says individual reviews need not be documented (Section 2, Commitment 4). What evidence suffices to show substantive human review and editorial responsibility for a sampled text?",
    "relatedIds": [
     "A50-P-04B",
-    "EX-50-4-EDITORIAL",
-    "allAiTextUnderEditorialControl"
+    "A50-P-04B-S04",
+    "editorialExceptionReliedOn"
    ]
   },
   {
@@ -7631,7 +7682,8 @@
     "EX-50-3-LE",
     "lawEnforcementPermittedErBc",
     "deployerUsesEmotionRecognition",
-    "deployerUsesBiometricCategorisation"
+    "deployerUsesBiometricCategorisation",
+    "A50-P-00-S12"
    ]
   },
   {
