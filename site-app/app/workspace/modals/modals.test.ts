@@ -112,6 +112,7 @@ describe("modal definitions", () => {
       invite: ["Invite by email", "Save invitation"],
       invitationCancel: ["Cancel invitation", "Cancel invitation"],
       practiceRename: ["Rename practice", "Save name"],
+      signingKeyRotate: ["Rotate signing key", "Rotate key"],
       adminGrant: ["Grant practice administration", "Grant administration"],
       adminRevoke: ["Remove practice administration", "Remove administration"],
       adminTransfer: [

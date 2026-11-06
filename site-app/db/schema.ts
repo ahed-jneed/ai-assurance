@@ -312,17 +312,28 @@ export const executionAttempts = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.jobId, t.fence] })],
 );
+// A practice's Ed25519 signing keys (lib/signing-keys.ts). The private half
+// is stored only wrapped under the DOSSIER_KEK secret (kek_id names which
+// one) and is erased when the key retires; the public half stays published.
 export const dossierKeys = sqliteTable(
   "dossier_keys",
   {
     tenantId: text("tenant_id").notNull(),
     id: text("id").notNull(),
-    privateKey: text("private_key").notNull(),
     publicKey: text("public_key").notNull(),
     active: integer("active").notNull().default(1),
     createdAt: text("created_at").notNull(),
+    wrappedKey: text("wrapped_key"),
+    kekId: text("kek_id"),
+    retiredAt: text("retired_at"),
+    retiredReason: text("retired_reason"),
   },
-  (t) => [primaryKey({ columns: [t.tenantId, t.id] })],
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.id] }),
+    uniqueIndex("idx_dossier_keys_active")
+      .on(t.tenantId)
+      .where(sql`active = 1`),
+  ],
 );
 export const personalPreferences = sqliteTable(
   "personal_preferences",
