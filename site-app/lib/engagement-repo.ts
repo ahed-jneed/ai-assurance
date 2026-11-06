@@ -45,7 +45,8 @@ const partial = new WeakSet<Engagement>();
  * Loads the engagement's D1 record for a caller who may open it, without its
  * immutable R2 parts (report snapshots stay empty objects, paper histories and
  * run results empty lists): enough for access checks, workflow state and work
- * items, and never saved. A body that is not JSON raises IntegrityError.
+ * items, and never saved. A body that is not JSON raises IntegrityError (for a
+ * Client Contributor, whose grant it would hold, 404).
  */
 export async function loadEngagement(ctx: Context, engagementId: string) {
   const row = await db()
@@ -70,6 +71,11 @@ export async function loadEngagement(ctx: Context, engagementId: string) {
   try {
     e = JSON.parse(row.body) as Engagement;
   } catch {
+    // A Client Contributor's access rests on a grant inside the body, so an
+    // unreadable body cannot show one: 404, as the directory decides it
+    // (engagementList), before anything about the record is revealed.
+    if (ctx.role === "Client Contributor")
+      throw new ApiError(404, "Engagement not found");
     throw new IntegrityError(engagementId, "unreadable", "body");
   }
   e.version = row.version;

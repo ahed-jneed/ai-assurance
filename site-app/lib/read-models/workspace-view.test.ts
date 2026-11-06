@@ -101,12 +101,42 @@ describe("workspaceView", () => {
     const { objects } = await practice(three());
     const [altered] = partsOf(objects.keys(), "ENG-A");
     objects.set(altered, JSON.stringify({ forged: true }));
-    const view = await workspaceView(lead(), null);
+    const view = await workspaceView(lead(), "ENG-A");
     expect(view.engagement).toBeNull();
     expect(view.engagementError?.error).toContain(
       "Immutable audit record integrity mismatch",
     );
     expect(view.engagements).toHaveLength(3);
+  });
+
+  it("falls back past an engagement with a damaged R2 part when none is requested", async () => {
+    const { objects, sqlite } = await practice(three());
+    const [altered] = partsOf(objects.keys(), "ENG-A");
+    objects.set(altered, JSON.stringify({ forged: true }));
+    const view = await workspaceView(lead(), null);
+    expect(view.engagement?.id).toBe("ENG-B");
+    expect(view.engagementError).toBeNull();
+    expect(view.engagements.map((e) => [e.id, !!e.integrity_error])).toEqual([
+      ["ENG-A", true],
+      ["ENG-B", false],
+      ["ENG-C", false],
+    ]);
+    expect(incidents(sqlite)).toMatchObject([
+      { engagement_id: "ENG-A", object_key: altered },
+    ]);
+  });
+
+  it("gives up the default selection after three damaged engagements", async () => {
+    const { objects, reads } = await practice([
+      ...three(),
+      engagementWithParts("ENG-D", "Zeta audit"),
+    ]);
+    for (const id of ["ENG-A", "ENG-B", "ENG-C"])
+      objects.delete(partsOf(objects.keys(), id)[0]);
+    const view = await workspaceView(lead(), null);
+    expect(view.engagement).toBeNull();
+    expect(view.engagementError?.engagementId).toBe("ENG-A");
+    expect(reads.some((k) => k.includes("/ENG-D/"))).toBe(false);
   });
 
   it("treats a failing R2 read as temporarily unavailable for that engagement only", async () => {
@@ -186,6 +216,24 @@ describe("workspaceView", () => {
         )
       ).engagements,
     ).toEqual([]);
+  });
+
+  it("answers a Client Contributor 404 for an unreadable body and records nothing", async () => {
+    const { sqlite } = await practice(three());
+    sqlite
+      .prepare("UPDATE engagements SET body='{not json' WHERE id='ENG-A'")
+      .run();
+    const contributor = member("contributor", "Client Contributor", "CL-1");
+    await expect(loadEngagement(contributor, "ENG-A")).rejects.toMatchObject({
+      status: 404,
+    });
+    const view = await workspaceView(contributor, "ENG-A").catch((e) => e);
+    expect(view).toMatchObject({ status: 404 });
+    expect(incidents(sqlite)).toEqual([]);
+    // Internal members still see the integrity error.
+    await expect(loadEngagement(lead(), "ENG-A")).rejects.toBeInstanceOf(
+      IntegrityError,
+    );
   });
 });
 
