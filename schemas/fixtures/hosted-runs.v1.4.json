@@ -1,0 +1,2742 @@
+[
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-FX0005",
+    "engagementId": "ENG-FIXTURE",
+    "modelId": "MODEL-BINARY",
+    "datasetId": "EV-BINARY",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-FX0001",
+    "suite": [
+      "performance",
+      "demographic_parity",
+      "disparate_impact"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "negativeLabel": "0"
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-FX0001",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T09:00:00.000Z",
+      "frozenBy": "fixture-auditor",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "negativeLabel": "0"
+    },
+    "state": "succeeded",
+    "outcome": "inconclusive",
+    "results": [
+      {
+        "testId": "accuracy-gate",
+        "label": "Binary classification performance",
+        "article": "15",
+        "outcome": "pass",
+        "metrics": [
+          {
+            "name": "accuracy",
+            "value": 0.8825,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 353,
+            "denominator": 400,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8472450357843669,
+              "upper": 0.9104780590498961,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 353,
+                "n": 400
+              },
+              "band": {
+                "lower": 0.8,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.00003707347569240485
+          },
+          {
+            "name": "recall",
+            "value": 0.875,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 175,
+            "denominator": 200,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8219857499741765,
+              "upper": 0.9138802552428735,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "recall",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 175,
+                "n": 200
+              },
+              "band": {
+                "lower": 0.7,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 6.641198786386101e-8
+          },
+          {
+            "name": "balanced_accuracy",
+            "value": 0.8825000000000001,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8457438411106382,
+              "upper": 0.9090711780785133,
+              "level": 0.95,
+              "method": "mover_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "balanced_accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 175,
+                "positives": 200,
+                "tn": 178,
+                "negatives": 200
+              },
+              "band": {
+                "lower": 0.5,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": 1.052212781960235e-58,
+              "reasons": []
+            },
+            "pValue": 1.5129922734805737e-58
+          },
+          {
+            "name": "precision",
+            "value": 0.8883248730964467,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 175,
+            "denominator": 197,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8367089939313668,
+              "upper": 0.9250859108576606,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "precision",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 175,
+                "n": 197
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "specificity",
+            "value": 0.89,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 178,
+            "denominator": 200,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8390730900269852,
+              "upper": 0.9262275553987469,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "specificity",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 178,
+                "n": 200
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "f1",
+            "value": 0.8816120906801007,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8438503221432838,
+              "upper": 0.91120285047063,
+              "level": 0.95,
+              "method": "jaccard_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "f1",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 175,
+                "tpPlusFpPlusFn": 222,
+                "positives": 200
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          }
+        ],
+        "limitations": [
+          "Saved-prediction evaluation; no independent model inference, cross-validation or holdout verification. Performance is measured on supplied labels and predictions; independence, representativeness and target leakage require review.",
+          "Recall, precision and F1 refer to the performance positive class '1'; specificity is the recall of the other class."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "performance",
+          "direction": "pass",
+          "pValue": 0.00003707347569240485,
+          "adjustedPValue": 0.0000741469513848097,
+          "adjustment": "bonferroni",
+          "familySize": 2,
+          "unadjustedOutcome": "pass",
+          "decidingMemberId": "accuracy",
+          "sampleSize": 400,
+          "coverage": null,
+          "suppressedGroups": null,
+          "libraryEntry": null,
+          "reasons": []
+        }
+      },
+      {
+        "testId": "parity-screen",
+        "label": "Demographic parity",
+        "article": "10",
+        "outcome": "inconclusive",
+        "metrics": [
+          {
+            "name": "maximum_selection_rate_gap",
+            "value": 0.015000000000000013,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0,
+              "upper": 0.11184933728872158,
+              "level": 0.95,
+              "method": "worst_member_bounds"
+            },
+            "slices": [
+              {
+                "slice": "A",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "selectionNumerator": 100,
+                "selectionDenominator": 200,
+                "selectionRate": 0.5,
+                "selectionConfidenceInterval": {
+                  "lower": 0.43136085960389187,
+                  "upper": 0.5686391403961081,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              },
+              {
+                "slice": "B",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "selectionNumerator": 97,
+                "selectionDenominator": 200,
+                "selectionRate": 0.485,
+                "selectionConfidenceInterval": {
+                  "lower": 0.4166738517187752,
+                  "upper": 0.5538915080725428,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              }
+            ],
+            "details": {
+              "role": "headline",
+              "metric": "selection_rate_difference",
+              "subject": null,
+              "comparator": null,
+              "counts": null,
+              "band": {
+                "lower": null,
+                "upper": 0.1
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "selection_rate_difference:B|A",
+            "value": -0.015000000000000013,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": -0.11184933728872158,
+              "upper": 0.08224901788103507,
+              "level": 0.95,
+              "method": "newcombe_hybrid_score"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "selection_rate_difference",
+              "subject": "B",
+              "comparator": "A",
+              "counts": {
+                "subject": {
+                  "x": 97,
+                  "n": 200
+                },
+                "comparator": {
+                  "x": 100,
+                  "n": 200
+                }
+              },
+              "band": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.08617199083210192
+          }
+        ],
+        "limitations": [
+          "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations. Protected-data processing requires a separately reviewed basis.",
+          "The confidence interval straddles the acceptable band, so the evidence is inconclusive.",
+          "no_legal_safe_harbour: Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "group_comparison",
+          "direction": "pass",
+          "pValue": 0.08617199083210192,
+          "adjustedPValue": 0.17234398166420384,
+          "adjustment": "bonferroni",
+          "familySize": 2,
+          "unadjustedOutcome": "inconclusive",
+          "decidingMemberId": "selection_rate_difference:B|A",
+          "sampleSize": 400,
+          "coverage": {
+            "eligibleRows": 400,
+            "populationRows": 400,
+            "unknownGroupRows": 0,
+            "value": 1,
+            "minimum": 1
+          },
+          "suppressedGroups": [],
+          "libraryEntry": {
+            "id": "policy.eu-aia.selection-rate-difference",
+            "version": 1,
+            "legalStatus": "no_legal_safe_harbour",
+            "caveat": "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity."
+          },
+          "reasons": [
+            "interval_straddles_band"
+          ]
+        }
+      },
+      {
+        "testId": "impact-screen",
+        "label": "Disparate impact",
+        "article": "10",
+        "outcome": "inconclusive",
+        "metrics": [
+          {
+            "name": "minimum_selection_rate_ratio",
+            "value": 0.97,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7949600644108779,
+              "upper": 1,
+              "level": 0.95,
+              "method": "worst_member_bounds"
+            },
+            "slices": [
+              {
+                "slice": "A",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "selectionNumerator": 100,
+                "selectionDenominator": 200,
+                "selectionRate": 0.5,
+                "selectionConfidenceInterval": {
+                  "lower": 0.43136085960389187,
+                  "upper": 0.5686391403961081,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              },
+              {
+                "slice": "B",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "selectionNumerator": 97,
+                "selectionDenominator": 200,
+                "selectionRate": 0.485,
+                "selectionConfidenceInterval": {
+                  "lower": 0.4166738517187752,
+                  "upper": 0.5538915080725428,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              }
+            ],
+            "details": {
+              "role": "headline",
+              "metric": "selection_rate_ratio",
+              "subject": null,
+              "comparator": null,
+              "counts": null,
+              "band": {
+                "lower": 0.8,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "selection_rate_ratio:B|A",
+            "value": 0.97,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7949600644108779,
+              "upper": 1.1835814679537067,
+              "level": 0.95,
+              "method": "katz_log"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "selection_rate_ratio",
+              "subject": "B",
+              "comparator": "A",
+              "counts": {
+                "subject": {
+                  "x": 97,
+                  "n": 200
+                },
+                "comparator": {
+                  "x": 100,
+                  "n": 200
+                }
+              },
+              "band": {
+                "lower": 0.8,
+                "upper": 1.25
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.05773288385166797
+          }
+        ],
+        "limitations": [
+          "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations. Protected-data processing requires a separately reviewed basis.",
+          "The confidence interval straddles the acceptable band, so the evidence is inconclusive.",
+          "screening_heuristic: Four-fifths screen: a rule of thumb from the US Uniform Guidelines (29 CFR 1607.4(D)), not a legal test of discrimination."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "exploratory",
+          "kind": "group_comparison",
+          "direction": "pass",
+          "pValue": 0.05773288385166797,
+          "adjustedPValue": 0.05773288385166797,
+          "adjustment": "benjamini_hochberg",
+          "familySize": 1,
+          "unadjustedOutcome": "inconclusive",
+          "decidingMemberId": "selection_rate_ratio:B|A",
+          "sampleSize": 400,
+          "coverage": {
+            "eligibleRows": 400,
+            "populationRows": 400,
+            "unknownGroupRows": 0,
+            "value": 1,
+            "minimum": 1
+          },
+          "suppressedGroups": [],
+          "libraryEntry": {
+            "id": "screen.us.four-fifths",
+            "version": 1,
+            "legalStatus": "screening_heuristic",
+            "caveat": "Four-fifths screen: a rule of thumb from the US Uniform Guidelines (29 CFR 1607.4(D)), not a legal test of discrimination."
+          },
+          "reasons": [
+            "interval_straddles_band"
+          ]
+        }
+      }
+    ],
+    "paperIds": [
+      "PAPER-RUN-FX0005-A15",
+      "PAPER-RUN-FX0005-A10"
+    ],
+    "createdAt": "2026-11-06T09:00:00.000Z",
+    "rulePack": {
+      "version": "2026.11.1",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.1",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
+        "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "protocol": "99b329bc0baa15bb4887d300b74e35cbf0067f8daf5c19b8d759fc68f948fb58",
+        "statisticsPlan": "ca27c6dc00fe331f320bc30b5c6c607a687b4b123f6fc087fefc478a1e89f49e",
+        "manifest": "44615258c0b79a6d2a0c8195d13927302ab82d5263f2de6dd7e21d7fa18988e6",
+        "configuration": "b7a5d3e4c59190618911578abf6121f059ccc96f6a89e899e8e3bde962282eb3"
+      },
+      "runnerVersion": "interactive-predictions-3.0.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "id": "MODEL-BINARY",
+        "name": "binary scorer",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Hosted 1.4 contract fixture",
+        "artifactId": "EV-BINARY",
+        "status": "registered",
+        "sourceSha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf"
+      },
+      "dataset": {
+        "id": "EV-BINARY",
+        "name": "binary.csv",
+        "sha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "size": 2422,
+        "rowCount": 400,
+        "columns": [
+          "actual",
+          "predicted",
+          "group"
+        ]
+      },
+      "profile": {
+        "name": "Planned screen",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance",
+          "demographic_parity",
+          "disparate_impact"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "group",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "negativeLabel": "0"
+        },
+        "statistics": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "minimums": {
+            "sampleSize": 30,
+            "groupSize": 30,
+            "classCount": 10
+          },
+          "configuredMinimums": null,
+          "multiplicity": {
+            "confirmatory": "bonferroni",
+            "exploratory": "benjamini_hochberg"
+          },
+          "clusterField": null,
+          "bootstrap": {
+            "replicates": 2000
+          },
+          "calibrationBins": 10,
+          "power": {
+            "targetPower": 0.8,
+            "acknowledgement": null
+          },
+          "derivedFrom": null,
+          "criteria": [
+            {
+              "id": "accuracy-gate",
+              "kind": "performance",
+              "role": "confirmatory",
+              "rationale": null,
+              "members": [
+                {
+                  "metric": "accuracy",
+                  "band": {
+                    "lower": 0.8,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "recall",
+                  "band": {
+                    "lower": 0.7,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "balanced_accuracy",
+                  "band": {
+                    "lower": 0.5,
+                    "upper": null
+                  }
+                }
+              ],
+              "libraryEntry": null,
+              "powerAssumptions": null
+            },
+            {
+              "id": "parity-screen",
+              "kind": "group_comparison",
+              "role": "confirmatory",
+              "rationale": null,
+              "metric": "selection_rate_difference",
+              "band": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "comparison": {
+                "mode": "all_pairs",
+                "referenceGroup": null
+              },
+              "groupFields": null,
+              "declaredGroups": null,
+              "minimumCoverage": 1,
+              "libraryEntry": {
+                "id": "policy.eu-aia.selection-rate-difference",
+                "version": 1,
+                "parameters": {
+                  "delta": 0.1
+                },
+                "overriddenParameters": []
+              },
+              "powerAssumptions": null
+            },
+            {
+              "id": "impact-screen",
+              "kind": "group_comparison",
+              "role": "exploratory",
+              "rationale": null,
+              "metric": "selection_rate_ratio",
+              "band": {
+                "lower": 0.8,
+                "upper": 1.25
+              },
+              "comparison": {
+                "mode": "all_pairs",
+                "referenceGroup": null
+              },
+              "groupFields": null,
+              "declaredGroups": null,
+              "minimumCoverage": 1,
+              "libraryEntry": {
+                "id": "screen.us.four-fifths",
+                "version": 1,
+                "parameters": {
+                  "tau": 0.8
+                },
+                "overriddenParameters": []
+              },
+              "powerAssumptions": null
+            }
+          ]
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic applicants",
+          "predictionProvenance": "Exported by the provider",
+          "independence": "Holdout declared by the provider",
+          "sensitiveDataBasis": "Synthetic groups; no personal data"
+        },
+        "rationale": "Pre-registered acceptance rules for the fixture",
+        "id": "PROTOCOL-FX0001",
+        "schemaVersion": "1.1",
+        "createdAt": "2026-11-06T09:00:00.000Z",
+        "createdBy": "fixture-auditor"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": null,
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": null,
+        "criteria": [
+          {
+            "id": "accuracy-gate",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          },
+          {
+            "id": "parity-screen",
+            "kind": "group_comparison",
+            "role": "confirmatory",
+            "rationale": null,
+            "metric": "selection_rate_difference",
+            "band": {
+              "lower": -0.1,
+              "upper": 0.1
+            },
+            "comparison": {
+              "mode": "all_pairs",
+              "referenceGroup": null
+            },
+            "groupFields": null,
+            "declaredGroups": null,
+            "minimumCoverage": 1,
+            "libraryEntry": {
+              "id": "policy.eu-aia.selection-rate-difference",
+              "version": 1,
+              "parameters": {
+                "delta": 0.1
+              },
+              "overriddenParameters": []
+            },
+            "powerAssumptions": null
+          },
+          {
+            "id": "impact-screen",
+            "kind": "group_comparison",
+            "role": "exploratory",
+            "rationale": null,
+            "metric": "selection_rate_ratio",
+            "band": {
+              "lower": 0.8,
+              "upper": 1.25
+            },
+            "comparison": {
+              "mode": "all_pairs",
+              "referenceGroup": null
+            },
+            "groupFields": null,
+            "declaredGroups": null,
+            "minimumCoverage": 1,
+            "libraryEntry": {
+              "id": "screen.us.four-fifths",
+              "version": 1,
+              "parameters": {
+                "tau": 0.8
+              },
+              "overriddenParameters": []
+            },
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.0.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "startedAt": "2026-11-06T09:00:00.000Z",
+    "completedAt": "2026-11-06T09:00:00.000Z",
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-FX0006",
+    "engagementId": "ENG-FIXTURE",
+    "modelId": "MODEL-BINARY",
+    "datasetId": "EV-BINARY",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-FX0002",
+    "suite": [
+      "performance",
+      "equalized_odds"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 20,
+      "maximumParityGap": 0.1,
+      "minimumImpactRatio": 0.8,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-FX0002",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T09:00:00.000Z",
+      "frozenBy": "fixture-auditor",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 20,
+      "maximumParityGap": 0.1,
+      "minimumImpactRatio": 0.8,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "state": "succeeded",
+    "outcome": "inconclusive",
+    "results": [
+      {
+        "testId": "performance",
+        "label": "Binary classification performance",
+        "article": "15",
+        "outcome": "pass",
+        "metrics": [
+          {
+            "name": "accuracy",
+            "value": 0.8825,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 353,
+            "denominator": 400,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8472450357843669,
+              "upper": 0.9104780590498961,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 353,
+                "n": 400
+              },
+              "band": {
+                "lower": 0.8,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.00003707347569240485
+          },
+          {
+            "name": "recall",
+            "value": 0.875,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 175,
+            "denominator": 200,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8219857499741765,
+              "upper": 0.9138802552428735,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "recall",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 175,
+                "n": 200
+              },
+              "band": {
+                "lower": 0.7,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 6.641198786386101e-8
+          },
+          {
+            "name": "balanced_accuracy",
+            "value": 0.8825000000000001,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8457438411106382,
+              "upper": 0.9090711780785133,
+              "level": 0.95,
+              "method": "mover_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "balanced_accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 175,
+                "positives": 200,
+                "tn": 178,
+                "negatives": 200
+              },
+              "band": {
+                "lower": 0.5,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": 1.052212781960235e-58,
+              "reasons": []
+            },
+            "pValue": 1.5129922734805737e-58
+          },
+          {
+            "name": "precision",
+            "value": 0.8883248730964467,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 175,
+            "denominator": 197,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8367089939313668,
+              "upper": 0.9250859108576606,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "precision",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 175,
+                "n": 197
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "specificity",
+            "value": 0.89,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": 178,
+            "denominator": 200,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8390730900269852,
+              "upper": 0.9262275553987469,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "specificity",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 178,
+                "n": 200
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "f1",
+            "value": 0.8816120906801007,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8438503221432838,
+              "upper": 0.91120285047063,
+              "level": 0.95,
+              "method": "jaccard_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "f1",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 175,
+                "tpPlusFpPlusFn": 222,
+                "positives": 200
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          }
+        ],
+        "limitations": [
+          "Saved-prediction evaluation; no independent model inference, cross-validation or holdout verification. Performance is measured on supplied labels and predictions; independence, representativeness and target leakage require review.",
+          "Recall, precision and F1 refer to the performance positive class '1'; specificity is the recall of the other class."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "performance",
+          "direction": "pass",
+          "pValue": 0.00003707347569240485,
+          "adjustedPValue": 0.0000741469513848097,
+          "adjustment": "bonferroni",
+          "familySize": 2,
+          "unadjustedOutcome": "pass",
+          "decidingMemberId": "accuracy",
+          "sampleSize": 400,
+          "coverage": null,
+          "suppressedGroups": null,
+          "libraryEntry": null,
+          "reasons": []
+        }
+      },
+      {
+        "testId": "equalized_odds",
+        "label": "Equalized odds",
+        "article": "10",
+        "outcome": "inconclusive",
+        "metrics": [
+          {
+            "name": "maximum_tpr_fpr_gap",
+            "value": 0.050000000000000044,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0,
+              "upper": 0.14416032135575416,
+              "level": 0.95,
+              "method": "worst_member_bounds"
+            },
+            "slices": [
+              {
+                "slice": "A",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "tprNumerator": 90,
+                "tprDenominator": 100,
+                "tpr": 0.9,
+                "tprConfidenceInterval": {
+                  "lower": 0.8256343384950865,
+                  "upper": 0.9447708629393249,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "fprNumerator": 10,
+                "fprDenominator": 100,
+                "fpr": 0.1,
+                "fprConfidenceInterval": {
+                  "lower": 0.0552291370606751,
+                  "upper": 0.17436566150491345,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              },
+              {
+                "slice": "B",
+                "n": 200,
+                "declared": false,
+                "suppressed": false,
+                "tprNumerator": 85,
+                "tprDenominator": 100,
+                "tpr": 0.85,
+                "tprConfidenceInterval": {
+                  "lower": 0.7671644040916764,
+                  "upper": 0.9069401471634336,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "fprNumerator": 12,
+                "fprDenominator": 100,
+                "fpr": 0.12,
+                "fprConfidenceInterval": {
+                  "lower": 0.06999406437019487,
+                  "upper": 0.1981209942671142,
+                  "level": 0.95,
+                  "method": "wilson"
+                }
+              }
+            ],
+            "details": {
+              "role": "headline",
+              "metric": "equalized_odds",
+              "subject": null,
+              "comparator": null,
+              "counts": null,
+              "band": {
+                "lower": null,
+                "upper": 0.1
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "tpr_difference:B|A",
+            "value": -0.050000000000000044,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": -0.14416032135575416,
+              "upper": 0.04366126184318066,
+              "level": 0.95,
+              "method": "newcombe_hybrid_score"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "tpr_difference",
+              "subject": "B",
+              "comparator": "A",
+              "counts": {
+                "subject": {
+                  "x": 85,
+                  "n": 100
+                },
+                "comparator": {
+                  "x": 90,
+                  "n": 100
+                }
+              },
+              "band": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.28884879950132836
+          },
+          {
+            "name": "fpr_difference:A|B",
+            "value": -0.01999999999999999,
+            "unit": "ratio",
+            "sampleSize": 400,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": -0.11004065700345762,
+              "upper": 0.06961498317399598,
+              "level": 0.95,
+              "method": "newcombe_hybrid_score"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "fpr_difference",
+              "subject": "A",
+              "comparator": "B",
+              "counts": {
+                "subject": {
+                  "x": 10,
+                  "n": 100
+                },
+                "comparator": {
+                  "x": 12,
+                  "n": 100
+                }
+              },
+              "band": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.07964587546074586
+          }
+        ],
+        "limitations": [
+          "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations. Protected-data processing requires a separately reviewed basis.",
+          "The confidence interval straddles the acceptable band, so the evidence is inconclusive."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "group_comparison",
+          "direction": "pass",
+          "pValue": 0.28884879950132836,
+          "adjustedPValue": 0.5776975990026567,
+          "adjustment": "bonferroni",
+          "familySize": 2,
+          "unadjustedOutcome": "inconclusive",
+          "decidingMemberId": "tpr_difference:B|A",
+          "sampleSize": 400,
+          "coverage": {
+            "eligibleRows": 400,
+            "populationRows": 400,
+            "unknownGroupRows": 0,
+            "value": 1,
+            "minimum": 1
+          },
+          "suppressedGroups": [],
+          "libraryEntry": null,
+          "reasons": [
+            "interval_straddles_band"
+          ]
+        }
+      }
+    ],
+    "paperIds": [
+      "PAPER-RUN-FX0006-A15",
+      "PAPER-RUN-FX0006-A10"
+    ],
+    "createdAt": "2026-11-06T09:00:00.000Z",
+    "rulePack": {
+      "version": "2026.11.1",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.1",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
+        "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "protocol": "9c3aa18cef563fd5d35a15c7fa6d039906b331381b0bb44dcf0c17109c226f07",
+        "statisticsPlan": "d5a2879c350d2ab94c88bdc56c22a8ccea6066f1c6b49f81808bbbd6dd6fd159",
+        "manifest": "9c7368f9907dd7153dff1f7662031cc2e4af54a450aa0bb8857d4fa9ce12bc0d",
+        "configuration": "b630a1cc50590cd5d82d8365fb29a9a81fb9cfedd125bd6b2d24dfba7f7249d1"
+      },
+      "runnerVersion": "interactive-predictions-3.0.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "id": "MODEL-BINARY",
+        "name": "binary scorer",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Hosted 1.4 contract fixture",
+        "artifactId": "EV-BINARY",
+        "status": "registered",
+        "sourceSha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf"
+      },
+      "dataset": {
+        "id": "EV-BINARY",
+        "name": "binary.csv",
+        "sha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "size": 2422,
+        "rowCount": 400,
+        "columns": [
+          "actual",
+          "predicted",
+          "group"
+        ]
+      },
+      "profile": {
+        "name": "Legacy acceptance",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance",
+          "equalized_odds"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "group",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "minimumGroupSize": 20,
+          "maximumParityGap": 0.1,
+          "minimumImpactRatio": 0.8,
+          "minimumAccuracy": 0.8,
+          "minimumSampleSize": 20,
+          "minimumClassCount": 5,
+          "maximumOddsGap": 0.1,
+          "minimumRecall": 0.7,
+          "minimumMacroF1": 0.7,
+          "maximumRmse": 1
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic applicants",
+          "predictionProvenance": "Exported by the provider",
+          "independence": "Holdout declared by the provider",
+          "sensitiveDataBasis": "Synthetic groups; no personal data"
+        },
+        "rationale": "Legacy thresholds; the plan is derived per run",
+        "id": "PROTOCOL-FX0002",
+        "schemaVersion": "1.0",
+        "createdAt": "2026-11-06T09:00:00.000Z",
+        "createdBy": "fixture-auditor"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": {
+          "sampleSize": 20,
+          "groupSize": 20,
+          "classCount": 5
+        },
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": {
+          "source": "hosted_config",
+          "contractVersion": "1.1"
+        },
+        "criteria": [
+          {
+            "id": "performance",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          },
+          {
+            "id": "equalized_odds",
+            "kind": "group_comparison",
+            "role": "confirmatory",
+            "rationale": null,
+            "metric": "equalized_odds",
+            "band": {
+              "lower": -0.1,
+              "upper": 0.1
+            },
+            "comparison": {
+              "mode": "all_pairs",
+              "referenceGroup": null
+            },
+            "groupFields": null,
+            "declaredGroups": null,
+            "minimumCoverage": 1,
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.0.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "startedAt": "2026-11-06T09:00:00.000Z",
+    "completedAt": "2026-11-06T09:00:00.000Z",
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-FX0007",
+    "engagementId": "ENG-FIXTURE",
+    "modelId": "MODEL-MULTICLASS",
+    "datasetId": "EV-MULTICLASS",
+    "task": "Multiclass classification",
+    "profileId": "PROTOCOL-FX0003",
+    "suite": [
+      "performance"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "",
+      "performancePositiveLabel": "",
+      "negativeLabel": ""
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-FX0003",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T09:00:00.000Z",
+      "frozenBy": "fixture-auditor",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "",
+      "performancePositiveLabel": "",
+      "negativeLabel": ""
+    },
+    "state": "succeeded",
+    "outcome": "pass",
+    "results": [
+      {
+        "testId": "performance",
+        "label": "Multiclass classification performance",
+        "article": "15",
+        "outcome": "pass",
+        "metrics": [
+          {
+            "name": "accuracy",
+            "value": 0.8666666666666667,
+            "unit": "ratio",
+            "sampleSize": 180,
+            "numerator": 156,
+            "denominator": 180,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8092727787274112,
+              "upper": 0.908737189463406,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 156,
+                "n": 180
+              },
+              "band": {
+                "lower": 0.7,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.0000010635492679527308
+          },
+          {
+            "name": "balanced_accuracy",
+            "value": 0.8666666666666667,
+            "unit": "ratio",
+            "sampleSize": 180,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.8041290881162434,
+              "upper": 0.9037280728603825,
+              "level": 0.95,
+              "method": "mover_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "balanced_accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "perClass": [
+                  {
+                    "label": "a",
+                    "tp": 52,
+                    "support": 60,
+                    "predicted": 60
+                  },
+                  {
+                    "label": "b",
+                    "tp": 52,
+                    "support": 60,
+                    "predicted": 60
+                  },
+                  {
+                    "label": "c",
+                    "tp": 52,
+                    "support": 60,
+                    "predicted": 60
+                  }
+                ]
+              },
+              "band": {
+                "lower": 0.3333333333333333,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": 3.612619749675804e-27,
+              "reasons": []
+            },
+            "pValue": 3.612619749675804e-27
+          },
+          {
+            "name": "macro_f1",
+            "value": 0.8666666666666667,
+            "unit": "ratio",
+            "sampleSize": 180,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7685418948597261,
+              "upper": 0.9271361748517101,
+              "level": 0.95,
+              "method": "jaccard_wilson_bonferroni"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "macro_f1",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "perClass": [
+                  {
+                    "label": "a",
+                    "tp": 52,
+                    "tpPlusFpPlusFn": 68
+                  },
+                  {
+                    "label": "b",
+                    "tp": 52,
+                    "tpPlusFpPlusFn": 68
+                  },
+                  {
+                    "label": "c",
+                    "tp": 52,
+                    "tpPlusFpPlusFn": 68
+                  }
+                ]
+              },
+              "band": {
+                "lower": 0.6,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 6.389124583609413e-8
+          },
+          {
+            "name": "macro_precision",
+            "value": 0.8666666666666667,
+            "unit": "ratio",
+            "sampleSize": 180,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7293524027029576,
+              "upper": 0.9400411371118903,
+              "level": 0.95,
+              "method": "wilson_bonferroni_mean"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "macro_precision",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "perClass": [
+                  {
+                    "label": "a",
+                    "tp": 52,
+                    "predicted": 60
+                  },
+                  {
+                    "label": "b",
+                    "tp": 52,
+                    "predicted": 60
+                  },
+                  {
+                    "label": "c",
+                    "tp": 52,
+                    "predicted": 60
+                  }
+                ]
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          }
+        ],
+        "limitations": [
+          "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. Balanced accuracy is macro recall over the observed classes."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "multiclass_performance",
+          "direction": "pass",
+          "pValue": 0.0000010635492679527308,
+          "adjustedPValue": 0.0000010635492679527308,
+          "adjustment": "bonferroni",
+          "familySize": 1,
+          "unadjustedOutcome": "pass",
+          "decidingMemberId": "accuracy",
+          "sampleSize": 180,
+          "coverage": null,
+          "suppressedGroups": null,
+          "libraryEntry": null,
+          "reasons": []
+        }
+      }
+    ],
+    "paperIds": [
+      "PAPER-RUN-FX0007-A15"
+    ],
+    "createdAt": "2026-11-06T09:00:00.000Z",
+    "rulePack": {
+      "version": "2026.11.1",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.1",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "f133e1094d5c2f16f658d4b5e65dcba527481e4af64e9e2cb47b8627139fd791",
+        "modelMetadata": "d3b1ba29852a4d5e3caecd279f212a6e32f40456af5923cc79f7a71761c71c58",
+        "modelArtifact": "f133e1094d5c2f16f658d4b5e65dcba527481e4af64e9e2cb47b8627139fd791",
+        "protocol": "c71ec5aebddbe218c1526ad7c93d161565fddf15cd455bc885c42235b870dd8c",
+        "statisticsPlan": "68826171823bc4f577f6733fe4c6702d3f3f91e3acc2dccf894f0e1648c32e45",
+        "manifest": "8207cfb3325d00207e86588d53e5bf81db310c88c61e89b442fa4762de766392",
+        "configuration": "bf7f7246a6d1de2856e721f37714ff57603929658f2fe2deb42203e6257ea024"
+      },
+      "runnerVersion": "interactive-predictions-3.0.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "id": "MODEL-MULTICLASS",
+        "name": "multiclass scorer",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Multiclass classification",
+        "intendedPurpose": "Hosted 1.4 contract fixture",
+        "artifactId": "EV-MULTICLASS",
+        "status": "registered",
+        "sourceSha256": "f133e1094d5c2f16f658d4b5e65dcba527481e4af64e9e2cb47b8627139fd791"
+      },
+      "dataset": {
+        "id": "EV-MULTICLASS",
+        "name": "multiclass.csv",
+        "sha256": "f133e1094d5c2f16f658d4b5e65dcba527481e4af64e9e2cb47b8627139fd791",
+        "size": 736,
+        "rowCount": 180,
+        "columns": [
+          "actual",
+          "predicted"
+        ]
+      },
+      "profile": {
+        "name": "Multiclass acceptance",
+        "version": "1.0",
+        "task": "Multiclass classification",
+        "suite": [
+          "performance"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "",
+          "positiveLabel": "",
+          "performancePositiveLabel": "",
+          "negativeLabel": ""
+        },
+        "statistics": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "minimums": {
+            "sampleSize": 30,
+            "groupSize": 30,
+            "classCount": 10
+          },
+          "configuredMinimums": null,
+          "multiplicity": {
+            "confirmatory": "bonferroni",
+            "exploratory": "benjamini_hochberg"
+          },
+          "clusterField": null,
+          "bootstrap": {
+            "replicates": 2000
+          },
+          "calibrationBins": 10,
+          "power": {
+            "targetPower": 0.8,
+            "acknowledgement": null
+          },
+          "derivedFrom": null,
+          "criteria": [
+            {
+              "id": "performance",
+              "kind": "multiclass_performance",
+              "role": "confirmatory",
+              "rationale": null,
+              "members": [
+                {
+                  "metric": "accuracy",
+                  "band": {
+                    "lower": 0.7,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "balanced_accuracy",
+                  "band": {
+                    "lower": 0.3333333333333333,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "macro_f1",
+                  "band": {
+                    "lower": 0.6,
+                    "upper": null
+                  }
+                }
+              ],
+              "libraryEntry": null,
+              "powerAssumptions": null
+            }
+          ]
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic applicants",
+          "predictionProvenance": "Exported by the provider",
+          "independence": "Holdout declared by the provider",
+          "sensitiveDataBasis": ""
+        },
+        "rationale": "Pre-registered multiclass criteria",
+        "id": "PROTOCOL-FX0003",
+        "schemaVersion": "1.1",
+        "createdAt": "2026-11-06T09:00:00.000Z",
+        "createdBy": "fixture-auditor"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": null,
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": null,
+        "criteria": [
+          {
+            "id": "performance",
+            "kind": "multiclass_performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.3333333333333333,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "macro_f1",
+                "band": {
+                  "lower": 0.6,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.0.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "startedAt": "2026-11-06T09:00:00.000Z",
+    "completedAt": "2026-11-06T09:00:00.000Z",
+    "overallOutcome": "pass",
+    "reviewFlags": []
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-FX0008",
+    "engagementId": "ENG-FIXTURE",
+    "modelId": "MODEL-REGRESSION",
+    "datasetId": "EV-REGRESSION",
+    "task": "Regression",
+    "profileId": "PROTOCOL-FX0004",
+    "suite": [
+      "regression"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "",
+      "performancePositiveLabel": "",
+      "minimumGroupSize": 30,
+      "maximumParityGap": 0.1,
+      "minimumImpactRatio": 0.8,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 0.5
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-FX0004",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T09:00:00.000Z",
+      "frozenBy": "fixture-auditor",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "",
+      "performancePositiveLabel": "",
+      "minimumGroupSize": 30,
+      "maximumParityGap": 0.1,
+      "minimumImpactRatio": 0.8,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 0.5
+    },
+    "state": "succeeded",
+    "outcome": "pass",
+    "results": [
+      {
+        "testId": "regression",
+        "label": "Regression performance",
+        "article": "15",
+        "outcome": "pass",
+        "metrics": [
+          {
+            "name": "rmse",
+            "value": 0.3535533905932738,
+            "unit": "target units",
+            "sampleSize": 60,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.31355086545490196,
+              "upper": 0.38946868265944307,
+              "level": 0.95,
+              "method": "normal_approximation_mse"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "rmse",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "n": 60,
+                "meanSquaredError": 0.125,
+                "sdSquaredError": 0.1054650717343529
+              },
+              "band": {
+                "lower": null,
+                "upper": 0.5
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 4.281980581928883e-20
+          },
+          {
+            "name": "mae",
+            "value": 0.3,
+            "unit": "target units",
+            "sampleSize": 60,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.25226289175283445,
+              "upper": 0.3477371082471655,
+              "level": 0.95,
+              "method": "normal_approximation"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "mae",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "n": 60,
+                "meanAbsoluteError": 0.3,
+                "sdAbsoluteError": 0.1886616557199238
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "r2",
+            "value": 0.9895104895104895,
+            "unit": "score",
+            "sampleSize": 60,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": null,
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "r2",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "n": 60
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          }
+        ],
+        "limitations": [
+          "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. R² is descriptive and has no interval in the hosted runner."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "regression_performance",
+          "direction": "pass",
+          "pValue": 4.281980581928883e-20,
+          "adjustedPValue": 4.281980581928883e-20,
+          "adjustment": "bonferroni",
+          "familySize": 1,
+          "unadjustedOutcome": "pass",
+          "decidingMemberId": "rmse",
+          "sampleSize": 60,
+          "coverage": null,
+          "suppressedGroups": null,
+          "libraryEntry": null,
+          "reasons": []
+        }
+      }
+    ],
+    "paperIds": [
+      "PAPER-RUN-FX0008-A15"
+    ],
+    "createdAt": "2026-11-06T09:00:00.000Z",
+    "rulePack": {
+      "version": "2026.11.1",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.1",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "2af04bb6e70d42eaa2f05f32d18a09521561c77b8e0db7b43aba0fac6c839984",
+        "modelMetadata": "11eaa9c3d2b20b1cbbeb637378da48e1e6fee7ebbab4457c68fbdf6e259e5f2f",
+        "modelArtifact": "2af04bb6e70d42eaa2f05f32d18a09521561c77b8e0db7b43aba0fac6c839984",
+        "protocol": "2159b5fd5c10604308623d005e8418dbc0d35fb66e2b9da35952803cb6dc2d02",
+        "statisticsPlan": "eadb2130a333b77ad882230394f4bb021c22d962f7f0a8814a9c2d90b224e528",
+        "manifest": "7291d6dc201398be8336ba8555e90b0b73b9e6d18369c1f9c9db16bcf5a796b9",
+        "configuration": "0946ce34011b98846c1ba4bd5cb0c7db235669f6c21707bcf946f43d7e1d0342"
+      },
+      "runnerVersion": "interactive-predictions-3.0.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "id": "MODEL-REGRESSION",
+        "name": "regression scorer",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Regression",
+        "intendedPurpose": "Hosted 1.4 contract fixture",
+        "artifactId": "EV-REGRESSION",
+        "status": "registered",
+        "sourceSha256": "2af04bb6e70d42eaa2f05f32d18a09521561c77b8e0db7b43aba0fac6c839984"
+      },
+      "dataset": {
+        "id": "EV-REGRESSION",
+        "name": "regression.csv",
+        "sha256": "2af04bb6e70d42eaa2f05f32d18a09521561c77b8e0db7b43aba0fac6c839984",
+        "size": 494,
+        "rowCount": 60,
+        "columns": [
+          "actual",
+          "predicted"
+        ]
+      },
+      "profile": {
+        "name": "Regression acceptance",
+        "version": "1.0",
+        "task": "Regression",
+        "suite": [
+          "regression"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "",
+          "positiveLabel": "",
+          "performancePositiveLabel": "",
+          "minimumGroupSize": 30,
+          "maximumParityGap": 0.1,
+          "minimumImpactRatio": 0.8,
+          "minimumAccuracy": 0.8,
+          "minimumSampleSize": 20,
+          "minimumClassCount": 5,
+          "maximumOddsGap": 0.1,
+          "minimumRecall": 0.7,
+          "minimumMacroF1": 0.7,
+          "maximumRmse": 0.5
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic applicants",
+          "predictionProvenance": "Exported by the provider",
+          "independence": "Holdout declared by the provider",
+          "sensitiveDataBasis": ""
+        },
+        "rationale": "Legacy regression threshold",
+        "id": "PROTOCOL-FX0004",
+        "schemaVersion": "1.0",
+        "createdAt": "2026-11-06T09:00:00.000Z",
+        "createdBy": "fixture-auditor"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": {
+          "sampleSize": 20,
+          "groupSize": 30,
+          "classCount": 5
+        },
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": {
+          "source": "hosted_config",
+          "contractVersion": "1.1"
+        },
+        "criteria": [
+          {
+            "id": "regression",
+            "kind": "regression_performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "rmse",
+                "band": {
+                  "lower": null,
+                  "upper": 0.5
+                }
+              }
+            ],
+            "passBlockedBy": [],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.0.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "startedAt": "2026-11-06T09:00:00.000Z",
+    "completedAt": "2026-11-06T09:00:00.000Z",
+    "overallOutcome": "pass",
+    "reviewFlags": []
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-FX0009",
+    "engagementId": "ENG-FIXTURE",
+    "modelId": "MODEL-BINARY",
+    "datasetId": "EV-BINARY",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-FX0001",
+    "suite": [
+      "performance",
+      "demographic_parity",
+      "disparate_impact"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "negativeLabel": "0"
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-FX0001",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T09:00:00.000Z",
+      "frozenBy": "fixture-auditor",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "group",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "negativeLabel": "0"
+    },
+    "state": "queued",
+    "outcome": null,
+    "results": [],
+    "paperIds": [],
+    "createdAt": "2026-11-06T09:00:00.000Z",
+    "rulePack": {
+      "version": "2026.11.1",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.1",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
+        "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "protocol": "99b329bc0baa15bb4887d300b74e35cbf0067f8daf5c19b8d759fc68f948fb58",
+        "statisticsPlan": "ca27c6dc00fe331f320bc30b5c6c607a687b4b123f6fc087fefc478a1e89f49e",
+        "manifest": "44615258c0b79a6d2a0c8195d13927302ab82d5263f2de6dd7e21d7fa18988e6",
+        "configuration": "b7a5d3e4c59190618911578abf6121f059ccc96f6a89e899e8e3bde962282eb3"
+      },
+      "runnerVersion": "interactive-predictions-3.0.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "id": "MODEL-BINARY",
+        "name": "binary scorer",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Hosted 1.4 contract fixture",
+        "artifactId": "EV-BINARY",
+        "status": "registered",
+        "sourceSha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf"
+      },
+      "dataset": {
+        "id": "EV-BINARY",
+        "name": "binary.csv",
+        "sha256": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
+        "size": 2422,
+        "rowCount": 400,
+        "columns": [
+          "actual",
+          "predicted",
+          "group"
+        ]
+      },
+      "profile": {
+        "name": "Planned screen",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance",
+          "demographic_parity",
+          "disparate_impact"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "group",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "negativeLabel": "0"
+        },
+        "statistics": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "minimums": {
+            "sampleSize": 30,
+            "groupSize": 30,
+            "classCount": 10
+          },
+          "configuredMinimums": null,
+          "multiplicity": {
+            "confirmatory": "bonferroni",
+            "exploratory": "benjamini_hochberg"
+          },
+          "clusterField": null,
+          "bootstrap": {
+            "replicates": 2000
+          },
+          "calibrationBins": 10,
+          "power": {
+            "targetPower": 0.8,
+            "acknowledgement": null
+          },
+          "derivedFrom": null,
+          "criteria": [
+            {
+              "id": "accuracy-gate",
+              "kind": "performance",
+              "role": "confirmatory",
+              "rationale": null,
+              "members": [
+                {
+                  "metric": "accuracy",
+                  "band": {
+                    "lower": 0.8,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "recall",
+                  "band": {
+                    "lower": 0.7,
+                    "upper": null
+                  }
+                },
+                {
+                  "metric": "balanced_accuracy",
+                  "band": {
+                    "lower": 0.5,
+                    "upper": null
+                  }
+                }
+              ],
+              "libraryEntry": null,
+              "powerAssumptions": null
+            },
+            {
+              "id": "parity-screen",
+              "kind": "group_comparison",
+              "role": "confirmatory",
+              "rationale": null,
+              "metric": "selection_rate_difference",
+              "band": {
+                "lower": -0.1,
+                "upper": 0.1
+              },
+              "comparison": {
+                "mode": "all_pairs",
+                "referenceGroup": null
+              },
+              "groupFields": null,
+              "declaredGroups": null,
+              "minimumCoverage": 1,
+              "libraryEntry": {
+                "id": "policy.eu-aia.selection-rate-difference",
+                "version": 1,
+                "parameters": {
+                  "delta": 0.1
+                },
+                "overriddenParameters": []
+              },
+              "powerAssumptions": null
+            },
+            {
+              "id": "impact-screen",
+              "kind": "group_comparison",
+              "role": "exploratory",
+              "rationale": null,
+              "metric": "selection_rate_ratio",
+              "band": {
+                "lower": 0.8,
+                "upper": 1.25
+              },
+              "comparison": {
+                "mode": "all_pairs",
+                "referenceGroup": null
+              },
+              "groupFields": null,
+              "declaredGroups": null,
+              "minimumCoverage": 1,
+              "libraryEntry": {
+                "id": "screen.us.four-fifths",
+                "version": 1,
+                "parameters": {
+                  "tau": 0.8
+                },
+                "overriddenParameters": []
+              },
+              "powerAssumptions": null
+            }
+          ]
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic applicants",
+          "predictionProvenance": "Exported by the provider",
+          "independence": "Holdout declared by the provider",
+          "sensitiveDataBasis": "Synthetic groups; no personal data"
+        },
+        "rationale": "Pre-registered acceptance rules for the fixture",
+        "id": "PROTOCOL-FX0001",
+        "schemaVersion": "1.1",
+        "createdAt": "2026-11-06T09:00:00.000Z",
+        "createdBy": "fixture-auditor"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": null,
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": null,
+        "criteria": [
+          {
+            "id": "accuracy-gate",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          },
+          {
+            "id": "parity-screen",
+            "kind": "group_comparison",
+            "role": "confirmatory",
+            "rationale": null,
+            "metric": "selection_rate_difference",
+            "band": {
+              "lower": -0.1,
+              "upper": 0.1
+            },
+            "comparison": {
+              "mode": "all_pairs",
+              "referenceGroup": null
+            },
+            "groupFields": null,
+            "declaredGroups": null,
+            "minimumCoverage": 1,
+            "libraryEntry": {
+              "id": "policy.eu-aia.selection-rate-difference",
+              "version": 1,
+              "parameters": {
+                "delta": 0.1
+              },
+              "overriddenParameters": []
+            },
+            "powerAssumptions": null
+          },
+          {
+            "id": "impact-screen",
+            "kind": "group_comparison",
+            "role": "exploratory",
+            "rationale": null,
+            "metric": "selection_rate_ratio",
+            "band": {
+              "lower": 0.8,
+              "upper": 1.25
+            },
+            "comparison": {
+              "mode": "all_pairs",
+              "referenceGroup": null
+            },
+            "groupFields": null,
+            "declaredGroups": null,
+            "minimumCoverage": 1,
+            "libraryEntry": {
+              "id": "screen.us.four-fifths",
+              "version": 1,
+              "parameters": {
+                "tau": 0.8
+              },
+              "overriddenParameters": []
+            },
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.0.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    }
+  }
+]

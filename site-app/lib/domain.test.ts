@@ -21,6 +21,7 @@ describe("domain entry point", () => {
       "finalReportGates",
       "gatesStage",
       "isReleaseTimeRecord",
+      "legacyConfig",
       "paperCurrent",
       "paperRequired",
       "releaseRequirements",

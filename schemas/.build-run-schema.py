@@ -1,7 +1,7 @@
 """Regenerate test-run.schema.json from its committed sources: the hand-maintained
 test-run.base.json (legacy 1.0 run body and shared definitions), the definitions built
 here (legacy 1.0 and hosted 1.1), external 1.2 via .extend-assurance-schema.py, and
-engine report 1.3 and external run 1.5 (statistics 1.0.0) via .statistics-schema.py,
+engine report 1.3, hosted run 1.4 and external run 1.5 (statistics 1.0.0) via .statistics-schema.py,
 which embeds statistics-plan.schema.json.
 The generated file is never read back. Usage: python schemas/.build-run-schema.py [--check]
 
@@ -156,6 +156,7 @@ output = statistics['add_statistics'](output)
 extend = runpy.run_path(str(Path(__file__).with_name('.extend-assurance-schema.py')))['extend_schema']
 output = extend(output)
 output = statistics['add_external_run'](output)
+output = statistics['add_hosted_run'](output)
 text = json.dumps(output, indent=2, ensure_ascii=False) + '\n'
 if '--check' in sys.argv[1:]:
     if p.read_bytes() != text.encode('utf-8'):

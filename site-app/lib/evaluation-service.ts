@@ -5,6 +5,7 @@ import {
   configSchema,
   suiteSchema,
   profileSchema,
+  planProfileSchema,
   tasks,
   assertSuite,
   fairnessSelected,
@@ -13,7 +14,13 @@ import {
   testDefinitionVersion,
 } from "./evaluation";
 import { inspectCSV, validateEvaluation } from "./diagnostics";
+import {
+  planSuite,
+  resolvePlan,
+  validateHostedPlan,
+} from "./hosted-statistics";
 import { recordVersions } from "./rule-pack-current";
+import { StatisticsError, planSha256 } from "./statistics";
 const short = z.string().trim().min(1).max(300),
   notes = z.string().trim().max(5000);
 const cardSchema = z
@@ -106,11 +113,19 @@ export function registerModel(
   e.models.push(m);
   return m;
 }
+/**
+ * Saves a protocol. A saved protocol is frozen: changing its plan, bands or
+ * mappings needs a new protocol version, and each run freezes the protocol
+ * and its plan into its manifest (#22). A request with `statistics` saves a
+ * pre-registered plan (schemaVersion 1.1); one with legacy thresholds saves a
+ * 1.0 protocol whose plan each run derives (section 9.3).
+ */
 export function registerProfile(
   e: Engagement,
   data: Record<string, unknown>,
   actor: string,
 ) {
+  if ("statistics" in data) return registerPlanProfile(e, data, actor);
   const a = profileSchema.parse(data);
   try {
     assertSuite(a.task, a.suite);
@@ -148,6 +163,18 @@ export function registerProfile(
       400,
       "Fairness procedures require a protected-group mapping and a reviewed data-handling basis",
     );
+  assertNewVersion(e, a);
+  const p: EvaluationProfile = {
+    ...a,
+    id: id("PROTOCOL"),
+    schemaVersion: "1.0",
+    createdAt: now(),
+    createdBy: actor,
+  };
+  (e.evaluationProfiles ??= []).push(p);
+  return p;
+}
+function assertNewVersion(e: Engagement, a: { name: string; version: string }) {
   if (
     (e.evaluationProfiles ?? []).some(
       (p) =>
@@ -157,12 +184,85 @@ export function registerProfile(
   )
     throw new ApiError(
       409,
-      "This protocol name and version already exist. Create a new version.",
+      "This protocol name and version already exist. A saved protocol and its plan are frozen: create a new version to change them.",
     );
+}
+/** A protocol with a pre-registered statistics plan (schemaVersion 1.1). */
+function registerPlanProfile(
+  e: Engagement,
+  data: Record<string, unknown>,
+  actor: string,
+) {
+  const a = planProfileSchema.parse(data);
+  let statistics;
+  try {
+    statistics = validateHostedPlan(a.task, a.statistics);
+  } catch (error) {
+    if (error instanceof StatisticsError)
+      throw new ApiError(400, error.message);
+    throw error;
+  }
+  const suite = planSuite(statistics);
+  if (
+    a.suite &&
+    (a.suite.length !== suite.length || a.suite.some((x) => !suite.includes(x)))
+  )
+    throw new ApiError(
+      400,
+      "The protocol's procedures must be exactly the families of its plan's criteria: " +
+        suite.join(", "),
+    );
+  const c = a.config;
+  if (c.labelColumn === c.predictionColumn)
+    throw new ApiError(400, "Target and prediction columns must be distinct");
+  if (a.task === "Binary classification") {
+    if (
+      !c.positiveLabel ||
+      !c.negativeLabel ||
+      c.positiveLabel === c.negativeLabel
+    )
+      throw new ApiError(
+        400,
+        "Binary classification declares two distinct labels: the favourable label and the other label",
+      );
+    // Only binary performance measures its own positive class.
+    c.performancePositiveLabel = suite.includes("performance")
+      ? c.performancePositiveLabel || c.positiveLabel
+      : "";
+    if (
+      c.performancePositiveLabel &&
+      ![c.positiveLabel, c.negativeLabel].includes(c.performancePositiveLabel)
+    )
+      throw new ApiError(
+        400,
+        "The performance positive class must be one of the two declared labels",
+      );
+  } else {
+    c.positiveLabel = "";
+    c.negativeLabel = "";
+    c.performancePositiveLabel = "";
+  }
+  if (fairnessSelected(suite)) {
+    if (new Set([c.labelColumn, c.predictionColumn, c.groupColumn]).size !== 3)
+      throw new ApiError(400, "Mapped role columns must be distinct");
+    if (!c.groupColumn || !a.datasetContext.sensitiveDataBasis)
+      throw new ApiError(
+        400,
+        "Fairness procedures require a protected-group mapping and a reviewed data-handling basis",
+      );
+  } else c.groupColumn = "";
+  assertNewVersion(e, a);
   const p: EvaluationProfile = {
-    ...a,
+    name: a.name,
+    version: a.version,
+    task: a.task,
+    suite,
+    config: c,
+    statistics,
+    datasetContext: a.datasetContext,
+    rationale: a.rationale,
     id: id("PROTOCOL"),
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     createdAt: now(),
     createdBy: actor,
   };
@@ -330,7 +430,7 @@ async function freezeRun(
   if (m.sourceSha256 && m.sourceSha256 !== dataset.sha256)
     throw new ApiError(400, "Registered prediction artifact hash changed");
   const run: Run = {
-    contractVersion: "1.1",
+    contractVersion: "1.4",
     id: id("RUN"),
     engagementId: e.id,
     modelId: m.id,
@@ -382,6 +482,15 @@ async function freezeRun(
       columns: Object.keys(dataRows[0]),
     },
     profile: profile ? structuredClone(profile) : null,
+    // The plan that decides the run, frozen with the inputs: the protocol's
+    // stored plan, or the derivation of a legacy protocol (section 9.3).
+    statistics: resolvePlan(
+      m.task,
+      run.suite,
+      run.config,
+      profile?.statistics,
+      dataRows,
+    ),
     executionMode: "saved_predictions",
     lineage: "registered_prediction_artifact",
     testDefinitionVersion,
@@ -397,6 +506,10 @@ async function freezeRun(
   };
   if (profile)
     run.provenance.inputHashes.protocol = await sha256(JSON.stringify(profile));
+  // The SHA-256 of the plan's RFC 8785 canonical JSON (section 9.2).
+  run.provenance.inputHashes.statisticsPlan = planSha256(
+    run.manifest.statistics,
+  );
   run.provenance.inputHashes.manifest = await sha256(
     JSON.stringify(run.manifest),
   );
@@ -447,6 +560,12 @@ export async function verifyFrozenInputs(
       run.provenance.inputHashes.protocol
   )
     throw Error("Frozen protocol integrity check failed");
+  if (
+    run.manifest.statistics &&
+    planSha256(run.manifest.statistics) !==
+      run.provenance.inputHashes.statisticsPlan
+  )
+    throw Error("Frozen statistics plan integrity check failed");
   if (
     (await sha256(
       JSON.stringify({

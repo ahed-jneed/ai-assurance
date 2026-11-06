@@ -2,6 +2,7 @@
 // roles people act in.
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
+import type { Decision, Plan } from "../statistics";
 export type Role =
   | "Auditor"
   | "Lead Auditor"
@@ -163,7 +164,12 @@ export type Model = {
   registeredAt?: string;
   registeredBy?: string;
 };
-export type EvaluationConfig = {
+/**
+ * The column mappings and declared labels of an evaluation. A profile with a
+ * stored statistics plan (schemaVersion 1.1) keeps only these in its config;
+ * bands and minimums live in the plan (docs/design/audit-statistics.md 9.1).
+ */
+export type PlanConfig = {
   labelColumn: string;
   predictionColumn: string;
   groupColumn: string;
@@ -171,6 +177,11 @@ export type EvaluationConfig = {
   positiveLabel: string;
   /** The class binary recall is measured on; absent or empty: positiveLabel. */
   performancePositiveLabel?: string;
+  /** The other declared binary label; with it, data with one observed label is evaluated. */
+  negativeLabel?: string;
+};
+/** The legacy (schemaVersion 1.0) configuration, from which each run derives its plan. */
+export type EvaluationConfig = PlanConfig & {
   minimumGroupSize: number;
   maximumParityGap: number;
   minimumImpactRatio: number;
@@ -182,14 +193,23 @@ export type EvaluationConfig = {
   minimumMacroF1?: number;
   maximumRmse?: number;
 };
+/** The legacy thresholds of a configuration, or null for a plan configuration. */
+export function legacyConfig(
+  config: PlanConfig | EvaluationConfig,
+): EvaluationConfig | null {
+  return "minimumAccuracy" in config ? config : null;
+}
 export type EvaluationProfile = {
   id: string;
-  schemaVersion: "1.0";
+  /** 1.1 stores the pre-registered statistics plan; 1.0 derives it per run. */
+  schemaVersion: "1.0" | "1.1";
   name: string;
   version: string;
   task: string;
   suite: string[];
-  config: EvaluationConfig;
+  config: EvaluationConfig | PlanConfig;
+  /** The normalised plan, frozen when the profile is saved (schemaVersion 1.1). */
+  statistics?: Plan;
   datasetContext: {
     split: "test" | "validation" | "training" | "unknown";
     population: string;
@@ -256,6 +276,18 @@ export type Metric = {
   unit: string;
   sampleSize: number;
   details?: unknown;
+  /** Statistics 1.0.0 results (hosted 1.4, external 1.5) carry the shared metric shape. */
+  numerator?: number | null;
+  denominator?: number | null;
+  threshold?: unknown;
+  confidenceInterval?: {
+    lower: number;
+    upper: number;
+    level: number;
+    method: string;
+  } | null;
+  slices?: unknown[];
+  pValue?: number | null;
 };
 export type Result = {
   testId: string;
@@ -264,6 +296,8 @@ export type Result = {
   outcome: Outcome;
   metrics: Metric[];
   limitations: string[];
+  /** The statistics 1.0.0 decision (hosted 1.4, external 1.5). */
+  decision?: Decision;
 };
 export type Run = {
   externalJobId?: string;
@@ -274,7 +308,7 @@ export type Run = {
     briefRevision: number;
     programRevision: number;
   };
-  contractVersion: "1.0" | "1.1" | "1.2";
+  contractVersion: "1.0" | "1.1" | "1.2" | "1.4" | "1.5";
   id: string;
   engagementId: string;
   modelId: string;
@@ -285,6 +319,8 @@ export type Run = {
   state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   outcome: Outcome | null;
   overallOutcome?: Outcome;
+  /** Exploratory criteria that failed (statistics 1.0.0); they never change the outcome. */
+  reviewFlags?: string[];
   results: Result[];
   paperIds: string[];
   createdAt: string;
@@ -299,7 +335,7 @@ export type Run = {
   /** The rule pack and methodology the run was made under; absent on older runs. */
   rulePack?: RulePackStamp;
   methodologyVersion?: string;
-  config: EvaluationConfig;
+  config: EvaluationConfig | PlanConfig;
   task?: string;
   profileId?: string;
   manifest?: {
@@ -328,6 +364,8 @@ export type Run = {
       "registered_prediction_artifact" | "authenticated_external_attempt";
     testDefinitionVersion: string;
     limitations: string[];
+    /** The normalised plan that decides the run, frozen at queueing (1.4, 1.5). */
+    statistics?: Plan;
   };
 };
 export type Report = {

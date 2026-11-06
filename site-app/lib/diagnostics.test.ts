@@ -1,19 +1,201 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- the golden fixture is untyped JSON. */
 import { describe, expect, it } from "vitest";
 import { evaluate, inspectCSV, parseCSV } from "./diagnostics";
-import type { EvaluationConfig, Result, Run } from "./domain";
+import type { EvaluationConfig, PlanConfig, Result, Run } from "./domain";
+import { explainResult, planSuite } from "./hosted-statistics";
+import {
+  HEADLINE_NAMES,
+  planFor,
+  planSha256,
+  validatePlan,
+} from "./statistics";
+import { GOLDEN, differences, publicView } from "./statistics.fixture";
 
-const config: EvaluationConfig = {
+// ------------------------------------------------------------ end to end: the golden cases through the hosted runner
+const TASKS: Record<string, string> = {
+  multiclass: "Multiclass classification",
+  regression: "Regression",
+};
+const repr = (v: number) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
+
+/** Rows from the case data, exactly as howToUse.rowExpansion states. */
+function expand(data: any) {
+  const rows: string[][] = [];
+  if (data.groups)
+    for (const g of data.groups) {
+      const pairs: [string, string, number][] =
+        "selected" in g
+          ? [
+              ["1", "1", g.selected],
+              ["0", "0", g.n - g.selected],
+            ]
+          : [
+              ["1", "1", g.tp],
+              ["0", "1", g.fp],
+              ["1", "0", g.fn],
+              ["0", "0", g.tn],
+            ];
+      for (const [a, p, count] of pairs)
+        for (let i = 0; i < count; i++) rows.push([a, p, g.group]);
+    }
+  else if (data.kind === "multiclass")
+    data.labels.forEach((label: string, i: number) =>
+      data.matrix[i].forEach((count: number, j: number) => {
+        for (let k = 0; k < count; k++) rows.push([label, data.labels[j], ""]);
+      }),
+    );
+  else {
+    const targets: number[] = data.targets ?? data.errors.map(() => 0);
+    targets.forEach((t, i) =>
+      rows.push([repr(t), repr(t + data.errors[i]), ""]),
+    );
+  }
+  return (
+    "actual,predicted,group\n" +
+    rows.map((r) => r.map((v) => v || "x").join(",")).join("\n")
+  );
+}
+
+/** A frozen run for a case: an explicit plan as a 1.1 profile, a hosted_config case as its legacy configuration. */
+function goldenRun(c: any) {
+  const legacy = c.legacy;
+  if (legacy)
+    return {
+      task: legacy.task,
+      suite: legacy.suite,
+      config: legacy.config,
+    } as Run;
+  const plan = planFor(c);
+  const task = TASKS[c.data.kind] ?? "Binary classification";
+  const config: PlanConfig = {
+    labelColumn: "actual",
+    predictionColumn: "predicted",
+    groupColumn: c.data.groups ? "group" : "",
+    positiveLabel: task === "Binary classification" ? "1" : "",
+    negativeLabel: task === "Binary classification" ? "0" : "",
+  };
+  return {
+    task,
+    suite: planSuite(plan),
+    config,
+    manifest: { statistics: plan },
+  } as unknown as Run;
+}
+
+/** Maps a hosted result back to the fixture's criterion shape (the inverse of section 11.4). */
+function fixtureView(result: Result) {
+  const metrics = result.metrics as any[];
+  let headline = null,
+    groups = null;
+  if (result.decision!.kind === "group_comparison") {
+    const top = metrics[0];
+    const metric = top.details.metric;
+    if (top.value !== null)
+      headline = {
+        names: HEADLINE_NAMES[metric],
+        estimate: top.value,
+        interval: top.confidenceInterval,
+        band: top.details.band,
+      };
+    groups = top.slices.map((s: any) => {
+      const out: any = {
+        group: s.slice,
+        n: s.n,
+        declared: s.declared,
+        suppressed: s.suppressed,
+      };
+      for (const [key, estimate] of [
+        ["selection", "selectionRate"],
+        ["tpr", "tpr"],
+        ["fpr", "fpr"],
+      ])
+        if (`${key}Numerator` in s)
+          out[key] = {
+            x: s[`${key}Numerator`],
+            n: s[`${key}Denominator`],
+            estimate: s[estimate],
+            interval: s[`${key}ConfidenceInterval`],
+          };
+      return out;
+    });
+  }
+  const entry = (m: any) => ({
+    memberId: m.name,
+    metric: m.details.metric,
+    subject: m.details.subject,
+    comparator: m.details.comparator,
+    counts: m.details.counts,
+    estimate: m.value,
+    interval: m.confidenceInterval,
+    band: m.details.band,
+    status: m.details.status,
+    direction: m.details.direction,
+    pValue: m.pValue,
+    smallCell: m.details.smallCell,
+    fisherExactP: m.details.fisherExactP,
+    chanceExactP: m.details.chanceExactP,
+    reasons: m.details.reasons,
+  });
+  return {
+    id: result.testId,
+    outcome: result.outcome,
+    headline,
+    members: metrics.filter((m) => m.details.role === "member").map(entry),
+    descriptive: metrics
+      .filter((m) => m.details.role === "descriptive")
+      .map(entry),
+    groups,
+    decision: result.decision,
+  };
+}
+
+const END_TO_END = (GOLDEN.cases as any[]).filter((c) => c.endToEnd.hosted);
+
+describe("statistics golden cases through the hosted runner (end to end)", () => {
+  it("covers every case the fixture marks for the hosted runner", () => {
+    expect(END_TO_END.length).toBeGreaterThanOrEqual(25);
+  });
+
+  it.each(END_TO_END.map((c) => [c.id, c]))(
+    "%s reproduces the engine's decisions",
+    (_, c: any) => {
+      const { results, evaluation } = evaluate(goldenRun(c), expand(c.data));
+      const expected = c.expected;
+      expect(publicView(evaluation.normalizedPlan)).toEqual(
+        expected.normalizedPlan,
+      );
+      expect(evaluation.planSha256).toBe(expected.planSha256);
+      expect(results.map((r) => r.testId)).toEqual(
+        expected.criteria.map((x: any) => x.id),
+      );
+      results.forEach((result, i) =>
+        expect(
+          differences(publicView(fixtureView(result)), expected.criteria[i]),
+          result.testId,
+        ).toEqual([]),
+      );
+      expect(evaluation.overallOutcome).toBe(expected.overallOutcome);
+      expect(evaluation.reviewFlags).toEqual(expected.reviewFlags);
+      // Every result explains its interval in plain language.
+      for (const result of results)
+        expect(explainResult(result).length).toBeGreaterThan(20);
+    },
+  );
+});
+
+// ------------------------------------------------------------ behaviour
+const legacy: EvaluationConfig = {
   labelColumn: "actual",
   predictionColumn: "predicted",
   groupColumn: "group",
   positiveLabel: "1",
   performancePositiveLabel: "",
-  minimumGroupSize: 5,
+  minimumGroupSize: 30,
   maximumParityGap: 0.2,
   minimumImpactRatio: 0.8,
   minimumAccuracy: 0.8,
-  minimumSampleSize: 20,
-  minimumClassCount: 5,
+  minimumSampleSize: 30,
+  minimumClassCount: 10,
   maximumOddsGap: 0.2,
   minimumRecall: 0.7,
   minimumMacroF1: 0.5,
@@ -24,7 +206,7 @@ function run(
   overrides: Partial<EvaluationConfig> = {},
   task = "Binary classification",
 ) {
-  return { task, suite, config: { ...config, ...overrides } } as Run;
+  return { task, suite, config: { ...legacy, ...overrides } } as Run;
 }
 /** A CSV with `count` copies of each [actual, predicted, group] row. */
 function csv(rows: [string, string, string, number][]) {
@@ -38,261 +220,167 @@ function csv(rows: [string, string, string, number][]) {
   );
 }
 const metric = (result: Result, name: string) =>
-  result.metrics.find((m) => m.name === name)?.value;
+  result.metrics.find((m) => m.name === name);
 
-describe("binary performance", () => {
-  // 85 favourable and 15 other reference rows; every prediction favourable.
-  const constant = csv([
-    ["1", "1", "A", 85],
-    ["0", "1", "A", 15],
-  ]);
-
-  it("fails a constant majority-class predictor that meets accuracy and recall", () => {
-    const [performance] = evaluate(run(["performance"]), constant);
-    expect(performance.outcome).toBe("fail");
-    expect(metric(performance, "accuracy")).toBe(0.85);
-    expect(metric(performance, "recall")).toBe(1);
-    expect(metric(performance, "specificity")).toBe(0);
-    expect(metric(performance, "balanced_accuracy")).toBe(0.5);
-    expect(metric(performance, "prevalence")).toBe(0.85);
-    expect(metric(performance, "majority_baseline_accuracy")).toBe(0.85);
-    expect(performance.limitations).toContainEqual(
-      expect.stringContaining("no better than a constant prediction"),
-    );
-  });
-
-  it("reports accuracy first and per-class recall for both classes", () => {
-    const [performance] = evaluate(run(["performance"]), constant);
-    expect(performance.metrics.map((m) => m.name)).toEqual([
-      "accuracy",
-      "precision",
-      "recall",
-      "f1",
-      "specificity",
-      "balanced_accuracy",
-      "prevalence",
-      "majority_baseline_accuracy",
-    ]);
-    expect(performance.metrics[0].details).toEqual({
-      tp: 85,
-      tn: 0,
-      fp: 15,
-      fn: 0,
-      n: 100,
-      rate: 1,
-      tpr: 1,
-      fpr: 1,
-    });
-    expect(
-      performance.metrics.find((m) => m.name === "balanced_accuracy")?.details,
-    ).toEqual([
-      expect.objectContaining({ label: "1", support: 85, recall: 1 }),
-      expect.objectContaining({ label: "0", support: 15, recall: 0 }),
-    ]);
-  });
-
-  it("passes a model that beats the majority baseline", () => {
-    const [performance] = evaluate(
-      run(["performance"]),
+describe("hosted decisions by interval", () => {
+  it("reports n and an interval for every headline and member metric, and no 'no confidence intervals' text", () => {
+    const { results } = evaluate(
+      run(["performance", "demographic_parity"]),
       csv([
-        ["1", "1", "A", 45],
-        ["1", "0", "A", 5],
-        ["0", "0", "A", 42],
-        ["0", "1", "A", 8],
+        ["1", "1", "A", 160],
+        ["0", "0", "A", 140],
+        ["1", "0", "B", 20],
+        ["1", "1", "B", 130],
+        ["0", "0", "B", 150],
       ]),
     );
-    expect(performance.outcome).toBe("pass");
-    expect(metric(performance, "balanced_accuracy")).toBeCloseTo(0.87, 12);
+    for (const result of results) {
+      expect(result.decision?.statisticsVersion).toBe("1.0.0");
+      expect(result.limitations.join(" ")).not.toMatch(
+        /No confidence intervals/,
+      );
+      for (const m of result.metrics) {
+        expect(m.sampleSize).toBeGreaterThan(0);
+        if ((m.details as any).status === "evaluated")
+          expect(m.confidenceInterval).not.toBeNull();
+      }
+    }
+    expect(metric(results[0], "accuracy")!.confidenceInterval!.level).toBe(
+      0.95,
+    );
   });
 
-  it("is inconclusive when accuracy meets its criterion but not the majority baseline", () => {
-    // 90% positive: accuracy 88% against a 90% majority baseline.
-    const [performance] = evaluate(
+  it("never passes a constant majority-class predictor", () => {
+    // 85 favourable and 15 other reference rows; every prediction favourable.
+    const { results } = evaluate(
       run(["performance"]),
       csv([
-        ["1", "1", "A", 81],
-        ["1", "0", "A", 9],
-        ["0", "0", "A", 7],
-        ["0", "1", "A", 3],
+        ["1", "1", "A", 85],
+        ["0", "1", "A", 15],
       ]),
     );
-    expect(performance.outcome).toBe("inconclusive");
-    expect(performance.limitations).toContainEqual(
-      expect.stringContaining(
-        "does not exceed the 90.00% of always predicting the majority class '1'",
-      ),
+    const [performance] = results;
+    expect(performance.outcome).not.toBe("pass");
+    // The chance baseline sits exactly on its bound.
+    expect(metric(performance, "balanced_accuracy")!.value).toBe(0.5);
+    expect(performance.decision!.reasons).toContain(
+      "estimate_on_band_boundary",
+    );
+  });
+
+  it("is inconclusive when a small sample cannot tell the gap from noise", () => {
+    // 20 per group is below the floor of 30: the groups are suppressed.
+    const { results } = evaluate(
+      run(["demographic_parity"], { minimumGroupSize: 2 }),
+      csv([
+        ["1", "1", "A", 6],
+        ["0", "0", "A", 14],
+        ["1", "1", "B", 10],
+        ["0", "0", "B", 10],
+      ]),
+    );
+    expect(results[0].outcome).toBe("inconclusive");
+    expect(results[0].decision!.reasons).toContain(
+      "group_suppressed_below_minimum",
     );
   });
 
   it("measures recall on the performance positive class, apart from the favourable outcome", () => {
-    // Favourable outcome "1" (approved); the event of interest is "0".
-    const data = csv([
-      ["1", "1", "A", 40],
-      ["1", "0", "A", 10],
-      ["0", "0", "B", 45],
-      ["0", "1", "B", 5],
+    const rows = csv([
+      ["fraud", "fraud", "A", 40],
+      ["fraud", "ok", "A", 10],
+      ["ok", "ok", "A", 150],
     ]);
-    const [performance, parity] = evaluate(
-      run(["performance", "demographic_parity"], {
-        performancePositiveLabel: "0",
-      }),
-      data,
-    );
-    expect(metric(performance, "recall")).toBe(0.9);
-    expect(metric(performance, "specificity")).toBe(0.8);
-    expect(metric(performance, "prevalence")).toBe(0.5);
-    expect(performance.limitations).toContainEqual(
-      "Fairness tests count the favourable outcome '1', not the performance positive class.",
-    );
-    // Selection rates still count the favourable "1": A 40/50, B 5/50.
-    expect(metric(parity, "maximum_selection_rate_gap")).toBeCloseTo(0.7, 12);
-    const [favourable] = evaluate(run(["performance"]), data);
-    expect(metric(favourable, "recall")).toBe(0.8);
-  });
-
-  it("requires the performance positive class to be one of the two labels", () => {
-    expect(() =>
-      evaluate(
-        run(["performance"], { performancePositiveLabel: "fraud" }),
-        constant,
-      ),
-    ).toThrow(/performance positive class/);
-  });
-
-  it("is inconclusive without reference rows of both classes and flags the other label", () => {
-    const [performance] = evaluate(
-      run(["performance"]),
-      csv([
-        ["1", "1", "A", 30],
-        ["1", "0", "A", 10],
-      ]),
-    );
-    expect(performance.outcome).toBe("inconclusive");
-    expect(performance.limitations).toContainEqual(
-      "Predicted labels absent from the reference column: '0' (10 rows). They count as errors.",
-    );
-  });
-});
-
-describe("multiclass performance", () => {
-  const multiclass = (rows: [string, string, number][]) =>
-    "actual,predicted\n" +
-    rows.flatMap(([a, p, n]) => Array(n).fill(a + "," + p)).join("\n");
-
-  it("fails rather than turns inconclusive when a predicted label is outside the reference set", () => {
-    const [performance] = evaluate(
-      run(["performance"], {}, "Multiclass classification"),
-      multiclass([
-        ["A", "A", 6],
-        ["A", "B", 4],
-        ["B", "Z", 7],
-        ["B", "B", 3],
-        ["C", "C", 5],
-        ["C", "A", 5],
-      ]),
-    );
-    expect(performance.outcome).toBe("fail");
-    expect(performance.limitations).toContainEqual(
-      "Predicted labels absent from the reference column: 'Z' (7 rows). They count as errors.",
-    );
-    // Balanced accuracy averages the reference classes A, B and C only.
-    expect(metric(performance, "balanced_accuracy")).toBeCloseTo(
-      (0.6 + 0.3 + 0.5) / 3,
-      12,
-    );
-    expect(metric(performance, "majority_baseline_accuracy")).toBeCloseTo(
-      10 / 30,
-      12,
-    );
-  });
-
-  it("fails a constant prediction of the majority class", () => {
-    const [performance] = evaluate(
-      run(["performance"], { minimumMacroF1: 0 }, "Multiclass classification"),
-      multiclass([
-        ["A", "A", 24],
-        ["B", "A", 5],
-        ["C", "A", 5],
-      ]),
-    );
-    expect(performance.outcome).toBe("fail");
-    expect(metric(performance, "balanced_accuracy")).toBeCloseTo(1 / 3, 12);
-  });
-});
-
-describe("fairness", () => {
-  const groups = csv([
-    ["1", "1", "A", 20],
-    ["0", "0", "A", 20],
-    ["1", "1", "B", 2],
-    ["0", "0", "B", 1],
-  ]);
-
-  it("gives the reason when parity and impact are inconclusive", () => {
-    const results = evaluate(
-      run(["demographic_parity", "disparate_impact", "equalized_odds"]),
-      groups,
-    );
-    for (const result of results) {
-      expect(result.outcome).toBe("inconclusive");
-      expect(result.limitations).toContainEqual(
-        "Groups below the protocol minimum of 5 rows: 'B' (3).",
-      );
-    }
-  });
-
-  it("fails a zero impact ratio and explains an undefined one", () => {
-    const [impact] = evaluate(
-      run(["disparate_impact"]),
-      csv([
-        ["1", "1", "A", 10],
-        ["0", "0", "A", 10],
-        ["1", "0", "B", 10],
-        ["0", "0", "B", 10],
-      ]),
-    );
-    expect(impact.outcome).toBe("fail");
-    expect(metric(impact, "minimum_selection_rate_ratio")).toBe(0);
-    // Nobody is predicted the favourable "0".
-    const [none] = evaluate(
-      run(["disparate_impact"], { positiveLabel: "0" }),
-      csv([
-        ["0", "1", "A", 10],
-        ["1", "1", "A", 10],
-        ["0", "1", "B", 10],
-        ["1", "1", "B", 10],
-      ]),
-    );
-    expect(none.outcome).toBe("inconclusive");
-    expect(none.limitations).toContainEqual(
-      "No group received the favourable prediction, so the selection-rate ratio is undefined.",
-    );
-  });
-
-  it("ignore a performance positive class when no performance test is selected", () => {
-    // A configuration frozen with the class of a deselected performance test.
-    const results = evaluate(
-      run(["demographic_parity", "disparate_impact"], {
+    const { results } = evaluate(
+      run(["performance"], {
+        positiveLabel: "ok",
         performancePositiveLabel: "fraud",
       }),
-      groups,
+      rows,
     );
-    expect(results.map((r) => r.testId)).toEqual([
-      "demographic_parity",
-      "disparate_impact",
-    ]);
-    // Only the favourable label must be one of the two observed labels.
-    expect(() =>
-      evaluate(run(["demographic_parity"], { positiveLabel: "yes" }), groups),
-    ).toThrow(
-      /^Binary evaluation requires two class labels, including the favourable label 'yes'$/,
+    const recall = metric(results[0], "recall")!;
+    expect(recall.value).toBe(0.8);
+    expect(recall.numerator).toBe(40);
+    expect(recall.denominator).toBe(50);
+    expect(results[0].limitations.join(" ")).toMatch(
+      /performance positive class 'fraud'/,
     );
-    expect(() =>
-      evaluate(
-        run(["performance"], { performancePositiveLabel: "fraud" }),
-        groups,
-      ),
-    ).toThrow("and the performance positive class 'fraud'");
+  });
+
+  it("requires both labels in a legacy profile, but evaluates one observed label when both are declared", () => {
+    const oneLabel = csv([["1", "1", "A", 60]]);
+    expect(() => evaluate(run(["performance"]), oneLabel)).toThrow(
+      /requires two class labels/,
+    );
+    const plan = validatePlan({
+      criteria: [
+        {
+          id: "performance",
+          kind: "performance",
+          members: [{ metric: "recall", band: { lower: 0.7 } }],
+        },
+      ],
+    });
+    const config: PlanConfig = {
+      labelColumn: "actual",
+      predictionColumn: "predicted",
+      groupColumn: "",
+      positiveLabel: "1",
+      negativeLabel: "0",
+    };
+    const declared = {
+      task: "Binary classification",
+      suite: ["performance"],
+      config,
+      manifest: { statistics: plan },
+    } as unknown as Run;
+    const { results } = evaluate(declared, oneLabel);
+    expect(metric(results[0], "recall")!.value).toBe(1);
+    expect(metric(results[0], "specificity")!.details).toMatchObject({
+      status: "undefined",
+    });
+    expect(() => evaluate(declared, csv([["2", "1", "A", 60]]))).toThrow(
+      /declares the labels '1' and '0'/,
+    );
+  });
+
+  it("derives a legacy profile's plan with the floors raised and the configured minimums recorded", () => {
+    const { evaluation } = evaluate(
+      run(["performance"], {
+        minimumSampleSize: 20,
+        minimumClassCount: 5,
+        minimumGroupSize: 2,
+      }),
+      csv([
+        ["1", "1", "A", 80],
+        ["0", "0", "A", 80],
+      ]),
+    );
+    expect(evaluation.normalizedPlan.minimums).toEqual({
+      sampleSize: 30,
+      groupSize: 30,
+      classCount: 10,
+    });
+    expect(evaluation.normalizedPlan.configuredMinimums).toEqual({
+      sampleSize: 20,
+      groupSize: 2,
+      classCount: 5,
+    });
+    expect(evaluation.planSha256).toBe(planSha256(evaluation.normalizedPlan));
+  });
+
+  it("treats a predicted label outside the reference set as an undefined class in multiclass data", () => {
+    const { results } = evaluate(
+      run(["performance"], {}, "Multiclass classification"),
+      csv([
+        ["a", "a", "", 40],
+        ["b", "b", "", 40],
+        ["c", "c", "", 39],
+        ["c", "z", "", 1],
+      ]).replaceAll(",\n", ",x\n"),
+    );
+    expect(results[0].outcome).not.toBe("pass");
+    expect(results[0].limitations.join(" ")).toMatch(/'z' \(1 rows\)/);
   });
 });
 
@@ -313,10 +401,7 @@ describe("blank rows", () => {
       "The CSV must start with its header row",
     );
     expect(() =>
-      evaluate(
-        run(["performance"], { minimumSampleSize: 2, minimumClassCount: 1 }),
-        "actual,predicted\n1,1\n\n0,0",
-      ),
+      evaluate(run(["performance"]), "actual,predicted\n1,1\n\n0,0"),
     ).toThrow(/Blank data row/);
   });
 

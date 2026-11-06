@@ -216,6 +216,62 @@ def add_external_run(schema):
     return schema
 
 
+def add_hosted_run(schema):
+    """Hosted run 1.4 (section 11.1, #22 H2): the hosted 1.1 saved-prediction run with one result per criterion
+    of the plan frozen in manifest.statistics, each with its decision and the shared metric shape, the plan's
+    hash in provenance.inputHashes.statisticsPlan and the failing exploratory criteria in reviewFlags. The
+    manifest's profile is a 1.0 protocol (plan derived per run, section 9.3) or a 1.1 protocol with its plan."""
+    defs = schema['$defs']
+    hashes = copy.deepcopy(defs['hostedInputHashes'])
+    hashes['properties']['statisticsPlan'] = ref('sha256')
+    hashes['required'] = list(dict.fromkeys(hashes['required'] + ['statisticsPlan']))
+    defs['hostedStatisticsInputHashes'] = hashes
+    provenance = copy.deepcopy(defs['hostedProvenance'])
+    provenance['properties']['inputHashes'] = ref('hostedStatisticsInputHashes')
+    defs['hostedStatisticsProvenance'] = provenance
+    manifest = copy.deepcopy(defs['runManifest'])
+    manifest['properties']['profile'] = {'anyOf': [ref('evaluationProfile'), ref('evaluationProfilePlan'), {'type': 'null'}]}
+    manifest['properties']['statistics'] = ref('statisticsPlan')
+    manifest['required'] = list(dict.fromkeys(manifest['required'] + ['statistics']))
+    defs['hostedStatisticsManifest'] = manifest
+    run = copy.deepcopy(defs['hostedRun'])
+    props = run['properties']
+    props['contractVersion'] = {'const': '1.4'}
+    props['config'] = {'anyOf': [ref('hostedConfig'), ref('hostedPlanConfig')]}
+    props['thresholds'] = {'anyOf': [ref('hostedThresholds'), ref('planThresholds')]}
+    props['manifest'] = ref('hostedStatisticsManifest')
+    props['provenance'] = ref('hostedStatisticsProvenance')
+    props['results'] = arr(ref('statisticsResult'), 0, MAX_RESULTS)
+    props['reviewFlags'] = arr(ref('id'), 0, MAX_RESULTS, True)
+    kinds = {'Binary classification': ['performance', 'group_comparison'], 'Multiclass classification': ['multiclass_performance'], 'Regression': ['regression_performance']}
+    rules = []
+    for rule in run['allOf']:
+        then = rule.get('then', {}).get('properties', {})
+        if then.get('results', {}).get('items', {}).get('properties', {}).get('testId') is not None:
+            # The per-task rule on result test ids becomes a rule on decision.kind (section 11.2, H2).
+            task = rule['if']['properties']['task']['const']
+            rule = copy.deepcopy(rule)
+            rule['then']['properties']['results'] = {'items': {'properties': {'decision': {'properties': {'kind': {'enum': kinds[task]}}}}}}
+        if rule.get('if', {}).get('properties', {}).get('state') == {'const': 'succeeded'}:
+            rule = copy.deepcopy(rule)
+            rule['then']['required'] = list(dict.fromkeys(rule['then']['required'] + ['reviewFlags']))
+        rules.append(rule)
+    run['allOf'] = rules
+    run['description'] = ('Hosted saved-prediction run under statistics 1.0.0: one result per criterion of the plan frozen in '
+        'manifest.statistics, decided by its interval against the pre-registered band; exploratory criteria never change '
+        'the outcome and failing ones are reviewFlags. SHA-256 values describe content; cross-field equality requires the '
+        'application validator.')
+    defs['hostedStatisticsRun'] = run
+    branch = ref('hostedStatisticsRun')
+    if branch not in schema['oneOf']:
+        schema['oneOf'].append(branch)
+    schema['description'] = ('Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1, authenticated external audit '
+        'projection 1.2, engine report 1.3, hosted run 1.4 and compiled external audit run 1.5 under statistics 1.0.0 '
+        '(docs/design/audit-statistics.md). Schema validity is distinct from result origin, input custody, statistical '
+        'suitability and legal sufficiency.')
+    return schema
+
+
 def add_statistics(schema):
     defs = schema['$defs']
     add_plan(defs)
