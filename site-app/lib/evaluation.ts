@@ -10,8 +10,11 @@ export const tasks = [
 // definition that produced its results.
 // 3.0.0: statistics 1.0.0 decides every criterion by its interval against
 // the pre-registered band (hosted run contract 1.4).
-export const runnerVersion = "interactive-predictions-3.0.0";
-export const testDefinitionVersion = "traditional-ml-3.0.0";
+// 3.1.0: a regression criterion reports the mean-prediction baseline RMSE and
+// passes only when the model's MSE is shown to be below it (section 5.9), so
+// a constant prediction cannot pass the RMSE criterion.
+export const runnerVersion = "interactive-predictions-3.1.0";
+export const testDefinitionVersion = "traditional-ml-3.1.0";
 export const tests = [
   {
     id: "performance",

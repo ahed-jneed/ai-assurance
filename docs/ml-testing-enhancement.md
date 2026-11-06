@@ -26,7 +26,7 @@ Four distinctions govern the design:
 | Optional Hugging Face reference | Repository ID, full commit and filename metadata; no remote fetch, download, code loading or token handling |
 | Evaluation profiles | Reusable immutable versioned records stored in the engagement aggregate JSON |
 | Dataset preflight | Read and verify accepted artifact bytes; parse CSV; expose a column profile and validate selected mappings before queueing |
-| Hosted procedures | Existing binary performance/fairness; multiclass accuracy, macro F1, balanced accuracy and class support; regression MAE, RMSE and R-squared |
+| Hosted procedures | Existing binary performance/fairness; multiclass accuracy, macro F1, balanced accuracy and class support; regression MAE, RMSE and R-squared, with the mean-prediction baseline RMSE that a pass must beat |
 | Run provenance | Strict registered prediction-artifact/dataset identity; frozen model, evaluation profile, dataset manifest and input hashes |
 | Paper/report compilation | Diagnostic draft papers retain run/evidence links; reports capture models as well as runs and paper revisions |
 | External Python execution | Separately run trusted model adapters and supported diagnostics, subject to format, runtime and explicit trust gates |
@@ -122,6 +122,8 @@ Compute actual classification metrics from the saved labels and predictions: ove
 
 Compute MAE and RMSE in the target's units, and R-squared as a dimensionless measure. Validate finite values and retain actual evaluated sample counts. Constant-target data makes ordinary R-squared undefined; do not manufacture a successful score. An undefined metric should be presented with its reason, and its effect on the procedure outcome should follow the declared policy. R-squared can be negative; do not clamp it to zero or treat it as a probability.
 
+An RMSE threshold is absolute, in target units, so on its own it passes a constant prediction whenever the threshold exceeds the target's standard deviation: predicting the reference mean on every row gives exactly that RMSE, and any other constant does worse. Since `traditional-ml-3.1.0` (issue #68, `docs/design/audit-statistics.md` section 5.9) every regression result therefore also reports the **baseline RMSE** (`baseline_rmse`), the RMSE of predicting the mean of the evaluated reference values, next to MAE, RMSE and R-squared. A regression criterion passes only when, besides its RMSE (or MAE) band, the model's mean squared error is shown to be below the baseline's: a one-sided normal-approximation test of the per-row difference in squared errors at the plan's confidence level (the mean baseline gate). The gate never fails a result; when it does not reject, the result is inconclusive with the reason `mean_baseline_not_beaten`, and the limitations name the model's RMSE and the baseline RMSE. No constant prediction can pass, and a model with R-squared above 0 passes only when that improvement is larger than noise. The hosted runner (`site-app/lib/statistics.ts`), the engine (`engine/statistics.py`) and therefore the external worker's projection apply the same rule, pinned by the shared golden cases GC-35, GC-48, GC-52 and GC-53.
+
 For every task, distinguish execution state from result outcome. A successfully executed job may produce an outside-criterion or inconclusive result. Failed/cancelled execution cannot become a pass, and an unavailable selected procedure cannot silently disappear from the result set. A run fails when any result fails and passes only when every result passes; no results, or an unrecognised outcome, make it inconclusive, never a pass.
 
 ## 7. Frozen traceability from run to report
@@ -181,7 +183,7 @@ Before describing the increment as available, verify these behaviors with meanin
 - New model/profile versions preserve older records; their hashes and snapshots remain unchanged in completed runs and reports.
 - An unrelated prediction CSV is rejected, even when accepted and in the same engagement; an altered stored source fails before computation.
 - Missing/duplicate columns, invalid labels, unsupported task/test combinations, non-finite numeric values and ambiguous mappings fail with a useful reason.
-- Binary procedures preserve their existing calculations; multiclass analytic fixtures verify macro/class support calculations; regression fixtures verify MAE/RMSE and undefined/negative R-squared behavior.
+- Binary procedures preserve their existing calculations; multiclass analytic fixtures verify macro/class support calculations; regression fixtures verify MAE/RMSE, undefined/negative R-squared behavior, and that a constant prediction meeting the RMSE threshold does not pass.
 - Insufficient support, failed/cancelled work and unavailable capabilities never become successful diagnostic outcomes.
 - A generated paper resolves to its exact run, model/card/profile and evidence; a later registration does not alter captured report content.
 - Client projections and exports preserve existing object-level authorization and omit unreleased internal cards/protocols.
