@@ -14,6 +14,7 @@ import {
   save,
   sha256,
 } from "@/lib/store";
+import { uploadGate, uploadHeader } from "@/lib/special-category";
 import { activeGrant } from "@/lib/workflow-state";
 import type { Submission } from "@/lib/workflow-types";
 export const dynamic = "force-dynamic";
@@ -142,8 +143,22 @@ export async function POST(request: Request) {
       artifactIds: string[] = [],
       hashes: string[] = [];
     scope = { tenantId: ctx.tenantId, engagementId: e.id, submissionId };
-    for (const file of bundle) {
-      const artifactId = id("EV"),
+    // A client cannot declare columns free of special-category data: such
+    // columns need the basis the audit team records first (#60, D-11). The
+    // audit event records each gated file's columns and bases.
+    const ids = bundle.map(() => id("EV")),
+      specialCategory: Record<string, ReturnType<typeof uploadGate>> = {};
+    for (const [i, file] of bundle.entries()) {
+      const gate = uploadGate(e, {
+        category: g.category,
+        headers: uploadHeader(file.name, await file.arrayBuffer()),
+        handlingBasis: g.handlingBasis,
+        declaration: null,
+      });
+      if (gate) specialCategory[ids[i]] = gate;
+    }
+    for (const [i, file] of bundle.entries()) {
+      const artifactId = ids[i],
         payload = await file.arrayBuffer(),
         hash = await sha256(payload),
         key = ctx.tenantId + "/" + e.id + "/" + artifactId + "/" + hash;
@@ -204,6 +219,7 @@ export async function POST(request: Request) {
       hashes,
       handlingBasis: g.handlingBasis,
       delivery: delivery.delivery,
+      ...(Object.keys(specialCategory).length ? { specialCategory } : {}),
     });
     keys.length = 0;
     return Response.json({
