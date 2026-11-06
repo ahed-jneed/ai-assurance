@@ -27,10 +27,11 @@ lock. No native runtime or Docker execution was qualified in this distribution's
 local checks. Tests use synthetic fixtures, application-owned test predictors,
 dummy credentials and loopback/mocked transports.
 
-Contract versions remain distinct: engine report **1.0**, hosted configuration
-and saved-prediction run **1.1**, authenticated external compilation **1.2**,
-worker transport request/result envelope schema **1.0**. Diagnostic runner is
-**1.2.0**, worker is **1.1.0**. Earlier immutable evidence retains its versions.
+Contract versions remain distinct: engine report **1.3** (statistics 1.0.0;
+1.0 stays readable), hosted configuration and saved-prediction run **1.1**,
+authenticated external compilation **1.2** and **1.5**, worker transport
+request/result envelope schema **1.0**. Diagnostic runner is **1.3.0**, worker
+is **1.2.0**. Earlier immutable evidence retains its versions.
 The result envelope is retained byte for byte alongside its imported projection.
 Provided/client-local predictions never establish independent model scoring;
 native inference additionally requires approved artifact hashes, typed numeric
