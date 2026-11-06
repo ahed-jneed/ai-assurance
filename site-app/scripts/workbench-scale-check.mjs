@@ -145,7 +145,8 @@ try {
       add("location", {
         label: "Quarantined holdout extract",
         locator: "rows 9001-9500",
-        artifactName: "Überprüfung holdout.csv",
+        artifactName:
+          "Überprüfung holdout extract of the quarantined population.csv",
       });
       continue;
     }
@@ -237,8 +238,13 @@ try {
   assert.equal(found.nextCursor, null);
   assert.equal(found.records[0].reviewState, null);
   assert.equal(found.records[0].body.locator, "rows 9001-9500");
-  // Case is ignored for non-ASCII letters too, in D1 as in the browser.
-  for (const q of ["überprüfung HOLDOUT", "ÜBERPRÜFUNG"])
+  // Case is ignored for non-ASCII letters too, in D1 as in the browser, and a
+  // term may be longer than D1's 50-byte LIKE and GLOB patterns.
+  for (const q of [
+    "überprüfung HOLDOUT",
+    "ÜBERPRÜFUNG",
+    "ÜBERPRÜFUNG HOLDOUT EXTRACT OF THE QUARANTINED POPULATION.CSV",
+  ])
     assert.deepEqual(
       (await api(path_({ view: "search", q }))).records.map((r) => r.id),
       ["AS-scale-04321"],

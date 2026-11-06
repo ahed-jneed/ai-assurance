@@ -132,7 +132,7 @@ function generator(seed: number) {
 // Words the records carry and the searches look for. None is a kind name or
 // part of a register's fallback title, so the in-memory search and the SQL
 // search must agree on them. Some carry non-ASCII letters, whose case the
-// search ignores too, and GLOB's own wildcards.
+// search ignores too, and LIKE's and GLOB's wildcards.
 const words = [
   "alpha",
   "bravo",
@@ -373,6 +373,21 @@ describe("record search in SQL", () => {
     expect(await find("JÖRG")).toEqual(["AS-Ü-2"]);
     // An umlaut is its own letter, not its base letter.
     expect(await find("uber")).toEqual(["AS-3"]);
+    // Every character is literal, and a term may pass D1's 50-byte patterns.
+    expect(await find("ÜBERPRÜFUNG DER DATEN")).toEqual(["AS-1"]);
+    expect(await find("%")).toEqual([]);
+    const greek = "αβγδεζηθικλμνξοπρστυφχψω";
+    await insert([
+      {
+        id: "AS-4",
+        kind: "location",
+        body: { label: greek + " " + "x".repeat(60) },
+        at: at(4),
+      },
+    ]);
+    expect(await find(greek.toUpperCase() + " " + "X".repeat(60))).toEqual([
+      "AS-4",
+    ]);
   });
 
   it("finds a record far past the first page among 5,000", async () => {

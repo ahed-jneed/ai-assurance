@@ -98,26 +98,44 @@ const haystack = [
   "COALESCE(m.display_name,'')",
 ].join("||' '||");
 
+/** How many distinct non-ASCII letters of a term have their case folded. */
+const foldedLetterLimit = 30;
 /**
- * A GLOB pattern that finds `term` anywhere in a text, ignoring the case of
- * every letter (not only ASCII ones, as LIKE would): each cased character
- * becomes a class of its lower and upper case forms, and `*`, `?` and `[`
- * are matched literally. `%`, `_` and `\` are ordinary characters in GLOB.
+ * A condition that finds `term` anywhere in the haystack, ignoring the case of
+ * every letter, with its bound values. SQLite's LIKE and lower() fold only
+ * ASCII case (D1 has no ICU), and D1 refuses LIKE and GLOB patterns over 50
+ * bytes, so the haystack goes through lower() and, for each non-ASCII letter
+ * of the term, a replace() of its upper case form by its lower case form, and
+ * instr() finds the lower-cased term in it. Every character of the term is
+ * matched literally. A letter whose case forms are not single characters
+ * (such as "ß" and "SS") keeps its case; the non-ASCII letters past the first
+ * `foldedLetterLimit` (a bound on the bound values: D1 takes 100) find only
+ * their lower case form.
  */
-export function caseInsensitiveGlob(term: string) {
-  let pattern = "";
+export function termCondition(term: string) {
+  let folded = "";
+  const pairs = new Map<string, string>();
   for (const c of term) {
-    if (c === "*" || c === "?" || c === "[") {
-      pattern += "[" + c + "]";
+    const lower = c.toLowerCase(),
+      upper = lower.toUpperCase();
+    if ([...lower].length !== 1 || [...upper].length !== 1) {
+      folded += c;
       continue;
     }
-    // Only single-character case forms fit in a class (not "SS" for "ß").
-    const forms = new Set(
-      [c, c.toLowerCase(), c.toUpperCase()].filter((f) => [...f].length === 1),
-    );
-    pattern += forms.size > 1 ? "[" + [...forms].join("") + "]" : c;
+    if (
+      upper !== lower &&
+      upper.charCodeAt(0) > 127 &&
+      (pairs.has(upper) || pairs.size < foldedLetterLimit)
+    )
+      pairs.set(upper, lower);
+    folded += lower;
   }
-  return "*" + pattern + "*";
+  let sql = `lower(${haystack})`;
+  for (let i = 0; i < pairs.size; i++) sql = `replace(${sql},?,?)`;
+  return {
+    sql: `instr(${sql},?)>0`,
+    values: [...[...pairs].flat(), folded],
+  };
 }
 
 function validKinds(kinds: readonly string[] = []) {
@@ -161,8 +179,9 @@ export async function searchRecords(
     values.push(search.notActor);
   }
   if (term) {
-    filters.push(`(${haystack}) GLOB ?`);
-    values.push(caseInsensitiveGlob(term));
+    const condition = termCondition(term);
+    filters.push(condition.sql);
+    values.push(...condition.values);
   }
   const page = [...filters],
     pageValues = [...values];
