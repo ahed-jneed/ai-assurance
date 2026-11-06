@@ -439,7 +439,7 @@ console.log(
   "PASS local day boundaries and tomorrow-at-08:00 reminders across spring/fall daylight saving",
 );
 
-const workflowStateURL = asURL(await compiled("lib/workflow-state.ts"));
+const workflowStateURL = await sourceURL("lib/workflow-state.ts");
 const domainURL = await sourceURL("lib/domain.ts");
 const paperWorkflowURL = asURL(
   (await compiled("lib/paper-workflow.ts")).replace(
@@ -467,8 +467,13 @@ const paperPresentationURL = asURL(
       "from " + JSON.stringify(workflowStateURL),
     ),
 );
+const releaseTimeURL = await sourceURL("lib/domain/release-time.ts");
 const workItemsURL = asURL(
   (await compiled("lib/work-items.ts"))
+    .replace(
+      /from (['"])\.\/domain\/release-time\1/,
+      "from " + JSON.stringify(releaseTimeURL),
+    )
     .replace(
       /from (['"])\.\/workflow-state\1/,
       "from " + JSON.stringify(workflowStateURL),
