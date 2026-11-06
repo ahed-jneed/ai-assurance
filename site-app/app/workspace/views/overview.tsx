@@ -74,7 +74,7 @@ export function Overview({
             busy={busy}
             onAdvance={onAdvance}
           />
-          <Suspense fallback={panelFallback}>
+          <Suspense fallback={<p className="subtle">Loading coverage…</p>}>
             <CoverageSummary
               tenantId={data.tenantId}
               engagementId={e.id}
