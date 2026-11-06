@@ -50,6 +50,7 @@ const UNITS: Record<string, string> = {
   mae: "target units",
   rmse: "target units",
   r2: "score",
+  baseline_rmse: "target units",
 };
 /** The hosted suite family of each criterion (section 11.2). */
 export function criterionFamily(c: Pick<PlanCriterion, "kind" | "metric">) {
@@ -107,6 +108,8 @@ export const REASON_TEXT: Record<string, string> = {
     "A comparison has a cell under 5 and Fisher's exact test does not confirm the disparity, so the fail is not claimed.",
   chance_exact_test_not_significant:
     "The exact test of independence between predictions and truth is not significant, so performance above chance is not claimed.",
+  mean_baseline_not_beaten:
+    "The model's mean squared error is not shown to be below that of predicting the mean of the reference values on every row (the mean-prediction baseline), so a pass is not claimed.",
   interval_straddles_band:
     "The confidence interval straddles the acceptable band, so the evidence is inconclusive.",
   within_criterion_multiplicity:
@@ -130,7 +133,7 @@ const BASE_NOTES: Record<string, string> = {
   multiclass_performance:
     "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. Balanced accuracy is macro recall over the observed classes.",
   regression_performance:
-    "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. R² is descriptive and has no interval in the hosted runner.",
+    "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. R² is descriptive and has no interval in the hosted runner. A pass also needs the model to beat the mean-prediction baseline (baseline_rmse).",
   group_comparison:
     "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations. Protected-data processing requires a separately reviewed basis.",
 };
@@ -340,6 +343,25 @@ function slice(g: GroupView) {
   return out;
 }
 
+/** A number to `digits` significant digits without trailing zeros (Python's `{:.4g}` for ordinary magnitudes). */
+const short = (v: number, digits: number) =>
+  String(Number(v.toPrecision(digits)));
+
+/** Section 5.9: when the mean baseline gate stops a regression pass, name the model's RMSE and the baseline's (engine/criteria.py baseline_note). */
+export function baselineNote(outcome: CriterionResult): string[] {
+  if (!outcome.decision.reasons.includes("mean_baseline_not_beaten")) return [];
+  const entries = new Map(
+    [...outcome.members, ...outcome.descriptive].map((e) => [e.metric, e]),
+  );
+  const rmse = entries.get("rmse"),
+    base = entries.get("baseline_rmse");
+  if (rmse?.estimate == null || base?.estimate == null) return [];
+  const gate = (base.counts as { gatePValue: number }).gatePValue;
+  return [
+    `RMSE ${short(rmse.estimate, 4)} does not beat the mean-prediction baseline RMSE ${short(base.estimate, 4)} (gate p ${short(gate, 3)}): the model is not shown to predict better than the mean of the reference values.`,
+  ];
+}
+
 /** Maps one evaluated criterion to a hosted 1.4 result (section 11.4). */
 export function criterionResult(
   spec: PlanCriterion,
@@ -392,6 +414,7 @@ export function criterionResult(
     ...decision.reasons.flatMap((r) =>
       r in REASON_TEXT ? [REASON_TEXT[r]] : [],
     ),
+    ...baselineNote(outcome),
   ];
   if (decision.libraryEntry)
     limitations.push(
@@ -504,6 +527,18 @@ export function explainResult(result: Result): string {
       return `Across groups of at least ${smallest} people, the whole ${level} interval (${show(ci.lower)} to ${show(ci.upper)}) lies within the band of ${show(limit)}.`;
     return `The whole ${level} interval (${show(ci.lower)} to ${show(ci.upper)}) lies beyond the band of ${show(limit)}: the disparity is larger than noise would explain.`;
   }
+  if (
+    result.outcome !== "fail" &&
+    d.reasons.includes("mean_baseline_not_beaten")
+  ) {
+    const value = (name: string) =>
+      result.metrics.find((m) => m.name === name)?.value;
+    const rmse = value("rmse"),
+      base = value("baseline_rmse");
+    return typeof rmse === "number" && typeof base === "number"
+      ? `RMSE ${short(rmse, 3)} is not shown to beat ${short(base, 3)}, the RMSE of predicting the mean of the reference values on every row, so the model is not shown to be better than a constant prediction.`
+      : "The model is not shown to beat predicting the mean of the reference values on every row, so no pass is claimed.";
+  }
   const deciding =
     result.metrics.find((m) => m.name === d.decidingMemberId) ??
     result.metrics.find(
@@ -534,6 +569,7 @@ const METRIC_NAMES: Record<string, string> = {
   macro_f1: "macro F1",
   mae: "MAE",
   rmse: "RMSE",
+  baseline_rmse: "mean-prediction baseline RMSE",
   selection_rate_difference: "selection-rate difference",
   selection_rate_ratio: "selection-rate ratio",
   equalized_odds: "TPR and FPR differences",

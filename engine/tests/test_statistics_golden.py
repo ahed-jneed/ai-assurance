@@ -86,7 +86,7 @@ def differences(actual, expected, path="", out=None, exact=False):
 class GoldenFixtureTests(unittest.TestCase):
     def test_fixture_shape(self):
         self.assertEqual(GOLDEN["specificationVersion"], st.SPEC_VERSION)
-        self.assertEqual(len(GOLDEN["cases"]), 51)
+        self.assertEqual(len(GOLDEN["cases"]), 53)
         self.assertEqual(GOLDEN["defaults"]["minimums"], st.FLOORS)
 
     def test_every_case_reproduces_at_core_level(self):
