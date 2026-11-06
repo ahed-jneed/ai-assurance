@@ -35,7 +35,6 @@ import {
   tasks,
   tests,
   fairnessSelected,
-  performancePositiveLabel,
   protocolConfigKeys,
 } from "@/lib/evaluation";
 import type {
@@ -48,6 +47,17 @@ import type {
   Role,
   Run,
 } from "@/lib/domain";
+import { legacyConfig } from "@/lib/domain";
+import {
+  defaultPlanForm,
+  describePlan,
+  formFromPlan,
+  planFromForm,
+  validateHostedPlan,
+  type PlanForm,
+} from "@/lib/hosted-statistics";
+import { planSha256, type Plan } from "@/lib/statistics";
+import { PowerCheck, powerShortfalls } from "./power-check";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
 import {
@@ -94,19 +104,22 @@ type Inspection = {
     uniqueCount: number;
   }[];
 };
+/** The protocol form: legacy-style threshold fields plus the plan options; saving pre-registers a plan (schemaVersion 1.1). */
 type Draft = Omit<
   EvaluationProfile,
-  "id" | "schemaVersion" | "createdAt" | "createdBy"
->;
+  "id" | "schemaVersion" | "createdAt" | "createdBy" | "config" | "statistics"
+> & { config: EvaluationConfig; plan: PlanForm };
 const initialConfig: EvaluationConfig = {
   labelColumn: "",
   predictionColumn: "",
   groupColumn: "",
   positiveLabel: "1",
+  negativeLabel: "0",
   performancePositiveLabel: "",
-  minimumSampleSize: 20,
-  minimumClassCount: 5,
-  minimumGroupSize: 20,
+  // The statistics 1.0.0 floors (section 7): a plan may raise them, never lower them.
+  minimumSampleSize: 30,
+  minimumClassCount: 10,
+  minimumGroupSize: 30,
   maximumParityGap: 0.1,
   maximumOddsGap: 0.1,
   minimumImpactRatio: 0.8,
@@ -115,21 +128,81 @@ const initialConfig: EvaluationConfig = {
   minimumMacroF1: 0.7,
   maximumRmse: 1,
 };
-const profileDraft = (p: EvaluationProfile): Draft => ({
-  name: p.name,
-  version: p.version,
-  task: p.task,
-  suite: [...p.suite],
-  config: { ...p.config },
-  datasetContext: { ...p.datasetContext },
-  rationale: p.rationale,
-});
+/** A form for a saved protocol: a revision starts from its plan, or from a legacy protocol's thresholds raised to the floors. */
+const profileDraft = (p: EvaluationProfile): Draft => {
+  const legacy = legacyConfig(p.config);
+  const base = {
+    name: p.name,
+    version: p.version,
+    task: p.task,
+    suite: [...p.suite],
+    datasetContext: { ...p.datasetContext },
+    rationale: p.rationale,
+  };
+  if (legacy || !p.statistics)
+    return {
+      ...base,
+      config: {
+        ...initialConfig,
+        ...p.config,
+        minimumSampleSize: Math.max(30, legacy?.minimumSampleSize ?? 20),
+        minimumClassCount: Math.max(10, legacy?.minimumClassCount ?? 5),
+        minimumGroupSize: Math.max(30, legacy?.minimumGroupSize ?? 30),
+      },
+      plan: { ...defaultPlanForm, powerAssumptions: {} },
+    };
+  const { thresholds, form } = formFromPlan(p.statistics);
+  return {
+    ...base,
+    config: { ...initialConfig, ...p.config, ...thresholds },
+    plan: form,
+  };
+};
+/** The createEvaluationProfile request for a form: its mappings, labels and pre-registered plan. */
+function profileRequest(d: Draft, classCount: number | null) {
+  const c = d.config;
+  return {
+    name: d.name,
+    version: d.version,
+    task: d.task,
+    suite: d.suite,
+    config: {
+      labelColumn: c.labelColumn,
+      predictionColumn: c.predictionColumn,
+      groupColumn: c.groupColumn,
+      positiveLabel: c.positiveLabel,
+      performancePositiveLabel: c.performancePositiveLabel ?? "",
+      negativeLabel: c.negativeLabel ?? "",
+    },
+    statistics: planFromForm(d.task, d.suite, c, d.plan, classCount),
+    datasetContext: d.datasetContext,
+    rationale: d.rationale,
+  };
+}
+/** The normalised plan a form pre-registers, or the reason it is not valid. */
+function draftPlan(
+  d: Draft,
+  classCount: number | null,
+): { plan: Plan; error: "" } | { plan: null; error: string } {
+  try {
+    return {
+      plan: validateHostedPlan(
+        d.task,
+        planFromForm(d.task, d.suite, d.config, d.plan, classCount),
+      ),
+      error: "",
+    };
+  } catch (err) {
+    return { plan: null, error: (err as Error).message };
+  }
+}
 const emptyDraft = (task = "Binary classification"): Draft => ({
   name: "",
   version: "1.0",
   task,
   suite: [task === "Regression" ? "regression" : "performance"],
   config: { ...initialConfig },
+  plan: { ...defaultPlanForm, powerAssumptions: {} },
   datasetContext: {
     split: "unknown",
     population: "",
@@ -435,6 +508,20 @@ export function TestingLab({
       setError((err as Error).message);
     }
   }
+  const classCount =
+      inspect?.columns.find((c) => c.name === draft.config.labelColumn)
+        ?.uniqueCount ?? null,
+    groupCount =
+      inspect?.columns.find((c) => c.name === draft.config.groupColumn)
+        ?.uniqueCount ?? 2,
+    // A saved protocol keeps its frozen plan; a new one pre-registers the form's.
+    lockedProfile = profiles.find((p) => p.id === profileId),
+    planned = lockedProfile?.statistics
+      ? { plan: lockedProfile.statistics, error: "" as const }
+      : draftPlan(draft, classCount);
+  function planForm(change: Partial<PlanForm>) {
+    setDraft((d) => ({ ...d, plan: { ...d.plan, ...change } }));
+  }
   const selectedTests = tests.filter((t) => draft.suite.includes(t.id)),
     fair = fairnessSelected(draft.suite),
     cols =
@@ -487,6 +574,13 @@ export function TestingLab({
         !draft.config.positiveLabel.trim()
       )
         return "Record the favourable class label.";
+      if (
+        !locked &&
+        model?.task === "Binary classification" &&
+        (!draft.config.negativeLabel?.trim() ||
+          draft.config.negativeLabel === draft.config.positiveLabel)
+      )
+        return "Record the other class label, distinct from the favourable label.";
     }
     if (step === 2) {
       if (fair) {
@@ -520,7 +614,22 @@ export function TestingLab({
           !draft.datasetContext.sensitiveDataBasis.trim())
       )
         return "Fairness requires a protected-group column and handling basis.";
+      if (!locked && planned.error) return planned.error;
+      if (
+        !locked &&
+        draft.plan.minimumCoverage < 1 &&
+        !draft.plan.coverageRationale.trim()
+      )
+        return "Record why a coverage below 100% is acceptable.";
     }
+    if (
+      step === 3 &&
+      !locked &&
+      planned.plan &&
+      powerShortfalls(planned.plan).length &&
+      !draft.plan.acknowledgement.trim()
+    )
+      return "Acknowledge the power shortfall before saving the protocol.";
     return "";
   }
   async function runEvaluation() {
@@ -529,7 +638,10 @@ export function TestingLab({
       let source = e,
         currentProfile = profileId;
       if (!currentProfile) {
-        const created = await act("createEvaluationProfile", draft);
+        const created = await act(
+          "createEvaluationProfile",
+          profileRequest(draft, classCount),
+        );
         source = created.engagement;
         currentProfile = created.details!.profileId;
         setProfileId(currentProfile);
@@ -1399,6 +1511,21 @@ export function TestingLab({
                             />
                           </Field>
                         )}
+                        {model?.task === "Binary classification" && (
+                          <Field
+                            label="Other class label"
+                            help="Declaring both labels lets data in which only one occurs be evaluated; the statistics gates then decide."
+                          >
+                            <Input
+                              disabled={locked}
+                              required
+                              value={draft.config.negativeLabel ?? ""}
+                              onChange={(ev) =>
+                                config("negativeLabel", ev.target.value)
+                              }
+                            />
+                          </Field>
+                        )}
                         <details className="ml-more">
                           <summary>Column profile (no raw row preview)</summary>
                           <Table>
@@ -1552,16 +1679,34 @@ export function TestingLab({
                       {numeric(
                         "minimumSampleSize",
                         "Minimum total rows",
-                        2,
+                        30,
                         10000,
+                        "At least 30, the platform floor.",
                       )}
                       {model?.task !== "Regression" &&
                         numeric(
                           "minimumClassCount",
-                          "Minimum reference rows per class",
-                          1,
+                          "Minimum rows per class-conditional denominator",
+                          10,
                           1000,
+                          "At least 10, the platform floor.",
                         )}
+                      <SelectField
+                        label="Confidence level"
+                        value={String(draft.plan.confidenceLevel)}
+                        disabled={locked}
+                        onChange={(v) =>
+                          planForm({
+                            confidenceLevel: Number(
+                              v || 0.95,
+                            ) as PlanForm["confidenceLevel"],
+                          })
+                        }
+                        options={[0.9, 0.95, 0.99].map((v) => ({
+                          value: String(v),
+                          label: `${v * 100}% intervals`,
+                        }))}
+                      />
                       {draft.suite.includes("performance") && (
                         <>
                           {numeric(
@@ -1640,9 +1785,28 @@ export function TestingLab({
                           {numeric(
                             "minimumGroupSize",
                             "Minimum rows per group",
-                            2,
+                            30,
                             1000,
+                            "Smaller groups are reported but never decide.",
                           )}
+                          <Field
+                            label="Minimum coverage (0.5–1)"
+                            help="Share of rows the eligible groups must cover for a pass."
+                          >
+                            <Input
+                              type="number"
+                              min={0.5}
+                              max={1}
+                              step="any"
+                              disabled={locked}
+                              value={draft.plan.minimumCoverage}
+                              onChange={(ev) =>
+                                planForm({
+                                  minimumCoverage: Number(ev.target.value),
+                                })
+                              }
+                            />
+                          </Field>
                           {draft.suite.includes("demographic_parity") &&
                             numeric(
                               "maximumParityGap",
@@ -1657,6 +1821,31 @@ export function TestingLab({
                               0,
                               1,
                             )}
+                          {draft.suite.includes("disparate_impact") && (
+                            <SelectField
+                              label="Ratio threshold basis"
+                              value={draft.plan.impactBasis}
+                              disabled={locked}
+                              onChange={(v) =>
+                                planForm({
+                                  impactBasis: (v ||
+                                    "policy.eu-aia.impact-ratio") as PlanForm["impactBasis"],
+                                })
+                              }
+                              options={[
+                                {
+                                  value: "policy.eu-aia.impact-ratio",
+                                  label:
+                                    "Internal AI Act policy (no legal safe harbour)",
+                                },
+                                {
+                                  value: "screen.us.four-fifths",
+                                  label:
+                                    "US four-fifths screen (a heuristic, not a legal test)",
+                                },
+                              ]}
+                            />
+                          )}
                           {draft.suite.includes("equalized_odds") &&
                             numeric(
                               "maximumOddsGap",
@@ -1665,6 +1854,18 @@ export function TestingLab({
                               1,
                             )}
                         </div>
+                        {draft.plan.minimumCoverage < 1 && (
+                          <Field label="Why a coverage below 100% is acceptable">
+                            <Textarea
+                              disabled={locked}
+                              required
+                              value={draft.plan.coverageRationale}
+                              onChange={(ev) =>
+                                planForm({ coverageRationale: ev.target.value })
+                              }
+                            />
+                          </Field>
+                        )}
                       </>
                     )}
                     <Field
@@ -1710,19 +1911,53 @@ export function TestingLab({
                         <dd>{selectedTests.map((t) => t.label).join(", ")}</dd>
                       </div>
                       <div>
-                        <dt>Acceptance criteria</dt>
-                        <dd>{criterionSummary(draft).join("; ")}</dd>
+                        <dt>Pre-registered plan</dt>
+                        <dd>
+                          {planned.plan ? (
+                            <>
+                              <ul className="record-list">
+                                {describePlan(planned.plan).map((line) => (
+                                  <li key={line}>{line}</li>
+                                ))}
+                              </ul>
+                              <small className="subtle">
+                                Plan SHA-256 {planSha256(planned.plan)}
+                              </small>
+                            </>
+                          ) : (
+                            planned.error
+                          )}
+                        </dd>
                       </div>
                       <div>
                         <dt>Acceptance rationale</dt>
                         <dd>{draft.rationale}</dd>
                       </div>
                     </dl>
+                    {planned.plan && !locked && inspect && (
+                      <PowerCheck
+                        plan={planned.plan}
+                        rows={inspect.rowCount}
+                        groups={fair ? groupCount : 1}
+                        assumptions={draft.plan.powerAssumptions}
+                        acknowledgement={draft.plan.acknowledgement}
+                        disabled={busy}
+                        onAssumptions={(powerAssumptions) =>
+                          planForm({ powerAssumptions })
+                        }
+                        onAcknowledgement={(acknowledgement) =>
+                          planForm({ acknowledgement })
+                        }
+                      />
+                    )}
                     <p className="ml-notice">
-                      The run freezes the card, artifact hash, protocol and
-                      runner definition. Supplied predictions and independence
-                      declarations require audit corroboration. Results create
-                      draft working papers for human review.
+                      Saving freezes the plan: the interval decides each
+                      criterion against its band, and changing the plan later
+                      needs a new protocol version. The run freezes the card,
+                      artifact hash, protocol and runner definition. Supplied
+                      predictions and independence declarations require audit
+                      corroboration. Results create draft working papers for
+                      human review.
                     </p>
                     {draft.datasetContext.split === "training" && (
                       <p className="ml-notice">
@@ -2010,6 +2245,20 @@ export function TestingLab({
                       </div>
                     ))}
                 </dl>
+                {selectedProtocol.statistics && (
+                  <section className="readable-section">
+                    <h3>Pre-registered statistics plan</h3>
+                    <ul className="record-list">
+                      {describePlan(selectedProtocol.statistics).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                    <p className="subtle">
+                      Plan SHA-256 {planSha256(selectedProtocol.statistics)}.
+                      Frozen: a change needs a new protocol version.
+                    </p>
+                  </section>
+                )}
                 <section className="readable-section">
                   <h3>Criteria rationale</h3>
                   <p>{selectedProtocol.rationale}</p>
@@ -2237,37 +2486,4 @@ function modelMarkdown(m: Model) {
 }
 function protocolKeys(p: { task: string; suite: string[] }) {
   return protocolConfigKeys(p.task, p.suite);
-}
-function criterionSummary(p: Draft) {
-  const c = p.config;
-  return [
-    `At least ${c.minimumSampleSize} total rows`,
-    ...(p.task !== "Regression"
-      ? [`${c.minimumClassCount} reference rows per class`]
-      : []),
-    ...(p.suite.includes("performance")
-      ? [
-          `accuracy ≥ ${c.minimumAccuracy}`,
-          p.task === "Binary classification"
-            ? `recall of '${performancePositiveLabel(c)}' ≥ ${c.minimumRecall}`
-            : `macro F1 ≥ ${c.minimumMacroF1}`,
-          "better than always predicting the majority class",
-        ]
-      : []),
-    ...(p.suite.includes("regression")
-      ? [`RMSE ≤ ${c.maximumRmse} target units`]
-      : []),
-    ...(fairnessSelected(p.suite)
-      ? [`${c.minimumGroupSize} rows per group (${c.groupColumn})`]
-      : []),
-    ...(p.suite.includes("demographic_parity")
-      ? [`selection gap ≤ ${c.maximumParityGap}`]
-      : []),
-    ...(p.suite.includes("disparate_impact")
-      ? [`selection ratio ≥ ${c.minimumImpactRatio}`]
-      : []),
-    ...(p.suite.includes("equalized_odds")
-      ? [`TPR/FPR gap ≤ ${c.maximumOddsGap}`]
-      : []),
-  ];
 }
