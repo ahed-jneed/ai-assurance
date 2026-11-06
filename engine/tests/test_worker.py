@@ -846,8 +846,9 @@ class WorkerTests(unittest.TestCase):
             raw = next(raw for body, raw in server.posts if body["op"] == "complete")
         packet = json.loads(Path(result["resultFile"]).read_bytes())
         verify_result_bytes(Path(result["resultFile"]).read_bytes(), claim, IMAGE)
-        # The same rows held by the platform, for comparison.
+        # The same rows held by the platform, for comparison, and the rows without C.
         exact = {r["testId"]: r for r in hosted_results(run_request(self.root/"exact.csv", data, hosted_request(data)), hosted_request(data))}
+        without = {r["testId"]: r for r in hosted_results(run_request(self.root/"without.csv", BIG, hosted_request(BIG)), hosted_request(BIG))}
         for source in (packet["hostedResults"], [r for r in packet["externalReport"]["results"] if "decision" in r]):
             for r in source:
                 if r["decision"]["kind"] != "group_comparison":
@@ -863,11 +864,27 @@ class WorkerTests(unittest.TestCase):
                     for m in involving:
                         self.assertEqual((m["value"], m["numerator"], m["denominator"], m["confidenceInterval"], m["pValue"], m["details"]["counts"], m["details"]["fisherExactP"]), (None,)*7)
                     self.assertTrue(any("withheld" in note for note in r["limitations"]))
-                    # Suppressed groups never decide, so withholding them changes no decision.
+                    # C's row counts only towards coverage, which decides but is not reported. Suppressed groups
+                    # never decide, so withholding C changes no group decision.
+                    self.assertIsNone(r["decision"]["coverage"])
+                    self.assertEqual(r["decision"]["sampleSize"], 800)
                     same = exact[r["testId"]]
-                    self.assertEqual({**r["decision"], "suppressedGroups": None}, {**same["decision"], "suppressedGroups": None})
+                    ignored = {"suppressedGroups": None, "coverage": None, "sampleSize": None}
+                    self.assertEqual({**r["decision"], **ignored}, {**same["decision"], **ignored})
                     self.assertEqual(r["outcome"], same["outcome"])
                     self.assertEqual(same["decision"]["suppressedGroups"], [{"group": "C", "n": 1}])
+                    self.assertEqual(same["decision"]["coverage"]["populationRows"], 801)
+        # C's row is left out of every other criterion too: each reports exactly what the rows without C give,
+        # so no total minus the eligible groups gives back C's size, label or prediction.
+        for r in packet["hostedResults"]:
+            if r["decision"]["kind"] == "group_comparison":
+                continue
+            with self.subTest(r["testId"]):
+                other = without[r["testId"]]
+                self.assertEqual(r["decision"], other["decision"])
+                self.assertEqual(r["metrics"], other["metrics"])
+                self.assertTrue(any("left out" in note for note in r["limitations"]))
+        self.assertEqual(packet["externalReport"]["provenance"]["inputs"]["data"]["rowCount"], 800)
         # Nothing in the completion the platform received states C's size, rates or counts.
         def about_c(value):
             if isinstance(value, dict):
@@ -884,6 +901,36 @@ class WorkerTests(unittest.TestCase):
         for item in found:
             self.assertIsNone(item.get("n"))
             self.assertFalse({"x", "counts", "selectionNumerator", "selectionRate", "tpr", "fpr", "observed"} & {k for k, v in item.items() if v is not None})
+
+        # No figure anywhere in the completion counts C's row: 801 rows, 401 positives or 301 selections would
+        # give it back by subtraction.
+        def integers(value):
+            if isinstance(value, bool):
+                return
+            if isinstance(value, int):
+                yield value
+            elif isinstance(value, dict):
+                for item in value.values():
+                    yield from integers(item)
+            elif isinstance(value, list):
+                for item in value:
+                    yield from integers(item)
+        self.assertFalse({801, 401, 301} & set(integers(sent)))
+        for r in sent["hostedResults"]:
+            if r["decision"]["kind"] == "group_comparison":
+                eligible = [s for s in r["metrics"][0]["slices"] if s["n"] is not None]
+                self.assertEqual(sum(s["n"] for s in eligible), max(m["sampleSize"] for m in r["metrics"]))
+
+    def test_client_held_runs_leave_out_rows_that_another_group_column_withholds(self):
+        from engine.criteria import withheld_strata
+        # Leaving out one ethnicity's rows can shrink a sex group below the minimum; that group goes too.
+        observations = [{"fields": {"eth": e, "sex": x}} for e, x, n in (("A", "F", 40), ("A", "M", 40), ("B", "F", 31), ("C", "M", 5), ("D", "X", 25), ("A", "X", 6), (None, "F", 3)) for _ in range(n)]
+        plan = {"minimums": {"groupSize": 30}, "criteria": [{"kind": "group_comparison", "groupFields": ["eth"]}, {"kind": "group_comparison", "groupFields": ["sex"]}]}
+        strata = withheld_strata(observations, plan, {"columns": {}})
+        self.assertEqual(strata, {("eth",): {"C", "D"}, ("sex",): {"X"}})
+        from engine.criteria import is_withheld
+        remaining = [o for o in observations if not is_withheld(o["fields"], strata)]
+        self.assertEqual(len(remaining), 40+40+31+3)
 
     def test_client_held_calibration_withholds_small_bins(self):
         from engine.criteria import withhold_small_groups

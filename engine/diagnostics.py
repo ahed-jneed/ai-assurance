@@ -21,7 +21,7 @@ from typing import Any
 
 from . import __version__
 from . import statistics as stats
-from .criteria import evaluate_plan_results, group_columns, multiclass_data, threshold_for, withhold_small_groups as withhold
+from .criteria import evaluate_plan_results, group_columns, is_withheld, multiclass_data, threshold_for, withheld_strata, withhold_small_groups as withhold
 from .errors import EngineError
 from .provenance import definition_versions, runtime_dependencies
 
@@ -285,7 +285,7 @@ def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any], group_fi
     required = [columns["target"], columns["prediction"]]
     required += [columns["score"]] if "score" in columns else []
     required += list(group_fields)
-    missing = set(required) - set(rows[0])
+    missing = set(required) - set(rows[0]) if rows else set()
     if missing:
         raise EngineError("missing_column", "Missing CSV columns: " + ", ".join(sorted(missing)))
     observations = []
@@ -307,7 +307,7 @@ def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any], group_fi
     return observations, len(rows)-len(observations)
 
 
-def statistical_results(observations: list[dict[str, Any]], frozen: dict[str, Any], plan: dict[str, Any], omitted: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def statistical_results(observations: list[dict[str, Any]], frozen: dict[str, Any], plan: dict[str, Any], omitted: int, withheld: list[dict[str, Any]] | tuple = ()) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Every plan criterion as a result with a decision (statistics 1.0.0)."""
     for fields in _group_field_sets(plan, frozen):
         labels = {tuple(o["fields"].get(f) for f in fields) for o in observations}
@@ -316,7 +316,7 @@ def statistical_results(observations: list[dict[str, Any]], frozen: dict[str, An
     if frozen["task"] == "multiclass_classification" and len({o["target"] for o in observations} | {o["prediction"] for o in observations}) > 100:
         raise EngineError("cardinality_limit_exceeded", "Multiclass evaluation is limited to 100 labels; revise the protocol for high-cardinality outcomes")
     notes = [f"Excluded {omitted} rows missing target or prediction; this may bias results."] if omitted else []
-    return evaluate_plan_results(plan, observations, frozen, notes)
+    return evaluate_plan_results(plan, observations, frozen, notes, withheld)
 
 
 def _group_field_sets(plan: dict[str, Any], frozen: dict[str, Any]) -> list[list[str]]:
@@ -421,7 +421,9 @@ def _inference(call, records):
 
 def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Path | None = None, *, adapter=None, withhold_small_groups: bool = False) -> dict[str, Any]:
     """Evaluate a frozen configuration on a dataset. withhold_small_groups (a run on a client-held dataset, #102)
-    withholds the values of groups and calibration bins below the minimum group size (criteria.withhold_small_groups)."""
+    leaves the rows of groups below the minimum group size out of every criterion, of drift and of the reported
+    row count (criteria.withheld_strata), and withholds the values of those groups and of calibration bins below
+    the minimum group size (criteria.withhold_small_groups)."""
     started_at = datetime.now(timezone.utc).isoformat()
     frozen = validate_config(config)
     from .connectors import read_dataset
@@ -468,11 +470,21 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     diagnostics, plan = [], None
     if {"performance", "fairness"}.intersection(frozen["suite"]):
         declared = frozen["statistics"] if frozen["contractVersion"] == "1.3" else None
-        observations, omitted = prediction_rows(rows, frozen, group_columns(declared, frozen))
+        fields = group_columns(declared, frozen)
+        observations, omitted = prediction_rows(rows, frozen, fields)
         plan = derived_plan(frozen, observations)
+        withheld = []
+        strata = withheld_strata(observations, plan, frozen) if plan is not None and withhold_small_groups else {}
+        if strata:
+            # No total may include a withheld row, or subtracting the eligible groups would give it back.
+            withheld = [o for o in observations if is_withheld(o["fields"], strata)]
+            rows = [row for row in rows if not is_withheld({field: label_cell(row[field]) for field in fields}, strata)]
+            current_meta = {**current_meta, "rowCount": len(rows)}
+            observations, omitted = prediction_rows(rows, frozen, fields)
+            plan = derived_plan(frozen, observations)
         if plan is not None:
-            decided = statistical_results(observations, frozen, plan, omitted)[0]
-            diagnostics.extend(withhold(decided, plan) if withhold_small_groups else decided)
+            decided = statistical_results(observations, frozen, plan, omitted, withheld)[0]
+            diagnostics.extend(withhold(decided, plan, bool(withheld)) if withhold_small_groups else decided)
         if "fairness" in frozen["suite"] and frozen["task"] != "binary_classification":
             diagnostics.append(result("FAIR-SCOPE", "Binary outcome fairness suite", "10", [], ["These fairness definitions require a binary decision. A task-specific group-fairness protocol is required for regression or multiclass tasks."], "not_applicable"))
     from_predictions = list(diagnostics)
