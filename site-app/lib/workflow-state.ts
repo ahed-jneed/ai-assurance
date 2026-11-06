@@ -70,15 +70,39 @@ export function currentExecution(e: Engagement, p: Procedure) {
     (x.briefRevision === scope || x.impactReview?.briefRevision === scope)
   );
 }
-/** Whether a run was queued for this procedure's current plan and scope. */
+/**
+ * Whether planning pins still name this procedure's current plan and the
+ * current scope: the plan hash they recorded or, for pins recorded without
+ * one, the plan revision, plus the brief revision. Program revisions do not
+ * enter into it, so a change to another procedure, or to a preparer,
+ * reviewer or due date, leaves the pins current.
+ */
+export function planPinsCurrent(
+  e: Engagement,
+  p: Procedure,
+  pins: {
+    procedureRevision?: number;
+    planHash?: string;
+    briefRevision?: number;
+  },
+) {
+  const scope = e.workflow?.brief?.revision;
+  return (
+    scope !== undefined &&
+    pins.briefRevision === scope &&
+    (pins.planHash !== undefined && p.planHash !== undefined
+      ? pins.planHash === p.planHash
+      : pins.procedureRevision === p.revision)
+  );
+}
+/**
+ * Whether a run was queued for this procedure's current plan and scope, the
+ * rule executions follow (see currentExecution): a run queued under an
+ * earlier program revision still binds while both are unchanged.
+ */
 export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
   const b = r.procedureBinding;
-  return (
-    !!b &&
-    b.procedureId === p.id &&
-    b.procedureRevision === p.revision &&
-    b.briefRevision === e.workflow?.brief?.revision
-  );
+  return !!b && b.procedureId === p.id && planPinsCurrent(e, p, b);
 }
 /**
  * The revision a recovery draft of a procedure form is based on. A saved
