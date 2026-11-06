@@ -9,6 +9,7 @@ import {
   engagement,
   expectFailure,
 } from "./test-fixtures";
+import { resolveNew } from "../criteria/pin";
 
 /** A captured final report whose two packages the reviewer approved. */
 function approvedReport(id: string): Report {
@@ -177,7 +178,7 @@ describe("report release", () => {
 
   it("ignores the release-time procedures but not other unfinished work", async () => {
     const e = setup("R1");
-    const seeded = seedWorkflow("lead", at).procedures;
+    const seeded = seedWorkflow(resolveNew(), "lead", at).procedures;
     const rp02 = seeded.find((p) => p.templateId === "WP-RP-02")!;
     e.workflow!.procedures = [
       { ...rp02, selected: true, applicability: "applicable" },

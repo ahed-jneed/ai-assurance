@@ -18,7 +18,7 @@ import {
   resolvePlan,
   validateHostedPlan,
 } from "./hosted-statistics";
-import { recordVersions } from "./rule-pack-current";
+import { recordVersions } from "./criteria/pin";
 import { StatisticsError, planSha256 } from "./statistics";
 import {
   declarationInputSchema,
@@ -475,7 +475,7 @@ async function freezeRun(
     results: [],
     paperIds: [],
     createdAt: now(),
-    ...recordVersions(),
+    ...recordVersions(e),
     provenance: {
       inputHashes: {
         dataset: dataset.sha256,

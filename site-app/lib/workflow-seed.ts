@@ -1,7 +1,21 @@
-import catalog from "./catalog.json";
 import { templateCriterion } from "./catalog-criteria";
-import type { Workflow } from "./workflow-types";
-export function seedWorkflow(userId: string, at: string): Workflow {
+import { displayRefs, type Resolved } from "./criteria/projection";
+import type { Procedure, Workflow } from "./workflow-types";
+/**
+ * The initial workflow of an engagement on a criteria pack: one planned,
+ * unselected procedure per working paper of the pack, in programme order
+ * (docs/design/criteria-model.md section 7).
+ */
+export function seedWorkflow(
+  resolved: Pick<Resolved, "pack" | "frameworks">,
+  userId: string,
+  at: string,
+): Workflow {
+  const { pack } = resolved;
+  const editions = pack.criteria
+    .filter((s) => s.role === "primary")
+    .map((s) => s.edition)
+    .join("; ");
   return {
     schemaVersion: "1.0",
     adoptedBy: userId,
@@ -17,41 +31,42 @@ export function seedWorkflow(userId: string, at: string): Workflow {
       updatedAt: at,
       history: [],
     },
-    procedures: catalog.items
+    procedures: pack.items
       .filter((t) => t.kind === "working_paper")
-      .map((t) => ({
-        id: "PROC-" + t.id,
-        templateId: t.id,
-        title: t.title,
-        stage: t.stage,
-        objective: t.objective,
-        instructions: structuredClone(t.procedures),
-        expectedEvidence: [...t.evidenceRequired],
-        candidateRefs: [...t.regulatoryRefs],
-        selected: false,
-        applicability: "pending",
-        rationale: "",
-        criterion: templateCriterion(t),
-        sourceVersion: t.regulatoryRefs.length
-          ? catalog.regulatorySnapshot.celex
-          : catalog.methodologyVersion,
-        periodAnalysis: "",
-        population: "",
-        sampling: "",
-        ownerId: userId,
-        reviewerId: "",
-        dueDate: "",
-        method: "manual",
-        modelId: "",
-        datasetId: "",
-        profileId: "",
-        revision: 1,
-        contributors: [userId],
-        updatedBy: userId,
-        updatedAt: at,
-        state: "planned",
-        history: [],
-      })),
+      .map((t): Procedure => {
+        const refs = displayRefs(resolved, t);
+        return {
+          id: "PROC-" + t.id,
+          templateId: t.id,
+          title: t.title,
+          stage: t.stage,
+          objective: t.objective,
+          instructions: structuredClone(t.procedures),
+          expectedEvidence: [...t.evidenceRequired],
+          candidateRefs: refs,
+          selected: false,
+          applicability: "pending",
+          rationale: "",
+          criterion: templateCriterion({ ...t, regulatoryRefs: refs }),
+          sourceVersion: refs.length ? editions : pack.methodologyVersion,
+          periodAnalysis: "",
+          population: "",
+          sampling: "",
+          ownerId: userId,
+          reviewerId: "",
+          dueDate: "",
+          method: "manual",
+          modelId: "",
+          datasetId: "",
+          profileId: "",
+          revision: 1,
+          contributors: [userId],
+          updatedBy: userId,
+          updatedAt: at,
+          state: "planned",
+          history: [],
+        };
+      }),
     clientGrants: [],
     submissions: [],
     monitoring: [],

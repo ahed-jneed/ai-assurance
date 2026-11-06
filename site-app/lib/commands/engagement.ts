@@ -2,6 +2,7 @@ import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
 import { roles, stageGates } from "../domain";
 import { db, now, sha256 } from "../engagement-repo";
+import { resolveFollowup } from "../criteria/pin";
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
 import { calendarDate } from "../workflow-service";
@@ -94,7 +95,14 @@ export const engagement = defineCommands({
           "Assess an open case requiring reassessment before creating its follow-up",
         );
       await assertEngagementQuota(db(), ctx.tenantId);
-      const next = freshEngagement(e.clientId, a.title, ctx.user.userId, true);
+      // The follow-up keeps the predecessor's pack, at its current version.
+      const next = freshEngagement(
+        resolveFollowup(e),
+        e.clientId,
+        a.title,
+        ctx.user.userId,
+        true,
+      );
       next.dueDate = a.dueDate;
       next.workflow!.successorOf = { engagementId: e.id, caseId: c.id };
       c.successorEngagementId = next.id;

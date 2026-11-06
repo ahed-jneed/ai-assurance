@@ -3,7 +3,7 @@
 // and captured records carry, the dating of each obligation against an
 // engagement period, and three-valued predicate selection. Pure and without the
 // catalog import, so client views can use it with the catalog the workspace
-// API sends (lib/rule-pack-current.ts binds the build's own catalog).
+// API sends (lib/criteria/pin.ts binds the pinned pack).
 import type { Engagement, RulePackStamp } from "./domain";
 import { classificationFactValues } from "./domain/classification";
 import {

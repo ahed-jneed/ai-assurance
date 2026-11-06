@@ -3,11 +3,12 @@ import type { Procedure } from "./workflow-types";
 import { engagementWork, procedureWork } from "./work-items";
 import { seedWorkflow } from "./workflow-seed";
 import { approvedWorkflow, at, engagement } from "./workflow/test-fixtures";
+import { resolveNew } from "./criteria/pin";
 
 const today = "2026-11-05";
 /** A selected, applicable, assigned and overdue procedure from the catalog. */
 function planned(templateId: string, overrides: Partial<Procedure> = {}) {
-  const p = seedWorkflow("lead", at).procedures.find(
+  const p = seedWorkflow(resolveNew(), "lead", at).procedures.find(
     (p) => p.templateId === templateId,
   );
   if (!p) throw new Error("Unknown template " + templateId);

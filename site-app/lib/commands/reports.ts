@@ -33,7 +33,7 @@ import {
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { assertReviewerIndependent } from "../quality-review-records";
-import { recordVersions } from "../rule-pack-current";
+import { recordVersions } from "../criteria/pin";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
@@ -188,7 +188,7 @@ export const reports = defineCommands({
         annexMapVersion,
         auditEventHead: e.eventHead,
         createdAt,
-        ...recordVersions(),
+        ...recordVersions(e),
         regulatorySource: "https://eur-lex.europa.eu/eli/reg/2024/1689",
         limitations: [
           "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification. The platform's diagnostics evaluate traditional ML systems; they do not yet evaluate generative AI outputs, so conclusions on generative systems rest on the auditor's own procedures and evidence.",

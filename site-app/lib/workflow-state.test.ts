@@ -27,8 +27,10 @@ import {
   structuredEngagement,
   workflowOf,
 } from "./workflow/test-fixtures";
+import { resolveNew } from "./criteria/pin";
 
-const workflow = () => approvedWorkflow(seedWorkflow("lead", at).procedures);
+const workflow = () =>
+  approvedWorkflow(seedWorkflow(resolveNew(), "lead", at).procedures);
 const procedure = (w: Workflow) => {
   const p = w.procedures.find((p) => p.id === procedureId);
   if (!p) throw new Error("Unknown procedure " + procedureId);

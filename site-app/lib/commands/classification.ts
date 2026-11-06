@@ -1,10 +1,12 @@
 import { z } from "zod";
-import catalog from "../catalog.json";
 import { classificationRules } from "../classification-rules";
+import { pinnedPack, requireFeature } from "../criteria/pin";
+import type { PackDocument } from "../criteria/types";
 import {
   approveClassification,
   ClassificationError,
   recordClassification,
+  type ClassificationRules,
   type Classification,
 } from "../domain/classification";
 import { db } from "../engagement-repo";
@@ -14,10 +16,29 @@ import { asRulePack } from "../rule-pack";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
 
-/** The classification rules of the rule pack this build serves. */
-export const currentClassificationRules = classificationRules(
-  asRulePack(catalog.regulatorySnapshot)!,
-);
+const rulesByPack = new WeakMap<PackDocument, ClassificationRules>();
+/**
+ * The classification rules of the engagement's pinned pack (its rule pack,
+ * #18 and #19). 409 on a pack without features.aiActClassification.
+ */
+export function engagementClassificationRules(
+  e: Parameters<typeof pinnedPack>[0],
+) {
+  requireFeature(e, "aiActClassification");
+  const pack = pinnedPack(e);
+  let rules = rulesByPack.get(pack);
+  if (!rules) {
+    const rulePack = asRulePack(pack.compat?.catalog?.regulatorySnapshot);
+    if (!rulePack)
+      throw new ApiError(
+        409,
+        "This criteria pack has no AI Act classification",
+      );
+    rules = classificationRules(rulePack);
+    rulesByPack.set(pack, rules);
+  }
+  return rules;
+}
 const key = z.string().min(1).max(80);
 const input = z.object({
   operatorRole: short,
@@ -64,7 +85,7 @@ export const classification = defineCommands({
       const a = input.parse(d);
       try {
         e.classification = recordClassification(e.classification, a, {
-          rules: currentClassificationRules,
+          rules: engagementClassificationRules(e),
           user: ctx.user.userId,
           at: now(),
         });
@@ -97,7 +118,7 @@ export const classification = defineCommands({
         );
       try {
         e.classification = approveClassification(e.classification, {
-          rules: currentClassificationRules,
+          rules: engagementClassificationRules(e),
           user: ctx.user.userId,
           at: now(),
         });

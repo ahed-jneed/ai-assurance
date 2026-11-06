@@ -11,17 +11,18 @@ import {
   type Resolved,
 } from "./projection";
 import {
+  currentVersion,
   defaultPin,
   frameworkEntry,
+  pinFor,
   pinOf,
   registry,
   resolve,
+  selectable,
   type Registry,
 } from "./registry";
 import type {
-  CriteriaPin,
   CriteriaView,
-  EngagementCriteria,
   PackDocument,
   PackFeatures,
   PackRoles,
@@ -50,23 +51,31 @@ export const packFeatures = (
   e: Pick<Engagement, "criteria" | "rulePack">,
 ): PackFeatures => features(pinnedPack(e));
 
-/** The pin a new engagement stores. */
-export function newCriteria(
-  pin: CriteriaPin,
-  userId: string,
-  at: string,
-): EngagementCriteria {
-  return {
-    pin,
-    pinnedAt: at,
-    pinnedBy: userId,
-    origin: "created",
-    history: [],
-  };
+/**
+ * The pack a new engagement is pinned to: index.defaults.pack, or the
+ * current version of the chosen pack id, optionally an exact version; 400
+ * "Choose a released criteria pack" unless it is released, selectable, not
+ * withdrawn and backed by confirmed licences.
+ */
+export function resolveNew(packId?: string, packVersion?: string) {
+  const r = criteriaRegistry();
+  return resolve(r, defaultPin(r, packId, packVersion));
 }
-/** The default pin, or the current version of a chosen pack (400 if not selectable). */
-export const chooseCriteria = (packId?: string, packVersion?: string) =>
-  defaultPin(criteriaRegistry(), packId, packVersion);
+/**
+ * The pack of a follow-up engagement: the predecessor's pack id at its
+ * current version (design section 10), 409 when no version can be pinned.
+ */
+export function resolveFollowup(e: Pick<Engagement, "criteria" | "rulePack">) {
+  const r = criteriaRegistry();
+  const packId = pinOf(r, e).packId;
+  const current = currentVersion(r, "pack", packId);
+  if (!current || !selectable(r, packId, current.version))
+    throw new ApiError(
+      409,
+      "Choose a criteria pack for the follow-up engagement",
+    );
+  return resolve(r, pinFor(r, packId, current.version));
+}
 
 /**
  * What a captured record states about the rules it was made under: the
@@ -140,7 +149,7 @@ export function requireFeature(
 }
 
 /** What GET /api/workspace tells the client about the pin (section 10). */
-export function criteriaView(e: Engagement): CriteriaView {
+export function criteriaView(e: Engagement, internal = true): CriteriaView {
   const r = criteriaRegistry();
   const resolved = pinned(e);
   const { pack } = resolved;
@@ -167,7 +176,7 @@ export function criteriaView(e: Engagement): CriteriaView {
       resolved.frameworks.some(
         (fw) => frameworkEntry(r, fw)?.status === "withdrawn",
       ),
-    ...(f.obligationAssessments
+    ...(f.obligationAssessments || !internal
       ? {}
       : {
           requirements: resolved.frameworks.flatMap((fw, i) => {
