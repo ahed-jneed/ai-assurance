@@ -64,6 +64,33 @@ export const invitations = sqliteTable(
       .where(sql`status = 'pending'`),
   ],
 );
+/**
+ * Engagement records found damaged while loading (#16): a D1 body that is not
+ * JSON (object key "body") or an R2 part that is missing, unavailable or does
+ * not match its hash. One row per engagement, object and kind, counting
+ * repeats (recordIntegrityIncident in lib/engagement-storage.ts).
+ */
+export const integrityIncidents = sqliteTable(
+  "integrity_incidents",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    engagementId: text("engagement_id").notNull(),
+    objectKey: text("object_key").notNull(),
+    kind: text("kind").notNull(),
+    status: integer("status").notNull(),
+    firstSeen: text("first_seen").notNull(),
+    lastSeen: text("last_seen").notNull(),
+    lastUserId: text("last_user_id").notNull(),
+    occurrences: integer("occurrences").notNull().default(1),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.tenantId, t.engagementId, t.objectKey, t.kind],
+    }),
+  ],
+);
 export const managementEvents = sqliteTable(
   "management_events",
   {

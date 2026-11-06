@@ -233,7 +233,11 @@ export function useUrlSync({
     lastLink = useRef("");
   function applyWorkspaceLink(current: WorkspaceData, link: WorkspaceLink) {
     if (!authorizedLink(link, current.identity.role, !!current.engagement)) {
-      setError("This page is outside your current access.");
+      // A linked engagement that failed to load intact keeps its own message.
+      setError(
+        current.engagementError?.error ??
+          "This page is outside your current access.",
+      );
       return;
     }
     paper.clearPaper();

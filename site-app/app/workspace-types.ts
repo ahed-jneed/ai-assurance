@@ -48,8 +48,12 @@ export type WorkspaceData = {
     client_id: string;
     stage: string;
     due_date: string;
+    /** Why the engagement cannot be opened now, when its record is damaged. */
+    integrity_error?: string;
   }[];
   engagement: Engagement | null;
+  /** Why the requested engagement is not open, when it failed to load intact. */
+  engagementError?: { engagementId: string; error: string } | null;
   /** The selected engagement's stored size in bytes, for internal roles. */
   metadataBytes?: number | null;
   members: Member[];
