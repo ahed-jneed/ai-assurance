@@ -7,6 +7,7 @@ import {
   metadataLimit,
   metadataReserve,
   metadataWarning,
+  planPinsCurrent,
   procedureDraftRevision,
   revisionWarnings,
   runBindsProcedure,
@@ -377,6 +378,64 @@ describe("run bindings", () => {
     ])
       expect(runBindsProcedure(e, p, bound(change))).toBe(false);
     expect(runBindsProcedure(e, p, run())).toBe(false);
+  });
+
+  it("binds a run that recorded a plan hash to the plan content, as executions do", () => {
+    const e = structuredEngagement({ workflow: workflow() }),
+      p = procedure(e.workflow!);
+    p.planHash = "a".repeat(64);
+    const bound = (change = {}) =>
+      run({
+        procedureBinding: {
+          procedureId,
+          procedureRevision: p.revision,
+          planHash: "a".repeat(64),
+          briefRevision: 1,
+          programRevision: 1,
+          ...change,
+        },
+      });
+    expect(runBindsProcedure(e, p, bound())).toBe(true);
+    // Another procedure's change moved the program revision only.
+    e.workflow!.program.revision = 4;
+    expect(runBindsProcedure(e, p, bound())).toBe(true);
+    // A plan changed and then restored: the revision moved, the hash did not.
+    p.revision += 2;
+    expect(runBindsProcedure(e, p, bound())).toBe(true);
+    // A different plan, or a different scope, no longer binds.
+    expect(runBindsProcedure(e, p, bound({ planHash: "b".repeat(64) }))).toBe(
+      false,
+    );
+    expect(runBindsProcedure(e, p, bound({ briefRevision: 2 }))).toBe(false);
+  });
+});
+
+describe("planning pins", () => {
+  it("follow the procedure's plan revision and the scope revision, not the program revision", () => {
+    const e = structuredEngagement({ workflow: workflow() }),
+      p = procedure(e.workflow!),
+      pins = (change = {}) => ({
+        procedureId,
+        procedureRevision: p.revision,
+        briefRevision: 1,
+        programRevision: 1,
+        ...change,
+      });
+    expect(planPinsCurrent(e, p, pins())).toBe(true);
+    e.workflow!.program.revision = 3;
+    expect(planPinsCurrent(e, p, pins())).toBe(true);
+    expect(
+      planPinsCurrent(e, p, pins({ procedureRevision: p.revision + 1 })),
+    ).toBe(false);
+    expect(planPinsCurrent(e, p, pins({ briefRevision: 2 }))).toBe(false);
+    expect(planPinsCurrent(e, p, pins({ briefRevision: undefined }))).toBe(
+      false,
+    );
+    // Without a scope no pin is current.
+    e.workflow!.brief = undefined;
+    expect(planPinsCurrent(e, p, pins({ briefRevision: undefined }))).toBe(
+      false,
+    );
   });
 });
 

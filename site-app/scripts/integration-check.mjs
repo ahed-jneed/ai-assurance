@@ -1526,6 +1526,67 @@ try {
     owner,
     409,
   );
+  // Retries bind the procedure's plan and the scope, not the program
+  // revision (#69): a change to another procedure, approved in a new program
+  // revision, leaves a cancelled run of this procedure retryable; a change
+  // to this procedure's own plan does not.
+  const planOf = (p, change = {}) => ({
+    selected: p.selected,
+    applicability: p.applicability,
+    rationale: p.rationale ?? "",
+    criterion: p.criterion ?? "",
+    sourceVersion: p.sourceVersion,
+    periodAnalysis: p.periodAnalysis ?? "",
+    population: p.population ?? "",
+    sampling: p.sampling ?? "",
+    ownerId: p.ownerId ?? "",
+    reviewerId: p.reviewerId ?? "",
+    dueDate: p.dueDate ?? "",
+    method: p.method,
+    modelId: p.modelId ?? "",
+    datasetId: p.datasetId ?? "",
+    profileId: p.profileId ?? "",
+    ...change,
+  });
+  const replan = async (p, change) => {
+    await command("saveProcedurePlan", {
+      procedureId: p.id,
+      assignmentRevision: p.assignmentRevision ?? 1,
+      plan: planOf(p, change),
+    });
+    await command("submitProgram", {});
+    await command(
+      "approveProgram",
+      {
+        revision: e.workflow.program.revision,
+        reason: "Changed plan independently reviewed",
+      },
+      reviewer,
+    );
+  };
+  const early = await command("queueRun", {
+    procedureId: proc.id,
+    modelId: runInput.modelId,
+    datasetId: uploaded.artifactId,
+    profileId,
+  });
+  assert.equal(e.runs.at(-1).procedureBinding.planHash, currentPlan().planHash);
+  await command("cancelRun", { runId: early.details.runId });
+  const neighbour = e.workflow.procedures.find(
+    (p) => p.id !== proc.id && !p.selected,
+  );
+  const programBefore = e.workflow.program.revision;
+  await replan(neighbour, {
+    rationale: neighbour.rationale + "; boundary confirmed again",
+  });
+  assert(e.workflow.program.revision > programBefore);
+  const retried = await command("retryRun", { runId: early.details.runId });
+  assert.equal(e.runs.at(-1).retryOf, early.details.runId);
+  await command("cancelRun", { runId: retried.details.runId });
+  await replan(currentPlan(), {
+    sampling: currentPlan().sampling + "; source manifest reconciled",
+  });
+  await command("retryRun", { runId: early.details.runId }, owner, 409);
   const planned = await command("queueRun", {
     procedureId: proc.id,
     modelId: runInput.modelId,
