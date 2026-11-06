@@ -926,15 +926,37 @@ describe("answers, history and migration", () => {
     });
   });
 
-  it("cites the draft Art 6 guidelines and the Art 50 guidance versions", () => {
+  it("cites the draft Art 6 guidelines and the Art 50 guidance versions from the rule pack's register", () => {
     const c = record({});
     expect(c.guidance?.map((g) => [g.id, g.status])).toEqual([
       ["GUID-ART6-HIGH-RISK-CLASSIFICATION", "draft"],
       ["GUID-PROHIBITED-PRACTICES", "published (covers prohibitions 1 to 8)"],
-      ["GUID-ART50-TRANSPARENCY", "adopted (non-binding)"],
-      ["GUID-ART50-COP", "published (voluntary; no presumption of conformity)"],
+      ["GUID-ART50-TRANSPARENCY", "adopted"],
+      ["GUID-ART50-COP", "published"],
     ]);
-    expect(c.guidance?.[2].reference).toBe("C(2026) 7702 final");
+    expect(c.guidance?.[2]).toMatchObject({
+      reference: "C(2026) 7702 final",
+      date: "2026-11-05",
+    });
+    // The record keeps the register's legal effect: the guidelines are
+    // non-binding, and a citation without one in the register has none.
+    expect(c.guidance?.[2]?.legalEffect).toMatch(/^Non-binding/);
+    expect(c.guidance?.[3]?.legalEffect).toMatch(/^Voluntary/);
+    expect(c.guidance?.[0]).not.toHaveProperty("legalEffect");
+    expect(c.guidance?.[3]).toMatchObject({
+      reference: "Final code, 10 June 2026",
+      date: "2026-06-10",
+    });
+    // The citation follows the register: a later revision changes it.
+    const revised = structuredClone(pack);
+    revised.guidanceDocuments.find(
+      (g) => g.id === "GUID-ART50-TRANSPARENCY",
+    )!.status = "reviewed";
+    expect(
+      classificationRules(revised).guidance.find(
+        (g) => g.id === "GUID-ART50-TRANSPARENCY",
+      )?.status,
+    ).toBe("reviewed");
   });
 
   it("migrates a four-flag classification: facts unknown, approval kept readable", () => {
