@@ -64,10 +64,12 @@ CI (`.github/workflows/ci.yml`) runs two jobs on every pull request and on pushe
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint; any warning fails |
 | `npm test` | Vitest unit tests (`lib/**/*.test.ts`, `app/**/*.test.ts`) |
-| `npm run build` | Production Worker build; must stay warning-free |
+| `npm run check:sync` | Generated files match their canonical sources (see below) |
+| `npm run check:build` | Production Worker build (`npm run build`), failing if the output reports any warning |
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
+| `npm run check:fixtures` | Validate the run, external-run and procedure records the harnesses just produced against `schemas/` |
 
-The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
+The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, default `python` on Windows and `python3` elsewhere). The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
 The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
 
@@ -76,11 +78,30 @@ python -m pip install -r engine/requirements-dev.txt
 python -m unittest discover -s engine/tests -v
 node schemas/validate-run-schema.mjs
 node schemas/validate-procedure-schema.mjs
+node schemas/validate-working-paper-schema.mjs
+python schemas/generate-external-fixtures.py --output tmp/external-runs.v1.2.json
+node schemas/validate-run-schema.mjs --external-fixtures tmp/external-runs.v1.2.json
 ```
+
+### Canonical sources and generated copies
+
+The root `docs/`, `engine/`, `schemas/` and `templates/` folders are canonical. These committed files are generated from them; edit the source, then run `npm run sync` in `site-app/` and commit both. CI fails when a copy drifts.
+
+| Generated file | Source |
+|---|---|
+| `site-app/lib/catalog.json`, `site-app/lib/annex-iv-map.json` | `templates/` (byte copies) |
+| `site-app/lib/obligation-subitems.json` | `docs/obligation-subitems.json` |
+| `site-app/public/tools/assurance-verifier.py` | `engine/assurance.py` |
+| `site-app/public/tools/assurance-runtime.zip` | `engine/` (without `engine/tests/`) and `schemas/`, via `python -m engine.package_runtime` (see `engine/RUNTIME_PACKAGE.md`) |
+| `schemas/test-run.schema.json` | `schemas/test-run.base.json` (hand-maintained legacy run body and shared definitions), `schemas/.build-run-schema.py` and `.extend-assurance-schema.py` |
+
+The working-paper contract is `schemas/working-paper.schema.json`; `templates/working-paper.blank.json` is its draft specimen.
 
 Run the diagnostics CLI with `python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-report.json`; it refuses to overwrite an existing output.
 
 `site-app/package-lock.json` is maintained with npm 11. Change dependencies with `npx npm@11 install …`: npm 10 (bundled with Node 22) rewrites unrelated lockfile entries.
+
+Formatting-only commits are listed in `.git-blame-ignore-revs`. Run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone so `git blame` skips them; GitHub's blame view does this automatically.
 
 ## Current legal snapshot
 
