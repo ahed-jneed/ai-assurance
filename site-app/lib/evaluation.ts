@@ -197,6 +197,52 @@ export function performancePositiveLabel(c: {
 }) {
   return c.performancePositiveLabel || c.positiveLabel;
 }
+const semver = (version: string | undefined, prefix: string) => {
+  const match = version?.startsWith(prefix)
+    ? /^(\d+)\.(\d+)\.(\d+)/.exec(version.slice(prefix.length))
+    : null;
+  return match ? match.slice(1).map(Number) : null;
+};
+const atLeastVersion = (v: number[] | null, minimum: number[]) =>
+  !!v &&
+  (v[0] !== minimum[0]
+    ? v[0] > minimum[0]
+    : v[1] !== minimum[1]
+      ? v[1] > minimum[1]
+      : v[2] >= minimum[2]);
+/**
+ * The baselines a run's performance result was decided against, besides its
+ * accuracy and recall (macro F1) criteria. Hosted runs under test definitions
+ * traditional-ml-2.1.x require balanced accuracy above chance and accuracy
+ * above the majority-class baseline. External runs translated by the worker
+ * from 2.0.0 (statistics 1.0.0) carry the chance baseline as a plan member;
+ * the majority-class baseline is reported there but does not decide. Earlier
+ * runs applied neither, so their criterion line must not claim them.
+ */
+export function performanceBaselines(run: {
+  task?: string;
+  externalJobId?: string;
+  manifest?: { testDefinitionVersion: string };
+}) {
+  const version = run.manifest?.testDefinitionVersion,
+    chance =
+      run.task === "Multiclass classification"
+        ? "Balanced accuracy above 1/k (chance)"
+        : "Balanced accuracy above 50% (chance)";
+  if (run.externalJobId)
+    return atLeastVersion(
+      semver(version, "hosted-1.1-1.4-to-engine-1.3/"),
+      [2, 0, 0],
+    )
+      ? [chance]
+      : [];
+  const hosted = semver(version, "traditional-ml-");
+  // From 3.0.0 hosted results carry their statistics 1.0.0 decision, whose
+  // plan names its members; the majority-class rule ended with 2.x.
+  return atLeastVersion(hosted, [2, 1, 0]) && !atLeastVersion(hosted, [3, 0, 0])
+    ? [chance, "Accuracy above the majority-class baseline"]
+    : [];
+}
 export function fairnessSelected(suite: string[]) {
   return suite.some((x) =>
     ["demographic_parity", "disparate_impact", "equalized_odds"].includes(x),

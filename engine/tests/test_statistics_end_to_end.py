@@ -100,9 +100,10 @@ def group_view(s):
 
 def comparable(view, expected):
     """End-to-end additions the core level leaves out: bootstrap intervals for ECE and R2 (null at core level)
-    and the descriptive Brier score, which needs row-level scores (section 4.8)."""
+    and the descriptive Brier score, which needs row-level scores (section 4.8), and the supplementary
+    descriptive entries of test definitions traditional-ml-2.1.0 (prevalence, majority-class baseline)."""
     view = json.loads(json.dumps(view))
-    view["descriptive"] = [e for e in view["descriptive"] if e["memberId"] != "brier_score"]
+    view["descriptive"] = [e for e in view["descriptive"] if e["memberId"] not in ("brier_score", "prevalence", "majority_baseline_accuracy")]
     for e in view["descriptive"]:
         if e["metric"] in ("expected_calibration_error", "r2"):
             e["interval"] = None
