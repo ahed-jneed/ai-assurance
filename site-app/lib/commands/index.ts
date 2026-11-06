@@ -6,6 +6,7 @@ import type { CommandData, CommandModule, CommandResult } from "./command";
 import { engagement } from "./engagement";
 import { evidenceRequests } from "./evidence-requests";
 import { findings } from "./findings";
+import { managementSystem } from "./management-system";
 import { papers } from "./papers";
 import { qualityReview } from "./quality-review";
 import { reports } from "./reports";
@@ -20,6 +21,7 @@ export const commandModules: readonly CommandModule[] = [
   papers,
   classification,
   findings,
+  managementSystem,
   runs,
   specialCategory,
   reports,

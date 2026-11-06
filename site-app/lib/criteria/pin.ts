@@ -16,6 +16,7 @@ import {
   frameworkEntry,
   pinFor,
   pinOf,
+  previewDraft,
   registry,
   resolve,
   selectable,
@@ -23,10 +24,13 @@ import {
 } from "./registry";
 import type {
   CriteriaView,
+  ManagementSystemView,
   PackDocument,
   PackFeatures,
   PackRoles,
+  SoaControl,
 } from "./types";
+import type { GateFeatures } from "../domain/gates";
 
 let active: Registry | undefined;
 /** The registry the server uses: the generated bundle, or one a test injected. */
@@ -50,6 +54,58 @@ export const pinnedPack = (e: Pick<Engagement, "criteria" | "rulePack">) =>
 export const packFeatures = (
   e: Pick<Engagement, "criteria" | "rulePack">,
 ): PackFeatures => features(pinnedPack(e));
+
+/**
+ * The programme phases and Statement of Applicability controls of a pack
+ * (#28); undefined for a pack with neither.
+ */
+export function managementSystemView(
+  resolved: Pick<Resolved, "pack" | "frameworks">,
+): ManagementSystemView | undefined {
+  const { pack } = resolved;
+  const phases = (pack.phases ?? []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    templateIds: pack.items.filter((i) => i.phase === p.id).map((i) => i.id),
+  }));
+  const [framework, group] = (pack.soaControls ?? "").split(":");
+  const fw = features(pack).statementOfApplicability
+    ? resolved.frameworks.find((f) => f.id === framework)
+    : undefined;
+  if (!phases.length && !fw) return undefined;
+  const nodes = new Map((fw?.requirements ?? []).map((n) => [n.id, n]));
+  const below = (id: string) => {
+    for (let n = nodes.get(id); n?.parent; n = nodes.get(n.parent))
+      if (n.parent === group) return true;
+    return false;
+  };
+  const controls: SoaControl[] = (fw?.requirements ?? [])
+    .filter((n) => n.type === "requirement" && below(n.id))
+    .map((n) => {
+      const parent = n.parent ? nodes.get(n.parent) : undefined;
+      return {
+        id: n.id,
+        ref: n.ref,
+        title: n.title ?? "",
+        group: parent ? parent.ref + " " + (parent.title ?? "") : "",
+      };
+    });
+  return {
+    phases,
+    controls,
+    controlsFramework: fw?.shortTitle ?? "",
+  };
+}
+/** What the issuance gates read about an engagement's pack. */
+export function gateFeatures(
+  e: Pick<Engagement, "criteria" | "rulePack">,
+): GateFeatures {
+  const resolved = pinned(e);
+  return {
+    ...features(resolved.pack),
+    soaControls: managementSystemView(resolved)?.controls ?? [],
+  };
+}
 
 /**
  * The pack a new engagement is pinned to: index.defaults.pack, or the
@@ -140,11 +196,17 @@ export function requireFeature(
   if (packFeatures(e)[feature]) return;
   throw new ApiError(
     409,
-    feature === "aiActClassification"
-      ? "This criteria pack has no AI Act classification"
-      : feature === "obligationAssessments"
-        ? "This criteria pack has no AI Act obligation assessments"
-        : "This criteria pack has no Annex IV index",
+    {
+      aiActClassification: "This criteria pack has no AI Act classification",
+      obligationAssessments:
+        "This criteria pack has no AI Act obligation assessments",
+      annexIvIndex: "This criteria pack has no Annex IV index",
+      statementOfApplicability:
+        "This criteria pack has no Statement of Applicability",
+      nonconformityGrading: "This criteria pack has no nonconformity grading",
+      certificationRecommendation:
+        "This criteria pack has no certification recommendation",
+    }[feature],
   );
 }
 
@@ -171,6 +233,10 @@ export function criteriaView(e: Engagement, internal = true): CriteriaView {
       legalReviewPending: legalReviewPending(fw, resolved.frameworkEntries[i]),
       textPolicy: fw.licence.textPolicy,
     })),
+    draft: previewDraft(resolved.entry),
+    ...(internal && managementSystemView(resolved)
+      ? { managementSystem: managementSystemView(resolved) }
+      : {}),
     withdrawn:
       resolved.entry.status === "withdrawn" ||
       resolved.frameworks.some(

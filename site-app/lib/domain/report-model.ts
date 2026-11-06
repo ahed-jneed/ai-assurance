@@ -26,12 +26,29 @@ export const conclusionTypeIds = [
   "disclaimer",
   "readiness",
   "factual_findings",
+  "certification_recommended",
+  "certification_deferred",
+  "certification_not_recommended",
 ] as const;
+/** The conclusions of a certification audit: a recommendation (#28). */
+export const certificationConclusionIds = [
+  "certification_recommended",
+  "certification_deferred",
+  "certification_not_recommended",
+] as const;
+export type CertificationConclusion =
+  (typeof certificationConclusionIds)[number];
+export const isCertificationConclusion = (
+  c: string,
+): c is CertificationConclusion =>
+  (certificationConclusionIds as readonly string[]).includes(c);
 export type EngagementType = (typeof engagementTypeIds)[number];
 export type AssuranceLevel = (typeof assuranceLevelIds)[number];
 export type ConclusionType = (typeof conclusionTypeIds)[number];
 type AssuranceConclusion =
   "unmodified" | "qualified" | "adverse" | "disclaimer";
+const isAssuranceConclusion = (c: ConclusionType): c is AssuranceConclusion =>
+  ["unmodified", "qualified", "adverse", "disclaimer"].includes(c);
 
 /** What a report expresses: its engagement type, level and conclusion. */
 export type ReportTerms = {
@@ -81,15 +98,19 @@ export const engagementTypes: Record<
     guidance:
       "We measure or evaluate the underlying subject matter against the criteria ourselves.",
   },
+  // A certification audit states no ISAE 3000 assurance level and no
+  // assurance conclusion: it ends in the audit team's recommendation to the
+  // certification body's decision (#28). It still needs an engagement quality
+  // review (qualityReviewRequired).
   certification: {
     label: "Certification audit",
-    assurance: true,
+    assurance: false,
     standard:
       "ISO/IEC 17021-1 with ISO/IEC 42006, AI management system certification audit",
-    conclusions: ["unmodified", "qualified", "adverse", "disclaimer"],
+    conclusions: [...certificationConclusionIds],
     subject: "underlying",
     guidance:
-      "An audit of a management system against ISO/IEC 42001 for a certification decision.",
+      "A Stage 1 and Stage 2 audit of a management system against ISO/IEC 42001 that ends in a recommendation to the certification decision. Needs a criteria pack with certification recommendations.",
   },
   agreed_upon_procedures: {
     label: "Agreed-upon procedures",
@@ -111,6 +132,13 @@ export const engagementTypes: Record<
       "An advisory view of preparedness against the criteria. It is not assurance and must not be presented as such.",
   },
 };
+
+/**
+ * The engagement types a report on a pack may choose: a certification audit
+ * only on packs with certification recommendations (#28).
+ */
+export const offeredEngagementTypes = (certification: boolean) =>
+  engagementTypeIds.filter((t) => certification || t !== "certification");
 
 export const assuranceLevels: Record<
   AssuranceLevel,
@@ -185,6 +213,30 @@ export const conclusionTypes: Record<
     guidance:
       "Reports the procedures performed and their factual findings, with no opinion or conclusion.",
   },
+  // The certification gates are in lib/domain/management-system.ts: they read
+  // nonconformity grades, not paper conclusions, because accepted plans for
+  // minor nonconformities do not block a recommendation.
+  certification_recommended: {
+    label: "Certification recommended",
+    requiresSupport: false,
+    modified: false,
+    guidance:
+      "No unresolved major nonconformity, an accepted corrective action plan for every unresolved minor one, and a reviewed Statement of Applicability.",
+  },
+  certification_deferred: {
+    label: "Recommendation deferred",
+    requiresSupport: false,
+    modified: true,
+    guidance:
+      "A major nonconformity awaits verification of its correction and corrective action; every unresolved nonconformity has an accepted plan.",
+  },
+  certification_not_recommended: {
+    label: "Certification not recommended",
+    requiresSupport: false,
+    modified: true,
+    guidance:
+      "The management system does not meet the criteria, or the evidence does not allow a recommendation.",
+  },
 };
 
 /** Report headings and wording by assurance level, our own drafting. */
@@ -236,9 +288,23 @@ const assuranceWording: Record<
   },
 };
 const nonAssuranceWording: Record<
-  "readiness" | "factual_findings",
-  { heading: string; text: string }
+  "readiness" | "factual_findings" | CertificationConclusion,
+  { heading: string; basis?: string; text: string }
 > = {
+  certification_recommended: {
+    heading: "Audit recommendation: certification recommended",
+    text: "Based on the Stage 1 and Stage 2 audit of {subject} against {criteria}, the audit team recommends certification. No major nonconformity remains unresolved, and the corrective action plan for each unresolved minor nonconformity was accepted. The certification decision rests with the certification body; this report is not a certificate.",
+  },
+  certification_deferred: {
+    heading: "Audit recommendation: deferred",
+    basis: "Basis for deferral",
+    text: "Based on the Stage 1 and Stage 2 audit of {subject} against {criteria}, the audit team defers its recommendation until the correction and corrective action of each major nonconformity described in the Basis for deferral section are verified. The certification decision rests with the certification body; this report is not a certificate.",
+  },
+  certification_not_recommended: {
+    heading: "Audit recommendation: certification not recommended",
+    basis: "Basis for the recommendation",
+    text: "Based on the Stage 1 and Stage 2 audit of {subject} against {criteria}, the audit team does not recommend certification, because of the matters described in the Basis for the recommendation section. The certification decision rests with the certification body.",
+  },
   readiness: {
     heading: "Readiness assessment — not an assurance engagement",
     text: "This report describes the readiness of {subject} against {criteria} as we observed it during the engagement. It is not an assurance engagement: we express no opinion or conclusion that provides assurance.",
@@ -371,10 +437,10 @@ export function reportTitle(t: ReportTerms) {
     return "Agreed-upon procedures report of factual findings";
   if (t.engagementType === "readiness")
     return "AI readiness assessment report (not an assurance report)";
+  if (t.engagementType === "certification")
+    return "AI management system certification audit report";
   const level = t.assuranceLevel ? t.assuranceLevel + " assurance " : "";
-  return t.engagementType === "certification"
-    ? "Independent certification audit report (" + level.trim() + ")"
-    : "Independent " + level + "report";
+  return "Independent " + level + "report";
 }
 
 /** The conclusion section of a report: heading, wording and basis heading. */
@@ -387,10 +453,9 @@ export function conclusionStatement(
     engagementTypes[t.engagementType].subject === "information"
       ? "the subject matter information on " + subject
       : subject;
-  const w =
-    t.conclusion === "readiness" || t.conclusion === "factual_findings"
-      ? nonAssuranceWording[t.conclusion]
-      : assuranceWording[t.assuranceLevel ?? "reasonable"][t.conclusion];
+  const w = isAssuranceConclusion(t.conclusion)
+    ? assuranceWording[t.assuranceLevel ?? "reasonable"][t.conclusion]
+    : nonAssuranceWording[t.conclusion];
   return {
     heading: w.heading,
     basisHeading: "basis" in w ? (w.basis ?? "") : "",
@@ -406,7 +471,7 @@ export function conclusionStatement(
 
 /** A short label for the terms, e.g. "Qualified conclusion · limited assurance". */
 export function termsLabel(t: ReportTerms) {
-  if (t.conclusion === "readiness" || t.conclusion === "factual_findings")
+  if (!isAssuranceConclusion(t.conclusion))
     return conclusionTypes[t.conclusion].label;
   const heading =
     assuranceWording[t.assuranceLevel ?? "reasonable"][t.conclusion].heading;

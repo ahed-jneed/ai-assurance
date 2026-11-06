@@ -32,6 +32,10 @@ export function features(pack: PackDocument): PackFeatures {
     annexIvIndex: pack.features?.annexIvIndex === true,
     aiActClassification: pack.features?.aiActClassification === true,
     obligationAssessments: pack.features?.obligationAssessments === true,
+    statementOfApplicability: pack.features?.statementOfApplicability === true,
+    nonconformityGrading: pack.features?.nonconformityGrading === true,
+    certificationRecommendation:
+      pack.features?.certificationRecommendation === true,
   };
 }
 export const item = (

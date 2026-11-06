@@ -127,6 +127,12 @@ export type PackFeatures = {
   aiActClassification: boolean;
   /** AI Act obligation-subitem assessments. */
   obligationAssessments: boolean;
+  /** The organisation's Statement of Applicability over `soaControls` (#28). */
+  statementOfApplicability: boolean;
+  /** Major, minor and opportunity grades and corrective action plans (#28). */
+  nonconformityGrading: boolean;
+  /** Reports may state an audit recommendation to a certification decision (#28). */
+  certificationRecommendation: boolean;
 };
 export type CriteriaSet = {
   framework: string;
@@ -157,6 +163,8 @@ export type PackDocument = {
   defaults: Record<string, unknown>;
   roles?: PackRoles;
   features?: Partial<PackFeatures>;
+  /** "<framework-id>:<group-id>": the controls of the Statement of Applicability. */
+  soaControls?: string;
   reporting?: { regulatorySource?: string; limitations: string };
   controlObjectives: ControlObjective[];
   items: PackItem[];
@@ -279,6 +287,30 @@ export type CriteriaView = {
   withdrawn: boolean;
   /** Assertion criteria on packs without obligation assessments. */
   requirements?: { reference: string; citation: string; title: string }[];
+  /**
+   * The pin is a draft of a local draft preview (CRITERIA_INCLUDE_DRAFTS=1):
+   * not released, never in a production build.
+   */
+  draft: boolean;
+  /** Programme phases and Statement of Applicability controls (#28). */
+  managementSystem?: ManagementSystemView;
+};
+/** What the management-system features need on the client (#28). */
+export type ManagementSystemView = {
+  /** Programme phases in order, with the pack items of each. */
+  phases: { id: string; title: string; templateIds: string[] }[];
+  /** The Statement of Applicability controls, in framework order. */
+  controls: SoaControl[];
+  /** The framework the controls belong to, e.g. "ISO/IEC 42001:2023". */
+  controlsFramework: string;
+};
+/** One control of a Statement of Applicability. */
+export type SoaControl = {
+  id: string;
+  ref: string;
+  title: string;
+  /** The control's own group, e.g. "A.2 AI-related policies". */
+  group: string;
 };
 /** A pack offered at engagement creation. */
 export type PackSummary = {
@@ -287,6 +319,8 @@ export type PackSummary = {
   title: string;
   summary: string;
   isDefault: boolean;
+  /** A draft of a local draft preview, never offered by a production build. */
+  draft: boolean;
   workingPapers: number;
   memos: number;
   frameworks: { shortTitle: string; edition: string; title: string }[];
