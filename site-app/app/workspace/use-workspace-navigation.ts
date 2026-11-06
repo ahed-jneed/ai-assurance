@@ -284,7 +284,13 @@ export function useWorkspaceNavigation({
         paper.clearPaper();
         sheet.setDetail(null);
         if (
-          ["procedure", "scope", "program", "monitoring"].includes(item.kind)
+          [
+            "procedure",
+            "scope",
+            "program",
+            "monitoring",
+            "acceptance",
+          ].includes(item.kind)
         ) {
           url.setProcedureContext(
             item.kind === "procedure" ? item.recordId : undefined,
