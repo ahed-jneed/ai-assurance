@@ -10,7 +10,7 @@
 // let a client hand such data to an external auditor's platform.
 import { z } from "zod";
 import { calendarDate } from "./dataset-card";
-import type { Engagement, EvaluationProfile, Run } from "./domain";
+import type { Artifact, Engagement, EvaluationProfile, Run } from "./domain";
 import { fairnessSelected } from "./evaluation";
 import { ApiError } from "./http";
 
@@ -554,14 +554,69 @@ export function hostedGate(
 }
 
 /**
- * Refuses an external run of a fairness protocol on special-category data
- * by a worker other than the client's own unless a basis is recorded: the
- * auditor's worker also accesses the data.
+ * A client-held dataset pin (#102): what the client confirmed about a file
+ * it keeps. The platform records the pin and never receives the bytes.
  */
-export function externalGate(profile: EvaluationProfile, mode: string) {
+export const clientPinInputSchema = z
+  .object({
+    /** The client's file name, for the record; the worker selects by hash. */
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .regex(/^[^\x00-\x1f/\\]+$/, "Give the file name without a path"),
+    sha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/, "Give the SHA-256 as 64 lowercase hex digits"),
+    /** The file's exact byte count, within the external route's 100 MB. */
+    size: z
+      .number()
+      .int()
+      .min(1)
+      .max(100 * 1024 * 1024),
+    /** Who at the client computed the hash: name and role. */
+    confirmedBy: person,
+    confirmedOn: calendarDate,
+    /** Where the client keeps the file and who runs its worker. */
+    custodyNote: statement,
+  })
+  .strict();
+export type ClientPinInput = z.infer<typeof clientPinInputSchema>;
+/** The dataset stays with the client; the platform holds only its pin. */
+export function heldByClient(a: Pick<Artifact, "custody">) {
+  return a.custody === "client";
+}
+/** Refuses to read the bytes of a client-held pin, which has none here. */
+export function assertPlatformBytes(a: Pick<Artifact, "custody" | "name">) {
+  if (heldByClient(a))
+    throw new ApiError(
+      409,
+      a.name +
+        " is held by the client: the platform holds only its SHA-256 pin, so only a client-local job on the client's own worker can use it",
+    );
+}
+/** The storage key of evidence whose bytes the platform holds. */
+export function platformKey(a: Pick<Artifact, "custody" | "name" | "key">) {
+  assertPlatformBytes(a);
+  return a.key;
+}
+
+/**
+ * Refuses an external run of a fairness protocol on special-category data
+ * unless a basis is recorded or the data reach no one but the client: a
+ * client-local job on a client-held pin, whose worker reads the file in the
+ * client's environment (#102). The auditor's worker, or the platform's copy
+ * of uploaded bytes, would also give others access to the data.
+ */
+export function externalGate(
+  profile: EvaluationProfile,
+  mode: string,
+  clientHeld: boolean,
+) {
   if (
     !groupColumnIsSpecial(profile) ||
-    mode === "client_local" ||
+    (mode === "client_local" && clientHeld) ||
     profile.specialCategory?.basis
   )
     return;
@@ -569,7 +624,10 @@ export function externalGate(profile: EvaluationProfile, mode: string) {
     409,
     "Special-category column " +
       profile.config.groupColumn +
-      " can run without a recorded basis only on the client's own worker (client-local mode). Record the client's basis in a new protocol version for the auditor's worker.",
+      (mode === "client_local"
+        ? " can run without a recorded basis only on a client-held dataset pin, which the client's worker reads in the client's environment; this dataset's bytes are on the platform."
+        : " can run without a recorded basis only on the client's own worker (client-local mode) reading a client-held dataset pin.") +
+      " Record the client's basis in a new protocol version, or pin the client's file instead of uploading it.",
   );
 }
 
@@ -583,7 +641,9 @@ export function specialCategoryLimitations(runs: readonly Run[]) {
         r.manifest!.executionMode === "saved_predictions"
           ? "on the platform"
           : r.manifest!.executionMode === "client_local"
-            ? "on the client's own worker"
+            ? r.manifest!.dataset?.custody === "client"
+              ? "on the client's own worker in the client's environment, which returned only aggregates,"
+              : "on the client's own worker"
             : "on the auditor's external worker";
     return [
       "Run " +

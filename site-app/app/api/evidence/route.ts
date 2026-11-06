@@ -12,7 +12,11 @@ import {
   save,
   sha256,
 } from "@/lib/store";
-import { uploadGate, uploadHeader } from "@/lib/special-category";
+import {
+  assertPlatformBytes,
+  uploadGate,
+  uploadHeader,
+} from "@/lib/special-category";
 import { activeGrant, isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -152,6 +156,7 @@ export async function GET(request: Request) {
         (a.visibility !== "client" || a.status !== "accepted"))
     )
       throw new ApiError(404, "Evidence not found");
+    assertPlatformBytes(a);
     const object = await bucket().get(a.key);
     if (!object) throw new ApiError(404, "Evidence bytes unavailable");
     if (url.searchParams.get("preview") === "1") {

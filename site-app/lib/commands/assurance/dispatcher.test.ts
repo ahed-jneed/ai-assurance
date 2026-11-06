@@ -349,7 +349,8 @@ describe("POST /api/assurance", () => {
     ]);
   });
 
-  it("freezes an external job and answers it uncached", async () => {
+  // An approved procedure ready for an external job on `data`.
+  function externalFixture(data: Artifact = dataset) {
     const e = stored();
     const model: Model = {
         id: "MODEL-1",
@@ -369,7 +370,7 @@ describe("POST /api/assurance", () => {
         suite: ["performance"],
         config: { positiveLabel: "1" },
       } as EvaluationProfile;
-    e.artifacts.push(dataset, {
+    e.artifacts.push(data, {
       ...dataset,
       id: "EV-2",
       name: "scores.csv",
@@ -418,15 +419,26 @@ describe("POST /api/assurance", () => {
     vi.mocked(recordsById).mockImplementation(async (_ctx, _id, ids) =>
       [system, prediction].filter((r) => ids.includes(r.id)),
     );
-    const response = await post(e, "queueExternal", {
-      systemId: system.id,
-      modelId: model.id,
-      datasetId: dataset.id,
-      profileId: profile.id,
-      procedureId: "PROC-1",
-      mode: "provided_predictions",
-      predictionId: prediction.id,
-    });
+    return {
+      e,
+      system,
+      prediction,
+      queue: (mode: string) =>
+        post(e, "queueExternal", {
+          systemId: system.id,
+          modelId: model.id,
+          datasetId: dataset.id,
+          profileId: profile.id,
+          procedureId: "PROC-1",
+          mode,
+          predictionId: prediction.id,
+        }),
+    };
+  }
+
+  it("freezes an external job and answers it uncached", async () => {
+    const { system, prediction, queue } = externalFixture();
+    const response = await queue("provided_predictions");
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     const reply = (await response.json()) as Record<string, string>;
@@ -440,6 +452,43 @@ describe("POST /api/assurance", () => {
       "freezeExternalExecution",
       { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
+  });
+
+  it("queues a client-held dataset pin only in client-local mode (#102)", async () => {
+    const { queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+    });
+    for (const mode of ["provided_predictions", "auditor_model"]) {
+      const refused = await queue(mode);
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toContain(
+        "held by the client: queue it in client-local mode",
+      );
+    }
+    expect(save).not.toHaveBeenCalled();
+    expect((await queue("client_local")).status).toBe(200);
+    // The frozen request carries the custody, so no worker downloads it.
+    const { db } = fakeD1();
+    env.DB = db;
+    const batch = vi.mocked(save).mock.calls[0][5] as unknown as (
+      cmd: string,
+    ) => { sql: string; args: unknown[] }[];
+    const insert = batch("CMD-1").find((s) =>
+      s.sql.startsWith("INSERT INTO execution_jobs"),
+    )!;
+    const frozen = JSON.parse(String(insert.args[3]));
+    expect(frozen.executionMode).toBe("client_local");
+    expect(frozen.dataset).toMatchObject({
+      id: dataset.id,
+      sha256: dataset.sha256,
+      size: dataset.size,
+      custody: "client",
+    });
+    expect(frozen.limitations.at(-1)).toContain(
+      "The dataset stays in the client's environment",
+    );
   });
 });
 

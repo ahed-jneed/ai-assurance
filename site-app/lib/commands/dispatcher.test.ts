@@ -239,6 +239,7 @@ describe("command registry", () => {
     recoverRun: ["Lead Auditor"],
     cancelRun: ["Auditor", "Lead Auditor"],
     recordSpecialCategoryBasis: ["Auditor", "Lead Auditor"],
+    pinClientDataset: ["Auditor", "Lead Auditor"],
     acceptEvidence: ["Auditor", "Lead Auditor"],
     setStage: ["Lead Auditor"],
     renameEngagement: ["Auditor", "Lead Auditor"],

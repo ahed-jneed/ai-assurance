@@ -10,6 +10,7 @@ import { bucket } from "../../bindings";
 import { parseCSV } from "../../diagnostics";
 import { datasetCSV } from "../../evaluation-service";
 import { ApiError } from "../../http";
+import { platformKey } from "../../special-category";
 import { sha256 } from "../../ids";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -47,7 +48,7 @@ export const sources: AssuranceModule = defineCommands({
           400,
           "Select an accepted assurance JSON packet up to 5 MB",
         );
-      const o = await bucket().get(source.key);
+      const o = await bucket().get(platformKey(source));
       if (!o) throw new ApiError(404, "Packet bytes unavailable");
       const bytes = await o.arrayBuffer();
       if ((await sha256(bytes)) !== source.sha256)

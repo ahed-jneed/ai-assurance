@@ -6,14 +6,16 @@ import { env } from "cloudflare:workers";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as submit } from "@/app/api/client-submission/route";
-import { POST as upload } from "@/app/api/evidence/route";
+import { GET as download, POST as upload } from "@/app/api/evidence/route";
 import { POST as workspace } from "@/app/api/workspace/route";
 import { caller, postRequest, stored } from "./commands/test-fixtures";
 import type { Engagement, EvaluationProfile, Run } from "./domain";
 import { ApiError } from "./http";
 import {
+  assertPlatformBytes,
   basisInputSchema,
   csvHeader,
+  heldByClient,
   namesSpecialCategory,
   normalizeColumn,
   specialCategoryLimitations,
@@ -619,6 +621,98 @@ describe("POST /api/evidence", () => {
     expect((await post(date(2 * day), ["ethnicity"])).status).toBe(400);
     expect((await post(date(day), ["ethnicity"])).status).toBe(200);
   });
+
+  // #102: the client keeps the file; the platform records only its pin.
+  const pin = (data: Record<string, unknown> = {}) => {
+    const { id, version } = engagement();
+    return workspace(
+      postRequest("/api/workspace", {
+        tenantId: "tenant-1",
+        engagementId: id,
+        expectedVersion: version,
+        op: "pinClientDataset",
+        data: {
+          name: "applicants-2026-q3.csv",
+          sha256: "c".repeat(64),
+          size: 1234,
+          confirmedBy: "Client data steward",
+          confirmedOn: "2026-11-05",
+          custodyNote:
+            "Kept on the client's analysis server; its worker reads it",
+          ...data,
+        },
+      }),
+    );
+  };
+  const pinnedEngagement = () =>
+    JSON.parse(
+      (sqlite.prepare("SELECT body FROM engagements").get() as { body: string })
+        .body,
+    ) as Engagement;
+
+  it("pins a client-held dataset without receiving or storing any bytes", async () => {
+    const response = await pin();
+    expect(response.status).toBe(200);
+    expect(objects.size).toBe(0);
+    const a = pinnedEngagement().artifacts.at(-1)!;
+    expect(a).toMatchObject({
+      name: "applicants-2026-q3.csv",
+      category: "Dataset",
+      sha256: "c".repeat(64),
+      size: 1234,
+      key: "",
+      status: "unverified",
+      custody: "client",
+      clientPin: {
+        confirmedBy: "Client data steward",
+        confirmedOn: "2026-11-05",
+      },
+    });
+    expect(audit().at(-1)).toEqual({
+      action: "pinClientDataset",
+      details: expect.objectContaining({
+        artifactId: a.id,
+        sha256: "c".repeat(64),
+        custody: "client",
+      }),
+    });
+    // There are no bytes to download, preview or evaluate on the platform.
+    const refused = await download(
+      new Request(
+        "https://workspace.test/api/evidence?" +
+          new URLSearchParams({
+            tenantId: "tenant-1",
+            engagementId: pinnedEngagement().id,
+            artifactId: a.id,
+          }),
+      ),
+    );
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toContain(
+      "is held by the client",
+    );
+    expect(() => assertPlatformBytes(a)).toThrow(/held by the client/);
+    expect(heldByClient(a)).toBe(true);
+  });
+
+  it("refuses a duplicate, future-dated, path-named or malformed pin", async () => {
+    expect((await pin()).status).toBe(200);
+    const duplicate = await pin();
+    expect(duplicate.status).toBe(409);
+    expect(
+      (await pin({ sha256: "d".repeat(64), confirmedOn: "2999-01-01" })).status,
+    ).toBe(400);
+    expect(
+      (await pin({ sha256: "d".repeat(64), name: "../data.csv" })).status,
+    ).toBe(400);
+    expect((await pin({ sha256: "D".repeat(64) })).status).toBe(400);
+    expect((await pin({ sha256: "d".repeat(64), size: 0 })).status).toBe(400);
+    expect(
+      (await pin({ sha256: "d".repeat(64), size: 100 * 1024 * 1024 + 1 }))
+        .status,
+    ).toBe(400);
+    expect(pinnedEngagement().artifacts.filter(heldByClient)).toHaveLength(1);
+  });
 });
 
 describe("specialCategoryLimitations", () => {
@@ -654,12 +748,28 @@ describe("specialCategoryLimitations", () => {
           },
           undefined,
         ),
+        run(
+          {
+            id: "JOB-2",
+            manifest: {
+              executionMode: "client_local",
+              dataset: { custody: "client" },
+              profile: {
+                suite: ["equalized_odds"],
+                config: { groupColumn: "ethnicity" },
+                specialCategory: { specialCategory: true, basis: null },
+              },
+            } as unknown as Run["manifest"],
+          },
+          undefined,
+        ),
         run({ id: "RUN-2", state: "failed" }, { specialCategory: true }),
         run({ id: "RUN-3" }, { specialCategory: false }),
       ]),
     ).toEqual([
       "Run RUN-1 evaluated special-category column ethnicity on the platform under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
       "Run JOB-1 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
+      "Run JOB-2 evaluated special-category column ethnicity on the client's own worker in the client's environment, which returned only aggregates, with no basis recorded on its protocol.",
     ]);
   });
 });
