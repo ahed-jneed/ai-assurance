@@ -44,6 +44,9 @@ REGRESSION_DESCRIPTIVE = ("mae", "rmse", "r2")
 PERFORMANCE_KINDS = ("performance", "multiclass_performance", "regression_performance")
 # Metrics that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval (section 4.8).
 UNDECIDABLE = {"regression_performance": "r2", "calibration": "expected_calibration_error"}
+# Section 5.9: a regression pass also needs the model to beat the mean-prediction baseline; an MSE reduction of at
+# most this share of the baseline MSE is floating-point rounding and never counts as beating it.
+BASELINE_TOLERANCE = 1e-9
 RATE_KEYS = {"selection_rate_difference": "selection", "selection_rate_ratio": "selection", "tpr_difference": "tpr", "fpr_difference": "fpr"}
 # Headline names keep each runner's existing metric names (section 11).
 HEADLINE_NAMES = {
@@ -908,6 +911,36 @@ def regression_stat(metric, data, mins):
     return Stat(math.sqrt(mean), "normal_approximation_mse", lambda z: (math.sqrt(max(0.0, mean - z * se)), math.sqrt(mean + z * se)), lambda band: (lambda d: normal_zstar(mean, se, square_band(band), d)), counts, *status)
 
 
+def mean_baseline(data, mins):
+    """Section 5.9: the mean-prediction baseline and its gate. Returns (the descriptive `baseline_rmse` Stat, gate p).
+
+    The baseline predicts the mean of the evaluated targets on every row; its RMSE is the targets' population
+    standard deviation, and no constant prediction has a lower one. The gate tests that the model's MSE lies below
+    the baseline's: d_i = e_i^2 - (mean - y_i)^2, one-sided normal approximation on the decision scale (p <= alpha
+    exactly when the upper bound of mean(d)'s interval is below 0). A reduction of at most BASELINE_TOLERANCE of the
+    baseline MSE is rounding, not evidence, so the gate does not reject (p = 1)."""
+    errors = data["errors"]
+    n = len(errors)
+    targets = data.get("targets")
+    if n < 2 or targets is None:
+        return Stat(None, None, None, None, {"n": n}, "undefined", ["undefined_zero_denominator"]), 1.0
+    mean_t = math.fsum(targets) / n
+    residuals = [mean_t - t for t in targets]
+    sst = math.fsum(r * r for r in residuals)
+    if sst == 0.0:
+        return Stat(None, None, None, None, {"n": n}, "undefined", ["undefined_zero_denominator"]), 1.0
+    baseline_mse = sst / n
+    mean_d, sd_d = mean_sd([e * e - r * r for e, r in zip(errors, residuals)])
+    se = sd_d / math.sqrt(n)
+    reduction = 0.0 - mean_d  # never -0.0
+    if reduction <= BASELINE_TOLERANCE * baseline_mse:
+        p = 1.0
+    else:
+        p = p_from_z(Z_MAX if se == 0.0 else reduction / se)
+    counts = {"n": n, "meanSquaredError": baseline_mse, "meanSquaredErrorReduction": reduction, "sdSquaredErrorDifference": sd_d, "gatePValue": p}
+    return Stat(math.sqrt(baseline_mse), None, None, None, counts, *support(n, mins["sampleSize"], "below_minimum_sample_size")), p
+
+
 def rate_counts(key, g):
     if g is None:
         return 0, 0
@@ -1137,7 +1170,9 @@ def evaluate_criterion(spec, data, level, mins, derived=False):
         planned = [item["metric"] for item in spec["members"]]
         members = [stat_entry(item["metric"], item["band"], regression_stat(item["metric"], data, mins), level, decide=decide) for item in spec["members"]]
         descriptive = [stat_entry(metric, None, regression_stat(metric, data, mins), level, descriptive=True) for metric in REGRESSION_DESCRIPTIVE if metric not in planned]
-        context = {"sampleSize": len(data["errors"]), "passBlocked": False, "reasons": []}
+        baseline, baseline_p = mean_baseline(data, mins)
+        descriptive.append(stat_entry("baseline_rmse", None, baseline, level, descriptive=True))
+        context = {"sampleSize": len(data["errors"]), "passBlocked": False, "reasons": [], "baselineP": baseline_p}
     elif kind == "group_comparison":
         members, context = group_members(spec, data, mins, level)
         groups = context["groups"]
@@ -1187,8 +1222,11 @@ def evaluate_criterion(spec, data, level, mins, derived=False):
             if p > alpha + EPS:
                 ungated = max(m["_pInterval"] for m in pool)  # without the chance gate of section 5.2
                 reasons.append("chance_exact_test_not_significant" if ungated <= alpha + EPS else "interval_straddles_band")
+            p = max(p, context.get("baselineP", 0.0))  # the mean baseline gate (section 5.9) gates passes only
         else:
             p = 1.0
+        if context.get("baselineP", 0.0) > alpha + EPS:
+            reasons.append("mean_baseline_not_beaten")
     for m in pool:
         for r in m["reasons"]:
             if r not in reasons:

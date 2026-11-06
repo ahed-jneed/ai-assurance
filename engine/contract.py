@@ -23,7 +23,7 @@ KIND_ARTICLES = {"performance": "15", "multiclass_performance": "15", "regressio
 KIND_METRICS = {
     "performance": {"accuracy", "precision", "recall", "specificity", "false_positive_rate", "balanced_accuracy", "f1"},
     "multiclass_performance": {"accuracy", "macro_recall", "macro_precision", "macro_f1"},
-    "regression_performance": {"mae", "rmse", "r2"},
+    "regression_performance": {"mae", "rmse", "r2", "baseline_rmse"},
     "calibration": {"maximum_calibration_gap", "brier_score", "expected_calibration_error"},
 }
 GROUP_NAMES = {"selection_rate_difference": ("demographic_parity_difference", ("selection_rate_difference",)), "selection_rate_ratio": ("disparate_impact_ratio", ("selection_rate_ratio",)), "equalized_odds": ("equalized_odds_difference", ("tpr_difference", "fpr_difference"))}
@@ -206,7 +206,14 @@ def _validate_criterion(criterion, result, plan, alpha, families, bh, expect):
         expect(bool(pool) and all(m["details"]["status"] == "evaluated" and m["details"]["direction"] == "pass" for m in pool), "a pass needs every pool member evaluated and passing")
         expect(not set(decision.get("reasons", ())) & PASS_BLOCKING and not criterion.get("passBlockedBy"), "a pass-blocking reason or passBlockedBy forbids a pass")
         largest = max(m["pValue"] for m in pool)
-        expect(_close(p, largest) and decision.get("decidingMemberId") in {_member_id(m) for m in pool if m["pValue"] == largest}, "a pass's p-value and deciding member are the largest member p-value")
+        expect(decision.get("decidingMemberId") in {_member_id(m) for m in pool if m["pValue"] == largest}, "a pass's deciding member has the largest member p-value")
+        if criterion["kind"] == "regression_performance":
+            # Section 5.9: a regression pass also needs the mean-prediction baseline beaten.
+            baseline = next((m for m in metrics if m["name"] == "baseline_rmse" and m["details"]["role"] == "descriptive"), None)
+            gate = (baseline["details"].get("counts") or {}).get("gatePValue") if baseline else None
+            expect(isinstance(gate, (int, float)) and not isinstance(gate, bool), "a regression pass reports the mean baseline gate (baseline_rmse counts.gatePValue)")
+            largest = max(largest, gate)
+        expect(_close(p, largest), "a pass's p-value is the largest member p-value (and, for regression, the mean baseline gate p)")
     if result["outcome"] == "fail":
         failing = [m for m in evaluated if m["details"]["direction"] == "fail"]
         expect(bool(failing), "a fail needs an evaluated failing member")
