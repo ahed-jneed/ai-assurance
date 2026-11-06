@@ -8,9 +8,14 @@ import {
   finding,
   procedureId,
   procedureOf,
+  recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
-import { criterionRollup, reportElements } from "./report-gates";
+import {
+  criterionRollup,
+  independenceProblem,
+  reportElements,
+} from "./report-gates";
 import {
   qualityStatement,
   type AssuranceLevel,
@@ -47,6 +52,7 @@ async function issuable() {
   const paperId = procedureOf(e, procedureId).paperId;
   e.papers.find((p) => p.id === paperId)!.status = "signed";
   e.stage = "Sign-off";
+  recordAcceptance(e);
   return e;
 }
 const kinds = (e: Engagement, t: ReportTerms, p = particulars) =>
@@ -267,19 +273,46 @@ describe("results by criterion", () => {
 });
 
 describe("independence element", () => {
+  const element = (e: Engagement) =>
+    reportElements(e, terms("unmodified"), particulars).find(
+      (x) => x.id === "independence",
+    )!;
   it("prints the firm's statement, never the internal planning note", async () => {
     const e = await issuable();
     e.workflow!.brief!.independence = "Internal conflicts note: partner X";
-    const el = reportElements(e, terms("unmodified"), particulars).find(
-      (x) => x.id === "independence",
-    )!;
-    expect(el.value).toBe(qualityStatement);
-    expect(el.problem).toBe("");
+    expect(element(e).value).toBe(qualityStatement);
+    expect(element(e).problem).toBe("");
+  });
+  it("comes from the acceptance record and declarations where the gate applies", async () => {
+    const e = await issuable();
+    // Briefs no longer ask for the free-text note (#23).
+    e.workflow!.brief!.independence = "";
+    expect(element(e).problem).toBe("");
+    e.workflow!.declarations = e.workflow!.declarations!.filter(
+      (d) => d.userId !== "reviewer",
+    );
+    expect(element(e).problem).toBe(independenceProblem);
+    const gate = finalReportGates(e, {
+      ...terms("unmodified"),
+      particulars,
+    }).find((g) => g.id === "report:independence");
+    // The gate opens the acceptance panel.
+    expect(gate).toMatchObject({ kind: "acceptance" });
+  });
+  it("keeps the brief's note for a workflow adopted before acceptance records", async () => {
+    const e = await issuable();
+    delete e.workflow!.acceptance;
+    delete e.workflow!.acceptanceRequired;
+    e.workflow!.declarations = [];
+    expect(element(e).problem).toBe("");
     e.workflow!.brief!.independence = " ";
+    expect(element(e).problem).toBe(
+      "The approved brief must record the independence assessment",
+    );
     expect(
-      reportElements(e, terms("unmodified"), particulars).find(
-        (x) => x.id === "independence",
-      )!.problem,
-    ).toBe("The approved brief must record the independence assessment");
+      finalReportGates(e, { ...terms("unmodified"), particulars }).find(
+        (g) => g.id === "report:independence",
+      ),
+    ).toMatchObject({ kind: "report" });
   });
 });

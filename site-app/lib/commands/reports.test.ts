@@ -9,6 +9,7 @@ import {
   paper,
   procedureId,
   procedureOf,
+  recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
 import { assertReleasable, reports } from "./reports";
@@ -52,6 +53,7 @@ async function issuable() {
   const paperId = procedureOf(e, procedureId).paperId;
   e.papers.find((p) => p.id === paperId)!.status = "signed";
   e.stage = "Sign-off";
+  recordAcceptance(e);
   e.classification.approvedBy = "user-approver-7";
   e.artifacts.push(
     artifact({
@@ -356,5 +358,8 @@ describe("report model v2 snapshots", () => {
     e.workflow!.brief!.independence = "Internal: partner X declared a conflict";
     const r = await capture(e, qualified);
     expect(JSON.stringify(r.clientSnapshot)).not.toContain("partner X");
+    // The acceptance record and the declarations are internal (#23).
+    for (const internal of ["DEC-reviewer", "EL-2026-014", "competence"])
+      expect(JSON.stringify(r.clientSnapshot)).not.toContain(internal);
   });
 });

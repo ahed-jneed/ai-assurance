@@ -14,6 +14,7 @@ import {
   type ReportParticulars,
   type ReportTerms,
 } from "./report-model";
+import { acceptanceApplies, acceptanceGates } from "../workflow/acceptance";
 
 /** One element a report must contain, with its value and what is missing. */
 export type ReportElement = {
@@ -35,6 +36,13 @@ export type ReportElement = {
   /** Why the element is incomplete; empty when it is complete. */
   problem: string;
 };
+
+/**
+ * Why the independence element is incomplete when the acceptance gate
+ * applies and its record or a team member's declaration is not in order.
+ */
+export const independenceProblem =
+  "Approve the acceptance record and obtain a current, conflict-free declaration from every team member";
 
 /** How the conclusion names the subject matter of the approved brief. */
 export function subjectPhrase(e: Engagement) {
@@ -204,14 +212,20 @@ export function reportElements(
     {
       id: "independence",
       label: "Independence and quality management",
-      // The brief's competence, independence and conflicts assessment is an
-      // internal planning note: it gates the element, and the report states
-      // the firm's fixed statement instead.
+      // The independence assessment is internal: it gates the element, and
+      // the report states the firm's fixed statement instead. Where the
+      // acceptance gate applies, the approved acceptance record and every
+      // team member's current, conflict-free declaration are that
+      // assessment; an older workflow keeps its brief's free-text note.
       value: qualityStatement,
-      problem: fromBrief(
-        b?.independence,
-        "The approved brief must record the independence assessment",
-      ),
+      problem: acceptanceApplies(e.workflow)
+        ? acceptanceGates(e).length
+          ? independenceProblem
+          : ""
+        : fromBrief(
+            b?.independence,
+            "The approved brief must record the independence assessment",
+          ),
     },
     {
       id: "work",

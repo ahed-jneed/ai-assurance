@@ -411,6 +411,17 @@ export function approvedWorkflow(procedures: Procedure[] = []): Workflow {
   return w;
 }
 
+/**
+ * Records what leaving Planning requires (#23): an approved acceptance record
+ * and a conflict-free declaration from every internal fixture member. For a
+ * test that moves an engagement past Planning by setting its stage.
+ */
+export function recordAcceptance(e: Engagement) {
+  const w = workflowOf(e);
+  w.acceptance = acceptedRecord();
+  w.declarations = internalPeople.map((userId) => declaration(userId));
+}
+
 // Every active internal fixture member, so that a test may assign any of
 // them without making the fixture declarations outdated.
 export const internalPeople = [
