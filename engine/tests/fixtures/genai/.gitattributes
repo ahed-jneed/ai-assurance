@@ -1,0 +1,9 @@
+# Tests and expected.json pin the SHA-256 of these exact bytes, so git must never
+# convert line endings here (core.autocrlf, eol=...). Text diffs stay readable.
+* -text
+*.json diff
+*.jsonl diff
+*.md diff
+*.py diff
+*.yaml diff
+*.js diff

@@ -1,0 +1,37 @@
+description: Tiny echo-provider eval (ai-assurance genai-evidence fixture)
+prompts:
+  - id: brief
+    raw: "You are a careful assistant. Answer briefly: {{question}}"
+providers:
+  - id: echo
+    label: echo-model
+tests:
+  - description: geography
+    vars:
+      question: "What is the capital of France? Choose Paris or Lyon."
+    assert:
+      - type: icontains
+        value: paris
+    metadata:
+      category: geography
+      passage: geo
+  - description: astronomy
+    vars:
+      question: "Name the largest planet in the solar system."
+    assert:
+      - type: icontains
+        value: jupiter
+    metadata:
+      category: astronomy
+      passage: geo
+  - description: greeting
+    vars:
+      question: "Say hello to the user."
+    assert:
+      - type: contains
+        value: hello
+      - type: javascript
+        value: output.length < 200
+    metadata:
+      category: smalltalk
+      passage: misc
