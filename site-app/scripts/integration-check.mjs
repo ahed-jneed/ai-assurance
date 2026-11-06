@@ -2590,10 +2590,64 @@ try {
     "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
   );
   await asRole("Reviewer");
+  // #127: an engagement grant held under another role is team membership,
+  // even without any recorded work and after a re-grant as reviewer.
+  const secondLead = "fixture-second-lead-" + stamp;
+  await management("grantMember", {
+    userId: secondLead,
+    displayName: "Fixture Second Lead",
+    role: "Lead Auditor",
+    engagementIds: [e.id],
+  });
+  await management("updateMember", {
+    userId: secondLead,
+    displayName: "Fixture Second Lead",
+    role: "Engagement Quality Reviewer",
+    clientId: null,
+    engagementIds: [e.id],
+  });
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: secondLead, reason: "Held access as a Lead" },
+        owner,
+        409,
+      )
+    ).error,
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+  );
+  await management("revokeMember", { userId: secondLead });
+  // #127: the cooling-off period is a practice policy, set with a reason and
+  // recorded as a management event; an appointment records the period.
+  assert.equal(workspace.qualityReviewPolicy.coolingOffDays, 730);
+  await management("setQualityReviewPolicy", {
+    coolingOffDays: 1095,
+    reason: "Firm policy: three years for assurance clients",
+  });
+  assert.deepEqual(
+    [
+      workspace.managementEvents[0].action,
+      JSON.parse(workspace.managementEvents[0].details),
+    ],
+    [
+      "setQualityReviewPolicy",
+      {
+        coolingOffDays: 1095,
+        previousCoolingOffDays: 730,
+        reason: "Firm policy: three years for assurance clients",
+      },
+    ],
+  );
+  assert.deepEqual(workspace.qualityReviewPolicy, {
+    coolingOffDays: 1095,
+    practiceSet: true,
+  });
   await command("appointQualityReviewer", {
     userId: quality,
     reason: "Independent of the fixture engagement team",
   });
+  assert.equal(e.qualityReview.coolingOffDays, 1095);
   assert.equal(
     (
       await command(
@@ -2636,7 +2690,7 @@ try {
       quality,
     );
   console.log(
-    "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
+    "PASS engagement quality reviewer: role grant, a former team member and a former grant holder refused, practice cooling-off policy, eligible appointment, no paper edits, stand-back checklist",
   );
   await command("createReport", {
     kind: "final",
@@ -2739,6 +2793,33 @@ try {
     "The engagement quality reviewer must sign off both exact packages before release",
   );
   await qualitySignOff(internalFinal);
+  // #127: at release the signer must still be an active Engagement Quality
+  // Reviewer; a revoked reviewer's sign-off releases nothing.
+  await management("revokeMember", { userId: quality });
+  assert.equal(
+    (
+      await command(
+        "releaseReport",
+        {
+          reportId: internalFinal.id,
+          recipientScope: "Fixture client members",
+          reason: "Must reject while the signer is revoked",
+        },
+        owner,
+        409,
+      )
+    ).error,
+    "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+  );
+  await management("grantMember", {
+    userId: quality,
+    displayName: "Fixture Quality Reviewer",
+    role: "Engagement Quality Reviewer",
+    engagementIds: [e.id],
+  });
+  console.log(
+    "PASS engagement quality reviewer: a revoked signer blocks release until restored",
+  );
   const releaseInbox = await request(inboxPath),
     approvalInbox = await request(inboxPath, { user: reviewer });
   const leadReleaseTask = releaseInbox.items.find(

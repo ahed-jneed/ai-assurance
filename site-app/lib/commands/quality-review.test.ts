@@ -9,11 +9,20 @@ import {
 import { ApiError } from "../http";
 import type { Context } from "../tenancy";
 import { sqliteD1 } from "../test-d1";
-import { assertReviewerIndependent } from "../quality-review-records";
-import { artifact, engagement, paper } from "../workflow/test-fixtures";
+import {
+  assertReviewerIndependent,
+  assertSignerActive,
+} from "../quality-review-records";
+import {
+  acceptedRecord,
+  approvedWorkflow,
+  artifact,
+  engagement,
+  paper,
+} from "../workflow/test-fixtures";
 import { dispatch } from ".";
 
-const settings = env as { DB?: D1Database; EQR_COOLING_OFF_DAYS?: string };
+const settings = env as { DB?: D1Database };
 let sqlite: DatabaseSync;
 
 function as(userId: string, role: Role): Context {
@@ -70,7 +79,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete settings.DB;
-  delete settings.EQR_COOLING_OFF_DAYS;
 });
 
 /** An audit event for a command `actor` issued on `engagementId`. */
@@ -296,7 +304,10 @@ describe("appointing the engagement quality reviewer", () => {
       message:
         "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
     });
-    settings.EQR_COOLING_OFF_DAYS = "14";
+    // The practice policy (setQualityReviewPolicy) sets the period.
+    sqlite
+      .prepare("UPDATE tenants SET eqr_cooling_off_days=14 WHERE id='tenant-1'")
+      .run();
     await appoint(e);
     expect(e.qualityReview?.coolingOffDays).toBe(14);
   });
@@ -315,6 +326,133 @@ describe("appointing the engagement quality reviewer", () => {
       "save",
       "replace",
     ]);
+  });
+});
+
+/** Changes a member's role the way updateMember does: grants withdrawn first. */
+function changeRole(userId: string, role: Role, at: string) {
+  sqlite
+    .prepare(
+      "UPDATE engagement_access SET active=0,actor='lead',updated_at=? WHERE tenant_id='tenant-1' AND user_id=? AND active=1",
+    )
+    .run(at, userId);
+  sqlite
+    .prepare(
+      "UPDATE memberships SET role=? WHERE tenant_id='tenant-1' AND user_id=?",
+    )
+    .run(role, userId);
+}
+/** Grants (or re-grants) access to an engagement, as every grant path does. */
+function grant(engagementId: string, userId: string, at: string) {
+  sqlite
+    .prepare(
+      "INSERT INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) VALUES('tenant-1',?,?,1,'lead',?) ON CONFLICT(tenant_id,engagement_id,user_id) DO UPDATE SET active=1,actor=excluded.actor,updated_at=excluded.updated_at",
+    )
+    .run(engagementId, userId, at);
+}
+const daysAgo = (days: number) =>
+  new Date(Date.now() - days * 86_400_000).toISOString();
+
+describe("team membership the engagement record does not show", () => {
+  it("counts everyone the acceptance record names, before they record any work", async () => {
+    member("eqr-named", "Engagement Quality Reviewer");
+    const workflow = approvedWorkflow();
+    workflow.acceptance = {
+      ...acceptedRecord(),
+      team: ["lead", "eqr-named"],
+    };
+    expect(
+      await refusal(appoint(engagement({ workflow }), "eqr-named")),
+    ).toEqual(teamRefusal);
+  });
+
+  it("counts an engagement grant held under another role, even after a re-grant as reviewer", async () => {
+    // A second Lead with access but no recorded work, later made a reviewer.
+    member("lead-2", "Lead Auditor");
+    changeRole("lead-2", "Engagement Quality Reviewer", daysAgo(1));
+    grant("ENG-1", "lead-2", new Date().toISOString());
+    expect(await refusal(appoint(engagement(), "lead-2"))).toEqual(teamRefusal);
+    // A grant given only under the reviewer role is what appointment needs.
+    await appoint(engagement());
+  });
+
+  it("applies the cooling-off period to grants on the client's other engagements", async () => {
+    storedEngagement("ENG-0", "client", engagement({ id: "ENG-0" }));
+    storedEngagement("ENG-9", "other-client", engagement({ id: "ENG-9" }));
+    member("former", "Auditor", false);
+    // An Auditor on another client's engagement, still: not a conflict.
+    grant("ENG-9", "former", daysAgo(30));
+    // An Auditor on this client's ENG-0 until 900 days ago: cooled off.
+    grant("ENG-0", "former", daysAgo(1000));
+    sqlite
+      .prepare(
+        "UPDATE engagement_access SET active=0,updated_at=? WHERE engagement_id='ENG-0' AND user_id='former'",
+      )
+      .run(daysAgo(900));
+    changeRole("former", "Engagement Quality Reviewer", daysAgo(2));
+    grant("ENG-1", "former", daysAgo(1));
+    const e = engagement();
+    await appoint(e, "former");
+    delete e.qualityReview;
+    // Re-granted to ENG-0 as an Auditor 30 days ago and withdrawn 10 days
+    // ago: the period runs from the withdrawal.
+    changeRole("former", "Auditor", daysAgo(31));
+    grant("ENG-0", "former", daysAgo(30));
+    changeRole("former", "Engagement Quality Reviewer", daysAgo(10));
+    grant("ENG-1", "former", daysAgo(9));
+    expect(await refusal(appoint(e, "former"))).toEqual({
+      status: 409,
+      message:
+        "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
+    });
+  });
+
+  it("counts a grant of unknown role recorded before the history existed", async () => {
+    storedEngagement("ENG-0", "client", engagement({ id: "ENG-0" }));
+    sqlite
+      .prepare(
+        "INSERT INTO engagement_access_history(tenant_id,engagement_id,user_id,active,role,actor,at) VALUES('tenant-1','ENG-0','eqr',0,NULL,'migration',?)",
+      )
+      .run(daysAgo(100));
+    expect(await refusal(appoint(engagement()))).toMatchObject({
+      status: 409,
+      message: expect.stringContaining("served on the team of ENG-0"),
+    });
+  });
+
+  it("keeps the grant history immutable", () => {
+    expect(() =>
+      sqlite.prepare("DELETE FROM engagement_access_history").run(),
+    ).toThrow(/immutable/);
+    expect(() =>
+      sqlite.prepare("UPDATE engagement_access_history SET role='x'").run(),
+    ).toThrow(/immutable/);
+  });
+});
+
+describe("the practice's cooling-off policy", () => {
+  it("applies the practice's period, or two years while it has set none", async () => {
+    storedEngagement(
+      "ENG-0",
+      "client",
+      engagement({
+        id: "ENG-0",
+        papers: [paper({ authorId: "eqr", updatedAt: daysAgo(30) })],
+      }),
+    );
+    const e = engagement();
+    expect(await refusal(appoint(e))).toMatchObject({
+      status: 409,
+      message: expect.stringContaining("730-day cooling-off period"),
+    });
+    sqlite
+      .prepare("UPDATE tenants SET eqr_cooling_off_days=0 WHERE id='tenant-1'")
+      .run();
+    // 0 checks only the engagement's own team; the appointment records it.
+    expect(await appoint(e)).toEqual({
+      details: { reviewerId: "eqr", coolingOffDays: 0 },
+    });
+    expect(e.qualityReview?.coolingOffDays).toBe(0);
   });
 });
 
@@ -422,6 +560,31 @@ describe("recorded team work after the appointment", () => {
     auditEvent("ENG-1", "eqr", "saveQualityReview");
     auditEvent("ENG-1", "lead", "appointQualityReviewer");
     await assertReviewerIndependent(lead, e);
+  });
+});
+
+describe("the signer at release", () => {
+  it("must still be an active member with the Engagement Quality Reviewer role", async () => {
+    const e = engagement({ reports: [finalPackage()] });
+    await appoint(e);
+    await assertSignerActive(lead, e);
+    const refused = {
+      status: 409,
+      message:
+        "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+    };
+    changeRole("eqr", "Reviewer", new Date().toISOString());
+    expect(await refusal(assertSignerActive(lead, e))).toEqual(refused);
+    changeRole("eqr", "Engagement Quality Reviewer", new Date().toISOString());
+    await assertSignerActive(lead, e);
+    sqlite
+      .prepare(
+        "UPDATE memberships SET status='revoked' WHERE tenant_id='tenant-1' AND user_id='eqr'",
+      )
+      .run();
+    expect(await refusal(assertSignerActive(lead, e))).toEqual(refused);
+    // Without a reviewer there is no signer to check.
+    await assertSignerActive(lead, engagement());
   });
 });
 

@@ -28,6 +28,7 @@ vi.mock("../assurance-store", async (importOriginal) => ({
 vi.mock("../quality-review-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../quality-review-records")>()),
   assertReviewerIndependent: vi.fn(async () => {}),
+  assertSignerActive: vi.fn(async () => {}),
 }));
 
 const particulars = {
