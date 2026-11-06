@@ -8,6 +8,7 @@ import {
   uploadHeader,
   type SpecialColumn,
 } from "@/lib/special-category";
+import { isParquet, isZip } from "@/lib/dataset-header";
 import { PendingLegalReview } from "../../special-category";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
@@ -27,24 +28,36 @@ function UploadFields({
   check,
   engagement: e,
 }: ModalFieldsProps) {
-  // The chosen CSV's special-category columns, read from its header here so
-  // the uploader sees what the server will gate (#60, D-11).
-  const [found, setFound] = useState<SpecialColumn[]>([]);
+  // The chosen dataset's special-category columns, read from its header (or
+  // a Parquet or spreadsheet schema) here so the uploader sees what the
+  // server will gate (#60, #103, D-11).
+  const [found, setFound] = useState<SpecialColumn[]>([]),
+    [unreadable, setUnreadable] = useState("");
   async function inspect(file: File | undefined) {
     setFound([]);
+    setUnreadable("");
     check("specialCategoryNotPersonal", false);
     if (!file || !e) return;
     try {
-      const headers = uploadHeader(
-        file.name,
-        await file.slice(0, headerScanBytes).arrayBuffer(),
-      );
-      setFound(headers ? specialColumns(headers, e) : []);
+      // Text needs only its first bytes; Parquet keeps its schema in the
+      // footer and a spreadsheet its directory at the end.
+      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer()),
+        headers = await uploadHeader(
+          file.name,
+          await (
+            isParquet(head) || isZip(head)
+              ? file
+              : file.slice(0, headerScanBytes)
+          ).arrayBuffer(),
+        );
+      if (headers && "unreadable" in headers) setUnreadable(headers.unreadable);
+      else setFound(headers ? specialColumns(headers, e) : []);
     } catch {
       setFound([]);
     }
   }
-  const uncovered = found.filter((c) => !c.basisId);
+  const uncovered = found.filter((c) => !c.basisId),
+    declarable = ["synthetic", "anonymized"].includes(choices.handlingBasis);
   return (
     <>
       <label>
@@ -147,21 +160,43 @@ function UploadFields({
             Only Dataset evidence is gated; runs read only Dataset evidence.{" "}
             <PendingLegalReview />
           </p>
-          {uncovered.length > 0 &&
-            ["synthetic", "anonymized"].includes(choices.handlingBasis) && (
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={!!checks.specialCategoryNotPersonal}
-                  onChange={(ev) =>
-                    check("specialCategoryNotPersonal", ev.target.checked)
-                  }
-                />{" "}
-                These columns hold no special-category personal data (synthetic,
-                anonymised or aggregate evidence). This declaration is recorded
-                in the audit trail.
-              </label>
-            )}
+          {uncovered.length > 0 && declarable && (
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={!!checks.specialCategoryNotPersonal}
+                onChange={(ev) =>
+                  check("specialCategoryNotPersonal", ev.target.checked)
+                }
+              />{" "}
+              These columns hold no special-category personal data (synthetic,
+              anonymised or aggregate evidence). This declaration is recorded in
+              the audit trail.
+            </label>
+          )}
+        </div>
+      )}
+      {choices.category === "Dataset" && unreadable && (
+        <div className="note" role="status">
+          <p>
+            The columns of this dataset could not be read ({unreadable}), so it
+            may hold special-category data. Upload it as CSV so its columns can
+            be checked. <PendingLegalReview />
+          </p>
+          {declarable && (
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={!!checks.specialCategoryNotPersonal}
+                onChange={(ev) =>
+                  check("specialCategoryNotPersonal", ev.target.checked)
+                }
+              />{" "}
+              This dataset holds no special-category personal data (synthetic,
+              anonymised or aggregate evidence). This declaration is recorded in
+              the audit trail.
+            </label>
+          )}
         </div>
       )}
       <div className="note">
