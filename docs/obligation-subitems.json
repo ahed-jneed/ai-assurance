@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "catalogVersion": "2026.11.06-proposed",
-  "rulePackVersion": "2026.11.1",
+  "rulePackVersion": "2026.11.2",
   "status": "proposed_for_methodology_review",
   "scope": "Selective audit prompts for Articles 9-15, Annex IV, Article 50 and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
   "source": {

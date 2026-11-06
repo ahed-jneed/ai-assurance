@@ -594,12 +594,12 @@
     ],
     "createdAt": "2026-11-06T09:00:00.000Z",
     "rulePack": {
-      "version": "2026.11.1",
+      "version": "2026.11.2",
       "legalVersion": "02024R1689-20260727",
       "researchedAsOf": "2026-11-05",
       "legalReview": "pending"
     },
-    "methodologyVersion": "2026.11.1",
+    "methodologyVersion": "2026.11.2",
     "provenance": {
       "inputHashes": {
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
@@ -1426,12 +1426,12 @@
     ],
     "createdAt": "2026-11-06T09:00:00.000Z",
     "rulePack": {
-      "version": "2026.11.1",
+      "version": "2026.11.2",
       "legalVersion": "02024R1689-20260727",
       "researchedAsOf": "2026-11-05",
       "legalReview": "pending"
     },
-    "methodologyVersion": "2026.11.1",
+    "methodologyVersion": "2026.11.2",
     "provenance": {
       "inputHashes": {
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
@@ -1877,12 +1877,12 @@
     ],
     "createdAt": "2026-11-06T09:00:00.000Z",
     "rulePack": {
-      "version": "2026.11.1",
+      "version": "2026.11.2",
       "legalVersion": "02024R1689-20260727",
       "researchedAsOf": "2026-11-05",
       "legalReview": "pending"
     },
-    "methodologyVersion": "2026.11.1",
+    "methodologyVersion": "2026.11.2",
     "provenance": {
       "inputHashes": {
         "dataset": "f133e1094d5c2f16f658d4b5e65dcba527481e4af64e9e2cb47b8627139fd791",
@@ -2265,12 +2265,12 @@
     ],
     "createdAt": "2026-11-06T09:00:00.000Z",
     "rulePack": {
-      "version": "2026.11.1",
+      "version": "2026.11.2",
       "legalVersion": "02024R1689-20260727",
       "researchedAsOf": "2026-11-05",
       "legalReview": "pending"
     },
-    "methodologyVersion": "2026.11.1",
+    "methodologyVersion": "2026.11.2",
     "provenance": {
       "inputHashes": {
         "dataset": "2af04bb6e70d42eaa2f05f32d18a09521561c77b8e0db7b43aba0fac6c839984",
@@ -2450,12 +2450,12 @@
     "paperIds": [],
     "createdAt": "2026-11-06T09:00:00.000Z",
     "rulePack": {
-      "version": "2026.11.1",
+      "version": "2026.11.2",
       "legalVersion": "02024R1689-20260727",
       "researchedAsOf": "2026-11-05",
       "legalReview": "pending"
     },
-    "methodologyVersion": "2026.11.1",
+    "methodologyVersion": "2026.11.2",
     "provenance": {
       "inputHashes": {
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",

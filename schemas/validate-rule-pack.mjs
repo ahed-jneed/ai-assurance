@@ -38,13 +38,18 @@ export function loadInputs({
   annexMap = resolve(workspace, 'templates/annex-iv-map.json'),
 } = {}) {
   const pack = readJSON(catalog);
-  const { data, report } = pack.regulatorySnapshot?.research ?? {};
+  const { data, report, revisions = [] } = pack.regulatorySnapshot?.research ?? {};
+  const present = file => typeof file === 'string' && existsSync(resolve(workspace, file));
   return {
     catalog: pack,
     obligations: readJSON(obligations),
     annexMap: readJSON(annexMap),
-    research: typeof data === 'string' && existsSync(resolve(workspace, data)) ? readJSON(resolve(workspace, data)) : null,
-    researchReportExists: typeof report === 'string' && existsSync(resolve(workspace, report)),
+    research: present(data) ? readJSON(resolve(workspace, data)) : null,
+    researchReportExists: present(report),
+    // The research files of later revisions, by the path the pack names.
+    revisionResearch: Object.fromEntries(
+      revisions.filter(r => present(r?.data)).map(r => [r.data, { data: readJSON(resolve(workspace, r.data)), reportExists: present(r.report) }]),
+    ),
   };
 }
 
@@ -85,7 +90,7 @@ function strings(value, visit, path = '') {
  * Returns the problems found, an empty array when the rule pack is sound.
  * `research` is the verified research JSON the pack names (research.data).
  */
-export function checkRulePack({ catalog, obligations, annexMap, research = null, researchReportExists = true, validate = loadValidator() }) {
+export function checkRulePack({ catalog, obligations, annexMap, research = null, researchReportExists = true, revisionResearch = {}, validate = loadValidator() }) {
   const problems = [];
   const fail = message => problems.push(message);
   const pack = catalog?.regulatorySnapshot;
@@ -185,9 +190,21 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
   // Related ids name entries, deadlines, standards or a whole section of the pack.
   const sections = ['specialCategoryData', 'provisionReferences'].filter(key => pack[key] !== undefined);
   const known = new Set([...entries.keys(), ...deadlines.keys(), ...list('standards').map(s => s.id), ...sections]);
+  const revisions = Array.isArray(pack.research?.revisions) ? pack.research.revisions : [];
+  const revisionData = revisions.map(r => revisionResearch[r?.data]?.data ?? null);
+  // Ids a revision's research defines (procedures, checks, facts and so on):
+  // a legal-review item that research introduced may relate to them.
+  const researchIds = new Map();
+  for (const data of revisionData) {
+    if (!data) continue;
+    const defined = new Set(Object.keys(data.vocabularies?.factVocabulary ?? {}));
+    walk(data, node => typeof node.id === 'string' && defined.add(node.id));
+    for (const item of data.legalReviewItems ?? []) researchIds.set(item.id, defined);
+  }
   for (const item of reviewItems.values()) {
     if (!flagged.has(item.id)) fail(`legal-review item ${item.id} is not referenced by any entry`);
-    for (const id of item.relatedIds ?? []) if (!known.has(id)) fail(`${item.id}: unknown related id ${id}`);
+    const defined = researchIds.get(item.id);
+    for (const id of item.relatedIds ?? []) if (!known.has(id) && (id.startsWith('aia-') || !defined?.has(id))) fail(`${item.id}: unknown related id ${id}`);
   }
 
   // Predicates over the declared fact vocabulary.
@@ -244,25 +261,85 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
     if (overlap.length) fail(`${s.id}: clause scope both covers and excludes ${overlap.join(', ')}`);
   }
 
+  // Later revisions: each names further verified research, applies every edit
+  // that research addresses to the rule pack (#18), and declares the fields it
+  // changes in entries taken from the base research.
+  const amended = new Map(); // target id -> fields a revision amends
+  const revisedFrom = new Map(); // research guidance id -> research entry
+  const revisionSources = new Map();
+  const revisionReviewItems = new Map();
+  const resolvedClaims = new Set();
+  revisions.forEach((revision, i) => {
+    const label = `research.revisions/${i}`;
+    const data = revisionData[i];
+    const applied = revision.edits ?? [];
+    if (i && versionKey(revision.rulePackVersion) <= versionKey(revisions[i - 1].rulePackVersion)) fail(`${label}: revisions are not in version order`);
+    if (versionKey(revision.rulePackVersion ?? '0') > versionKey(pack.rulePackVersion ?? '0.0.0')) fail(`${label}: names a rule pack later than ${pack.rulePackVersion}`);
+    if (!data) {
+      fail(`${label}: research data ${revision.data} is missing`);
+      return;
+    }
+    if (!revisionResearch[revision.data]?.reportExists) fail(`${label}: research report ${revision.report} does not exist`);
+    if (data.basedOn?.file !== pack.research?.data) fail(`${label}: the research is not based on ${pack.research?.data}`);
+    const edits = new Map((data.repositoryChanges ?? []).map(e => [e.id, e]));
+    for (const id of applied)
+      if (!edits.has(id)) fail(`${label}: unknown research edit ${id}`);
+      else if (edits.get(id).target !== '#18') fail(`${label}: research edit ${id} is not addressed to the rule pack`);
+    for (const e of edits.values()) if (e.target === '#18' && !applied.includes(e.id)) fail(`${label}: research edit ${e.id} is not applied`);
+    for (const a of revision.amendments ?? []) {
+      if (!applied.includes(a.edit)) fail(`${label}: amendment of ${a.target} cites ${a.edit}, which the revision does not apply`);
+      amended.set(a.target, new Set([...(amended.get(a.target) ?? []), ...(a.fields ?? [])]));
+    }
+    for (const g of data.guidance ?? []) revisedFrom.set(g.id, g);
+    for (const s of data.sources ?? []) if (!revisionSources.has(s.id)) revisionSources.set(s.id, s);
+    for (const item of data.legalReviewItems ?? []) revisionReviewItems.set(item.id, item);
+    for (const id of revision.resolvesUnverified ?? []) {
+      if (!(data.consistencyChecks ?? []).some(c => c.rulePackRef === id && c.finding === 'resolved')) fail(`${label}: the research does not resolve ${id}`);
+      resolvedClaims.add(id);
+    }
+  });
+  for (const target of amended.keys()) if (!entries.has(target) && !reviewItems.has(target)) fail(`a research revision amends unknown entry ${target}`);
+  const extends_ = (list, base) => Array.isArray(list) && Array.isArray(base) && list.length > base.length && base.every((x, i) => same(list[i], x));
+  const amends = (x, field) => amended.get(x.id)?.has(field) ?? false;
+
   // Agreement with the verified research.
   if (!research) fail(`research data ${pack.research?.data} is missing`);
   else {
     if (research.researchedOn !== pack.researchedAsOf) fail(`researchedAsOf ${pack.researchedAsOf} differs from the research date ${research.researchedOn}`);
     if (research.legalText?.consolidatedVersion?.celex !== pack.celex) fail('celex differs from the research');
-    const compare = (label, ours, theirs, fields) => {
+    // An entry a revision amends, replaces or adds is checked against that
+    // revision (below) for what it declares, and against the base otherwise.
+    const compare = (label, ours, theirs, fields, { skip = () => false, removed = new Set(), added = () => false } = {}) => {
       const mine = new Map(ours.map(x => [x.id ?? x.point, x]));
       const verified = new Map(theirs.map(x => [x.id ?? x.point, x]));
-      for (const id of verified.keys()) if (!mine.has(id)) fail(`${label}: research entry ${id} is missing`);
+      for (const id of verified.keys()) if (!mine.has(id) && !removed.has(id)) fail(`${label}: research entry ${id} is missing`);
+      for (const id of removed) if (mine.has(id)) fail(`${label}: ${id} was resolved by a research revision but is still listed`);
       for (const [id, x] of mine) {
         const r = verified.get(id);
         if (!r) {
-          fail(`${label}: ${id} is not in the research`);
+          if (!added(x)) fail(`${label}: ${id} is not in the research`);
           continue;
         }
-        for (const field of fields) if (!same(x[field], r[field])) fail(`${label} ${id}: ${field} differs from the research`);
+        for (const field of fields) if (!skip(x, field) && !same(x[field], r[field])) fail(`${label} ${id}: ${field} differs from the research`);
       }
     };
-    compare('applicationDates', list('applicationDates'), research.applicationDates ?? [], ['date', 'dateType', 'provisions', 'scope', 'actors', 'conditions', 'appliesIf', 'exceptIf', 'notes', 'sourceIds', 'verification', 'legalReview', 'legalBasis']);
+    compare('applicationDates', list('applicationDates'), research.applicationDates ?? [], ['date', 'dateType', 'provisions', 'scope', 'actors', 'conditions', 'appliesIf', 'exceptIf', 'notes', 'sourceIds', 'verification', 'legalReview', 'legalBasis'], { skip: amends });
+    // Amended fields extend the base: notes are appended to, source and
+    // legal-review lists keep the base items first and add to them.
+    for (const r of research.applicationDates ?? []) {
+      const e = entries.get(r.id);
+      if (!e || !amended.has(r.id)) continue;
+      const fields = amended.get(r.id);
+      if (fields.has('notes') && !(typeof e.notes === 'string' && e.notes.startsWith(r.notes ?? '') && e.notes.length > (r.notes ?? '').length)) fail(`applicationDates ${r.id}: amended notes do not extend the research notes`);
+      if (fields.has('sourceIds') && !extends_(e.sourceIds, r.sourceIds)) fail(`applicationDates ${r.id}: amended sources do not extend the research sources`);
+      if (fields.has('legalReview')) {
+        const base = r.legalReview?.itemIds ?? [];
+        const ids = e.legalReview?.itemIds ?? [];
+        if (!e.legalReview?.required || !extends_(ids, base)) fail(`applicationDates ${r.id}: amended legal review does not extend the research flags`);
+        for (const id of ids.slice(base.length)) if (!revisionReviewItems.has(id)) fail(`applicationDates ${r.id}: legal-review item ${id} is not in a revision's research`);
+      }
+      if (!(e.history ?? []).some(h => revisions.some(v => v.rulePackVersion === h.rulePackVersion))) fail(`applicationDates ${r.id}: amended without a history record of the revision`);
+    }
     // The summary is the research text, except that a pointer to a research
     // data key reads as a pointer the product resolves (summaryPointers).
     for (const r of research.applicationDates ?? []) {
@@ -305,10 +382,39 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
       if (scope && (s.presumptionOfConformity?.clauseScope?.status !== scope.status || !same(s.presumptionOfConformity?.clauseScope?.sourceIds, scope.sourceIds))) fail(`standards ${s.id}: clause scope differs from the research`);
       if (r.ojCitation && (s.ojCitation?.celex !== r.ojCitation.celex || s.ojCitation?.publicationDate !== r.ojCitation.publicationDate || s.ojCitation?.eli !== r.ojCitation.eli)) fail(`standards ${s.id}: OJ citation differs from the research`);
     }
-    compare('guidanceDocuments', list('guidanceDocuments'), research.guidance ?? [], ['title', 'status', 'sourceIds', 'verification', 'statutoryDeadline', 'draftPublished', 'expectedFinal']);
-    compare('legalReviewItems', list('legalReviewItems'), research.legalReviewItems ?? [], ['topic', 'question', 'relatedIds']);
-    compare('unverified', list('unverified'), research.unverified ?? [], ['claim', 'status', 'reason', 'sourceIds']);
-    compare('sources', list('sources'), research.sources ?? [], ['title', 'publisher', 'kind', 'canonicalUrl', 'accessUrl', 'sha256', 'retrievedOn']);
+    // A guidance entry with researchRef reproduces a revision's research entry.
+    const revised = g => typeof g.researchRef === 'string';
+    compare('guidanceDocuments', list('guidanceDocuments'), research.guidance ?? [], ['title', 'status', 'sourceIds', 'verification', 'statutoryDeadline', 'draftPublished', 'expectedFinal'], { skip: revised, added: revised });
+    for (const g of list('guidanceDocuments').filter(revised)) {
+      const r = revisedFrom.get(g.researchRef);
+      if (!r) {
+        fail(`guidanceDocuments ${g.id}: researchRef ${g.researchRef} is not in a revision's research`);
+        continue;
+      }
+      if (r.rulePackGuidanceId && r.rulePackGuidanceId !== g.id) fail(`guidanceDocuments ${g.id}: the research revises ${r.rulePackGuidanceId} from ${r.id}`);
+      for (const field of ['title', 'status', 'reference', 'legalEffect', 'dates', 'sourceIds', 'verification']) if (!same(g[field], r[field])) fail(`guidanceDocuments ${g.id}: ${field} differs from ${r.id} in the research`);
+      if (r.notes !== undefined && g.note !== r.notes) fail(`guidanceDocuments ${g.id}: note differs from ${r.id} in the research`);
+    }
+    for (const r of revisedFrom.values())
+      if (r.rulePackGuidanceId && !list('guidanceDocuments').some(g => g.id === r.rulePackGuidanceId && g.researchRef === r.id)) fail(`guidanceDocuments ${r.rulePackGuidanceId}: not revised from ${r.id} as the research requires`);
+    const fromRevision = x => revisionReviewItems.has(x.id);
+    compare('legalReviewItems', list('legalReviewItems'), research.legalReviewItems ?? [], ['topic', 'question', 'relatedIds'], { skip: amends, added: fromRevision });
+    for (const r of research.legalReviewItems ?? []) {
+      const item = reviewItems.get(r.id);
+      if (item && amends(item, 'question') && !(item.question.startsWith(r.question) && item.question.length > r.question.length)) fail(`legalReviewItems ${r.id}: amended question does not extend the research question`);
+    }
+    for (const item of list('legalReviewItems').filter(fromRevision)) {
+      const r = revisionReviewItems.get(item.id);
+      for (const field of ['topic', 'question', 'relatedIds']) if (!same(item[field], r[field])) fail(`legalReviewItems ${item.id}: ${field} differs from the research revision`);
+    }
+    compare('unverified', list('unverified'), research.unverified ?? [], ['claim', 'status', 'reason', 'sourceIds'], { removed: resolvedClaims });
+    const sourceFields = ['title', 'publisher', 'kind', 'canonicalUrl', 'accessUrl', 'sha256', 'retrievedOn'];
+    const baseSources = new Set((research.sources ?? []).map(s => s.id));
+    compare('sources', list('sources'), research.sources ?? [], sourceFields, { added: s => revisionSources.has(s.id) });
+    for (const s of list('sources').filter(s => !baseSources.has(s.id) && revisionSources.has(s.id))) {
+      const r = revisionSources.get(s.id);
+      for (const field of sourceFields) if (!same(s[field], r[field])) fail(`sources ${s.id}: ${field} differs from the research revision`);
+    }
     if (research.approval?.status !== 'approved' && pack.approval?.status === 'approved') fail('rule pack approved although the research is unapproved');
   }
   return problems;
@@ -335,7 +441,7 @@ export const mutations = [
   ['date differs from the verified research', p => { const e = p.applicationDates.find(x => x.id === 'aia-2027-12-02-high-risk-annex-iii'); e.date = '2027-08-02'; e.effectiveFrom = '2027-08-02'; }],
   ['legal-review flag dropped', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-12-02-art5-new-prohibitions'); e.legalReview = { required: false, itemIds: [] }; }],
   ['duplicate id', p => { p.authorityDeadlines[0].id = p.applicationDates[0].id; }],
-  ['rule-pack version differs from the methodology version', p => { p.rulePackVersion = '2026.11.2'; }],
+  ['rule-pack version differs from the methodology version', p => { p.rulePackVersion = '2099.1.1'; }],
   ['consolidated text presented as having legal effect', p => { p.consolidatedTextLegalEffect = 'authentic'; }],
   ['summary differs from the verified research', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-12-02-art50-2-legacy-transition'); e.summary = e.summary.replace('2 Dec 2026', '2 Feb 2027'); }],
   ['condition differs from the verified research', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-12-02-art5-new-prohibitions'); e.conditions[1] = e.conditions[1].replace('only where', 'where'); }],
@@ -345,6 +451,17 @@ export const mutations = [
   ['Art 4a legal-review flag dropped', p => { p.specialCategoryData.legalReview = { required: false, itemIds: [] }; }],
   ['legal-review related id dropped', p => { p.legalReviewItems.find(i => i.id === 'LR-06').relatedIds = ['aia-2026-07-27-art4a-bias-data']; }],
   ['clause scope covers and excludes the same clause', p => { const scope = p.standards.find(s => s.presumptionOfConformity.clauseScope).presumptionOfConformity.clauseScope; scope.excludes.push(scope.covers[0]); }],
+  ['research edit for the rule pack not applied', p => { p.research.revisions[0].edits = p.research.revisions[0].edits.filter(id => id !== 'A50-ED-11'); }],
+  ['unknown research edit', p => { p.research.revisions[0].edits.push('A50-ED-99'); }],
+  ['revised guidance differs from the Art 50 research', p => { p.guidanceDocuments.find(g => g.id === 'GUID-ART50-TRANSPARENCY').status = 'published'; }],
+  ['guidance revision dropped', p => { delete p.guidanceDocuments.find(g => g.id === 'GUID-ART50-COP-OPINION').researchRef; }],
+  ['resolved unverified claim still listed', p => { p.unverified.push({ id: 'UV-05', claim: 'Final Code of Practice on marking and labelling published 10 Jun 2026 (earlier research)', status: 'secondary_only', reason: 'Not fetched.' }); }],
+  ['unverified claim dropped without a resolving revision', p => { p.research.revisions[0].resolvesUnverified = ['UV-05']; }],
+  ['amended legal review drops a base flag', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-08-02-art50-transparency'); e.legalReview.itemIds = e.legalReview.itemIds.filter(id => id !== 'LR-04'); }],
+  ['Art 50 legal-review item differs from the research', p => { p.legalReviewItems.find(x => x.id === 'LR-A50-10').question = 'Changed.'; }],
+  ['amended question rewrites the research question', p => { const i = p.legalReviewItems.find(x => x.id === 'LR-03'); i.question = 'Is Art 50 deferred? ' + i.question; }],
+  ['undeclared change to an entry from the base research', p => { p.research.revisions[0].amendments = p.research.revisions[0].amendments.filter(a => a.target !== 'aia-2026-08-02-art50-transparency'); }],
+  ['revision source differs from the research', p => { p.sources.find(s => s.id === 'SRC-EC-A50-GUIDELINES').sha256 = '0'.repeat(64); }],
 ];
 
 function main() {

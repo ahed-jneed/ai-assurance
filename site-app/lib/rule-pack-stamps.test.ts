@@ -3,7 +3,7 @@ import catalog from "./catalog.json";
 import { classification } from "./commands/classification";
 import { reports } from "./commands/reports";
 import { caller } from "./commands/test-fixtures";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report, RulePackStamp } from "./domain";
 import { freshEngagement } from "./factories";
 import { sha256 } from "./ids";
 import { engagementRulePack } from "./rule-pack";
@@ -17,8 +17,8 @@ vi.mock("./assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
-const stamp2026_11_1 = {
-  version: "2026.11.1",
+const stamp2026_11_2: RulePackStamp = {
+  version: "2026.11.2",
   legalVersion: "02024R1689-20260727",
   researchedAsOf: "2026-11-05",
   legalReview: "pending",
@@ -49,11 +49,11 @@ async function capture(e: Engagement) {
 }
 
 describe("the engagement rule-pack stamp", () => {
-  it("stamps new engagements with rule pack 2026.11.1 read from the catalog", () => {
-    expect(currentRulePack).toEqual(stamp2026_11_1);
+  it("stamps new engagements with rule pack 2026.11.2 read from the catalog", () => {
+    expect(currentRulePack).toEqual(stamp2026_11_2);
     for (const structured of [false, true]) {
       const e = freshEngagement("CL-1", "New audit", "user-lead", structured);
-      expect(e.rulePack).toEqual(stamp2026_11_1);
+      expect(e.rulePack).toEqual(stamp2026_11_2);
       expect(e.rulePack?.version).toBe(catalog.methodologyVersion);
       expect(e.classification.version).toBe(catalog.regulatorySnapshot.celex);
       expect(e.classification.asOf).toBe(
@@ -61,11 +61,11 @@ describe("the engagement rule-pack stamp", () => {
       );
       expect(engagementRulePack(e, currentRulePack)).toEqual({
         kind: "current",
-        stamp: stamp2026_11_1,
+        stamp: stamp2026_11_2,
       });
       // The stamp is the engagement's own copy.
       e.rulePack!.version = "edited";
-      expect(currentRulePack.version).toBe("2026.11.1");
+      expect(currentRulePack.version).toBe("2026.11.2");
     }
   });
 
@@ -91,7 +91,7 @@ describe("the engagement rule-pack stamp", () => {
     // Each answer records the legal version and rule pack it was given under.
     expect(e.classification.answers?.smeStatus).toMatchObject({
       legalVersion: "02024R1689-20260727",
-      rulePackVersion: "2026.11.1",
+      rulePackVersion: "2026.11.2",
     });
     expect(e.rulePack).toBeUndefined();
     expect(engagementRulePack(e, currentRulePack)).toEqual({
@@ -105,26 +105,57 @@ describe("the engagement rule-pack stamp", () => {
       "other",
     );
   });
+
+  it("keeps the 2026.11.1 stamp of an engagement created before rule pack 2026.11.2", async () => {
+    const stamp2026_11_1 = { ...stamp2026_11_2, version: "2026.11.1" };
+    const e = freshEngagement("CL-1", "Earlier audit", "user-lead");
+    e.rulePack = { ...stamp2026_11_1 };
+    await classification.run(
+      e,
+      "classify",
+      {
+        annexRoute: "Annex III — sensitive use case",
+        operatorRole: "Provider",
+        intendedPurpose: "Credit scoring",
+        rationale: "Annex III point 5(b)",
+        facts: { smeStatus: "sme" },
+      },
+      caller("Auditor"),
+    );
+    // Classifying again records the current pack on the answers, never on the stamp.
+    expect(e.rulePack).toEqual(stamp2026_11_1);
+    expect(e.classification.answers?.smeStatus.rulePackVersion).toBe(
+      "2026.11.2",
+    );
+    expect(engagementRulePack(e, currentRulePack)).toEqual({
+      kind: "other",
+      stamp: stamp2026_11_1,
+    });
+    // Its report snapshots record the pack applied at capture.
+    const r = await capture(e);
+    expect(r.snapshot.rulePack).toEqual(stamp2026_11_2);
+    expect(e.rulePack).toEqual(stamp2026_11_1);
+  });
 });
 
 describe("version stamps on captured records", () => {
   it("records the rule pack and methodology versions in report snapshots", async () => {
     const e = freshEngagement("CL-1", "New audit", "user-lead");
     const r = await capture(e);
-    expect(r.snapshot.rulePack).toEqual(stamp2026_11_1);
-    expect(r.snapshot.methodologyVersion).toBe("2026.11.1");
-    expect(r.clientSnapshot?.rulePack).toEqual(stamp2026_11_1);
-    expect(r.clientSnapshot?.methodologyVersion).toBe("2026.11.1");
+    expect(r.snapshot.rulePack).toEqual(stamp2026_11_2);
+    expect(r.snapshot.methodologyVersion).toBe("2026.11.2");
+    expect(r.clientSnapshot?.rulePack).toEqual(stamp2026_11_2);
+    expect(r.clientSnapshot?.methodologyVersion).toBe("2026.11.2");
     expect(r.sha256).toBe(await sha256(JSON.stringify(r.snapshot)));
     expect(recordVersions()).toEqual({
-      rulePack: stamp2026_11_1,
-      methodologyVersion: "2026.11.1",
+      rulePack: stamp2026_11_2,
+      methodologyVersion: "2026.11.2",
     });
   });
 
   it("captures a pinned engagement under the current pack without changing its classification", async () => {
     const r = await capture(pinnedBeforeStamps());
-    expect(r.snapshot.rulePack).toEqual(stamp2026_11_1);
+    expect(r.snapshot.rulePack).toEqual(stamp2026_11_2);
     expect((r.snapshot.engagement as Engagement).classification).toMatchObject({
       version: "02024R1689-20260727",
       asOf: "2026-10-05",
@@ -145,7 +176,7 @@ describe("version stamps on captured records", () => {
       expect(later.snapshot.rulePack).toMatchObject({ version: "2026.12.1" });
       expect(JSON.stringify(issued.snapshot)).toBe(frozen);
       expect(issued.sha256).toBe(await sha256(frozen));
-      expect(e.rulePack).toEqual(stamp2026_11_1);
+      expect(e.rulePack).toEqual(stamp2026_11_2);
     } finally {
       Object.assign(currentRulePack, saved);
     }
