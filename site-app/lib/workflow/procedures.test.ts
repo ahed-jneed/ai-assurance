@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { completionGates, finalReportGates, type Engagement } from "../domain";
+import {
+  completionGates,
+  finalReportGates,
+  paperRequired,
+  type Engagement,
+} from "../domain";
 import {
   currentExecution,
   procedureLabel,
@@ -595,8 +600,76 @@ describe("procedure submission", () => {
     expect(paperId).not.toBe(signed.id);
     expect(signed).toMatchObject({ status: "signed", revision: 1 });
     expect(e.papers.map((q) => q.id)).toEqual([signed.id, paperId]);
+    // The adopted signed paper is superseded, not orphaned as required work.
+    expect(signed).toMatchObject({
+      supersededBy: paperId,
+      supersededAt: at,
+      required: false,
+    });
+    expect(paperOf(e).supersedes).toBe(signed.id);
+    expect(paperRequired(e, signed)).toBe(false);
+  });
+
+  it("binds an adopted procedure to its template's required paper", async () => {
+    const draft = {
+      ...templatePaper("WP-A10-01"),
+      title: "Diagnostic run",
+      required: false,
+    };
+    const required = templatePaper("WP-A10-01");
+    const e = engagement({ papers: [draft, required] });
+    await command(e, "adoptWorkflow", {}, "lead");
+    expect(procedureOf(e, procedureId).paperId).toBe(required.id);
+  });
+
+  it("supersedes the signed paper when reviewed work is recompiled", async () => {
+    const e = await reviewedAndSigned();
+    const first = paperOf(e);
+    first.body.conclusionStatus = "qualified";
+    await record(e);
+    await evaluate(e);
+    await command(e, "submitProcedure", { procedureId }, "auditor");
+    const second = paperOf(e);
+    expect(second.id).not.toBe(first.id);
+    expect(first).toMatchObject({
+      status: "signed",
+      supersededBy: second.id,
+      required: false,
+    });
+    await command(
+      e,
+      "reviewProcedure",
+      { procedureId, reason: "The new work supports the conclusion" },
+      "reviewer",
+    );
+    second.status = "signed";
+    e.stage = "Sign-off";
+    // The superseded qualified conclusion keeps no opinion out.
+    for (const opinion of ["Readiness assessment", "Adverse conclusion"])
+      expect(finalReportGates(e, opinion)).toEqual([]);
+    expect(
+      completionGates(
+        { ...e, stage: "Reporting" },
+        "Adverse conclusion",
+        "Sign-off",
+      ),
+    ).toEqual([]);
   });
 });
+
+/** An engagement whose procedure is reviewed and its compiled paper signed. */
+async function reviewedAndSigned() {
+  const e = await submittedProcedure();
+  await command(
+    e,
+    "reviewProcedure",
+    { procedureId, reason: "The evidence supports the conclusion" },
+    "reviewer",
+  );
+  // Signing is a working-paper command of the workspace route.
+  paperOf(e).status = "signed";
+  return e;
+}
 
 describe("procedure review", () => {
   const review = (e: Engagement, userId = "reviewer") =>
@@ -1320,5 +1393,73 @@ describe("plan changes after execution", () => {
       expect(revisionWarnings(workflowOf(e))).toEqual([]);
       expect(procedureLabel(e, p)).toBe("Changes requested");
     });
+  });
+});
+
+describe("release-time procedures", () => {
+  // WP-RP-02 and MEM-SO-01 are recorded by the release against the approved
+  // package hashes; work on them after capture would change the package.
+  it("refuse execution, evaluation, submission, review and evidence papers", async () => {
+    const e = await ready();
+    // MEM-SO-01 is a memo, not a program procedure.
+    expect(workflowOf(e).procedures.map((p) => p.templateId)).not.toContain(
+      "MEM-SO-01",
+    );
+    for (const templateId of ["WP-RP-02"]) {
+      const p = procedureOf(e, "PROC-" + templateId);
+      p.selected = true;
+      p.applicability = "applicable";
+      const paperId = p.paperId;
+      const expectRefused = async (result: Promise<unknown>) => {
+        const error = await result.then(
+          () => new Error("Expected the command to fail"),
+          (error: unknown) => error,
+        );
+        expect(error).toMatchObject({ status: 409 });
+        expect(String((error as Error).message)).toContain(
+          templateId + " is recorded at release",
+        );
+      };
+      await expectRefused(
+        command(
+          e,
+          "recordProcedureExecution",
+          executionInput(e, {
+            procedureId: p.id,
+            steps: p.instructions.map((i) => ({
+              id: i.id,
+              state: "performed",
+              notes: "",
+            })),
+          }),
+          "lead",
+        ),
+      );
+      await expectRefused(
+        command(
+          e,
+          "evaluateProcedure",
+          { ...assessmentInput, procedureId: p.id },
+          "lead",
+        ),
+      );
+      await expectRefused(
+        command(e, "submitProcedure", { procedureId: p.id }, "lead"),
+      );
+      await expectRefused(
+        command(
+          e,
+          "reviewProcedure",
+          { procedureId: p.id, reason: "Reviewed" },
+          "reviewer",
+        ),
+      );
+      await expectRefused(
+        command(e, "ensureProcedurePaper", { procedureId: p.id }, "lead"),
+      );
+      expect(p.execution).toBeUndefined();
+      expect(p.paperId).toBe(paperId);
+      expect(procedureLabel(e, p)).toBe("Recorded at release");
+    }
   });
 });

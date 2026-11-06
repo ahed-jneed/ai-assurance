@@ -135,6 +135,9 @@ function reportMarkup(report: Report, s: ReportSnapshot) {
           })}{" "}
           Europe/Vienna
         </p>
+        {!!report.replaces?.length && (
+          <p className="report-meta">Replaces {report.replaces.join(", ")}</p>
+        )}
       </header>
       <section>
         <h2>Scoped conclusion</h2>
