@@ -9,6 +9,7 @@ import { POST as submit } from "@/app/api/client-submission/route";
 import { POST as upload } from "@/app/api/evidence/route";
 import { POST as workspace } from "@/app/api/workspace/route";
 import { caller, postRequest, stored } from "./commands/test-fixtures";
+import { pyarrowParquet, workbook } from "./dataset-header.fixture";
 import type { Engagement, EvaluationProfile, Run } from "./domain";
 import { ApiError } from "./http";
 import {
@@ -16,10 +17,12 @@ import {
   csvHeader,
   namesSpecialCategory,
   normalizeColumn,
+  specialCategoryLimitation,
   specialCategoryLimitations,
   specialColumns,
   uploadGate,
   uploadHeader,
+  utf16ByteOrder,
   type SpecialCategoryBasis,
 } from "./special-category";
 import { context } from "./tenancy";
@@ -53,7 +56,7 @@ function refusal(action: () => unknown) {
 }
 
 describe("column detection", () => {
-  it("reads the header row of a CSV, quotes and BOM included", () => {
+  it("reads the header row of a CSV, quotes and BOM included", async () => {
     expect(csvHeader('﻿id,"ethnic, origin","say ""hi"""\r\n1,2,3')).toEqual([
       "id",
       "ethnic, origin",
@@ -61,31 +64,37 @@ describe("column detection", () => {
     ]);
     expect(csvHeader("")).toBeNull();
     const bytes = (text: string) => new TextEncoder().encode(text).buffer;
-    expect(uploadHeader("data.tsv", bytes("a\tb\n1\t2"))).toEqual(["a", "b"]);
+    expect(await uploadHeader("data.tsv", bytes("a\tb\n1\t2"))).toEqual([
+      "a",
+      "b",
+    ]);
     // Any text upload is inspected, whatever its name: the external worker
     // reads every Dataset as CSV.
-    expect(uploadHeader("dataset", bytes("id,ethnicity\n1,A"))).toEqual([
+    expect(await uploadHeader("dataset", bytes("id,ethnicity\n1,A"))).toEqual([
       "id",
       "ethnicity",
     ]);
-    expect(uploadHeader("data.bin", bytes("a\tethnicity\n1\t2"))).toEqual([
-      "a",
-      "ethnicity",
-    ]);
+    expect(await uploadHeader("data.bin", bytes("a\tethnicity\n1\t2"))).toEqual(
+      ["a", "ethnicity"],
+    );
     // A character cut by the scan limit does not hide the header.
     const long = bytes("ethnicity," + "é".repeat(40_000));
-    expect(uploadHeader("dataset", long)?.[0]).toBe("ethnicity");
-    // Binary formats cannot be inspected.
+    expect(await uploadHeader("dataset", long)).toContain("ethnicity");
+    // Other binary formats are not inspected.
     expect(
-      uploadHeader(
+      await uploadHeader(
         "model.onnx",
         new Uint8Array([0x08, 0x00, 0xff, 0xfe]).buffer,
       ),
     ).toBeNull();
-    expect(uploadHeader("x.parquet", bytes("PAR1\u0000\u0001"))).toBeNull();
+    // A Parquet file whose footer cannot be read is reported as such, so
+    // the gate can refuse it (#103).
+    expect(await uploadHeader("x.parquet", bytes("PAR1\u0000\u0001"))).toEqual({
+      unreadable: "the Parquet file is truncated",
+    });
   });
 
-  it("reads the header of a CSV that is not UTF-8", () => {
+  it("reads the header of a CSV that is not UTF-8", async () => {
     // Excel's "CSV (Comma delimited)": Windows-1252, with accented and
     // 0x80-0x9F characters that are not valid UTF-8.
     const encode = (text: string) => new TextEncoder().encode(text),
@@ -97,28 +106,48 @@ describe("column detection", () => {
         0xe9,
         0x0a,
       ]);
-    expect(uploadHeader("export.csv", cp1252.buffer)).toEqual([
+    expect(await uploadHeader("export.csv", cp1252.buffer)).toEqual([
       "id",
       "Ethnicité€",
       "religion",
     ]);
     // Excel's "Unicode Text": UTF-16 with a byte order mark, tab-separated.
-    const utf16 = (text: string, little: boolean) => {
-      const out = new Uint8Array(2 + text.length * 2),
+    const utf16 = (text: string, little: boolean, bom = true) => {
+      const start = bom ? 2 : 0,
+        out = new Uint8Array(start + text.length * 2),
         view = new DataView(out.buffer);
-      view.setUint16(0, 0xfeff, little);
+      if (bom) view.setUint16(0, 0xfeff, little);
       for (let i = 0; i < text.length; i++)
-        view.setUint16(2 + 2 * i, text.charCodeAt(i), little);
+        view.setUint16(start + 2 * i, text.charCodeAt(i), little);
       return out.buffer;
     };
     for (const little of [true, false])
       expect(
-        uploadHeader("export.txt", utf16("id\tethnicity\r\n1\tA\r\n", little)),
+        await uploadHeader(
+          "export.txt",
+          utf16("id\tethnicity\r\n1\tA\r\n", little),
+        ),
         little ? "UTF-16LE" : "UTF-16BE",
       ).toEqual(["id", "ethnicity"]);
-    expect(uploadHeader("export.csv", utf16("id,religion\n1,x", true))).toEqual(
-      ["id", "religion"],
+    expect(
+      await uploadHeader("export.csv", utf16("id,religion\n1,x", true)),
+    ).toEqual(["id", "religion"]);
+    // UTF-16 written without a byte order mark: every other byte is NUL,
+    // which also tells the byte order (#103).
+    for (const little of [true, false])
+      expect(
+        await uploadHeader(
+          "export.csv",
+          utf16("id,Ethnicité\r\n1,A\r\n", little, false),
+        ),
+        little ? "UTF-16LE without BOM" : "UTF-16BE without BOM",
+      ).toEqual(["id", "Ethnicité"]);
+    expect(utf16ByteOrder(new Uint8Array(utf16("a,b", true, false)))).toBe(
+      "le",
     );
+    expect(utf16ByteOrder(new TextEncoder().encode("id,ethnicity"))).toBeNull();
+    // Too short to tell.
+    expect(utf16ByteOrder(new Uint8Array([0x61, 0]))).toBeNull();
   });
 
   it("recognises names of GDPR Art 9(1) categories", () => {
@@ -250,6 +279,42 @@ describe("uploadGate", () => {
       declaration: "not_personal",
     });
   });
+  it("refuses a dataset whose columns could not be read unless declared free of such data", () => {
+    const unreadable = { unreadable: "the Parquet footer is encrypted" };
+    const refused = refusal(() => gate({}, { headers: unreadable }));
+    expect(refused.status).toBe(409);
+    expect(refused.message).toContain(
+      "could not be read (the Parquet footer is encrypted)",
+    );
+    expect(
+      refusal(() => gate({}, { headers: unreadable, declaration: null }))
+        .message,
+    ).toContain("Send it as CSV");
+    expect(
+      refusal(() =>
+        gate({}, { headers: unreadable, declaration: "not_personal" }),
+      ).status,
+    ).toBe(400);
+    expect(
+      gate(
+        {},
+        {
+          headers: unreadable,
+          declaration: "not_personal",
+          handlingBasis: "anonymized",
+        },
+      ),
+    ).toEqual({
+      columns: [],
+      bases: [],
+      unreadable: "the Parquet footer is encrypted",
+      declaration: "not_personal",
+    });
+    // Only Dataset evidence is gated.
+    expect(
+      gate({}, { headers: unreadable, category: "Validation" }),
+    ).toBeNull();
+  });
   it("ignores other categories, other formats and ordinary columns", () => {
     expect(gate({}, { category: "Validation" })).toBeNull();
     expect(gate({}, { headers: null })).toBeNull();
@@ -306,7 +371,7 @@ describe("POST /api/evidence", () => {
       id: string;
       version: number;
     };
-  function send(csv: BlobPart, name = "applicants.csv") {
+  function send(csv: BlobPart, name = "applicants.csv", declaration = "") {
     const { id, version } = engagement(),
       form = new FormData();
     form.set("tenantId", "tenant-1");
@@ -315,6 +380,7 @@ describe("POST /api/evidence", () => {
     form.set("category", "Dataset");
     form.set("visibility", "internal");
     form.set("handlingBasis", "synthetic");
+    form.set("specialCategoryDeclaration", declaration);
     form.set("file", new File([csv], name, { type: "text/csv" }));
     return upload(
       new Request("https://workspace.test/api/evidence", {
@@ -446,6 +512,49 @@ describe("POST /api/evidence", () => {
       action: "uploadEvidence",
       details: expect.objectContaining({
         specialCategory: { columns: ["ethnicity"], bases: [basisId] },
+      }),
+    });
+  });
+
+  it("inspects Parquet and spreadsheet datasets (#103)", async () => {
+    const xlsx = await workbook([
+      '<row r="1"><c r="A1" t="inlineStr"><is><t>actual</t></is></c><c r="B1" t="inlineStr"><is><t>ethnicity</t></is></c></row>',
+    ]);
+    for (const [bytes, name] of [
+      [pyarrowParquet(), "applicants.parquet"],
+      [xlsx, "applicants.xlsx"],
+    ] as const) {
+      const refused = await send(bytes.slice(), name);
+      expect(refused.status, name).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toMatch(
+        /recorded basis before upload: (E|e)thnicity/,
+      );
+    }
+    expect(objects.size).toBe(0);
+    // A Parquet file whose footer is encrypted cannot be checked: refused
+    // unless the uploader declares it free of special-category data.
+    const encrypted = pyarrowParquet();
+    encrypted.set([0x50, 0x41, 0x52, 0x45], encrypted.length - 4);
+    const unread = await send(encrypted.slice(), "applicants.parquet");
+    expect(unread.status).toBe(409);
+    expect(((await unread.json()) as { error: string }).error).toContain(
+      "could not be read (the Parquet footer is encrypted)",
+    );
+    const declared = await send(
+      encrypted.slice(),
+      "applicants.parquet",
+      "not_personal",
+    );
+    expect(declared.status).toBe(200);
+    expect(audit().at(-1)).toEqual({
+      action: "uploadEvidence",
+      details: expect.objectContaining({
+        specialCategory: {
+          columns: [],
+          bases: [],
+          unreadable: "the Parquet footer is encrypted",
+          declaration: "not_personal",
+        },
       }),
     });
   });
@@ -661,5 +770,51 @@ describe("specialCategoryLimitations", () => {
       "Run RUN-1 evaluated special-category column ethnicity on the platform under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
       "Run JOB-1 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
     ]);
+  });
+  it("gives the sentence an external run's paper states (#103)", () => {
+    const profile = {
+      suite: ["demographic_parity"],
+      config: { groupColumn: "ethnicity" },
+    } as unknown as EvaluationProfile;
+    expect(
+      specialCategoryLimitation(
+        "JOB-2",
+        {
+          ...profile,
+          specialCategory: {
+            column: "ethnicity",
+            specialCategory: true,
+            route: "client_side",
+            basis,
+            declaredBy: "user-lead",
+            declaredAt: "2026-11-02T09:00:00.000Z",
+          },
+        },
+        "auditor_model",
+      ),
+    ).toBe(
+      "Run JOB-2 evaluated special-category column ethnicity on the auditor's external worker under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
+    );
+    // A protocol saved before declarations counts as special-category.
+    expect(specialCategoryLimitation("JOB-3", profile, "client_local")).toBe(
+      "Run JOB-3 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
+    );
+    expect(
+      specialCategoryLimitation(
+        "JOB-4",
+        {
+          ...profile,
+          specialCategory: {
+            column: "ethnicity",
+            specialCategory: false,
+            route: "hosted",
+            basis: null,
+            declaredBy: "user-lead",
+            declaredAt: "2026-11-02T09:00:00.000Z",
+          },
+        },
+        "client_local",
+      ),
+    ).toBeNull();
   });
 });

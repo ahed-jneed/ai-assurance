@@ -14,7 +14,10 @@ import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { diagnosticNarrative } from "../../presentation";
 import { recordVersions } from "../../rule-pack-current";
-import { externalGate } from "../../special-category";
+import {
+  externalGate,
+  specialCategoryLimitation,
+} from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
@@ -440,7 +443,17 @@ export const execution: AssuranceModule = defineCommands({
         "; attempt " +
         job.attempt_id +
         ". Technical output compilation only. Auditor must record actual procedure work and assess sufficiency.";
-      p.body.limitations = frozen.limitations.join("\n");
+      // A protocol on special-category data states where the data were
+      // processed and under which basis, as a hosted run's paper does (#103).
+      const specialCategory = specialCategoryLimitation(
+        job.id,
+        frozen.profile,
+        frozen.executionMode,
+      );
+      p.body.limitations = [
+        ...frozen.limitations,
+        ...(specialCategory ? [specialCategory] : []),
+      ].join("\n");
       p.evidenceIds = [job.id];
       p.runIds = [job.id];
       const binding = {

@@ -1280,6 +1280,53 @@ try {
     planRun.provenance.inputHashes.statisticsPlan,
     planEnvelope.externalReport.provenance.statisticsPlanSha256,
   );
+  // The paper an external run compiles states the special-category
+  // limitation, as a hosted run's paper does (#103). The completed job
+  // replays the plan job's result under a frozen request whose protocol
+  // declares its group column special-category on the client's own worker.
+  const planPaper = e.papers.find((p) => p.runIds?.includes(planJob.jobId));
+  assert.doesNotMatch(planPaper.body.limitations, /special-category/);
+  const specialRequest = structuredClone(planFrozen);
+  specialRequest.executionMode = "client_local";
+  specialRequest.profile.specialCategory = {
+    column: "group",
+    specialCategory: true,
+    route: "client_side",
+    basis: null,
+    declaredBy: owner,
+    declaredAt: planDone.created_at,
+  };
+  const specialJobId = planJob.jobId + "-special",
+    specialText = JSON.stringify(specialRequest);
+  await testDb
+    .prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at,attempt_id,fence,result_key,result_sha256,completed_at) VALUES (?,?,?,'succeeded',?,?,?,?,?,?,?,?,?)",
+    )
+    .bind(
+      specialJobId,
+      planDone.tenant_id,
+      planDone.engagement_id,
+      specialText,
+      digest(specialText),
+      planDone.created_by,
+      planDone.created_at,
+      planDone.attempt_id,
+      planDone.fence,
+      planDone.result_key,
+      planDone.result_sha256,
+      planDone.completed_at,
+    )
+    .run();
+  await assurance("importJob", { jobId: specialJobId });
+  const specialPaper = e.papers.find((p) => p.runIds?.includes(specialJobId));
+  assert.ok(
+    specialPaper.body.limitations.endsWith(
+      "\nRun " +
+        specialJobId +
+        " evaluated special-category column group on the client's own worker with no basis recorded on its protocol.",
+    ),
+    specialPaper.body.limitations,
+  );
   // The runner route checks a delivery against the plan's criterion ids and
   // kinds: results out of plan order are refused before they are stored.
   const orderJob = await assurance("queueExternal", {
