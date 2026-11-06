@@ -166,6 +166,9 @@ async function newApi(id: PersonaId, baseURL: string) {
   const http = await playwrightRequest.newContext({
     baseURL,
     extraHTTPHeaders: identityHeaders(who),
+    // A request the Worker never answers fails on its own, naming its URL,
+    // instead of running into the test's timeout.
+    timeout: 15_000,
   });
   return new Api(who, http, baseURL);
 }
@@ -240,6 +243,36 @@ export function paperPath(demo: Demo, paperId: string) {
     "&" +
     new URLSearchParams({ kind: "paper", record: paperId })
   );
+}
+
+/**
+ * Runs `action` (a click that sends one workspace command) and waits for the
+ * Worker's answer to that command, so the spec reads the result only after
+ * the save is complete. Never read through the API while the UI's command is
+ * still in flight: that is the read that hung in #119.
+ */
+export async function runCommand(
+  page: Page,
+  op: string,
+  action: () => Promise<unknown>,
+) {
+  const answered = page.waitForResponse((response) => {
+    const request = response.request();
+    if (
+      request.method() !== "POST" ||
+      new URL(request.url()).pathname !== "/api/workspace"
+    )
+      return false;
+    try {
+      return (request.postDataJSON() as { op?: unknown } | null)?.op === op;
+    } catch {
+      return false;
+    }
+  });
+  await action();
+  const response = await answered;
+  expect(response.status(), `${op}: ${await response.text()}`).toBe(200);
+  return response;
 }
 
 /** Picks an option of a Radix select (components/ui/select.tsx). */

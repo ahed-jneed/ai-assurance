@@ -10,6 +10,14 @@
 // let a client hand such data to an external auditor's platform.
 import { z } from "zod";
 import { calendarDate } from "./dataset-card";
+import {
+  type BinaryHeader,
+  endsParquet,
+  isParquet,
+  isZip,
+  parquetColumns,
+  spreadsheetColumns,
+} from "./dataset-header";
 import type { Artifact, Engagement, EvaluationProfile, Run } from "./domain";
 import { fairnessSelected } from "./evaluation";
 import { ApiError } from "./http";
@@ -322,26 +330,47 @@ function fromCodes(codes: ArrayLike<number>) {
   return text;
 }
 /**
+ * The byte order of UTF-16 text without a byte order mark: in text that is
+ * mostly ASCII, every other byte is NUL. It is taken as UTF-16 when at least
+ * 75 % of its first 512 byte pairs have a NUL on one side only, the same
+ * side. Null when the bytes do not look like UTF-16.
+ */
+export function utf16ByteOrder(b: Uint8Array): "le" | "be" | null {
+  const pairs = Math.min(b.length >> 1, 512);
+  if (pairs < 2) return null;
+  let le = 0,
+    be = 0;
+  for (let i = 0; i < pairs; i++) {
+    const x = b[2 * i],
+      y = b[2 * i + 1];
+    if (x && !y) le++;
+    else if (!x && y) be++;
+  }
+  return le >= pairs * 0.75 ? "le" : be >= pairs * 0.75 ? "be" : null;
+}
+function utf16(b: Uint8Array, order: "le" | "be", from: number) {
+  const units = new Uint16Array((b.length - from) >> 1);
+  for (let i = 0; i < units.length; i++) {
+    const x = b[from + 2 * i],
+      y = b[from + 2 * i + 1];
+    units[i] = order === "le" ? x | (y << 8) : (x << 8) | y;
+  }
+  return fromCodes(units);
+}
+/**
  * The text of an upload's first bytes, for finding its header row: UTF-16
- * when a byte order mark says so (Excel's "Unicode Text"), UTF-8 when the
- * bytes are valid UTF-8, and Windows-1252 otherwise (Excel's "CSV (Comma
- * delimited)" on Western-European systems). Decoded by hand, so the result
- * does not depend on the legacy encodings the runtime's TextDecoder knows.
+ * when a byte order mark says so (Excel's "Unicode Text") or when mostly
+ * every other byte is NUL (UTF-16 written without one, see utf16ByteOrder), UTF-8 when the bytes are
+ * valid UTF-8, and Windows-1252 otherwise (Excel's "CSV (Comma delimited)"
+ * on Western-European systems). Decoded by hand, so the result does not
+ * depend on the legacy encodings the runtime's TextDecoder knows.
  */
 export function headerText(bytes: ArrayBuffer) {
   const b = new Uint8Array(bytes.slice(0, headerScanBytes));
-  if (b[0] === 0xff && b[1] === 0xfe)
-    return fromCodes(
-      new Uint16Array(b.length >> 1)
-        .map((_, i) => b[2 * i] | (b[2 * i + 1] << 8))
-        .subarray(1),
-    );
-  if (b[0] === 0xfe && b[1] === 0xff)
-    return fromCodes(
-      new Uint16Array(b.length >> 1)
-        .map((_, i) => (b[2 * i] << 8) | b[2 * i + 1])
-        .subarray(1),
-    );
+  if (b[0] === 0xff && b[1] === 0xfe) return utf16(b, "le", 2);
+  if (b[0] === 0xfe && b[1] === 0xff) return utf16(b, "be", 2);
+  const order = utf16ByteOrder(b);
+  if (order) return utf16(b, order, 0);
   try {
     // `stream` tolerates a multi-byte character cut at the scan limit.
     return new TextDecoder("utf-8", { fatal: true }).decode(b, {
@@ -354,17 +383,57 @@ export function headerText(bytes: ArrayBuffer) {
   }
 }
 /**
- * The header of an upload whose first bytes are text, whatever its name or
- * encoding: the external worker reads every Dataset as CSV, so a file
- * without a .csv extension is inspected too, and a file that is not UTF-8
- * still brings its columns onto the platform although no run can read it.
- * Tab-separated when the name says so, or when the first line holds tabs
- * and no commas. Null for binary formats (Parquet, spreadsheets), which
- * cannot be inspected.
+ * What the gate reads from an upload: its column names, or why a dataset
+ * format the gate recognises could not be read. Null when the upload is
+ * neither text nor a recognised dataset format.
  */
-export function uploadHeader(name: string, bytes: ArrayBuffer) {
+export type UploadHeader = string[] | { unreadable: string } | null;
+/**
+ * What a binary reader found: its columns, or why they could not be read.
+ * A failure the reader did not anticipate (malformed input exhausting the
+ * stack, say) counts as unreadable too, so the gate fails closed with its
+ * declaration path instead of an internal error.
+ */
+async function binaryHeader(
+  format: string,
+  read: () => BinaryHeader | null | Promise<BinaryHeader | null>,
+): Promise<UploadHeader> {
+  try {
+    const header = await read();
+    return !header ? null : "columns" in header ? header.columns : header;
+  } catch {
+    return { unreadable: "the " + format + " could not be read" };
+  }
+}
+/**
+ * The column names of an upload, whatever its name or encoding: the
+ * external worker reads every Dataset as CSV, so a file without a .csv
+ * extension is inspected too, and a file that is not UTF-8 still brings its
+ * columns onto the platform although no run can read it. Text is
+ * tab-separated when the name says so, or when the first line holds tabs
+ * and no commas. Parquet files (by their leading or trailing magic number,
+ * or a .parquet or .pq name) are read from their footer schema and
+ * spreadsheets (.xlsx, .xlsm) from the first non-empty row of every
+ * worksheet; neither is executed. Other binary formats (legacy .xls,
+ * OpenDocument, archives) are not inspected; a binary .xlsb workbook is
+ * recognised and reported unreadable.
+ */
+export async function uploadHeader(
+  name: string,
+  bytes: ArrayBuffer,
+): Promise<UploadHeader> {
+  const b = new Uint8Array(bytes),
+    parquet = () => binaryHeader("Parquet file", () => parquetColumns(b));
+  if (isParquet(b)) return parquet();
+  if (isZip(b)) return binaryHeader("spreadsheet", () => spreadsheetColumns(b));
+  // A file whose first bytes are not Parquet's magic number may still be
+  // Parquet: its footer ends with the magic number too, and the engine
+  // picks Parquet by a .parquet or .pq name (connectors.read_parquet).
+  const footer =
+    endsParquet(b) || /\.(parquet|pq)$/i.test(name) ? await parquet() : null;
+  if (Array.isArray(footer)) return footer;
   const text = headerText(bytes);
-  if (!text || text.includes("\u0000")) return null;
+  if (!text || text.includes("\u0000")) return footer;
   const first = text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
   return /\.tsv$/i.test(name) || (first.includes("\t") && !first.includes(","))
     ? first
@@ -384,7 +453,8 @@ export function uploadGate(
   e: Pick<Engagement, "specialCategoryBases" | "evaluationProfiles">,
   upload: {
     category: string;
-    headers: readonly string[] | null;
+    /** What uploadHeader read. */
+    headers: readonly string[] | { unreadable: string } | null;
     handlingBasis: string;
     /**
      * "not_personal": the uploader's declaration for uncovered columns; null
@@ -394,6 +464,33 @@ export function uploadGate(
   },
 ) {
   if (upload.category !== "Dataset" || !upload.headers) return null;
+  if ("unreadable" in upload.headers) {
+    // A Parquet file or spreadsheet whose columns cannot be read may hold
+    // special-category columns, so it is refused unless declared free of
+    // them, like an uncovered column.
+    const reason = upload.headers.unreadable;
+    if (upload.declaration !== "not_personal")
+      throw new ApiError(
+        409,
+        "The columns of this dataset could not be read (" +
+          reason +
+          "), so it may hold special-category data. " +
+          (upload.declaration === null
+            ? "Send it as CSV, or compute the fairness tests in your own environment and send only the approved aggregates."
+            : "Upload it as CSV so its columns can be checked, or, if it holds no special-category personal data, declare that with a synthetic or anonymised handling basis."),
+      );
+    if (!["synthetic", "anonymized"].includes(upload.handlingBasis))
+      throw new ApiError(
+        400,
+        "Only synthetic or anonymised evidence can be declared free of special-category personal data",
+      );
+    return {
+      columns: [],
+      bases: [],
+      unreadable: reason,
+      declaration: "not_personal",
+    };
+  }
   const found = specialColumns(upload.headers, e);
   if (!found.length) return null;
   const uncovered = found.filter((c) => !c.basisId);
@@ -631,31 +728,53 @@ export function externalGate(
   );
 }
 
+/**
+ * The limitation a run states when its frozen protocol evaluated
+ * special-category data: the column, where it was processed and the basis.
+ * Null when the protocol's group column is not special-category data.
+ */
+export function specialCategoryLimitation(
+  runId: string,
+  profile: Pick<EvaluationProfile, "suite" | "config" | "specialCategory">,
+  executionMode: string,
+  datasetCustody?: string,
+) {
+  if (!groupColumnIsSpecial(profile)) return null;
+  const d = profile.specialCategory,
+    where =
+      executionMode === "saved_predictions"
+        ? "on the platform"
+        : executionMode === "client_local"
+          ? datasetCustody === "client"
+            ? "on the client's own worker in the client's environment, which returned only aggregates and withheld groups below the minimum group size,"
+            : "on the client's own worker"
+          : "on the auditor's external worker";
+  return (
+    "Run " +
+    runId +
+    " evaluated special-category column " +
+    profile.config.groupColumn +
+    " " +
+    where +
+    (d?.basis
+      ? " under " + basisSummary(d.basis) + "."
+      : " with no basis recorded on its protocol.")
+  );
+}
 /** The report limitation for each run that evaluated special-category data. */
 export function specialCategoryLimitations(runs: readonly Run[]) {
   return runs.flatMap((r) => {
-    const p = r.manifest?.profile;
-    if (r.state !== "succeeded" || !p || !groupColumnIsSpecial(p)) return [];
-    const d = p.specialCategory,
-      where =
-        r.manifest!.executionMode === "saved_predictions"
-          ? "on the platform"
-          : r.manifest!.executionMode === "client_local"
-            ? r.manifest!.dataset?.custody === "client"
-              ? "on the client's own worker in the client's environment, which returned only aggregates and withheld groups below the minimum group size,"
-              : "on the client's own worker"
-            : "on the auditor's external worker";
-    return [
-      "Run " +
-        r.id +
-        " evaluated special-category column " +
-        p.config.groupColumn +
-        " " +
-        where +
-        (d?.basis
-          ? " under " + basisSummary(d.basis) + "."
-          : " with no basis recorded on its protocol."),
-    ];
+    const p = r.manifest?.profile,
+      line =
+        r.state === "succeeded" && p
+          ? specialCategoryLimitation(
+              r.id,
+              p,
+              r.manifest!.executionMode,
+              r.manifest!.dataset?.custody,
+            )
+          : null;
+    return line ? [line] : [];
   });
 }
 

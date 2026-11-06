@@ -790,6 +790,14 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
+  // A procedure that samples the population fixture.
+  const sampledProcedure = e.workflow.procedures.find(
+    (p) => !["WP-A15-01", "WP-A15-02", "WP-A15-03"].includes(p.templateId),
+  );
+  Object.assign(sampledProcedure, {
+    datasetId: sampleId,
+    planHash: digest("sampled plan fixture"),
+  });
   // Writes the fixture engagement as edited here, bypassing the commands.
   const writeEngagement = async () => {
     await testDb
@@ -799,6 +807,20 @@ try {
     await refresh();
   };
   await writeEngagement();
+  // A procedure-bound sample pins the plan content it was drawn for (#105).
+  const boundSample = (
+    await assurance("sample", {
+      ...sampleInput,
+      procedureId: sampledProcedure.id,
+    })
+  ).record;
+  const sampled = e.workflow.procedures.find(
+    (p) => p.id === sampledProcedure.id,
+  );
+  assert.equal(boundSample.body.planHash, digest("sampled plan fixture"));
+  assert.equal(sampled.planHash, boundSample.body.planHash);
+  assert.equal(boundSample.body.procedureRevision, sampled.revision);
+  console.log("PASS a procedure-bound sample pins the procedure's plan hash");
   const datasetCard = (
     await assurance("registerDataset", {
       schemaVersion: "1.0",
@@ -993,6 +1015,13 @@ try {
     .bind(job.jobId)
     .first();
   assert.equal(jobRow.state, "succeeded");
+  // The request binds the plan content (#105).
+  const jobPlanHash = JSON.parse(jobRow.request).procedure.planHash;
+  assert.match(jobPlanHash, /^[a-f0-9]{64}$/);
+  assert.equal(
+    jobPlanHash,
+    e.workflow.procedures.find((p) => p.id === procedure.id).planHash,
+  );
   const envelope = JSON.parse(
     await (await testBucket.get(jobRow.result_key)).text(),
   );
@@ -1032,9 +1061,33 @@ try {
     },
   });
   assert(repeat.duplicate);
+  // A content change to the procedure's plan after the job was queued refuses
+  // the import, even with the plan revision unchanged (#105).
+  {
+    const { body: queued } = await testDb
+      .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+      .bind(tenantId, e.id)
+      .first();
+    const changed = JSON.parse(queued);
+    changed.workflow.procedures.find((p) => p.id === procedure.id).planHash =
+      "f".repeat(64);
+    const write = (b) =>
+      testDb
+        .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+        .bind(b, tenantId, e.id)
+        .run();
+    await write(JSON.stringify(changed));
+    assert.match(
+      (await assurance("importJob", { jobId: job.jobId }, owner, 409)).error,
+      /plan or scope changed after this job was queued/,
+    );
+    await write(queued);
+    await refresh();
+  }
   await assurance("importJob", { jobId: job.jobId });
   const run = e.runs.find((r) => r.externalJobId === job.jobId);
   assert(run && run.procedureBinding.procedureId === procedure.id);
+  assert.equal(run.procedureBinding.planHash, jobPlanHash);
   assert.equal(run.results.length, 4);
   assert.equal(run.manifest.dataset.cardPin.recordId, datasetCard.id);
   assert.equal(run.manifest.dataset.cardPin.sha256, datasetCard.sha256);
@@ -1676,6 +1729,53 @@ try {
     planRun.provenance.inputHashes.statisticsPlan,
     planEnvelope.externalReport.provenance.statisticsPlanSha256,
   );
+  // The paper an external run compiles states the special-category
+  // limitation, as a hosted run's paper does (#103). The completed job
+  // replays the plan job's result under a frozen request whose protocol
+  // declares its group column special-category on the client's own worker.
+  const planPaper = e.papers.find((p) => p.runIds?.includes(planJob.jobId));
+  assert.doesNotMatch(planPaper.body.limitations, /special-category/);
+  const specialRequest = structuredClone(planFrozen);
+  specialRequest.executionMode = "client_local";
+  specialRequest.profile.specialCategory = {
+    column: "group",
+    specialCategory: true,
+    route: "client_side",
+    basis: null,
+    declaredBy: owner,
+    declaredAt: planDone.created_at,
+  };
+  const specialJobId = planJob.jobId + "-special",
+    specialText = JSON.stringify(specialRequest);
+  await testDb
+    .prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at,attempt_id,fence,result_key,result_sha256,completed_at) VALUES (?,?,?,'succeeded',?,?,?,?,?,?,?,?,?)",
+    )
+    .bind(
+      specialJobId,
+      planDone.tenant_id,
+      planDone.engagement_id,
+      specialText,
+      digest(specialText),
+      planDone.created_by,
+      planDone.created_at,
+      planDone.attempt_id,
+      planDone.fence,
+      planDone.result_key,
+      planDone.result_sha256,
+      planDone.completed_at,
+    )
+    .run();
+  await assurance("importJob", { jobId: specialJobId });
+  const specialPaper = e.papers.find((p) => p.runIds?.includes(specialJobId));
+  assert.ok(
+    specialPaper.body.limitations.endsWith(
+      "\nRun " +
+        specialJobId +
+        " evaluated special-category column group on the client's own worker with no basis recorded on its protocol.",
+    ),
+    specialPaper.body.limitations,
+  );
   // The runner route checks a delivery against the plan's criterion ids and
   // kinds: results out of plan order are refused before they are stored.
   const orderJob = await assurance("queueExternal", {
@@ -1739,9 +1839,10 @@ try {
       headers: { Authorization: "Bearer " + worker.token },
     });
   assert.equal(claim.jobId, next.jobId);
-  // The job guard binds the procedure's plan revision and the scope, not the
-  // program revision (#69): another procedure's approved change keeps this
-  // job running; a change to its own plan or to the scope stops it.
+  // The job guard binds the procedure's plan and the scope, not the program
+  // revision (#69): another procedure's approved change keeps this job
+  // running; a change to its own plan content (its plan hash, #105) or to
+  // the scope stops it, and a plan restored to the queued content does not.
   const heartbeat = (status = 200) =>
     api("/api/runner", {
       body: {
@@ -1773,10 +1874,15 @@ try {
   });
   await heartbeat();
   await replanned((wf, p) => {
-    p(procedure.id).revision++;
+    p(procedure.id).planHash = "f".repeat(64);
     wf.program.revision++;
   });
   await heartbeat(409);
+  await replanned((wf, p) => {
+    p(procedure.id).revision += 2;
+    wf.program.revision += 2;
+  });
+  await heartbeat();
   await replanned((wf) => wf.brief.revision++);
   await heartbeat(409);
   await replanned(() => {});

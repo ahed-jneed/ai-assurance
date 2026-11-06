@@ -300,6 +300,7 @@ export function WorkspaceViews({
             onView={url.setLabView}
             onEditorOpen={reporters["testing-lab"]}
             onDatasetEditing={reporters["dataset-registry"]}
+            onBasisEditing={reporters["special-category-basis"]}
             act={act}
             onPaper={nav.openPaper}
             resolve={resolve}

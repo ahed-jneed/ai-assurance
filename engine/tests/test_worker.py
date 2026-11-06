@@ -494,6 +494,42 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(report["configuration"]["statistics"]["criteria"][0]["members"][1]["band"]["lower"], 1/3)
         self.assertEqual(result[0]["outcome"], "pass")
 
+    def test_regression_needs_the_mean_prediction_baseline_beaten(self):
+        """Section 5.9 (#68): a constant prediction that meets maximumRmse never passes; a model with R2 > 0 does.
+        The same rows as the hosted runner's test in site-app/lib/diagnostics.test.ts."""
+        targets = [10 + i % 12 for i in range(60)]  # mean 15.5, population SD 3.452
+
+        def evaluate(predict):
+            data = ("actual,predicted\n"+"".join(f"{t},{predict(t, i)}\n" for i, t in enumerate(targets))).encode()
+            request = hosted_request(data, task="Regression", suite=["regression"])
+            request["engineConfig"]["config"]["maximumRmse"] = 5
+            report, results = self.evaluate(request, data)
+            return report, results[0], {m["name"]: m for m in results[0]["metrics"]}
+
+        report, result, metrics = evaluate(lambda t, i: 15.5)
+        self.assertAlmostEqual(metrics["rmse"]["value"], 3.452, places=3)
+        self.assertEqual(metrics["rmse"]["details"]["direction"], "pass")
+        self.assertLess(metrics["rmse"]["pValue"], 0.05)
+        self.assertAlmostEqual(metrics["baseline_rmse"]["value"], metrics["rmse"]["value"], places=12)
+        self.assertEqual(metrics["baseline_rmse"]["unit"], "target_units")
+        self.assertEqual(metrics["baseline_rmse"]["details"]["role"], "descriptive")
+        self.assertEqual(metrics["baseline_rmse"]["details"]["counts"]["gatePValue"], 1.0)
+        self.assertEqual(result["outcome"], "inconclusive")
+        self.assertIn("mean_baseline_not_beaten", result["decision"]["reasons"])
+        self.assertEqual(result["decision"]["pValue"], 1.0)
+        self.assertIn("RMSE 3.452 does not beat the mean-prediction baseline RMSE 3.452", " ".join(result["limitations"]))
+        self.assertEqual(result["decision"], next(r for r in report["results"] if r["testId"] == "regression")["decision"])
+        for constant in (15, 16, 17.25):
+            _, result, metrics = evaluate(lambda t, i: constant)
+            self.assertLess(metrics["rmse"]["value"], 5)
+            self.assertNotEqual(result["outcome"], "pass", constant)
+            self.assertIn("mean_baseline_not_beaten", result["decision"]["reasons"])
+        _, result, metrics = evaluate(lambda t, i: t + (i % 5 - 2) * 0.25)
+        self.assertGreater(metrics["r2"]["value"], 0.9)
+        self.assertLess(metrics["baseline_rmse"]["details"]["counts"]["gatePValue"], 1e-6)
+        self.assertEqual(result["outcome"], "pass")
+        self.assertNotIn("mean_baseline_not_beaten", result["decision"]["reasons"])
+
     def test_small_group_absent_class_and_constant_target_semantics(self):
         request = hosted_request(BIG)
         request["engineConfig"]["config"]["minimumGroupSize"] = 500

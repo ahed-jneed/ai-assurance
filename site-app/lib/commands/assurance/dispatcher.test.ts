@@ -28,6 +28,8 @@ import { ApiError } from "@/lib/http";
 import { sha256 } from "@/lib/ids";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
+import { at, declaration } from "@/lib/workflow/test-fixtures";
+import { seedWorkflow } from "@/lib/workflow-seed";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -386,6 +388,7 @@ describe("POST /api/assurance", () => {
         {
           id: "PROC-1",
           revision: 1,
+          instructions: [],
           selected: true,
           applicability: "applicable",
           modelId: model.id,
@@ -438,7 +441,7 @@ describe("POST /api/assurance", () => {
   }
 
   it("freezes an external job and answers it uncached", async () => {
-    const { system, prediction, queue } = externalFixture();
+    const { e, system, prediction, queue } = externalFixture();
     const response = await queue("provided_predictions");
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
@@ -453,6 +456,9 @@ describe("POST /api/assurance", () => {
       "freezeExternalExecution",
       { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
+    // The job binds the plan content: a procedure planned before plan hashes
+    // keeps the hash it was queued with (#105).
+    expect(e.workflow!.procedures[0].planHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("queues a client-held dataset pin only in client-local mode (#102)", async () => {
@@ -500,6 +506,13 @@ describe("POST /api/assurance", () => {
     "importJob refuses a result whose custody differs from the frozen %s request (#102)",
     async (frozenCustody, stated) => {
       const e = stored();
+      // The job binds the procedure's current plan, so only the custody
+      // differs (#123).
+      e.workflow = {
+        brief: { status: "approved", revision: 2 },
+        program: { status: "approved", revision: 3 },
+        procedures: [{ id: "PROC-1", revision: 1, planHash: "a".repeat(64) }],
+      } as unknown as Engagement["workflow"];
       load(e);
       const bytes = new TextEncoder().encode(
         JSON.stringify({
@@ -523,6 +536,12 @@ describe("POST /api/assurance", () => {
             ...(frozenCustody === "client" ? { custody: "client" } : {}),
           },
           engineConfig: {},
+          procedure: {
+            id: "PROC-1",
+            revision: 1,
+            planHash: "a".repeat(64),
+            briefRevision: 2,
+          },
         }),
       };
       env.DB = fakeD1((sql) =>
@@ -670,6 +689,55 @@ describe("GET /api/assurance", () => {
     expect(recordPage).toHaveBeenCalledWith(ctx, e.id, options);
     expect(recordCount).not.toHaveBeenCalled();
     expect(jobs).not.toHaveBeenCalled();
+  });
+});
+
+describe("setAccess and declared conflicts (#112)", () => {
+  function conflicted() {
+    const e = stored();
+    e.workflow = {
+      ...seedWorkflow("user-lead", at),
+      declarations: [
+        declaration("auditor", {
+          userId: "user-2",
+          exclusions: ["financial_interest"],
+        }),
+      ],
+    };
+    env.DB = fakeD1((sql) =>
+      sql.startsWith("SELECT 1 FROM memberships") ? { 1: 1 } : null,
+    ).db;
+    load(e);
+    statements();
+    return e;
+  }
+
+  it("refuses to grant access to a person with a declared conflict", async () => {
+    const e = conflicted();
+    const response = await post(e, "setAccess", {
+      userId: "user-2",
+      active: true,
+      reason: "Joins the review",
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+    });
+    expect(recordStatement).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("still revokes their access, and grants others", async () => {
+    const e = conflicted();
+    for (const data of [
+      { userId: "user-2", active: false, reason: "Leaves the team" },
+      { userId: "user-3", active: true, reason: "Joins the review" },
+    ]) {
+      const response = await post(e, "setAccess", data);
+      expect(response.status, data.userId).toBe(200);
+    }
+    expect(save).toHaveBeenCalledTimes(2);
   });
 });
 

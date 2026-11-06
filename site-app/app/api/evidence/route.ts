@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       // the bytes are stored (#60, D-11).
       specialCategory = uploadGate(e, {
         category,
-        headers: uploadHeader(file.name, payload),
+        headers: await uploadHeader(file.name, payload),
         handlingBasis,
         declaration: String(form.get("specialCategoryDeclaration") ?? ""),
       });

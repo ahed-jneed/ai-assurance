@@ -3,7 +3,7 @@
 // client's recorded bases, the declaration a fairness protocol makes about
 // its group column, and the acknowledgement a hosted run needs. The Art 4a
 // reading is pending legal review (LR-06).
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,15 +52,24 @@ export function SpecialCategoryRegister({
   writer,
   busy,
   act,
+  onEditing,
 }: {
   engagement: Engagement;
   writer: boolean;
   busy: boolean;
   act: Act;
+  /**
+   * Reports whether the basis form is open, so the workspace navigation
+   * guard keeps an unsaved basis from being dropped (#103).
+   */
+  onEditing: (editing: boolean) => void;
 }) {
   const bases = e.specialCategoryBases ?? [],
     [form, setForm] = useState<typeof emptyForm | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    open = form !== null;
+  useEffect(() => onEditing(open), [open, onEditing]);
+  useEffect(() => () => onEditing(false), [onEditing]);
   const paragraph = form?.kind === "art4a-2" ? "2" : "1",
     points = art4aPoints(paragraph),
     titles: Record<string, string> = Object.fromEntries([

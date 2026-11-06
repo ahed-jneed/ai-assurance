@@ -275,6 +275,76 @@ describe("context", () => {
     }
   });
 
+  it("withholds an invited engagement where the invitee declared a conflict (#112)", async () => {
+    let joined = false;
+    d1.state.list = (sql) =>
+      /FROM invitations WHERE email=\?/.test(sql)
+        ? [
+            {
+              tenant_id: "tenant-firm",
+              id: "INV-1",
+              display_name: "Lea",
+              role: "Auditor",
+              client_id: null,
+              engagement_ids: '["ENG-1","ENG-2"]',
+              invited_by: "user-admin",
+              created_at: "2026-11-01T00:00:00.000Z",
+            },
+          ]
+        : [];
+    const conflicted = {
+      workflow: {
+        declarations: [
+          { userId: "user-lea", exclusions: ["financial_interest"] },
+        ],
+      },
+    };
+    d1.state.lookup = (sql, args) => {
+      if (/SELECT body FROM engagements/.test(sql))
+        return args[1] === "ENG-1"
+          ? { body: JSON.stringify(conflicted) }
+          : { body: JSON.stringify({ workflow: { declarations: [] } }) };
+      if (
+        /SELECT tenant_id FROM memberships WHERE user_id=\? AND status/.test(
+          sql,
+        )
+      )
+        return joined ? { tenant_id: "tenant-firm" } : null;
+      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
+        return joined
+          ? { role: "Auditor", client_id: null, access_since: "2026-11-06" }
+          : null;
+      return null;
+    };
+    const batch = d1.db.batch;
+    d1.db.batch = async (statements) => {
+      joined = true;
+      return batch(statements);
+    };
+    try {
+      await as(lea, () => context());
+      const grants = d1.state.writes.filter((w) =>
+        w.sql.startsWith("INSERT INTO engagement_access"),
+      );
+      expect(grants.map((g) => g.args[1])).toEqual(["ENG-2"]);
+      const event = d1.state.writes.find((w) =>
+        w.sql.startsWith("INSERT INTO management_events"),
+      )!;
+      expect(JSON.parse(String(event.args[4]))).toMatchObject({
+        engagementIds: ["ENG-2"],
+        withheld: [
+          {
+            engagementId: "ENG-1",
+            reason:
+              "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+          },
+        ],
+      });
+    } finally {
+      d1.db.batch = batch;
+    }
+  });
+
   it("closes an invitation issued before a revocation as superseded and never restores the membership", async () => {
     d1.state.list = (sql) =>
       /FROM invitations WHERE email=\?/.test(sql)
