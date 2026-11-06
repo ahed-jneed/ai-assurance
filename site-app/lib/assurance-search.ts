@@ -98,43 +98,102 @@ const haystack = [
   "COALESCE(m.display_name,'')",
 ].join("||' '||");
 
-/** How many distinct non-ASCII letters of a term have their case folded. */
-const foldedLetterLimit = 30;
+/**
+ * How many case forms the haystack replaces for one term: two bound values
+ * each. With the other values of a search (at most 31) a query binds at most
+ * 91, under D1's limit of 100.
+ */
+const foldedFormLimit = 30;
+/**
+ * The case forms of a letter other than its canonical form
+ * `c.toUpperCase().toLowerCase()` and that form's upper case, keyed by the
+ * canonical form: final sigma, the Greek symbol variants, the title case
+ * digraphs, the Ohm, Angstrom and micro signs and the Cyrillic rounded forms.
+ * lib/assurance-search.test.ts checks it against every code point.
+ */
+const otherCaseForms: Record<string, string> = {
+  "\u03bc": "\u00b5",
+  "\u00e5": "\u212b",
+  "\u01c6": "\u01c5",
+  "\u01c9": "\u01c8",
+  "\u01cc": "\u01cb",
+  "\u01f3": "\u01f2",
+  "\u03b9": "\u0345\u1fbe",
+  "\u03b2": "\u03d0",
+  "\u03b5": "\u03f5",
+  "\u03b8": "\u03d1\u03f4",
+  "\u03ba": "\u03f0",
+  "\u03c0": "\u03d6",
+  "\u03c1": "\u03f1",
+  "\u03c3": "\u03c2",
+  "\u03c6": "\u03d5",
+  "\u03c9": "\u2126",
+  "\u0432": "\u1c80",
+  "\u0434": "\u1c81",
+  "\u043e": "\u1c82",
+  "\u0441": "\u1c83",
+  "\u0442": "\u1c84\u1c85",
+  "\u044a": "\u1c86",
+  "\u0463": "\u1c87",
+  "\ua64b": "\u1c88",
+  "\u1e61": "\u1e9b",
+};
+const single = (s: string) => [...s].length === 1;
+/**
+ * A letter's canonical case form, `c.toUpperCase().toLowerCase()`, or
+ * undefined when a case form on the way is not a single character (as "ß"
+ * has "SS" and "İ" has "i̇") or the canonical form is ASCII (as for "ı" and
+ * "ſ", which SQLite's lower() cannot fold to).
+ */
+export function canonicalCaseForm(c: string) {
+  const upper = c.toUpperCase(),
+    canonical = upper.toLowerCase();
+  return single(upper) &&
+    single(canonical) &&
+    single(canonical.toUpperCase()) &&
+    canonical.charCodeAt(0) > 127
+    ? canonical
+    : undefined;
+}
+/** Every other single-character case form whose canonical form is `canonical`. */
+export function caseForms(canonical: string) {
+  return [canonical.toUpperCase(), ...(otherCaseForms[canonical] ?? "")].filter(
+    (f) => f !== canonical && single(f),
+  );
+}
 /**
  * A condition that finds `term` anywhere in the haystack, ignoring the case of
  * every letter, with its bound values. SQLite's LIKE and lower() fold only
  * ASCII case (D1 has no ICU), and D1 refuses LIKE and GLOB patterns over 50
- * bytes, so the haystack goes through lower() and, for each non-ASCII letter
- * of the term, a replace() of its upper case form by its lower case form, and
- * instr() finds the lower-cased term in it. Every character of the term is
- * matched literally. A letter whose case forms are not single characters
- * (such as "ß" and "SS") keeps its case; the non-ASCII letters past the first
- * `foldedLetterLimit` (a bound on the bound values: D1 takes 100) find only
- * their lower case form.
+ * bytes, so each non-ASCII letter of the term is folded to its canonical form
+ * (σ for Σ, σ and ς), the haystack goes through lower() and a replace() of
+ * every other case form of those letters by their canonical form, and instr()
+ * finds the folded term in it. Every character of the term is matched
+ * literally. A letter without a single-character canonical form (such as
+ * "ß") keeps its case, one whose canonical form is ASCII (such as "ı") is
+ * matched by its lower case form, and so is a letter whose forms would take
+ * the haystack past `foldedFormLimit` replaced forms.
  */
 export function termCondition(term: string) {
   let folded = "";
-  const pairs = new Map<string, string>();
+  const forms = new Map<string, string>();
   for (const c of term) {
-    const lower = c.toLowerCase(),
-      upper = lower.toUpperCase();
-    if ([...lower].length !== 1 || [...upper].length !== 1) {
-      folded += c;
-      continue;
+    const canonical = canonicalCaseForm(c);
+    if (canonical !== undefined) {
+      const others = caseForms(canonical).filter((f) => !forms.has(f));
+      if (forms.size + others.length <= foldedFormLimit) {
+        for (const f of others) forms.set(f, canonical);
+        folded += canonical;
+        continue;
+      }
     }
-    if (
-      upper !== lower &&
-      upper.charCodeAt(0) > 127 &&
-      (pairs.has(upper) || pairs.size < foldedLetterLimit)
-    )
-      pairs.set(upper, lower);
-    folded += lower;
+    folded += single(c.toLowerCase()) ? c.toLowerCase() : c;
   }
   let sql = `lower(${haystack})`;
-  for (let i = 0; i < pairs.size; i++) sql = `replace(${sql},?,?)`;
+  for (let i = 0; i < forms.size; i++) sql = `replace(${sql},?,?)`;
   return {
     sql: `instr(${sql},?)>0`,
-    values: [...[...pairs].flat(), folded],
+    values: [...[...forms].flat(), folded],
   };
 }
 

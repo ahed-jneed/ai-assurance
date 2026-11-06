@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { recordTitle } from "../app/assurance-register";
 import type { AssuranceRecord } from "./assurance-core";
 import {
+  canonicalCaseForm,
+  caseForms,
   reviewQueuePage,
   reviewQueueSummary,
   searchRecords,
@@ -143,6 +145,7 @@ const words = [
   "Überprüfung",
   "ærøskøbing",
   "Σχέδιο",
+  "Σκοπός",
   "a*[b]?c",
 ];
 /**
@@ -272,6 +275,9 @@ describe("record search in SQL", () => {
         "ÜBERPRÜFUNG-1",
         "ÆRØ",
         "σχέδιο",
+        "Σκοπός",
+        "σκοπός",
+        "ΣΚΟΠΌΣ-1",
         "MÜLLER",
         "jörg müller",
         "*",
@@ -346,6 +352,21 @@ describe("record search in SQL", () => {
     ).toBe("Awaiting review");
   });
 
+  it("knows every case form of every letter", () => {
+    const expected = new Map<string, string[]>();
+    for (let cp = 0x80; cp <= 0x10ffff; cp++) {
+      if (cp >= 0xd800 && cp < 0xe000) continue;
+      const c = String.fromCodePoint(cp),
+        canonical = canonicalCaseForm(c);
+      if (canonical === undefined || canonical === c) continue;
+      expected.set(canonical, [...(expected.get(canonical) ?? []), c]);
+    }
+    expect(expected.size).toBeGreaterThan(1000);
+    for (const [canonical, forms] of expected)
+      expect([...caseForms(canonical)].sort(), canonical).toEqual(forms.sort());
+    expect(caseForms("σ").sort()).toEqual(["Σ", "ς"].sort());
+  });
+
   it("ignores the case of non-ASCII letters", async () => {
     await insert([
       {
@@ -376,6 +397,22 @@ describe("record search in SQL", () => {
     // Every character is literal, and a term may pass D1's 50-byte patterns.
     expect(await find("ÜBERPRÜFUNG DER DATEN")).toEqual(["AS-1"]);
     expect(await find("%")).toEqual([]);
+    await insert([
+      {
+        id: "AS-5",
+        kind: "location",
+        body: { label: "Σκοπός της αξιολόγησης" },
+        at: at(5),
+      },
+    ]);
+    // Σ, σ and ς are one letter, wherever they stand.
+    expect(await find("Σκοπός")).toEqual(["AS-5"]);
+    expect(await find("σκοπός")).toEqual(["AS-5"]);
+    expect(await find("ΣΚΟΠΌΣ")).toEqual(["AS-5"]);
+    expect(await find("σκοπόσ τησ")).toEqual(["AS-5"]);
+    expect(await find("ΑΞΙΟΛΌΓΗΣΗΣ")).toEqual(["AS-5"]);
+    // An accented letter is its own letter, as an umlaut is.
+    expect(await find("ΣΚΟΠΟΣ")).toEqual([]);
     const greek = "αβγδεζηθικλμνξοπρστυφχψω";
     await insert([
       {
