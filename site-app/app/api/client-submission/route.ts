@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     for (const [i, file] of bundle.entries()) {
       const gate = uploadGate(e, {
         category: g.category,
-        headers: uploadHeader(file.name, await file.arrayBuffer()),
+        headers: await uploadHeader(file.name, await file.arrayBuffer()),
         handlingBasis: g.handlingBasis,
         declaration: null,
       });

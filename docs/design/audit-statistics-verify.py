@@ -58,6 +58,9 @@ REGRESSION_DESCRIPTIVE = ("mae", "rmse", "r2")
 PERFORMANCE_KINDS = ("performance", "multiclass_performance", "regression_performance")
 # Metrics that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval (section 4.8).
 UNDECIDABLE = {"regression_performance": "r2", "calibration": "expected_calibration_error"}
+# Section 5.9: a regression pass also needs the model to beat the mean-prediction baseline; an MSE reduction of at
+# most this share of the baseline MSE is floating-point rounding and never counts as beating it.
+BASELINE_TOLERANCE = 1e-9
 RATE_KEYS = {"selection_rate_difference": "selection", "selection_rate_ratio": "selection", "tpr_difference": "tpr", "fpr_difference": "fpr"}
 # Headline names keep each runner's existing metric names (section 11).
 HEADLINE_NAMES = {
@@ -751,6 +754,31 @@ def regression_stat(metric, data, mins):
     return Stat(math.sqrt(mean), "normal_approximation_mse", lambda z: (math.sqrt(max(0.0, mean - z * se)), math.sqrt(mean + z * se)), lambda band: (lambda d: normal_zstar(mean, se, square_band(band), d)), counts, *status)
 
 
+def mean_baseline(data, mins):
+    """Section 5.9: the mean-prediction baseline (descriptive baseline_rmse) and its gate p. The gate tests
+    mean(d) < 0 for d_i = e_i^2 - (mean - y_i)^2 by the one-sided normal approximation on the decision scale."""
+    errors = data["errors"]
+    n = len(errors)
+    targets = data.get("targets")
+    if n < 2 or targets is None:
+        return Stat(None, None, None, None, {"n": n}, "undefined", ["undefined_zero_denominator"]), 1.0
+    mean_t = math.fsum(targets) / n
+    residuals = [mean_t - t for t in targets]
+    sst = math.fsum(r * r for r in residuals)
+    if sst == 0.0:
+        return Stat(None, None, None, None, {"n": n}, "undefined", ["undefined_zero_denominator"]), 1.0
+    baseline_mse = sst / n
+    mean_d, sd_d = mean_sd([e * e - r * r for e, r in zip(errors, residuals)])
+    se = sd_d / math.sqrt(n)
+    reduction = 0.0 - mean_d  # never -0.0
+    if reduction <= BASELINE_TOLERANCE * baseline_mse:
+        p = 1.0
+    else:
+        p = p_from_z(Z_MAX if se == 0.0 else reduction / se)
+    counts = {"n": n, "meanSquaredError": baseline_mse, "meanSquaredErrorReduction": reduction, "sdSquaredErrorDifference": sd_d, "gatePValue": p}
+    return Stat(math.sqrt(baseline_mse), None, None, None, counts, *support(n, mins["sampleSize"], "below_minimum_sample_size")), p
+
+
 def rate_counts(key, g):
     if g is None:
         return 0, 0
@@ -955,7 +983,9 @@ def evaluate_criterion(spec, data, level, mins):
         planned = [item["metric"] for item in spec["members"]]
         members = [stat_entry(item["metric"], item["band"], regression_stat(item["metric"], data, mins), level) for item in spec["members"]]
         descriptive = [stat_entry(metric, None, regression_stat(metric, data, mins), level, descriptive=True) for metric in REGRESSION_DESCRIPTIVE if metric not in planned]
-        context = {"sampleSize": len(data["errors"]), "passBlocked": False, "reasons": []}
+        baseline, baseline_p = mean_baseline(data, mins)
+        descriptive.append(stat_entry("baseline_rmse", None, baseline, level, descriptive=True))
+        context = {"sampleSize": len(data["errors"]), "passBlocked": False, "reasons": [], "baselineP": baseline_p}
     elif kind == "group_comparison":
         members, context = group_members(spec, data, mins, level)
         groups = context["groups"]
@@ -1002,8 +1032,11 @@ def evaluate_criterion(spec, data, level, mins):
             if p > alpha + EPS:
                 ungated = max(m["_pInterval"] for m in pool)  # without the chance gate of section 5.2
                 reasons.append("chance_exact_test_not_significant" if ungated <= alpha + EPS else "interval_straddles_band")
+            p = max(p, context.get("baselineP", 0.0))  # the mean baseline gate (section 5.9) gates passes only
         else:
             p = 1.0
+        if context.get("baselineP", 0.0) > alpha + EPS:
+            reasons.append("mean_baseline_not_beaten")
     for m in pool:
         for r in m["reasons"]:
             if r not in reasons:
@@ -1398,6 +1431,10 @@ MULTICLASS_3X3 = {"kind": "multiclass", "labels": ["high", "low", "medium"], "ma
 # GC-48: dyadic targets symmetric about 5 (so every runner gets R2 = 0 exactly) and the mean predictor 5.
 MEAN_PREDICTOR_DEVIATIONS = ((0.125, 63), (0.375, 53), (0.625, 39), (0.875, 24), (1.125, 12), (1.375, 6), (1.625, 2), (1.875, 1))
 MEAN_PREDICTOR_TARGETS = [5.0 + sign * d for d, count in MEAN_PREDICTOR_DEVIATIONS for _ in range(count) for sign in (1.0, -1.0)]
+# GC-53: a weak model on the same targets, dyadic so every runner gets the same errors: a quarter of each deviation
+# from the mean plus noise of +-0.375 (R2 0.063 > 0, yet the MSE reduction is not significant).
+WEAK_MODEL_ERRORS = [5.0 + 0.25 * (t - 5.0) + (0.375 if i % 4 in (0, 3) else -0.375) - t for i, t in enumerate(MEAN_PREDICTOR_TARGETS)]
+LEGACY_HOSTED_REGRESSION = {"source": "hosted_config", "task": "Regression", "suite": ["regression"], "config": LEGACY_HOSTED_CONFIG}
 
 
 def engine_legacy(task, values):
@@ -1522,6 +1559,12 @@ CASES = [
     {"id": "GC-51", "category": "chance_baseline", "title": "GC-46's policy and a predictor that rarely predicts two of three classes: one correct 'high' puts the macro-recall interval above 1/3, but the exact chance gate (Bonferroni over the classes) does not reject, so the criterion is inconclusive", "type": "plan",
      "data": {"kind": "multiclass", "labels": ["high", "low", "medium"], "matrix": [[1, 39, 0], [0, 1900, 0], [0, 60, 0]]},
      "legacy": engine_legacy("multiclass_classification", {"accuracy": {"operator": ">=", "value": 0.9}})},
+    {"id": "GC-52", "category": "mean_baseline", "title": "Legacy hosted regression profile (RMSE <= 1) and the mean predictor: RMSE 0.622 meets the threshold, but predicting the mean does not beat the mean-prediction baseline, so the criterion is inconclusive", "type": "plan",
+     "data": {"kind": "regression", "targets": MEAN_PREDICTOR_TARGETS, "errors": [5.0 - t for t in MEAN_PREDICTOR_TARGETS]},
+     "legacy": LEGACY_HOSTED_REGRESSION},
+    {"id": "GC-53", "category": "mean_baseline", "title": "The same profile and a weak model with R2 0.063: RMSE 0.602 meets the threshold, but the MSE reduction against the mean baseline is not significant (gate p 0.23), so the criterion is inconclusive", "type": "plan",
+     "data": {"kind": "regression", "targets": MEAN_PREDICTOR_TARGETS, "errors": WEAK_MODEL_ERRORS},
+     "legacy": LEGACY_HOSTED_REGRESSION},
 ]
 
 
@@ -1900,6 +1943,17 @@ def cross_check(fixture):
                     e = np.array(data["errors"])
                     sst = float(np.sum((y - y.mean()) ** 2))
                     expect((sst == 0 and r2["estimate"] is None) or near(1 - float(np.sum(e * e)) / sst, r2["estimate"], 1e-9), "ece_r2", f"{case['id']} R2")
+                # the mean-prediction baseline and its gate (section 5.9), written again with numpy and scipy
+                base = next(m for m in crit["descriptive"] if m["metric"] == "baseline_rmse")
+                y, e = np.array(data["targets"]), np.array(data["errors"])
+                r = y.mean() - y
+                base_mse = float(np.mean(r * r))
+                diff = e * e - r * r
+                reduction, se_d = -float(np.mean(diff)), float(np.std(diff, ddof=1)) / math.sqrt(sample)
+                want_gate = 1.0 if reduction <= 1e-9 * base_mse else (2.0 * float(norm.sf(min(reduction / se_d, 37.0))) if se_d > 0 else 0.0)
+                got_gate = base["counts"]["gatePValue"]
+                expect(near(math.sqrt(base_mse), base["estimate"], 1e-9) and near(base_mse, base["counts"]["meanSquaredError"], 1e-9) and near(reduction, base["counts"]["meanSquaredErrorReduction"], 1e-9), "mean_baseline", f"{case['id']} baseline RMSE {math.sqrt(base_mse)} vs {base['estimate']}")
+                expect(abs(got_gate - want_gate) <= 1e-9 + 1e-6 * want_gate, "mean_baseline", f"{case['id']} gate p {got_gate} vs {want_gate}")
             expect(d["sampleSize"] == sample, "sample_sizes", f"{case['id']} {crit['id']} sampleSize {d['sampleSize']} vs {sample}")
             # an undecidable metric that today's rule needs (R2, ECE) blocks a pass and is flagged on its descriptive entry
             undecidable = spec.get("passBlockedBy") or []
@@ -1952,10 +2006,15 @@ def cross_check(fixture):
                 p = max(m["pValue"] for m in pool) if complete and not blocked else 1.0
                 if complete and not blocked:
                     deciding = min(pool, key=lambda m: (-m["pValue"], m["memberId"]))["memberId"]
+            members_p = p
+            if spec["kind"] == "regression_performance" and direction == "pass" and complete and not blocked:
+                p = max(p, base["counts"]["gatePValue"])  # a pass also needs the mean baseline beaten
             expect(near(p, d["pValue"], 1e-9) and direction == d["direction"], "criterion_p", f"{case['id']} {crit['id']} P {p} {direction} vs {d['pValue']} {d['direction']}")
             expect(deciding == d["decidingMemberId"], "criterion_p", f"{case['id']} {crit['id']} decidingMemberId {deciding} vs {d['decidingMemberId']}")
+            baseline_flag = spec["kind"] == "regression_performance" and sample >= mins["sampleSize"] and bool(ev) and not fails and base["counts"]["gatePValue"] > alpha + 1e-12
+            expect(("mean_baseline_not_beaten" in d["reasons"]) == baseline_flag, "mean_baseline", f"{case['id']} {crit['id']} mean_baseline_not_beaten should be {'present' if baseline_flag else 'absent'}")
             # the chance gate alone prevents a pass: every pool interval decides at the nominal level, yet P > alpha
-            gate_alone = direction == "pass" and complete and not blocked and p > alpha + 1e-12 and all(inside(independent_interval(m, alpha), m["band"]) for m in pool)
+            gate_alone = direction == "pass" and complete and not blocked and members_p > alpha + 1e-12 and all(inside(independent_interval(m, alpha), m["band"]) for m in pool)
             expect(("chance_exact_test_not_significant" in d["reasons"]) == gate_alone, "chance_gate", f"{case['id']} {crit['id']} chance_exact_test_not_significant should be {'present' if gate_alone else 'absent'}")
             expect(d["unadjustedOutcome"] == (direction if direction in ("pass", "fail") and p <= alpha + 1e-12 else "inconclusive"), "outcomes", f"{case['id']} {crit['id']} unadjusted outcome")
         # family adjustment, outcomes, run outcome and review flags
@@ -2355,6 +2414,14 @@ def mutation_test(fixture):
         d.update(pValue=gated["pValue"], adjustedPValue=gated["pValue"], unadjustedOutcome="pass", reasons=[])
         c["outcome"] = expected["overallOutcome"] = "pass"
 
+    def skip_mean_baseline(f, cid):
+        """A runner without the mean baseline gate: the criterion takes its members' p and passes consistently."""
+        expected, c = case(f, cid)["expected"], crit(f, cid)
+        p = max(m["pValue"] for m in c["members"])
+        d = c["decision"]
+        d.update(pValue=p, adjustedPValue=p, unadjustedOutcome="pass", reasons=[r for r in d["reasons"] if r != "mean_baseline_not_beaten"])
+        c["outcome"] = expected["overallOutcome"] = "pass"
+
     mutations = {
         "headline upper bound": lambda f: bump(crit(f, "GC-22")["headline"]["interval"], "upper", 1e-4),
         "one-sided headline estimate": lambda f: crit(f, "GC-30")["headline"].__setitem__("estimate", 0.76),
@@ -2388,6 +2455,9 @@ def mutation_test(fixture):
         "chance gate p-value": lambda f: crit(f, "GC-50")["members"][1].__setitem__("chanceExactP", 0.05),
         "multiclass chance gate without its Bonferroni factor": lambda f: crit(f, "GC-51")["members"][1].__setitem__("chanceExactP", 0.04),
         "chance gate skipped, the pass recomputed without it": lambda f: skip_chance_gate(f, "GC-50"),
+        "baseline RMSE": lambda f: bump(next(m for m in crit(f, "GC-35")["descriptive"] if m["metric"] == "baseline_rmse"), "estimate", 1e-4),
+        "mean baseline gate p-value": lambda f: next(m for m in crit(f, "GC-53")["descriptive"] if m["metric"] == "baseline_rmse")["counts"].__setitem__("gatePValue", 0.01),
+        "mean baseline gate skipped, the pass recomputed without it": lambda f: skip_mean_baseline(f, "GC-52"),
     }
     missed = []
     for name, mutate in mutations.items():

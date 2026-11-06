@@ -15,7 +15,7 @@ REASONS = [
     'below_minimum_sample_size', 'undefined_zero_denominator', 'single_class', 'below_minimum_class_count',
     'group_suppressed_below_minimum', 'group_below_minimum_size', 'insufficient_coverage', 'empty_declared_group',
     'insufficient_groups', 'too_many_groups', 'small_cell_exact_test_not_significant', 'chance_exact_test_not_significant',
-    'interval_straddles_band', 'within_criterion_multiplicity', 'multiplicity_adjustment', 'estimate_on_band_boundary',
+    'mean_baseline_not_beaten', 'interval_straddles_band', 'within_criterion_multiplicity', 'multiplicity_adjustment', 'estimate_on_band_boundary',
     'degenerate_interval', 'no_threshold', 'undecidable_metric', 'invalid_band', 'interval_requires_engine',
     'clustered_design_requires_engine', 'bootstrap_insufficient_valid_replicates', 'bootstrap_budget_exceeded',
     'small_cell_clustered']

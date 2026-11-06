@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { db } from "../../bindings";
+import { roles, type Role } from "../../domain";
 import { loadEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
@@ -14,6 +15,9 @@ import type { ManagementBatch } from "./batch";
  * batch. Nothing is restored implicitly: a re-grant activates only the
  * engagements it lists, and a withdrawn worker must be enrolled again.
  */
+
+/** The role a membership or invitation grants: any of `roles`. */
+export const memberRole = z.enum(roles as [Role, ...Role[]]);
 
 /** The engagements a grant, re-grant or invitation lists explicitly. */
 export const engagementIds = z

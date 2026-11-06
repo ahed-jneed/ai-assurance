@@ -14,6 +14,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: ci,
+  // No retries, locally or in CI: a flaky spec fails the run and is fixed at
+  // its cause (wait for the specific response, never a timer), not hidden.
   retries: 0,
   timeout: 60_000,
   expect: { timeout: 10_000 },

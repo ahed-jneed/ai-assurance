@@ -43,6 +43,7 @@ describe("domain entry point", () => {
       "Client Viewer",
       "Client Contributor",
       "Reviewer",
+      "Engagement Quality Reviewer",
     ]);
     expect(stages).toEqual([
       "Planning",

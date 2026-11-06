@@ -257,7 +257,10 @@ export function useWorkspaceNavigation({
     // The checklist's report elements come from the brief and program.
     else if (gate.kind === "report") navigate("Audit program");
     else if (gate.kind === "run") showRun(gate.recordId ?? "");
-    else if (gate.kind === "finding") {
+    else if (gate.kind === "quality_review") {
+      url.setReportSection("quality");
+      navigate("Reports & sign-off");
+    } else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
       if (record) viewRecord(record.title, record);
     }
@@ -306,6 +309,8 @@ export function useWorkspaceNavigation({
         } else if (item.kind === "paper") {
           const p = audit.papers.find((p) => p.id === item.recordId);
           if (p) paper.showPaper(p, structuredClone(p));
+        } else if (item.section === "quality") {
+          url.setReportSection("quality");
         } else {
           const record = findRecord(audit, item.kind, item.recordId);
           if (record) sheet.viewDetail(item.title, record);

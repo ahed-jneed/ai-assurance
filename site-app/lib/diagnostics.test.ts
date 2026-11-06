@@ -268,6 +268,60 @@ describe("hosted decisions by interval", () => {
     );
   });
 
+  describe("regression against the mean-prediction baseline", () => {
+    // 60 targets 10..21 (each five times): mean 15.5, population SD 3.452.
+    const targets = Array.from({ length: 60 }, (_, i) => 10 + (i % 12));
+    const regression = (predict: (target: number, i: number) => number) =>
+      evaluate(
+        run(["regression"], { maximumRmse: 5 }, "Regression"),
+        csv(targets.map((t, i) => [String(t), String(predict(t, i)), "A", 1])),
+      ).results[0];
+
+    it("does not pass a constant mean prediction that meets maximumRmse, and names the baseline", () => {
+      const result = regression(() => 15.5);
+      const rmse = metric(result, "rmse")!;
+      const baseline = metric(result, "baseline_rmse")!;
+      // RMSE 3.452 <= 5 by its interval: the threshold alone would pass.
+      expect(rmse.value).toBeCloseTo(3.452, 3);
+      expect((rmse.details as any).direction).toBe("pass");
+      expect(rmse.pValue!).toBeLessThan(0.05);
+      // The baseline RMSE is the targets' SD, which the mean prediction equals.
+      expect(baseline.value).toBeCloseTo(rmse.value!, 12);
+      expect(baseline.unit).toBe("target units");
+      expect((baseline.details as any).role).toBe("descriptive");
+      expect((baseline.details as any).counts.gatePValue).toBe(1);
+      expect(metric(result, "r2")!.value).toBeCloseTo(0, 12);
+      expect(result.outcome).toBe("inconclusive");
+      expect(result.decision!.reasons).toContain("mean_baseline_not_beaten");
+      expect(result.decision!.pValue).toBe(1);
+      expect(result.limitations.join(" ")).toMatch(
+        /RMSE 3\.452 does not beat the mean-prediction baseline RMSE 3\.452/,
+      );
+      expect(explainResult(result)).toMatch(/not shown to beat 3\.45/);
+    });
+
+    it("does not pass any other constant prediction either", () => {
+      for (const constant of [15, 16, 17.25]) {
+        const result = regression(() => constant);
+        expect(metric(result, "rmse")!.value!).toBeLessThan(5);
+        expect(result.outcome, String(constant)).not.toBe("pass");
+        expect(result.decision!.reasons).toContain("mean_baseline_not_beaten");
+      }
+    });
+
+    it("passes a model with R² > 0 that meets maximumRmse", () => {
+      const result = regression((t, i) => t + ((i % 5) - 2) * 0.25);
+      expect(metric(result, "r2")!.value!).toBeGreaterThan(0.9);
+      expect(
+        (metric(result, "baseline_rmse")!.details as any).counts.gatePValue,
+      ).toBeLessThan(1e-6);
+      expect(result.outcome).toBe("pass");
+      expect(result.decision!.reasons).not.toContain(
+        "mean_baseline_not_beaten",
+      );
+    });
+  });
+
   it("is inconclusive when a small sample cannot tell the gap from noise", () => {
     // 20 per group is below the floor of 30: the groups are suppressed.
     const { results } = evaluate(

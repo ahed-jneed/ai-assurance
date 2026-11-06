@@ -9,7 +9,12 @@ import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
   role === "Client Viewer" || role === "Client Contributor";
 export const isInternalRole = (role: Role | string) =>
-  ["Auditor", "Lead Auditor", "Reviewer"].includes(role);
+  [
+    "Auditor",
+    "Lead Auditor",
+    "Reviewer",
+    "Engagement Quality Reviewer",
+  ].includes(role);
 export const releaseState = (report: Report) =>
   report.release?.state ?? "internal";
 export const isReleased = (report: Report) =>
@@ -114,6 +119,18 @@ export function planPinsCurrent(
 export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
   const b = r.procedureBinding;
   return !!b && b.procedureId === p.id && planPinsCurrent(e, p, b);
+}
+/**
+ * The latest queued or running run bound to this procedure. While one
+ * exists, another planned run of the procedure is refused: duplicate queued
+ * runs block final issuance until someone cancels them.
+ */
+export function activeProcedureRun(e: Engagement, procedureId: string) {
+  return e.runs.findLast(
+    (r) =>
+      ["queued", "running"].includes(r.state) &&
+      r.procedureBinding?.procedureId === procedureId,
+  );
 }
 /**
  * The revision a recovery draft of a procedure form is based on. A saved

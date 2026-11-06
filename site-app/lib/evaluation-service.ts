@@ -559,6 +559,24 @@ async function freezeRun(
   return run;
 }
 /**
+ * Pins a registered dataset card to a run just frozen and rehashes its
+ * manifest. The caller checks that the card describes the evaluated bytes.
+ */
+export async function pinDatasetCard(
+  run: Run,
+  card: { id: string; sha256: string; body: Record<string, unknown> },
+) {
+  if (!run.manifest) return;
+  run.manifest.dataset.cardPin = {
+    recordId: card.id,
+    sha256: card.sha256,
+    card: card.body,
+  };
+  run.provenance.inputHashes.manifest = await sha256(
+    JSON.stringify(run.manifest),
+  );
+}
+/**
  * Verifies a frozen run's procedure binding, manifest, protocol and
  * configuration pins and its dataset bytes, and returns those bytes. A
  * retry needs only these; executing a queued run also needs the runner and

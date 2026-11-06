@@ -469,6 +469,7 @@ const paperPresentationURL = asURL(
 );
 const releaseTimeURL = await sourceURL("lib/domain/release-time.ts");
 const acceptanceURL = await sourceURL("lib/workflow/acceptance.ts");
+const qualityReviewURL = await sourceURL("lib/domain/quality-review.ts");
 const workItemsURL = asURL(
   (await compiled("lib/work-items.ts"))
     .replace(
@@ -478,6 +479,10 @@ const workItemsURL = asURL(
     .replace(
       /from (['"])\.\/domain\/release-time\1/,
       "from " + JSON.stringify(releaseTimeURL),
+    )
+    .replace(
+      /from (['"])\.\/domain\/quality-review\1/,
+      "from " + JSON.stringify(qualityReviewURL),
     )
     .replace(
       /from (['"])\.\/workflow-state\1/,

@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   Mail,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,10 @@ const permissions = [
   [
     "Reviewer",
     "Independently reviews papers and classification; confirms retests.",
+  ],
+  [
+    "Engagement Quality Reviewer",
+    "Outside the engagement team: reviews significant judgments and signs off the final package before release. Cannot edit audit work.",
   ],
   [
     "Client Contributor",
@@ -234,13 +239,32 @@ export function ManagementViews({
                 {activeAdmins === 1 ? "" : "s"}
               </span>
             </div>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              onClick={() => open("practiceRename", { name: practiceName })}
-            >
-              <Settings2 size={15} /> Rename practice
-            </Button>
+            <div className="practice-settings-actions">
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => open("practiceRename", { name: practiceName })}
+              >
+                <Settings2 size={15} /> Rename practice
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => open("signingKeyRotate", {})}
+              >
+                <KeyRound size={15} /> Rotate signing key
+              </Button>
+              <a
+                href={
+                  "/api/dossier/keys?" +
+                  new URLSearchParams({ tenantId: data.tenantId })
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                Verification keys
+              </a>
+            </div>
           </section>
         )}
         {lead && (

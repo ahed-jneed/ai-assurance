@@ -252,7 +252,7 @@ try {
   console.log("Sign in as a persona (loopback development server):");
   for (const who of fixture.personas)
     console.log(
-      `  ${who.id.padEnd(12)} ${(who.role ?? "none").padEnd(19)} ${base}/signin-with-chatgpt?${new URLSearchParams(
+      `  ${who.id.padEnd(12)} ${(who.role ?? "none").padEnd(28)} ${base}/signin-with-chatgpt?${new URLSearchParams(
         { as: who.id, return_to: who.role ? deepLink : "/" },
       )}`,
     );

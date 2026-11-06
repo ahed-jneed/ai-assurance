@@ -5,7 +5,8 @@ import { Choice } from "../workspace-ui";
 import { checkedEngagements, EngagementChecks } from "./member";
 import type { ModalDefinition, ModalFieldsProps } from "./types";
 
-// Practice administration, invitations by email and the practice's name.
+// Practice administration, invitations by email, the practice's name and its
+// signing key.
 
 const clientRole = (role: string) =>
   ["Client Viewer", "Client Contributor"].includes(role);
@@ -112,6 +113,31 @@ export const practiceRenameModal: ModalDefinition = {
     </label>
   ),
   submit: ({ manage, values: v }) => manage("renamePractice", { name: v.name }),
+};
+export const signingKeyRotateModal: ModalDefinition = {
+  title: "Rotate signing key",
+  submitLabel: "Rotate key",
+  Fields: () => (
+    <>
+      <p>
+        Dossiers and briefing packets from every engagement of this practice are
+        signed with a new key from now on. The current key retires: its private
+        half is erased and its public half stays listed, so everything it signed
+        still verifies. Give recipients who pin keys the new key through an
+        independent channel.
+      </p>
+      <label>
+        Reason
+        <Input name="reason" required maxLength={500} autoComplete="off" />
+        <small className="subtle">
+          Recorded in the practice&apos;s management history, for example a
+          scheduled rotation or a suspected exposure.
+        </small>
+      </label>
+    </>
+  ),
+  submit: ({ manage, values: v }) =>
+    manage("rotateSigningKey", { reason: v.reason }),
 };
 export const adminGrantModal: ModalDefinition = {
   title: "Grant practice administration",

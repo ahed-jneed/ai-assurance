@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
@@ -36,6 +37,8 @@ const mf = new Miniflare({
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
     // First sign-ins provision the fixture practices (lib/access-policy.ts).
     SELF_SIGNUP: "open",
+    // A key-encryption key generated for this run (docs/security/signing-keys.md).
+    DOSSIER_KEK: randomBytes(32).toString("base64"),
   },
   d1Databases: { DB: "audit-integration" },
   r2Buckets: { BUCKET: "audit-integration-evidence" },
@@ -1571,7 +1574,7 @@ try {
       .map((p) => ({ id: p.id, body: p.body, signatures: p.signatures })),
   );
   await command("adoptWorkflow", {});
-  assert.equal(e.workflow.procedures.length, 33);
+  assert.equal(e.workflow.procedures.length, 36);
   assert(
     e.workflow.procedures.every(
       (p) => p.applicability === "pending" && !p.selected,
@@ -1792,6 +1795,38 @@ try {
     sampling: currentPlan().sampling + "; source manifest reconciled",
   });
   await command("retryRun", { runId: early.details.runId }, owner, 409);
+  // A procedure has one queued or running planned run at a time, and a
+  // retry keeps the dataset card its source pinned (#67).
+  const plannedInput = {
+    procedureId: proc.id,
+    modelId: runInput.modelId,
+    datasetId: uploaded.artifactId,
+    profileId,
+  };
+  const cardRun = await command("queueRun", {
+    ...plannedInput,
+    datasetCardRecordId: datasetCard.id,
+  });
+  assert.match(
+    (await command("queueRun", plannedInput, owner, 409)).error,
+    /is already queued/,
+  );
+  await command("cancelRun", { runId: cardRun.details.runId });
+  const cardRetry = await command("retryRun", {
+    runId: cardRun.details.runId,
+  });
+  assert.equal(e.runs.at(-1).retryOf, cardRun.details.runId);
+  assert.deepEqual(
+    e.runs.at(-1).manifest.dataset.cardPin,
+    e.runs.find((r) => r.id === cardRun.details.runId).manifest.dataset.cardPin,
+  );
+  assert.equal(e.runs.at(-1).manifest.dataset.cardPin.recordId, datasetCard.id);
+  assert.match(
+    (await command("retryRun", { runId: cardRun.details.runId }, owner, 409))
+      .error,
+    /is already queued/,
+  );
+  await command("cancelRun", { runId: cardRetry.details.runId });
   const planned = await command("queueRun", {
     procedureId: proc.id,
     modelId: runInput.modelId,
@@ -2489,6 +2524,120 @@ try {
       recordIds.length +
       " assurance records: cursor-paged workbench and kind listings, record lookups, review gate and cited briefing",
   );
+  // #24: an assurance package needs an engagement quality review. The
+  // reviewer gets the role and engagement access through member management,
+  // and a Lead appoints them; nobody on the team can be appointed.
+  const quality = "fixture-quality-reviewer-" + stamp;
+  await management("grantMember", {
+    userId: quality,
+    displayName: "Fixture Quality Reviewer",
+    role: "Engagement Quality Reviewer",
+    engagementIds: [e.id],
+  });
+  assert.equal(
+    workspace.managementEvents[0].action,
+    "grantMember",
+    "The role grant is a recorded management event",
+  );
+  const unreviewed = await command(
+    "createReport",
+    {
+      kind: "final",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
+      summary: "Must wait for the engagement quality review",
+    },
+    owner,
+    400,
+  );
+  assert.equal(
+    unreviewed.error,
+    "An assurance engagement needs an engagement quality reviewer before final issuance",
+  );
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: reviewer, reason: "A team member is not eligible" },
+        owner,
+        400,
+      )
+    ).error,
+    "Select an active member with the Engagement Quality Reviewer role",
+  );
+  // A team member who is given the role is still on the team: the reviewer
+  // commented on and reviewed this engagement's papers above.
+  const asRole = (role) =>
+    management("updateMember", {
+      userId: reviewer,
+      displayName: "Independent Reviewer",
+      role,
+      clientId: null,
+      engagementIds: [e.id],
+    });
+  await asRole("Engagement Quality Reviewer");
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: reviewer, reason: "A former team member is not eligible" },
+        owner,
+        409,
+      )
+    ).error,
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+  );
+  await asRole("Reviewer");
+  await command("appointQualityReviewer", {
+    userId: quality,
+    reason: "Independent of the fixture engagement team",
+  });
+  assert.equal(
+    (
+      await command(
+        "editPaper",
+        { paperId: e.papers[0].id, body: {} },
+        quality,
+        403,
+      )
+    ).error,
+    "An Engagement Quality Reviewer reviews the engagement but cannot change its audit work",
+  );
+  await command(
+    "saveQualityReview",
+    {
+      items: [
+        "understanding",
+        "judgments",
+        "documentation",
+        "independence",
+        "consultation",
+        "involvement",
+        "report",
+      ].map((id) => ({
+        id,
+        status: "satisfied",
+        notes: "Evaluated for the fixture",
+      })),
+    },
+    quality,
+  );
+  const qualitySignOff = (report) =>
+    command(
+      "signOffQualityReview",
+      {
+        reportId: report.id,
+        internalHash: report.sha256,
+        clientHash: report.clientSha256,
+        conclusion: "Significant judgments and the conclusion are appropriate",
+      },
+      quality,
+    );
+  console.log(
+    "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
+  );
   await command("createReport", {
     kind: "final",
     engagementType: "attestation",
@@ -2566,6 +2715,30 @@ try {
     },
     reviewer,
   );
+  // Release waits for the quality reviewer's sign-off of both exact packages.
+  const qualityInbox = await request(inboxPath, { user: quality });
+  assert.equal(
+    qualityInbox.items.find(
+      (i) => i.engagementId === e.id && i.title === "Engagement quality review",
+    )?.action,
+    "Sign off final package",
+  );
+  assert.equal(
+    (
+      await command(
+        "releaseReport",
+        {
+          reportId: internalFinal.id,
+          recipientScope: "Fixture client members",
+          reason: "Must reject before the quality review sign-off",
+        },
+        owner,
+        409,
+      )
+    ).error,
+    "The engagement quality reviewer must sign off both exact packages before release",
+  );
+  await qualitySignOff(internalFinal);
   const releaseInbox = await request(inboxPath),
     approvalInbox = await request(inboxPath, { user: reviewer });
   const leadReleaseTask = releaseInbox.items.find(
@@ -2906,6 +3079,7 @@ try {
     },
     reviewer,
   );
+  await qualitySignOff(replacement);
   const replaced = await command("releaseReport", {
     reportId: replacement.id,
     recipientScope: "Authorized fixture client members",
