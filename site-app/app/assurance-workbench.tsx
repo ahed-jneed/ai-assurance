@@ -201,6 +201,8 @@ export function AssuranceWorkbench({
     [loaded, setLoaded] = useState(0),
     // The record last opened from a register, until the snapshot holds it.
     [opened, setOpened] = useState<AssuranceRecord | null>(null),
+    // Whether the review queue is listed (its pages load only when opened).
+    [queueListed, setQueueListed] = useState(false),
     [dirty, setDirty] = useState(false),
     [sourceIds, setSourceIds] = useState<string[]>([]),
     [affectedIds, setAffectedIds] = useState<string[]>([]),
@@ -1469,9 +1471,12 @@ export function AssuranceWorkbench({
               <ChevronRight size={16} aria-hidden="true" />
             </button>
           )}
-          <details className="workbench-queue-list">
+          <details
+            className="workbench-queue-list"
+            onToggle={(ev) => setQueueListed(ev.currentTarget.open)}
+          >
             <summary>List the review queue</summary>
-            {queue.awaiting > 0 && (
+            {queueListed && queue.awaiting > 0 && (
               <>
                 <h3>
                   {queue.canReview
@@ -1491,7 +1496,7 @@ export function AssuranceWorkbench({
                 />
               </>
             )}
-            {queue.returned > 0 && (
+            {queueListed && queue.returned > 0 && (
               <>
                 <h3>Returned for revision</h3>
                 <RecordRegister
