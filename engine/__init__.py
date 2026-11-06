@@ -1,3 +1,3 @@
 """Auditable traditional-ML diagnostics. No pickle/joblib or user-code loading."""
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"

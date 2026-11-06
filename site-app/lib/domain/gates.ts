@@ -1,5 +1,14 @@
 // Audit gates: what must hold before an engagement moves to the next
 // lifecycle stage and before a final report can be issued.
+//
+// Gates are stage-scoped: entering a stage needs only the work of the stages
+// before it, and final issuance needs the work of every stage except the
+// release-time records, whose evidence is the final package itself. So
+// Reporting and Sign-off have distinct exit criteria: leaving Reporting
+// (entering Sign-off) needs the Reporting work signed; leaving Sign-off needs
+// the final package captured, independently approved and released, which
+// records the release-time completion records against its hashes.
+import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
 import type { Engagement, Paper } from "./types";
 export const stages = [
@@ -24,24 +33,71 @@ export type AuditGate = {
   title: string;
   message: string;
 };
+import { isReleaseTimeRecord } from "./release-time";
+export {
+  isReleaseTimeRecord,
+  releaseTimeMessage,
+  releaseTimeTemplates,
+} from "./release-time";
+/**
+ * The index in `stages` of the lifecycle stage a paper's or procedure's
+ * work belongs to, matched without case (the catalog says "Evidence
+ * Evaluation"). Remediation and Monitoring work follows the engagement and
+ * gates nothing: -1. Work of an unknown stage counts as Fieldwork work.
+ */
+export function workStage(stage: string) {
+  if (stage === "Remediation and Monitoring") return -1;
+  const i = stages.findIndex((s) => s.toLowerCase() === stage.toLowerCase());
+  return i < 0 ? 1 : i;
+}
+/**
+ * Whether work of this stage and template must be complete before the
+ * engagement enters `target`, or, without a target, before final issuance.
+ */
+export function gatesStage(stage: string, templateId: string, target?: string) {
+  if (isReleaseTimeRecord(templateId)) return false;
+  const i = workStage(stage);
+  return (
+    i >= 0 &&
+    i < (target === undefined ? stages.length : stages.indexOf(target))
+  );
+}
+/**
+ * Whether a paper is current: not superseded by a recompiled revision and
+ * not a limitation memo retired by reopening its evidence request.
+ */
+export const paperCurrent = (p: Paper) => !p.supersededBy && !p.retired;
 export function paperRequired(e: Engagement, p: Paper) {
   const linked =
     e.workflow?.program.status === "approved"
       ? e.workflow.procedures.find((q) => q.paperId === p.id)
       : undefined;
   return (
+    paperCurrent(p) &&
+    !isReleaseTimeRecord(p.templateId) &&
     p.required &&
     (!linked ||
       (linked.selected &&
         ["applicable", "readiness"].includes(linked.applicability)))
   );
 }
+const procedureScope = (target?: string) => (p: Procedure) =>
+  gatesStage(p.stage, p.templateId, target);
+const paperScope = (target?: string) => (p: Paper) =>
+  paperCurrent(p) && gatesStage(p.stage, p.templateId, target);
+/**
+ * What must hold before final issuance with this opinion or, with `target`,
+ * the opinion-neutral part for entering that lifecycle stage: then only the
+ * work of earlier stages counts.
+ */
 export function completionGates(
   e: Engagement,
   opinion = "Readiness assessment",
+  target?: string,
 ): AuditGate[] {
+  const inScope = paperScope(target);
   return [
-    ...workflowRequirements(e, true).map((g) => ({
+    ...workflowRequirements(e, true, procedureScope(target)).map((g) => ({
       ...g,
       kind: "workflow" as const,
     })),
@@ -51,7 +107,7 @@ export function completionGates(
             (p) =>
               !p.selected &&
               p.applicability === "applicable" &&
-              p.stage !== "Remediation and Monitoring",
+              procedureScope(target)(p),
           )
           .map((p) => ({
             id: p.id,
@@ -89,6 +145,7 @@ export function completionGates(
     ...e.papers
       .filter(
         (p) =>
+          inScope(p) &&
           (paperRequired(e, p) ||
             p.body.conclusionStatus === "not_applicable") &&
           p.status !== "signed",
@@ -104,6 +161,7 @@ export function completionGates(
       .filter(
         (p) =>
           opinion === "Readiness assessment" &&
+          inScope(p) &&
           paperRequired(e, p) &&
           p.status === "signed" &&
           !["supported", "not_applicable"].includes(p.body.conclusionStatus),
@@ -186,6 +244,11 @@ export function reportBlockers(
 ) {
   return completionGates(e, opinion).map((g) => g.message);
 }
+/**
+ * What must hold before a final report is captured or released: the
+ * engagement is in Sign-off and every stage's work is complete, except the
+ * release-time records the release itself records.
+ */
 export function finalReportGates(
   e: Engagement,
   opinion = "Readiness assessment",
@@ -205,6 +268,13 @@ export function finalReportGates(
     ...completionGates(e, opinion),
   ];
 }
+/**
+ * The structured workflow's requirements for releasing a captured final
+ * package: approved scope and program, and every in-scope procedure except
+ * the release-time records complete.
+ */
+export const releaseRequirements = (e: Engagement) =>
+  workflowRequirements(e, true, procedureScope());
 export function stageGates(e: Engagement, target: string): AuditGate[] {
   if (
     stages.indexOf(target) !== stages.indexOf(e.stage) + 1 ||
@@ -220,7 +290,7 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
     ];
   if (target === "Fieldwork")
     return [
-      ...workflowRequirements(e).map((g) => ({
+      ...workflowRequirements(e, false, procedureScope(target)).map((g) => ({
         ...g,
         kind: "workflow" as const,
       })),
@@ -239,7 +309,7 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
       ...e.papers
         .filter(
           (p) =>
-            p.stage === "Planning" &&
+            paperScope(target)(p) &&
             paperRequired(e, p) &&
             p.status !== "signed",
         )
@@ -258,7 +328,5 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
         ...g,
         message: "Complete diagnostic runs before evidence evaluation",
       }));
-  return ["Reporting", "Sign-off"].includes(target)
-    ? completionGates(e, "Adverse conclusion")
-    : [];
+  return completionGates(e, "Adverse conclusion", target);
 }

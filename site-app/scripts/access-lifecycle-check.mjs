@@ -5,7 +5,7 @@
 // a re-grant never restores (F-24); practice administration granted, revoked
 // and transferred while one active administrator remains (F-43); practice
 // rename and per-practice quotas (F-44 / F-09); every write refused to a
-// Client Viewer (F-56); and drizzle 0006 withdrawing what earlier revocations
+// Client Viewer (F-56); and drizzle 0007 withdrawing what earlier revocations
 // left active. Needs `npm run build` first.
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -544,7 +544,7 @@ console.log(
   "PASS each practice saves at most TENANT_MAX_SAVES_PER_HOUR engagement versions an hour, with a clear 429",
 );
 
-// --- drizzle 0006 withdraws what earlier revocations left active ------------
+// --- drizzle 0007 withdraws what earlier revocations left active ------------
 {
   const mf = new Miniflare({
     modules: true,
@@ -609,7 +609,7 @@ console.log(
       ],
     );
     console.log(
-      "PASS drizzle 0006 withdraws the grants, runner workers and administration that earlier revocations left active",
+      "PASS drizzle 0007 withdraws the grants, runner workers and administration that earlier revocations left active",
     );
   } finally {
     await mf.dispose();

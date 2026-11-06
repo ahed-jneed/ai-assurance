@@ -83,6 +83,11 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       actor: "",
       sha256: r.clientSha256!,
       snapshot: r.clientSnapshot!,
+      // Releasing a report supersedes the one released before, which then
+      // leaves this projection; the client sees which reports it replaced.
+      replaces: e.reports
+        .filter((q) => q.release?.supersededBy === r.id)
+        .map((q) => q.id),
     })),
     ...(contributor
       ? {

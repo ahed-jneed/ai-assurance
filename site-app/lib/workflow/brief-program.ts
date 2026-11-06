@@ -13,6 +13,7 @@
 // (preparer, reviewer, due date) is versioned apart from it and changes
 // without renewed program approval or invalidating any work.
 import { z } from "zod";
+import { paperCurrent } from "../domain/gates";
 import { seedWorkflow } from "../workflow-seed";
 import {
   briefReturns,
@@ -188,8 +189,15 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     lead();
     if (e.workflow) fail(409, "This engagement already uses the workflow");
     e.workflow = seedWorkflow(c.userId, c.at);
-    for (const p of e.workflow.procedures)
-      p.paperId = e.papers.find((q) => q.templateId === p.templateId)?.id;
+    // Each procedure takes over its template's current paper, the required
+    // one when diagnostic drafts share the template. Compiling its work later
+    // supersedes that paper if it was signed (submitProcedure).
+    for (const p of e.workflow.procedures) {
+      const papers = e.papers.filter(
+        (q) => q.templateId === p.templateId && paperCurrent(q),
+      );
+      p.paperId = (papers.find((q) => q.required) ?? papers[0])?.id;
+    }
     return { workflow: "adopted" };
   },
   async saveBrief({ c, writer, lead, w, programDraft }, data) {

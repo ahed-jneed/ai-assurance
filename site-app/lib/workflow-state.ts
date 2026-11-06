@@ -1,6 +1,9 @@
-// Only type imports: scripts/paper-presentation-check.mjs and
-// scripts/work-inbox-check.mjs load this module without resolving imports.
+// Keep runtime imports to small leaf modules (./domain/release-time): the
+// harnesses scripts/paper-presentation-check.mjs and
+// scripts/work-inbox-check.mjs load this module through sourceURL
+// (scripts/ts-modules.mjs), which compiles it and its relative imports.
 import type { Engagement, Report, Role, Run } from "./domain";
+import { isReleaseTimeRecord } from "./domain/release-time";
 import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
 import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
@@ -381,7 +384,18 @@ export function revisionWarnings(
     );
   return warnings;
 }
-export function workflowRequirements(e: Engagement, final = false) {
+/**
+ * What the structured workflow still needs: the approved scope and program
+ * and, for the in-scope procedures `gated` selects (all of them for final
+ * issuance), current reviewed work compiled into a signed paper. Without a
+ * workflow, only final issuance asks for its adoption. lib/domain/gates.ts
+ * passes the lifecycle stage scope.
+ */
+export function workflowRequirements(
+  e: Engagement,
+  final = false,
+  gated: (p: Procedure) => boolean = () => final,
+) {
   const w = e.workflow;
   if (!w)
     return final
@@ -415,38 +429,36 @@ export function workflowRequirements(e: Engagement, final = false) {
       title: "Approve the audit program",
       message: "The audit program must bind the approved scope revision",
     });
-  if (final)
-    for (const p of w.procedures.filter(
-      (p) =>
-        p.selected &&
-        ["applicable", "readiness"].includes(p.applicability) &&
-        p.stage !== "Remediation and Monitoring",
-    )) {
-      if (p.state !== "reviewed" || !currentExecution(e, p) || !p.review)
+  for (const p of w.procedures.filter(
+    (p) =>
+      p.selected &&
+      ["applicable", "readiness"].includes(p.applicability) &&
+      p.stage !== "Remediation and Monitoring" &&
+      gated(p),
+  )) {
+    if (p.state !== "reviewed" || !currentExecution(e, p) || !p.review)
+      gates.push({
+        id: p.id,
+        recordId: p.id,
+        title: p.title,
+        message:
+          p.templateId + ": current execution and independent review required",
+      });
+    else {
+      const paper = e.papers.find((q) => q.id === p.paperId);
+      if (
+        !paper ||
+        paper.revision !== p.paperRevision ||
+        paper.status !== "signed"
+      )
         gates.push({
           id: p.id,
           recordId: p.id,
           title: p.title,
-          message:
-            p.templateId +
-            ": current execution and independent review required",
+          message: p.templateId + ": sign the procedure working-paper revision",
         });
-      else {
-        const paper = e.papers.find((q) => q.id === p.paperId);
-        if (
-          !paper ||
-          paper.revision !== p.paperRevision ||
-          paper.status !== "signed"
-        )
-          gates.push({
-            id: p.id,
-            recordId: p.id,
-            title: p.title,
-            message:
-              p.templateId + ": sign the procedure working-paper revision",
-          });
-      }
     }
+  }
   return gates;
 }
 export function procedureLabel(e: Engagement, p: Procedure) {
@@ -456,6 +468,7 @@ export function procedureLabel(e: Engagement, p: Procedure) {
       ? "Outside agreed scope"
       : "Outside proposed scope";
   if (p.applicability === "not_applicable") return "Not applicable";
+  if (isReleaseTimeRecord(p.templateId)) return "Recorded at release";
   if (p.execution && !currentExecution(e, p))
     return "Scope or plan reassessment needed";
   const paper = e.papers.find((q) => q.id === p.paperId);

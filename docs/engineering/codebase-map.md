@@ -226,7 +226,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    1. Audit program → Engagement brief → Complete brief → Save scope draft → Submit for review (`saveBrief`, `submitBrief`).
    2. qa-auditor's own approval is blocked with 403 (contributors cannot approve).
    3. qa-reviewer: Request changes (`returnBrief`). qa-auditor resubmits. qa-reviewer: Approve scope (`approveBrief`).
-   4. Program tab → Assess candidates → Save scope decisions (`scopeProgramCandidates`). To keep later flows short, mark 2–3 procedures applicable and the rest not applicable with a rationale. Leave WP-RP-01 and WP-RP-02 unselected (see F-30).
+   4. Program tab → Assess candidates → Save scope decisions (`scopeProgramCandidates`). To keep later flows short, mark 2–3 procedures applicable and the rest not applicable with a rationale. WP-RP-02 is a release-time record and never gates capture (F-30 fixed in #14).
    5. Select the rows → Assign & schedule: preparer qa-auditor, reviewer qa-reviewer, due date (`bulkPlanProcedures`) → Submit program → qa-reviewer: Approve program (`approveProgram`).
    - **Expect:** execution is refused until both brief and program are approved.
    - **Watch F-04** (a later due-date edit invalidates every execution) and **F-29** (the 150-revision cap).
@@ -294,7 +294,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
     5. qa-reviewer trying to release gets 403 (role). qa-lead: Release to client (`releaseReport`).
     6. qa-viewer sees the package and can Print (`/report?tenantId&engagementId&reportId`). `/api/report-package?download=1` returns `proof.valid:true`.
     7. qa-lead: Withdraw (`withdrawReport`). The client loses access.
-    - **Watch F-30** (circular gate on WP-RP-02) and **F-32** (a second release without supersession is accepted).
+    - **Expect:** a second release supersedes the first automatically and records a client notification (F-32, fixed in #14); WP-RP-02 and MEM-SO-01 never gate capture (F-30).
 
 13. **Client and tenant isolation** (qa-viewer, qa-outsider)
     1. qa-viewer sees only Acme engagements; client-visible accepted evidence only; no Requests tab.

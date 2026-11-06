@@ -1,19 +1,30 @@
 import { z } from "zod";
-import { records } from "@/lib/assurance-store";
 import { assuranceTarget, dispatchAssurance } from "@/lib/commands/assurance";
 import { short } from "@/lib/commands/fields";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
-import { assuranceView } from "@/lib/read-models/assurance-view";
+import {
+  assuranceRecordPage,
+  assuranceView,
+} from "@/lib/read-models/assurance-view";
 import { context, refuseReadOnly } from "@/lib/tenancy";
 import { isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
+/**
+ * The workbench view with the first page of records or, given a `cursor` from
+ * a previous page or a record `kind`, just that page of records.
+ */
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url),
-      ctx = await context(u.searchParams.get("tenantId") ?? "");
+      ctx = await context(u.searchParams.get("tenantId") ?? ""),
+      engagementId = u.searchParams.get("engagementId") ?? "",
+      kind = u.searchParams.get("kind") ?? "",
+      cursor = u.searchParams.get("cursor") ?? "";
     return Response.json(
-      await assuranceView(ctx, u.searchParams.get("engagementId") ?? ""),
+      kind || cursor
+        ? await assuranceRecordPage(ctx, engagementId, { kind, cursor })
+        : await assuranceView(ctx, engagementId),
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (e) {
@@ -28,7 +39,10 @@ const command = z
     data: z.record(z.unknown()),
   })
   .strict();
-/** Parse → context → load → dispatch (lib/commands/assurance). */
+/**
+ * Parse → context → dispatch (lib/commands/assurance). Nothing loads the
+ * engagement's assurance records up front: each op loads the records it names.
+ */
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
@@ -41,10 +55,9 @@ export async function POST(request: Request) {
     refuseReadOnly(ctx);
     if (isClientRole(ctx.role))
       throw new ApiError(403, "The assurance workbench is internal");
-    const e = await getEngagement(ctx, a.engagementId),
-      all = await records(ctx, e.id);
+    const e = await getEngagement(ctx, a.engagementId);
     const result = await dispatchAssurance(
-      assuranceTarget(e, all),
+      assuranceTarget(e, ctx),
       a.op,
       a.data,
       ctx,

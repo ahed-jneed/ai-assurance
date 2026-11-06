@@ -54,7 +54,7 @@ export const execution: AssuranceModule = defineCommands({
           })
           .strict()
           .parse(d),
-        system = find(v.systemId, "system"),
+        system = await find(v.systemId, "system"),
         m = e.models.find((m) => m.id === v.modelId),
         dataset = accepted(v.datasetId, "Dataset"),
         profile = e.evaluationProfiles?.find((p) => p.id === v.profileId),
@@ -79,7 +79,7 @@ export const execution: AssuranceModule = defineCommands({
         );
       assertExternalProtocol(profile);
       const card = v.datasetCardRecordId
-        ? find(v.datasetCardRecordId, "dataset")
+        ? await find(v.datasetCardRecordId, "dataset")
         : undefined;
       if (
         card &&
@@ -105,7 +105,7 @@ export const execution: AssuranceModule = defineCommands({
       if (dataset.size > 100 * 1024 * 1024)
         throw new ApiError(413, "External datasets are limited to 100 MB");
       if (v.mode !== "auditor_model") {
-        const pred = find(v.predictionId, "prediction");
+        const pred = await find(v.predictionId, "prediction");
         if (
           pred.body.modelId !== m.id ||
           pred.body.systemId !== system.id ||
@@ -266,7 +266,10 @@ export const execution: AssuranceModule = defineCommands({
           log.guarded(cmd),
         ],
       );
-      return Response.json({ jobId, requestSha256: hash });
+      return Response.json(
+        { jobId, requestSha256: hash },
+        { headers: { "Cache-Control": "no-store" } },
+      );
     },
   },
   cancelJob: {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { WorkflowDialog } from "./audit-program";
 import type { Engagement, Role } from "@/lib/domain";
 import type { AssuranceRecord } from "@/lib/assurance-core";
+import { assuranceRecords } from "@/lib/assurance-store-client";
 type Form = NonNullable<Parameters<typeof WorkflowDialog>[0]["form"]>;
 export function DatasetRegistry({
   engagement: e,
@@ -26,14 +27,11 @@ export function DatasetRegistry({
     [error, setError] = useState("");
   const load = useCallback(async () => {
     try {
-      const r = await fetch(
-          "/api/assurance?" +
-            new URLSearchParams({ tenantId, engagementId: e.id }),
-          { cache: "no-store" },
-        ),
-        v = (await r.json()) as { records: AssuranceRecord[]; error?: string };
-      if (!r.ok) throw Error(v.error);
-      const datasets = v.records.filter((r) => r.kind === "dataset");
+      const datasets = await assuranceRecords({
+        tenantId,
+        engagementId: e.id,
+        kind: "dataset",
+      });
       setCards(datasets);
       onCards(datasets);
       setError("");

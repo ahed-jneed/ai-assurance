@@ -5,15 +5,24 @@ import { locationSchema, type AssuranceRecord } from "@/lib/assurance-core";
 import {
   addRecord,
   jobs,
+  recordCount,
+  recordPage,
+  recordsById,
   recordStatement,
-  records,
 } from "@/lib/assurance-store";
 import {
   assuranceModules,
   assuranceTarget,
   dispatchAssurance,
 } from "@/lib/commands/assurance";
-import { roles, type Artifact, type Engagement, type Role } from "@/lib/domain";
+import {
+  roles,
+  type Artifact,
+  type Engagement,
+  type EvaluationProfile,
+  type Model,
+  type Role,
+} from "@/lib/domain";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
@@ -32,7 +41,9 @@ vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
 }));
 vi.mock("@/lib/assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/assurance-store")>()),
-  records: vi.fn(),
+  recordPage: vi.fn(),
+  recordCount: vi.fn(),
+  recordsById: vi.fn(),
   addRecord: vi.fn(),
   recordStatement: vi.fn(),
   jobs: vi.fn(),
@@ -59,20 +70,27 @@ const location = {
   excerpt: "approved = score > 600",
   quality: "Transcribed from the accepted source",
 };
-function written(kind: string, body: Record<string, unknown>): AssuranceRecord {
+function written(
+  kind: string,
+  body: Record<string, unknown>,
+  id = "AS-1",
+  actor = "user-lead",
+): AssuranceRecord {
   return {
-    id: "AS-1",
+    id,
     kind,
     body,
     sha256: "b".repeat(64),
     createdAt: "2026-11-05T10:00:00.000Z",
-    actor: "user-lead",
+    actor,
   };
 }
 function load(e: Engagement, ctx: Context = caller()) {
   vi.mocked(context).mockResolvedValue(ctx);
   vi.mocked(getEngagement).mockResolvedValue(e);
-  vi.mocked(records).mockResolvedValue([]);
+  vi.mocked(recordPage).mockResolvedValue({ records: [], nextCursor: null });
+  vi.mocked(recordCount).mockResolvedValue(0);
+  vi.mocked(recordsById).mockResolvedValue([]);
   vi.mocked(jobs).mockResolvedValue([]);
 }
 function post(e: Engagement, op: string, data: Record<string, unknown> = {}) {
@@ -82,6 +100,15 @@ function post(e: Engagement, op: string, data: Record<string, unknown> = {}) {
       engagementId: e.id,
       op,
       data,
+    }),
+  );
+}
+function statements() {
+  vi.mocked(recordStatement).mockImplementation(
+    async (_ctx, _id, kind, body) => ({
+      statement: {} as D1PreparedStatement,
+      guarded: () => ({}) as D1PreparedStatement,
+      record: written(kind, body),
     }),
   );
 }
@@ -133,6 +160,7 @@ describe("POST /api/assurance", () => {
       }
       expect(getEngagement).not.toHaveBeenCalled();
       expect(addRecord).not.toHaveBeenCalled();
+      expect(recordsById).not.toHaveBeenCalled();
     },
   );
 
@@ -142,11 +170,15 @@ describe("POST /api/assurance", () => {
     const register = await post(e, "registerSystem", { name: "" });
     expect(register.status).toBe(403);
     expect(await register.json()).toEqual(refusal);
+    const assist = await post(e, "assist", { sourceIds: [] });
+    expect(assist.status).toBe(403);
+    expect(await assist.json()).toEqual(refusal);
     load(e, caller("Auditor"));
     const review = await post(e, "reviewAssertion", { assertionId: "" });
     expect(review.status).toBe(403);
     expect(await review.json()).toEqual(refusal);
     expect(addRecord).not.toHaveBeenCalled();
+    expect(recordsById).not.toHaveBeenCalled();
   });
 
   it("answers invalid data with the zod messages and no paths", async () => {
@@ -183,18 +215,59 @@ describe("POST /api/assurance", () => {
       record: written("location", body),
     });
     expect(addRecord).toHaveBeenCalledWith(ctx, e.id, "location", body);
+    // An op that names no record loads none.
+    expect(recordsById).not.toHaveBeenCalled();
+    expect(recordPage).not.toHaveBeenCalled();
+  });
+
+  it("loads only the records an op names", async () => {
+    const e = stored();
+    const ctx = caller("Reviewer");
+    load(e, ctx);
+    const assertion = written(
+      "assertion",
+      { statement: "Approvals follow the policy" },
+      "AS-7",
+      "user-auditor",
+    );
+    vi.mocked(recordsById).mockResolvedValue([assertion]);
+    vi.mocked(addRecord).mockImplementation(async (_ctx, _id, kind, body) =>
+      written(kind, body, "AS-8"),
+    );
+    const response = await post(e, "reviewAssertion", {
+      assertionId: "AS-7",
+      decision: "approve",
+      reason: "Independent source review",
+    });
+    expect(response.status).toBe(200);
+    expect(recordsById).toHaveBeenCalledTimes(1);
+    expect(recordsById).toHaveBeenCalledWith(ctx, e.id, ["AS-7"]);
+    expect(recordPage).not.toHaveBeenCalled();
+    expect(addRecord).toHaveBeenCalledWith(ctx, e.id, "assertion_review", {
+      assertionId: "AS-7",
+      decision: "approve",
+      reason: "Independent source review",
+      assertionSha256: assertion.sha256,
+    });
+    // A record of another kind, or none, is not a review target.
+    vi.mocked(recordsById).mockResolvedValue([
+      written("location", location, "AS-7"),
+    ]);
+    const wrongKind = await post(e, "reviewAssertion", {
+      assertionId: "AS-7",
+      decision: "approve",
+      reason: "Independent source review",
+    });
+    expect(wrongKind.status).toBe(400);
+    expect(await wrongKind.json()).toEqual({
+      error: "Select an existing assertion record",
+    });
   });
 
   it("passes through the Response of an op that builds its own", async () => {
     const e = stored();
     load(e);
-    vi.mocked(recordStatement).mockImplementation(
-      async (_ctx, _id, kind, body) => ({
-        statement: {} as D1PreparedStatement,
-        guarded: () => ({}) as D1PreparedStatement,
-        record: written(kind, body),
-      }),
-    );
+    statements();
     const response = await post(e, "enrollWorker", {
       name: "Runner",
       imageDigest: "sha256:" + "4".repeat(64),
@@ -214,14 +287,111 @@ describe("POST /api/assurance", () => {
       { workerId: reply.workerId },
     ]);
   });
+
+  it("freezes an external job and answers it uncached", async () => {
+    const e = stored();
+    const model: Model = {
+        id: "MODEL-1",
+        name: "Scorer",
+        version: "1",
+        format: "Prediction file",
+        task: "Binary classification",
+        intendedPurpose: "Credit decisions",
+        artifactId: "EV-2",
+        status: "registered",
+        sourceSha256: "c".repeat(64),
+      },
+      profile = {
+        id: "PROFILE-1",
+        version: "1",
+        task: "Binary classification",
+        suite: ["performance"],
+        config: { positiveLabel: "1" },
+      } as EvaluationProfile;
+    e.artifacts.push(dataset, {
+      ...dataset,
+      id: "EV-2",
+      name: "scores.csv",
+      sha256: model.sourceSha256!,
+    });
+    e.models.push(model);
+    e.evaluationProfiles = [profile];
+    e.workflow = {
+      brief: { status: "approved", revision: 2 },
+      program: { status: "approved", revision: 3 },
+      procedures: [
+        {
+          id: "PROC-1",
+          revision: 1,
+          selected: true,
+          applicability: "applicable",
+          modelId: model.id,
+          datasetId: dataset.id,
+          profileId: profile.id,
+        },
+      ],
+    } as unknown as Engagement["workflow"];
+    const ctx = caller("Auditor");
+    load(e, ctx);
+    statements();
+    const system = written(
+        "system",
+        {
+          modelIds: [model.id],
+          modelPins: [{ id: model.id, sha256: model.sourceSha256 }],
+          features: [],
+          outputs: { classOrder: ["0", "1"], threshold: 0.5 },
+        },
+        "AS-SYSTEM",
+      ),
+      prediction = written(
+        "prediction",
+        {
+          modelId: model.id,
+          systemId: system.id,
+          datasetId: dataset.id,
+          datasetSha256: dataset.sha256,
+        },
+        "AS-PREDICTION",
+      );
+    vi.mocked(recordsById).mockImplementation(async (_ctx, _id, ids) =>
+      [system, prediction].filter((r) => ids.includes(r.id)),
+    );
+    const response = await post(e, "queueExternal", {
+      systemId: system.id,
+      modelId: model.id,
+      datasetId: dataset.id,
+      profileId: profile.id,
+      procedureId: "PROC-1",
+      mode: "provided_predictions",
+      predictionId: prediction.id,
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const reply = (await response.json()) as Record<string, string>;
+    expect(reply.jobId).toMatch(/^JOB-/);
+    expect(reply.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(vi.mocked(recordsById).mock.calls.map((c) => c[2])).toEqual([
+      [system.id],
+      [prediction.id],
+    ]);
+    expect(vi.mocked(save).mock.calls[0].slice(3, 5)).toEqual([
+      "freezeExternalExecution",
+      { jobId: reply.jobId, requestSha256: reply.requestSha256 },
+    ]);
+  });
 });
 
 describe("GET /api/assurance", () => {
-  function get(e: Engagement) {
+  function get(e: Engagement, query: Record<string, string> = {}) {
     return GET(
       new Request(
-        "https://workspace.test/api/assurance?tenantId=tenant-1&engagementId=" +
-          e.id,
+        "https://workspace.test/api/assurance?" +
+          new URLSearchParams({
+            tenantId: "tenant-1",
+            engagementId: e.id,
+            ...query,
+          }),
       ),
     );
   }
@@ -231,10 +401,18 @@ describe("GET /api/assurance", () => {
     async (role) => {
       const e = stored();
       load(e, caller(role));
-      const response = await get(e);
-      expect(response.status).toBe(403);
-      expect(await response.json()).toEqual(internalOnly);
-      expect(records).not.toHaveBeenCalled();
+      const queries: Record<string, string>[] = [
+        {},
+        { cursor: "next" },
+        { kind: "dossier" },
+      ];
+      for (const query of queries) {
+        const response = await get(e, query);
+        expect(response.status).toBe(403);
+        expect(await response.json()).toEqual(internalOnly);
+      }
+      expect(recordPage).not.toHaveBeenCalled();
+      expect(recordCount).not.toHaveBeenCalled();
       expect(jobs).not.toHaveBeenCalled();
     },
   );
@@ -244,12 +422,17 @@ describe("GET /api/assurance", () => {
     ["Auditor", 0],
     ["Reviewer", 0],
   ] as [Role, number][])(
-    "loads the workbench for %s",
+    "loads the workbench with the first page of records for %s",
     async (role, eligible) => {
       const e = stored();
-      load(e, caller(role));
+      const ctx = caller(role);
+      load(e, ctx);
       const record = written("location", location);
-      vi.mocked(records).mockResolvedValue([record]);
+      vi.mocked(recordPage).mockResolvedValue({
+        records: [record],
+        nextCursor: "page-2",
+      });
+      vi.mocked(recordCount).mockResolvedValue(1201);
       const past = new Date(Date.now() - 60_000).toISOString(),
         future = new Date(Date.now() + 60_000).toISOString();
       vi.mocked(jobs).mockResolvedValue([
@@ -276,11 +459,14 @@ describe("GET /api/assurance", () => {
       >;
       expect(view).toMatchObject({
         records: [record],
+        nextCursor: "page-2",
+        total: 1201,
         workers: rows.runner_workers,
         access: rows.engagement_access,
         practiceAdmin: true,
         telemetry: { queued: 1, stalled: 1 },
       });
+      expect(recordPage).toHaveBeenCalledWith(ctx, e.id);
       expect(view.jobs).toHaveLength(3);
       expect(view.eligibleMembers).toHaveLength(eligible);
       expect(Object.keys(view.capabilities).sort()).toEqual([
@@ -292,12 +478,37 @@ describe("GET /api/assurance", () => {
       ]);
     },
   );
+
+  it.each([
+    [{ cursor: "page-2" }, { kind: "", cursor: "page-2" }],
+    [{ kind: "dataset" }, { kind: "dataset", cursor: "" }],
+    [
+      { kind: "dossier", cursor: "page-3" },
+      { kind: "dossier", cursor: "page-3" },
+    ],
+  ])("answers only the page of records for %o", async (query, options) => {
+    const e = stored();
+    const ctx = caller("Reviewer");
+    load(e, ctx);
+    const page = {
+      records: [written("dataset", { name: "Applicants" })],
+      nextCursor: null,
+    };
+    vi.mocked(recordPage).mockResolvedValue(page);
+    const response = await get(e, query);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(await response.json()).toEqual(page);
+    expect(recordPage).toHaveBeenCalledWith(ctx, e.id, options);
+    expect(recordCount).not.toHaveBeenCalled();
+    expect(jobs).not.toHaveBeenCalled();
+  });
 });
 
 describe("assurance command registry", () => {
-  // The ops and role checks of the route's if-chain before the split. assist
-  // had no role check of its own: the client-role gate left the three
-  // internal roles.
+  // The ops and role checks of the route's if-chain before the split, except
+  // assist: it had no role check of its own (the client-role gate let the
+  // three internal roles through) and is now preparer work.
   const allowed: Record<string, Role[]> = {
     setAccess: ["Lead Auditor"],
     enrollWorker: ["Lead Auditor"],
@@ -316,7 +527,7 @@ describe("assurance command registry", () => {
     reviewImpact: ["Reviewer", "Lead Auditor"],
     exportBriefing: ["Auditor", "Lead Auditor"],
     importBriefing: ["Auditor", "Lead Auditor"],
-    assist: ["Auditor", "Lead Auditor", "Reviewer"],
+    assist: ["Auditor", "Lead Auditor"],
     acceptAssistant: ["Auditor", "Lead Auditor"],
     queueExternal: ["Auditor", "Lead Auditor"],
     cancelJob: ["Auditor", "Lead Auditor"],
@@ -333,11 +544,12 @@ describe("assurance command registry", () => {
     "lets only the permitted roles issue %s",
     async (op, permitted) => {
       for (const role of roles) {
+        const ctx = caller(role);
         const outcome = await dispatchAssurance(
-          assuranceTarget(stored(), []),
+          assuranceTarget(stored(), ctx),
           op,
           {},
-          caller(role),
+          ctx,
         ).then(
           () => undefined,
           (error: unknown) => error,

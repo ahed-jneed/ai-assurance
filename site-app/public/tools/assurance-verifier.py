@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
 MAX_RECORDS = 100_000
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_CONTAINER_BYTES = 64 * 1024 * 1024
@@ -29,6 +29,8 @@ MAX_LINE_BYTES = 64 * 1024
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_FILES = 500
 MAX_BOOTSTRAP_WORK = 5_000_000
+# Section 5.11: cluster-bootstrap decisions draw at most 50,000,000 clusters per run (B x C).
+MAX_DECISION_DRAWS = 50_000_000
 HASH = re.compile(r"^[a-f0-9]{64}$")
 
 
@@ -265,13 +267,18 @@ def quality_checks(records, *, record_id="id", split_field="split", entity_field
     return {"schemaVersion": "1.0", "type": "data_quality", "toolVersion": TOOL_VERSION, "outcome": "fail" if failed else "pass" if len(split_counts) >= 2 else "inconclusive", "populationSha256": _sha(canonical_bytes(rows)), "recordCount": len(rows), "splitCounts": dict(sorted(split_counts.items())), "splitSeparationAssessable": len(split_counts) >= 2, "missingFields": [{"field": key, "count": missing[key], "examples": missing_examples[key]} for key in sorted(missing)], "duplicateIds": duplicates, "recordLeakage": record_leakage, "entityLeakage": entity_leakage, "contentLeakage": content_leakage, "temporalViolations": {"count": len(temporal), "examples": temporal[:100]}, "invalidFields": {"count": len(invalid), "examples": invalid[:100]}, "protocol": {"recordId": record_id, "splitField": split_field, "entityField": entity_field, "requiredFields": sorted(required), "contentFields": list(content_fields), "timestampField": timestamp_field, "temporalCutoff": temporal_cutoff, "beforeSplits": list(before_splits), "afterSplits": list(after_splits), "boundary": "before splits <= cutoff; after splits > cutoff"}, "limitations": ["Only supplied records and declared fields/split names are checked; fewer than two populated splits cannot establish separation.", "Content matches use only explicitly declared fingerprint fields and require assessment of whether they identify the same record.", "No feature-engineering, target derivation, preprocessing-fit or model-training leakage is inferred.", "An event timestamp does not establish when its label or feature became available."]}
 
 
-def _bootstrap_protocol(n, seed, replicates, confidence, min_support, min_clusters):
+def _bootstrap_protocol(n, seed, replicates, confidence, min_support, min_clusters, purpose="descriptive"):
+    """Section 5.11 (E3): a "descriptive" bootstrap accepts 100-10000 replicates within rows x replicates
+    <= 5,000,000; a "decision" bootstrap accepts 1000-10000 replicates within clusters x replicates <=
+    50,000,000 draws (`n` is then the cluster count)."""
+    _expect(purpose in {"descriptive", "decision"}, "Bootstrap purpose must be descriptive or decision")
     _integer(seed, "seed", 0, 2**32 - 1)
-    _integer(replicates, "replicates", 100, 2000)
+    _integer(replicates, "replicates", 100 if purpose == "descriptive" else 1000, 10000)
     _integer(min_support, "min_support", 2)
     _integer(min_clusters, "min_clusters", 2)
     _number(confidence, "confidence", 0.5, 0.999)
-    _expect(n * replicates <= MAX_BOOTSTRAP_WORK, "Bootstrap work exceeds bounded observation/repetition limit")
+    budget = MAX_BOOTSTRAP_WORK if purpose == "descriptive" else MAX_DECISION_DRAWS
+    _expect(n * replicates <= budget, "Bootstrap work exceeds bounded observation/repetition limit")
 
 
 def _draws(n, rng, clusters=None):
@@ -339,8 +346,13 @@ def bootstrap_interval(values, *, statistic="mean", seed=1729, replicates=500, c
     return {"schemaVersion": "1.0", "type": "bootstrap_interval", "toolVersion": TOOL_VERSION, "outcome": "pass" if sufficient else "inconclusive", "statistic": statistic, "estimate": estimate(values), "populationSha256": _sha(canonical_bytes({"values": values, "clusters": clusters})), "sampleSize": len(values), "clusterCount": count_clusters, "method": "cluster" if clusters is not None else "iid", "seed": seed, "replicatesRequested": replicates, "validReplicates": len(samples), "confidenceInterval": _interval(samples, confidence, replicates) if sufficient else None, "assumptions": ["Observations are independent and representative of the declared population; seed reproducibility also requires identical input order."] if clusters is None else ["Clusters are independently sampled and representative; complete clusters are resampled uniformly with replacement.", "Within-cluster dependence is preserved. The estimand is an observation-weighted statistic, not an equal-cluster mean."], "limitations": notes}
 
 
-def intersectional_slices(records, *, protected_fields, target_field="actual", prediction_field="predicted", positive_label="1", negative_label="0", record_id="id", seed=1729, replicates=500, confidence=0.95, min_support=30, min_class_count=5, cluster_field=None, min_clusters=10):
-    """Binary intersectional DP/DI/EO with whole-population iid/cluster resampling."""
+def intersectional_slices(records, *, protected_fields, target_field="actual", prediction_field="predicted", positive_label="1", negative_label="0", record_id="id", seed=1729, replicates=500, confidence=0.95, min_support=30, min_class_count=5, cluster_field=None, min_clusters=10, bands=None, minimum_coverage=1.0):
+    """Binary intersectional DP/DI/EO with whole-population iid/cluster resampling.
+
+    With `bands` ({selection_rate_difference | selection_rate_ratio | equalized_odds: band}) the strata are
+    also decided by statistics 1.0.0 as exploratory group criteria (section 5.10): strata below the
+    minimum group size are suppressed one at a time, coverage is recorded and Benjamini-Hochberg adjusts
+    the family. Exploratory claims are screening; they never decide a run outcome."""
     index = _index(records, record_id)
     _expect(isinstance(protected_fields, (list, tuple)) and 1 <= len(protected_fields) <= 5 and len(set(protected_fields)) == len(protected_fields), "Declare one to five unique protected fields")
     _text(positive_label, "positive label", 3000)
@@ -415,7 +427,56 @@ def intersectional_slices(records, *, protected_fields, target_field="actual", p
         eligible = support and value is not None and len(resampled[name]) >= math.ceil(0.9 * replicates)
         metrics.append({"name": name, "value": value, "outcome": "pass" if eligible else "inconclusive", "validReplicates": len(resampled[name]), "undefinedReplicates": replicates - len(resampled[name]) if sufficient else 0, "confidenceInterval": _interval(resampled[name], confidence, math.ceil(0.9 * replicates)) if eligible else None, "limitations": ["No acceptance threshold applied; pass means estimation support only."] if eligible else ["Insufficient group/class/cluster support, undefined denominator, or more than 10% undefined bootstrap replicates."]})
     slices = [{"stratum": key, "values": group_values[key], **original[key], "clusterCount": len(group_clusters[key]) if clusters is not None else None} for key in sorted(original)]
-    return {"schemaVersion": "1.0", "type": "intersectional_slices", "toolVersion": TOOL_VERSION, "outcome": "pass" if all(metric["outcome"] == "pass" for metric in metrics) and not exclusions else "inconclusive", "scope": "binary saved-label/prediction intersectional contrasts", "populationSha256": _population_hash(index), "populationCount": len(index), "includedCount": len(observations), "exclusions": exclusions, "protectedFields": list(protected_fields), "slices": slices, "metrics": metrics, "bootstrap": {"method": "cluster" if clusters is not None else "iid", "seed": seed, "replicates": replicates, "confidence": confidence, "clusterField": cluster_field, "clusterCount": cluster_count}, "assumptions": ["The mapped binary favourable label and protected attributes have been reviewed for this use.", "Whole-population resampling preserves cross-slice dependence; iid observations are assumed unless independent clusters are declared.", "Percentile intervals require representative observations/clusters and are descriptive; no multiple-comparison correction."], "limitations": ["Exclusions and source-population completeness require human assessment.", "Confidence intervals are conditional on defined contrasts; undefined-replicate counts are retained.", "Metrics and support flags do not determine legal conformity or an approved audit conclusion."]}
+    decided = _slice_statistics(original, len(exclusions), bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field)
+    return {"schemaVersion": "1.0", "type": "intersectional_slices", "statistics": decided, "toolVersion": TOOL_VERSION, "outcome": "pass" if all(metric["outcome"] == "pass" for metric in metrics) and not exclusions else "inconclusive", "scope": "binary saved-label/prediction intersectional contrasts", "populationSha256": _population_hash(index), "populationCount": len(index), "includedCount": len(observations), "exclusions": exclusions, "protectedFields": list(protected_fields), "slices": slices, "metrics": metrics, "bootstrap": {"method": "cluster" if clusters is not None else "iid", "seed": seed, "replicates": replicates, "confidence": confidence, "clusterField": cluster_field, "clusterCount": cluster_count}, "assumptions": ["The mapped binary favourable label and protected attributes have been reviewed for this use.", "Whole-population resampling preserves cross-slice dependence; iid observations are assumed unless independent clusters are declared.", "Percentile intervals require representative observations/clusters and are descriptive; no multiple-comparison correction."], "limitations": ["Exclusions and source-population completeness require human assessment.", "Confidence intervals are conditional on defined contrasts; undefined-replicate counts are retained.", "Metrics and support flags do not determine legal conformity or an approved audit conclusion."]}
+
+
+def _slice_statistics(counts, unknown, bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field):
+    """Exploratory statistics 1.0.0 group criteria over the strata (E3); None without bands."""
+    if bands is None:
+        return None
+    from . import statistics as stats
+    _expect(isinstance(bands, dict) and bands and set(bands) <= {"selection_rate_difference", "selection_rate_ratio", "equalized_odds"}, "bands names selection_rate_difference, selection_rate_ratio or equalized_odds")
+    _expect(cluster_field is None, "Decided strata need independent rows; clustered strata require the cluster bootstrap")
+    _expect(confidence in (0.9, 0.95, 0.99), "Decided strata use a confidence level of 0.90, 0.95 or 0.99")
+    plan = {"confidenceLevel": confidence, "minimums": {"sampleSize": max(30, min_support), "groupSize": max(30, min_support), "classCount": max(10, min_class_count)},
+        "criteria": [{"id": "intersectional-" + metric.replace("_", "-"), "kind": "group_comparison", "role": "exploratory", "metric": metric, "band": band, "minimumCoverage": minimum_coverage} for metric, band in sorted(bands.items())]}
+    try:
+        plan = stats.validate_plan(plan)
+    except stats.StatisticsError as exc:
+        raise ValueError(str(exc)) from exc
+    data = {"groups": [{"group": key, **{cell: row[cell] for cell in ("tp", "fp", "fn", "tn")}} for key, row in sorted(counts.items())], "unknownGroupRows": unknown}
+    evaluation = stats.evaluate_plan(plan, data)
+
+    def public(value):
+        if isinstance(value, dict):
+            return {key: public(item) for key, item in value.items() if not key.startswith("_")}
+        return [public(item) for item in value] if isinstance(value, list) else value
+
+    return {"statisticsVersion": stats.SPEC_VERSION, "planSha256": evaluation["planSha256"], "plan": plan, "criteria": public(evaluation["criteria"]), "reviewFlags": evaluation["reviewFlags"], "note": "Exploratory screening with Benjamini-Hochberg adjustment; excluded rows count as unknown-group rows in coverage."}
+
+
+def power(plan_or_case):
+    """Power and minimum detectable effects at plan approval (section 8).
+
+    A plan (`{"criteria": [...]}`) gets every criterion's power at its family's Bonferroni level; a single
+    case (`{"kind": "equality_test" | "criterion", ...}`, the golden fixture's power input) is evaluated
+    as given. Outcome-derived assumptions come from the auditor, never from the data being tested."""
+    from . import statistics as stats
+    _expect(isinstance(plan_or_case, dict), "Power input must be an object")
+    try:
+        if "criteria" not in plan_or_case:
+            return {"schemaVersion": "1.0", "type": "statistics_power", "toolVersion": TOOL_VERSION, "statisticsVersion": stats.SPEC_VERSION, "result": stats.evaluate_power(plan_or_case)}
+        plan = stats.validate_plan(plan_or_case)
+        families = {role: sum(1 for c in plan["criteria"] if c["role"] == role) for role in ("confirmatory", "exploratory")}
+        criteria = []
+        for criterion in plan["criteria"]:
+            family = families["confirmatory"] if criterion["role"] == "confirmatory" else 1
+            criteria.append({"id": criterion["id"], "role": criterion["role"], "familySize": family, **stats.criterion_power(criterion, plan["confidenceLevel"], plan["power"]["targetPower"], family, plan["minimums"])})
+    except (stats.StatisticsError, KeyError, TypeError) as exc:
+        raise ValueError("Power input rejected: " + str(exc)) from exc
+    short = [c["id"] for c in criteria if c["role"] == "confirmatory" and (c["status"] != "computed" or c["passProbability"] < plan["power"]["targetPower"])]
+    return {"schemaVersion": "1.0", "type": "statistics_power", "toolVersion": TOOL_VERSION, "statisticsVersion": stats.SPEC_VERSION, "planSha256": stats.plan_sha256(plan), "targetPower": plan["power"]["targetPower"], "criteria": criteria, "acknowledgementRequired": bool(short), "shortfalls": short, "acknowledgement": plan["power"]["acknowledgement"], "limitations": ["Normal approximations at assumed true values; required sizes and pass ranges are conservative under dependence between members.", "A shortfall needs a recorded acknowledgement at approval; it does not block (section 8)."]}
 
 
 def collect_jsonl(paths):
@@ -774,7 +835,7 @@ def _write(value, path):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Portable local assurance evidence procedures; no production model inference")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("sample", "quality", "bootstrap", "slices"):
+    for name in ("sample", "quality", "bootstrap", "slices", "power"):
         command = sub.add_parser(name)
         command.add_argument("--input", required=True)
         command.add_argument("--config")
@@ -803,7 +864,9 @@ def main(argv=None):
             command.add_argument("--key-id", required=True)
     args = parser.parse_args(argv)
     try:
-        if args.command in {"sample", "quality", "bootstrap", "slices"}:
+        if args.command == "power":
+            result = power(read_json(args.input, 1024 * 1024))
+        elif args.command in {"sample", "quality", "bootstrap", "slices"}:
             config = read_json(args.config, 1024 * 1024) if args.config else {}
             _expect(isinstance(config, dict), "Procedure configuration must be an object")
             functions = {"sample": sample_records, "quality": quality_checks, "bootstrap": bootstrap_interval, "slices": intersectional_slices}

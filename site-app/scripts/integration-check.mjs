@@ -1257,8 +1257,51 @@ try {
   });
   await command("approveClassification", {}, owner, 403);
   await command("approveClassification", {}, reviewer);
+  // Reopening a closed request retires its limitation memo; closing it again
+  // revises the same memo instead of adding a second one.
+  const memoCount = e.papers.length;
+  await command("reopenEvidenceRequest", {
+    requestId: unavailableRequest,
+    reason: "Synthetic provider located further records",
+  });
+  const retiredMemo = e.papers.find((p) => p.id === limitationMemo.id);
+  assert.equal(retiredMemo.retired.requestId, unavailableRequest);
+  assert.equal(retiredMemo.required, false);
+  await command(
+    "editPaper",
+    {
+      paperId: limitationMemo.id,
+      body: retiredMemo.body,
+      evidenceIds: [],
+      required: true,
+    },
+    owner,
+    409,
+  );
+  const reclosed = await command("closeEvidenceRequest", {
+    requestId: unavailableRequest,
+    disposition: "unobtainable",
+    assessment:
+      "Internal restriction secret; the located records do not cover the period, so the limitation remains.",
+  });
+  assert.equal(reclosed.details.paperId, limitationMemo.id);
+  assert.equal(e.papers.length, memoCount);
+  const revisedMemo = e.papers.find((p) => p.id === limitationMemo.id);
+  assert.equal(revisedMemo.retired, undefined);
+  assert.equal(revisedMemo.required, true);
+  assert.equal(revisedMemo.revision, limitationMemo.revision + 1);
+  console.log(
+    "PASS reopened limitation memo is retired and revised, not duplicated, on re-close",
+  );
+  // The release-time records (WP-RP-02, MEM-SO-01) are recorded by the
+  // release and refuse preparation and signing.
+  const releaseTime = ["WP-RP-02", "MEM-SO-01"];
   for (const id of e.papers.filter((p) => p.required).map((p) => p.id)) {
     const current = e.papers.find((p) => p.id === id);
+    if (releaseTime.includes(current.templateId)) {
+      await command("submitPaper", { paperId: id }, owner, 409);
+      continue;
+    }
     if (current.status === "signed") continue;
     await command("editPaper", {
       paperId: id,
@@ -1640,6 +1683,58 @@ try {
   console.log(
     "PASS versioned engagement brief, return/rework, explicit program selection, actual execution, evidence evaluation and assigned review/sign-off",
   );
+  // Sign → recompile: new work on a procedure whose paper is signed compiles a
+  // new paper and supersedes the signed one instead of orphaning it.
+  await command("recordProcedureExecution", {
+    ...actual,
+    results: actual.results + "; re-performed after sign-off",
+  });
+  await command("evaluateProcedure", {
+    procedureId: proc.id,
+    relevance: "Evidence addresses the fixture criterion",
+    reliability: "Hash-pinned synthetic source inspected again",
+    coverage: "Complete fixture population and period",
+    contradictions: "No contradictions in the fixture; limitations documented",
+    conclusion: "Synthetic fixture procedure supported after re-performance",
+    outcome: "supported",
+  });
+  const recompile = await command("submitProcedure", { procedureId: proc.id });
+  const recompiledPaper = recompile.details.paperId;
+  assert.notEqual(recompiledPaper, procedurePaper);
+  const supersededPaper = e.papers.find((p) => p.id === procedurePaper);
+  assert.equal(supersededPaper.status, "signed");
+  assert.equal(supersededPaper.supersededBy, recompiledPaper);
+  assert.equal(supersededPaper.required, false);
+  assert.equal(
+    e.papers.find((p) => p.id === recompiledPaper).supersedes,
+    procedurePaper,
+  );
+  for (const [op, data] of [
+    ["reopenPaper", { paperId: procedurePaper }],
+    ["comment", { paperId: procedurePaper, text: "Must stay as signed" }],
+    [
+      "editPaper",
+      {
+        paperId: procedurePaper,
+        body: supersededPaper.body,
+        evidenceIds: supersededPaper.evidenceIds,
+        required: true,
+      },
+    ],
+  ])
+    await command(op, data, owner, 409);
+  await command(
+    "reviewProcedure",
+    {
+      procedureId: proc.id,
+      reason: "Re-performed work and conclusion independently inspected",
+    },
+    reviewer,
+  );
+  await command("signPaper", { paperId: recompiledPaper });
+  console.log(
+    "PASS sign → recompile supersedes the signed paper, which stays immutable",
+  );
   const contributor = "fixture-contributor-" + stamp,
     crossContributor = "fixture-cross-contributor-" + stamp;
   await management("grantMember", {
@@ -1660,7 +1755,7 @@ try {
   );
   await command("createEvidenceRequest", {
     ...requestSpec,
-    paperIds: [procedurePaper],
+    paperIds: [recompiledPaper],
     subject: "INTERNAL_REQUEST_SECRET",
     description: "INTERNAL_PROCEDURE_SECRET",
   });
@@ -1864,6 +1959,243 @@ try {
     owner,
     400,
   );
+  // #17: past 1,000 assurance records an engagement keeps its workbench,
+  // access changes, report capture and release, and dossiers. The bulk goes
+  // straight into D1 (each op's own path is checked above and in
+  // assurance-integration-check.mjs): source locations, reviewed assessments,
+  // a superseded revision and unpinned events, in runs of seven records that
+  // share a timestamp so that page breaks fall inside a run.
+  const hex = async (bytes) =>
+    Buffer.from(await crypto.subtle.digest("SHA-256", bytes)).toString("hex");
+  const bulkSource = e.artifacts.find((a) => a.id === uploaded.artifactId),
+    bulkStart = Date.now() - 2 * 3600 * 1000,
+    bulk = [];
+  assert.equal(bulkSource.status, "accepted");
+  const bulkRecord = (kind, body, actor = owner) => {
+    const record = {
+      id: "AS-" + crypto.randomUUID().slice(0, 12),
+      kind,
+      body: JSON.stringify(body),
+      actor,
+      createdAt: new Date(
+        bulkStart + Math.floor(bulk.length / 7) * 1000,
+      ).toISOString(),
+    };
+    bulk.push(record);
+    return record;
+  };
+  const bulkLocations = Array.from({ length: 1100 }, (_, i) =>
+    bulkRecord("location", {
+      artifactId: bulkSource.id,
+      label: "Bulk source " + i,
+      kind: "dataset",
+      locator: "row " + (i + 1),
+      excerpt: "Synthetic excerpt " + i,
+      parser: "manual-transcription",
+      quality: "Synthetic scale fixture",
+      artifactSha256: bulkSource.sha256,
+      artifactName: bulkSource.name,
+      visibility: bulkSource.visibility,
+    }),
+  );
+  const superseded = bulkRecord("assertion", {
+    statement: "Superseded scale assertion",
+    criterion: "AIA-15-1",
+    relations: [],
+    missingEvidence: "",
+    assessment: "First revision",
+    conclusion: "unassessed",
+    status: "draft",
+    revision: 1,
+  });
+  for (let i = 0; i < 30; i++) {
+    const assertion = bulkRecord("assertion", {
+      ...(i === 0 ? { supersedesId: superseded.id } : {}),
+      statement: "Scale assertion " + i,
+      criterion: "AIA-15-1",
+      relations: [],
+      missingEvidence: "",
+      assessment: "Synthetic assessment",
+      conclusion: "supported",
+      status: "draft",
+      revision: i === 0 ? 2 : 1,
+    });
+    bulkRecord(
+      "assertion_review",
+      {
+        assertionId: assertion.id,
+        decision: "approve",
+        reason: "Synthetic independent review",
+      },
+      reviewer,
+    );
+  }
+  for (const [kind, review, body] of [
+    [
+      "obligation",
+      { decision: "confirmed" },
+      { code: "AIA-14-123", applicability: "readiness", outcome: "supported" },
+    ],
+    [
+      "impact",
+      { decision: "confirmed" },
+      { description: "Synthetic change", decision: "no_effect" },
+    ],
+  ])
+    for (let i = 0; i < 10; i++) {
+      const assessment = bulkRecord(kind, { ...body, rationale: "Scale " + i });
+      bulkRecord(
+        kind + "_review",
+        { [kind + "Id"]: assessment.id, ...review, reason: "Synthetic" },
+        reviewer,
+      );
+    }
+  for (let i = 0; i < 40; i++)
+    bulkRecord(["access_event", "worker_event", "assistant"][i % 3], {
+      reason: "Unpinned scale event " + i,
+    });
+  for (let i = 0; i < bulk.length; i += 100)
+    await testDb.batch(
+      await Promise.all(
+        bulk
+          .slice(i, i + 100)
+          .map(async (r) =>
+            testDb
+              .prepare(
+                "INSERT INTO assurance_records(tenant_id,engagement_id,id,kind,body,sha256,created_at,actor) VALUES(?,?,?,?,?,?,?,?)",
+              )
+              .bind(
+                tenantId,
+                e.id,
+                r.id,
+                r.kind,
+                r.body,
+                await hex(new TextEncoder().encode(r.body)),
+                r.createdAt,
+                r.actor,
+              ),
+          ),
+      ),
+    );
+  const recordIds = (
+    await testDb
+      .prepare(
+        "SELECT id FROM assurance_records WHERE tenant_id=? AND engagement_id=? ORDER BY created_at,id",
+      )
+      .bind(tenantId, e.id)
+      .all()
+  ).results.map((r) => r.id);
+  assert(recordIds.length > 1200);
+  // The workbench view answers the first page; its cursor walks the rest.
+  const assurancePath = (query = {}) =>
+    "/api/assurance?" +
+    new URLSearchParams({ tenantId, engagementId: e.id, ...query });
+  const workbench = await request(assurancePath());
+  assert.equal(workbench.total, recordIds.length);
+  assert.equal(workbench.records.length, 200);
+  assert(Array.isArray(workbench.jobs) && workbench.capabilities);
+  const listed = [...workbench.records],
+    pageBreaks = [];
+  for (let cursor = workbench.nextCursor; cursor;) {
+    const page = await request(assurancePath({ cursor }));
+    assert.deepEqual(Object.keys(page).sort(), ["nextCursor", "records"]);
+    assert(page.records.length > 0 && page.records.length <= 200);
+    pageBreaks.push(listed.at(-1).createdAt === page.records[0].createdAt);
+    listed.push(...page.records);
+    cursor = page.nextCursor;
+  }
+  assert.deepEqual(
+    listed.map((r) => r.id),
+    recordIds,
+  );
+  assert.equal(pageBreaks.length + 1, Math.ceil(recordIds.length / 200));
+  assert(pageBreaks.includes(true), "A page break splits equal timestamps");
+  const locations = [];
+  for (let page = { nextCursor: "" }; page.nextCursor !== null;) {
+    page = await request(
+      assurancePath({
+        kind: "location",
+        ...(page.nextCursor ? { cursor: page.nextCursor } : {}),
+      }),
+    );
+    locations.push(...page.records);
+  }
+  assert(locations.length >= 1100);
+  assert(locations.every((r) => r.kind === "location"));
+  assert(locations.some((r) => r.id === bulkLocations.at(-1).id));
+  assert.equal(
+    (await request(assurancePath({ cursor: "not-a-cursor" }), { status: 400 }))
+      .error,
+    "Invalid page cursor",
+  );
+  // Writes no longer load every record: an assessment citing a bulk source
+  // gates final capture until it is independently reviewed, and a briefing
+  // reads it and the source it cites.
+  const lateAssertion = (
+    await assurance("addAssertion", {
+      statement: "Scale sources remain covered",
+      criterion: "AIA-15-1",
+      relations: [
+        {
+          locationId: bulkLocations.at(-1).id,
+          relation: "supports",
+          rationale: "Synthetic citation of the newest bulk source",
+        },
+      ],
+      missingEvidence: "",
+      assessment: "Synthetic assessment past 1,000 records",
+      conclusion: "supported",
+    })
+  ).record;
+  assert.equal(
+    lateAssertion.body.relations[0].locationSha256,
+    await hex(new TextEncoder().encode(bulkLocations.at(-1).body)),
+  );
+  const ungated = await command(
+    "createReport",
+    {
+      kind: "final",
+      opinion: "Adverse conclusion",
+      summary: "Must wait for the independent review",
+    },
+    owner,
+    409,
+  );
+  assert.equal(
+    ungated.error,
+    "Independent review required: Scale sources remain covered",
+  );
+  await assurance(
+    "reviewAssertion",
+    {
+      assertionId: lateAssertion.id,
+      decision: "approve",
+      reason: "Independent review of the scale citation",
+    },
+    200,
+    reviewer,
+  );
+  const scaleBriefing = (
+    await assurance("assist", {
+      sourceIds: [lateAssertion.id],
+      action: "summary",
+    })
+  ).record;
+  assert.deepEqual(
+    scaleBriefing.body.citations.map((c) => c.recordId),
+    [lateAssertion.id, bulkLocations.at(-1).id],
+  );
+  await assurance(
+    "assist",
+    { sourceIds: [lateAssertion.id], action: "summary" },
+    403,
+    reviewer,
+  );
+  console.log(
+    "PASS " +
+      recordIds.length +
+      " assurance records: cursor-paged workbench and kind listings, record lookups, review gate and cited briefing",
+  );
   await command("createReport", {
     kind: "final",
     opinion: "Adverse conclusion",
@@ -1871,6 +2203,20 @@ try {
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
   const internalFinal = e.reports.at(-1);
+  // Every pinned record is captured, past the old 1,000-record limit.
+  const pinnedIds = (
+    await testDb
+      .prepare(
+        "SELECT id FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind NOT IN ('assistant','assistant_export','assistant_acceptance','key_rotation','dossier','access_event','worker_event') ORDER BY created_at,id",
+      )
+      .bind(tenantId, e.id)
+      .all()
+  ).results.map((r) => r.id);
+  assert(pinnedIds.length > 1100);
+  assert.deepEqual(
+    internalFinal.snapshot.assurancePins.map((p) => p.id),
+    pinnedIds,
+  );
   const immutableFinal = JSON.stringify({
     snapshot: internalFinal.snapshot,
     clientSnapshot: internalFinal.clientSnapshot,
@@ -1955,6 +2301,18 @@ try {
   console.log(
     "PASS inbox report release handoff and non-actionable approver dependency",
   );
+  // Revoking access past 1,000 records works, and the access event it records
+  // is not a pinned source, so the approved package can still be released.
+  await assurance("setAccess", {
+    userId: auditor,
+    active: false,
+    reason: "Preparer rotated off before release",
+  });
+  await request(assurancePath(), { user: auditor, status: 404 });
+  await request(
+    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+    { user: auditor, status: 404 },
+  );
   // Controlled ephemeral source revisions prove every captured technical collection blocks stale release.
   const approvedSource = structuredClone(e);
   for (const amend of [
@@ -2007,6 +2365,103 @@ try {
       clientSha256: e.reports.at(-1).clientSha256,
     }),
     immutableFinal,
+  );
+  assert.deepEqual(e.reports.at(-1).snapshot.rulePack, e.rulePack);
+  assert.deepEqual(e.reports.at(-1).clientSnapshot.rulePack, e.rulePack);
+  // The released package seals into both audiences' dossiers; the internal
+  // one carries every pinned assurance record byte for byte.
+  const seals = {};
+  for (const audience of ["internal", "client"])
+    seals[audience] = (
+      await request("/api/dossier", {
+        method: "POST",
+        body: {
+          tenantId,
+          engagementId: e.id,
+          reportId: internalFinal.id,
+          audience,
+          withheld: [],
+        },
+      })
+    ).record;
+  const resealed = await request("/api/dossier", {
+    method: "POST",
+    body: { tenantId, engagementId: e.id, reportId: internalFinal.id },
+  });
+  assert.equal(resealed.existing, true);
+  assert.equal(resealed.record.id, seals.internal.id);
+  for (const [audience, user] of [
+    ["internal", owner],
+    ["client", viewer],
+  ]) {
+    const download = await transport(
+      base +
+        "/api/dossier?" +
+        new URLSearchParams({
+          tenantId,
+          engagementId: e.id,
+          reportId: internalFinal.id,
+          audience,
+        }),
+      { headers: h(user) },
+    );
+    assert.equal(download.status, 200);
+    const bytes = new Uint8Array(await download.arrayBuffer()),
+      hash = await hex(bytes),
+      dossier = JSON.parse(new TextDecoder().decode(bytes));
+    assert.equal(download.headers.get("X-Dossier-SHA256"), hash);
+    assert.equal(hash, seals[audience].body.sha256);
+    assert.equal(dossier.manifest.audience, audience);
+    for (const file of dossier.files)
+      assert.equal(
+        await hex(Buffer.from(file.contentBase64, "base64")),
+        dossier.manifest.files.find((leaf) => leaf.path === file.path).sha256,
+      );
+    // The released report keeps the rule-pack and methodology versions it
+    // was captured under (#18), in both the hashed and the readable copy.
+    const dossierText = (name) =>
+        Buffer.from(
+          dossier.files.find((f) => f.path === name).contentBase64,
+          "base64",
+        ).toString("utf8"),
+      dossierReport = JSON.parse(dossierText("report.json"));
+    assert.deepEqual(dossierReport.rulePack, e.rulePack);
+    assert.equal(
+      dossierReport.methodologyVersion,
+      workspace.catalog.methodologyVersion,
+    );
+    assert(
+      dossierText("report.html").includes(
+        "Rule pack " +
+          e.rulePack.version +
+          " (legal text " +
+          e.rulePack.legalVersion,
+      ),
+      "released report.html names the rule pack",
+    );
+    const pinnedFiles = dossier.files.filter((f) =>
+      f.path.startsWith("assurance/"),
+    );
+    if (audience === "internal") {
+      assert.deepEqual(
+        pinnedFiles.map((f) => f.path),
+        pinnedIds.map((id) => "assurance/" + id + ".json"),
+      );
+      const newest = pinnedFiles.find(
+        (f) => f.path === "assurance/" + bulkLocations.at(-1).id + ".json",
+      );
+      assert.equal(
+        Buffer.from(newest.contentBase64, "base64").toString(),
+        bulkLocations.at(-1).body,
+      );
+    } else assert.equal(pinnedFiles.length, 0);
+  }
+  // Each seal is a saved engagement change.
+  await refresh();
+  console.log(
+    "PASS " +
+      pinnedIds.length +
+      " pinned records captured, released and sealed into verified internal and client dossiers",
   );
   const released = await request(
       "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
@@ -2082,6 +2537,99 @@ try {
   assert(!html.includes("Internal unavailable evidence fixture"));
   assert(!html.includes("predictions.csv"));
   assert(!html.includes("Unresolved synthetic high-risk finding"));
+  // The sign → recompile → issue scenario: only the current paper is captured.
+  const capturedIds = (papers) => papers.map((p) => p.id);
+  assert(capturedIds(internalFinal.snapshot.papers).includes(recompiledPaper));
+  assert(!capturedIds(internalFinal.snapshot.papers).includes(procedurePaper));
+  assert(
+    !capturedIds(internalFinal.clientSnapshot.papers).includes(procedurePaper),
+  );
+  // The adopted legacy WP-A09-01 paper was signed, so the first compilation
+  // already superseded it; the recompile superseded the first compilation.
+  const adoptedPaper = supersededPaper.supersedes;
+  assert(adoptedPaper);
+  assert.deepEqual(
+    internalFinal.snapshot.supersededPapers.map((p) => [p.id, p.supersededBy]),
+    [
+      [adoptedPaper, procedurePaper],
+      [procedurePaper, recompiledPaper],
+    ],
+  );
+  assert(!capturedIds(internalFinal.snapshot.papers).includes(adoptedPaper));
+  assert(
+    internalFinal.snapshot.annexIV.every(
+      (s) => !s.paperIds.includes(procedurePaper),
+    ),
+  );
+  const firstRelease = e.reports.find((r) => r.id === internalFinal.id).release;
+  assert.deepEqual(firstRelease.completion.templateIds, [
+    "WP-RP-02",
+    "MEM-SO-01",
+  ]);
+  assert.equal(firstRelease.completion.internalHash, internalFinal.sha256);
+  assert.equal(firstRelease.completion.clientHash, internalFinal.clientSha256);
+  assert.deepEqual(firstRelease.history.map((h) => h.action).slice(-2), [
+    "release",
+    "notify_client",
+  ]);
+  // A newer final report supersedes the released one automatically.
+  await command("createReport", {
+    kind: "final",
+    opinion: "Adverse conclusion",
+    summary: "Synthetic amended adverse report replacing the first release.",
+  });
+  const replacement = e.reports.at(-1);
+  await command(
+    "approveReportPackage",
+    {
+      reportId: replacement.id,
+      internalHash: replacement.sha256,
+      clientHash: replacement.clientSha256,
+      reason: "Amended packages independently reviewed",
+    },
+    reviewer,
+  );
+  const replaced = await command("releaseReport", {
+    reportId: replacement.id,
+    recipientScope: "Authorized fixture client members",
+    reason: "Lead releases the amended package",
+  });
+  assert.equal(replaced.details.supersedes, internalFinal.id);
+  const supersededRelease = e.reports.find(
+    (r) => r.id === internalFinal.id,
+  ).release;
+  assert.equal(supersededRelease.state, "superseded");
+  assert.equal(supersededRelease.supersededBy, replacement.id);
+  assert.equal(e.reports.at(-1).release.supersedes, internalFinal.id);
+  assert(
+    e.reports
+      .at(-1)
+      .release.history.some(
+        (h) =>
+          h.action === "notify_client" && h.reason.includes(internalFinal.id),
+      ),
+  );
+  assert.equal(
+    e.reports.filter((r) => r.release?.state === "released").length,
+    1,
+  );
+  const clientReports = await request(
+    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+    { user: viewer },
+  );
+  assert.deepEqual(
+    clientReports.engagement.reports.map((r) => r.id),
+    [replacement.id],
+  );
+  // The client sees which earlier report the released one replaced.
+  assert.deepEqual(clientReports.engagement.reports[0].replaces, [
+    internalFinal.id,
+  ]);
+  // The release-time records are recorded by the release, never prepared.
+  await command("createPaper", { templateId: "WP-RP-02" }, undefined, 409);
+  console.log(
+    "PASS sign → recompile → issue captures only current papers; a newer release supersedes the older one with a client notification",
+  );
   // Verify independently assessed remediation and linked reassessment without rewriting the baseline report.
   const findingId = e.findings.find(
     (f) => f.title === "Unresolved synthetic high-risk finding",
@@ -2089,7 +2637,7 @@ try {
   await command("linkFindingSupport", {
     findingId,
     procedureId: proc.id,
-    paperIds: [procedurePaper],
+    paperIds: [recompiledPaper],
     evidenceIds: [uploaded.artifactId],
     runIds: [],
   });
@@ -2197,14 +2745,55 @@ try {
     e.workflow.monitoring.find((c) => c.id === caseId).state,
     "closed",
   );
+  // A case assessed without evidence is closed once an assessment links it;
+  // concluding that no reassessment is needed requires the evidence upfront.
+  const nextCycle = e.workflow.monitoring.at(-1).id;
+  const assessCycle = (decision, evidenceIds, status) =>
+    command(
+      "assessMonitoringCase",
+      {
+        caseId: nextCycle,
+        decision,
+        assessment: "Quarterly fixture monitoring assessed",
+        evidenceIds,
+        dueDate: "2027-03-31",
+      },
+      owner,
+      status,
+    );
+  await assessCycle("no_reassessment", [], 400);
+  await assessCycle("follow_up", [], 200);
+  await command(
+    "closeMonitoringCase",
+    { caseId: nextCycle, closure: "Must wait for evidence" },
+    reviewer,
+    400,
+  );
+  await assessCycle("no_reassessment", [uploaded.artifactId], 200);
+  await command(
+    "closeMonitoringCase",
+    { caseId: nextCycle, closure: "Evidence shows no reassessment is needed" },
+    reviewer,
+  );
+  assert.equal(
+    e.workflow.monitoring.find((c) => c.id === nextCycle).state,
+    "closed",
+  );
   assert.equal(
     JSON.stringify(e.reports.find((r) => r.id === internalFinal.id).snapshot),
     JSON.parse(immutableFinal).snapshot
       ? JSON.stringify(JSON.parse(immutableFinal).snapshot)
       : "",
   );
+  // A superseded report is no longer released, so it cannot be withdrawn.
+  await command(
+    "withdrawReport",
+    { reportId: internalFinal.id, reason: "Superseded already" },
+    owner,
+    409,
+  );
   await command("withdrawReport", {
-    reportId: internalFinal.id,
+    reportId: replacement.id,
     reason: "Synthetic test withdrawal; preserve all captured bytes",
   });
   const afterWithdrawal = await request(
@@ -2212,15 +2801,12 @@ try {
     { user: viewer },
   );
   assert.equal(afterWithdrawal.engagement.reports.length, 0);
-  await request(
-    "/api/report-package?" +
-      new URLSearchParams({
-        tenantId,
-        engagementId: e.id,
-        reportId: internalFinal.id,
-      }),
-    { user: viewer, status: 404 },
-  );
+  for (const reportId of [internalFinal.id, replacement.id])
+    await request(
+      "/api/report-package?" +
+        new URLSearchParams({ tenantId, engagementId: e.id, reportId }),
+      { user: viewer, status: 404 },
+    );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );

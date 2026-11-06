@@ -1,6 +1,7 @@
 import { ApiError, bucket, db, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { canonical } from "./assurance-core";
+import { storedBodies } from "./assurance-store";
 import { legalDate } from "./rule-pack";
 export function base64(bytes: ArrayBuffer | Uint8Array) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -157,30 +158,36 @@ export async function buildDossier(
       "application/json",
     );
   if (!client) {
-    for (const pin of (snapshot.assurancePins ?? []) as {
+    const pins = (snapshot.assurancePins ?? []) as {
       id: string;
       sha256: string;
-    }[]) {
-      const rec = await db()
-        .prepare(
-          "SELECT body,sha256,kind FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND id=?",
-        )
-        .bind(ctx.tenantId, e.id, pin.id)
-        .first<{ body: string; sha256: string; kind: string }>();
-      if (
-        !rec ||
-        rec.sha256 !== pin.sha256 ||
-        (await sha256(rec.body)) !== pin.sha256
-      )
-        throw new ApiError(
-          409,
-          "Pinned assurance record unavailable or altered: " + pin.id,
+    }[];
+    // A hundred pinned records per query: a query per record would pass D1's
+    // per-request query limit on a large engagement.
+    for (let start = 0; start < pins.length; start += 100) {
+      const chunk = pins.slice(start, start + 100),
+        stored = await storedBodies(
+          ctx,
+          e.id,
+          chunk.map((pin) => pin.id),
         );
-      await add(
-        "assurance/" + pin.id + ".json",
-        bytes(rec.body),
-        "application/json",
-      );
+      for (const pin of chunk) {
+        const rec = stored.get(pin.id);
+        if (
+          !rec ||
+          rec.sha256 !== pin.sha256 ||
+          (await sha256(rec.body)) !== pin.sha256
+        )
+          throw new ApiError(
+            409,
+            "Pinned assurance record unavailable or altered: " + pin.id,
+          );
+        await add(
+          "assurance/" + pin.id + ".json",
+          bytes(rec.body),
+          "application/json",
+        );
+      }
     }
   }
   for (const captured of (snapshot.evidence ?? []) as {

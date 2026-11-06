@@ -1,14 +1,37 @@
 import { z } from "zod";
-import annexMap from "../annex-iv-map.json";
+import { annexIVIndex, annexMapVersion } from "../annex-iv";
 import { assurancePins, jobs, assuranceGates } from "../assurance-store";
 import { clientFinding } from "../client-projection";
-import { finalReportGates, type Engagement } from "../domain";
+import { finalReportGates, paperCurrent, type Engagement } from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { recordVersions } from "../rule-pack-current";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
 import { text } from "./fields";
+/**
+ * The papers a report captures: every current paper for a draft, the current
+ * signed papers for a final report. Superseded papers and retired limitation
+ * memos are history, not current work.
+ */
+function capturedPapers(e: Engagement, kind: "draft" | "final") {
+  return e.papers
+    .filter(
+      (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
+    )
+    .map((p) => ({
+      id: p.id,
+      templateId: p.templateId,
+      title: p.title,
+      revision: p.revision,
+      status: p.status,
+      body: p.body,
+      evidenceIds: p.evidenceIds,
+      runIds: p.runIds,
+      reviews: p.reviews,
+      signatures: p.signatures,
+    }));
+}
 /**
  * Report capture: the hashed internal snapshot with its Annex IV map, and the
  * client snapshot published when the report is released.
@@ -54,36 +77,7 @@ export const reports = defineCommands({
               .join("; "),
           );
       }
-      const annexIV = annexMap.sections.map((section) => {
-        const matching = e.papers.filter((p) =>
-            section.paperIds.includes(p.templateId),
-          ),
-          candidates = e.artifacts.filter(
-            (a) =>
-              a.status === "accepted" &&
-              section.evidenceCategories.includes(a.category),
-          );
-        return {
-          number: section.number,
-          title: section.title,
-          reference: section.reference,
-          state: candidates.length
-            ? "candidate_evidence_present"
-            : "unassessed",
-          paperIds: matching.map((p) => p.id),
-          candidateEvidenceIds: candidates.map((a) => a.id),
-          gaps: [
-            ...(!candidates.length ? ["No accepted candidate evidence"] : []),
-            ...matching
-              .filter((p) => p.status !== "signed")
-              .map(
-                (p) => p.templateId + ": independent signed assessment missing",
-              ),
-            "Human assessment of legal subitems, scope, currency and version remains required",
-          ],
-          checklist: section.evidenceChecklist,
-        };
-      });
+      const annexIV = annexIVIndex(e);
       const snapshot = {
         workflow: e.workflow ? structuredClone(e.workflow) : null,
         contractVersion: "1.1",
@@ -96,18 +90,25 @@ export const reports = defineCommands({
         opinion: a.opinion,
         summary: a.summary,
         evidenceRequests: e.evidenceRequests ?? [],
-        papers: e.papers
-          .filter((p) => a.kind === "draft" || p.status === "signed")
+        papers: capturedPapers(e, a.kind),
+        supersededPapers: e.papers
+          .filter((p) => p.supersededBy)
           .map((p) => ({
             id: p.id,
             templateId: p.templateId,
-            title: p.title,
             revision: p.revision,
-            status: p.status,
-            body: p.body,
-            evidenceIds: p.evidenceIds,
-            runIds: p.runIds,
-            reviews: p.reviews,
+            supersededBy: p.supersededBy,
+            signatures: p.signatures,
+          })),
+        // Limitation memos retired by reopening their evidence request stay
+        // referenced, so evidenceRequests[].limitationPaperId resolves.
+        retiredPapers: e.papers
+          .filter((p) => p.retired && !p.supersededBy)
+          .map((p) => ({
+            id: p.id,
+            templateId: p.templateId,
+            revision: p.revision,
+            retired: p.retired,
             signatures: p.signatures,
           })),
         evidence: e.artifacts.map(({ key, ...a }) => a),
@@ -116,7 +117,7 @@ export const reports = defineCommands({
         evaluationProfiles: e.evaluationProfiles ?? [],
         runs: e.runs,
         annexIV,
-        annexMapVersion: annexMap.mapVersion,
+        annexMapVersion,
         auditEventHead: e.eventHead,
         createdAt: now(),
         ...recordVersions(),
@@ -157,7 +158,7 @@ export const reports = defineCommands({
         summary: a.summary,
         createdAt: r.createdAt,
         papers: e.papers
-          .filter((p) => p.status === "signed")
+          .filter((p) => paperCurrent(p) && p.status === "signed")
           .map((p) => ({
             id: p.id,
             title: p.title,
@@ -240,24 +241,11 @@ export async function assertReleasable(
       409,
       "Prepare a new report for the current approved scope and program",
     );
-  const capturedPapers = e.papers
-    .filter((p) => p.status === "signed")
-    .map((p) => ({
-      id: p.id,
-      templateId: p.templateId,
-      title: p.title,
-      revision: p.revision,
-      status: p.status,
-      body: p.body,
-      evidenceIds: p.evidenceIds,
-      runIds: p.runIds,
-      reviews: p.reviews,
-      signatures: p.signatures,
-    }));
   if (
     JSON.stringify(frozen.procedures) !==
       JSON.stringify(e.workflow?.procedures) ||
-    JSON.stringify(r.snapshot.papers) !== JSON.stringify(capturedPapers) ||
+    JSON.stringify(r.snapshot.papers) !==
+      JSON.stringify(capturedPapers(e, "final")) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
     JSON.stringify(
       (

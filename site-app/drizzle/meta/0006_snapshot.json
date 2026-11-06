@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "3b7b26eb-d518-4a56-895f-99455fc14eaf",
+  "id": "72d0bf71-65ce-4260-89c1-4aef2c6df917",
   "prevId": "5168c72f-c95e-47bf-8616-fe7d0074498f",
   "tables": {
     "engagement_access_policies": {
@@ -111,6 +111,18 @@
             "engagement_id",
             "kind",
             "created_at"
+          ],
+          "isUnique": false
+        },
+        "idx_assurance_order": {
+          "name": "idx_assurance_order",
+          "columns": [
+            "tenant_id",
+            "engagement_id",
+            "created_at",
+            "id",
+            "kind",
+            "sha256"
           ],
           "isUnique": false
         }
@@ -764,149 +776,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "invitations": {
-      "name": "invitations",
-      "columns": {
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "client_id": {
-          "name": "client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "engagement_ids": {
-          "name": "engagement_ids",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'pending'"
-        },
-        "invited_by": {
-          "name": "invited_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "accepted_by": {
-          "name": "accepted_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "closed_at": {
-          "name": "closed_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_invitations_email": {
-          "name": "idx_invitations_email",
-          "columns": [
-            "email",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "idx_invitations_pending": {
-          "name": "idx_invitations_pending",
-          "columns": [
-            "tenant_id",
-            "email"
-          ],
-          "isUnique": true,
-          "where": "status = 'pending'"
-        }
-      },
-      "foreignKeys": {
-        "invitations_tenant_id_tenants_id_fk": {
-          "name": "invitations_tenant_id_tenants_id_fk",
-          "tableFrom": "invitations",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "invitations_tenant_id_id_pk": {
-          "columns": [
-            "tenant_id",
-            "id"
-          ],
-          "name": "invitations_tenant_id_id_pk"
-        }
-      },
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "management_events": {
       "name": "management_events",
       "columns": {
@@ -1033,13 +902,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'active'"
-        },
-        "access_since": {
-          "name": "access_since",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {},

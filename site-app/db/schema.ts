@@ -176,6 +176,16 @@ export const assuranceRecords = sqliteTable(
       t.kind,
       t.createdAt,
     ),
+    // Record listings page in (created_at, id) order; with kind and sha256 it
+    // also covers report pins, which never read a record body.
+    index("idx_assurance_order").on(
+      t.tenantId,
+      t.engagementId,
+      t.createdAt,
+      t.id,
+      t.kind,
+      t.sha256,
+    ),
   ],
 );
 export const engagementAccess = sqliteTable(

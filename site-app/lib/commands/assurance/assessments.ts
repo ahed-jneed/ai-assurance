@@ -13,9 +13,9 @@ import type { AssuranceModule } from "./target";
 export const assessments: AssuranceModule = defineCommands({
   addAssertion: {
     roles: ["Auditor", "Lead Auditor"],
-    async handle({ e, find, revision }, d, ctx) {
+    async handle({ e, lookup, pick, revision }, d, ctx) {
       const v = assertionSchema.parse(d),
-        previous = revision(v.supersedesId, "assertion");
+        previous = await revision(v.supersedesId, "assertion");
       if (
         v.procedureId &&
         !e.workflow?.procedures.some((p) => p.id === v.procedureId)
@@ -23,12 +23,13 @@ export const assessments: AssuranceModule = defineCommands({
         throw new ApiError(400, "Procedure not found");
       if (v.paperId && !e.papers.some((p) => p.id === v.paperId))
         throw new ApiError(400, "Paper not found");
+      const locations = await lookup(v.relations.map((rel) => rel.locationId));
       return {
         record: await addRecord(ctx, e.id, "assertion", {
           ...v,
           relations: v.relations.map((rel) => ({
             ...rel,
-            locationSha256: find(rel.locationId, "location").sha256,
+            locationSha256: pick(locations, rel.locationId, "location").sha256,
           })),
           status: "draft",
           revision: previous ? (previous.body.revision ?? 1) + 1 : 1,
@@ -47,7 +48,7 @@ export const assessments: AssuranceModule = defineCommands({
           })
           .strict()
           .parse(d),
-        source = find(v.assertionId, "assertion");
+        source = await find(v.assertionId, "assertion");
       if (source.actor === ctx.user.userId)
         throw new ApiError(403, "Independent assertion review is required");
       return {
@@ -93,7 +94,7 @@ export const assessments: AssuranceModule = defineCommands({
           .parse(d),
         item = obligations.items.find((x) => x.code === v.code);
       if (!item) throw new ApiError(400, "Unknown obligation subitem");
-      revision(v.supersedesId, "obligation");
+      await revision(v.supersedesId, "obligation");
       for (const evidenceId of v.evidenceIds) accepted(evidenceId);
       if (
         v.applicability === "applicable" &&
@@ -130,7 +131,7 @@ export const assessments: AssuranceModule = defineCommands({
           })
           .strict()
           .parse(d),
-        source = find(v.obligationId, "obligation");
+        source = await find(v.obligationId, "obligation");
       if (source.actor === ctx.user.userId)
         throw new ApiError(403, "Independent obligation review is required");
       return {
@@ -145,7 +146,7 @@ export const assessments: AssuranceModule = defineCommands({
     roles: ["Auditor", "Lead Auditor"],
     async handle({ e, revision }, d, ctx) {
       const v = impactSchema.parse(d);
-      revision(v.supersedesId, "impact");
+      await revision(v.supersedesId, "impact");
       return {
         record: await addRecord(ctx, e.id, "impact", { ...v, state: "open" }),
       };
@@ -162,7 +163,7 @@ export const assessments: AssuranceModule = defineCommands({
           })
           .strict()
           .parse(d),
-        source = find(v.impactId, "impact");
+        source = await find(v.impactId, "impact");
       if (source.actor === ctx.user.userId)
         throw new ApiError(403, "Independent impact review is required");
       return {
