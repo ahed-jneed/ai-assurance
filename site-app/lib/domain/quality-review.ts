@@ -113,9 +113,10 @@ export type QualityReview = {
 };
 
 /**
- * The engagement team as the engagement record shows it: everyone who
- * prepared, reviewed, commented on, uploaded evidence to, approved or led any
- * of the engagement's work, with the time of their latest involvement. The
+ * The engagement team as the engagement record shows it: everyone the
+ * acceptance record names, and everyone who prepared, reviewed, commented on,
+ * uploaded evidence to, approved, declared for or led any of the engagement's
+ * work, with the time of their latest involvement. The
  * quality review records themselves are not team work. Client users' records
  * (evidence uploads, comments) count too: a client's own staff are never
  * independent of the engagement.
@@ -139,6 +140,19 @@ export function engagementTeam(e: Engagement): Map<string, string> {
   const w = e.workflow;
   if (w) {
     add(w.adoptedBy, w.adoptedAt);
+    // The acceptance record names the team (#23), whether or not they have
+    // recorded any work yet; its preparers, approvers and declarants count.
+    const acceptance = w.acceptance;
+    for (const a of acceptance ? [acceptance, ...acceptance.history] : []) {
+      addAll(a.team, a.updatedAt);
+      addAll(a.contributors, a.updatedAt);
+      add(a.updatedBy, a.updatedAt);
+      add(a.approval?.userId, a.approval?.at);
+    }
+    for (const d of w.declarations ?? []) {
+      add(d.userId, d.declaredAt);
+      for (const t of d.threats) add(t.resolution?.userId, t.resolution?.at);
+    }
     for (const b of [...(w.brief ? [w.brief, ...w.brief.history] : [])]) {
       addAll(b.contributors, b.updatedAt);
       add(b.updatedBy, b.updatedAt);

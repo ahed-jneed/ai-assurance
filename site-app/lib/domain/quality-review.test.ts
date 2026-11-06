@@ -4,11 +4,13 @@ import { caller } from "../commands/test-fixtures";
 import { finalReportGates, type Engagement, type Report } from "../domain";
 import { engagementWork } from "../work-items";
 import {
+  acceptedRecord,
   approvedWorkflow,
   artifact,
   at,
   command,
   completedQualityReview,
+  declaration,
   engagement,
   expectFailure,
   paper,
@@ -128,6 +130,18 @@ describe("engagement team", () => {
     expect(team.get("commenter")).toBe("2026-10-01T09:00:00Z");
     expect(team.get("responder")).toBe("2026-10-02T09:00:00Z");
     expect(team.get("uploader")).toBe("2026-10-03T09:00:00Z");
+  });
+
+  it("names everyone the acceptance record names, before they record any work", () => {
+    const workflow = approvedWorkflow();
+    workflow.acceptance = { ...acceptedRecord(), team: ["lead", "named-only"] };
+    const team = engagementTeam(engagement({ workflow }));
+    expect(team.get("named-only")).toBe(at);
+    // A declaration also makes its declarant a team member.
+    workflow.declarations = [declaration("second-auditor")];
+    expect(engagementTeam(engagement({ workflow })).has("second-auditor")).toBe(
+      true,
+    );
   });
 
   it("finds team service on the client's other engagements within the cooling-off period", () => {
