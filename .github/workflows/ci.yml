@@ -58,8 +58,8 @@ jobs:
       # fresh set with the current engine and validate it as well.
       - name: Validate freshly generated external fixtures
         run: |
-          python schemas/generate-external-fixtures.py --output "$RUNNER_TEMP/external-runs.v1.2.json"
-          node schemas/validate-run-schema.mjs --external-fixtures "$RUNNER_TEMP/external-runs.v1.2.json"
+          python schemas/generate-external-fixtures.py --output "$RUNNER_TEMP/external-runs.v1.5.json"
+          node schemas/validate-run-schema.mjs --external-fixtures-1.5 "$RUNNER_TEMP/external-runs.v1.5.json"
 
   web:
     name: web
