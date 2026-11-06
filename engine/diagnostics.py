@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__
+from .errors import EngineError
 from .provenance import definition_versions, runtime_dependencies
 
 MAX_BYTES = 100 * 1024 * 1024
@@ -60,7 +61,10 @@ def finite_number(value: Any, name: str) -> float:
 def numeric_cell(value: str | None, name: str) -> float | None:
     if value is None or value.strip().lower() in {"", "null", "none"}:
         return None
-    return finite_number(value, name)
+    try:
+        return finite_number(value, name)
+    except ValueError as exc:
+        raise EngineError("invalid_numeric_value", str(exc)) from exc
 
 
 def label_cell(value: str | None) -> str | None:
@@ -72,28 +76,30 @@ def label_cell(value: str | None) -> str | None:
 def read_csv(path: str | Path) -> tuple[list[dict[str, str]], dict[str, Any]]:
     source = Path(path)
     if not source.is_file() or source.suffix.lower() != ".csv":
-        raise ValueError("Input must be an existing CSV file")
+        raise EngineError("dataset_malformed", "Input must be an existing CSV file")
     if source.stat().st_size > MAX_BYTES:
-        raise ValueError(f"CSV exceeds {MAX_BYTES} byte limit")
+        raise EngineError("dataset_limit_exceeded", f"CSV exceeds {MAX_BYTES} byte limit")
     data = source.read_bytes()
     if len(data) > MAX_BYTES:
-        raise ValueError("CSV grew beyond size limit during read")
+        raise EngineError("dataset_limit_exceeded", "CSV grew beyond size limit during read")
     try:
         reader = csv.DictReader(io.StringIO(data.decode("utf-8-sig"), newline=""), strict=True)
         columns = reader.fieldnames
-        if not columns or len(columns) > MAX_COLUMNS or len(set(columns)) != len(columns) or any(not c.strip() for c in columns):
-            raise ValueError("CSV requires unique, nonempty column names within the column limit")
+        if columns and len(columns) > MAX_COLUMNS:
+            raise EngineError("dataset_limit_exceeded", f"CSV exceeds {MAX_COLUMNS} column limit")
+        if not columns or len(set(columns)) != len(columns) or any(not c.strip() for c in columns):
+            raise EngineError("dataset_malformed", "CSV requires unique, nonempty column names")
         rows = []
         for row_number, row in enumerate(reader, 2):
             if None in row or any(v is None for v in row.values()):
-                raise ValueError(f"CSV row {row_number} has a different number of fields from its header")
+                raise EngineError("dataset_malformed", f"CSV row {row_number} has a different number of fields from its header")
             rows.append(row)
             if len(rows) > MAX_ROWS:
-                raise ValueError(f"CSV exceeds {MAX_ROWS} row limit")
+                raise EngineError("dataset_limit_exceeded", f"CSV exceeds {MAX_ROWS} row limit")
     except (UnicodeError, csv.Error) as exc:
-        raise ValueError("CSV must be well-formed UTF-8") from exc
+        raise EngineError("dataset_malformed", "CSV must be well-formed UTF-8") from exc
     if not rows:
-        raise ValueError("CSV contains no observations")
+        raise EngineError("dataset_malformed", "CSV contains no observations")
     return rows, {"name": source.name, "sha256": sha256(data), "bytes": len(data), "rowCount": len(rows), "columns": columns}
 
 
@@ -185,7 +191,7 @@ def threshold_for(config: dict[str, Any], name: str) -> dict[str, Any] | None:
 
 def metric(config: dict[str, Any], name: str, value: float | None, sample_size: int, *, unit: str = "ratio", numerator: int | None = None, denominator: int | None = None, details: dict[str, Any] | None = None, slices: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     if value is not None and not math.isfinite(value):
-        raise ValueError(f"Computed metric {name} overflowed; rescale numeric inputs")
+        raise EngineError("invalid_numeric_value", f"Computed metric {name} overflowed; rescale numeric inputs")
     return {"name": name, "value": value, "threshold": threshold_for(config, name), "unit": unit, "sampleSize": sample_size, "numerator": numerator, "denominator": denominator, "confidenceInterval": wilson(numerator, denominator) if numerator is not None and denominator is not None else None, "slices": slices or [], "details": details or {}}
 
 
@@ -212,7 +218,7 @@ def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any]) -> tuple
     required += [columns[c] for c in ("score", "protected") if c in columns]
     missing = set(required) - set(rows[0])
     if missing:
-        raise ValueError("Missing CSV columns: " + ", ".join(sorted(missing)))
+        raise EngineError("missing_column", "Missing CSV columns: " + ", ".join(sorted(missing)))
     observations = []
     for row_number, row in enumerate(rows, 2):
         if config["task"] == "regression":
@@ -223,11 +229,11 @@ def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any]) -> tuple
             predicted = label_cell(row[columns["prediction"]])
         score = numeric_cell(row[columns["score"]], f"row {row_number} score") if "score" in columns else None
         if score is not None and not 0 <= score <= 1:
-            raise ValueError("Scores must be probabilities between 0 and 1")
+            raise EngineError("invalid_numeric_value", f"Row {row_number} score is not a probability between 0 and 1")
         if target is None or predicted is None:
             continue
         if config["task"] == "binary_classification" and (target not in {config["positiveLabel"], config["negativeLabel"]} or predicted not in {config["positiveLabel"], config["negativeLabel"]}):
-            raise ValueError(f"Unexpected binary label in row {row_number}; configure positiveLabel and negativeLabel")
+            raise EngineError("label_set_mismatch", f"Unexpected binary label in row {row_number}; configure positiveLabel and negativeLabel")
         observations.append({"target": target, "prediction": predicted, "score": score, "group": label_cell(row[columns["protected"]]) if "protected" in columns else None})
     return observations, len(rows)-len(observations)
 
@@ -282,7 +288,7 @@ def binary_performance(observations: list[dict[str, Any]], config: dict[str, Any
 def multiclass_performance(observations: list[dict[str, Any]], config: dict[str, Any], omitted: int) -> list[dict[str, Any]]:
     labels = sorted({o["target"] for o in observations} | {o["prediction"] for o in observations})
     if len(labels) > 100:
-        raise ValueError("Multiclass evaluation is limited to 100 labels; revise the protocol for high-cardinality outcomes")
+        raise EngineError("cardinality_limit_exceeded", "Multiclass evaluation is limited to 100 labels; revise the protocol for high-cardinality outcomes")
     n = len(observations)
     cells = defaultdict(int)
     for observation in observations:
@@ -338,7 +344,7 @@ def fairness(observations: list[dict[str, Any]], config: dict[str, Any]) -> list
         if observation["group"] is not None:
             groups[observation["group"]].append(observation)
     if len(groups) > 1000:
-        raise ValueError("Fairness evaluation is limited to 1000 protected groups; revise the grouping protocol")
+        raise EngineError("cardinality_limit_exceeded", "Fairness evaluation is limited to 1000 protected groups; revise the grouping protocol")
     slices = []
     for group in sorted(groups):
         entries = groups[group]
@@ -421,16 +427,19 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
     if reference is None:
         return [result("DRIFT-INPUT", "Numeric distribution drift", "10, 15", [], ["Reference dataset is absent; no baseline was invented."], "inconclusive")]
     output = []
-    for feature in config["driftFeatures"]:
+    # Test IDs must match the shared schema's identifier pattern. Column names
+    # may contain spaces or any Unicode, so they stay in labels and details.
+    for index, feature in enumerate(config["driftFeatures"], 1):
+        test_id = f"DRIFT-{index}"
         if feature not in rows[0] or feature not in reference[0]:
-            raise ValueError(f"Drift feature {feature!r} is missing in current or reference CSV")
+            raise EngineError("missing_column", f"Drift feature {feature!r} is missing in current or reference CSV")
         a_raw = [numeric_cell(row[feature], f"reference row {i+2} feature {feature}") for i, row in enumerate(reference)]
         b_raw = [numeric_cell(row[feature], f"current row {i+2} feature {feature}") for i, row in enumerate(rows)]
         a = [v for v in a_raw if v is not None]
         b = [v for v in b_raw if v is not None]
         missing_details = {"feature": feature, "referenceN": len(a), "currentN": len(b), "referenceMissing": len(a_raw)-len(a), "currentMissing": len(b_raw)-len(b), "referenceMissingRate": (len(a_raw)-len(a))/len(a_raw), "currentMissingRate": (len(b_raw)-len(b))/len(b_raw)}
         if not a or not b:
-            output.append(result("DRIFT-"+feature, f"Distribution drift: {feature}", "10, 15", [], ["At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
+            output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", [], ["At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
             continue
         psi_value, psi_details = psi(a, b, config["psiBins"])
         ks = ks_statistic(a, b)
@@ -440,7 +449,7 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
         insufficient = min(len(a), len(b)) < config["minSampleSize"]
         if insufficient:
             notes.append("Insufficient current or reference numeric observations.")
-        output.append(result("DRIFT-"+feature, f"Distribution drift: {feature}", "10, 15", measurements, notes, "inconclusive" if insufficient else None))
+        output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", measurements, notes, "inconclusive" if insufficient else None))
     return output
 
 
@@ -452,6 +461,18 @@ def paper_for(run: dict[str, Any], diagnostic: dict[str, Any]) -> dict[str, Any]
     return {"id": paper_id, "schemaVersion": "1.0", "engagementId": run["engagementId"], "modelId": run["modelId"], "runId": run["id"], "templateId": "automated-diagnostic-v1", "title": diagnostic["label"], "status": "draft", "objective": f"Evaluate {diagnostic['label'].lower()} using frozen internal policy criteria.", "regulatoryMapping": {"regulation": "EU 2024/1689", "articleReferences": diagnostic["article"], "mappingKind": "supporting evidence; reviewer must determine applicability"}, "procedure": {"testId": diagnostic["testId"], "runnerVersion": runner_version, "testDefinitionVersion": test_version, "configurationSha256": run["provenance"]["configSha256"]}, "evidence": {"inputHashes": run["provenance"]["inputHashes"], "metrics": diagnostic["metrics"]}, "exceptions": diagnostic["limitations"], "proposedConclusion": diagnostic["outcome"], "review": {"required": True, "preparerId": "diagnostic-runner", "reviewerId": None, "reviewedAt": None, "signOffs": []}, "version": 1}
 
 
+def _inference(call, records):
+    """Score through an adapter; native runtimes raise their own error types."""
+    try:
+        return list(call(records))
+    except (EngineError, MemoryError):
+        # MemoryError is compute_resource_exhausted, not a model defect.
+        raise
+    except Exception as exc:
+        # Native messages can echo arbitrary content; keep only the type.
+        raise EngineError("model_inference_failed", "Model inference raised "+type(exc).__name__) from exc
+
+
 def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Path | None = None, *, adapter=None) -> dict[str, Any]:
     started_at = datetime.now(timezone.utc).isoformat()
     frozen = validate_config(config)
@@ -460,25 +481,36 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     reference_rows, reference_meta = read_dataset(reference_path) if reference_path else (None, None)
     if adapter is not None:
         if adapter.descriptor.task != frozen["task"]:
-            raise ValueError("Adapter task differs from frozen run configuration")
+            raise EngineError("model_interface_mismatch", "Adapter task differs from frozen run configuration")
         if frozen.get("modelSpec") != adapter.spec:
-            raise ValueError("Adapter modelSpec must be bound into the frozen configuration")
-        feature_rows = [{feature.name: numeric_cell(row.get(feature.name), "model feature "+feature.name) for feature in adapter.descriptor.feature_schema} for row in rows]
-        predictions = list(adapter.predict(feature_rows))
+            raise EngineError("model_interface_mismatch", "Adapter modelSpec must be bound into the frozen configuration")
+        # The decision threshold applies to this label's probability.
+        if frozen["task"] == "binary_classification" and getattr(adapter, "positive_label", None) not in (None, frozen["positiveLabel"]):
+            raise EngineError("label_set_mismatch", "Adapter favourable label differs from the frozen positiveLabel")
+        absent = [feature.name for feature in adapter.descriptor.feature_schema if feature.name not in rows[0]]
+        if absent:
+            raise EngineError("missing_column", "Model feature columns are absent: "+", ".join(map(repr, absent)))
+        feature_rows = [{feature.name: numeric_cell(row[feature.name], "model feature "+feature.name) for feature in adapter.descriptor.feature_schema} for row in rows]
+        if any(value is None for record in feature_rows for value in record.values()):
+            raise EngineError("missing_value", "Model inference requires complete numeric features; apply reviewed preprocessing before ingestion")
+        predictions = _inference(adapter.predict, feature_rows)
         if len(predictions) != len(rows):
-            raise ValueError("Model returned a different number of predictions")
+            raise EngineError("model_output_invalid", "Model returned a different number of predictions")
         rows = [{**row, frozen["columns"]["prediction"]: str(prediction)} for row, prediction in zip(rows, predictions)]
         if "score" in frozen["columns"]:
             score_column = frozen["columns"]["score"]
             if "probability" in adapter.capabilities and frozen["task"] == "binary_classification":
-                probabilities = list(adapter.predict_probability(feature_rows))
+                probabilities = _inference(adapter.predict_probability, feature_rows)
                 positive_index = adapter.descriptor.output_labels.index(frozen["positiveLabel"])
                 if len(probabilities) != len(rows) or any(len(values) != 2 for values in probabilities):
-                    raise ValueError("Binary model probability dimensions differ from declared labels")
+                    raise EngineError("model_output_invalid", "Binary model probability dimensions differ from declared labels")
                 for row, values in zip(rows, probabilities):
-                    numeric = [finite_number(value, "model probability") for value in values]
+                    try:
+                        numeric = [finite_number(value, "model probability") for value in values]
+                    except ValueError as exc:
+                        raise EngineError("model_output_invalid", str(exc)) from exc
                     if any(not 0 <= value <= 1 for value in numeric) or not math.isclose(sum(numeric), 1.0, abs_tol=1e-5):
-                        raise ValueError("Model probabilities must lie in [0,1] and sum to one")
+                        raise EngineError("model_output_invalid", "Model probabilities must lie in [0,1] and sum to one")
                     row[score_column] = str(numeric[positive_index])
             else:
                 # Never attach saved probabilities from a different model to
@@ -497,6 +529,7 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
                 for diagnostic in fairness_results:
                     diagnostic["limitations"].append(f"Excluded {omitted} input rows missing target or prediction before group comparison.")
             diagnostics.extend(fairness_results)
+    from_predictions = list(diagnostics)
     if "drift" in frozen["suite"]:
         diagnostics.extend(drift(rows, reference_rows, frozen))
     for suite in frozen["suite"]:
@@ -507,9 +540,15 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
                 else:
                     from .model_diagnostics import permutation_importance, perturbation
                     diagnostics.append((permutation_importance if suite == "permutation_importance" else perturbation)(rows, frozen, adapter))
+                from_predictions.append(diagnostics[-1])
                 continue
             test_id, label, article, reason = UNAVAILABLE_SUITES[suite]
             diagnostics.append(result(test_id, label, article, [], ["Capability unavailable in this runner: "+reason], "inconclusive"))
+    # How the adapter produced its predictions (for example class labels that
+    # bypass the frozen threshold) qualifies every result built on them.
+    adapter_notes = list(getattr(adapter, "limitations", None) or ()) if adapter is not None else []
+    for diagnostic in from_predictions:
+        diagnostic["limitations"].extend(adapter_notes)
     outcomes = [r["outcome"] for r in diagnostics]
     overall = "fail" if "fail" in outcomes else "inconclusive" if "inconclusive" in outcomes else "pass" if "pass" in outcomes else "not_applicable"
     input_hashes = {"data": current_meta["sha256"], "reference": reference_meta["sha256"] if reference_meta else None}
@@ -518,7 +557,7 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     dependencies, dependency_notes = runtime_dependencies(adapter, (current_meta, reference_meta))
     report = {"contractVersion": "1.0", "id": frozen["id"], "engagementId": frozen["engagementId"], "modelId": frozen["modelId"], "datasetId": frozen["datasetId"], "suite": frozen["suite"], "thresholds": frozen["thresholds"], "seed": frozen["seed"], "state": "succeeded", "outcome": overall, "overallOutcome": overall, "startedAt": started_at, "configuration": frozen, "provenance": {"runnerVersion": __version__, "inputHashes": input_hashes, "configSha256": sha256(canonical_bytes(frozen)), "inputs": {"data": current_meta, "reference": reference_meta}, "determinism": "No sampling or randomized computation; seed reserved for adapter protocols", "dependencies": dependencies}, "results": diagnostics, "limitations": ["This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.", "Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody."], "paperIds": [], "workingPapers": []}
     report["provenance"]["inputs"]["testDefinitions"] = definition_versions(diagnostic["testId"] for diagnostic in diagnostics)
-    report["limitations"].extend(dependency_notes)
+    report["limitations"].extend(dependency_notes+adapter_notes)
     report["workingPapers"] = [paper_for(report, diagnostic) for diagnostic in diagnostics]
     report["provenance"]["policyVersion"] = frozen["thresholds"]["policyVersion"]
     if adapter is not None:
