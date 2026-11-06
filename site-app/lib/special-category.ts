@@ -331,8 +331,9 @@ function fromCodes(codes: ArrayLike<number>) {
 }
 /**
  * The byte order of UTF-16 text without a byte order mark: in text that is
- * mostly ASCII, every other byte is NUL. Null when the bytes do not look
- * like UTF-16.
+ * mostly ASCII, every other byte is NUL. It is taken as UTF-16 when at least
+ * 75 % of its first 512 byte pairs have a NUL on one side only, the same
+ * side. Null when the bytes do not look like UTF-16.
  */
 export function utf16ByteOrder(b: Uint8Array): "le" | "be" | null {
   const pairs = Math.min(b.length >> 1, 512);
@@ -358,8 +359,8 @@ function utf16(b: Uint8Array, order: "le" | "be", from: number) {
 }
 /**
  * The text of an upload's first bytes, for finding its header row: UTF-16
- * when a byte order mark says so (Excel's "Unicode Text") or when every
- * other byte is NUL (UTF-16 written without one), UTF-8 when the bytes are
+ * when a byte order mark says so (Excel's "Unicode Text") or when mostly
+ * every other byte is NUL (UTF-16 written without one, see utf16ByteOrder), UTF-8 when the bytes are
  * valid UTF-8, and Windows-1252 otherwise (Excel's "CSV (Comma delimited)"
  * on Western-European systems). Decoded by hand, so the result does not
  * depend on the legacy encodings the runtime's TextDecoder knows.
