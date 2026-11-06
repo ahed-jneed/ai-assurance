@@ -132,7 +132,9 @@ for task, tests in [('Binary classification', ['performance', 'demographic_parit
     manifestTask = {'properties': {'model': {'properties': {'task': {'const': task}}}, 'profile': {'anyOf': [{'type': 'null'}, {'properties': {'task': {'const': task}}}]}}}
     resultTests = {'items': {'properties': {'testId': en(*tests)}}}
     run['allOf'].append(condition({'task': {'const': task}}, {'properties': {'manifest': manifestTask, 'results': resultTests}}))
-defs['procedureBinding'] = obj({'procedureId': ref('id'), 'procedureRevision': it(1, 2147483647), 'briefRevision': it(1, 2147483647), 'programRevision': it(1, 2147483647)})
+# planHash: the procedure plan hash the run was queued for (#69); absent on runs
+# queued before runs recorded it and on external job runs, which bind the plan revision.
+defs['procedureBinding'] = obj({'procedureId': ref('id'), 'procedureRevision': it(1, 2147483647), 'planHash': ref('sha256'), 'briefRevision': it(1, 2147483647), 'programRevision': it(1, 2147483647)}, ['procedureId', 'procedureRevision', 'briefRevision', 'programRevision'])
 run['properties']['procedureBinding'] = ref('procedureBinding')
 run['properties']['retryOf'] = ref('id')
 # Rule-pack stamp (#18): the rule pack and methodology the run was made under.

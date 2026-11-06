@@ -16,6 +16,8 @@ import {
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { diagnosticNarrative } from "../presentation";
+import { substantivePlan } from "../workflow/command";
+import { runBindsProcedure } from "../workflow-state";
 import { defineCommands } from "./command";
 import { short } from "./fields";
 /**
@@ -89,10 +91,15 @@ export const runs = defineCommands({
           JSON.stringify(run.manifest),
         );
       }
+      // The run binds the plan content, as executions do: the plan hash is
+      // kept on first use for procedures planned before plan hashes.
       if (p)
         run.procedureBinding = {
           procedureId: p.id,
           procedureRevision: p.revision,
+          planHash: (p.planHash ??= await sha256(
+            JSON.stringify(substantivePlan(p)),
+          )),
           briefRevision: e.workflow!.brief!.revision,
           programRevision: e.workflow!.program.revision,
         };
@@ -125,14 +132,14 @@ export const runs = defineCommands({
             (p) => p.id === source.procedureBinding?.procedureId,
           )
         : undefined;
+      // The procedure's plan and the scope decide, as for linking a run to an
+      // execution; a change to another procedure that moved the program
+      // revision does not stop the retry once the program is approved again.
       if (
         source.procedureBinding &&
         (!p ||
           e.workflow?.program.status !== "approved" ||
-          p.revision !== source.procedureBinding.procedureRevision ||
-          e.workflow.program.revision !==
-            source.procedureBinding.programRevision ||
-          e.workflow.brief?.revision !== source.procedureBinding.briefRevision)
+          !runBindsProcedure(e, p, source))
       )
         throw new ApiError(
           409,
