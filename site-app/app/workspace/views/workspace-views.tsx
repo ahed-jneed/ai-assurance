@@ -7,7 +7,7 @@ import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
 import { WorkingPaperRegister } from "../../paper-register";
 import type { WorkspaceData } from "../../workspace-types";
-import type { PendingLabIntent } from "../lab-intent";
+import type { LabIntentState } from "../lab-intent";
 import { classificationDefaults } from "../modals/classification";
 import {
   newFindingDefaults,
@@ -67,7 +67,7 @@ export function WorkspaceViews({
   paperRows,
   reporters,
   resolve,
-  labIntent,
+  lab,
   onModal,
   onDetail,
   onOnboard,
@@ -84,7 +84,8 @@ export function WorkspaceViews({
   paperRows: PaperRegisterRow[];
   reporters: Record<EditingSource, EditingReporter>;
   resolve: (id: string) => string;
-  labIntent: PendingLabIntent;
+  /** Work handed to the Testing lab (lab-intent.ts). */
+  lab: Pick<LabIntentState, "intent" | "consume">;
   onModal: OpenModal;
   onDetail: ViewDetail;
   onOnboard: () => void;
@@ -194,6 +195,7 @@ export function WorkspaceViews({
             onContext={url.setProcedureContext}
             onFinding={(p) => onModal("finding", procedureFindingDefaults(p))}
             onFollowup={(id) => nav.openEngagement(id)}
+            onQueuedRun={nav.showQueuedRun}
           />
         </Suspense>
       )}
@@ -280,8 +282,8 @@ export function WorkspaceViews({
       {view === "Testing lab" && (
         <Suspense fallback={panelFallback}>
           <TestingLab
-            initialProcedure={labIntent.procedureId}
-            datasetCardRecordId={labIntent.datasetCardRecordId}
+            intent={lab.intent}
+            onIntentUsed={lab.consume}
             onRefresh={reload}
             key={data.tenantId + ":" + e.id}
             engagement={e}
@@ -291,6 +293,7 @@ export function WorkspaceViews({
             view={url.labView}
             onView={url.setLabView}
             onEditorOpen={reporters["testing-lab"]}
+            onDatasetEditing={reporters["dataset-registry"]}
             act={act}
             onPaper={nav.openPaper}
             resolve={resolve}

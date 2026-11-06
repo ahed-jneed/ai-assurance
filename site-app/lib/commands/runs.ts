@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { records } from "../assurance-store";
+import { aggregateOutcome } from "../diagnostic-decisions";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain";
 import { getEngagement, now, save, sha256 } from "../engagement-repo";
@@ -8,7 +9,9 @@ import {
   registerModel,
   registerProfile,
   queueEvaluation,
+  queueRetry,
   executionCSV,
+  verifyFrozenInputs,
 } from "../evaluation-service";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
@@ -114,7 +117,9 @@ export const runs = defineCommands({
           409,
           "Retry a failed or cancelled frozen evaluation",
         );
-      await executionCSV(e, source);
+      // The retry is a new run under the current runner; the source's own
+      // definition version may be retired.
+      await verifyFrozenInputs(e, source);
       const p = source.procedureBinding
         ? e.workflow?.procedures.find(
             (p) => p.id === source.procedureBinding?.procedureId,
@@ -133,19 +138,7 @@ export const runs = defineCommands({
           409,
           "The audit scope or procedure changed. Queue a new planned evaluation",
         );
-      const args = source.profileId
-          ? {
-              modelId: source.modelId,
-              datasetId: source.datasetId,
-              profileId: source.profileId,
-            }
-          : {
-              modelId: source.modelId,
-              datasetId: source.datasetId,
-              suite: source.suite,
-              config: source.config,
-            },
-        run = await queueEvaluation(e, args, ctx.user.userId);
+      const run = await queueRetry(e, source, ctx.user.userId);
       run.retryOf = source.id;
       if (source.procedureBinding) {
         run.procedureBinding = { ...source.procedureBinding };
@@ -177,11 +170,7 @@ export const runs = defineCommands({
       try {
         const { a, csv } = await executionCSV(e, run);
         run.results = evaluate(run, csv);
-        run.outcome = run.results.some((r) => r.outcome === "fail")
-          ? "fail"
-          : run.results.some((r) => r.outcome === "inconclusive")
-            ? "inconclusive"
-            : "pass";
+        run.outcome = aggregateOutcome(run.results.map((r) => r.outcome));
         run.overallOutcome = run.outcome;
         run.state = "succeeded";
         run.completedAt = now();

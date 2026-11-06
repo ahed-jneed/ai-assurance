@@ -105,7 +105,11 @@ assert.ok(complete && queued && regression && multiclass && cardFixture, 'Expect
 const legacy = copy(complete);
 legacy.contractVersion = '1.0';
 for (const key of ['task', 'profileId', 'manifest']) delete legacy[key];
-legacy.provenance = { inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
+// Contract 1.0 predates the performance positive class of test definitions
+// 2.1.0, which fresh `--fixtures` runs freeze.
+delete legacy.config.performancePositiveLabel;
+delete legacy.thresholds.performancePositiveLabel;
+legacy.provenance ={ inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
 positive('Legacy interactive completed', legacy);
 const oldConfig = copy(legacy);
 for (const key of ['minimumSampleSize', 'minimumClassCount', 'maximumOddsGap', 'minimumRecall', 'minimumMacroF1', 'maximumRmse']) {
@@ -140,6 +144,16 @@ positive('Hosted run with rule-pack stamp', stamped);
 negative('rule-pack stamp with unknown field', stamped, run => { run.rulePack.approvedBy = 'counsel'; });
 negative('rule-pack stamp without legal-review status', stamped, run => { delete run.rulePack.legalReview; });
 negative('malformed methodology version', stamped, run => { run.methodologyVersion = 'latest'; });
+// Test definitions 2.1.0: binary performance freezes its positive class and
+// reports specificity, prevalence and the majority-class baseline.
+const perClass = copy(complete);
+perClass.config.performancePositiveLabel = perClass.config.positiveLabel;
+perClass.thresholds.performancePositiveLabel = perClass.config.positiveLabel;
+const perClassResult = perClass.results.find(result => result.testId === 'performance');
+for (const name of ['specificity', 'prevalence', 'majority_baseline_accuracy']) perClassResult.metrics.push({ name, value: 0.5, unit: 'ratio', sampleSize: perClassResult.metrics[0].sampleSize });
+positive('Hosted performance positive class and per-class evidence', perClass);
+negative('per-class ratio outside range', perClass, run => { run.results.find(result => result.testId === 'performance').metrics.at(-1).value = 1.5; });
+negative('per-class metric on a fairness result', perClass, run => { run.results.find(result => result.testId === 'demographic_parity').metrics.push({ name: 'specificity', value: 0.5, unit: 'ratio', sampleSize: 1 }); });
 
 const mutations = [
   ['unknown contract', complete, run => { run.contractVersion = '2.0'; }],

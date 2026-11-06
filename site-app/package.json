@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "check:harnesses": "node scripts/run-checks.mjs",
+    "seed:demo": "node scripts/seed-demo.mjs",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build && npm run check:harnesses",
     "db:generate": "drizzle-kit generate"
   },

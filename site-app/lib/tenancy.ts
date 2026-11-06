@@ -1,12 +1,13 @@
 // Who is calling, in which practice and with which role: resolves the signed-in
-// user to an active membership, provisions a practice on first sign-in and
-// enforces role and practice-administration permissions.
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+// user (lib/identity.ts) to an active membership, provisions a practice on
+// first sign-in and enforces role and practice-administration permissions.
+// Apart from that first provisioning, resolving the caller only reads.
 import type { Role } from "./domain";
 import { roles } from "./domain";
 import { db, now, sha256 } from "./engagement-repo";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
+import { currentUser } from "./identity";
 export type Context = {
   user: { userId: string; displayName: string; email: string };
   tenantId: string;
@@ -15,7 +16,7 @@ export type Context = {
   practiceAdmin?: boolean;
 };
 export async function context(tenantId?: string): Promise<Context> {
-  const user = await getChatGPTUser();
+  const user = currentUser();
   if (!user) throw new ApiError(401, "Sign in to access the audit workspace");
   if (!tenantId) {
     const existing = await db()
@@ -47,25 +48,6 @@ export async function context(tenantId?: string): Promise<Context> {
     .first<{ role: Role; client_id: string | null }>();
   if (!member || !roles.includes(member.role))
     throw new ApiError(403, "You do not have access to this practice");
-  // Adopt existing practice access once. New members receive no engagement grants.
-  // A policy row prevents a revoked grant from being recreated on later reads.
-  await db().batch([
-    db()
-      .prepare(
-        "INSERT OR IGNORE INTO practice_admins(tenant_id,user_id,active) SELECT ?,MIN(user_id),1 FROM memberships WHERE tenant_id=? AND role='Lead Auditor' AND status='active' HAVING NOT EXISTS(SELECT 1 FROM practice_admins WHERE tenant_id=?)",
-      )
-      .bind(tenantId, tenantId, tenantId),
-    db()
-      .prepare(
-        "INSERT OR IGNORE INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) SELECT e.tenant_id,e.id,m.user_id,1,'legacy-access-adoption',? FROM engagements e JOIN memberships m ON m.tenant_id=e.tenant_id AND m.status='active' AND m.role IN ('Auditor','Lead Auditor','Reviewer') WHERE e.tenant_id=? AND NOT EXISTS(SELECT 1 FROM engagement_access_policies p WHERE p.tenant_id=e.tenant_id AND p.engagement_id=e.id)",
-      )
-      .bind(now(), tenantId),
-    db()
-      .prepare(
-        "INSERT OR IGNORE INTO engagement_access_policies(tenant_id,engagement_id,created_at) SELECT tenant_id,id,? FROM engagements WHERE tenant_id=?",
-      )
-      .bind(now(), tenantId),
-  ]);
   const practiceAdmin = !!(await db()
     .prepare(
       "SELECT 1 FROM practice_admins WHERE tenant_id=? AND user_id=? AND active=1",
@@ -80,19 +62,24 @@ export async function context(tenantId?: string): Promise<Context> {
     practiceAdmin,
   };
 }
-/** First sign-in: a practice led by the user, with an example client and engagement. */
+/**
+ * First sign-in: a practice that the user leads and administers, with an
+ * example client and an engagement only the user may open. Practices that
+ * predate engagement grants were adopted once by drizzle/0005.
+ */
 async function provisionPractice(user: Context["user"]) {
   const tenantId = "tenant-" + (await sha256(user.userId)).slice(0, 24);
   const clientId = "CL-default",
     e = freshEngagement(clientId, "New AI assurance engagement", user.userId);
   e.id = "ENG-default";
-  const body = JSON.stringify(e);
+  const body = JSON.stringify(e),
+    at = now();
   await db().batch([
     db()
       .prepare(
         "INSERT OR IGNORE INTO tenants(id,name,created_at) VALUES(?,?,?)",
       )
-      .bind(tenantId, "Assurance practice", now()),
+      .bind(tenantId, "Assurance practice", at),
     db()
       .prepare(
         "INSERT OR IGNORE INTO memberships(tenant_id,user_id,role,client_id,display_name) VALUES(?,?,?,?,?)",
@@ -100,9 +87,14 @@ async function provisionPractice(user: Context["user"]) {
       .bind(tenantId, user.userId, "Lead Auditor", null, user.displayName),
     db()
       .prepare(
+        "INSERT OR IGNORE INTO practice_admins(tenant_id,user_id,active) VALUES(?,?,1)",
+      )
+      .bind(tenantId, user.userId),
+    db()
+      .prepare(
         "INSERT OR IGNORE INTO clients(tenant_id,id,name,sector,created_at) VALUES(?,?,?,?,?)",
       )
-      .bind(tenantId, clientId, "Example client", "Financial services", now()),
+      .bind(tenantId, clientId, "Example client", "Financial services", at),
     db()
       .prepare(
         "INSERT OR IGNORE INTO engagements(tenant_id,id,client_id,title,version,body,last_command_id) VALUES(?,?,?,?,?,?,?)",
@@ -112,7 +104,17 @@ async function provisionPractice(user: Context["user"]) {
       .prepare(
         "INSERT OR IGNORE INTO engagement_snapshots(tenant_id,engagement_id,version,body,sha256,created_at) VALUES(?,?,?,?,?,?)",
       )
-      .bind(tenantId, e.id, 1, body, await sha256(body), now()),
+      .bind(tenantId, e.id, 1, body, await sha256(body), at),
+    db()
+      .prepare(
+        "INSERT OR IGNORE INTO engagement_access_policies(tenant_id,engagement_id,created_at) VALUES(?,?,?)",
+      )
+      .bind(tenantId, e.id, at),
+    db()
+      .prepare(
+        "INSERT OR IGNORE INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) VALUES(?,?,?,1,?,?)",
+      )
+      .bind(tenantId, e.id, user.userId, user.userId, at),
   ]);
   return tenantId;
 }

@@ -36,3 +36,30 @@ export const datasetCardSchema = z
     "Explain the baseline selection",
   );
 export type DatasetCard = z.infer<typeof datasetCardSchema>;
+
+/** A registered dataset card record, as the assurance records API returns it. */
+type CardRecord = {
+  id: string;
+  kind: string;
+  body: { artifactId?: unknown; artifactSha256?: unknown };
+};
+/**
+ * The dataset card to pin to an evaluation of `artifact`: the `preferred`
+ * card when it describes these exact bytes, otherwise the latest card that
+ * does. Records are in registration order. A card for other bytes is never
+ * chosen, so a card handed over for one evaluation cannot leak into another.
+ */
+export function datasetCardFor<T extends CardRecord>(
+  cards: readonly T[],
+  artifact: { id: string; sha256: string } | undefined,
+  preferred?: string,
+): T | undefined {
+  if (!artifact) return undefined;
+  const matching = cards.filter(
+    (c) =>
+      c.kind === "dataset" &&
+      c.body.artifactId === artifact.id &&
+      c.body.artifactSha256 === artifact.sha256,
+  );
+  return matching.find((c) => c.id === preferred) ?? matching.at(-1);
+}

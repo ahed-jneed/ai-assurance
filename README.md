@@ -39,7 +39,7 @@ Every report is a fixed snapshot. Final issuance requires signed required/exclud
 
 ## Run locally
 
-Node >=22.13.0 (CI uses Node 22) and Python 3.11. Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations in order (every file in `site-app/drizzle/`; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. Hosting uses dispatch-owned identity, not the local mock. `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
+Node >=22.13.0 (CI uses Node 22) and Python 3.11. Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations in order (every file in `site-app/drizzle/`; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. To exercise several roles, run `npm run seed:demo` while the dev server is up and sign in as a test persona with `/signin-with-chatgpt?as=<persona>` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`); the account menu switches persona and signs out. Hosting uses dispatch-owned identity, not the local mock. The Worker trusts only the identity source that `IDENTITY_MODE` names (Sites dispatch, Cloudflare Access, or the loopback test and dev modes) and answers 401 when none is configured; see [`docs/security/identity.md`](docs/security/identity.md). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
 
 ```powershell
 cd site-app
@@ -48,6 +48,8 @@ npm run build
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_sour_tana_nile.sql
 # ...repeat for each later migration in drizzle/, in order
 npm run dev
+# in another terminal: the persona demo practice
+npm run seed:demo
 ```
 
 Apply each migration once; do not replay already-applied migrations. Hosting applies production migrations separately.
@@ -65,7 +67,7 @@ CI (`.github/workflows/ci.yml`) runs two jobs on every pull request and on pushe
 | `npm run build` | Production Worker build; must stay warning-free |
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
 
-The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs.
+The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
 The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
 

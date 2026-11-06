@@ -32,6 +32,8 @@ export type WorkspaceData = {
     due_date: string;
   }[];
   engagement: Engagement | null;
+  /** The selected engagement's stored size in bytes, for internal roles. */
+  metadataBytes?: number | null;
   members: Member[];
   people: {
     user_id: string;

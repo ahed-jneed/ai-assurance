@@ -21,6 +21,12 @@ const mf = new Miniflare({
   modulesRoot: path.resolve("dist/server"),
   compatibilityDate: "2026-05-15",
   compatibilityFlags: ["nodejs_compat"],
+  // The fixture identity headers below are trusted only because this opts in
+  // to the loopback-only test mode (docs/security/identity.md).
+  bindings: {
+    IDENTITY_MODE: "trusted-headers",
+    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+  },
   d1Databases: { DB: "audit-integration" },
   r2Buckets: { BUCKET: "audit-integration-evidence" },
   d1Persist: false,
@@ -560,13 +566,39 @@ try {
       minimumAccuracy: 0.8,
     },
   };
+  // A new run needs a saved protocol; an explicit suite and configuration
+  // would skip its checks, such as the fairness data-handling basis.
+  await command("queueRun", runInput, owner, 400);
+  const fairnessProtocol = {
+    name: "Synthetic performance and fairness",
+    version: "1.0",
+    task: "Binary classification",
+    suite: runInput.suite,
+    config: runInput.config,
+    datasetContext: {
+      split: "test",
+      population: "Synthetic full fixture population",
+      predictionProvenance: "Controlled synthetic predictions",
+      independence: "Synthetic fixture; no real holdout independence claim",
+      sensitiveDataBasis: "Synthetic groups; no personal data",
+    },
+    rationale: "Fixture acceptance rules assess arithmetic, not conformity",
+  };
   await command(
-    "queueRun",
-    { ...runInput, suite: ["performance", "performance"] },
+    "createEvaluationProfile",
+    { ...fairnessProtocol, suite: ["performance", "performance"] },
     owner,
     400,
   );
-  const queued = await command("queueRun", runInput);
+  const fairnessProfile = await command(
+    "createEvaluationProfile",
+    fairnessProtocol,
+  );
+  const queued = await command("queueRun", {
+    modelId: runInput.modelId,
+    datasetId: runInput.datasetId,
+    profileId: fairnessProfile.details.profileId,
+  });
   await command("executeRun", { runId: queued.details.runId });
   const run = e.runs.at(-1);
   assert.equal(
@@ -678,13 +710,21 @@ try {
   assert.equal(e.models.at(-1).card.source.revision, "a".repeat(40));
   await command(
     "queueRun",
-    { ...runInput, datasetId: "different-artifact" },
+    {
+      modelId: runInput.modelId,
+      datasetId: "different-artifact",
+      profileId: fairnessProfile.details.profileId,
+    },
     owner,
     400,
   );
   await command(
-    "queueRun",
-    { ...runInput, config: { ...runInput.config, predictionColumn: "actual" } },
+    "createEvaluationProfile",
+    {
+      ...fairnessProtocol,
+      version: "1.1",
+      config: { ...runInput.config, predictionColumn: "actual" },
+    },
     owner,
     400,
   );
@@ -809,9 +849,11 @@ try {
       intendedPurpose: "Task expansion fixture",
       artifactId,
     });
-    const q = await command("queueRun", {
-      modelId: e.models.at(-1).id,
-      datasetId: artifactId,
+    const modelId = e.models.at(-1).id;
+    const protocol = await command("createEvaluationProfile", {
+      ...profileInput,
+      name: item.task + " acceptance",
+      task: item.task,
       suite: item.suite,
       config: {
         ...runInput.config,
@@ -821,6 +863,11 @@ try {
         maximumRmse: 2,
         minimumMacroF1: 0.5,
       },
+    });
+    const q = await command("queueRun", {
+      modelId,
+      datasetId: artifactId,
+      profileId: protocol.details.profileId,
     });
     await command("executeRun", { runId: q.details.runId });
     const tested = e.runs.at(-1);
@@ -1156,7 +1203,10 @@ try {
   });
   assert.equal(report.snapshot.annexIV.length, 9);
   assert.equal(report.snapshot.models.length, e.models.length);
-  assert.equal(report.snapshot.evaluationProfiles.length, 2);
+  assert.equal(
+    report.snapshot.evaluationProfiles.length,
+    e.evaluationProfiles.length,
+  );
   await command("reopenPaper", { paperId: p.id });
   assert.equal(e.papers.find((x) => x.id === p.id).signatures.length, 0);
   assert.equal(
@@ -1396,7 +1446,14 @@ try {
     datasetId: uploaded.artifactId,
     profileId,
   };
-  await command("saveProcedurePlan", { procedureId: proc.id, plan });
+  await command("saveProcedurePlan", {
+    procedureId: proc.id,
+    assignmentRevision: proc.assignmentRevision ?? 1,
+    plan,
+  });
+  const currentPlan = () => e.workflow.procedures.find((p) => p.id === proc.id);
+  // The assignment revision a plan form opened now would send.
+  const openedAt = currentPlan().assignmentRevision;
   const beforeBulk = e.workflow.program.revision;
   await command(
     "bulkPlanProcedures",
@@ -1414,7 +1471,9 @@ try {
     procedureIds: [proc.id],
     patch: { dueDate: "2026-12-30" },
   });
-  assert.equal(e.workflow.program.revision, beforeBulk + 1);
+  // Drafting amends the program revision; only submissions are revisions.
+  assert.equal(e.workflow.program.revision, beforeBulk);
+  assert.equal(e.workflow.program.history.length, 0);
   const tasks = await request(
     "/api/work-inbox?" + new URLSearchParams({ tenantId }),
   );
@@ -1428,13 +1487,24 @@ try {
     reviewer,
   );
   assert(!e.workflow.program.contributors.includes(reviewer));
+  const resampled = {
+    ...plan,
+    sampling: "All 80 synthetic records, checked against source manifest",
+  };
+  // A plan opened before the bulk due-date change would revert it.
+  await command(
+    "saveProcedurePlan",
+    { procedureId: proc.id, assignmentRevision: openedAt, plan: resampled },
+    owner,
+    409,
+  );
+  assert.equal(currentPlan().dueDate, "2026-12-30");
   await command("saveProcedurePlan", {
     procedureId: proc.id,
-    plan: {
-      ...plan,
-      sampling: "All 80 synthetic records, checked against source manifest",
-    },
+    assignmentRevision: currentPlan().assignmentRevision,
+    plan: { ...resampled, dueDate: currentPlan().dueDate },
   });
+  assert.equal(currentPlan().dueDate, "2026-12-30");
   await command("submitProgram", {});
   await command(
     "approveProgram",

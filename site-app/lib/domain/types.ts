@@ -151,7 +151,10 @@ export type EvaluationConfig = {
   labelColumn: string;
   predictionColumn: string;
   groupColumn: string;
+  /** The favourable outcome fairness tests count as selection. */
   positiveLabel: string;
+  /** The class binary recall is measured on; absent or empty: positiveLabel. */
+  performancePositiveLabel?: string;
   minimumGroupSize: number;
   maximumParityGap: number;
   minimumImpactRatio: number;

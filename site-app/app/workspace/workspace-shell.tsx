@@ -15,6 +15,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { canWrite } from "@/lib/domain";
 import { selectPaperRegister } from "@/lib/paper-presentation";
+import {
+  AccountMenu,
+  DevPersonaSignIn,
+  SIGN_IN_LABEL,
+  signInHere,
+} from "../account-menu";
 import { EngagementSwitcher } from "../engagement-switcher";
 import { MemberOnboarding } from "../member-onboarding";
 import { WorkspaceNavigation } from "../workspace-navigation";
@@ -76,13 +82,10 @@ function SignedOut() {
           Sign in to access your practice, client engagements and controlled
           audit evidence.
         </p>
-        <a
-          href="/signin-with-chatgpt?return_to=%2F"
-          target="_top"
-          className="signin-button"
-        >
-          Sign in with ChatGPT
+        <a href={signInHere()} target="_top" className="signin-button">
+          {SIGN_IN_LABEL}
         </a>
+        <DevPersonaSignIn />
         <p className="subtle">
           Access is determined by your practice membership.
         </p>
@@ -105,7 +108,7 @@ export default function Workspace() {
   const modal = useModalState();
   const sheet = useRecordSheet();
   const paper = usePaperEditor(e);
-  const lab = useLabIntent(url.procedureContext);
+  const lab = useLabIntent(url.view);
   const [switchOpen, setSwitchOpen] = useState(false),
     [searchOpen, setSearchOpen] = useState(false),
     [sidebarWidth, setSidebarWidth] = useState(272),
@@ -220,6 +223,7 @@ export default function Workspace() {
         onNavigate={nav.navigate}
         onSwitch={nav.switchEngagement}
         onPractice={nav.changePractice}
+        account={<AccountMenu data={data} />}
       />
       <SidebarInset>
         <WorkspaceTopbar
@@ -262,7 +266,7 @@ export default function Workspace() {
                 paperRows={paperRows}
                 reporters={editing.reporters}
                 resolve={resolveName}
-                labIntent={lab.intent}
+                lab={lab}
                 onModal={modal.open}
                 onDetail={sheet.viewDetail}
                 onOnboard={() => setOnboarding(true)}

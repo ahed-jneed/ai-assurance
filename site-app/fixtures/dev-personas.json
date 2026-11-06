@@ -1,0 +1,66 @@
+{
+  "$comment": "Loopback development identities. /signin-with-chatgpt signs in as `defaultIdentity`; /signin-with-chatgpt?as=<id> as a persona (build/sites-vite-plugin.ts). `npm run seed:demo` gives each persona its role in a demo practice (scripts/seed-demo.mjs). Never used by a build.",
+  "defaultIdentity": {
+    "userId": "local_seedy",
+    "email": "seedy@sites.test",
+    "name": "Seedy"
+  },
+  "personas": [
+    {
+      "id": "qa-lead",
+      "userId": "persona-qa-lead",
+      "email": "qa-lead@personas.test",
+      "name": "QA Lead",
+      "role": "Lead Auditor",
+      "purpose": "Leads and administers the demo practice; lead sign-off and client access grants."
+    },
+    {
+      "id": "qa-auditor",
+      "userId": "persona-qa-auditor",
+      "email": "qa-auditor@personas.test",
+      "name": "QA Auditor",
+      "role": "Auditor",
+      "purpose": "Prepares working papers and procedures on the Acme engagement."
+    },
+    {
+      "id": "qa-reviewer",
+      "userId": "persona-qa-reviewer",
+      "email": "qa-reviewer@personas.test",
+      "name": "QA Reviewer",
+      "role": "Reviewer",
+      "purpose": "Independent reviewer on the Acme engagement."
+    },
+    {
+      "id": "qa-lead2",
+      "userId": "persona-qa-lead2",
+      "email": "qa-lead2@personas.test",
+      "name": "QA Second Lead",
+      "role": "Lead Auditor",
+      "purpose": "A second Lead Auditor for independent approvals; also leads a practice of their own, so practice switching is reachable."
+    },
+    {
+      "id": "qa-contrib",
+      "userId": "persona-qa-contrib",
+      "email": "qa-contrib@personas.test",
+      "name": "QA Client Contributor",
+      "role": "Client Contributor",
+      "purpose": "Acme staff member who answers the seeded evidence request in the client portal."
+    },
+    {
+      "id": "qa-viewer",
+      "userId": "persona-qa-viewer",
+      "email": "qa-viewer@personas.test",
+      "name": "QA Client Viewer",
+      "role": "Client Viewer",
+      "purpose": "Acme staff member who sees released reports only."
+    },
+    {
+      "id": "qa-outsider",
+      "userId": "persona-qa-outsider",
+      "email": "qa-outsider@personas.test",
+      "name": "QA Outsider",
+      "role": null,
+      "purpose": "Not a member of the demo practice; the first sign-in provisions a separate practice, for isolation checks."
+    }
+  ]
+}
