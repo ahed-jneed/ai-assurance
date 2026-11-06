@@ -18,13 +18,16 @@ import {
   engagementRulePack,
   legalDate,
   obligationsByDate,
+  openReviewItems,
   researchAge,
   type ApplicationDate,
   type ObligationRow,
   type PeriodStatus,
+  type PointCondition,
   type RegulatorySnapshot,
   type Selection,
   type Source,
+  type SpecialCategoryData,
   type Standard,
 } from "@/lib/rule-pack";
 
@@ -183,11 +186,70 @@ export function RulePackStatus({
   );
 }
 
+function PointConditions({ items }: { items: PointCondition[] }) {
+  return (
+    <ul className="rule-pack-list">
+      {items.map((c) => (
+        <li key={c.point}>
+          <b>{c.point}</b> {c.condition}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The Art 4a conditions, a structured paraphrase; the OJ text governs. */
+function SpecialCategoryConditions({
+  data: d,
+  pendingReview,
+  sources,
+}: {
+  data: SpecialCategoryData;
+  pendingReview: string[];
+  sources: Map<string, Source>;
+}) {
+  return (
+    <section className="special-category-data" aria-label={d.provision}>
+      <h4>
+        Art 4a(1): all conditions required{" "}
+        <LegalReviewLabel itemIds={pendingReview} />
+      </h4>
+      <p>
+        <b>Who:</b> {d.paragraph1.who} <b>Purpose:</b> {d.paragraph1.purpose}
+      </p>
+      <p className="subtle">{d.paragraph1.threshold}</p>
+      <PointConditions items={d.paragraph1.allConditionsRequired} />
+      <h4>Art 4a(2)</h4>
+      <p>
+        <b>Who:</b> {d.paragraph2.who}
+      </p>
+      <PointConditions items={d.paragraph2.conditions} />
+      <p className="subtle">{d.paragraph2.noObligation}</p>
+      {d.relatedProvisions.length > 0 && (
+        <>
+          <h4>Related provisions</h4>
+          <ul className="rule-pack-list">
+            {d.relatedProvisions.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="subtle">
+        {d.insertedBy}; replaces {d.replaces}. {d.verification.method} Sources:{" "}
+        <SourceLinks ids={d.sourceIds} sources={sources} />
+      </p>
+    </section>
+  );
+}
+
 function Obligation({
   row,
+  pack,
   sources,
 }: {
   row: ObligationRow;
+  pack: RegulatorySnapshot;
   sources: Map<string, Source>;
 }) {
   const e = row.entry;
@@ -260,6 +322,16 @@ function Obligation({
             ))}
           </ul>
         </>
+      )}
+      {row.specialCategoryData && (
+        <SpecialCategoryConditions
+          data={row.specialCategoryData}
+          pendingReview={openReviewItems(
+            pack,
+            row.specialCategoryData.legalReview,
+          )}
+          sources={sources}
+        />
       )}
       {(row.rules.length > 0 || row.links.length > 0) && (
         <>
@@ -364,7 +436,7 @@ export function ObligationsByDate({
               <TableHead>Obligation</TableHead>
               <TableHead>Engagement period</TableHead>
               <TableHead>This system</TableHead>
-              <TableHead>Review</TableHead>
+              <TableHead>Legal review</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -378,7 +450,7 @@ export function ObligationsByDate({
                       <small>{dateTypeLabels[row.entry.dateType]}</small>
                     </TableCell>
                     <TableCell className="obligation-cell">
-                      <Obligation row={row} sources={sources} />
+                      <Obligation row={row} pack={pack} sources={sources} />
                     </TableCell>
                     <TableCell>
                       <span className={"badge " + tone}>{period}</span>
@@ -396,12 +468,14 @@ export function ObligationsByDate({
                     <TableCell>
                       {row.pendingReview.length ? (
                         <LegalReviewLabel itemIds={row.pendingReview} />
+                      ) : row.entry.approval.status === "approved" ? (
+                        <span>Approved</span>
                       ) : (
-                        <span className="subtle">
-                          Verified{" "}
-                          {legalDate(row.entry.verification.verifiedOn)}
-                        </span>
+                        <span>No open item · approval pending</span>
                       )}
+                      <small className="subtle verified-on">
+                        Verified {legalDate(row.entry.verification.verifiedOn)}
+                      </small>
                     </TableCell>
                   </TableRow>
                 );
@@ -565,7 +639,9 @@ export function StandardsRegister({ pack }: { pack: RegulatorySnapshot }) {
                     </TableCell>
                     <TableCell>
                       <Presumption standard={s} />
-                      <LegalReviewLabel itemIds={s.legalReview.itemIds} />
+                      <LegalReviewLabel
+                        itemIds={openReviewItems(pack, s.legalReview)}
+                      />
                     </TableCell>
                     <TableCell>
                       <p>{s.useInAudits}</p>
@@ -598,12 +674,18 @@ export function StandardsRegister({ pack }: { pack: RegulatorySnapshot }) {
 
 /** Legal-review items, unverified claims, guidance and the source register. */
 export function RulePackSources({ pack }: { pack: RegulatorySnapshot }) {
+  const sources = new Map(pack.sources.map((s) => [s.id, s]));
   const titles = new Map<string, string>([
     ...pack.applicationDates.map((e) => [e.id, e.title] as [string, string]),
     ...pack.standards.map((s) => [s.id, s.reference] as [string, string]),
     ...pack.authorityDeadlines.map(
       (d) => [d.id, d.provision] as [string, string],
     ),
+    ["specialCategoryData", "Art 4a conditions (special-category data)"],
+    [
+      "provisionReferences",
+      "Provisions changed by Regulation " + pack.amendingRegulation,
+    ],
   ]);
   return (
     <>
@@ -658,6 +740,49 @@ export function RulePackSources({ pack }: { pack: RegulatorySnapshot }) {
           </TableBody>
         </Table>
       </section>
+      {pack.provisionReferences && (
+        <section className="panel" id="provisionReferences">
+          <div className="panel-head">
+            <h2>Provisions changed by Regulation {pack.amendingRegulation}</h2>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Provision</TableHead>
+                <TableHead>Change</TableHead>
+                <TableHead>Effect</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pack.provisionReferences.map((r) => (
+                <TableRow key={r.provision}>
+                  <TableCell>
+                    <b>{r.provision}</b>
+                    {r.amendingProvision && (
+                      <>
+                        <br />
+                        <span className="reference-cell">
+                          {r.amendingProvision}
+                        </span>
+                      </>
+                    )}
+                  </TableCell>
+                  <TableCell>{r.change}</TableCell>
+                  <TableCell>
+                    {r.appliesFrom && (
+                      <p>Applies from {legalDate(r.appliesFrom)}</p>
+                    )}
+                    {r.effect && <p>{r.effect}</p>}
+                    <p className="subtle">
+                      <SourceLinks ids={r.sourceIds} sources={sources} />
+                    </p>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </section>
+      )}
       <section className="panel">
         <div className="panel-head">
           <h2>Not verified</h2>

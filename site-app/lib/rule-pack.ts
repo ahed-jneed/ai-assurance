@@ -77,6 +77,47 @@ export type ProhibitedPractice = {
   sourceIds: string[];
   verification: Verification;
 };
+export type PointCondition = { point: string; condition: string };
+/**
+ * The Art 4a conditions for special-category data in bias detection: a
+ * structured paraphrase of the OJ text, rendered under its entry (entryId).
+ */
+export type SpecialCategoryData = {
+  provision: string;
+  insertedBy: string;
+  replaces: string;
+  inForceFrom: string;
+  entryId: string;
+  paragraph1: {
+    who: string;
+    purpose: string;
+    threshold: string;
+    allConditionsRequired: PointCondition[];
+  };
+  paragraph2: {
+    who: string;
+    conditions: PointCondition[];
+    noObligation: string;
+  };
+  relatedProvisions: string[];
+  sourceIds: string[];
+  verification: {
+    status: Verification["status"];
+    verifiedOn: string;
+    method?: string;
+  };
+  legalReview: LegalReviewFlag;
+};
+/** A provision Regulation (EU) 2026/1744 changed (or left unchanged), with its effect. */
+export type ProvisionReference = {
+  provision: string;
+  change: string;
+  amendingProvision: string | null;
+  appliesFrom?: string;
+  effect?: string;
+  sourceIds: string[];
+  verification: Verification;
+};
 export type SecondaryOnly = {
   status: "secondary_only";
   sourceIds: string[];
@@ -200,6 +241,8 @@ export type RegulatorySnapshot = {
   applicationDates: ApplicationDate[];
   authorityDeadlines: AuthorityDeadline[];
   prohibitedPractices: ProhibitedPractice[];
+  specialCategoryData?: SpecialCategoryData;
+  provisionReferences?: ProvisionReference[];
   standardsCitationRule: string;
   standards: Standard[];
   guidanceDocuments: GuidanceDocument[];
@@ -222,9 +265,6 @@ export function asRulePack(value: unknown): RegulatorySnapshot | null {
     ? (s as RegulatorySnapshot)
     : null;
 }
-
-/** The only methodology version that shipped before engagements were stamped. */
-export const legacyRulePackVersion = "2026.10.1";
 
 /** The stamp of the rule pack a catalog serves. */
 export function rulePackStamp(catalog: {
@@ -324,11 +364,6 @@ export function researchAge(
     maxAgeDays: snapshot.staleAfterDays,
     stale: days > snapshot.staleAfterDays,
   };
-}
-
-/** Whether a dated entry applies (or has fallen due) on a day. */
-export function inApplicationOn(entry: { date: string }, day: string) {
-  return entry.date <= day;
 }
 
 export type EngagementPeriod = { start: string; end: string };
@@ -437,6 +472,22 @@ export function select(
   };
 }
 
+/**
+ * The legal-review items of a flag that are still open: a resolved item no
+ * longer reads "Pending legal review".
+ */
+export function openReviewItems(
+  pack: Pick<RegulatorySnapshot, "legalReviewItems">,
+  review: LegalReviewFlag,
+) {
+  const resolved = new Set(
+    pack.legalReviewItems
+      .filter((i) => i.status === "resolved")
+      .map((i) => i.id),
+  );
+  return review.itemIds.filter((id) => !resolved.has(id));
+}
+
 export type ObligationLink = {
   reference: string;
   entryId: string;
@@ -460,6 +511,8 @@ export type ObligationRow = {
   })[];
   /** The Art 5(1) practices this entry dates. */
   practices: ProhibitedPractice[];
+  /** The Art 4a conditions, under the entry they belong to. */
+  specialCategoryData: SpecialCategoryData | null;
   /** Legal-review items still open for this entry. */
   pendingReview: string[];
 };
@@ -475,11 +528,6 @@ export function obligationsByDate(
 ): { date: string; rows: ObligationRow[] }[] {
   const facts = engagementFacts(e),
     period = engagementPeriod(e),
-    open = new Set(
-      pack.legalReviewItems
-        .filter((i) => i.status !== "resolved")
-        .map((i) => i.id),
-    ),
     entries = new Map(pack.applicationDates.map((x) => [x.id, x])),
     authorities = new Map(pack.authorityDeadlines.map((x) => [x.id, x]));
   const rows = pack.applicationDates.map((entry): ObligationRow => {
@@ -515,7 +563,11 @@ export function obligationsByDate(
           };
         }),
       practices: pack.prohibitedPractices.filter((p) => p.entryId === entry.id),
-      pendingReview: entry.legalReview.itemIds.filter((id) => open.has(id)),
+      specialCategoryData:
+        pack.specialCategoryData?.entryId === entry.id
+          ? pack.specialCategoryData
+          : null,
+      pendingReview: openReviewItems(pack, entry.legalReview),
     };
   });
   const byDate = new Map<string, ObligationRow[]>();
@@ -531,11 +583,6 @@ export function obligationsByDate(
  * legal-review items still open for it.
  */
 export function upcomingDates(pack: RegulatorySnapshot, day: string) {
-  const open = new Set(
-    pack.legalReviewItems
-      .filter((i) => i.status !== "resolved")
-      .map((i) => i.id),
-  );
   return [...new Set(pack.applicationDates.map((e) => e.date))]
     .filter((date) => date >= day)
     .sort()
@@ -545,7 +592,7 @@ export function upcomingDates(pack: RegulatorySnapshot, day: string) {
         .filter((e) => e.date === date)
         .map((e) => ({
           title: e.title,
-          pendingReview: e.legalReview.itemIds.filter((id) => open.has(id)),
+          pendingReview: openReviewItems(pack, e.legalReview),
         })),
     }));
 }

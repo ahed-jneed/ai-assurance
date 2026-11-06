@@ -1389,8 +1389,13 @@ input {
   font-weight: 500;
 }
 .obligation-detail > p,
-.obligation-detail > dl {
+.obligation-detail > dl,
+.special-category-data > p {
   margin-top: 10px;
+}
+.verified-on {
+  display: block;
+  margin-top: 4px;
 }
 .stat-grid {
   display: flex;

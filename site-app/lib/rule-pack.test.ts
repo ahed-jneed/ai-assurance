@@ -7,10 +7,10 @@ import {
   asRulePack,
   engagementFacts,
   engagementPeriod,
-  inApplicationOn,
   isIsoDate,
   legalDate,
   obligationsByDate,
+  openReviewItems,
   periodStatus,
   researchAge,
   select,
@@ -180,6 +180,55 @@ describe("rule pack 2026.11.1 data", () => {
       pack.standards.find((s) => s.reference === "ISO/IEC 42001:2023")?.label,
     ).toBe("Not cited in the OJ: no presumption of conformity");
   });
+
+  it("carries the Art 4a conditions under the Art 4a entry, flagged LR-06", () => {
+    const row = rowOf(
+      freshEngagement("C", "T", "u"),
+      "aia-2026-07-27-art4a-bias-data",
+    );
+    const d = row.specialCategoryData!;
+    expect(d.inForceFrom).toBe(row.entry.date);
+    expect(d.paragraph1.allConditionsRequired.map((c) => c.point)).toEqual([
+      "(a)",
+      "(b)",
+      "(c)",
+      "(d)",
+      "(e)",
+      "(f)",
+    ]);
+    expect(d.paragraph2.conditions.map((c) => c.point)).toEqual(["(a)", "(b)"]);
+    expect(d.legalReview.itemIds).toEqual(["LR-06"]);
+    expect(
+      pack.legalReviewItems.find((i) => i.id === "LR-06")?.relatedIds,
+    ).toContain("specialCategoryData");
+    // Only the Art 4a entry carries them.
+    expect(
+      obligationsByDate(pack, freshEngagement("C", "T", "u"))
+        .flatMap((g) => g.rows)
+        .filter((r) => r.specialCategoryData)
+        .map((r) => r.entry.id),
+    ).toEqual(["aia-2026-07-27-art4a-bias-data"]);
+  });
+
+  it("points auditors only at content the product shows, never at a data key", () => {
+    for (const e of pack.applicationDates)
+      expect(
+        [e.summary, ...(e.conditions ?? []), e.notes ?? ""].join(" "),
+        e.id,
+      ).not.toMatch(/\bSee [a-z]+[A-Z]\w*/);
+  });
+
+  it("reads a resolved legal-review item as no longer pending", () => {
+    const resolved = {
+      ...pack,
+      legalReviewItems: pack.legalReviewItems.map((i) =>
+        i.id === "LR-01" ? { ...i, status: "resolved" as const } : i,
+      ),
+    };
+    const en = pack.standards.find((s) => s.reference === "EN 18286:2026")!;
+    expect(openReviewItems(pack, en.legalReview)).toEqual(["LR-01"]);
+    expect(openReviewItems(resolved, en.legalReview)).toEqual([]);
+  });
 });
 
 describe("transitions", () => {
@@ -189,8 +238,9 @@ describe("transitions", () => {
     ["aia-2027-12-02-high-risk-annex-iii", "2027-12-01", "2027-12-02"],
     ["aia-2028-08-02-high-risk-annex-i", "2028-08-01", "2028-08-02"],
   ])("%s is not in application on %s and applies from %s", (id, before, on) => {
-    expect(inApplicationOn(entry(id), before)).toBe(false);
-    expect(inApplicationOn(entry(id), on)).toBe(true);
+    const day = (d: string) => ({ start: d, end: d });
+    expect(periodStatus(entry(id).date, day(before))).toBe("readiness");
+    expect(periodStatus(entry(id).date, day(on))).toBe("applicable");
   });
 
   it.each([
