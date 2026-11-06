@@ -248,9 +248,9 @@ describe("quality review records", () => {
       reports: [approvedPackage()],
     });
     const work = (userId: string) =>
-      engagementWork(e, "Engagement Quality Reviewer", userId)
-        .filter((i) => i.title === "Engagement quality review")
-        .map((i) => i.action);
+      engagementWork(e, "Engagement Quality Reviewer", userId).map(
+        (i) => i.action,
+      );
     expect(work("quality-reviewer")).toEqual([
       "Complete the stand-back checklist",
     ]);

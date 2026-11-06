@@ -531,8 +531,10 @@ export function engagementWork(
       eligible,
     );
   }
-  // The engagement quality review is the appointed reviewer's own work.
+  // The engagement quality review is the appointed reviewer's own work, and
+  // the only work an Engagement Quality Reviewer sees: they change nothing else.
   const eqr = e.qualityReview;
+  if (role === "Engagement Quality Reviewer") result.length = 0;
   if (
     eqr &&
     role === "Engagement Quality Reviewer" &&
