@@ -18,10 +18,13 @@ export const workers: AssuranceModule = defineCommands({
         .object({
           name: short,
           imageDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+          // "client_local": the client's own worker, which reads client-held
+          // datasets in the client's environment (#102).
           formats: z
             .array(
               z.enum([
                 "provided_predictions",
+                "client_local",
                 "ONNX",
                 "XGBoost",
                 "LightGBM",
@@ -29,7 +32,7 @@ export const workers: AssuranceModule = defineCommands({
               ]),
             )
             .min(1)
-            .max(5),
+            .max(6),
           securityReview: note,
         })
         .strict()

@@ -12,13 +12,21 @@ import {
   copyFileSync,
   existsSync,
   mkdtempSync,
+  mkdirSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
+import {
+  buildBundle,
+  canonicalize,
+  checkCriteria,
+  readCriteria,
+} from "../../schemas/validate-criteria.mjs";
 
 const repo = fileURLToPath(new URL("../../", import.meta.url));
 const check = process.argv.includes("--check");
@@ -126,7 +134,41 @@ if (schema.status !== 0)
   drift.push(`schemas/test-run.schema.json: ${schema.stderr.trim()}`);
 else console.log(schema.stdout.trim());
 
-// 2. Plain copies.
+// 2. The criteria bundle (docs/design/criteria-model.md section 14.3): the
+// index and every released or withdrawn criteria document, validated first,
+// in JCS order so --check compares bytes. Drafts are included only with
+// CRITERIA_INCLUDE_DRAFTS=1, for local development; never commit that bundle.
+{
+  const target = "site-app/lib/criteria/bundle.generated.json";
+  const criteria = readCriteria();
+  const { errors } = checkCriteria(criteria);
+  if (errors.length)
+    drift.push(
+      "templates/criteria is invalid (node schemas/validate-criteria.mjs):\n    " +
+        errors.join("\n    "),
+    );
+  else {
+    const text =
+      canonicalize(
+        buildBundle(criteria, {
+          includeDrafts: process.env.CRITERIA_INCLUDE_DRAFTS === "1",
+        }),
+      ) + "\n";
+    const current = existsSync(absolute(target))
+      ? readFileSync(absolute(target), "utf8")
+      : undefined;
+    if (current !== text) {
+      if (check) drift.push(`${target} differs from templates/criteria`);
+      else {
+        mkdirSync(path.dirname(absolute(target)), { recursive: true });
+        writeFileSync(absolute(target), text);
+        console.log(`Updated ${target} from templates/criteria`);
+      }
+    }
+  }
+}
+
+// 3. Plain copies.
 for (const [source, target] of COPIES) {
   const bytes = readFileSync(absolute(source));
   if (
@@ -141,7 +183,7 @@ for (const [source, target] of COPIES) {
   }
 }
 
-// 3. The runtime zip is rebuilt from engine/ and schemas/ in a temporary
+// 4. The runtime zip is rebuilt from engine/ and schemas/ in a temporary
 // directory. Equal SHA-256 means up to date. Otherwise the entries decide, so a
 // different zlib build (for example zlib-ng) does not count as drift.
 const temporary = mkdtempSync(path.join(tmpdir(), "assurance-runtime-"));

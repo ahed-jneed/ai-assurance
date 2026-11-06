@@ -19,7 +19,9 @@ from . import statistics as stats
 from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, validate_config
 from .errors import EngineError
 
-WORKER_VERSION = "1.2.0"
+# 1.3.0: client-local jobs whose dataset stays with the client (#102): the worker reads the file from its
+# local client data directory by the frozen SHA-256 pin and downloads nothing; only aggregates are returned.
+WORKER_VERSION = "1.3.0"
 # 2.0.0: hosted engineConfig 1.1 (derived plan) and 1.4 (explicit plan) become engine configuration 1.3,
 # and hostedResults copy the engine's statistics 1.0.0 decisions (docs/design/audit-statistics.md E4).
 # 2.1.0: the performance rules of test definitions traditional-ml-2.1.0 (#65): binary performance is measured
@@ -56,6 +58,7 @@ COMPUTE_FAILURE_CODES = frozenset({
 })
 FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
     "lease_expired_on_receipt", "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
+    "client_dataset_unavailable",
     "transport_unavailable", "transport_idle_timeout", "response_deadline_exceeded", "response_truncated", "response_size_rejected", "model_input_size_mismatch",
     "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
 })
@@ -196,6 +199,10 @@ def validate_request(request):
         raise ValueError("Dataset exceeds worker byte limits")
     if request["inputHashes"].get("dataset") != digest:
         raise ValueError("Dataset manifest/hash mismatch")
+    # A client-held dataset (#102) has no bytes on the platform; only the
+    # client's own worker, in client-local mode, can read it.
+    if "custody" in data and (data["custody"] != "client" or request["executionMode"] != "client_local"):
+        raise ValueError("Only a client-local request can pin a client-held dataset")
     config = request["engineConfig"]
     if config.get("contractVersion") not in ENGINE_CONFIG_VERSIONS:
         raise ValueError("Worker requires frozen hosted engineConfig contractVersion 1.1 or 1.4")
@@ -242,6 +249,11 @@ def validate_request(request):
             # The same check compute makes, here so that a model whose labels
             # are not the frozen pair fails at claim time, before any download.
             binary_labels(config, inference=True)
+
+
+def client_held(request):
+    """The frozen dataset stays in the client's environment; the platform holds only its pin."""
+    return request["dataset"].get("custody") == "client"
 
 
 def validate_model_spec(spec, task):

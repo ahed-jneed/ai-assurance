@@ -2,9 +2,15 @@ import { describe, expect, it } from "vitest";
 import { freshEngagement } from "@/lib/factories";
 import type { WorkspaceData } from "../workspace-types";
 import { applySaved } from "./use-workspace-data";
+import { resolveNew } from "@/lib/criteria/pin";
 
-const engagement = freshEngagement("CL-1", "Model risk audit", "lead");
-const other = freshEngagement("CL-1", "Claims audit", "lead");
+const engagement = freshEngagement(
+  resolveNew(),
+  "CL-1",
+  "Model risk audit",
+  "lead",
+);
+const other = freshEngagement(resolveNew(), "CL-1", "Claims audit", "lead");
 const data = {
   engagement,
   engagements: [

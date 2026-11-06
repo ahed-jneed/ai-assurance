@@ -20,6 +20,7 @@ import {
   type Facts,
 } from "./rule-pack";
 import { seedWorkflow } from "./workflow-seed";
+import { resolveNew } from "./criteria/pin";
 
 const pack = asRulePack(catalog.regulatorySnapshot)!;
 const entry = (id: string) =>
@@ -30,8 +31,17 @@ function auditOf(
   end: string,
   annexRoute = "Unassessed",
 ): Engagement {
-  const e = freshEngagement("CL-1", "Model risk audit", "user-lead");
-  e.workflow = seedWorkflow("user-lead", "2026-11-05T10:00:00.000Z");
+  const e = freshEngagement(
+    resolveNew(),
+    "CL-1",
+    "Model risk audit",
+    "user-lead",
+  );
+  e.workflow = seedWorkflow(
+    resolveNew(),
+    "user-lead",
+    "2026-11-05T10:00:00.000Z",
+  );
   e.workflow.brief = {
     systemName: "Credit scoring",
     intendedUse: "Consumer credit decisions",
@@ -139,7 +149,10 @@ describe("rule pack 2026.11.2 data", () => {
         reviewer: null,
         approvedAt: null,
       });
-    const flagged = obligationsByDate(pack, freshEngagement("C", "T", "u"))
+    const flagged = obligationsByDate(
+      pack,
+      freshEngagement(resolveNew(), "C", "T", "u"),
+    )
       .flatMap((g) => g.rows)
       .filter((r) => r.pendingReview.length)
       .map((r) => [r.entry.id, r.pendingReview]);
@@ -186,7 +199,7 @@ describe("rule pack 2026.11.2 data", () => {
 
   it("carries the Art 4a conditions under the Art 4a entry, flagged LR-06", () => {
     const row = rowOf(
-      freshEngagement("C", "T", "u"),
+      freshEngagement(resolveNew(), "C", "T", "u"),
       "aia-2026-07-27-art4a-bias-data",
     );
     const d = row.specialCategoryData!;
@@ -206,7 +219,7 @@ describe("rule pack 2026.11.2 data", () => {
     ).toContain("specialCategoryData");
     // Only the Art 4a entry carries them.
     expect(
-      obligationsByDate(pack, freshEngagement("C", "T", "u"))
+      obligationsByDate(pack, freshEngagement(resolveNew(), "C", "T", "u"))
         .flatMap((g) => g.rows)
         .filter((r) => r.specialCategoryData)
         .map((r) => r.entry.id),
@@ -285,7 +298,13 @@ describe("transitions", () => {
       "applicable",
     );
     // Without a period in the brief nothing is dated against the engagement.
-    const unset = freshEngagement("CL-1", "Unscoped", "user-lead", true);
+    const unset = freshEngagement(
+      resolveNew(),
+      "CL-1",
+      "Unscoped",
+      "user-lead",
+      true,
+    );
     expect(engagementPeriod(unset)).toBeNull();
     expect(
       obligationsByDate(pack, unset)
@@ -296,7 +315,10 @@ describe("transitions", () => {
   });
 
   it("orders the view by date, lists cross-referenced rules once and keeps authority deadlines apart", () => {
-    const groups = obligationsByDate(pack, freshEngagement("C", "T", "u"));
+    const groups = obligationsByDate(
+      pack,
+      freshEngagement(resolveNew(), "C", "T", "u"),
+    );
     const dates = groups.map((g) => g.date);
     expect(dates).toEqual([...dates].sort());
     expect(dates).toEqual([

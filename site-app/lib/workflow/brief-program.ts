@@ -14,7 +14,6 @@
 // without renewed program approval or invalidating any work.
 import { z } from "zod";
 import { paperCurrent } from "../domain/gates";
-import { seedWorkflow } from "../workflow-seed";
 import {
   briefReturns,
   programReturns,
@@ -191,7 +190,7 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
   async adoptWorkflow({ e, c, lead }) {
     lead();
     if (e.workflow) fail(409, "This engagement already uses the workflow");
-    e.workflow = seedWorkflow(c.userId, c.at);
+    e.workflow = c.seedWorkflow(c.at);
     // Each procedure takes over its template's current paper, the required
     // one when diagnostic drafts share the template. Compiling its work later
     // supersedes that paper if it was signed (submitProcedure).

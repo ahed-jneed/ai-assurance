@@ -35,7 +35,12 @@ import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { assertReviewerIndependent } from "../quality-review-records";
 import { practiceReportSettings } from "../report-settings";
-import { recordVersions } from "../rule-pack-current";
+import {
+  criteriaStamp,
+  packFeatures,
+  pinned,
+  recordVersions,
+} from "../criteria/pin";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
@@ -123,7 +128,11 @@ export const reports = defineCommands({
         const assuranceBlockers = await assuranceGates(ctx, e.id, a.conclusion);
         if (assuranceBlockers.length)
           throw new ApiError(409, assuranceBlockers[0]);
-        const gates = finalReportGates(e, { ...terms, particulars });
+        const gates = finalReportGates(
+          e,
+          { ...terms, particulars },
+          packFeatures(e),
+        );
         if (gates[0]?.kind === "stage")
           throw new ApiError(400, gates[0].message);
         if (gates.length)
@@ -136,8 +145,11 @@ export const reports = defineCommands({
           );
         await assertReviewerIndependent(ctx, e);
       }
-      const createdAt = now(),
-        annexIV = annexIVIndex(e);
+      // What the pinned pack switches on and the texts it reports with
+      // (docs/design/criteria-model.md sections 7.1 and 10).
+      const { pack } = pinned(e),
+        features = packFeatures(e),
+        createdAt = now();
       // The part of the report written for its reader, in both snapshots.
       const elements = reportElements(e, terms, particulars, createdAt).map(
         ({ id, label, value }) => ({ id, label, value }),
@@ -161,7 +173,9 @@ export const reports = defineCommands({
           id: e.id,
           title: e.title,
           stage: e.stage,
-          classification: e.classification,
+          ...(features.aiActClassification
+            ? { classification: e.classification }
+            : {}),
         },
         opinion: termsLabel(terms),
         ...report,
@@ -193,16 +207,24 @@ export const reports = defineCommands({
         models: e.models,
         evaluationProfiles: e.evaluationProfiles ?? [],
         runs: e.runs,
-        annexIV,
-        annexMapVersion,
+        ...(features.annexIvIndex
+          ? { annexIV: annexIVIndex(e), annexMapVersion }
+          : {}),
         auditEventHead: e.eventHead,
         createdAt,
-        ...recordVersions(),
-        regulatorySource: "https://eur-lex.europa.eu/eli/reg/2024/1689",
+        ...recordVersions(e),
+        // The pack stamp (design section 10). Named criteriaPack because
+        // `criteria` holds the results by criterion of report model v2.
+        criteriaPack: criteriaStamp(e),
+        ...(pack.reporting?.regulatorySource
+          ? { regulatorySource: pack.reporting.regulatorySource }
+          : {}),
         limitations: [
-          "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification. The platform's diagnostics evaluate traditional ML systems; they do not yet evaluate generative AI outputs, so conclusions on generative systems rest on the auditor's own procedures and evidence.",
+          pack.reporting?.limitations ?? "",
           ...specialCategoryLimitations(e.runs),
-        ].join(" "),
+        ]
+          .filter(Boolean)
+          .join(" "),
       };
       Object.assign(snapshot, {
         assurancePins: await assurancePins(ctx, e.id),
@@ -255,6 +277,14 @@ export const reports = defineCommands({
     },
   },
 });
+const pinOfStamp = (stamp: unknown) => {
+  const s = stamp as {
+    packId?: string;
+    packVersion?: string;
+    packSha256?: string;
+  };
+  return [s.packId, s.packVersion, s.packSha256];
+};
 /**
  * Checks that a captured report may still be released: its assurance sources,
  * the release gates and every audit record it captured are unchanged. Runs
@@ -301,7 +331,8 @@ export async function assertReleasable(
       409,
       "Complete or cancel external execution before release",
     );
-  const gates = finalReportGates(e, report);
+  const features = packFeatures(e);
+  const gates = finalReportGates(e, report, features);
   if (gates.length) throw new ApiError(409, gates[0].message);
   await assertReviewerIndependent(ctx, e);
   const frozen = r.snapshot.workflow as Engagement["workflow"];
@@ -320,13 +351,20 @@ export async function assertReleasable(
     JSON.stringify(r.snapshot.papers) !==
       JSON.stringify(capturedPapers(e, "final")) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
-    JSON.stringify(
-      (
-        r.snapshot.engagement as {
-          classification: unknown;
-        }
-      ).classification,
-    ) !== JSON.stringify(e.classification) ||
+    // Without the AI Act classification the snapshot has none to compare.
+    (features.aiActClassification &&
+      JSON.stringify(
+        (
+          r.snapshot.engagement as {
+            classification: unknown;
+          }
+        ).classification,
+      ) !== JSON.stringify(e.classification)) ||
+    // A pin moved between capture and release forces a new capture; packages
+    // captured before pins existed have none, and legacy pins never move.
+    (r.snapshot.criteriaPack !== undefined &&
+      JSON.stringify(pinOfStamp(r.snapshot.criteriaPack)) !==
+        JSON.stringify(pinOfStamp(criteriaStamp(e)))) ||
     JSON.stringify(r.snapshot.evidenceRequests) !==
       JSON.stringify(e.evidenceRequests ?? []) ||
     JSON.stringify(r.snapshot.evidence) !==

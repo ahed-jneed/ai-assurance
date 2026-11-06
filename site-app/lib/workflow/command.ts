@@ -8,6 +8,7 @@ import type {
   Procedure,
   ProcedureChange,
   ProcedurePlan,
+  Workflow,
 } from "../workflow-types";
 export class WorkflowError extends Error {
   constructor(
@@ -38,6 +39,8 @@ export type Context = {
   id: (prefix: string) => string;
   sha256: (value: string) => Promise<string>;
   makePaper: (templateId: string) => Paper;
+  /** The initial workflow of the engagement's criteria pack (lib/workflow-seed.ts). */
+  seedWorkflow: (at: string) => Workflow;
   member: (userId: string) => Promise<{
     role: Role;
     client_id: string | null;

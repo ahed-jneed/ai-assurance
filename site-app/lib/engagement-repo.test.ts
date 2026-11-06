@@ -4,12 +4,17 @@ import { save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import { seedWorkflow } from "@/lib/workflow-seed";
 import { caller, fakeD1, stored } from "./commands/test-fixtures";
+import { resolveNew } from "./criteria/pin";
 
 // The central write guards of save() (F-56) and the hourly save quota, which
 // all refuse before anything is written.
 function contributorEngagement(grantAt: string) {
   const e = stored();
-  e.workflow = seedWorkflow("user-lead", "2026-11-01T00:00:00.000Z");
+  e.workflow = seedWorkflow(
+    resolveNew(),
+    "user-lead",
+    "2026-11-01T00:00:00.000Z",
+  );
   e.workflow.clientGrants.push({
     id: "GRANT-1",
     userId: "user-lead",

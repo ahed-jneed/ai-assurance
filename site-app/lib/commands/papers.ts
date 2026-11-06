@@ -6,6 +6,7 @@ import {
   type Paper,
 } from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
+import { pinned } from "../criteria/pin";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
@@ -70,7 +71,7 @@ export const papers = defineCommands({
       const a = z.object({ templateId: short }).parse(d);
       if (isReleaseTimeRecord(a.templateId))
         throw new ApiError(409, releaseTimeMessage(a.templateId));
-      const p = templatePaper(a.templateId, ctx.user.userId);
+      const p = templatePaper(pinned(e), a.templateId, ctx.user.userId);
       e.papers.push(p);
       return { details: { paperId: p.id } };
     },

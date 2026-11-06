@@ -45,6 +45,14 @@ export type AuditGate = {
   message: string;
 };
 import { isReleaseTimeRecord } from "./release-time";
+/**
+ * What the engagement's criteria pack switches on (lib/criteria/types.ts
+ * PackFeatures); the gates read only the AI Act classification. Absent means
+ * pack #1, which switches everything on, so every caller that does not pass
+ * the pack's features keeps the behaviour of AI Act engagements.
+ */
+export type GateFeatures = { aiActClassification: boolean };
+const aiActFeatures: GateFeatures = { aiActClassification: true };
 export {
   isReleaseTimeRecord,
   releaseTimeMessage,
@@ -108,7 +116,9 @@ export function completionGates(
   e: Engagement,
   conclusion = "readiness",
   target?: string,
+  features: GateFeatures = aiActFeatures,
 ): AuditGate[] {
+  const classified = features.aiActClassification;
   const inScope = paperScope(target),
     positive = requiresSupport(conclusion);
   return [
@@ -134,7 +144,7 @@ export function completionGates(
               ": an applicable procedure outside audit scope prevents an unmodified or readiness conclusion",
           }))
       : []),
-    ...(e.classification.status !== "approved"
+    ...(classified && e.classification.status !== "approved"
       ? [
           {
             id: "classification",
@@ -146,7 +156,7 @@ export function completionGates(
           },
         ]
       : []),
-    ...(positive && e.classification.prohibited
+    ...(classified && positive && e.classification.prohibited
       ? [
           {
             id: "prohibited",
@@ -253,8 +263,14 @@ export function completionGates(
       })),
   ];
 }
-export function reportBlockers(e: Engagement, conclusion = "readiness") {
-  return completionGates(e, conclusion).map((g) => g.message);
+export function reportBlockers(
+  e: Engagement,
+  conclusion = "readiness",
+  features?: GateFeatures,
+) {
+  return completionGates(e, conclusion, undefined, features).map(
+    (g) => g.message,
+  );
 }
 /** A final report as it is prepared: its terms and, at capture, particulars. */
 export type FinalReport = ReportTerms & { particulars?: ReportParticulars };
@@ -271,6 +287,7 @@ export type FinalReport = ReportTerms & { particulars?: ReportParticulars };
 export function finalReportGates(
   e: Engagement,
   report: FinalReport | string = "readiness",
+  features?: GateFeatures,
 ): AuditGate[] {
   const conclusion = typeof report === "string" ? report : report.conclusion;
   return [
@@ -285,7 +302,7 @@ export function finalReportGates(
           },
         ]
       : []),
-    ...completionGates(e, conclusion),
+    ...completionGates(e, conclusion, undefined, features),
     // The engagement quality review (ISQM 2) before capture; its sign-off of
     // the exact package is checked at release.
     ...qualityReviewGates(
@@ -317,7 +334,11 @@ export function finalReportGates(
  */
 export const releaseRequirements = (e: Engagement) =>
   workflowRequirements(e, true, procedureScope());
-export function stageGates(e: Engagement, target: string): AuditGate[] {
+export function stageGates(
+  e: Engagement,
+  target: string,
+  features: GateFeatures = aiActFeatures,
+): AuditGate[] {
   if (
     stages.indexOf(target) !== stages.indexOf(e.stage) + 1 ||
     !stages.includes(target)
@@ -340,7 +361,7 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
         kind: "workflow" as const,
       })),
       ...acceptanceGates(e),
-      ...(e.classification.status !== "approved"
+      ...(features.aiActClassification && e.classification.status !== "approved"
         ? [
             {
               id: "classification",
@@ -364,15 +385,17 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
           kind: "paper" as const,
           recordId: p.id,
           title: p.templateId + " · " + p.title,
-          message: "Planning papers and classification must be approved",
+          message: features.aiActClassification
+            ? "Planning papers and classification must be approved"
+            : "Planning papers must be approved",
         })),
     ];
   if (target === "Evidence evaluation")
-    return completionGates(e, "adverse")
+    return completionGates(e, "adverse", undefined, features)
       .filter((g) => g.kind === "run")
       .map((g) => ({
         ...g,
         message: "Complete diagnostic runs before evidence evaluation",
       }));
-  return completionGates(e, "adverse", target);
+  return completionGates(e, "adverse", target, features);
 }

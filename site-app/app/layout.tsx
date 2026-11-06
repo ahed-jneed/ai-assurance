@@ -9,6 +9,7 @@ import "./report-workspace.css";
 import "./work-inbox.css";
 import "./evidence-workspace.css";
 import "./workbench-experience.css";
+import "./criteria.css";
 import "./paper-workspace.css";
 
 export const viewport: Viewport = {

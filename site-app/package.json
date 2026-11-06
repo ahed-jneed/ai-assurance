@@ -22,7 +22,7 @@
     "seed:demo": "node scripts/seed-demo.mjs",
     "db:migrate:local": "node scripts/db-migrate-local.mjs",
     "test:e2e": "playwright test",
-    "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .sites-runtime/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-1.5.json &&node ../schemas/validate-procedure-schema.mjs .sites-runtime/execution-schema-fixture.json",
+    "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .sites-runtime/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-1.5.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-client-local.json &&node ../schemas/validate-procedure-schema.mjs .sites-runtime/execution-schema-fixture.json",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run check:sync && npm run check:build && npm run check:harnesses && npm run check:fixtures",
     "db:generate": "drizzle-kit generate"
   },

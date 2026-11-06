@@ -157,9 +157,11 @@ export function clientReportSnapshot(
     opinion: string;
     summary: string;
     limitations: string;
-    regulatorySource: string;
+    regulatorySource?: string;
     rulePack?: unknown;
     methodologyVersion?: unknown;
+    criteriaPack?: unknown;
+    engagement: { classification?: unknown };
     report: Record<string, unknown>;
   },
 ) {
@@ -169,7 +171,10 @@ export function clientReportSnapshot(
     engagement: {
       id: e.id,
       title: e.title,
-      classification: clientClassification(e.classification),
+      // Only packs with the AI Act classification capture one.
+      ...(captured.engagement.classification
+        ? { classification: clientClassification(e.classification) }
+        : {}),
     },
     opinion: captured.opinion,
     ...captured.report,
@@ -183,9 +188,12 @@ export function clientReportSnapshot(
       ((e.evidenceRequests ?? []).some((q) => q.disposition === "unobtainable")
         ? " Evidence availability limitations were recorded; refer to the scoped opinion and executive summary."
         : ""),
-    regulatorySource: captured.regulatorySource,
+    ...(captured.regulatorySource
+      ? { regulatorySource: captured.regulatorySource }
+      : {}),
     rulePack: captured.rulePack,
     methodologyVersion: captured.methodologyVersion,
+    criteriaPack: captured.criteriaPack,
   };
 }
 
