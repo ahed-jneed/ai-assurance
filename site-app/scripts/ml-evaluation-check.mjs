@@ -24,6 +24,11 @@ for (const name of modules) {
     .outputText.replace(
       /from (['"])\.\/(evaluation|statistics|hosted-statistics)\1/g,
       "from './$2.js'",
+    )
+    // Node loads JSON modules with an import attribute.
+    .replace(
+      /from (['"])\.\/threshold-library\.json\1;/,
+      'from "../../lib/threshold-library.json" with { type: "json" };',
     );
   await fs.writeFile(dir + "/" + name + ".js", js);
 }

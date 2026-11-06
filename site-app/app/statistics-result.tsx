@@ -13,7 +13,7 @@ import {
 import type { Metric, Result } from "@/lib/domain";
 import { REASON_TEXT, bandText, explainResult } from "@/lib/hosted-statistics";
 import { humanLabel } from "@/lib/presentation";
-import type { Band } from "@/lib/statistics";
+import { THRESHOLD_LIBRARY, type Band } from "@/lib/statistics";
 
 type Details = {
   role: "headline" | "member" | "descriptive";
@@ -198,6 +198,14 @@ export function StatisticsResult({ result }: { result: Result }) {
               {decision.libraryEntry.id}@{decision.libraryEntry.version} ·{" "}
               {humanLabel(decision.libraryEntry.legalStatus)}:{" "}
               {decision.libraryEntry.caveat}
+              {/* Current status notes, shown beside the frozen caveat and never frozen into the result. */}
+              {THRESHOLD_LIBRARY.find(
+                (e) => e.id === decision.libraryEntry!.id,
+              )?.statusNotes.map((note) => (
+                <small className="block subtle" key={note.asOf + note.text}>
+                  Status as of {note.asOf}: {note.text}
+                </small>
+              ))}
             </dd>
           </div>
         )}

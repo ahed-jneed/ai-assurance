@@ -193,3 +193,32 @@ describe("statistics core behaviour", () => {
     ).toThrow(/derived plans/);
   });
 });
+
+describe("threshold library", () => {
+  it("ships the screen, the LL144 reporting profile, the EU policies and the Art 50 entries", () => {
+    const ids = st.THRESHOLD_LIBRARY.map((e) => e.id);
+    expect(ids).toEqual(expect.arrayContaining(Object.keys(st.LIBRARY)));
+    expect(ids).toContain("report.us-nyc.ll144");
+    expect(
+      ids.filter((id) => id.startsWith("policy.eu-aia.art50-")),
+    ).toHaveLength(5);
+    for (const entry of st.THRESHOLD_LIBRARY)
+      if (entry.id.startsWith("policy.eu-aia."))
+        expect(entry.legalStatus).toBe("no_legal_safe_harbour");
+  });
+
+  it("lets a plan reference only entries a criterion can decide", () => {
+    expect(() =>
+      st.validatePlan({
+        criteria: [
+          {
+            id: "marking",
+            kind: "performance",
+            members: [{ metric: "recall", band: { lower: 0.95 } }],
+            libraryEntry: { id: "policy.eu-aia.art50-marking-presence" },
+          },
+        ],
+      }),
+    ).toThrow(/not a library entry/);
+  });
+});

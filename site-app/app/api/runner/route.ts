@@ -10,6 +10,7 @@ import {
 } from "@/lib/store";
 import { activeJobGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
+import { requestedCriteria } from "@/lib/hosted-statistics";
 import type { Artifact } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -310,17 +311,18 @@ export async function POST(request: Request) {
         r.provenance.executionMode !== frozen.executionMode
       )
         throw new ApiError(400, "Consumed input or runtime pins mismatch");
+      // Section 11.2: one result per criterion of the plan, in plan order,
+      // the article following the criterion kind. A 1.4 request carries its
+      // plan; a 1.1 request's derived plan has the suite names as ids.
+      const expected = requestedCriteria(frozen);
       if (
-        new Set(r.hostedResults.map((x) => x.testId)).size !==
-          r.hostedResults.length ||
-        frozen.profile.suite.length !== r.hostedResults.length ||
+        expected.length !== r.hostedResults.length ||
         r.hostedResults.some(
-          (x) =>
-            !frozen.profile.suite.includes(x.testId) ||
+          (x, i) =>
+            x.testId !== expected[i].id ||
+            (x.decision && x.decision.kind !== expected[i].kind) ||
             x.article !==
-              (x.testId === "performance" || x.testId === "regression"
-                ? "15"
-                : "10"),
+              (expected[i].kind === "group_comparison" ? "10" : "15"),
         )
       )
         throw new ApiError(

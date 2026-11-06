@@ -490,6 +490,8 @@ const externalMutations = [
   ['external unknown metric attribute', run => { run.results[0].metrics[0].fabricated = true; }],
   ['external oversized dataset', run => { run.manifest.dataset.size = 104857601; }],
   ['external contradictory outcome', run => { run.overallOutcome = run.outcome === 'fail' ? 'pass' : 'fail'; }],
+  // Results with a copied decision compile into 1.5 (#22 H4); the frozen 1.2 result has none.
+  ['external 1.2 result with a copied decision', run => { run.results[0].decision = copy(engine13.results[firstDecided].decision); }],
 ];
 for (const [label, mutate] of externalMutations) negative(label, ext, mutate);
 for (const [label, mutate] of [

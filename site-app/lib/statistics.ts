@@ -18,6 +18,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- plans and legacy
    configurations are untyped JSON validated here, as in the Python core. */
 
+import library from "./threshold-library.json";
+
 export class StatisticsError extends Error {}
 
 function require_(condition: unknown, message: string): asserts condition {
@@ -799,8 +801,6 @@ function get(o: any, key: string, fallback: any = null) {
   return o !== null && typeof o === "object" && key in o ? o[key] : fallback;
 }
 
-const EU_CAVEAT =
-  "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity.";
 type LibraryParameter = {
   default: any;
   minimum?: number;
@@ -812,66 +812,36 @@ export type LibraryEntry = {
   kind: string;
   metric: string | null;
   parameters: Record<string, LibraryParameter>;
-  legalStatus: "screening_heuristic" | "no_legal_safe_harbour";
+  legalStatus:
+    "screening_heuristic" | "reporting_only" | "no_legal_safe_harbour";
   caveat: string;
 };
-/** Section 10.1, the entries the hosted runner and the engine ship identically. */
-export const LIBRARY: Record<string, LibraryEntry> = {
-  "screen.us.four-fifths": {
-    version: 1,
-    kind: "group_comparison",
-    metric: "selection_rate_ratio",
-    parameters: { tau: { default: 0.8, minimum: 0.5, maximum: 0.95 } },
-    legalStatus: "screening_heuristic",
-    caveat:
-      "Four-fifths screen: a rule of thumb from the US Uniform Guidelines (29 CFR 1607.4(D)), not a legal test of discrimination.",
-  },
-  "policy.eu-aia.selection-rate-difference": {
-    version: 1,
-    kind: "group_comparison",
-    metric: "selection_rate_difference",
-    parameters: { delta: { default: 0.1, minimum: 0.01, maximum: 0.3 } },
-    legalStatus: "no_legal_safe_harbour",
-    caveat: EU_CAVEAT,
-  },
-  "policy.eu-aia.impact-ratio": {
-    version: 1,
-    kind: "group_comparison",
-    metric: "selection_rate_ratio",
-    parameters: { tau: { default: 0.8, minimum: 0.5, maximum: 0.95 } },
-    legalStatus: "no_legal_safe_harbour",
-    caveat: EU_CAVEAT,
-  },
-  "policy.eu-aia.equalized-odds": {
-    version: 1,
-    kind: "group_comparison",
-    metric: "equalized_odds",
-    parameters: { delta: { default: 0.1, minimum: 0.01, maximum: 0.3 } },
-    legalStatus: "no_legal_safe_harbour",
-    caveat: EU_CAVEAT,
-  },
-  "policy.eu-aia.declared-performance": {
-    version: 1,
-    kind: "performance",
-    metric: null,
-    parameters: {
-      metric: { default: null, enum: BINARY_METRICS },
-      declaredValue: { default: null, minimum: 0.0, maximum: 1.0 },
-      tolerance: { default: null, minimum: 0.0, maximum: 0.2 },
-    },
-    legalStatus: "no_legal_safe_harbour",
-    caveat:
-      "Checks consistency with the accuracy level declared under Art. 15(3); not a conformity assessment.",
-  },
-  "policy.eu-aia.calibration": {
-    version: 1,
-    kind: "calibration",
-    metric: null,
-    parameters: { delta: { default: null, minimum: 0.01, maximum: 0.2 } },
-    legalStatus: "no_legal_safe_harbour",
-    caveat: EU_CAVEAT,
-  },
+/** One entry of schemas/threshold-library.json, with its sources and dated status notes. */
+export type LibraryRecord = LibraryEntry & {
+  id: string;
+  sources: string[];
+  statusNotes: { asOf: string; text: string; source: string }[];
+  band?: "lower" | "upper";
+  research?: string;
 };
+/** Section 10.1: the threshold library, shipped identically to both runners (schemas/threshold-library.json). */
+export const THRESHOLD_LIBRARY = library.entries as unknown as LibraryRecord[];
+/** The entries a plan criterion can reference; engine/statistics.py LIBRARY mirrors them. */
+export const LIBRARY: Record<string, LibraryEntry> = Object.fromEntries(
+  THRESHOLD_LIBRARY.filter((e) =>
+    [...PERFORMANCE_KINDS, "group_comparison", "calibration"].includes(e.kind),
+  ).map((e) => [
+    e.id,
+    {
+      version: e.version,
+      kind: e.kind,
+      metric: e.metric,
+      parameters: e.parameters,
+      legalStatus: e.legalStatus,
+      caveat: e.caveat,
+    },
+  ]),
+);
 
 function bandNorm(band: any): Band | null {
   return band === null || band === undefined

@@ -801,6 +801,34 @@ export function formFromPlan(plan: Plan): {
   return { thresholds, form };
 }
 
+/**
+ * The criteria a frozen external request asks for, in order (section 11.2):
+ * an engineConfig 1.4 request's plan, or for 1.1 the derived plan's
+ * criteria, whose ids are the suite names.
+ */
+export function requestedCriteria(frozen: {
+  profile: { suite: string[]; task?: string };
+  engineConfig: { task?: string; statistics?: Pick<Plan, "criteria"> };
+}): { id: string; kind: string }[] {
+  if (frozen.engineConfig.statistics)
+    return frozen.engineConfig.statistics.criteria.map((c) => ({
+      id: c.id,
+      kind: c.kind,
+    }));
+  const task = frozen.engineConfig.task ?? frozen.profile.task;
+  return frozen.profile.suite.map((id) => ({
+    id,
+    kind:
+      id === "performance"
+        ? task === "Multiclass classification"
+          ? "multiclass_performance"
+          : "performance"
+        : id === "regression"
+          ? "regression_performance"
+          : "group_comparison",
+  }));
+}
+
 /** The threshold library entries a hosted plan may reference (section 10.1), for the plan step. */
 export const HOSTED_LIBRARY = Object.fromEntries(
   Object.entries(LIBRARY).filter(([, entry]) =>
