@@ -917,7 +917,7 @@ export function AuditProgram({
     ).length,
     inScope = w.procedures.filter((p) => p.selected).length;
   const b = w.brief,
-    warnings = revisionWarnings(w),
+    warnings = revisionWarnings(w, data.metadataBytes),
     lastProgramEntry = w.program.history.at(-1),
     programReturn =
       w.program.status === "draft" && lastProgramEntry?.status === "returned"
@@ -1021,7 +1021,7 @@ export function AuditProgram({
                     )}
                   </div>
                 )}
-                {warningCards((id) => id === "brief")}
+                {warningCards((id) => id === "brief" || id === "metadata")}
                 {[
                   ["intendedUse", "Intended use"],
                   ["boundary", "Boundary and exclusions"],

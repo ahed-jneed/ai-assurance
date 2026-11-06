@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Engagement } from "./domain";
 import { seedWorkflow } from "./workflow-seed";
 import {
+  approvalReserve,
+  approvalStatus,
+  metadataLimit,
+  metadataReserve,
+  metadataWarning,
   procedureDraftRevision,
   revisionWarnings,
   runBindsProcedure,
@@ -11,7 +16,9 @@ import {
   approveProgram,
   approvedWorkflow,
   at,
+  briefInput,
   command,
+  planProgram,
   planSave,
   procedureId,
   procedureOf,
@@ -130,6 +137,221 @@ describe("revision limit warnings", () => {
     );
     expect(revisionWarnings(w)).toEqual([]);
     expect(revisionWarnings(undefined)).toEqual([]);
+  });
+});
+
+describe("metadata reserve", () => {
+  /** The room save() keeps for `op`, run on the engagement as loaded. */
+  async function reserveFor(
+    e: Engagement,
+    op: string,
+    data: unknown,
+    userId: string,
+  ) {
+    const loaded = approvalStatus(e.workflow);
+    await command(e, op, data, userId);
+    return metadataReserve(loaded, e.workflow, op);
+  }
+  const resample = (e: Engagement, sampling = "Stratified sample of 40") =>
+    planSave(e, { sampling });
+  const reassign = {
+    procedureIds: [procedureId],
+    patch: { dueDate: "2026-12-15" },
+  };
+  const scopeChange = {
+    ...briefInput,
+    boundary: "Scoring service, decision support and appeals",
+    changeImpact: "Appeals handling is now in scope",
+  };
+  const whole = { bytes: approvalReserve, whole: true };
+  const held = { bytes: approvalReserve, whole: false };
+  const size = (value: unknown) =>
+    new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  /** What a decision adds to the engagement, with a 2,000-character reason. */
+  async function decisionSize(e: Engagement, op: string, data: unknown) {
+    const decided = structuredClone(e);
+    await command(
+      decided,
+      op,
+      { ...(data as object), reason: "r".repeat(2_000) },
+      "reviewer",
+    );
+    return size(decided) - size(e);
+  }
+  async function changedProgram() {
+    const e = structuredEngagement();
+    await approveProgram(e);
+    await command(e, "saveProcedurePlan", resample(e), "lead");
+    return e;
+  }
+
+  it("keeps none once the scope and program are approved", async () => {
+    const e = structuredEngagement();
+    await approveProgram(e);
+    expect(
+      await reserveFor(e, "bulkPlanProcedures", reassign, "lead"),
+    ).toBeUndefined();
+    expect(
+      metadataReserve(approvalStatus(undefined), undefined, "renameEngagement"),
+    ).toBeUndefined();
+  });
+
+  it("makes a change that needs the scope or program approved leave the whole reserve", async () => {
+    // A plan change to the approved program.
+    let e = structuredEngagement();
+    await approveProgram(e);
+    expect(
+      await reserveFor(e, "saveProcedurePlan", resample(e), "lead"),
+    ).toMatchObject(whole);
+    // A change to the approved scope.
+    e = structuredEngagement();
+    await approveProgram(e);
+    expect(await reserveFor(e, "saveBrief", scopeChange, "lead")).toMatchObject(
+      whole,
+    );
+    // A Lead's change that withdraws the submitted program.
+    e = await changedProgram();
+    await command(e, "submitProgram", {}, "auditor");
+    expect(
+      await reserveFor(
+        e,
+        "saveProcedurePlan",
+        resample(e, "All 12 datasets"),
+        "lead",
+      ),
+    ).toMatchObject(whole);
+    expect(workflowOf(e).program.history.at(-1)?.status).toBe("withdrawn");
+    // Adopting the workflow starts its first approval.
+    e = structuredEngagement({ workflow: undefined });
+    expect(await reserveFor(e, "adoptWorkflow", {}, "lead")).toMatchObject(
+      whole,
+    );
+  });
+
+  it("keeps room for the reviewer to approve or return each submission", async () => {
+    const e = structuredEngagement(),
+      w = () => workflowOf(e);
+    await command(e, "saveBrief", briefInput, "auditor");
+    const scope = await reserveFor(e, "submitBrief", {}, "auditor");
+    expect(scope).toMatchObject({ whole: true });
+    expect(scope!.bytes).toBe(
+      size({ ...w().brief, history: undefined }) + 5_000,
+    );
+    const revision = { revision: w().brief!.revision };
+    for (const [op, data] of [
+      ["approveBrief", revision],
+      ["returnBrief", {}],
+    ] as const)
+      expect(await decisionSize(e, op, data)).toBeLessThan(scope!.bytes);
+    await command(
+      e,
+      "approveBrief",
+      { ...revision, reason: "Scope agreed" },
+      "reviewer",
+    );
+    await planProgram(e);
+    const program = await reserveFor(e, "submitProgram", {}, "auditor");
+    expect(program).toMatchObject({ whole: true });
+    expect(program!.bytes).toBe(size(w().program.history.at(-1)) + 5_000);
+    for (const [op, data] of [
+      ["approveProgram", { revision: w().program.revision }],
+      ["returnProgram", {}],
+    ] as const)
+      expect(await decisionSize(e, op, data)).toBeLessThan(program!.bytes);
+  });
+
+  it("lets the scope and program be drafted and decided with the reserve, and keeps it from other writes", async () => {
+    const e = await changedProgram(),
+      w = workflowOf(e);
+    expect(
+      metadataReserve(approvalStatus(w), w, "createFinding"),
+    ).toMatchObject(held);
+    expect(
+      await reserveFor(
+        e,
+        "saveProcedurePlan",
+        resample(e, "Stratified sample of 60"),
+        "lead",
+      ),
+    ).toBeUndefined();
+    await command(e, "submitProgram", {}, "auditor");
+    // While the submission awaits a decision, an assignment change is held
+    // to the reserve too.
+    expect(
+      await reserveFor(e, "bulkPlanProcedures", reassign, "lead"),
+    ).toMatchObject(held);
+    expect(
+      await reserveFor(
+        e,
+        "returnProgram",
+        { reason: "Size the sample" },
+        "reviewer",
+      ),
+    ).toBeUndefined();
+    await command(e, "submitProgram", {}, "auditor");
+    expect(
+      await reserveFor(
+        e,
+        "approveProgram",
+        { revision: w.program.revision, reason: "Program agreed" },
+        "reviewer",
+      ),
+    ).toBeUndefined();
+    // A scope change that awaits approval holds the program's drafting to
+    // the reserve, and the reviewer's decision on it may use it.
+    await command(e, "saveBrief", scopeChange, "lead");
+    await command(e, "submitBrief", {}, "lead");
+    expect(
+      await reserveFor(
+        e,
+        "saveProcedurePlan",
+        resample(e, "All 12 datasets"),
+        "lead",
+      ),
+    ).toMatchObject(held);
+    expect(
+      await reserveFor(
+        e,
+        "returnBrief",
+        { reason: "Name the appeals channel" },
+        "reviewer",
+      ),
+    ).toBeUndefined();
+    expect(
+      await reserveFor(e, "saveBrief", scopeChange, "lead"),
+    ).toBeUndefined();
+  });
+});
+
+describe("metadata warning", () => {
+  it("warns from 200 KB before the limit and says what the reserve refuses", async () => {
+    const e = structuredEngagement();
+    await approveProgram(e);
+    const w = workflowOf(e);
+    expect(metadataWarning(w, metadataLimit - 200_001)).toBeUndefined();
+    expect(metadataWarning(w, undefined)).toBeUndefined();
+    expect(metadataWarning(undefined, metadataLimit)).toBeUndefined();
+    expect(metadataWarning(w, metadataLimit - 200_000)).toEqual({
+      id: "metadata",
+      title: "Engagement record",
+      message:
+        "The engagement record uses 1.30 MB of its 1.5 MB limit. Once less than 100 KB is left, a change that needs the scope or audit program approved again is refused, so that every approval started can be completed.",
+    });
+    expect(metadataWarning(w, metadataLimit - 99_999)?.message).toBe(
+      "The engagement record uses 1.40 MB of its 1.5 MB limit. Less than the 100 KB an approval needs is left, so a change that needs the scope or audit program approved again is refused. Continue such changes in a follow-up engagement.",
+    );
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, { sampling: "Stratified sample of 40" }),
+      "lead",
+    );
+    expect(metadataWarning(w, metadataLimit - 50_000)?.message).toBe(
+      "The engagement record uses 1.45 MB of its 1.5 MB limit. The room left is kept for approving the scope and audit program: until they are approved, other changes that need more room are refused.",
+    );
+    expect(revisionWarnings(w, metadataLimit - 50_000)).toEqual([
+      metadataWarning(w, metadataLimit - 50_000),
+    ]);
   });
 });
 

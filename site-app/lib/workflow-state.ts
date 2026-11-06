@@ -125,14 +125,203 @@ export const procedureWorkRevisions = (p: Procedure) =>
       h.action === "evaluate" ||
       h.action === "reaffirm",
   ).length;
-/** The brief, program and procedures close to or at their history limit. */
-export function revisionWarnings(w: Workflow | undefined) {
+// The engagement metadata limit bounds approval cycles, which count towards no
+// history limit. save() in lib/engagement-repo.ts refuses a write that would
+// store more than `metadataLimit` bytes. So that the limit never stops an
+// approval halfway, `approvalReserve` bytes under it are kept for approving
+// the scope and the program: a change that needs them approved must leave the
+// reserve free, and until they are approved only their own drafting,
+// submissions, approvals and returns may use it.
+export const metadataLimit = 1_500_000;
+export const approvalReserve = 100_000;
+/** How close to the metadata limit the audit program warns. */
+export const metadataWarningLevel = 2 * approvalReserve;
+/** Room for a reviewer's reason, in bytes, when a decision is reserved. */
+const reasonRoom = 2_000;
+const kb = (bytes: number) => bytes / 1000 + " KB",
+  mb = (bytes: number) => bytes / 1_000_000 + " MB";
+/** Whether the scope, or the program bound to it, awaits approval. */
+export const approvalPending = (w: Workflow | undefined): w is Workflow =>
+  !!w &&
+  (w.brief?.status !== "approved" ||
+    w.program.status !== "approved" ||
+    w.program.briefRevision !== w.brief.revision);
+/** The scope and program status of an engagement as it was loaded. */
+export type ApprovalStatus = {
+  brief?: Brief["status"];
+  program?: Program["status"];
+};
+export const approvalStatus = (w: Workflow | undefined): ApprovalStatus => ({
+  brief: w?.brief?.status,
+  program: w?.program.status,
+});
+/**
+ * Room a write must keep free under the metadata limit, and the refusal when
+ * it does not. With `whole`, the record must keep all of it free after the
+ * write; otherwise the write must only not grow the record into it.
+ */
+export type MetadataReserve = {
+  bytes: number;
+  whole: boolean;
+  refusal: string;
+};
+// The scope's and program's own drafting and the reviewer's decisions, which
+// may use the reserve while the scope or program awaits approval.
+const approvalWrites = new Set([
+  "saveBrief",
+  "approveBrief",
+  "returnBrief",
+  "saveProcedurePlan",
+  "bulkPlanProcedures",
+  "scopeProgramCandidates",
+  "approveProgram",
+  "returnProgram",
+]);
+const byteLength = (value: unknown) =>
+  new TextEncoder().encode(JSON.stringify(value)).byteLength;
+/**
+ * Room for the reviewer's approval or return of a submission. Either adds
+ * about the submitted record (`submitted`: the program's submission entry, or
+ * the brief) and the approval or reason twice.
+ */
+const decisionRoom = (submitted: unknown) =>
+  byteLength(submitted) + 2 * (500 + reasonRoom);
+/**
+ * The room a write must keep under the metadata limit (save() in
+ * lib/engagement-repo.ts), given the approval status the engagement was
+ * loaded with (`loaded`), the workflow after the write and its op:
+ * - Nothing awaits approval after it: none.
+ * - It starts an approval: it adopts the workflow, or takes an approved scope
+ *   or program, or a submitted program, back to draft. It must leave the
+ *   whole approval reserve, or it is refused and the records stay as they
+ *   were.
+ * - It submits the scope or program: it must leave room for the reviewer to
+ *   approve or return the submission.
+ * - The scope's and program's drafting and the reviewer's decisions, while no
+ *   submission awaits a decision: none, so they may use the reserve.
+ * - Any other write while approval is pending must not take room from the
+ *   reserve (or, while a submission awaits a decision, the room kept for it
+ *   if that is larger): it may not grow the record into it.
+ */
+export function metadataReserve(
+  loaded: ApprovalStatus,
+  w: Workflow | undefined,
+  op: string,
+): MetadataReserve | undefined {
+  if (!approvalPending(w)) return undefined;
+  if (
+    loaded.program === undefined ||
+    (loaded.brief === "approved" && w.brief?.status !== "approved") ||
+    (loaded.program !== "draft" &&
+      w.program.status === "draft" &&
+      op !== "returnProgram")
+  )
+    return {
+      bytes: approvalReserve,
+      whole: true,
+      refusal:
+        "This change would need the engagement scope or audit program to be approved, but would leave less than the " +
+        kb(approvalReserve) +
+        " that approval needs under the engagement's " +
+        mb(metadataLimit) +
+        " limit. Nothing was saved, and the scope and program stay as they were. Continue in a follow-up engagement.",
+    };
+  const submission = (record: string, room: number, shorten: string) => ({
+    bytes: room,
+    whole: true,
+    refusal:
+      "Submitting the " +
+      record +
+      " now would leave too little room under the engagement's " +
+      mb(metadataLimit) +
+      " limit for the reviewer to approve or return it. Nothing was saved. Shorten the " +
+      shorten +
+      ", or continue in a follow-up engagement.",
+  });
+  if (op === "submitBrief" && w.brief)
+    return submission(
+      "scope",
+      decisionRoom({ ...w.brief, history: undefined }),
+      "brief",
+    );
+  if (op === "submitProgram")
+    return submission(
+      "audit program",
+      decisionRoom(w.program.history.at(-1)),
+      "procedure plans you changed",
+    );
+  if (
+    approvalWrites.has(op) &&
+    w.brief?.status !== "submitted" &&
+    w.program.status !== "submitted"
+  )
+    return undefined;
+  // While a submission awaits a decision, the room kept for that decision is
+  // held too, should a large program's submission need more than the reserve.
+  const awaiting =
+    w.program.status === "submitted"
+      ? decisionRoom(w.program.history.at(-1))
+      : w.brief?.status === "submitted"
+        ? decisionRoom({ ...w.brief, history: undefined })
+        : 0;
+  return {
+    bytes: Math.max(approvalReserve, awaiting),
+    whole: false,
+    refusal:
+      "The engagement record is close to its " +
+      mb(metadataLimit) +
+      " limit, and the room left is kept for approving the engagement scope and audit program. Nothing was saved. Save this again once they are approved, or continue in a follow-up engagement.",
+  };
+}
+/**
+ * A warning once the stored engagement record (`bytes`, as last saved) comes
+ * close to the metadata limit.
+ */
+export function metadataWarning(
+  w: Workflow | undefined,
+  bytes: number | null | undefined,
+) {
+  if (!w || bytes == null || metadataLimit - bytes > metadataWarningLevel)
+    return undefined;
+  const used =
+    "The engagement record uses " +
+    (bytes / 1_000_000).toFixed(2) +
+    " MB of its " +
+    mb(metadataLimit) +
+    " limit. ";
+  return {
+    id: "metadata",
+    title: "Engagement record",
+    message:
+      used +
+      (metadataLimit - bytes >= approvalReserve
+        ? "Once less than " +
+          kb(approvalReserve) +
+          " is left, a change that needs the scope or audit program approved again is refused, so that every approval started can be completed."
+        : approvalPending(w)
+          ? "The room left is kept for approving the scope and audit program: until they are approved, other changes that need more room are refused."
+          : "Less than the " +
+            kb(approvalReserve) +
+            " an approval needs is left, so a change that needs the scope or audit program approved again is refused. Continue such changes in a follow-up engagement."),
+  };
+}
+/**
+ * The brief, program and procedures close to or at their history limit, and
+ * the engagement record close to its metadata limit (`metadataBytes`, the
+ * stored size when known).
+ */
+export function revisionWarnings(
+  w: Workflow | undefined,
+  metadataBytes?: number | null,
+) {
   const warnings: {
     id: string;
     recordId?: string;
     title: string;
     message: string;
   }[] = [];
+  const metadata = metadataWarning(w, metadataBytes);
+  if (metadata) warnings.push(metadata);
   const check = (
     id: string,
     title: string,
