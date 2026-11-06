@@ -351,8 +351,10 @@ export function ClientDatasetPins({
         the pin in the evidence register. Only a client-local external job can
         use it. The client&apos;s own worker finds the file in its client data
         directory by the pin, refuses a changed file and returns only aggregate
-        results. A fairness protocol on a special-category column needs no
-        recorded basis on this route.
+        results, withholding groups below the minimum group size. Groups at or
+        above it are reported exactly. Under the platform&apos;s current Art 4a
+        reading, a fairness protocol on a special-category column needs no
+        recorded basis on this route. <PendingLegalReview />
       </p>
       {pins.length ? (
         <ul className="record-list">
