@@ -2,7 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/bindings";
 import { short } from "@/lib/commands/fields";
 import { dispatchManagement, managementOps } from "@/lib/commands/management";
-import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
+import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import { id, now, sha256 } from "@/lib/ids";
 import { context, refuseReadOnly, requireAdmin } from "@/lib/tenancy";
 
@@ -24,9 +24,7 @@ const command = z
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const payload = command.parse(
-      JSON.parse(new TextDecoder().decode(await readBounded(request, 16384))),
-    );
+    const payload = command.parse(await readJson(request, 16384));
     const ctx = await context(payload.tenantId);
     refuseReadOnly(ctx);
     requireAdmin(ctx);

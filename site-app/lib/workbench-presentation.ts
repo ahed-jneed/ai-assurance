@@ -85,6 +85,10 @@ export function workbenchQueryParams(query: WorkbenchQuery) {
   return params;
 }
 
+// The workbench reads its review queue and register filters from the server
+// (reviewQueueSummary, reviewQueuePage and searchRecords in
+// lib/assurance-search.ts). These in-memory versions define the expected
+// results: lib/assurance-search.test.ts checks the SQL against them.
 export function workbenchReviewQueue(
   all: AssuranceRecord[],
   role: Role,

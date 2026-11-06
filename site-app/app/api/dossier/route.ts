@@ -6,7 +6,7 @@ import {
   context,
   getEngagement,
   now,
-  readBounded,
+  readJson,
   requireRole,
   responseError,
   sha256,
@@ -40,11 +40,7 @@ export async function POST(request: Request) {
             .default([]),
         })
         .strict()
-        .parse(
-          JSON.parse(
-            new TextDecoder().decode(await readBounded(request, 20000)),
-          ),
-        ),
+        .parse(await readJson(request, 20000)),
       ctx = await context(v.tenantId),
       e = await getEngagement(ctx, v.engagementId);
     requireRole(ctx, ["Lead Auditor"]);
