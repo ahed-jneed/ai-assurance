@@ -5,7 +5,7 @@ import {
   responseError,
   sha256,
 } from "@/lib/store";
-import { isClientRole, isReleased } from "@/lib/workflow-state";
+import { isClientRole, isClientVisible } from "@/lib/workflow-state";
 import { verifyPackage } from "@/lib/report-package";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
       e = await getEngagement(ctx, url.searchParams.get("engagementId") ?? ""),
       r = e.reports.find((r) => r.id === url.searchParams.get("reportId")),
       client = isClientRole(ctx.role);
-    if (!r || (client && !isReleased(r)))
+    if (!r || (client && !isClientVisible(r)))
       throw new ApiError(404, "Report package not found");
     const proof = await verifyPackage(r, sha256, client);
     if (url.searchParams.get("download") === "1") {

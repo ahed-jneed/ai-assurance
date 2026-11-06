@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1ca88991-dff6-4a36-980c-fd6249e767f9",
+  "id": "73abe291-7f17-4767-8d73-2f6a7a38513c",
   "prevId": "3b7b26eb-d518-4a56-895f-99455fc14eaf",
   "tables": {
     "engagement_access_policies": {
@@ -241,6 +241,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "private_key": {
+          "name": "private_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "public_key": {
           "name": "public_key",
           "type": "text",
@@ -262,46 +269,9 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "wrapped_key": {
-          "name": "wrapped_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "kek_id": {
-          "name": "kek_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "retired_at": {
-          "name": "retired_at",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "retired_reason": {
-          "name": "retired_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
-      "indexes": {
-        "idx_dossier_keys_active": {
-          "name": "idx_dossier_keys_active",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": true,
-          "where": "active = 1"
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "dossier_keys_tenant_id_id_pk": {
@@ -803,6 +773,104 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "integrity_incidents": {
+      "name": "integrity_incidents",
+      "columns": {
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "engagement_id": {
+          "name": "engagement_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "object_key": {
+          "name": "object_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "first_seen": {
+          "name": "first_seen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_user_id": {
+          "name": "last_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurrences": {
+          "name": "occurrences",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "integrity_incidents_tenant_id_tenants_id_fk": {
+          "name": "integrity_incidents_tenant_id_tenants_id_fk",
+          "tableFrom": "integrity_incidents",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "integrity_incidents_tenant_id_engagement_id_object_key_kind_pk": {
+          "columns": [
+            "tenant_id",
+            "engagement_id",
+            "object_key",
+            "kind"
+          ],
+          "name": "integrity_incidents_tenant_id_engagement_id_object_key_kind_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

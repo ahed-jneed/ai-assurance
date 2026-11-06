@@ -92,7 +92,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 |---|---|
 | Tenancy and access | `tenants` (version, last_command_id), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_policies` |
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
-| Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0008`; retired keys keep only the public key) |
+| Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |
 
 **Invariants.** Append-only triggers protect `audit_events`, `engagement_snapshots`, `management_events`, `assurance_records`, and completed jobs and attempts. Unique indexes on `json_extract` expressions stop revision forks. All of these exist only in hand-written SQL (`0001`, `0003`).

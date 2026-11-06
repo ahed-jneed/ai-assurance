@@ -10,9 +10,9 @@ ALTER TABLE `dossier_keys` ADD `wrapped_key` text;--> statement-breakpoint
 ALTER TABLE `dossier_keys` ADD `kek_id` text;--> statement-breakpoint
 ALTER TABLE `dossier_keys` ADD `retired_at` text;--> statement-breakpoint
 ALTER TABLE `dossier_keys` ADD `retired_reason` text;--> statement-breakpoint
-UPDATE `dossier_keys` SET `retired_at`=strftime('%Y-%m-%dT%H:%M:%fZ','now'),`retired_reason`='Private key was stored unwrapped; retired by migration 0008 (F-23)'
+UPDATE `dossier_keys` SET `retired_at`=strftime('%Y-%m-%dT%H:%M:%fZ','now'),`retired_reason`='Private key was stored unwrapped; retired by migration 0009 (F-23)'
 WHERE `active`=1;--> statement-breakpoint
-UPDATE `dossier_keys` SET `retired_reason`='Rotated before migration 0008; retirement time not recorded'
+UPDATE `dossier_keys` SET `retired_reason`='Rotated before migration 0009; retirement time not recorded'
 WHERE `active`<>1;--> statement-breakpoint
 UPDATE `dossier_keys` SET `active`=0;--> statement-breakpoint
 ALTER TABLE `dossier_keys` DROP COLUMN `private_key`;--> statement-breakpoint

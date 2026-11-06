@@ -256,7 +256,7 @@ describe("activeSigningKey", () => {
   });
 });
 
-describe("drizzle 0008", () => {
+describe("drizzle 0009", () => {
   it("retires and erases every plaintext key, keeping the public halves", () => {
     const sqlite = new DatabaseSync(":memory:"),
       folder = new URL("../drizzle/", import.meta.url),
@@ -299,7 +299,7 @@ describe("drizzle 0008", () => {
         0,
         null,
         "string",
-        "Private key was stored unwrapped; retired by migration 0008 (F-23)",
+        "Private key was stored unwrapped; retired by migration 0009 (F-23)",
       ],
       [
         "KEY-new",
@@ -307,7 +307,7 @@ describe("drizzle 0008", () => {
         0,
         null,
         "string",
-        "Private key was stored unwrapped; retired by migration 0008 (F-23)",
+        "Private key was stored unwrapped; retired by migration 0009 (F-23)",
       ],
       [
         "KEY-old",
@@ -315,7 +315,7 @@ describe("drizzle 0008", () => {
         0,
         null,
         "object",
-        "Rotated before migration 0008; retirement time not recorded",
+        "Rotated before migration 0009; retirement time not recorded",
       ],
     ]);
   });

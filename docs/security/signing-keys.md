@@ -1,6 +1,6 @@
 # Dossier signing keys
 
-Each practice signs its dossiers and evidence briefing packets with an Ed25519 key of its own. This page covers how those keys are stored, how the platform operator configures the key-encryption secret, how a practice administrator rotates a key, and how a recipient finds the key that verifies a dossier. Code: `site-app/lib/signing-keys.ts`, `site-app/lib/dossier.ts`, `site-app/lib/commands/management/signing-keys.ts`, `site-app/app/api/dossier/keys/route.ts`; table `dossier_keys` (`site-app/db/schema.ts`, `site-app/drizzle/0008_dossier_signing_keys.sql`).
+Each practice signs its dossiers and evidence briefing packets with an Ed25519 key of its own. This page covers how those keys are stored, how the platform operator configures the key-encryption secret, how a practice administrator rotates a key, and how a recipient finds the key that verifies a dossier. Code: `site-app/lib/signing-keys.ts`, `site-app/lib/dossier.ts`, `site-app/lib/commands/management/signing-keys.ts`, `site-app/app/api/dossier/keys/route.ts`; table `dossier_keys` (`site-app/db/schema.ts`, `site-app/drizzle/0009_dossier_signing_keys.sql`).
 
 ## Storage
 
@@ -9,7 +9,7 @@ Each practice signs its dossiers and evidence briefing packets with an Ed25519 k
 - A practice has at most one active key (a unique partial index). A practice's first seal or briefing export creates it.
 - When a key retires, its wrapped private half is erased (`wrapped_key` and `kek_id` become NULL). Its public half, creation time, retirement time and reason stay, so everything it signed still verifies.
 
-**Before #25** private keys were stored as plaintext PKCS#8 (F-23). Migration `0008` cannot wrap a key in SQL, and a key that sat in plaintext must be presumed exposed to anyone who had D1 read access or a backup. So the migration retires every existing key, erases its private half and records the reason. Each practice's next seal or briefing export creates a new, wrapped key. Dossiers and packets signed before the migration still verify against the retired public keys. Older D1 backups and Time Travel restore points still contain the plaintext keys: treat them as sensitive until they expire, and do not restore `dossier_keys` from them.
+**Before #25** private keys were stored as plaintext PKCS#8 (F-23). Migration `0009` cannot wrap a key in SQL, and a key that sat in plaintext must be presumed exposed to anyone who had D1 read access or a backup. So the migration retires every existing key, erases its private half and records the reason. Each practice's next seal or briefing export creates a new, wrapped key. Dossiers and packets signed before the migration still verify against the retired public keys. Older D1 backups and Time Travel restore points still contain the plaintext keys: treat them as sensitive until they expire, and do not restore `dossier_keys` from them.
 
 ## Configure the key-encryption secret (platform operator)
 

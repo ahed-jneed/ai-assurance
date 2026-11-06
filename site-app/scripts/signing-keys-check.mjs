@@ -1,5 +1,5 @@
 // Dossier signing keys in the built Worker (#25, F-23,
-// docs/security/signing-keys.md): drizzle 0008 retires and erases plaintext
+// docs/security/signing-keys.md): drizzle 0009 retires and erases plaintext
 // private keys while a dossier signed before it still verifies with
 // `python -m engine.assurance verify` against the published keys; signing
 // refuses without DOSSIER_KEK outside the development server; and a rotation
@@ -139,7 +139,7 @@ const verify = (dossierPath, trustPath) =>
     child.on("exit", (code) => resolve({ code, out }));
   });
 
-// --- 0008 retires plaintext keys; earlier dossiers still verify -------------
+// --- 0009 retires plaintext keys; earlier dossiers still verify -------------
 // A key and a manifest-1.0 dossier exactly as the platform made them before
 // #25: plaintext PKCS#8 in D1, Ed25519 over the canonical manifest.
 const legacy = generateKeyPairSync("ed25519"),
@@ -211,7 +211,7 @@ try {
       assert.equal(rows[0].wrapped_key, null);
       assert.equal(
         rows[0].retired_reason,
-        "Private key was stored unwrapped; retired by migration 0008 (F-23)",
+        "Private key was stored unwrapped; retired by migration 0009 (F-23)",
       );
       // The legacy practice is provisioned at first sign-in.
       assert.equal((await call("/api/workspace")).body.tenantId, tenantId);
@@ -249,7 +249,7 @@ try {
     },
   );
   console.log(
-    "PASS drizzle 0008 erases plaintext keys; a pre-migration dossier verifies against the published retired key; signing refuses without DOSSIER_KEK",
+    "PASS drizzle 0009 erases plaintext keys; a pre-migration dossier verifies against the published retired key; signing refuses without DOSSIER_KEK",
   );
 
   // --- With DOSSIER_KEK: only a wrapped key reaches D1 ------------------------

@@ -1,5 +1,6 @@
 import { ApiError, bucket, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
+import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
 import { storedBodies } from "./assurance-store";
 import { legalDate } from "./rule-pack";
@@ -133,7 +134,7 @@ export async function buildDossier(
     "</small><h1>" +
     escaped(e.title) +
     "</h1><h2>" +
-    escaped(snapshot.opinion) +
+    escaped(opinionLabel(snapshot)) +
     "</h2>" +
     rulePackLine(snapshot) +
     "<pre>" +

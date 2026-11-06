@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "../../bindings";
-import { getEngagement } from "../../engagement-repo";
+import { loadEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
 import { isClientRole } from "../../workflow-state";
@@ -36,7 +36,8 @@ export async function checkAssignable(
       403,
       "Only a Lead Auditor may assign internal engagement access",
     );
-  for (const engagementId of ids) await getEngagement(ctx, engagementId);
+  // Access is decided by the D1 record; its R2 parts are never needed here.
+  for (const engagementId of ids) await loadEngagement(ctx, engagementId);
 }
 
 /** Activates the user's access to each listed engagement. */
