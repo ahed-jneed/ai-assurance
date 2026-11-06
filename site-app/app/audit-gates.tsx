@@ -30,12 +30,14 @@ import {
   type ReportTerms,
 } from "@/lib/domain/report-model";
 import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
-/** Report elements the approved brief and program supply. */
+/**
+ * Report elements the approved brief and program supply. Independence is
+ * not one of them: its gate has kind "acceptance" and opens that panel.
+ */
 export const briefElements = [
   "report:subject",
   "report:criteria",
   "report:responsibilities",
-  "report:independence",
   "report:work",
 ];
 export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;

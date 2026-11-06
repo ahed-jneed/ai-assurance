@@ -44,6 +44,14 @@ export type ReportElement = {
 export const independenceProblem =
   "Approve the acceptance record and obtain a current, conflict-free declaration from every team member";
 
+/**
+ * Why the independence element is incomplete for a workflow adopted before
+ * acceptance records whose brief has no independence note. Briefs no longer
+ * ask for the note, so the acceptance record is the only way to record it.
+ */
+export const legacyIndependenceProblem =
+  "Record the independence assessment: start the acceptance record and obtain a declaration from every team member";
+
 /** How the conclusion names the subject matter of the approved brief. */
 export function subjectPhrase(e: Engagement) {
   const b = e.workflow?.brief;
@@ -217,15 +225,14 @@ export function reportElements(
       // acceptance gate applies, the approved acceptance record and every
       // team member's current, conflict-free declaration are that
       // assessment; an older workflow keeps its brief's free-text note.
+      // Briefs no longer ask for that note, so an older workflow without
+      // one is pointed to the acceptance record, which then applies.
       value: qualityStatement,
       problem: acceptanceApplies(e.workflow)
         ? acceptanceGates(e).length
           ? independenceProblem
           : ""
-        : fromBrief(
-            b?.independence,
-            "The approved brief must record the independence assessment",
-          ),
+        : fromBrief(b?.independence, legacyIndependenceProblem),
     },
     {
       id: "work",

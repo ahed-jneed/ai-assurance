@@ -10,7 +10,7 @@
 // records the release-time completion records against its hashes.
 import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
-import { acceptanceApplies, acceptanceGates } from "../workflow/acceptance";
+import { acceptanceGates } from "../workflow/acceptance";
 import type { Engagement, Paper } from "./types";
 import { reportElements } from "./report-gates";
 import {
@@ -288,11 +288,11 @@ export function finalReportGates(
           .filter((el) => el.problem)
           .map((el) => ({
             id: "report:" + el.id,
-            // Independence comes from the acceptance record and the
-            // declarations where the acceptance gate applies, so the gate
-            // opens the acceptance panel.
+            // Independence is recorded only in the acceptance record and the
+            // declarations (briefs no longer ask for a note), so the gate
+            // opens the acceptance panel, also for an older workflow.
             kind:
-              el.id === "independence" && acceptanceApplies(e.workflow)
+              el.id === "independence"
                 ? ("acceptance" as const)
                 : ("report" as const),
             title: el.label,

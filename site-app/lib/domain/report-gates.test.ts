@@ -14,6 +14,7 @@ import {
 import {
   criterionRollup,
   independenceProblem,
+  legacyIndependenceProblem,
   reportElements,
 } from "./report-gates";
 import {
@@ -305,14 +306,21 @@ describe("independence element", () => {
     delete e.workflow!.acceptanceRequired;
     e.workflow!.declarations = [];
     expect(element(e).problem).toBe("");
+    // A brief first saved after #23 has no note, since the form no longer
+    // asks for one: the gate points to the acceptance record, the only
+    // place left to record the assessment, and opens the acceptance panel.
     e.workflow!.brief!.independence = " ";
-    expect(element(e).problem).toBe(
-      "The approved brief must record the independence assessment",
-    );
+    expect(element(e).problem).toBe(legacyIndependenceProblem);
     expect(
       finalReportGates(e, { ...terms("unmodified"), particulars }).find(
         (g) => g.id === "report:independence",
       ),
-    ).toMatchObject({ kind: "report" });
+    ).toMatchObject({ kind: "acceptance" });
+    // Starting the acceptance record makes the gate apply, and an approved
+    // record with every declaration clears the element without a note.
+    const approved = await issuable();
+    e.workflow!.acceptance = approved.workflow!.acceptance;
+    e.workflow!.declarations = approved.workflow!.declarations;
+    expect(element(e).problem).toBe("");
   });
 });
