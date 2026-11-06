@@ -6,6 +6,7 @@ export {
   bucket,
   db,
   getEngagement,
+  loadEngagement,
   id,
   now,
   save,
