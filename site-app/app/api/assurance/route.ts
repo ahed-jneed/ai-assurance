@@ -5,7 +5,7 @@ import { short } from "@/lib/commands/fields";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
 import { assuranceView } from "@/lib/read-models/assurance-view";
-import { context } from "@/lib/tenancy";
+import { context, refuseReadOnly } from "@/lib/tenancy";
 import { isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -37,11 +37,12 @@ export async function POST(request: Request) {
           new TextDecoder().decode(await readBounded(request, 1024 * 1024)),
         ),
       ),
-      ctx = await context(a.tenantId),
-      e = await getEngagement(ctx, a.engagementId),
-      all = await records(ctx, e.id);
+      ctx = await context(a.tenantId);
+    refuseReadOnly(ctx);
     if (isClientRole(ctx.role))
       throw new ApiError(403, "The assurance workbench is internal");
+    const e = await getEngagement(ctx, a.engagementId),
+      all = await records(ctx, e.id);
     const result = await dispatchAssurance(
       assuranceTarget(e, all),
       a.op,

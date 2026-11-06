@@ -1,103 +1,153 @@
 import { z } from "zod";
 import { db } from "../../bindings";
 import { roles } from "../../domain";
-import { getEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
+import { isClientRole } from "../../workflow-state";
 import { defineCommands } from "../command";
 import { short } from "../fields";
 import type { ManagementHandler, ManagementModule } from "./batch";
+import {
+  checkAssignable,
+  engagementIds,
+  grantStatements,
+  withdrawAll,
+} from "./engagement-grants";
+
+const memberRole = z.enum([
+  "Auditor",
+  "Lead Auditor",
+  "Client Viewer",
+  "Client Contributor",
+  "Reviewer",
+]);
+type Existing = {
+  role: string;
+  status: string;
+  client_id: string | null;
+  practice_admin: number;
+};
+async function existingMember(tenantId: string, userId: string) {
+  return db()
+    .prepare(
+      "SELECT m.role,m.status,m.client_id,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin FROM memberships m WHERE m.tenant_id=? AND m.user_id=?",
+    )
+    .bind(tenantId, userId)
+    .first<Existing>();
+}
 /**
- * Granting, editing and revoking practice membership share one handler: the
- * same validation and self-change refusal, and for grant and update the same
- * role, client and engagement-grant checks. Only a Lead Auditor may grant
- * internal engagement access with a membership.
+ * The client a client role is scoped to, which must be a client of this
+ * practice; null for internal roles.
+ */
+export async function clientScope(
+  tenantId: string,
+  role: string,
+  clientId: string | null | undefined,
+) {
+  if (!isClientRole(role)) return null;
+  if (
+    !clientId ||
+    !(await db()
+      .prepare("SELECT id FROM clients WHERE tenant_id=? AND id=?")
+      .bind(tenantId, clientId)
+      .first())
+  )
+    throw new ApiError(400, "Select a client for client access");
+  return clientId;
+}
+/**
+ * Granting and editing practice membership share one handler: the same
+ * validation, self-change refusal and role, client and engagement checks.
+ * A new grant, a re-grant of revoked access and any change of role or client
+ * starts a fresh grant: the member's earlier engagement grants and sponsored
+ * runner workers are withdrawn, their earlier client request grants lapse
+ * (memberships.access_since), and only the engagements listed in
+ * `engagementIds` are granted, which such a change must list explicitly for
+ * an internal role. Editing only the name keeps the grants; listed
+ * engagements are then added. Only a Lead Auditor may grant internal
+ * engagement access with a membership.
  */
 const saveMember: ManagementHandler = {
   roles,
-  async handle({ commandId, timestamp, guard, statements }, data, ctx, op) {
+  async handle(batch, data, ctx, op) {
+    const { timestamp, guard, commandId, statements } = batch;
     const a = z
       .object({
         userId: short,
         displayName: short.optional(),
-        role: z
-          .enum([
-            "Auditor",
-            "Lead Auditor",
-            "Client Viewer",
-            "Client Contributor",
-            "Reviewer",
-          ])
-          .optional(),
+        role: memberRole.optional(),
         clientId: z.string().max(300).nullable().optional(),
-        engagementIds: z
-          .array(short)
-          .max(50)
-          .refine((v) => new Set(v).size === v.length)
-          .optional(),
+        engagementIds: engagementIds.optional(),
       })
       .parse(data);
     if (a.userId === ctx.user.userId)
       throw new ApiError(400, "You cannot change or revoke your own access");
-    const existing = await db()
-      .prepare(
-        "SELECT user_id,status FROM memberships WHERE tenant_id=? AND user_id=?",
-      )
-      .bind(ctx.tenantId, a.userId)
-      .first<{ user_id: string; status: string }>();
-    if (op !== "grantMember" && !existing)
+    const existing = await existingMember(ctx.tenantId, a.userId);
+    if (op === "updateMember" && !existing)
       throw new ApiError(404, "User not found in this practice");
     if (op === "updateMember" && existing?.status !== "active")
       throw new ApiError(409, "Restore revoked access before editing the role");
-    if (op === "revokeMember") {
-      statements.push(
-        db()
-          .prepare(
-            "UPDATE memberships SET status=? WHERE tenant_id=? AND user_id=? AND " +
-              guard,
-          )
-          .bind("revoked", ctx.tenantId, a.userId, ctx.tenantId, commandId),
+    if (!a.displayName || !a.role)
+      throw new ApiError(400, "Enter a name and select a role");
+    const clientId = await clientScope(ctx.tenantId, a.role, a.clientId);
+    const fresh =
+      !existing ||
+      existing.status !== "active" ||
+      existing.role !== a.role ||
+      existing.client_id !== clientId;
+    if (
+      existing &&
+      fresh &&
+      !isClientRole(a.role) &&
+      a.engagementIds === undefined
+    )
+      throw new ApiError(
+        400,
+        existing.status === "active"
+          ? "List the engagements this member keeps with the new role; earlier grants are withdrawn"
+          : "List the engagements to grant again; earlier grants are not restored",
       );
-      return { userId: a.userId, status: "revoked" };
-    } else {
-      if (!a.displayName || !a.role)
-        throw new ApiError(400, "Enter a name and select a role");
-      if (
-        ["Client Viewer", "Client Contributor"].includes(a.role) &&
-        (!a.clientId ||
-          !(await db()
-            .prepare("SELECT id FROM clients WHERE tenant_id=? AND id=?")
-            .bind(ctx.tenantId, a.clientId)
-            .first()))
-      )
-        throw new ApiError(400, "Select a client for client access");
-      const clientId = ["Client Viewer", "Client Contributor"].includes(a.role)
-        ? a.clientId!
-        : null;
-      if (op === "updateMember")
-        statements.push(
-          db()
+    if (existing?.practice_admin && isClientRole(a.role))
+      throw new ApiError(
+        409,
+        "Remove practice administration before giving this member a client role",
+      );
+    const ids = isClientRole(a.role) ? [] : (a.engagementIds ?? []);
+    await checkAssignable(ctx, a.role, a.engagementIds ?? []);
+    let withdrawn: { engagementIds: string[]; workerIds: string[] } = {
+      engagementIds: [],
+      workerIds: [],
+    };
+    if (existing && fresh) {
+      const withdrawal = await withdrawAll(batch, ctx, a.userId);
+      withdrawn = withdrawal.withdrawn;
+      statements.push(...withdrawal.statements);
+    }
+    statements.push(
+      op === "updateMember"
+        ? db()
             .prepare(
-              "UPDATE memberships SET display_name=?,role=?,client_id=? WHERE tenant_id=? AND user_id=? AND status=? AND " +
+              "UPDATE memberships SET display_name=?,role=?,client_id=?,access_since=" +
+                (fresh ? "?" : "access_since") +
+                " WHERE tenant_id=? AND user_id=? AND status=? AND " +
                 guard,
             )
             .bind(
               a.displayName,
               a.role,
               clientId,
+              ...(fresh ? [timestamp] : []),
               ctx.tenantId,
               a.userId,
               "active",
               ctx.tenantId,
               commandId,
-            ),
-        );
-      else
-        statements.push(
-          db()
+            )
+        : db()
             .prepare(
-              "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status) SELECT ?,?,?,?,?,? WHERE " +
+              "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status,access_since) SELECT ?,?,?,?,?,?,? WHERE " +
                 guard +
-                " ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role,client_id=excluded.client_id,display_name=excluded.display_name,status=excluded.status",
+                " ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role,client_id=excluded.client_id,display_name=excluded.display_name,status=excluded.status,access_since=" +
+                (fresh ? "excluded.access_since" : "memberships.access_since"),
             )
             .bind(
               ctx.tenantId,
@@ -106,54 +156,77 @@ const saveMember: ManagementHandler = {
               clientId,
               a.displayName,
               "active",
+              timestamp,
               ctx.tenantId,
               commandId,
             ),
-        );
-      if (a.engagementIds?.length) {
-        if (
-          ctx.role !== "Lead Auditor" ||
-          ["Client Viewer", "Client Contributor"].includes(a.role)
+    );
+    statements.push(...grantStatements(batch, ctx, a.userId, ids));
+    return {
+      userId: a.userId,
+      displayName: a.displayName,
+      role: a.role,
+      clientId,
+      status: "active",
+      engagementIds: ids,
+      ...(existing && fresh ? { withdrawn } : {}),
+    };
+  },
+};
+/**
+ * Revoking a member withdraws, in the same batch, their engagement grants,
+ * the runner workers they sponsored and their practice administration, and
+ * lapses their client request grants. A later re-grant restores none of it.
+ */
+const revokeMember: ManagementHandler = {
+  roles,
+  async handle(batch, data, ctx) {
+    const { timestamp, guard, commandId, statements } = batch;
+    const a = z.object({ userId: short }).parse(data);
+    if (a.userId === ctx.user.userId)
+      throw new ApiError(400, "You cannot change or revoke your own access");
+    const existing = await existingMember(ctx.tenantId, a.userId);
+    if (!existing) throw new ApiError(404, "User not found in this practice");
+    if (existing.status !== "active")
+      throw new ApiError(409, "This member's access is already revoked");
+    const { withdrawn, statements: withdrawal } = await withdrawAll(
+      batch,
+      ctx,
+      a.userId,
+    );
+    statements.push(
+      db()
+        .prepare(
+          "UPDATE memberships SET status=?,access_since=? WHERE tenant_id=? AND user_id=? AND " +
+            guard,
         )
-          throw new ApiError(
-            403,
-            "Only a Lead Auditor may assign internal engagement access",
-          );
-        for (const engagementId of a.engagementIds) {
-          await getEngagement(ctx, engagementId);
-          statements.push(
-            db()
-              .prepare(
-                "INSERT INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) SELECT ?,?,?,1,?,? WHERE " +
-                  guard +
-                  " ON CONFLICT(tenant_id,engagement_id,user_id) DO UPDATE SET active=1,actor=excluded.actor,updated_at=excluded.updated_at",
-              )
-              .bind(
-                ctx.tenantId,
-                engagementId,
-                a.userId,
-                ctx.user.userId,
-                timestamp,
-                ctx.tenantId,
-                commandId,
-              ),
-          );
-        }
-      }
-      return {
-        userId: a.userId,
-        displayName: a.displayName,
-        role: a.role,
-        clientId,
-        status: "active",
-        engagementIds: a.engagementIds ?? [],
-      };
-    }
+        .bind(
+          "revoked",
+          timestamp,
+          ctx.tenantId,
+          a.userId,
+          ctx.tenantId,
+          commandId,
+        ),
+      ...withdrawal,
+      db()
+        .prepare(
+          "UPDATE practice_admins SET active=0 WHERE tenant_id=? AND user_id=? AND active=1 AND " +
+            guard,
+        )
+        .bind(ctx.tenantId, a.userId, ctx.tenantId, commandId),
+    );
+    return {
+      userId: a.userId,
+      status: "revoked",
+      withdrawn,
+      practiceAdminRemoved: !!existing.practice_admin,
+    };
   },
 };
 /** Practice members and the engagement access granted with a membership. */
 export const members: ManagementModule = defineCommands({
   grantMember: saveMember,
   updateMember: saveMember,
-  revokeMember: saveMember,
+  revokeMember,
 });

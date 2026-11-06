@@ -14,11 +14,17 @@ export const isReleased = (report: Report) =>
   releaseState(report) === "released" &&
   !!report.clientSnapshot &&
   !!report.clientSha256;
+/**
+ * The user's live client request grants: active, unexpired and, given
+ * `since` (the start of the user's current membership grant), issued at or
+ * after it, so a revoked or re-roled contributor never regains old requests.
+ */
 export function activeGrant(
   w: Workflow | undefined,
   userId: string,
   requestId?: string,
   at = Date.now(),
+  since?: string | null,
 ) {
   return (
     w?.clientGrants.filter(
@@ -26,7 +32,8 @@ export function activeGrant(
         g.active &&
         g.userId === userId &&
         (!requestId || g.requestId === requestId) &&
-        Date.parse(g.expiresAt) > at,
+        Date.parse(g.expiresAt) > at &&
+        (!since || g.at >= since),
     ) ?? []
   );
 }

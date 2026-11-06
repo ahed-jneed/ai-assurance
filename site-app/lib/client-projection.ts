@@ -37,7 +37,8 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       (g) =>
         g.userId === ctx.user.userId &&
         g.active &&
-        Date.parse(g.expiresAt) > Date.now(),
+        Date.parse(g.expiresAt) > Date.now() &&
+        (!ctx.accessSince || g.at >= ctx.accessSince),
     ) ?? [];
   const own =
     e.workflow?.submissions.filter(

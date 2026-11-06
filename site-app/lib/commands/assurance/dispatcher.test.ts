@@ -117,11 +117,21 @@ describe("POST /api/assurance", () => {
     async (role) => {
       const e = stored();
       load(e, caller(role));
-      for (const op of ["addLocation", "assist", "archiveEverything"]) {
+      // F-56: a Client Viewer is refused every op the bus accepts.
+      const ops =
+        role === "Client Viewer"
+          ? [...assuranceModules.flatMap((m) => m.ops), "archiveEverything"]
+          : ["addLocation", "assist", "archiveEverything"];
+      for (const op of ops) {
         const response = await post(e, op, location);
         expect(response.status, op).toBe(403);
-        expect(await response.json(), op).toEqual(internalOnly);
+        expect(await response.json(), op).toEqual(
+          role === "Client Viewer"
+            ? { error: "Client Viewers have read-only access" }
+            : internalOnly,
+        );
       }
+      expect(getEngagement).not.toHaveBeenCalled();
       expect(addRecord).not.toHaveBeenCalled();
     },
   );
