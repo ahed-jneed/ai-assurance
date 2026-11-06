@@ -18,6 +18,10 @@ const eslintConfig = defineConfig([
     ".vinext/**",
     ".wrangler/**",
     ".sites-runtime/**",
+    // Playwright output.
+    "test-results/**",
+    "playwright-report/**",
+    "blob-report/**",
   ]),
   {
     rules: {
