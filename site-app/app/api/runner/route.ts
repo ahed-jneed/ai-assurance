@@ -11,6 +11,7 @@ import {
 } from "@/lib/store";
 import { activeJobGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
+import { GenaiEnvelopeError, readGenaiEnvelope } from "@/lib/genai/envelope";
 import { claimResponse } from "@/lib/external-worker-contract";
 import { requestedCriteria } from "@/lib/hosted-statistics";
 import { assertPlatformBytes } from "@/lib/special-category";
@@ -99,6 +100,77 @@ const lease = (j: JobRow) => {
       "Attempt is expired, cancelled or already complete",
     );
 };
+/** The tabular result contract (run contract 1.x) against the frozen request. */
+function assertTabularResult(
+  resultJSON: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the frozen request is the JSON the workspace wrote
+  frozen: any,
+  j: JobRow,
+  w: WorkerRow,
+) {
+  const r = resultEnvelope.parse(JSON.parse(resultJSON));
+  if (
+    r.provenance.requestSha256 !== j.request_sha256 ||
+    r.provenance.inputHashes.dataset !== frozen.inputHashes.dataset ||
+    (frozen.executionMode === "auditor_model" &&
+      r.provenance.inputHashes.modelArtifact !==
+        frozen.inputHashes.modelArtifact) ||
+    r.provenance.imageDigest !== w.image_digest ||
+    r.provenance.executionMode !== frozen.executionMode
+  )
+    throw new ApiError(400, "Consumed input or runtime pins mismatch");
+  const execution = r.provenance.execution as
+    { datasetCustody?: unknown } | undefined;
+  if (
+    (frozen.dataset.custody === "client") !==
+    (execution?.datasetCustody === "client")
+  )
+    throw new ApiError(400, "Dataset custody differs from the frozen request");
+  // Section 11.2: one result per criterion of the plan, in plan order,
+  // the article following the criterion kind. A 1.4 request carries its
+  // plan; a 1.1 request's derived plan has the suite names as ids.
+  const expected = requestedCriteria(frozen);
+  if (
+    expected.length !== r.hostedResults.length ||
+    r.hostedResults.some(
+      (x, i) =>
+        x.testId !== expected[i].id ||
+        (x.decision && x.decision.kind !== expected[i].kind) ||
+        x.article !== (expected[i].kind === "group_comparison" ? "10" : "15"),
+    )
+  )
+    throw new ApiError(400, "Result definitions do not match requested tests");
+}
+/**
+ * A genai-result/0.1 envelope (docs/design/genai-evidence.md section 10.2):
+ * its own pins hold, and it binds this request, these inputs and this
+ * worker's enrolled image.
+ */
+async function assertGenaiResult(
+  resultJSON: string,
+  frozen: { inputHashes: Record<string, string> },
+  j: JobRow,
+  w: WorkerRow,
+) {
+  let verified;
+  try {
+    verified = await readGenaiEnvelope(resultJSON);
+  } catch (error) {
+    if (error instanceof GenaiEnvelopeError)
+      throw new ApiError(400, "GenAI result rejected: " + error.message);
+    throw error;
+  }
+  const pins = verified.envelope.provenance,
+    sorted = (h: Record<string, string>) =>
+      JSON.stringify(Object.entries(h).sort(([a], [b]) => a.localeCompare(b)));
+  if (
+    pins.channel !== "runner" ||
+    pins.requestSha256 !== j.request_sha256 ||
+    sorted(pins.inputHashes) !== sorted(frozen.inputHashes) ||
+    pins.imageDigest !== w.image_digest
+  )
+    throw new ApiError(400, "Consumed input or runtime pins mismatch");
+}
 export async function POST(request: Request) {
   let pendingKey: string | undefined;
   try {
@@ -152,11 +224,13 @@ export async function POST(request: Request) {
       const j = candidates.find((j) => {
         const r = JSON.parse(j.request);
         return formats.includes(
-          r.dataset.custody === "client"
-            ? "client_local"
-            : r.executionMode === "auditor_model"
-              ? r.model.format
-              : "provided_predictions",
+          r.executionMode === "genai_ingest"
+            ? "genai_ingest"
+            : r.dataset.custody === "client"
+              ? "client_local"
+              : r.executionMode === "auditor_model"
+                ? r.model.format
+                : "provided_predictions",
         );
       });
       if (!j) return Response.json({ idle: true });
@@ -309,46 +383,10 @@ export async function POST(request: Request) {
         (await sha256(p.resultJSON)) !== p.resultSha256
       )
         throw new ApiError(400, "Result bytes hash mismatch");
-      const r = resultEnvelope.parse(JSON.parse(p.resultJSON)),
-        frozen = JSON.parse(j.request);
-      if (
-        r.provenance.requestSha256 !== j.request_sha256 ||
-        r.provenance.inputHashes.dataset !== frozen.inputHashes.dataset ||
-        (frozen.executionMode === "auditor_model" &&
-          r.provenance.inputHashes.modelArtifact !==
-            frozen.inputHashes.modelArtifact) ||
-        r.provenance.imageDigest !== w.image_digest ||
-        r.provenance.executionMode !== frozen.executionMode
-      )
-        throw new ApiError(400, "Consumed input or runtime pins mismatch");
-      const execution = r.provenance.execution as
-        { datasetCustody?: unknown } | undefined;
-      if (
-        (frozen.dataset.custody === "client") !==
-        (execution?.datasetCustody === "client")
-      )
-        throw new ApiError(
-          400,
-          "Dataset custody differs from the frozen request",
-        );
-      // Section 11.2: one result per criterion of the plan, in plan order,
-      // the article following the criterion kind. A 1.4 request carries its
-      // plan; a 1.1 request's derived plan has the suite names as ids.
-      const expected = requestedCriteria(frozen);
-      if (
-        expected.length !== r.hostedResults.length ||
-        r.hostedResults.some(
-          (x, i) =>
-            x.testId !== expected[i].id ||
-            (x.decision && x.decision.kind !== expected[i].kind) ||
-            x.article !==
-              (expected[i].kind === "group_comparison" ? "10" : "15"),
-        )
-      )
-        throw new ApiError(
-          400,
-          "Result definitions do not match requested tests",
-        );
+      const frozen = JSON.parse(j.request);
+      if (frozen.executionMode === "genai_ingest")
+        await assertGenaiResult(p.resultJSON, frozen, j, w);
+      else assertTabularResult(p.resultJSON, frozen, j, w);
       resultHash = p.resultSha256;
       resultKey =
         w.tenant_id +
@@ -471,15 +509,21 @@ export async function GET(request: Request) {
       throw new ApiError(404, "Attempt input not found");
     lease(j);
     const input = z
-        .enum(["dataset", "model"])
+        .enum(["dataset", "model", "evidence"])
         .parse(u.searchParams.get("input")),
       r = JSON.parse(j.request);
+    // A GenAI ingest downloads only its pinned evidence inputs, by index.
+    if ((input === "evidence") !== (r.executionMode === "genai_ingest"))
+      throw new ApiError(
+        403,
+        "These input bytes are not authorized for this request",
+      );
     if (input === "model" && r.executionMode !== "auditor_model")
       throw new ApiError(
         403,
         "Model bytes are not authorized for this prediction-only request",
       );
-    if (input === "dataset" && r.dataset.custody === "client")
+    if (input === "dataset" && r.dataset?.custody === "client")
       throw new ApiError(
         403,
         "This dataset stays in the client's environment; the platform holds only its SHA-256 pin",
@@ -488,14 +532,31 @@ export async function GET(request: Request) {
         .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
         .bind(w.tenant_id, w.engagement_id)
         .first<{ body: string }>(),
-      a = JSON.parse(body!.body).artifacts.find(
-        (a: Artifact) =>
-          a.id === (input === "dataset" ? r.dataset.id : r.model.artifactId),
-      );
+      pin =
+        input === "evidence"
+          ? r.inputs.find(
+              (i: { index: number }) =>
+                String(i.index) === u.searchParams.get("index"),
+            )
+          : undefined;
+    if (input === "evidence" && !pin)
+      throw new ApiError(404, "Attempt input not found");
+    const a = JSON.parse(body!.body).artifacts.find(
+      (a: Artifact) =>
+        a.id ===
+        (input === "evidence"
+          ? pin.artifactId
+          : input === "dataset"
+            ? r.dataset.id
+            : r.model.artifactId),
+    );
     if (
       !a ||
+      (input === "evidence" && a.status !== "accepted") ||
       a.sha256 !==
-        r.inputHashes[input === "dataset" ? "dataset" : "modelArtifact"]
+        (input === "evidence"
+          ? r.inputHashes[String(pin.index)]
+          : r.inputHashes[input === "dataset" ? "dataset" : "modelArtifact"])
     )
       throw new ApiError(409, "Input artifact pin changed");
     assertPlatformBytes(a);
