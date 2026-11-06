@@ -10,6 +10,7 @@
 // records the release-time completion records against its hashes.
 import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
+import { acceptanceGates } from "../workflow/acceptance";
 import type { Engagement, Paper } from "./types";
 export const stages = [
   "Planning",
@@ -28,7 +29,8 @@ export type AuditGate = {
     | "stage"
     | "request"
     | "conclusion"
-    | "workflow";
+    | "workflow"
+    | "acceptance";
   recordId?: string;
   title: string;
   message: string;
@@ -288,12 +290,16 @@ export function stageGates(e: Engagement, target: string): AuditGate[] {
         message: "Progress one lifecycle stage at a time",
       },
     ];
+  // Planning exit: the approved scope, program and Planning work, the
+  // classification, and acceptance with current, conflict-free declarations
+  // (lib/workflow/acceptance.ts).
   if (target === "Fieldwork")
     return [
       ...workflowRequirements(e, false, procedureScope(target)).map((g) => ({
         ...g,
         kind: "workflow" as const,
       })),
+      ...acceptanceGates(e),
       ...(e.classification.status !== "approved"
         ? [
             {

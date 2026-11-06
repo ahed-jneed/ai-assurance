@@ -64,6 +64,13 @@ const asClientViewer: Record<string, FirstFailure> = {
   linkFindingSupport: writerOnly,
   recordFindingRetest: reviewerOnly,
   reopenFinding: leadOnly,
+  saveAcceptance: writerOnly,
+  approveAcceptance: leadOnly,
+  saveDeclaration: [
+    403,
+    "Only Auditors, Lead Auditors and Reviewers declare independence",
+  ],
+  resolveDeclaredThreat: reviewerOnly,
 };
 
 // The next check: a Lead Auditor on a legacy engagement without a workflow.
@@ -133,6 +140,10 @@ describe("workflow command dispatch", () => {
       "linkFindingSupport",
       "recordFindingRetest",
       "reopenFinding",
+      "saveAcceptance",
+      "approveAcceptance",
+      "saveDeclaration",
+      "resolveDeclaredThreat",
     ]);
     expect(Object.keys(asClientViewer).sort()).toEqual([...workflowOps].sort());
   });

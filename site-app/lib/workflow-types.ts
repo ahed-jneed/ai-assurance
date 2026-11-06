@@ -303,6 +303,15 @@ export type Workflow = {
     engagementId: string;
     caseId: string;
   };
+  /**
+   * Set on every workflow adopted or created since the acceptance gate: it
+   * needs an approved acceptance record and current declarations to leave
+   * Planning. Older workflows without it are prompted, not gated, until they
+   * start an acceptance record.
+   */
+  acceptanceRequired?: boolean;
+  acceptance?: Acceptance;
+  declarations?: Declaration[];
 };
 export type Release = {
   state: "internal" | "approved" | "released" | "withdrawn" | "superseded";
@@ -339,4 +348,131 @@ export type Release = {
     action: string;
     reason: string;
   }[];
+};
+/**
+ * The ISAE 3000 preconditions the acceptance decision records, each met or
+ * not with the basis for that view.
+ */
+export const acceptancePreconditions = [
+  "subjectMatter",
+  "criteria",
+  "evidence",
+  "purpose",
+] as const;
+export type AcceptancePrecondition = (typeof acceptancePreconditions)[number];
+/** How far the auditor can see into the AI system. */
+export const accessLevels = ["white", "grey", "black"] as const;
+export type AccessLevel = (typeof accessLevels)[number];
+export type AcceptanceFields = {
+  /** A new engagement or the continuance of a recurring one. */
+  decision: "acceptance" | "continuance";
+  preconditions: Record<
+    AcceptancePrecondition,
+    { met: boolean; basis: string }
+  >;
+  scope: string;
+  periodStart: string;
+  periodEnd: string;
+  systemBoundary: string;
+  accessLevel: AccessLevel;
+  /** The engagement letter's reference: its number, date or filed copy. */
+  engagementLetter: string;
+  /**
+   * The engagement team the Lead Auditor names. With the preparers and
+   * reviewers of selected procedures, everyone who must declare.
+   */
+  team: string[];
+  /** The Lead's conclusion on the team's collective competence. */
+  competenceConclusion: string;
+  /** Why an approved record was revised; empty for a first draft. */
+  changeReason: string;
+};
+/**
+ * The acceptance and continuance record (lib/workflow/acceptance.ts). A Lead
+ * Auditor approves it; a structured engagement needs it approved to leave
+ * Planning.
+ */
+export type Acceptance = AcceptanceFields & {
+  revision: number;
+  status: "draft" | "approved";
+  contributors: string[];
+  updatedBy: string;
+  updatedAt: string;
+  approval?: Approval & {
+    /** The lifecycle stage the engagement was in when it was approved. */
+    stage: string;
+  };
+  /** Each approved revision, kept when a Lead revises it. */
+  history: Omit<Acceptance, "history">[];
+};
+/** The threat categories of the IESBA Code's conceptual framework. */
+export const threatKinds = [
+  "self_interest",
+  "self_review",
+  "advocacy",
+  "familiarity",
+  "intimidation",
+] as const;
+export type ThreatKind = (typeof threatKinds)[number];
+/**
+ * Relationships that disqualify a person outright. They follow the NYC Local
+ * Law 144 independent-auditor exclusions and apply to every engagement here:
+ * no safeguard resolves them.
+ */
+export const exclusionKinds = [
+  "system_involvement",
+  "employment",
+  "financial_interest",
+] as const;
+export type ExclusionKind = (typeof exclusionKinds)[number];
+export const competenceAreas = [
+  "assurance",
+  "ai_systems",
+  "statistics",
+  "regulation",
+  "management_systems",
+  "data_protection",
+  "security",
+  "domain",
+] as const;
+export type CompetenceArea = (typeof competenceAreas)[number];
+export const competenceLevels = [
+  "none",
+  "foundation",
+  "proficient",
+  "expert",
+] as const;
+export type CompetenceLevel = (typeof competenceLevels)[number];
+export type DeclaredThreat = {
+  kind: ThreatKind;
+  description: string;
+  safeguards: string;
+  /** The evaluation by someone other than the declarant that resolved it. */
+  resolution?: { userId: string; at: string; reason: string };
+};
+/**
+ * One person's dated independence and competence declaration for one
+ * engagement period. A later declaration by the same person for the same
+ * period supersedes it; earlier ones stay as the record.
+ */
+export type Declaration = {
+  id: string;
+  userId: string;
+  /** The role the person declared in. */
+  role: string;
+  declaredAt: string;
+  periodStart: string;
+  periodEnd: string;
+  /**
+   * The engagement team when it was declared: the declaration stays current
+   * only while nobody outside it joins the team.
+   */
+  team: string[];
+  /** Earlier implementation or governance work on the system, if any. */
+  priorWork: string;
+  threats: DeclaredThreat[];
+  exclusions: ExclusionKind[];
+  competence: Record<CompetenceArea, CompetenceLevel>;
+  /** The field this person serves in as practitioner's expert, if any. */
+  expertField: string;
 };
