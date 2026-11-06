@@ -4,7 +4,7 @@ import { short } from "@/lib/commands/fields";
 import { dispatchManagement, managementOps } from "@/lib/commands/management";
 import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
 import { id, now, sha256 } from "@/lib/ids";
-import { context, requireAdmin } from "@/lib/tenancy";
+import { context, refuseReadOnly, requireAdmin } from "@/lib/tenancy";
 
 export const dynamic = "force-dynamic";
 const command = z
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       JSON.parse(new TextDecoder().decode(await readBounded(request, 16384))),
     );
     const ctx = await context(payload.tenantId);
+    refuseReadOnly(ctx);
     requireAdmin(ctx);
     const commandId = id("MGMT"),
       timestamp = now();

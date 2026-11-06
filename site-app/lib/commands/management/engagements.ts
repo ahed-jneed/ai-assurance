@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assertEngagementQuota } from "../../access-policy";
 import { db } from "../../bindings";
 import { roles } from "../../domain";
 import { freshEngagement } from "../../factories";
@@ -9,7 +10,8 @@ import { short } from "../fields";
 import type { ManagementModule } from "./batch";
 /**
  * Opening an engagement for a client: its first version and snapshot, an
- * access policy, and access for the admin who created it.
+ * access policy, and access for the admin who created it, within the
+ * practice's engagement quota (lib/access-policy.ts).
  */
 export const engagements: ManagementModule = defineCommands({
   createEngagement: {
@@ -23,6 +25,7 @@ export const engagements: ManagementModule = defineCommands({
           .first())
       )
         throw new ApiError(404, "Client not found");
+      await assertEngagementQuota(db(), ctx.tenantId);
       const engagement = freshEngagement(
           a.clientId,
           a.title,

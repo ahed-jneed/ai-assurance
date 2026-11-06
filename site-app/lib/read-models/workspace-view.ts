@@ -61,15 +61,39 @@ export async function workspaceView(
   const selectedId =
     requestedEngagementId ?? (engagementRows[0]?.id as string | undefined);
   const e = selectedId ? await getEngagement(ctx, selectedId) : null;
+  // Administrators see each member's live engagement grants, sponsored runner
+  // workers and administration, and the pending invitations.
   const members = ctx.practiceAdmin
     ? (
         await db()
           .prepare(
-            "SELECT user_id,role,client_id,display_name,status FROM memberships WHERE tenant_id=? ORDER BY display_name",
+            "SELECT m.user_id,m.role,m.client_id,m.display_name,m.status,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin,(SELECT json_group_array(json_object('id',e.id,'title',e.title)) FROM engagement_access x JOIN engagements e ON e.tenant_id=x.tenant_id AND e.id=x.engagement_id WHERE x.tenant_id=m.tenant_id AND x.user_id=m.user_id AND x.active=1) AS grants,(SELECT COUNT(*) FROM runner_workers w WHERE w.tenant_id=m.tenant_id AND w.created_by=m.user_id AND w.active=1) AS sponsored_workers FROM memberships m WHERE m.tenant_id=? ORDER BY m.display_name",
           )
           .bind(ctx.tenantId)
-          .all()
-      ).results
+          .all<Record<string, unknown>>()
+      ).results.map((m) => ({
+        ...m,
+        practice_admin: !!m.practice_admin,
+        grants: JSON.parse(String(m.grants ?? "[]")) as {
+          id: string;
+          title: string;
+        }[],
+      }))
+    : [];
+  const invitations = ctx.practiceAdmin
+    ? (
+        await db()
+          .prepare(
+            "SELECT id,email,display_name,role,client_id,engagement_ids,invited_by,created_at,expires_at FROM invitations WHERE tenant_id=? AND status='pending' AND expires_at>? ORDER BY created_at DESC LIMIT 100",
+          )
+          .bind(ctx.tenantId, new Date().toISOString())
+          .all<Record<string, unknown>>()
+      ).results.map((i) => ({
+        ...i,
+        engagement_ids: JSON.parse(
+          String(i.engagement_ids ?? "[]"),
+        ) as string[],
+      }))
     : [];
   const people = isInternalRole(ctx.role)
     ? (
@@ -124,6 +148,7 @@ export async function workspaceView(
     metadataBytes:
       e && isInternalRole(ctx.role) ? (storedSize(e) ?? null) : null,
     members,
+    invitations,
     people,
     managementVersion,
     managementEvents,

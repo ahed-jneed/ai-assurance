@@ -34,6 +34,8 @@ const mf = new Miniflare({
   bindings: {
     IDENTITY_MODE: "trusted-headers",
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    // First sign-ins provision the fixture practices (lib/access-policy.ts).
+    SELF_SIGNUP: "open",
   },
   d1Databases: { DB: "audit-integration" },
   r2Buckets: { BUCKET: "audit-integration-evidence" },
@@ -455,6 +457,9 @@ try {
     displayName: "Independent Reviewer",
     role: "Auditor",
     clientId: null,
+    // A role change withdraws earlier grants; the engagement is kept by
+    // listing it (F-24).
+    engagementIds: [e.id],
   });
   await command("reviewPaper", { paperId: e.papers[0].id }, reviewer, 403);
   await management("updateMember", {
@@ -462,6 +467,9 @@ try {
     displayName: "Independent Reviewer",
     role: "Reviewer",
     clientId: null,
+    // A role change withdraws earlier grants; the engagement is kept by
+    // listing it (F-24).
+    engagementIds: [e.id],
   });
   await management("revokeMember", { userId: viewer });
   await request("/api/workspace?tenantId=" + tenantId, {
