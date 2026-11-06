@@ -4,10 +4,10 @@
  "specificationVersion": "1.0.0",
  "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
  "howToUse": {
-  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
+  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (engine only, section 5.11) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, and every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}.",
   "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
   "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
-  "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine."
+  "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine. Clustered data (GC-54 to GC-57) expands each cluster in the same way and adds its id in a column cluster, which the plan names as clusterField; the run seed is data.seed."
  },
  "defaults": {
   "confidenceLevel": 0.95,
@@ -17925,6 +17925,5001 @@
     ],
     "overallOutcome": "inconclusive",
     "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-54",
+   "category": "clustered",
+   "title": "40 applicants with 6 applications each, every fifth with all positives missed: with independent rows recall 96/120 passes 0.70 (Wilson [0.720, 0.862]), but the cluster bootstrap over applicants gives [0.675, 0.925], so the criterion is inconclusive; parity within +-0.20 passes",
+   "type": "plan",
+   "data": {
+    "seed": 1729,
+    "clusters": [
+     {
+      "cluster": "p01",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 0,
+        "fp": 0,
+        "fn": 3,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p02",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p03",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p04",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p05",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p06",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 0,
+        "fp": 1,
+        "fn": 3,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p07",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p08",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p09",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p10",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p11",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 0,
+        "fp": 1,
+        "fn": 3,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p12",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p13",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p14",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p15",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p16",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 0,
+        "fp": 0,
+        "fn": 3,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p17",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p18",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p19",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p20",
+      "groups": [
+       {
+        "group": "A",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p21",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 0,
+        "fp": 1,
+        "fn": 3,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p22",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p23",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p24",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p25",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p26",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 0,
+        "fp": 1,
+        "fn": 3,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p27",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p28",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p29",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p30",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p31",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 0,
+        "fp": 0,
+        "fn": 3,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p32",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p33",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p34",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p35",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p36",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 0,
+        "fp": 1,
+        "fn": 3,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p37",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     },
+     {
+      "cluster": "p38",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p39",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "tn": 2
+       }
+      ]
+     },
+     {
+      "cluster": "p40",
+      "groups": [
+       {
+        "group": "B",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0,
+        "tn": 3
+       }
+      ]
+     }
+    ]
+   },
+   "plan": {
+    "clusterField": "cluster",
+    "criteria": [
+     {
+      "id": "performance",
+      "role": "confirmatory",
+      "kind": "performance",
+      "members": [
+       {
+        "metric": "recall",
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        }
+       }
+      ]
+     },
+     {
+      "id": "parity-0.20",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": -0.2,
+       "upper": 0.2
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "6fd89afd4cebe9557d6308148eb82048f7aa4cc80da6e85e0445117ff90cf319",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": null,
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": "cluster",
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": null,
+     "criteria": [
+      {
+       "id": "performance",
+       "kind": "performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "recall",
+         "band": {
+          "lower": 0.7,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.5,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      },
+      {
+       "id": "parity-0.20",
+       "kind": "group_comparison",
+       "role": "confirmatory",
+       "rationale": null,
+       "metric": "selection_rate_difference",
+       "band": {
+        "lower": -0.2,
+        "upper": 0.2
+       },
+       "comparison": {
+        "mode": "all_pairs",
+        "referenceGroup": null
+       },
+       "groupFields": null,
+       "declaredGroups": null,
+       "minimumCoverage": 1.0,
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "performance",
+      "outcome": "inconclusive",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "recall",
+        "metric": "recall",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 96,
+         "n": 120
+        },
+        "estimate": 0.8,
+        "interval": {
+         "lower": 0.675,
+         "upper": 0.925,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.7,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0720360185951,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 96,
+         "positives": 120,
+         "tn": 94,
+         "negatives": 120
+        },
+        "estimate": 0.791666666667,
+        "interval": {
+         "lower": 0.725,
+         "upper": 0.854166666667,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.5,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000999500249875,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": 4.04403799394e-20,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 190,
+         "n": 240
+        },
+        "estimate": 0.791666666667,
+        "interval": {
+         "lower": 0.725,
+         "upper": 0.854166666667,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       },
+       {
+        "memberId": "precision",
+        "metric": "precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 96,
+         "n": 122
+        },
+        "estimate": 0.786885245902,
+        "interval": {
+         "lower": 0.738085480094,
+         "upper": 0.833333333333,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       },
+       {
+        "memberId": "specificity",
+        "metric": "specificity",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 94,
+         "n": 120
+        },
+        "estimate": 0.783333333333,
+        "interval": {
+         "lower": 0.733333333333,
+         "upper": 0.833333333333,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       },
+       {
+        "memberId": "f1",
+        "metric": "f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "tp": 96,
+         "tpPlusFpPlusFn": 146,
+         "positives": 120
+        },
+        "estimate": 0.793388429752,
+        "interval": {
+         "lower": 0.710526315789,
+         "upper": 0.863813229572,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 40
+        }
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "performance",
+       "direction": "pass",
+       "pValue": 0.0720360185951,
+       "adjustedPValue": 0.14407203719,
+       "adjustment": "bonferroni",
+       "familySize": 2,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": "recall",
+       "sampleSize": 240,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": [
+        "interval_straddles_band"
+       ]
+      }
+     },
+     {
+      "id": "parity-0.20",
+      "outcome": "pass",
+      "headline": {
+       "names": {
+        "engine": "demographic_parity_difference",
+        "hosted": "maximum_selection_rate_gap"
+       },
+       "estimate": 0.0,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.141099292154,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       },
+       "band": {
+        "lower": null,
+        "upper": 0.2
+       }
+      },
+      "members": [
+       {
+        "memberId": "selection_rate_difference:A|B",
+        "metric": "selection_rate_difference",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 61,
+          "n": 120
+         },
+         "comparator": {
+          "x": 61,
+          "n": 120
+         }
+        },
+        "estimate": 0.0,
+        "interval": {
+         "lower": -0.141099292154,
+         "upper": 0.1361946533,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": -0.2,
+         "upper": 0.2
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.00721087865531,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 20
+        }
+       }
+      ],
+      "descriptive": [],
+      "groups": [
+       {
+        "group": "A",
+        "n": 120,
+        "declared": false,
+        "suppressed": false,
+        "selection": {
+         "x": 61,
+         "n": 120,
+         "estimate": 0.508333333333,
+         "interval": {
+          "lower": 0.420025397837,
+          "upper": 0.596124282723,
+          "level": 0.95,
+          "method": "wilson"
+         }
+        }
+       },
+       {
+        "group": "B",
+        "n": 120,
+        "declared": false,
+        "suppressed": false,
+        "selection": {
+         "x": 61,
+         "n": 120,
+         "estimate": 0.508333333333,
+         "interval": {
+          "lower": 0.420025397837,
+          "upper": 0.596124282723,
+          "level": 0.95,
+          "method": "wilson"
+         }
+        }
+       }
+      ],
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "group_comparison",
+       "direction": "pass",
+       "pValue": 0.00721087865531,
+       "adjustedPValue": 0.0144217573106,
+       "adjustment": "bonferroni",
+       "familySize": 2,
+       "unadjustedOutcome": "pass",
+       "decidingMemberId": "selection_rate_difference:A|B",
+       "sampleSize": 240,
+       "coverage": {
+        "eligibleRows": 240,
+        "populationRows": 240,
+        "unknownGroupRows": 0,
+        "value": 1.0,
+        "minimum": 1.0
+       },
+       "suppressedGroups": [],
+       "libraryEntry": null,
+       "reasons": []
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-55",
+   "category": "clustered",
+   "title": "60 sites with 5 rows each and errors dominated by a site effect: the cluster bootstrap decides MAE <= 0.5, RMSE <= 0.6 and the mean baseline gate on one replicate set, and the criterion passes",
+   "type": "plan",
+   "data": {
+    "seed": 1729,
+    "kind": "regression",
+    "clusters": [
+     {
+      "cluster": "s01",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       -0.625,
+       -0.8125,
+       -0.6875,
+       -0.875,
+       -0.75
+      ]
+     },
+     {
+      "cluster": "s02",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       -0.5625,
+       -0.4375,
+       -0.625,
+       -0.5,
+       -0.375
+      ]
+     },
+     {
+      "cluster": "s03",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       -0.1875,
+       -0.375,
+       -0.25,
+       -0.125,
+       -0.3125
+      ]
+     },
+     {
+      "cluster": "s04",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       -0.125,
+       0.0,
+       0.125,
+       -0.0625,
+       0.0625
+      ]
+     },
+     {
+      "cluster": "s05",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       0.25,
+       0.375,
+       0.1875,
+       0.3125,
+       0.125
+      ]
+     },
+     {
+      "cluster": "s06",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       0.625,
+       0.4375,
+       0.5625,
+       0.375,
+       0.5
+      ]
+     },
+     {
+      "cluster": "s07",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       0.6875,
+       0.8125,
+       0.625,
+       0.75,
+       0.875
+      ]
+     },
+     {
+      "cluster": "s08",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       -0.6875,
+       -0.875,
+       -0.75,
+       -0.625,
+       -0.8125
+      ]
+     },
+     {
+      "cluster": "s09",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       -0.625,
+       -0.5,
+       -0.375,
+       -0.5625,
+       -0.4375
+      ]
+     },
+     {
+      "cluster": "s10",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       -0.25,
+       -0.125,
+       -0.3125,
+       -0.1875,
+       -0.375
+      ]
+     },
+     {
+      "cluster": "s11",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       0.125,
+       -0.0625,
+       0.0625,
+       -0.125,
+       0.0
+      ]
+     },
+     {
+      "cluster": "s12",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       0.1875,
+       0.3125,
+       0.125,
+       0.25,
+       0.375
+      ]
+     },
+     {
+      "cluster": "s13",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       0.5625,
+       0.375,
+       0.5,
+       0.625,
+       0.4375
+      ]
+     },
+     {
+      "cluster": "s14",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       0.625,
+       0.75,
+       0.875,
+       0.6875,
+       0.8125
+      ]
+     },
+     {
+      "cluster": "s15",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       -0.75,
+       -0.625,
+       -0.8125,
+       -0.6875,
+       -0.875
+      ]
+     },
+     {
+      "cluster": "s16",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       -0.375,
+       -0.5625,
+       -0.4375,
+       -0.625,
+       -0.5
+      ]
+     },
+     {
+      "cluster": "s17",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       -0.3125,
+       -0.1875,
+       -0.375,
+       -0.25,
+       -0.125
+      ]
+     },
+     {
+      "cluster": "s18",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       0.0625,
+       -0.125,
+       0.0,
+       0.125,
+       -0.0625
+      ]
+     },
+     {
+      "cluster": "s19",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       0.125,
+       0.25,
+       0.375,
+       0.1875,
+       0.3125
+      ]
+     },
+     {
+      "cluster": "s20",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       0.5,
+       0.625,
+       0.4375,
+       0.5625,
+       0.375
+      ]
+     },
+     {
+      "cluster": "s21",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       0.875,
+       0.6875,
+       0.8125,
+       0.625,
+       0.75
+      ]
+     },
+     {
+      "cluster": "s22",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       -0.8125,
+       -0.6875,
+       -0.875,
+       -0.75,
+       -0.625
+      ]
+     },
+     {
+      "cluster": "s23",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       -0.4375,
+       -0.625,
+       -0.5,
+       -0.375,
+       -0.5625
+      ]
+     },
+     {
+      "cluster": "s24",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       -0.375,
+       -0.25,
+       -0.125,
+       -0.3125,
+       -0.1875
+      ]
+     },
+     {
+      "cluster": "s25",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       0.0,
+       0.125,
+       -0.0625,
+       0.0625,
+       -0.125
+      ]
+     },
+     {
+      "cluster": "s26",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       0.375,
+       0.1875,
+       0.3125,
+       0.125,
+       0.25
+      ]
+     },
+     {
+      "cluster": "s27",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       0.4375,
+       0.5625,
+       0.375,
+       0.5,
+       0.625
+      ]
+     },
+     {
+      "cluster": "s28",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       0.8125,
+       0.625,
+       0.75,
+       0.875,
+       0.6875
+      ]
+     },
+     {
+      "cluster": "s29",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       -0.875,
+       -0.75,
+       -0.625,
+       -0.8125,
+       -0.6875
+      ]
+     },
+     {
+      "cluster": "s30",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       -0.5,
+       -0.375,
+       -0.5625,
+       -0.4375,
+       -0.625
+      ]
+     },
+     {
+      "cluster": "s31",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       -0.125,
+       -0.3125,
+       -0.1875,
+       -0.375,
+       -0.25
+      ]
+     },
+     {
+      "cluster": "s32",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       -0.0625,
+       0.0625,
+       -0.125,
+       0.0,
+       0.125
+      ]
+     },
+     {
+      "cluster": "s33",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       0.3125,
+       0.125,
+       0.25,
+       0.375,
+       0.1875
+      ]
+     },
+     {
+      "cluster": "s34",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       0.375,
+       0.5,
+       0.625,
+       0.4375,
+       0.5625
+      ]
+     },
+     {
+      "cluster": "s35",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       0.75,
+       0.875,
+       0.6875,
+       0.8125,
+       0.625
+      ]
+     },
+     {
+      "cluster": "s36",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       -0.625,
+       -0.8125,
+       -0.6875,
+       -0.875,
+       -0.75
+      ]
+     },
+     {
+      "cluster": "s37",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       -0.5625,
+       -0.4375,
+       -0.625,
+       -0.5,
+       -0.375
+      ]
+     },
+     {
+      "cluster": "s38",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       -0.1875,
+       -0.375,
+       -0.25,
+       -0.125,
+       -0.3125
+      ]
+     },
+     {
+      "cluster": "s39",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       -0.125,
+       0.0,
+       0.125,
+       -0.0625,
+       0.0625
+      ]
+     },
+     {
+      "cluster": "s40",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       0.25,
+       0.375,
+       0.1875,
+       0.3125,
+       0.125
+      ]
+     },
+     {
+      "cluster": "s41",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       0.625,
+       0.4375,
+       0.5625,
+       0.375,
+       0.5
+      ]
+     },
+     {
+      "cluster": "s42",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       0.6875,
+       0.8125,
+       0.625,
+       0.75,
+       0.875
+      ]
+     },
+     {
+      "cluster": "s43",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       -0.6875,
+       -0.875,
+       -0.75,
+       -0.625,
+       -0.8125
+      ]
+     },
+     {
+      "cluster": "s44",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       -0.625,
+       -0.5,
+       -0.375,
+       -0.5625,
+       -0.4375
+      ]
+     },
+     {
+      "cluster": "s45",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       -0.25,
+       -0.125,
+       -0.3125,
+       -0.1875,
+       -0.375
+      ]
+     },
+     {
+      "cluster": "s46",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       0.125,
+       -0.0625,
+       0.0625,
+       -0.125,
+       0.0
+      ]
+     },
+     {
+      "cluster": "s47",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       0.1875,
+       0.3125,
+       0.125,
+       0.25,
+       0.375
+      ]
+     },
+     {
+      "cluster": "s48",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       0.5625,
+       0.375,
+       0.5,
+       0.625,
+       0.4375
+      ]
+     },
+     {
+      "cluster": "s49",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       0.625,
+       0.75,
+       0.875,
+       0.6875,
+       0.8125
+      ]
+     },
+     {
+      "cluster": "s50",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       -0.75,
+       -0.625,
+       -0.8125,
+       -0.6875,
+       -0.875
+      ]
+     },
+     {
+      "cluster": "s51",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       -0.375,
+       -0.5625,
+       -0.4375,
+       -0.625,
+       -0.5
+      ]
+     },
+     {
+      "cluster": "s52",
+      "kind": "regression",
+      "targets": [
+       10.5,
+       10.75,
+       11.0,
+       11.25,
+       11.5
+      ],
+      "errors": [
+       -0.3125,
+       -0.1875,
+       -0.375,
+       -0.25,
+       -0.125
+      ]
+     },
+     {
+      "cluster": "s53",
+      "kind": "regression",
+      "targets": [
+       11.0,
+       11.25,
+       11.5,
+       11.75,
+       12.0
+      ],
+      "errors": [
+       0.0625,
+       -0.125,
+       0.0,
+       0.125,
+       -0.0625
+      ]
+     },
+     {
+      "cluster": "s54",
+      "kind": "regression",
+      "targets": [
+       11.5,
+       11.75,
+       12.0,
+       12.25,
+       12.5
+      ],
+      "errors": [
+       0.125,
+       0.25,
+       0.375,
+       0.1875,
+       0.3125
+      ]
+     },
+     {
+      "cluster": "s55",
+      "kind": "regression",
+      "targets": [
+       7.5,
+       7.75,
+       8.0,
+       8.25,
+       8.5
+      ],
+      "errors": [
+       0.5,
+       0.625,
+       0.4375,
+       0.5625,
+       0.375
+      ]
+     },
+     {
+      "cluster": "s56",
+      "kind": "regression",
+      "targets": [
+       8.0,
+       8.25,
+       8.5,
+       8.75,
+       9.0
+      ],
+      "errors": [
+       0.875,
+       0.6875,
+       0.8125,
+       0.625,
+       0.75
+      ]
+     },
+     {
+      "cluster": "s57",
+      "kind": "regression",
+      "targets": [
+       8.5,
+       8.75,
+       9.0,
+       9.25,
+       9.5
+      ],
+      "errors": [
+       -0.8125,
+       -0.6875,
+       -0.875,
+       -0.75,
+       -0.625
+      ]
+     },
+     {
+      "cluster": "s58",
+      "kind": "regression",
+      "targets": [
+       9.0,
+       9.25,
+       9.5,
+       9.75,
+       10.0
+      ],
+      "errors": [
+       -0.4375,
+       -0.625,
+       -0.5,
+       -0.375,
+       -0.5625
+      ]
+     },
+     {
+      "cluster": "s59",
+      "kind": "regression",
+      "targets": [
+       9.5,
+       9.75,
+       10.0,
+       10.25,
+       10.5
+      ],
+      "errors": [
+       -0.375,
+       -0.25,
+       -0.125,
+       -0.3125,
+       -0.1875
+      ]
+     },
+     {
+      "cluster": "s60",
+      "kind": "regression",
+      "targets": [
+       10.0,
+       10.25,
+       10.5,
+       10.75,
+       11.0
+      ],
+      "errors": [
+       0.0,
+       0.125,
+       -0.0625,
+       0.0625,
+       -0.125
+      ]
+     }
+    ]
+   },
+   "plan": {
+    "clusterField": "cluster",
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "role": "confirmatory",
+      "kind": "regression_performance",
+      "members": [
+       {
+        "metric": "mae",
+        "band": {
+         "lower": null,
+         "upper": 0.5
+        }
+       },
+       {
+        "metric": "rmse",
+        "band": {
+         "lower": null,
+         "upper": 0.6
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "8af578863fe35e7be494197eb39f123cf39ff92806d65dc28e2a1d6764e1aed0",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": null,
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": "cluster",
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": null,
+     "criteria": [
+      {
+       "id": "regression-performance",
+       "kind": "regression_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "mae",
+         "band": {
+          "lower": null,
+          "upper": 0.5
+         }
+        },
+        {
+         "metric": "rmse",
+         "band": {
+          "lower": null,
+          "upper": 0.6
+         }
+        }
+       ],
+       "passBlockedBy": [],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "outcome": "pass",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "mae",
+        "metric": "mae",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 300,
+         "meanAbsoluteError": 0.43625,
+         "sdAbsoluteError": 0.256191107924
+        },
+        "estimate": 0.43625,
+        "interval": {
+         "lower": 0.3770625,
+         "upper": 0.496666666667,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": null,
+         "upper": 0.5
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.0375187601894,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 60
+        }
+       },
+       {
+        "memberId": "rmse",
+        "metric": "rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 300,
+         "meanSquaredError": 0.255729166667,
+         "sdSquaredError": 0.234465852421
+        },
+        "estimate": 0.505696714115,
+        "interval": {
+         "lower": 0.45011572586,
+         "upper": 0.556682883995,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": null,
+         "upper": 0.6
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000999500249875,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 60
+        }
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "r2",
+        "metric": "r2",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 300
+        },
+        "estimate": 0.853747170261,
+        "interval": null,
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "baseline_rmse",
+        "metric": "baseline_rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 300,
+         "meanSquaredError": 1.74854166667,
+         "meanSquaredErrorReduction": 1.4928125,
+         "sdSquaredErrorDifference": 1.74899584952,
+         "gatePValue": 0.000999500249875,
+         "gateMethod": "cluster_percentile_bootstrap"
+        },
+        "estimate": 1.32232434246,
+        "interval": null,
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "regression_performance",
+       "direction": "pass",
+       "pValue": 0.0375187601894,
+       "adjustedPValue": 0.0375187601894,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "pass",
+       "decidingMemberId": "mae",
+       "sampleSize": 300,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": []
+      }
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-56",
+   "category": "clustered",
+   "title": "Clustered four-fifths screen: group B has 40 rows but 8 clusters (below_minimum_cluster_count) and group C 3 selections of 40, a cell under 5 that Fisher cannot gate under clustering (small_cell_clustered), so a ratio of 0.15 that fails with independent rows is inconclusive",
+   "type": "plan",
+   "data": {
+    "seed": 1729,
+    "clusters": [
+     {
+      "cluster": "a01",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a02",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a03",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a04",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a05",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a06",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a07",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a08",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a09",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a10",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a11",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a12",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a13",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a14",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a15",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a16",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a17",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a18",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a19",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a20",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a21",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a22",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a23",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a24",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a25",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a26",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a27",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a28",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a29",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a30",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a31",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a32",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a33",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a34",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 2,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a35",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 0,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "a36",
+      "groups": [
+       {
+        "group": "A",
+        "selected": 1,
+        "n": 2
+       }
+      ]
+     },
+     {
+      "cluster": "b01",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 2,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b02",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 3,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b03",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 2,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b04",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 3,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b05",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 2,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b06",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 3,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b07",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 2,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "b08",
+      "groups": [
+       {
+        "group": "B",
+        "selected": 3,
+        "n": 5
+       }
+      ]
+     },
+     {
+      "cluster": "c01",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 1,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c02",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 1,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c03",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 1,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c04",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c05",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c06",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c07",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c08",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c09",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c10",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c11",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c12",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c13",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c14",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c15",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c16",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c17",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c18",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c19",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c20",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c21",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c22",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c23",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c24",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c25",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c26",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c27",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c28",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c29",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c30",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c31",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c32",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c33",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c34",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c35",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c36",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c37",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c38",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c39",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     },
+     {
+      "cluster": "c40",
+      "groups": [
+       {
+        "group": "C",
+        "selected": 0,
+        "n": 1
+       }
+      ]
+     }
+    ]
+   },
+   "plan": {
+    "clusterField": "cluster",
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "role": "confirmatory",
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "comparison": {
+       "mode": "all_pairs"
+      },
+      "band": {
+       "lower": 0.8,
+       "upper": 1.25
+      },
+      "minimumCoverage": 1.0
+     }
+    ]
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "08bdcc291aef7a2716581232a2d10610264a4b04bb2812eb2221e636d4b4e98c",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": null,
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": "cluster",
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": null,
+     "criteria": [
+      {
+       "id": "four-fifths-screen",
+       "kind": "group_comparison",
+       "role": "confirmatory",
+       "rationale": null,
+       "metric": "selection_rate_ratio",
+       "band": {
+        "lower": 0.8,
+        "upper": 1.25
+       },
+       "comparison": {
+        "mode": "all_pairs",
+        "referenceGroup": null
+       },
+       "groupFields": null,
+       "declaredGroups": null,
+       "minimumCoverage": 1.0,
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "four-fifths-screen",
+      "outcome": "inconclusive",
+      "headline": {
+       "names": {
+        "engine": "disparate_impact_ratio",
+        "hosted": "minimum_selection_rate_ratio"
+       },
+       "estimate": 0.15,
+       "interval": {
+        "lower": 0.0,
+        "upper": 0.352956030897,
+        "level": 0.95,
+        "method": "worst_member_bounds"
+       },
+       "band": {
+        "lower": 0.8,
+        "upper": null
+       }
+      },
+      "members": [
+       {
+        "memberId": "selection_rate_ratio:A|B",
+        "metric": "selection_rate_ratio",
+        "subject": "A",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 36,
+          "n": 72
+         },
+         "comparator": {
+          "x": 20,
+          "n": 40
+         }
+        },
+        "estimate": 1.0,
+        "interval": {
+         "lower": 0.727930477747,
+         "upper": 1.34214436285,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "insufficient_support",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [
+         "below_minimum_cluster_count"
+        ],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 8
+        }
+       },
+       {
+        "memberId": "selection_rate_ratio:C|A",
+        "metric": "selection_rate_ratio",
+        "subject": "C",
+        "comparator": "A",
+        "counts": {
+         "subject": {
+          "x": 3,
+          "n": 40
+         },
+         "comparator": {
+          "x": 36,
+          "n": 72
+         }
+        },
+        "estimate": 0.15,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.352956030897,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 1.0,
+        "smallCell": true,
+        "fisherExactP": 3.03520143177e-06,
+        "chanceExactP": null,
+        "reasons": [
+         "small_cell_clustered"
+        ],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 36
+        }
+       },
+       {
+        "memberId": "selection_rate_ratio:C|B",
+        "metric": "selection_rate_ratio",
+        "subject": "C",
+        "comparator": "B",
+        "counts": {
+         "subject": {
+          "x": 3,
+          "n": 40
+         },
+         "comparator": {
+          "x": 20,
+          "n": 40
+         }
+        },
+        "estimate": 0.15,
+        "interval": {
+         "lower": 0.0,
+         "upper": 0.330943627451,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.8,
+         "upper": 1.25
+        },
+        "status": "insufficient_support",
+        "direction": "none",
+        "pValue": 1.0,
+        "smallCell": true,
+        "fisherExactP": 4.30077473571e-05,
+        "chanceExactP": null,
+        "reasons": [
+         "below_minimum_cluster_count"
+        ],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 8
+        }
+       }
+      ],
+      "descriptive": [],
+      "groups": [
+       {
+        "group": "A",
+        "n": 72,
+        "declared": false,
+        "suppressed": false,
+        "selection": {
+         "x": 36,
+         "n": 72,
+         "estimate": 0.5,
+         "interval": {
+          "lower": 0.387470923095,
+          "upper": 0.612529076905,
+          "level": 0.95,
+          "method": "wilson"
+         }
+        }
+       },
+       {
+        "group": "B",
+        "n": 40,
+        "declared": false,
+        "suppressed": false,
+        "selection": {
+         "x": 20,
+         "n": 40,
+         "estimate": 0.5,
+         "interval": {
+          "lower": 0.351995269335,
+          "upper": 0.648004730665,
+          "level": 0.95,
+          "method": "wilson"
+         }
+        }
+       },
+       {
+        "group": "C",
+        "n": 40,
+        "declared": false,
+        "suppressed": false,
+        "selection": {
+         "x": 3,
+         "n": 40,
+         "estimate": 0.075,
+         "interval": {
+          "lower": 0.0258360257746,
+          "upper": 0.198642335243,
+          "level": 0.95,
+          "method": "wilson"
+         }
+        }
+       }
+      ],
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "group_comparison",
+       "direction": "fail",
+       "pValue": 1.0,
+       "adjustedPValue": 1.0,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "inconclusive",
+       "decidingMemberId": "selection_rate_ratio:C|A",
+       "sampleSize": 152,
+       "coverage": {
+        "eligibleRows": 152,
+        "populationRows": 152,
+        "unknownGroupRows": 0,
+        "value": 1.0,
+        "minimum": 1.0
+       },
+       "suppressedGroups": [],
+       "libraryEntry": null,
+       "reasons": [
+        "below_minimum_cluster_count",
+        "small_cell_clustered"
+       ]
+      }
+     }
+    ],
+    "overallOutcome": "inconclusive",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-57",
+   "category": "clustered",
+   "title": "45 clusters over three classes with the errors concentrated in every fourth cluster: accuracy >= 0.6 and macro recall >= 0.35 pass on cluster-bootstrap intervals, the chance gate still applied",
+   "type": "plan",
+   "data": {
+    "seed": 1729,
+    "kind": "multiclass",
+    "clusters": [
+     {
+      "cluster": "k01",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k02",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k03",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k04",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k05",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k06",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k07",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k08",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k09",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k10",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k11",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k12",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k13",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k14",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k15",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k16",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        1,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k17",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k18",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k19",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k20",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k21",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k22",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k23",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k24",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k25",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k26",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k27",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k28",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k29",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k30",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        1,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k31",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k32",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k33",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k34",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k35",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k36",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k37",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k38",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k39",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k40",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k41",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        1,
+        0,
+        0
+       ]
+      ]
+     },
+     {
+      "cluster": "k42",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        2
+       ]
+      ]
+     },
+     {
+      "cluster": "k43",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        2,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k44",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        1,
+        0,
+        0
+       ],
+       [
+        0,
+        1,
+        1
+       ],
+       [
+        0,
+        0,
+        1
+       ]
+      ]
+     },
+     {
+      "cluster": "k45",
+      "kind": "multiclass",
+      "labels": [
+       "high",
+       "low",
+       "medium"
+      ],
+      "matrix": [
+       [
+        0,
+        1,
+        0
+       ],
+       [
+        0,
+        0,
+        1
+       ],
+       [
+        1,
+        0,
+        1
+       ]
+      ]
+     }
+    ]
+   },
+   "plan": {
+    "clusterField": "cluster",
+    "criteria": [
+     {
+      "id": "multiclass-performance",
+      "role": "confirmatory",
+      "kind": "multiclass_performance",
+      "members": [
+       {
+        "metric": "accuracy",
+        "band": {
+         "lower": 0.6,
+         "upper": null
+        }
+       },
+       {
+        "metric": "balanced_accuracy",
+        "band": {
+         "lower": 0.35,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": false
+   },
+   "expected": {
+    "planSha256": "b24115ad4962d4544f9aa37164482f0590aaf0253479aadbc68457380bf5a9d8",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": null,
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": "cluster",
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": null,
+     "criteria": [
+      {
+       "id": "multiclass-performance",
+       "kind": "multiclass_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "accuracy",
+         "band": {
+          "lower": 0.6,
+          "upper": null
+         }
+        },
+        {
+         "metric": "balanced_accuracy",
+         "band": {
+          "lower": 0.35,
+          "upper": null
+         }
+        }
+       ],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "multiclass-performance",
+      "outcome": "pass",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "accuracy",
+        "metric": "accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "x": 139,
+         "n": 180
+        },
+        "estimate": 0.772222222222,
+        "interval": {
+         "lower": 0.672222222222,
+         "upper": 0.861111111111,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.6,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000999500249875,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 45
+        }
+       },
+       {
+        "memberId": "balanced_accuracy",
+        "metric": "balanced_accuracy",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 47,
+           "support": 60,
+           "predicted": 60
+          },
+          {
+           "label": "low",
+           "tp": 45,
+           "support": 60,
+           "predicted": 58
+          },
+          {
+           "label": "medium",
+           "tp": 47,
+           "support": 60,
+           "predicted": 62
+          }
+         ]
+        },
+        "estimate": 0.772222222222,
+        "interval": {
+         "lower": 0.672886115113,
+         "upper": 0.862669055749,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": {
+         "lower": 0.35,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 0.000999500249875,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": 7.77542905559e-19,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 45
+        }
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "macro_precision",
+        "metric": "macro_precision",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 47,
+           "predicted": 60
+          },
+          {
+           "label": "low",
+           "tp": 45,
+           "predicted": 58
+          },
+          {
+           "label": "medium",
+           "tp": 47,
+           "predicted": 62
+          }
+         ]
+        },
+        "estimate": 0.772419972809,
+        "interval": {
+         "lower": 0.673059705447,
+         "upper": 0.862564176156,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 45
+        }
+       },
+       {
+        "memberId": "macro_f1",
+        "metric": "macro_f1",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "perClass": [
+          {
+           "label": "high",
+           "tp": 47,
+           "tpPlusFpPlusFn": 73
+          },
+          {
+           "label": "low",
+           "tp": 45,
+           "tpPlusFpPlusFn": 73
+          },
+          {
+           "label": "medium",
+           "tp": 47,
+           "tpPlusFpPlusFn": 75
+          }
+         ]
+        },
+        "estimate": 0.77217900034,
+        "interval": {
+         "lower": 0.672219907083,
+         "upper": 0.861449369009,
+         "level": 0.95,
+         "method": "cluster_percentile_bootstrap"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": [],
+        "bootstrap": {
+         "replicates": 2000,
+         "validReplicates": 2000,
+         "clusters": 45
+        }
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "multiclass_performance",
+       "direction": "pass",
+       "pValue": 0.000999500249875,
+       "adjustedPValue": 0.000999500249875,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "pass",
+       "decidingMemberId": "accuracy",
+       "sampleSize": 180,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": []
+      }
+     }
+    ],
+    "overallOutcome": "pass",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-58",
+   "category": "power_mean_baseline",
+   "title": "GC-44 with the target standard deviation 1.1 (R2 about 0.17): the mean baseline gate becomes a pass condition with probability 0.666 at 120 rows, the pass range falls from [0.163, 0.458] to [0, 0.458] and the required size rises from 293 to 312 rows",
+   "type": "power",
+   "input": {
+    "kind": "criterion",
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8,
+    "familySize": 1,
+    "criterion": {
+     "id": "regression-performance",
+     "role": "confirmatory",
+     "kind": "regression_performance",
+     "members": [
+      {
+       "metric": "mae",
+       "band": {
+        "lower": null,
+        "upper": 0.9
+       }
+      },
+      {
+       "metric": "rmse",
+       "band": {
+        "lower": null,
+        "upper": 1.15
+       }
+      }
+     ],
+     "powerAssumptions": {
+      "n": 120,
+      "errorSd": 1.0,
+      "targetSd": 1.1
+     }
+    }
+   },
+   "runners": [
+    "engine"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "status": "computed",
+    "passProbability": 0.0,
+    "passProbabilityUpperBound": 0.458469110083,
+    "failProbability": 2.09201271311e-05,
+    "requiredNForPass": 312,
+    "members": [
+     {
+      "memberId": "mae",
+      "metric": "mae",
+      "assumedValue": 0.797884560803,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.458469110083,
+      "failProbability": 2.09201271311e-05,
+      "reasons": []
+     },
+     {
+      "memberId": "rmse",
+      "metric": "rmse",
+      "assumedValue": 1.0,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.704749539966,
+      "failProbability": 1.07135284555e-06,
+      "reasons": []
+     },
+     {
+      "memberId": "mean_baseline_gate",
+      "metric": "baseline_rmse",
+      "assumedValue": 1.1,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.665597104754,
+      "failProbability": 0.0,
+      "reasons": []
+     }
+    ],
+    "reasons": []
    }
   }
  ]
