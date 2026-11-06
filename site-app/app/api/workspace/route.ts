@@ -3,7 +3,7 @@ import { sanitize } from "@/lib/client-projection";
 import { dispatch } from "@/lib/commands";
 import { short } from "@/lib/commands/fields";
 import { getEngagement, save } from "@/lib/engagement-repo";
-import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
+import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import {
   engagementTrail,
   workspaceView,
@@ -48,11 +48,7 @@ const command = z
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const payload = command.parse(
-        JSON.parse(
-          new TextDecoder().decode(await readBounded(request, 2 * 1024 * 1024)),
-        ),
-      ),
+    const payload = command.parse(await readJson(request, 2 * 1024 * 1024)),
       ctx = await context(payload.tenantId);
     refuseReadOnly(ctx);
     const e = await getEngagement(ctx, payload.engagementId);

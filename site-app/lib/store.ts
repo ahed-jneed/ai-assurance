@@ -1,6 +1,13 @@
 // Compatibility barrel for code written before the store was split. New code
 // imports from the focused modules directly.
-export { ApiError, checkOrigin, readBounded, responseError } from "./http";
+export {
+  ApiError,
+  checkOrigin,
+  parseJsonBody,
+  readBounded,
+  readJson,
+  responseError,
+} from "./http";
 export { context, requireAdmin, requireRole, type Context } from "./tenancy";
 export {
   bucket,

@@ -6,7 +6,7 @@ import {
   db,
   loadEngagement,
   now,
-  readBounded,
+  readJson,
   requireRole,
   responseError,
 } from "@/lib/store";
@@ -134,9 +134,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const raw = JSON.parse(
-        new TextDecoder().decode(await readBounded(request, 65536)),
-      ),
+    const raw = (await readJson(request, 65536)) as {
+        tenantId?: unknown;
+        kind?: unknown;
+      },
       ctx = await context(short.parse(raw.tenantId));
     if (raw.kind === "preferences") {
       const a = z

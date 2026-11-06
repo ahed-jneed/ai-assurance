@@ -9,26 +9,27 @@ export class ApiError extends Error {
   }
 }
 /**
- * A D1 (or SQLite) constraint violation: a unique key or check another
- * request won the race for.
+ * A D1 (or SQLite) uniqueness violation: a unique or primary key another
+ * request won the race for. NOT NULL, CHECK and FOREIGN KEY failures are
+ * programming errors, not races, and stay a logged 500.
  */
-const constraintFailure = (error: unknown) =>
+const uniquenessRace = (error: unknown) =>
   error instanceof Error &&
-  /SQLITE_CONSTRAINT|constraint failed/i.test(error.message);
+  /\b(?:UNIQUE|PRIMARY KEY) constraint failed|SQLITE_CONSTRAINT_(?:UNIQUE|PRIMARYKEY)\b/i.test(
+    error.message,
+  );
 /**
- * The response for a failed request: an ApiError as it says, a request body
- * that is not JSON as 400, a constraint race as 409 (F-54), and anything else
- * as a logged 500 that does not reveal its cause.
+ * The response for a failed request: an ApiError as it says (a request body
+ * that is not JSON arrives here as ApiError(400) from parseJsonBody), a
+ * uniqueness race as 409 (F-54), and anything else, including a SyntaxError
+ * from stored data, as a logged 500 that does not reveal its cause.
  */
 export function responseError(error: unknown) {
   if (error instanceof ApiError)
     return Response.json({ error: error.message }, { status: error.status });
-  if (error instanceof SyntaxError)
-    return Response.json(
-      { error: "The request body is not valid JSON" },
-      { status: 400 },
-    );
-  if (constraintFailure(error))
+  const message = error instanceof Error ? error.message : "Unknown failure";
+  if (uniquenessRace(error)) {
+    console.warn("Audit workspace request lost a uniqueness race", message);
     return Response.json(
       {
         error:
@@ -36,10 +37,8 @@ export function responseError(error: unknown) {
       },
       { status: 409 },
     );
-  console.error(
-    "Audit workspace request failed",
-    error instanceof Error ? error.message : "Unknown failure",
-  );
+  }
+  console.error("Audit workspace request failed", message);
   return Response.json(
     {
       error:
@@ -47,6 +46,21 @@ export function responseError(error: unknown) {
     },
     { status: 500 },
   );
+}
+/**
+ * Decode a request body as JSON. Only this parse answers 400: a SyntaxError
+ * anywhere else comes from stored data and is a server fault.
+ */
+export function parseJsonBody(bytes: Uint8Array): unknown {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new ApiError(400, "The request body is not valid JSON");
+  }
+}
+/** Read a bounded request body and decode it as JSON (see parseJsonBody). */
+export async function readJson(request: Request, limit: number) {
+  return parseJsonBody(await readBounded(request, limit));
 }
 export async function readBounded(request: Request, limit: number) {
   const reader = request.body?.getReader();
