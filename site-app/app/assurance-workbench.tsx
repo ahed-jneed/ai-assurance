@@ -118,6 +118,17 @@ type Field = {
 
 const label = (s: string) => s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
 
+/** "Pending legal review · LR-02": a flagged obligation item, never approved (D-02). */
+const pendingLegalReview = (itemIds: string[]) =>
+  "Pending legal review · " + itemIds.join(", ");
+/** An obligation subitem in a picker, with its legal-review flag when it has one. */
+function obligationOptionLabel(o: (typeof obligations.items)[number]) {
+  const label = o.article + " · " + o.title;
+  return o.legalReview?.required
+    ? label + " (" + pendingLegalReview(o.legalReview.itemIds) + ")"
+    : label;
+}
+
 export function AssuranceWorkbench({
   data,
   onRefresh,
@@ -336,7 +347,7 @@ export function AssuranceWorkbench({
         label: "Obligation subitem",
         options: obligations.items.map((o) => ({
           value: o.code,
-          label: o.article + " · " + o.title,
+          label: obligationOptionLabel(o),
         })),
         required: true,
       },
@@ -678,7 +689,7 @@ export function AssuranceWorkbench({
         label: "Criterion / obligation subitem",
         options: obligations.items.map((o) => ({
           value: o.code,
-          label: o.article + " · " + o.title,
+          label: obligationOptionLabel(o),
         })),
         required: true,
       },
@@ -1990,6 +2001,19 @@ export function AssuranceWorkbench({
                       <b>
                         {o.article} · {o.title}
                       </b>
+                      {o.legalReview?.required && (
+                        <>
+                          {" "}
+                          <span
+                            className="badge amber"
+                            title={
+                              o.reviewNote ?? "Pending qualified legal review"
+                            }
+                          >
+                            {pendingLegalReview(o.legalReview.itemIds)}
+                          </span>
+                        </>
+                      )}
                       <small className="block subtle">
                         {o.actor.join(", ")} · {o.code} ·{" "}
                         {o.evidenceCategories.join(", ")}

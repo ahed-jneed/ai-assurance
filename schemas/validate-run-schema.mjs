@@ -104,7 +104,9 @@ const cardFixture = hosted.find(run => run.manifest.model.card);
 assert.ok(complete && queued && regression && multiclass && cardFixture, 'Expected queued, binary, regression, multiclass and full-card fixtures');
 const legacy = copy(complete);
 legacy.contractVersion = '1.0';
-for (const key of ['task', 'profileId', 'manifest']) delete legacy[key];
+// Contract 1.0 also predates the rule-pack and methodology stamps that fresh
+// `--fixtures` runs carry.
+for (const key of ['task', 'profileId', 'manifest', 'rulePack', 'methodologyVersion']) delete legacy[key];
 // Contract 1.0 predates the performance positive class of test definitions
 // 2.1.0, which fresh `--fixtures` runs freeze.
 delete legacy.config.performancePositiveLabel;
@@ -136,6 +138,14 @@ const undefinedR2 = copy(regression);
 undefinedR2.results[0].metrics.find(metric => metric.name === 'r2').value = null;
 undefinedR2.results[0].limitations.push('R² is undefined for this target population.');
 positive('Hosted null R² evidence', undefinedR2);
+// Rule-pack stamp (#18): optional, because older runs lack it, and strict when present.
+const stamped = copy(complete);
+stamped.rulePack = { version: '2026.11.1', legalVersion: '02024R1689-20260727', researchedAsOf: '2026-11-05', legalReview: 'pending' };
+stamped.methodologyVersion = '2026.11.1';
+positive('Hosted run with rule-pack stamp', stamped);
+negative('rule-pack stamp with unknown field', stamped, run => { run.rulePack.approvedBy = 'counsel'; });
+negative('rule-pack stamp without legal-review status', stamped, run => { delete run.rulePack.legalReview; });
+negative('malformed methodology version', stamped, run => { run.methodologyVersion = 'latest'; });
 // Test definitions 2.1.0: binary performance freezes its positive class and
 // reports specificity, prevalence and the majority-class baseline.
 const perClass = copy(complete);
@@ -297,6 +307,7 @@ const notApplicableExternal = copy(emptyExternal);
 notApplicableExternal.results.forEach(result => { result.outcome = 'not_applicable'; });
 notApplicableExternal.outcome = notApplicableExternal.overallOutcome = 'not_applicable';
 positive('External all-not-applicable shape', notApplicableExternal);
+positive('External run with rule-pack stamp', { ...copy(ext), rulePack: copy(stamped.rulePack), methodologyVersion: stamped.methodologyVersion });
 const externalMutations = [
   ['external missing job ID', run => { delete run.externalJobId; }],
   ['external queued result projection', run => { run.state = 'queued'; }],
