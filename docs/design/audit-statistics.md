@@ -1040,8 +1040,8 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`; without it, the other label derived from the data, or in `auditor_model` mode from `modelSpec.outputLabels` (E4) |
 | Power and MDE at plan approval | **mirror** (approval UI) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
-| LL144 computations | via #30 (same arithmetic) | via #30 | – |
-| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns, which #30 adds (section 15); until then one column | yes (`intersectional_slices`) | – |
+| LL144 computations | **mirror** (`lib/ll144.ts`, #30; same arithmetic, `schemas/fixtures/ll144-golden.json`) | yes (`engine/ll144.py`) | – |
+| Intersectional strata (several protected columns) | **mirror** (#30): a hosted plan criterion may set `groupFields` (1–5 columns); strata labels, blank values as `unknownGroupRows` and the 1,000-strata limit follow `engine/criteria.py`. A special-category declaration and its basis cover every grouped column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
 | Cluster bootstrap and descriptive bootstrap (ECE, R²) | not available; `clustered_design_requires_engine` | engine-only | copied |
 | Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |

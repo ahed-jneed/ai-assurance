@@ -76,6 +76,17 @@ class GoldenCases(unittest.TestCase):
         from engine import criteria
         self.assertEqual(ll144.category_label(["Male", "Asian"]), criteria.group_label(["Male", "Asian"]))
 
+    def test_intersectional_strata_match_the_hosted_runner(self):
+        """The rows of the hosted test 'compares the intersectional strata of several group columns (#30)'
+        (site-app/lib/hosted-statistics.test.ts) give the same strata and unknown count here."""
+        from engine import criteria
+        rows = []
+        for sex, race, selected, n in (("F", "A", 20, 40), ("F", "B", 18, 40), ("M", "A", 22, 40), ("M", "B", 21, 40), ("M", " ", 2, 5)):
+            rows += [{"target": "1" if i < selected else "0", "prediction": "1" if i < selected else "0", "score": None, "fields": {"sex": sex, "race": race.strip() or None}} for i in range(n)]
+        data = criteria.group_data({"groupFields": ["sex", "race"]}, rows, {"positiveLabel": "1", "columns": {}})
+        self.assertEqual([(g["group"], g["tp"] + g["fp"] + g["fn"] + g["tn"]) for g in data["groups"]], [('["F","A"]', 40), ('["F","B"]', 40), ('["M","A"]', 40), ('["M","B"]', 40)])
+        self.assertEqual(data["unknownGroupRows"], 5)
+
     def test_the_statistics_table_keeps_its_selection_shape(self):
         table = st.evaluate_ll144({"categories": [{"name": "a", "n": 0, "selected": 0}, {"name": "b", "n": 4, "selected": 2}]})
         self.assertEqual(table["referenceCategory"], "b")

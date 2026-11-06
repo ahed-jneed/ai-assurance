@@ -3,11 +3,14 @@ import type { Result } from "./domain";
 import {
   defaultPlanForm,
   describePlan,
+  evaluateHostedPlan,
   explainResult,
   formFromPlan,
   planFromForm,
+  planGroupFields,
   planSuite,
   requestedCriteria,
+  stratumOf,
   validateHostedPlan,
 } from "./hosted-statistics";
 import { criterionPower } from "./statistics";
@@ -182,19 +185,74 @@ describe("the protocol form's plan", () => {
         ],
       }),
     ).toThrow(/not available for Regression/);
+  });
+
+  it("compares the intersectional strata of several group columns (#30)", () => {
+    const plan = validateHostedPlan("Binary classification", {
+      criteria: [
+        {
+          id: "g",
+          kind: "group_comparison",
+          metric: "selection_rate_difference",
+          band: { lower: -0.2, upper: 0.2 },
+          groupFields: ["sex", "race"],
+          minimumCoverage: 0.9,
+        },
+      ],
+    });
+    expect(planGroupFields(plan)).toEqual(["sex", "race"]);
+    const rows: Record<string, string>[] = [];
+    const add = (sex: string, race: string, selected: number, n: number) => {
+      for (let i = 0; i < n; i++)
+        rows.push({
+          sex,
+          race,
+          label: i < selected ? "1" : "0",
+          prediction: i < selected ? "1" : "0",
+          group: sex,
+        });
+    };
+    add("F", "A", 20, 40);
+    add("F", "B", 18, 40);
+    add("M", "A", 22, 40);
+    add("M", "B", 21, 40);
+    add("M", " ", 2, 5);
+    const columns = {
+      labelColumn: "label",
+      predictionColumn: "prediction",
+      groupColumn: "group",
+      positiveLabel: "1",
+      negativeLabel: "0",
+    };
+    const { evaluation, results } = evaluateHostedPlan(
+      plan,
+      rows,
+      columns,
+      "Binary classification",
+    );
+    const c = evaluation.criteria[0];
+    // Labels are the engine's: a compact JSON array, in code-point order.
+    expect(c.groups!.map((g) => [g.group, g.n])).toEqual([
+      ['["F","A"]', 40],
+      ['["F","B"]', 40],
+      ['["M","A"]', 40],
+      ['["M","B"]', 40],
+    ]);
+    expect(c.decision.coverage).toMatchObject({
+      unknownGroupRows: 5,
+      populationRows: 165,
+    });
+    expect(results).toHaveLength(1);
+    expect(stratumOf({ a: "x", b: "" }, ["a", "b"])).toBeNull();
+    expect(stratumOf({ a: " x " }, ["a"])).toBe("x");
     expect(() =>
-      validateHostedPlan("Binary classification", {
-        criteria: [
-          {
-            id: "g",
-            kind: "group_comparison",
-            metric: "selection_rate_difference",
-            band: { lower: -0.1, upper: 0.1 },
-            groupFields: ["sex", "race"],
-          },
-        ],
-      }),
-    ).toThrow(/#30/);
+      evaluateHostedPlan(
+        plan,
+        rows.map(({ race: _race, ...r }) => r),
+        columns,
+        "Binary classification",
+      ),
+    ).toThrow(/Required column missing: race/);
   });
 });
 

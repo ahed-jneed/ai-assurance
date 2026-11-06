@@ -59,14 +59,14 @@ describe("LL144 golden cases (hosted runner)", () => {
     expect(GOLDEN.errorCases).toHaveLength(4);
   });
 
-  it.each(GOLDEN.cases.map((c: any) => [c.id, c]))(
+  it.each(GOLDEN.cases.map((c: any) => [c.id, c]) as [string, any][])(
     "%s reproduces",
     (_, c: any) => {
       expect(differences(ll144Audit(c.input), c.expected)).toEqual([]);
     },
   );
 
-  it.each(GOLDEN.errorCases.map((c: any) => [c.id, c]))(
+  it.each(GOLDEN.errorCases.map((c: any) => [c.id, c]) as [string, any][])(
     "%s is rejected",
     (_, c: any) => {
       expect(() => ll144Audit(c.input)).toThrow(Ll144Error);
