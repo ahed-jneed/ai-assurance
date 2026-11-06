@@ -6,6 +6,11 @@ import type {
   EvidenceRequest,
   RulePackStamp,
 } from "@/lib/domain";
+import type { CriterionResult } from "@/lib/domain/report-gates";
+import {
+  snapshotTerms,
+  type ReportParticulars,
+} from "@/lib/domain/report-model";
 import { requestLabel } from "@/lib/evidence-requests";
 import { legalDate } from "@/lib/rule-pack";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
@@ -72,6 +77,18 @@ type ReportSnapshot = {
   summary: string;
   opinion: string;
   limitations: string;
+  /** Report model v2 (contractVersion 2.0); absent on older snapshots. */
+  reportTitle?: string;
+  particulars?: ReportParticulars;
+  elements?: { id: string; label: string; value: string }[];
+  conclusionStatement?: {
+    heading: string;
+    basisHeading: string;
+    text: string;
+    levelStatement: string;
+    notAssurance: boolean;
+  };
+  criteria?: CriterionResult[];
   /** Recorded at capture from rule pack 2026.11.1 on; absent on older snapshots. */
   rulePack?: RulePackStamp;
   methodologyVersion?: string;
@@ -114,8 +131,122 @@ type ReportSnapshot = {
   }[];
 };
 
+const criterionResults = {
+  no_exceptions: "No exceptions noted",
+  exceptions: "Exceptions noted",
+  not_evaluated: "Not fully evaluated",
+};
+/**
+ * The ISAE 3000 (Revised) report of a report model v2 snapshot: title,
+ * addressee, subject matter and criteria, responsibilities, the standard
+ * applied, independence and quality management, the summary of work, any
+ * basis for modification, the conclusion, results by criterion and the
+ * signature, date and location.
+ */
+function AssuranceReport({
+  s,
+  createdAt,
+}: {
+  s: ReportSnapshot;
+  createdAt: string;
+}) {
+  const c = s.conclusionStatement!,
+    element = (id: string) => s.elements?.find((e) => e.id === id),
+    body = [
+      "subject",
+      "criteria",
+      "responsibilities",
+      "standard",
+      "independence",
+      "work",
+    ];
+  return (
+    <>
+      <section className="assurance-report">
+        <h2>{s.reportTitle}</h2>
+        {c.notAssurance && (
+          <p>
+            <strong>
+              This is not an assurance report. It expresses no opinion or
+              conclusion providing assurance.
+            </strong>
+          </p>
+        )}
+        <p>{"To: " + (s.particulars?.addressee || "Not recorded")}</p>
+        {body.map((id) => {
+          const el = element(id);
+          return el ? (
+            <div key={id}>
+              <h3>{el.label}</h3>
+              <p>{el.value}</p>
+            </div>
+          ) : null;
+        })}
+        <p>{s.summary}</p>
+        {c.basisHeading && (
+          <div>
+            <h3>{c.basisHeading}</h3>
+            <p>{s.particulars?.basisForModification}</p>
+          </div>
+        )}
+        <div className="assurance-conclusion">
+          <h3>{c.heading}</h3>
+          <p>{c.text}</p>
+          {c.levelStatement && <p>{c.levelStatement}</p>}
+        </div>
+        <p>{s.limitations}</p>
+        <div className="report-signature">
+          <p>{"Signed: " + (s.particulars?.signatory || "Not recorded")}</p>
+          <p>
+            Report date:{" "}
+            {new Date(createdAt).toLocaleDateString("en-GB", {
+              timeZone: "Europe/Vienna",
+              dateStyle: "long",
+            })}
+          </p>
+          <p>{"Location: " + (s.particulars?.location || "Not recorded")}</p>
+        </div>
+      </section>
+      {!!s.criteria?.length && (
+        <section>
+          <h2>Results by criterion</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Criterion</th>
+                <th>Procedures</th>
+                <th>Exceptions</th>
+                <th>Open findings</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.criteria.map((r) => (
+                <tr key={r.criterion}>
+                  <td>{r.criterion}</td>
+                  <td>{r.procedures}</td>
+                  <td>{r.exceptions}</td>
+                  <td>
+                    {r.openFindings}
+                    {r.openHighFindings
+                      ? " (" + r.openHighFindings + " High or Critical)"
+                      : ""}
+                  </td>
+                  <td>{criterionResults[r.result] ?? r.result}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+    </>
+  );
+}
+
 function reportMarkup(report: Report, s: ReportSnapshot) {
-  const scope = s.scope ?? s.workflow?.brief;
+  const scope = s.scope ?? s.workflow?.brief,
+    v2 = !!snapshotTerms(s) && !!s.conclusionStatement,
+    supersededBy = report.supersededBy ?? report.release?.supersededBy;
   return (
     <main className="print-report">
       <nav className="print-toolbar">
@@ -138,13 +269,22 @@ function reportMarkup(report: Report, s: ReportSnapshot) {
         {!!report.replaces?.length && (
           <p className="report-meta">Replaces {report.replaces.join(", ")}</p>
         )}
+        {supersededBy && (
+          <p className="report-meta report-superseded">
+            Superseded by {supersededBy}. This report remains as it was issued.
+          </p>
+        )}
       </header>
-      <section>
-        <h2>Scoped conclusion</h2>
-        <h3>{s.opinion}</h3>
-        <p>{s.summary}</p>
-        <p>{s.limitations}</p>
-      </section>
+      {v2 ? (
+        <AssuranceReport s={s} createdAt={report.createdAt} />
+      ) : (
+        <section>
+          <h2>Scoped conclusion</h2>
+          <h3>{s.opinion}</h3>
+          <p>{s.summary}</p>
+          <p>{s.limitations}</p>
+        </section>
+      )}
       {scope && (
         <section>
           <h2>Agreed scope and audit period</h2>

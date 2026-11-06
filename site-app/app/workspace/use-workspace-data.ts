@@ -59,6 +59,7 @@ const actMessages: Record<string, string> = {
   reopenEvidenceRequest: "Evidence request reopened",
   createFinding: "Finding recorded",
   createReport: "Report snapshot created",
+  setPaperAudience: "Paper audience updated",
   classify: "Classification saved",
   approveClassification: "Classification approved",
   setStage: "Engagement stage updated",

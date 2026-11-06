@@ -1,4 +1,5 @@
 import type { Artifact, Finding, Paper, Report } from "./domain";
+import { opinionLabel } from "./domain/report-model";
 export type RegisterQuery = {
   view: string;
   facet: string;
@@ -89,7 +90,7 @@ export function reportRows(reports: Report[], q: RegisterQuery) {
         includes(
           r.kind +
             " " +
-            String(r.snapshot.opinion ?? "") +
+            opinionLabel(r.snapshot) +
             " " +
             String(r.snapshot.summary ?? "") +
             " " +
