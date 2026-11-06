@@ -4,7 +4,9 @@
 // (docs/security/identity.md), so only a verified sign-in can accept.
 import { db } from "./bindings";
 import type { Identity } from "./identity";
+import type { Engagement } from "./domain/types";
 import { id, now, sha256 } from "./ids";
+import { accessConflict } from "./workflow/acceptance";
 
 /** How long an invitation stays valid. */
 export const invitationLifetimeDays = 30;
@@ -70,13 +72,18 @@ export async function acceptInvitations(
     const guard =
       "EXISTS(SELECT 1 FROM invitations WHERE tenant_id=? AND id=? AND status='accepted' AND accepted_by=? AND closed_at=?)";
     const guardArgs = [tenantId, invitationId, user.userId, at];
-    const engagementIds = parseIds(invitation.engagement_ids);
+    const { engagementIds, withheld } = await withholdConflicts(
+      tenantId,
+      user.userId,
+      parseIds(invitation.engagement_ids),
+    );
     const details = {
       invitationId,
       userId: user.userId,
       role: invitation.role,
       clientId: invitation.client_id,
       engagementIds,
+      ...(withheld.length ? { withheld } : {}),
     };
     const event = {
       id: id("ME"),
@@ -150,6 +157,39 @@ export async function acceptInvitations(
     if (results[0]?.meta.changes) accepted++;
   }
   return accepted;
+}
+
+/**
+ * Splits the invited engagements into those to grant and those withheld: an
+ * engagement where the user declared a disqualifying relationship or an
+ * unresolved threat (accessConflict) is not granted, and the acceptance
+ * event records it with the reason so an administrator sees it. The
+ * invitation is still accepted. An engagement whose record cannot be read
+ * is left to the grant's own SQL guard, as before.
+ */
+async function withholdConflicts(
+  tenantId: string,
+  userId: string,
+  ids: string[],
+) {
+  const engagementIds: string[] = [],
+    withheld: { engagementId: string; reason: string }[] = [];
+  for (const engagementId of ids) {
+    const row = await db()
+      .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+      .bind(tenantId, engagementId)
+      .first<{ body: string }>();
+    let reason: string | undefined;
+    try {
+      if (row)
+        reason = accessConflict(JSON.parse(row.body) as Engagement, userId);
+    } catch {
+      // Unreadable: the grant's own SQL guard decides, as before.
+    }
+    if (reason) withheld.push({ engagementId, reason });
+    else engagementIds.push(engagementId);
+  }
+  return { engagementIds, withheld };
 }
 
 async function isSuperseded(args: string[]): Promise<boolean> {

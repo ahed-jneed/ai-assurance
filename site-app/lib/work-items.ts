@@ -9,6 +9,7 @@ import { stagePaperQueue } from "./auditor-workflow";
 import { paperNextAction } from "./paper-workflow";
 import { paperRegisterRow } from "./paper-presentation";
 import { localWorkDay } from "./work-inbox";
+import { acceptanceTasks } from "./workflow/acceptance";
 
 export type WorkItem = {
   id: string;
@@ -16,6 +17,7 @@ export type WorkItem = {
   engagement: string;
   client: string;
   kind:
+    | "acceptance"
     | "scope"
     | "program"
     | "procedure"
@@ -131,12 +133,18 @@ export function procedureWork(
             !["reviewed", "signed"].includes(paper?.status ?? "")))),
   };
 }
+/**
+ * The work an internal member sees for the engagement. `nameOf` gives a
+ * person's display name for the titles that name a team member; the user id
+ * stands in without it.
+ */
 export function engagementWork(
   e: Engagement,
   role: Role,
   userId: string,
   client = "",
   today = localWorkDay(),
+  nameOf: (userId: string) => string | undefined = () => undefined,
 ): WorkItem[] {
   if (["Client Viewer", "Client Contributor"].includes(role)) return [];
   const result: WorkItem[] = [],
@@ -177,6 +185,46 @@ export function engagementWork(
     });
   const w = e.workflow,
     b = w?.brief;
+  // Declarations are owed by the declarant; a declared threat is evaluated
+  // by a Reviewer or Lead Auditor other than the declarant.
+  for (const t of acceptanceTasks(w)) {
+    const name = nameOf(t.userId) || t.userId;
+    if (t.kind === "declaration")
+      add(
+        "acceptance",
+        "declaration:" + t.userId,
+        "Independence and competence declaration · " + name,
+        t.status === "missing" ? "Declare independence" : "Renew declaration",
+        t.status === "missing"
+          ? "Declare independence and competence for the accepted engagement period."
+          : "The engagement team changed after this declaration; declare again.",
+        "Audit program",
+        t.userId,
+        e.dueDate,
+        "ready",
+        1,
+        "acceptance",
+        t.userId === userId,
+      );
+    else
+      add(
+        "acceptance",
+        "threat:" + t.declarationId,
+        "Declared independence threat · " + name,
+        "Evaluate declared threat",
+        t.threats === 1
+          ? "A declared threat awaits evaluation by someone other than the declarant."
+          : t.threats +
+              " declared threats await evaluation by someone other than the declarant.",
+        "Audit program",
+        "",
+        e.dueDate,
+        "review",
+        1,
+        "acceptance",
+        reviewer && t.userId !== userId,
+      );
+  }
   if (w) {
     if (!b || b.status === "draft")
       add(

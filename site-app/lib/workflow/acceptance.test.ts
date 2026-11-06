@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { stageGates, type Engagement } from "../domain";
+import { stageGates, type Engagement, type Role } from "../domain";
+import { engagementWork } from "../work-items";
 import { seedWorkflow } from "../workflow-seed";
 import {
+  accessConflict,
   acceptancePrompt,
   acceptanceApplies,
+  acceptanceTasks,
   declarationStatus,
   engagementTeam,
+  gateTitle,
 } from "./acceptance";
 import {
   acceptanceInput,
@@ -843,5 +847,135 @@ describe("independence and competence declarations", () => {
     );
     await declare(e, "reviewer", { threats: [] });
     expect(declarationStatus(workflowOf(e), "reviewer")).toBe("current");
+  });
+});
+
+describe("independence work, names and access grants (#112)", () => {
+  const names: Record<string, string> = {
+    lead: "Lea Lead",
+    reviewer: "Rae Reviewer",
+  };
+  const nameOf = (id: string) => names[id];
+  const acceptanceWork = (e: Engagement, role: Role, userId: string) =>
+    engagementWork(e, role, userId, "", "2026-11-05", nameOf).filter(
+      (i) => i.kind === "acceptance",
+    );
+  const threat = () => ({
+    kind: "familiarity" as const,
+    description: "Former colleague of the model owner",
+    safeguards: "Rotate the review of WP-A10-01",
+  });
+
+  it("names the team member of a declaration gate", () => {
+    const e = planned();
+    const w = workflowOf(e);
+    w.declarations = w.declarations!.filter((d) => d.userId !== "reviewer");
+    w.acceptance!.status = "draft";
+    const [acceptance, declarationGate] = stageGates(e, "Fieldwork");
+    expect(gateTitle(declarationGate, nameOf)).toBe(
+      "Independence and competence declaration · Rae Reviewer",
+    );
+    // Someone no longer in the practice keeps their user id.
+    expect(gateTitle(declarationGate)).toBe(
+      "Independence and competence declaration · reviewer",
+    );
+    expect(gateTitle(acceptance, nameOf)).toBe(acceptance.title);
+  });
+
+  it("puts a missing or outdated declaration in the declarant's inbox", () => {
+    const e = planned();
+    const w = workflowOf(e);
+    w.declarations = w.declarations!.filter((d) => d.userId !== "reviewer");
+    expect(acceptanceWork(e, "Reviewer", "reviewer")).toMatchObject([
+      {
+        id: e.id + ":acceptance:declaration:reviewer",
+        recordId: "declaration:reviewer",
+        title: "Independence and competence declaration · Rae Reviewer",
+        action: "Declare independence",
+        module: "Audit program",
+        section: "acceptance",
+        ownerId: "reviewer",
+        state: "ready",
+        personal: true,
+      },
+    ]);
+    // The team sees it; only the declarant owes it.
+    expect(acceptanceWork(e, "Lead Auditor", "lead")).toMatchObject([
+      { recordId: "declaration:reviewer", personal: false },
+    ]);
+    // Someone joining the team leaves the earlier declarations outdated.
+    for (const d of w.declarations!) d.team = ["auditor", "lead", "reviewer"];
+    procedureOf(e, procedureId).ownerId = "second-auditor";
+    expect(acceptanceTasks(w)).toEqual([
+      { kind: "declaration", userId: "lead", status: "outdated" },
+      { kind: "declaration", userId: "reviewer", status: "missing" },
+      { kind: "declaration", userId: "second-auditor", status: "outdated" },
+    ]);
+    expect(acceptanceWork(e, "Lead Auditor", "lead")[0]).toMatchObject({
+      recordId: "declaration:lead",
+      action: "Renew declaration",
+      personal: true,
+    });
+  });
+
+  it("puts a declared threat in an independent reviewer's inbox until it is resolved", () => {
+    const e = planned();
+    const w = workflowOf(e);
+    w.declarations!.push(
+      declaration("lead", { id: "DEC-lead-2", threats: [threat()] }),
+    );
+    const item = {
+      recordId: "threat:DEC-lead-2",
+      title: "Declared independence threat · Lea Lead",
+      action: "Evaluate declared threat",
+      state: "review",
+      section: "acceptance",
+    };
+    expect(acceptanceWork(e, "Reviewer", "reviewer")).toMatchObject([
+      { ...item, personal: true },
+    ]);
+    // The declarant never evaluates their own threat; an Auditor cannot.
+    expect(acceptanceWork(e, "Lead Auditor", "lead")).toMatchObject([
+      { ...item, personal: false },
+    ]);
+    expect(acceptanceWork(e, "Auditor", "auditor")).toMatchObject([
+      { ...item, personal: false },
+    ]);
+    w.declarations!.at(-1)!.threats[0].resolution = {
+      userId: "reviewer",
+      at,
+      reason: "Rotation removes the threat",
+    };
+    expect(acceptanceWork(e, "Reviewer", "reviewer")).toEqual([]);
+  });
+
+  it("asks for nothing before the acceptance record states the period", () => {
+    const w = workflowOf(planned());
+    delete w.acceptance;
+    w.declarations = [];
+    expect(acceptanceTasks(w)).toEqual([]);
+    expect(acceptanceTasks(undefined)).toEqual([]);
+  });
+
+  it("refuses access where assignment is refused", () => {
+    const e = planned();
+    const w = workflowOf(e);
+    expect(accessConflict(e, "reviewer")).toBeUndefined();
+    expect(accessConflict(engagement(), "reviewer")).toBeUndefined();
+    w.declarations!.push(
+      declaration("reviewer", {
+        id: "DEC-reviewer-2",
+        exclusions: ["financial_interest"],
+      }),
+      declaration("auditor", { id: "DEC-auditor-2", threats: [threat()] }),
+    );
+    expect(accessConflict(e, "reviewer")).toBe(
+      "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+    );
+    expect(accessConflict(e, "auditor")).toBe(
+      "This person declared an unresolved independence threat; resolve it before assigning them",
+    );
+    // A person who never declared on the engagement may be given access.
+    expect(accessConflict(e, "second-auditor")).toBeUndefined();
   });
 });

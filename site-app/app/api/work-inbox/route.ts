@@ -43,6 +43,20 @@ export async function GET(request: Request) {
         .bind(ctx.tenantId, ctx.user.userId, page * 25)
         .all<{ id: string; client_id: string; title: string; client: string }>()
     ).results;
+    // Items that name a team member show their display name.
+    const names = new Map(
+      rows.length
+        ? (
+            await db()
+              .prepare(
+                "SELECT user_id,display_name FROM memberships WHERE tenant_id=?",
+              )
+              .bind(ctx.tenantId)
+              .all<{ user_id: string; display_name: string }>()
+          ).results.map((m) => [m.user_id, m.display_name])
+        : [],
+    );
+    const nameOf = (userId: string) => names.get(userId);
     // Engagements load in parallel, each on its own: one that fails to load
     // intact is reported beside the queue instead of failing it for everyone.
     const loaded = await Promise.all(
@@ -52,7 +66,14 @@ export async function GET(request: Request) {
             reports: openFinalReport,
           });
           return {
-            items: engagementWork(e, ctx.role, ctx.user.userId, row.client),
+            items: engagementWork(
+              e,
+              ctx.role,
+              ctx.user.userId,
+              row.client,
+              undefined,
+              nameOf,
+            ),
           };
         } catch (error) {
           if (error instanceof IntegrityError) {
