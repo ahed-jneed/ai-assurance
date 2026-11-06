@@ -7,7 +7,7 @@ import {
   approvalBlockers,
   art50Assessment,
   awaitsReclassification,
-  capturedBeforeMigration,
+  awaitsRecapture,
   classificationFacts,
   classify,
   factDefinitions,
@@ -146,7 +146,7 @@ export function ClassificationPanel({
       (r) =>
         r.kind === "final" &&
         (!r.release || ["internal", "approved"].includes(r.release.state)) &&
-        capturedBeforeMigration(r.snapshot),
+        awaitsRecapture(r, e.reports),
     ).length,
     route = highRiskRouteOf(c),
     label = (id: string) => factLabel(rules, id);
@@ -363,7 +363,9 @@ export function ClassificationPanel({
                       ? "Re-review due"
                       : t.state === "scheduled"
                         ? "Scheduled " + legalDate(t.date!)
-                        : "Watching"}
+                        : t.state === "reviewed"
+                          ? "Reviewed " + legalDate(t.reviewedOn!)
+                          : "Watching"}
                   </span>
                   <small className="subtle"> {t.basis}</small>
                 </li>

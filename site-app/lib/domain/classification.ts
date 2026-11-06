@@ -1393,14 +1393,46 @@ export function capturedBeforeMigration(snapshot: Record<string, unknown>) {
     ?.classification as { model?: unknown } | null | undefined;
   return !!c && typeof c === "object" && c.model !== 2;
 }
+/**
+ * Whether a final package captured before the migration must still be
+ * captured again: no later final package holds a classification recorded
+ * since #19. The old internal package cannot be withdrawn, so a later
+ * capture is what retires it. A later package whose snapshot was not loaded
+ * counts as a recapture: it was captured after this one, and a package
+ * captured from a migrated classification cannot be approved or released.
+ */
+export function awaitsRecapture(
+  report: { createdAt: string; snapshot: Record<string, unknown> },
+  reports: readonly {
+    kind: string;
+    createdAt: string;
+    snapshot: Record<string, unknown>;
+  }[],
+) {
+  return (
+    capturedBeforeMigration(report.snapshot) &&
+    !reports.some(
+      (r) =>
+        r !== report &&
+        r.kind === "final" &&
+        r.createdAt > report.createdAt &&
+        !capturedBeforeMigration(r.snapshot),
+    )
+  );
+}
 
 export type ReReviewTrigger = {
   id: string;
   title: string;
   basis: string;
-  /** due: re-review now; scheduled: from `date`; watch: no date announced. */
-  state: "due" | "scheduled" | "watch";
+  /**
+   * due: re-review now; scheduled: from `date`; watch: no date announced;
+   * reviewed: `date` has passed and the system was classified or approved
+   * again on or after it (`reviewedOn`).
+   */
+  state: "due" | "scheduled" | "watch" | "reviewed";
   date?: string;
+  reviewedOn?: string;
 };
 export const art6GuidelinesId = "GUID-ART6-HIGH-RISK-CLASSIFICATION";
 /** The Code of Practice is reviewed at least every two years (A50-ED-07). */
@@ -1408,10 +1440,25 @@ export const codeReviewDue = "2028-06-10";
 /** Code Measure 3.4(c): interoperable watermark detection (TL-13). */
 export const interoperabilityMilestone = "2027-02-02";
 /**
+ * The day the classification was last recorded or approved: the latest
+ * `classified` or `approved` event, or `approvedAt`. A dated re-review
+ * trigger on or before this day has been reviewed.
+ */
+export function lastReviewedOn(c: Classification): string {
+  const days = [
+    c.approvedAt ?? "",
+    ...(c.history ?? [])
+      .filter((h) => h.action === "classified" || h.action === "approved")
+      .map((h) => h.at ?? ""),
+  ].map((d) => d.slice(0, 10));
+  return days.reduce((a, d) => (d > a ? d : a), "");
+}
+/**
  * When the classification must be reviewed again: final Art 6 guidelines
  * (the classification cited the draft), a review of the Art 50 guidelines,
  * a Code update, the 2 February 2027 interoperability milestone, and a new
- * rule pack.
+ * rule pack. A dated trigger is due once its date has come and the
+ * classification was not recorded or approved again on or after it.
  */
 export function reReviewTriggers(
   c: Classification,
@@ -1422,8 +1469,13 @@ export function reReviewTriggers(
     facts = classificationFactValues(c),
     cited = c.guidance?.find((g) => g.id === art6GuidelinesId),
     current = rules.guidance.find((g) => g.id === art6GuidelinesId),
-    dated = (date: string): ReReviewTrigger["state"] =>
-      today >= date ? "due" : "scheduled",
+    reviewedOn = lastReviewedOn(c),
+    dated = (date: string): Pick<ReReviewTrigger, "state" | "reviewedOn"> =>
+      today < date
+        ? { state: "scheduled" }
+        : reviewedOn >= date
+          ? { state: "reviewed", reviewedOn }
+          : { state: "due" },
     out: ReReviewTrigger[] = [];
   if (current)
     out.push({
@@ -1450,7 +1502,7 @@ export function reReviewTriggers(
       id: "code-update",
       title: "Update of the Code of Practice on transparency",
       basis: "Reviewed at least every two years after the final Code",
-      state: dated(codeReviewDue),
+      ...dated(codeReviewDue),
       date: codeReviewDue,
     });
   }
@@ -1459,7 +1511,7 @@ export function reReviewTriggers(
       id: "interoperability-2027",
       title: "Interoperable watermark detection (Code Measure 3.4(c))",
       basis: "Code milestone for signatories; not a statutory date",
-      state: dated(interoperabilityMilestone),
+      ...dated(interoperabilityMilestone),
       date: interoperabilityMilestone,
     });
   if (c.rulePackVersion && c.rulePackVersion !== rules.rulePackVersion)

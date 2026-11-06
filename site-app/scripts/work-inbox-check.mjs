@@ -621,4 +621,30 @@ assert.equal(
   ).some((i) => i.kind === "classification"),
   false,
 );
+// A later final package captured since the migration retires the old one.
+assert.deepEqual(
+  engagementWork(
+    {
+      ...migrated,
+      reports: [
+        { ...migrated.reports[0], createdAt: "2026-11-01T00:00:00.000Z" },
+        {
+          id: "post-19",
+          kind: "final",
+          actor: "creator",
+          createdAt: "2026-11-06T00:00:00.000Z",
+          snapshot: {
+            workflow: {},
+            engagement: { classification: { status: "approved", model: 2 } },
+          },
+        },
+      ],
+    },
+    "Lead Auditor",
+    "lead",
+  )
+    .filter((i) => i.kind === "report")
+    .map((i) => i.recordId),
+  ["post-19"],
+);
 console.log("PASS migrated classification and pre-migration package work");

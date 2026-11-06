@@ -11,6 +11,7 @@ import { paperRegisterRow } from "./paper-presentation";
 import { localWorkDay } from "./work-inbox";
 import {
   awaitsReclassification,
+  awaitsRecapture,
   capturedBeforeMigration,
   reReviewTriggers,
   type ClassificationRules,
@@ -618,6 +619,8 @@ export function engagementWork(
     // four-flag classification: approving or releasing it fails the
     // source-record check, so it must be captured again.
     if (capturedBeforeMigration(r.snapshot)) {
+      // A later final package captured since the migration retires it.
+      if (!awaitsRecapture(r, e.reports)) continue;
       add(
         "report",
         r.id,

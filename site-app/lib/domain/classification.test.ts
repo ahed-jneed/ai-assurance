@@ -11,6 +11,7 @@ import {
   approveClassification,
   art50Assessment,
   awaitsReclassification,
+  awaitsRecapture,
   capturedBeforeMigration,
   classificationFacts,
   ClassificationError,
@@ -24,6 +25,7 @@ import {
   obligationSuggestions,
   practiceKey,
   recordClassification,
+  lastReviewedOn,
   reReviewTriggers,
   type Classification,
   type ClassificationInput,
@@ -1029,6 +1031,44 @@ describe("answers, history and migration", () => {
     });
   });
 
+  it("clears a dated trigger once the system is approved or classified again on or after its date", () => {
+    const c = record({ facts: { generatesSyntheticText: "unknown" } });
+    const state = (x: Classification, today: string) =>
+      reReviewTriggers(x, rules, today).find(
+        (t) => t.id === "interoperability-2027",
+      );
+    // Approved before the milestone: due once it passes.
+    const before = { ...c, approvedAt: "2027-01-15T09:00:00.000Z" };
+    expect(state(before, "2027-03-02")).toMatchObject({ state: "due" });
+    // Approved again after the milestone: reviewed, not due.
+    const after = { ...c, approvedAt: "2027-03-01T09:00:00.000Z" };
+    expect(lastReviewedOn(after)).toBe("2027-03-01");
+    expect(state(after, "2027-03-02")).toMatchObject({
+      state: "reviewed",
+      reviewedOn: "2027-03-01",
+    });
+    // A reclassification recorded on the milestone day counts as well.
+    const reclassified = {
+      ...before,
+      history: [
+        ...(before.history ?? []),
+        {
+          action: "classified",
+          at: "2027-02-02T08:00:00.000Z",
+          label: "Minimal risk",
+          legalVersion: c.version,
+        },
+      ],
+    } satisfies Classification;
+    expect(state(reclassified, "2027-03-02")?.state).toBe("reviewed");
+    // The later Code review date is still ahead, then due again.
+    const code = (x: Classification, today: string) =>
+      reReviewTriggers(x, rules, today).find((t) => t.id === "code-update")
+        ?.state;
+    expect(code(after, "2027-03-02")).toBe("scheduled");
+    expect(code(after, "2028-06-10")).toBe("due");
+  });
+
   it("knows when a migrated classification still awaits its new answers", () => {
     const old = {
       ...fresh(),
@@ -1054,6 +1094,27 @@ describe("answers, history and migration", () => {
     expect(capturedBeforeMigration(engagement(record({})))).toBe(false);
     // An unloaded snapshot (an empty object) is never flagged.
     expect(capturedBeforeMigration({})).toBe(false);
+  });
+
+  it("retires a pre-migration package once a later package is captured", () => {
+    const final = (createdAt: string, classification: unknown) => ({
+      kind: "final",
+      createdAt,
+      snapshot: { engagement: { id: "E-1", classification } },
+    });
+    const old = final("2026-10-01T00:00:00.000Z", { status: "approved" });
+    expect(awaitsRecapture(old, [old])).toBe(true);
+    // An earlier package of the new model does not retire it.
+    const earlier = final("2026-09-01T00:00:00.000Z", record({}));
+    expect(awaitsRecapture(old, [earlier, old])).toBe(true);
+    // Another pre-migration package does not either.
+    const again = final("2026-10-02T00:00:00.000Z", { status: "approved" });
+    expect(awaitsRecapture(old, [old, again])).toBe(true);
+    // A later package captured since the migration does.
+    const later = final("2026-11-06T00:00:00.000Z", record({}));
+    expect(awaitsRecapture(old, [old, later])).toBe(false);
+    // A later draft does not.
+    expect(awaitsRecapture(old, [old, { ...later, kind: "draft" }])).toBe(true);
   });
 });
 

@@ -164,6 +164,35 @@ describe("classification work (#104)", () => {
     ).toMatchObject({ action: "View package dependency", personal: false });
   });
 
+  it("drops the recapture item once a new final package is captured", () => {
+    const e = migrated();
+    const pkg = (id: string, createdAt: string, classification: unknown) => ({
+      id,
+      kind: "final" as const,
+      createdAt,
+      actor: "lead",
+      sha256: "0".repeat(64),
+      snapshot: {
+        workflow: null,
+        engagement: { id: e.id, classification },
+      },
+    });
+    e.reports = [
+      pkg("R-1", at, engagement().classification),
+      pkg(
+        "R-2",
+        "2026-11-06T10:00:00.000Z",
+        freshEngagement("client", "E", "auditor").classification,
+      ),
+    ];
+    const reports = classificationTasks(e, "Lead Auditor", "lead").filter(
+      (i) => i.kind === "report",
+    );
+    // R-1 is retired by R-2; only R-2 is open for approval.
+    expect(reports.map((i) => i.recordId)).toEqual(["R-2"]);
+    expect(reports[0].action).not.toBe("Capture the package again");
+  });
+
   it("turns a due re-review trigger into a work item", () => {
     // A new rule pack is due at once.
     const stale = approved({ rulePackVersion: "2026.10.1" });
@@ -183,6 +212,11 @@ describe("classification work (#104)", () => {
       classificationTasks(approved(), "Lead Auditor", "lead", "2028-06-10")[0]
         ?.reason,
     ).toContain("Code of Practice");
+    // Re-approving after the date clears it; the next date brings it back.
+    const reapproved = approved({ approvedAt: "2028-06-11T09:00:00.000Z" });
+    expect(
+      classificationTasks(reapproved, "Lead Auditor", "lead", "2028-06-12"),
+    ).toEqual([]);
     // Without the rules (no catalog) no trigger is evaluated.
     expect(
       classificationTasks(stale, "Lead Auditor", "lead", today, null),
@@ -194,6 +228,33 @@ describe("classification work (#104)", () => {
         "Lead Auditor",
         "lead",
       ),
+    ).toEqual([]);
+  });
+
+  it("clears the interoperability re-review once the classification is approved again", () => {
+    const before = approved({ approvedAt: "2027-01-15T09:00:00.000Z" });
+    const [task] = classificationTasks(
+      before,
+      "Lead Auditor",
+      "lead",
+      "2027-03-02",
+    );
+    expect(task?.reason).toContain("Interoperable watermark detection");
+    // Re-approved on 1 March 2027, after the 2 February milestone.
+    const after = approved({
+      approvedAt: "2027-03-01T09:00:00.000Z",
+      history: [
+        {
+          action: "approved",
+          at: "2027-03-01T09:00:00.000Z",
+          by: "reviewer",
+          label: "Minimal risk",
+          legalVersion: "x",
+        },
+      ],
+    });
+    expect(
+      classificationTasks(after, "Lead Auditor", "lead", "2027-03-02"),
     ).toEqual([]);
   });
 
