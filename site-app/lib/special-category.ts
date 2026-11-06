@@ -305,24 +305,65 @@ export function csvHeader(text: string): string[] | null {
 }
 /** Bytes read from the start of an upload to find its header row. */
 export const headerScanBytes = 64 * 1024;
+// Windows-1252 code points of bytes 0x80-0x9F. The other bytes match
+// Latin-1; the five unassigned ones keep their C1 code point.
+const cp1252High = [
+  0x20ac, 0x81, 0x201a, 0x192, 0x201e, 0x2026, 0x2020, 0x2021, 0x2c6, 0x2030,
+  0x160, 0x2039, 0x152, 0x8d, 0x17d, 0x8f, 0x90, 0x2018, 0x2019, 0x201c, 0x201d,
+  0x2022, 0x2013, 0x2014, 0x2dc, 0x2122, 0x161, 0x203a, 0x153, 0x9d, 0x17e,
+  0x178,
+];
+function fromCodes(codes: ArrayLike<number>) {
+  let text = "";
+  for (let i = 0; i < codes.length; i += 8192)
+    text += String.fromCharCode(
+      ...Array.prototype.slice.call(codes, i, i + 8192),
+    );
+  return text;
+}
 /**
- * The header of an upload whose first bytes are UTF-8 text, whatever its
- * name: the external worker reads every Dataset as CSV, so a file without a
- * .csv extension is inspected too. Tab-separated when the name says so, or
- * when the first line holds tabs and no commas. Null for binary formats
- * (Parquet, spreadsheets), which cannot be inspected.
+ * The text of an upload's first bytes, for finding its header row: UTF-16
+ * when a byte order mark says so (Excel's "Unicode Text"), UTF-8 when the
+ * bytes are valid UTF-8, and Windows-1252 otherwise (Excel's "CSV (Comma
+ * delimited)" on Western-European systems). Decoded by hand, so the result
+ * does not depend on the legacy encodings the runtime's TextDecoder knows.
  */
-export function uploadHeader(name: string, bytes: ArrayBuffer) {
-  let text: string;
+export function headerText(bytes: ArrayBuffer) {
+  const b = new Uint8Array(bytes.slice(0, headerScanBytes));
+  if (b[0] === 0xff && b[1] === 0xfe)
+    return fromCodes(
+      new Uint16Array(b.length >> 1)
+        .map((_, i) => b[2 * i] | (b[2 * i + 1] << 8))
+        .subarray(1),
+    );
+  if (b[0] === 0xfe && b[1] === 0xff)
+    return fromCodes(
+      new Uint16Array(b.length >> 1)
+        .map((_, i) => (b[2 * i] << 8) | b[2 * i + 1])
+        .subarray(1),
+    );
   try {
     // `stream` tolerates a multi-byte character cut at the scan limit.
-    text = new TextDecoder("utf-8", { fatal: true }).decode(
-      bytes.slice(0, headerScanBytes),
-      { stream: true },
-    );
+    return new TextDecoder("utf-8", { fatal: true }).decode(b, {
+      stream: true,
+    });
   } catch {
-    return null;
+    return fromCodes(
+      Array.from(b, (c) => (c >= 0x80 && c <= 0x9f ? cp1252High[c - 0x80] : c)),
+    );
   }
+}
+/**
+ * The header of an upload whose first bytes are text, whatever its name or
+ * encoding: the external worker reads every Dataset as CSV, so a file
+ * without a .csv extension is inspected too, and a file that is not UTF-8
+ * still brings its columns onto the platform although no run can read it.
+ * Tab-separated when the name says so, or when the first line holds tabs
+ * and no commas. Null for binary formats (Parquet, spreadsheets), which
+ * cannot be inspected.
+ */
+export function uploadHeader(name: string, bytes: ArrayBuffer) {
+  const text = headerText(bytes);
   if (!text || text.includes("\u0000")) return null;
   const first = text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
   return /\.tsv$/i.test(name) || (first.includes("\t") && !first.includes(","))

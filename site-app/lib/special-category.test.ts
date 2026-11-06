@@ -85,6 +85,42 @@ describe("column detection", () => {
     expect(uploadHeader("x.parquet", bytes("PAR1\u0000\u0001"))).toBeNull();
   });
 
+  it("reads the header of a CSV that is not UTF-8", () => {
+    // Excel's "CSV (Comma delimited)": Windows-1252, with accented and
+    // 0x80-0x9F characters that are not valid UTF-8.
+    const encode = (text: string) => new TextEncoder().encode(text),
+      cp1252 = new Uint8Array([
+        ...encode("id,Ethnicit"),
+        0xe9, // é
+        0x80, // €
+        ...encode(",religion\n1,"),
+        0xe9,
+        0x0a,
+      ]);
+    expect(uploadHeader("export.csv", cp1252.buffer)).toEqual([
+      "id",
+      "Ethnicité€",
+      "religion",
+    ]);
+    // Excel's "Unicode Text": UTF-16 with a byte order mark, tab-separated.
+    const utf16 = (text: string, little: boolean) => {
+      const out = new Uint8Array(2 + text.length * 2),
+        view = new DataView(out.buffer);
+      view.setUint16(0, 0xfeff, little);
+      for (let i = 0; i < text.length; i++)
+        view.setUint16(2 + 2 * i, text.charCodeAt(i), little);
+      return out.buffer;
+    };
+    for (const little of [true, false])
+      expect(
+        uploadHeader("export.txt", utf16("id\tethnicity\r\n1\tA\r\n", little)),
+        little ? "UTF-16LE" : "UTF-16BE",
+      ).toEqual(["id", "ethnicity"]);
+    expect(uploadHeader("export.csv", utf16("id,religion\n1,x", true))).toEqual(
+      ["id", "religion"],
+    );
+  });
+
   it("recognises names of GDPR Art 9(1) categories", () => {
     expect(normalizeColumn("applicantEthnicity ")).toBe("applicant_ethnicity");
     for (const name of [
@@ -270,7 +306,7 @@ describe("POST /api/evidence", () => {
       id: string;
       version: number;
     };
-  function send(csv: string, name = "applicants.csv") {
+  function send(csv: BlobPart, name = "applicants.csv") {
     const { id, version } = engagement(),
       form = new FormData();
     form.set("tenantId", "tenant-1");
@@ -380,6 +416,38 @@ describe("POST /api/evidence", () => {
     const refused = await send(csv, "dataset");
     expect(refused.status).toBe(409);
     expect(objects.size).toBe(0);
+  });
+
+  it("inspects a Dataset that is not UTF-8", async () => {
+    // Windows-1252 with an accented value, and UTF-16 with a byte order mark.
+    const encode = (text: string) => new TextEncoder().encode(text),
+      cp1252 = new Uint8Array([
+        ...encode("actual,predicted,ethnicity\n1,1,Fran"),
+        0xe7,
+        ...encode("aise\n"),
+      ]),
+      utf16 = new Uint8Array([
+        0xff,
+        0xfe,
+        ...[...csv].flatMap((c) => [c.charCodeAt(0), 0]),
+      ]);
+    for (const bytes of [cp1252, utf16]) {
+      const refused = await send(bytes);
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toContain(
+        "recorded basis before upload: ethnicity",
+      );
+    }
+    expect(objects.size).toBe(0);
+    const basisId = await record();
+    const accepted = await send(cp1252);
+    expect(accepted.status).toBe(200);
+    expect(audit().at(-1)).toEqual({
+      action: "uploadEvidence",
+      details: expect.objectContaining({
+        specialCategory: { columns: ["ethnicity"], bases: [basisId] },
+      }),
+    });
   });
 
   it("gates a client submission and records the gate in its audit event", async () => {
