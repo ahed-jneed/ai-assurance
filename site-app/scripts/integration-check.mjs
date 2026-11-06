@@ -1804,7 +1804,10 @@ try {
     ...plannedInput,
     datasetCardRecordId: datasetCard.id,
   });
-  await command("queueRun", plannedInput, owner, 409);
+  assert.match(
+    (await command("queueRun", plannedInput, owner, 409)).error,
+    /is already queued/,
+  );
   await command("cancelRun", { runId: cardRun.details.runId });
   const cardRetry = await command("retryRun", {
     runId: cardRun.details.runId,
@@ -1815,7 +1818,11 @@ try {
     e.runs.find((r) => r.id === cardRun.details.runId).manifest.dataset.cardPin,
   );
   assert.equal(e.runs.at(-1).manifest.dataset.cardPin.recordId, datasetCard.id);
-  await command("retryRun", { runId: cardRun.details.runId }, owner, 409);
+  assert.match(
+    (await command("retryRun", { runId: cardRun.details.runId }, owner, 409))
+      .error,
+    /is already queued/,
+  );
   await command("cancelRun", { runId: cardRetry.details.runId });
   const planned = await command("queueRun", {
     procedureId: proc.id,

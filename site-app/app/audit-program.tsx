@@ -2582,7 +2582,15 @@ function PlannedEvaluation({
   onQueuedRun: (runId: string) => void;
 }) {
   const [cards, setCards] = useState<AssuranceRecord[] | null>(null),
-    [unavailable, setUnavailable] = useState(false);
+    [unavailable, setUnavailable] = useState(false),
+    [refresh, setRefresh] = useState(0);
+  // A card registered in another tab or view need not bump the engagement
+  // version, so the cards are read again when the window regains focus.
+  useEffect(() => {
+    const onFocus = () => setRefresh((n) => n + 1);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     void assuranceRecords(
@@ -2597,7 +2605,7 @@ function PlannedEvaluation({
         if (!controller.signal.aborted) setUnavailable(true);
       });
     return () => controller.abort();
-  }, [tenantId, e.id, e.version]);
+  }, [tenantId, e.id, e.version, refresh]);
   const active = activeProcedureRun(e, p.id),
     dataset = e.artifacts.find(
       (a) => a.id === p.datasetId && a.status === "accepted",
