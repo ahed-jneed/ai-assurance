@@ -159,6 +159,59 @@ def add_engine_report(schema):
     defs['engineReport'] = report
 
 
+def add_external_run(schema):
+    """Compiled external audit run 1.5 (section 11.1, #21 E4 with #22 H4): the 1.2 projection with results
+    keyed by criterion id, each carrying the engine's copied decision, the plan in manifest.statistics and
+    its hash in provenance.inputHashes.statisticsPlan. A profile with a stored plan (schemaVersion 1.1)
+    keeps only column mappings and the declared labels in config (section 9.1)."""
+    defs = schema['$defs']
+    profile = copy.deepcopy(defs['evaluationProfile'])
+    profile['properties'].update(schemaVersion={'const': '1.1'}, config=ref('hostedPlanConfig'), statistics=ref('statisticsPlan'))
+    profile['required'] = list(dict.fromkeys(profile['required'] + ['statistics']))
+    profile.pop('allOf', None)
+    defs['evaluationProfilePlan'] = profile
+    thresholds = obj({'source': {'const': 'internal_policy'}, 'policyId': st(1, 300), 'policyVersion': st(1, 300), 'frozenAt': {'type': 'string', 'format': 'date-time'}, 'frozenBy': ref('actorId'), **copy.deepcopy(defs['hostedPlanConfig']['properties'])}, ['source', 'policyId', 'policyVersion', 'frozenAt', 'frozenBy'])
+    defs['planThresholds'] = thresholds
+    manifest = copy.deepcopy(defs['externalRunManifest'])
+    manifest['properties']['profile'] = {'anyOf': [ref('evaluationProfile'), ref('evaluationProfilePlan')]}
+    manifest['properties']['statistics'] = ref('statisticsPlan')
+    manifest['required'] = list(dict.fromkeys(manifest['required'] + ['statistics']))
+    defs['externalStatisticsManifest'] = manifest
+    run = copy.deepcopy(defs['externalAuditRun'])
+    props = run['properties']
+    props['contractVersion'] = {'const': '1.5'}
+    props['config'] = {'anyOf': [ref('hostedConfig'), ref('hostedPlanConfig')]}
+    props['thresholds'] = {'anyOf': [ref('hostedThresholds'), ref('planThresholds')]}
+    props['manifest'] = ref('externalStatisticsManifest')
+    props['results'] = arr(ref('statisticsResult'), 0, MAX_RESULTS)
+    props['reviewFlags'] = arr(ref('id'), 0, MAX_RESULTS, True)
+    props['provenance'] = copy.deepcopy(props['provenance'])
+    props['provenance']['properties']['inputHashes']['required'] = list(dict.fromkeys(props['provenance']['properties']['inputHashes']['required'] + ['statisticsPlan']))
+    run['required'] = list(dict.fromkeys(run['required'] + ['reviewFlags', 'overallOutcome']))
+    kinds = {'Binary classification': ['performance', 'group_comparison'], 'Multiclass classification': ['multiclass_performance'], 'Regression': ['regression_performance']}
+    rules = []
+    for rule in run['allOf']:
+        results = rule.get('then', {}).get('properties', {}).get('results', {}).get('items', {}).get('properties', {}).get('testId')
+        if results is not None:
+            # The per-task rule on result test ids becomes a rule on decision.kind (section 11.2, H2/H4).
+            task = rule['if']['properties']['task']['const']
+            rule = copy.deepcopy(rule)
+            rule['then']['properties']['results'] = {'items': {'properties': {'decision': {'properties': {'kind': {'enum': kinds[task]}}}}}}
+        rules.append(rule)
+    run['allOf'] = rules
+    run['description'] = ('Authenticated external attempt under statistics 1.0.0: results are the criteria of the recorded plan, each '
+        'with the engine decision the worker copied; exploratory criteria never change the outcome and failing ones are reviewFlags.')
+    defs['externalStatisticsRun'] = run
+    branch = ref('externalStatisticsRun')
+    if branch not in schema['oneOf']:
+        schema['oneOf'].append(branch)
+    schema['description'] = ('Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1, authenticated external audit '
+        'projection 1.2, engine report 1.3 and compiled external audit run 1.5 under statistics 1.0.0 '
+        '(docs/design/audit-statistics.md). Schema validity is distinct from result origin, input custody, statistical '
+        'suitability and legal sufficiency.')
+    return schema
+
+
 def add_statistics(schema):
     defs = schema['$defs']
     add_plan(defs)

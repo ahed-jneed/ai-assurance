@@ -137,9 +137,10 @@ run['properties']['retryOf'] = ref('id')
 run['allOf'].append({'if': {'required': ['procedureBinding']}, 'then': {'properties': {'provenance': {'properties': {'inputHashes': {'required': ['auditBinding']}}}}}, 'else': {'properties': {'provenance': {'properties': {'inputHashes': {'not': {'required': ['auditBinding']}}}}}}})
 defs['hostedRun'] = run
 output = {'$schema': 'https://json-schema.org/draft/2020-12/schema', '$id': 'urn:ai-assurance:test-run:1.1', 'title': 'AI Assurance common diagnostic run contract', 'description': 'Version-discriminated contract: v1.0 Python/legacy interactive runs and v1.1 hosted saved-prediction runs. Frozen internal policies and diagnostic outcomes provide audit evidence; they do not certify EU AI Act conformity. Application validation must verify hashes, cross-field bindings, timestamp order and evidence custody.', 'oneOf': [ref('legacyRun'), ref('hostedRun')], '$defs': defs}
-statistics = runpy.run_path(str(Path(__file__).with_name('.statistics-schema.py')))['add_statistics']
-output = statistics(output)
+statistics = runpy.run_path(str(Path(__file__).with_name('.statistics-schema.py')))
+output = statistics['add_statistics'](output)
 extend = runpy.run_path(str(Path(__file__).with_name('.extend-assurance-schema.py')))['extend_schema']
 output = extend(output)
+output = statistics['add_external_run'](output)
 p.write_text(json.dumps(output, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
 print('Updated schema with', len(defs), 'definitions')

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ai-assurance:test-run:1.2",
   "title": "AI Assurance common diagnostic run contract",
-  "description": "Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1 and authenticated external audit projection 1.2. Schema validity is distinct from result origin, input custody, statistical suitability and legal sufficiency.",
+  "description": "Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1, authenticated external audit projection 1.2, engine report 1.3 and compiled external audit run 1.5 under statistics 1.0.0 (docs/design/audit-statistics.md). Schema validity is distinct from result origin, input custody, statistical suitability and legal sufficiency.",
   "oneOf": [
     {
       "$ref": "#/$defs/legacyRun"
@@ -15,6 +15,9 @@
     },
     {
       "$ref": "#/$defs/externalAuditRun"
+    },
+    {
+      "$ref": "#/$defs/externalStatisticsRun"
     }
   ],
   "$defs": {
@@ -8573,6 +8576,1041 @@
           }
         }
       }
+    },
+    "evaluationProfilePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "schemaVersion": {
+          "const": "1.1"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "task": {
+          "enum": [
+            "Binary classification",
+            "Multiclass classification",
+            "Regression"
+          ]
+        },
+        "suite": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "performance",
+              "regression",
+              "demographic_parity",
+              "disparate_impact",
+              "equalized_odds"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "config": {
+          "$ref": "#/$defs/hostedPlanConfig"
+        },
+        "datasetContext": {
+          "$ref": "#/$defs/datasetContext"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "$ref": "#/$defs/actorId"
+        },
+        "statistics": {
+          "$ref": "#/$defs/statisticsPlan"
+        }
+      },
+      "required": [
+        "id",
+        "schemaVersion",
+        "name",
+        "version",
+        "task",
+        "suite",
+        "config",
+        "datasetContext",
+        "rationale",
+        "createdAt",
+        "createdBy",
+        "statistics"
+      ]
+    },
+    "planThresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "const": "internal_policy"
+        },
+        "policyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "policyVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "frozenAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "frozenBy": {
+          "$ref": "#/$defs/actorId"
+        },
+        "labelColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "predictionColumn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "groupColumn": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "positiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "negativeLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "source",
+        "policyId",
+        "policyVersion",
+        "frozenAt",
+        "frozenBy"
+      ]
+    },
+    "externalStatisticsManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "model": {
+          "$ref": "#/$defs/registeredModel"
+        },
+        "dataset": {
+          "$ref": "#/$defs/externalPredictionDataset"
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/evaluationProfile"
+            },
+            {
+              "$ref": "#/$defs/evaluationProfilePlan"
+            }
+          ]
+        },
+        "executionMode": {
+          "enum": [
+            "provided_predictions",
+            "auditor_model",
+            "client_local"
+          ]
+        },
+        "lineage": {
+          "const": "authenticated_external_attempt"
+        },
+        "testDefinitionVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "limitations": {
+          "$ref": "#/$defs/stringNotes"
+        },
+        "statistics": {
+          "$ref": "#/$defs/statisticsPlan"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "model",
+        "dataset",
+        "profile",
+        "executionMode",
+        "lineage",
+        "testDefinitionVersion",
+        "limitations",
+        "statistics"
+      ]
+    },
+    "externalStatisticsRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "contractVersion": {
+          "const": "1.5"
+        },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "engagementId": {
+          "$ref": "#/$defs/id"
+        },
+        "modelId": {
+          "$ref": "#/$defs/id"
+        },
+        "datasetId": {
+          "$ref": "#/$defs/id"
+        },
+        "suite": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "performance",
+              "regression",
+              "demographic_parity",
+              "disparate_impact",
+              "equalized_odds"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "thresholds": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/hostedThresholds"
+            },
+            {
+              "$ref": "#/$defs/planThresholds"
+            }
+          ]
+        },
+        "state": {
+          "const": "succeeded"
+        },
+        "outcome": {
+          "enum": [
+            null,
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "overallOutcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/statisticsResult"
+          },
+          "minItems": 0,
+          "maxItems": 20
+        },
+        "paperIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "inputHashes",
+            "runnerVersion",
+            "policyVersion"
+          ],
+          "properties": {
+            "inputHashes": {
+              "type": "object",
+              "required": [
+                "dataset",
+                "modelArtifact",
+                "system",
+                "protocol",
+                "auditBinding",
+                "externalRequest",
+                "externalResult",
+                "statisticsPlan"
+              ],
+              "additionalProperties": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "runnerVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "policyVersion": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            }
+          }
+        },
+        "config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/hostedConfig"
+            },
+            {
+              "$ref": "#/$defs/hostedPlanConfig"
+            }
+          ]
+        },
+        "task": {
+          "enum": [
+            "Binary classification",
+            "Multiclass classification",
+            "Regression"
+          ]
+        },
+        "profileId": {
+          "$ref": "#/$defs/id"
+        },
+        "manifest": {
+          "$ref": "#/$defs/externalStatisticsManifest"
+        },
+        "procedureBinding": {
+          "$ref": "#/$defs/procedureBinding"
+        },
+        "retryOf": {
+          "$ref": "#/$defs/id"
+        },
+        "externalJobId": {
+          "$ref": "#/$defs/id"
+        },
+        "reviewFlags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "minItems": 0,
+          "maxItems": 20,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "contractVersion",
+        "id",
+        "engagementId",
+        "modelId",
+        "datasetId",
+        "suite",
+        "seed",
+        "thresholds",
+        "state",
+        "outcome",
+        "results",
+        "paperIds",
+        "createdAt",
+        "provenance",
+        "config",
+        "task",
+        "manifest",
+        "externalJobId",
+        "procedureBinding",
+        "profileId",
+        "startedAt",
+        "completedAt",
+        "reviewFlags",
+        "overallOutcome"
+      ],
+      "description": "Authenticated external attempt under statistics 1.0.0: results are the criteria of the recorded plan, each with the engine decision the worker copied; exploratory criteria never change the outcome and failing ones are reviewFlags.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Binary classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "enum": [
+                    "performance",
+                    "demographic_parity",
+                    "disparate_impact",
+                    "equalized_odds"
+                  ]
+                }
+              },
+              "config": {
+                "properties": {
+                  "positiveLabel": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Multiclass classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "const": "performance"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Regression"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "suite": {
+                "items": {
+                  "const": "regression"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "suite": {
+                "contains": {
+                  "enum": [
+                    "demographic_parity",
+                    "disparate_impact",
+                    "equalized_odds"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "suite"
+            ]
+          },
+          "then": {
+            "properties": {
+              "config": {
+                "properties": {
+                  "groupColumn": {
+                    "minLength": 1
+                  },
+                  "positiveLabel": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "queued"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "type": "null"
+              },
+              "results": {
+                "maxItems": 0
+              },
+              "paperIds": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "startedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "completedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "overallOutcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "error"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "running"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "startedAt"
+            ],
+            "properties": {
+              "outcome": {
+                "type": "null"
+              },
+              "results": {
+                "maxItems": 0
+              },
+              "paperIds": {
+                "maxItems": 0
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "completedAt"
+                  ]
+                },
+                {
+                  "required": [
+                    "overallOutcome"
+                  ]
+                },
+                {
+                  "required": [
+                    "error"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "succeeded"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "startedAt",
+              "completedAt",
+              "overallOutcome"
+            ],
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "inconclusive",
+                  "not_applicable"
+                ]
+              },
+              "results": {
+                "minItems": 1
+              },
+              "paperIds": {
+                "minItems": 1
+              }
+            },
+            "not": {
+              "required": [
+                "error"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "failed",
+                  "cancelled"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "completedAt",
+              "overallOutcome"
+            ],
+            "properties": {
+              "outcome": {
+                "const": "inconclusive"
+              },
+              "overallOutcome": {
+                "const": "inconclusive"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "failed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "error"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "profile": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "profile"
+                ]
+              }
+            },
+            "required": [
+              "manifest"
+            ]
+          },
+          "then": {
+            "required": [
+              "profileId"
+            ],
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "required": [
+                      "protocol"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "not": {
+              "required": [
+                "profileId"
+              ]
+            },
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "not": {
+                      "required": [
+                        "protocol"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "pass"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "pass"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "fail"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "fail"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "inconclusive"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "inconclusive"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "overallOutcome": {
+                "const": "not_applicable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Binary classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Binary classification"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Binary classification"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "decision": {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "performance",
+                            "group_comparison"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Multiclass classification"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Multiclass classification"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Multiclass classification"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "decision": {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "multiclass_performance"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "const": "Regression"
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "properties": {
+              "manifest": {
+                "properties": {
+                  "model": {
+                    "properties": {
+                      "task": {
+                        "const": "Regression"
+                      }
+                    }
+                  },
+                  "profile": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "properties": {
+                          "task": {
+                            "const": "Regression"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              "results": {
+                "items": {
+                  "properties": {
+                    "decision": {
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "regression_performance"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "procedureBinding"
+            ]
+          },
+          "then": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "required": [
+                      "auditBinding"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "provenance": {
+                "properties": {
+                  "inputHashes": {
+                    "not": {
+                      "required": [
+                        "auditBinding"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
