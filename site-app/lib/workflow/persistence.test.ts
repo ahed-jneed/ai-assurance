@@ -1,6 +1,7 @@
 // What the workspace routes store for the workflow: recovery drafts of
-// procedure forms (app/api/workspace-state) and engagement writes at the
-// 1.5 MB metadata limit (app/api/workspace through lib/engagement-repo.ts).
+// procedure forms (app/api/workspace-state) and engagement writes near the
+// 1.5 MB metadata limit and the approval reserve kept under it
+// (app/api/workspace through lib/engagement-repo.ts).
 // Identity is faked; D1 is an in-memory stand-in for one engagement row and
 // the recovery drafts.
 import { env } from "cloudflare:workers";
@@ -14,12 +15,17 @@ import type { Engagement } from "@/lib/domain";
 import { getEngagement } from "@/lib/engagement-repo";
 import { dehydrate } from "@/lib/engagement-storage";
 import { context, type Context } from "@/lib/tenancy";
-import { procedureDraftRevision } from "@/lib/workflow-state";
+import {
+  approvalReserve,
+  metadataLimit,
+  procedureDraftRevision,
+} from "@/lib/workflow-state";
 import type { DraftKind } from "@/lib/workspace-state";
 import { postRequest } from "../commands/test-fixtures";
 import {
   approveProgram,
   artifact,
+  briefInput,
   people,
   planSave,
   procedureId,
@@ -242,27 +248,31 @@ describe("recovery drafts of procedure forms", () => {
 });
 
 describe("the engagement metadata limit", () => {
-  const limit = 1_500_000;
   const tooLarge =
-    "The active engagement metadata exceeds its 1.5 MB limit. Archive supplementary active records or split this engagement before adding more content.";
+    "This change would take the engagement record over its 1.5 MB limit. Nothing was saved. Shorten the text you are adding, or continue in a follow-up engagement.";
+  const reserveRefusal =
+    "This change would need the engagement scope or audit program to be approved, but would leave less than the 100 KB that approval needs under the engagement's 1.5 MB limit. Nothing was saved, and the scope and program stay as they were. Continue in a follow-up engagement.";
   /** The bytes save() would store for the engagement as it is now. */
   const size = async (e: Engagement) =>
     new TextEncoder().encode(JSON.stringify(await dehydrate(signIn("lead"), e)))
       .byteLength;
-
-  it("refuses the write that would exceed it, stores nothing and keeps the approved program in force", async () => {
+  /**
+   * An engagement with an approved scope and program whose earlier approval
+   * cycles fill the record to `room` bytes (plus less than one history entry)
+   * under the limit. Approval cycles count towards no history limit: each
+   * submission and approval binds the plan revision and hash of every
+   * procedure.
+   */
+  async function filled(room: number) {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveProgram(e);
-    // Approval cycles count towards no history limit. Earlier ones fill the
-    // record to within a few kilobytes of the limit: each submission and
-    // approval binds the plan revision and hash of every procedure.
     const program = workflowOf(e).program,
       cycle = program.history,
       padding: typeof cycle = [];
     for (let bytes = await size(e), i = 0; ; i++) {
       const entry = { ...cycle[i % 2], revision: Math.floor(i / 2) + 1 },
         added = JSON.stringify(entry).length + 1;
-      if (bytes + added > limit - 2_000) break;
+      if (bytes + added > metadataLimit - room) break;
       padding.push(entry);
       bytes += added;
     }
@@ -270,10 +280,18 @@ describe("the engagement metadata limit", () => {
     program.history = [...padding, ...cycle.map((h) => ({ ...h, revision }))];
     program.revision = revision;
     program.approval = { ...program.approval!, revision };
-    expect(padding.length).toBeGreaterThan(300);
-    expect(limit - (await size(e))).toBeGreaterThan(1_000);
-    expect(limit - (await size(e))).toBeLessThan(8_000);
-    const d1 = storage(e);
+    const left = metadataLimit - (await size(e));
+    expect(left).toBeGreaterThanOrEqual(room - 1_000);
+    expect(left).toBeLessThan(room + 6_000);
+    return { e, d1: storage(e), revision, approval: program.approval };
+  }
+  const resample = (e: Engagement, sampling = "Stratified sample of 40") =>
+    planSave(e, { dueDate: "2026-12-15", sampling });
+  const json = async (response: Response) =>
+    (await response.json()) as { error?: string };
+
+  it("refuses the write that would exceed it, stores nothing and keeps the approved program in force", async () => {
+    const { e, d1, revision, approval } = await filled(2_000);
     // A due-date change still fits and is stored with its snapshot and
     // audit event in one batch.
     const moved = await act(e, "lead", "saveProcedurePlan", {
@@ -296,7 +314,7 @@ describe("the engagement metadata limit", () => {
       }),
     });
     expect(resampled.status).toBe(413);
-    expect(await resampled.json()).toEqual({ error: tooLarge });
+    expect(await json(resampled)).toEqual({ error: tooLarge });
     expect(d1.batches).toHaveLength(1);
     expect(d1.row).toEqual(before);
     // The approved scope, program and plan stay in force as they were.
@@ -306,12 +324,118 @@ describe("the engagement metadata limit", () => {
     expect(workflowOf(kept).program).toMatchObject({
       status: "approved",
       revision,
-      approval: program.approval,
+      approval,
     });
     expect(procedureOf(kept, procedureId)).toMatchObject({
       dueDate: "2026-12-15",
       sampling: procedureOf(e, procedureId).sampling,
       planHash: procedureOf(e, procedureId).planHash,
     });
+  });
+
+  it("refuses, near the limit, a change that the reviewer could not approve, and keeps the approval in force", async () => {
+    // A few kilobytes would fit the change, but not its submission and
+    // approval, which bind every procedure.
+    const { e, d1, approval } = await filled(6_000);
+    const approved = await stored(e);
+    const resampled = await act(
+      e,
+      "lead",
+      "saveProcedurePlan",
+      resample(approved),
+    );
+    expect(resampled.status).toBe(413);
+    expect(await json(resampled)).toEqual({ error: reserveRefusal });
+    // A change to the approved scope is refused the same way.
+    const rescoped = await act(e, "lead", "saveBrief", {
+      ...briefInput,
+      boundary: "Scoring service, decision support and appeals",
+      changeImpact: "Appeals handling is now in scope",
+    });
+    expect(rescoped.status).toBe(413);
+    expect(await json(rescoped)).toEqual({ error: reserveRefusal });
+    expect(d1.batches).toEqual([]);
+    // The approved scope and program stay in force, so execution goes on.
+    const kept = await stored(e);
+    expect(kept.workflow).toEqual(approved.workflow);
+    expect(workflowOf(kept).program).toMatchObject({
+      status: "approved",
+      approval,
+    });
+    // Changes that need no approval still fit.
+    const moved = await act(e, "lead", "saveProcedurePlan", {
+      ...planSave(kept, { dueDate: "2026-12-16" }),
+    });
+    expect(moved.status).toBe(200);
+  });
+
+  it("lets a cycle started with the reserve free complete inside it", async () => {
+    // Just over the reserve is left: the change fits with the reserve free,
+    // and its submission, return, resubmission and approval go into it.
+    const { e, d1 } = await filled(approvalReserve + 600);
+    const changed = await act(
+      e,
+      "lead",
+      "saveProcedurePlan",
+      resample(await stored(e)),
+    );
+    expect(changed.status).toBe(200);
+    expect(workflowOf(await stored(e)).program.status).toBe("draft");
+    expect((await act(e, "auditor", "submitProgram", {})).status).toBe(200);
+    const submitted = await stored(e);
+    expect(metadataLimit - d1.row.body.length).toBeLessThan(approvalReserve);
+    // Inside the reserve, the Lead cannot withdraw the submission with a
+    // further change, which would start another cycle...
+    const withdrawn = await act(
+      e,
+      "lead",
+      "saveProcedurePlan",
+      resample(submitted, "All 12 datasets"),
+    );
+    expect(withdrawn.status).toBe(413);
+    expect(await json(withdrawn)).toEqual({ error: reserveRefusal });
+    // ...but the reviewer can return it, the preparers can amend and
+    // resubmit it, and the reviewer can approve it.
+    expect(
+      (
+        await act(e, "reviewer", "returnProgram", {
+          reason: "Size the sample to the population",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await act(
+          e,
+          "lead",
+          "saveProcedurePlan",
+          resample(await stored(e), "Stratified sample of 60"),
+        )
+      ).status,
+    ).toBe(200);
+    expect((await act(e, "auditor", "submitProgram", {})).status).toBe(200);
+    const resubmitted = workflowOf(await stored(e)).program;
+    const decided = await act(e, "reviewer", "approveProgram", {
+      revision: resubmitted.revision,
+      reason: "Program agreed",
+    });
+    expect(decided.status).toBe(200);
+    const done = await stored(e);
+    expect(workflowOf(done).program).toMatchObject({
+      status: "approved",
+      revision: resubmitted.revision,
+    });
+    expect(procedureOf(done, procedureId).sampling).toBe(
+      "Stratified sample of 60",
+    );
+    // The next change would need another approval, which no longer fits.
+    const again = await act(
+      e,
+      "lead",
+      "saveProcedurePlan",
+      resample(done, "All 12 datasets"),
+    );
+    expect(again.status).toBe(413);
+    expect(await json(again)).toEqual({ error: reserveRefusal });
   });
 });
