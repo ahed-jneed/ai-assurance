@@ -514,10 +514,12 @@ pinnedExternal.manifest.dataset.cardPin = copy(cardPin);
 positive('External run with dataset-card pin', pinnedExternal);
 negative('external dataset-card pin malformed hash', pinnedExternal, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
 // A fresh platform projection, e.g. the assurance harness's
-// tmp/assurance-worker-fixture/hosted-external-run.json.
-if (option('--external-run')) {
-  const current = json(resolve(option('--external-run')));
-  positive('Supplied external import projection', current);
+// tmp/assurance-worker-fixture/hosted-external-run.json and its run contract
+// 1.5 sibling. --external-run may be given more than once.
+for (const [position, flag] of args.entries()) {
+  if (flag !== '--external-run') continue;
+  const current = json(resolve(args[position + 1]));
+  positive(`Supplied external import projection (contract ${current.contractVersion})`, current);
   if (current.manifest?.dataset?.cardPin) {
     negative('Supplied projection malformed dataset-card hash', current, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
     negative('Supplied projection missing dataset-card identity', current, run => { delete run.manifest.dataset.cardPin.recordId; });
