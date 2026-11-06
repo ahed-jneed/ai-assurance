@@ -805,7 +805,12 @@ try {
     profileId,
   });
   const pinned = e.runs.at(-1);
-  assert.equal(pinned.contractVersion, "1.1");
+  assert.equal(pinned.contractVersion, "1.4");
+  assert.equal(
+    pinned.provenance.inputHashes.statisticsPlan.length,
+    64,
+    "the run freezes its statistics plan",
+  );
   assert.equal(pinned.manifest.model.version, "1");
   assert.equal(pinned.manifest.dataset.rowCount, 80);
   assert.equal(pinned.manifest.profile.name, "Binary acceptance");
@@ -926,8 +931,9 @@ try {
     assert.equal(tested.state, "succeeded", tested.error);
     assert(
       Math.abs(
-        tested.results[0].metrics[item.task === "Regression" ? 1 : 0].value -
-          item.expected,
+        tested.results[0].metrics.find(
+          (m) => m.name === (item.task === "Regression" ? "rmse" : "accuracy"),
+        ).value - item.expected,
       ) < 1e-12,
     );
   }

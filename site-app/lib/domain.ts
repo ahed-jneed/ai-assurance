@@ -14,13 +14,14 @@ export type {
   ModelCard,
   Outcome,
   Paper,
+  PlanConfig,
   Report,
   Result,
   Role,
   RulePackStamp,
   Run,
 } from "./domain/types";
-export { canWrite, roles } from "./domain/types";
+export { canWrite, legacyConfig, roles } from "./domain/types";
 export type {
   Classification,
   ClassificationLabel,

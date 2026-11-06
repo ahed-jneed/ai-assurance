@@ -8,8 +8,10 @@ export const tasks = [
 // Bump both when a metric or decision rule changes: a run queued under one
 // definition cannot execute under another, and its manifest names the
 // definition that produced its results.
-export const runnerVersion = "interactive-predictions-2.1.0";
-export const testDefinitionVersion = "traditional-ml-2.1.0";
+// 3.0.0: statistics 1.0.0 decides every criterion by its interval against
+// the pre-registered band (hosted run contract 1.4).
+export const runnerVersion = "interactive-predictions-3.0.0";
+export const testDefinitionVersion = "traditional-ml-3.0.0";
 export const tests = [
   {
     id: "performance",
@@ -123,6 +125,22 @@ export const configSchema = z
     maximumRmse: z.number().positive().max(1e100).default(1),
   })
   .strict();
+/**
+ * The config of a profile with a stored statistics plan (schemaVersion 1.1):
+ * only the column mappings and the declared labels; bands and minimums live
+ * in the plan (docs/design/audit-statistics.md section 9.1).
+ */
+export const planConfigSchema = z
+  .object({
+    labelColumn: column.min(1),
+    predictionColumn: column.min(1),
+    groupColumn: column.default(""),
+    positiveLabel: column.default(""),
+    performancePositiveLabel: column.default(""),
+    /** The other declared binary label: with both declared, data with one observed label is evaluated. */
+    negativeLabel: column.default(""),
+  })
+  .strict();
 export const suiteSchema = z
   .array(
     z.enum([
@@ -152,6 +170,22 @@ export const profileSchema = z
     task: z.enum(tasks),
     suite: suiteSchema,
     config: configSchema,
+    datasetContext: contextSchema,
+    rationale: z.string().trim().min(1).max(5000),
+  })
+  .strict();
+/**
+ * A protocol with a pre-registered statistics plan (schemaVersion 1.1). Its
+ * suite follows from the plan's criteria; a stated suite must equal it.
+ */
+export const planProfileSchema = z
+  .object({
+    name: column.min(1),
+    version: column.min(1),
+    task: z.enum(tasks),
+    suite: suiteSchema.optional(),
+    config: planConfigSchema,
+    statistics: z.record(z.string(), z.unknown()),
     datasetContext: contextSchema,
     rationale: z.string().trim().min(1).max(5000),
   })

@@ -11,6 +11,8 @@ import {
   verifyFrozenInputs,
 } from "./evaluation-service";
 import { ApiError } from "./http";
+import { sha256 as sha256Text } from "./ids";
+import { planSha256 } from "./statistics";
 import { externalGate, type SpecialCategoryBasis } from "./special-category";
 
 // Evidence bytes by R2 key, served as the BUCKET binding of the shared
@@ -317,6 +319,185 @@ describe("retries", () => {
     await expect(verifyFrozenInputs(e, run)).rejects.toThrow(
       "Frozen evaluation configuration integrity check failed",
     );
+  });
+});
+
+// Statistics 1.0.0 protocols (schemaVersion 1.1, #22): the plan is
+// pre-registered when the protocol is saved and frozen into every run.
+const planConfig = {
+  labelColumn: "actual",
+  predictionColumn: "predicted",
+  groupColumn: "",
+  positiveLabel: "1",
+  negativeLabel: "0",
+};
+const recallPlan = (lower = 0.7) => ({
+  criteria: [
+    {
+      id: "recall-check",
+      kind: "performance",
+      members: [{ metric: "recall", band: { lower } }],
+    } as Record<string, unknown>,
+  ],
+});
+const planProtocol = (overrides: Record<string, unknown> = {}) => ({
+  name: "Planned acceptance",
+  version: "1.0",
+  task: "Binary classification",
+  config: planConfig,
+  statistics: recallPlan(),
+  datasetContext: context,
+  rationale: "Pre-registered acceptance rule",
+  ...overrides,
+});
+
+describe("protocols with a pre-registered statistics plan", () => {
+  it("store the normalised plan, derive the suite and add the chance baseline", () => {
+    const profile = registerProfile(e, planProtocol(), "auditor");
+    expect(profile.schemaVersion).toBe("1.1");
+    expect(profile.suite).toEqual(["performance"]);
+    expect(profile.statistics!.criteria[0].members).toEqual([
+      { metric: "recall", band: { lower: 0.7, upper: null } },
+      { metric: "balanced_accuracy", band: { lower: 0.5, upper: null } },
+    ]);
+    expect(profile.statistics!.minimums).toEqual({
+      sampleSize: 30,
+      groupSize: 30,
+      classCount: 10,
+    });
+    expect(profile.config).toEqual({
+      ...planConfig,
+      performancePositiveLabel: "1",
+    });
+  });
+
+  it("leave the chance baseline out only with a recorded rationale", () => {
+    const plan = recallPlan();
+    plan.criteria[0].rationale = "Recall alone is the contractual criterion";
+    const profile = registerProfile(
+      e,
+      planProtocol({ statistics: plan }),
+      "auditor",
+    );
+    expect(profile.statistics!.criteria[0].members).toHaveLength(1);
+  });
+
+  it("reject minimums below the floors, invalid bands, a mismatched suite and undeclared labels", () => {
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({
+            statistics: { ...recallPlan(), minimums: { sampleSize: 20 } },
+          }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/platform floor/);
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({ statistics: recallPlan(1) }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/strictly inside/);
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({ suite: ["performance", "demographic_parity"] }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/families of its plan/);
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({ config: { ...planConfig, negativeLabel: "" } }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/two distinct labels/);
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({
+            task: "Multiclass classification",
+            statistics: {
+              criteria: [
+                {
+                  id: "performance",
+                  kind: "multiclass_performance",
+                  members: [{ metric: "accuracy", band: { lower: 0.8 } }],
+                },
+              ],
+            },
+          }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/1\/k/);
+  });
+
+  it("need a new protocol version to change the plan after it is saved", () => {
+    const first = registerProfile(e, planProtocol(), "auditor");
+    const changed = planProtocol({ statistics: recallPlan(0.6) });
+    const conflict = thrown(() => registerProfile(e, changed, "auditor"));
+    expect(conflict.status).toBe(409);
+    expect(conflict.message).toMatch(/create a new version/);
+    const revised = registerProfile(
+      e,
+      { ...changed, version: "1.1" },
+      "auditor",
+    );
+    expect(revised.id).not.toBe(first.id);
+    expect(revised.statistics!.criteria[0].members![0].band.lower).toBe(0.6);
+    // The first version still holds its plan, untouched.
+    expect(first.statistics!.criteria[0].members![0].band.lower).toBe(0.7);
+  });
+
+  it("freeze the plan and its hash into the run manifest, and detect a changed plan", async () => {
+    const profile = registerProfile(e, planProtocol(), "auditor");
+    const run = await queueEvaluation(
+      e,
+      { modelId: "MODEL-1", datasetId: "EV-1", profileId: profile.id },
+      "auditor",
+    );
+    expect(run.contractVersion).toBe("1.4");
+    expect(run.manifest!.statistics).toEqual(profile.statistics);
+    expect(run.provenance.inputHashes.statisticsPlan).toBe(
+      planSha256(profile.statistics!),
+    );
+    await expect(executionCSV(e, run)).resolves.toBeTruthy();
+    // The manifest pin covers the plan; the plan's own hash pins it too.
+    run.manifest!.statistics!.criteria[0].members![0].band.lower = 0.1;
+    await expect(verifyFrozenInputs(e, run)).rejects.toThrow(
+      /integrity check failed/,
+    );
+    run.provenance.inputHashes.manifest = await sha256Text(
+      JSON.stringify(run.manifest),
+    );
+    await expect(verifyFrozenInputs(e, run)).rejects.toThrow(
+      "Frozen statistics plan integrity check failed",
+    );
+  });
+
+  it("freeze the derived plan of a legacy protocol with its configured minimums", async () => {
+    const profile = registerProfile(e, binaryProtocol(), "auditor");
+    const run = await queueEvaluation(
+      e,
+      { modelId: "MODEL-1", datasetId: "EV-1", profileId: profile.id },
+      "auditor",
+    );
+    expect(run.manifest!.statistics).toMatchObject({
+      derivedFrom: { source: "hosted_config", contractVersion: "1.1" },
+      minimums: { sampleSize: 30, groupSize: 30, classCount: 10 },
+      configuredMinimums: { sampleSize: 20, groupSize: 5, classCount: 5 },
+    });
   });
 });
 

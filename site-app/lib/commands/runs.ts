@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { recordsById } from "../assurance-store";
-import { aggregateOutcome } from "../diagnostic-decisions";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain";
 import { getEngagement, now, save, sha256 } from "../engagement-repo";
-import { protocolConfigKeys } from "../evaluation";
+import { describePlan } from "../hosted-statistics";
 import {
   registerModel,
   registerProfile,
@@ -179,9 +178,17 @@ export const runs = defineCommands({
       });
       try {
         const { a, csv } = await executionCSV(e, run);
-        run.results = evaluate(run, csv);
-        run.outcome = aggregateOutcome(run.results.map((r) => r.outcome));
+        const { results, evaluation } = evaluate(run, csv);
+        if (evaluation.planSha256 !== run.provenance.inputHashes.statisticsPlan)
+          throw Error(
+            "The evaluated statistics plan differs from the plan frozen at queueing",
+          );
+        run.results = results;
+        // Section 4.6: confirmatory criteria decide the run; failing
+        // exploratory criteria are flagged for review instead.
+        run.outcome = evaluation.overallOutcome;
         run.overallOutcome = run.outcome;
+        run.reviewFlags = evaluation.reviewFlags;
         run.state = "succeeded";
         run.completedAt = now();
         for (const article of [...new Set(run.results.map((r) => r.article))]) {
@@ -223,19 +230,10 @@ export const runs = defineCommands({
               run.manifest.profile.rationale
             : p.body.criteria;
           p.body.criteria +=
-            "\nInternal protocol parameters: " +
-            Object.entries(run.config)
-              .filter(([key]) =>
-                protocolConfigKeys(
-                  run.task ?? "Binary classification",
-                  run.suite,
-                ).includes(key),
-              )
-              .map(
-                ([key, value]) =>
-                  key.replace(/([A-Z])/g, " $1") + " = " + value,
-              )
-              .join("; ");
+            "\nPre-registered statistics plan (SHA-256 " +
+            evaluation.planSha256 +
+            "):\n" +
+            describePlan(evaluation.normalizedPlan).join("\n");
           p.body.limitations =
             "Automated diagnostic draft. Evaluate suitability, data rights, sampling and uncertainty before reaching a human audit conclusion. " +
             (run.manifest?.limitations ?? []).join(" ");
