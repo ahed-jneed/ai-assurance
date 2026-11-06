@@ -168,6 +168,15 @@ export type SpecialCategoryDeclaration = {
   declaredAt: string;
 };
 
+/** Who acknowledged hosted processing of special-category data, and when. */
+export type SpecialCategoryAcknowledgement = {
+  column: string;
+  acknowledgedBy: string;
+  acknowledgedAt: string;
+  /** A retry carries over the acknowledgement of this source run. */
+  inheritedFrom?: string;
+};
+
 /** A column name compared without case, spacing or punctuation. */
 export function normalizeColumn(name: string) {
   return name
@@ -462,15 +471,21 @@ export function basisSummary(b: SpecialCategoryBasis) {
  */
 export function hostedGate(
   profile: EvaluationProfile | null,
+  frozen: Pick<EvaluationProfile, "suite" | "config">,
   acknowledged: boolean,
 ) {
-  if (!profile || !groupColumnIsSpecial(profile)) return null;
-  const d = profile.specialCategory,
-    column = profile.config.groupColumn;
+  // A legacy explicit run (retried without a protocol) has no declaration,
+  // so its group column counts as special-category like an old protocol.
+  if (!groupColumnIsSpecial(profile ?? frozen)) return null;
+  const d = profile?.specialCategory,
+    column = (profile ?? frozen).config.groupColumn;
   if (!d)
     throw new ApiError(
       409,
-      "This fairness protocol predates special-category declarations. Create a new protocol version that declares whether " +
+      (profile
+        ? "This fairness protocol predates special-category declarations. Create a new protocol version"
+        : "This explicit fairness run predates special-category declarations. Save a fairness protocol") +
+        " that declares whether " +
         column +
         " is special-category data.",
     );

@@ -419,12 +419,39 @@ describe("special-category fairness data (#60)", () => {
     await expect(executionCSV(e, run)).resolves.toMatchObject({
       csv: predictions,
     });
-    // A retry repeats the frozen request, acknowledgement included.
+    // A retry repeats the frozen request and carries the acknowledgement
+    // over as given, naming the source run: the person who retries gave none.
     run.state = "cancelled";
     const retry = await queueRetry(e, run, "lead");
-    expect(retry.manifest?.specialCategoryAcknowledgement).toMatchObject({
-      acknowledgedBy: "lead",
+    expect(retry.manifest?.specialCategoryAcknowledgement).toEqual({
+      ...run.manifest!.specialCategoryAcknowledgement,
+      acknowledgedBy: "auditor",
+      inheritedFrom: run.id,
     });
+  });
+
+  it("refuses to retry a legacy explicit fairness run on the platform", async () => {
+    e.specialCategoryBases = [basis];
+    const p = registerProfile(
+      e,
+      special("1.0", { route: "hosted", basisId: "BASIS-1" }),
+      "auditor",
+    );
+    const frozen = await queue(p.id, true);
+    // Explicit-configuration runs predate protocols and declarations.
+    const legacy = {
+      ...frozen,
+      id: "RUN-LEGACY",
+      state: "cancelled" as const,
+      profileId: undefined,
+      manifest: { ...frozen.manifest!, profile: null },
+    };
+    delete legacy.manifest.specialCategoryAcknowledgement;
+    const refused = await rejection(queueRetry(e, legacy, "lead"));
+    expect(refused.status).toBe(409);
+    expect(refused.message).toContain(
+      "This explicit fairness run predates special-category declarations",
+    );
   });
 
   it("refuses hosted runs of fairness protocols saved before declarations", async () => {

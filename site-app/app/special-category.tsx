@@ -16,6 +16,7 @@ import {
   basisFor,
   basisSummary,
   gdprArt9Grounds,
+  type SpecialCategoryAcknowledgement,
   type SpecialCategoryDeclaration,
   type SpecialCategoryDeclarationInput,
 } from "@/lib/special-category";
@@ -124,7 +125,8 @@ export function SpecialCategoryRegister({
         platform, record the client&apos;s AI Act Art 4a conditions or other
         GDPR Art 9(2) basis here. On its face, Art 4a(1)(d) bars access by other
         parties, so an Art 4a basis alone may not cover an upload to an external
-        auditor.
+        auditor. The upload gate reads the header of Dataset evidence only, the
+        only category runs read; other categories are not gated.
       </p>
       {bases.length ? (
         <ul className="record-list">
@@ -363,7 +365,7 @@ export function SpecialCategoryRecord({
   acknowledgement,
 }: {
   declaration: SpecialCategoryDeclaration;
-  acknowledgement?: { acknowledgedBy: string; acknowledgedAt: string };
+  acknowledgement?: SpecialCategoryAcknowledgement;
 }) {
   return (
     <>
@@ -384,7 +386,11 @@ export function SpecialCategoryRecord({
       {acknowledgement && (
         <p>
           Hosted processing acknowledged by {acknowledgement.acknowledgedBy} on{" "}
-          {acknowledgement.acknowledgedAt.slice(0, 10)}.
+          {acknowledgement.acknowledgedAt.slice(0, 10)}
+          {acknowledgement.inheritedFrom
+            ? ", carried over from run " + acknowledgement.inheritedFrom
+            : ""}
+          .
         </p>
       )}
     </>

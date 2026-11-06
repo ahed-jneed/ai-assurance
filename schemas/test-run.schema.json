@@ -3029,6 +3029,9 @@
             "acknowledgedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
             }
           },
           "required": [
@@ -4840,6 +4843,9 @@
             "acknowledgedAt": {
               "type": "string",
               "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
             }
           },
           "required": [

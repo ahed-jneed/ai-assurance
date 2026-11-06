@@ -3,6 +3,7 @@
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
 import type {
+  SpecialCategoryAcknowledgement,
   SpecialCategoryBasis,
   SpecialCategoryDeclaration,
 } from "../special-category";
@@ -318,12 +319,11 @@ export type Run = {
       "registered_prediction_artifact" | "authenticated_external_attempt";
     testDefinitionVersion: string;
     limitations: string[];
-    /** A hosted run on special-category data: who acknowledged it, when. */
-    specialCategoryAcknowledgement?: {
-      column: string;
-      acknowledgedBy: string;
-      acknowledgedAt: string;
-    };
+    /**
+     * A hosted run on special-category data: who acknowledged it, when, and
+     * on a retry the run whose acknowledgement it carries over.
+     */
+    specialCategoryAcknowledgement?: SpecialCategoryAcknowledgement;
   };
 };
 export type Report = {

@@ -18,6 +18,7 @@ import {
   declarationInputSchema,
   declareProtocol,
   hostedGate,
+  type SpecialCategoryAcknowledgement,
 } from "./special-category";
 const short = z.string().trim().min(1).max(300),
   notes = z.string().trim().max(5000);
@@ -284,7 +285,9 @@ export async function queueEvaluation(
 /**
  * Queues a new run with the frozen request of a failed or cancelled run: its
  * protocol, or the suite and configuration of a legacy explicit run. It
- * repeats the source's acknowledgement of hosted special-category processing.
+ * carries over the source's acknowledgement of hosted special-category
+ * processing unchanged, naming the source run, so the manifest still names
+ * whoever gave it rather than the person who retries.
  */
 export async function queueRetry(e: Engagement, source: Run, actor: string) {
   const profile = source.profileId
@@ -300,7 +303,10 @@ export async function queueRetry(e: Engagement, source: Run, actor: string) {
       profile,
       suite: profile?.suite ?? source.suite,
       config: profile?.config ?? source.config,
-      acknowledged: !!source.manifest?.specialCategoryAcknowledgement,
+      acknowledgement: source.manifest?.specialCategoryAcknowledgement && {
+        ...source.manifest.specialCategoryAcknowledgement,
+        inheritedFrom: source.id,
+      },
     },
     actor,
   );
@@ -314,6 +320,7 @@ async function freezeRun(
     suite,
     config,
     acknowledged = false,
+    acknowledgement,
   }: {
     modelId: string;
     datasetId: string;
@@ -323,6 +330,8 @@ async function freezeRun(
     config: Run["config"];
     /** The auditor acknowledged hosted special-category processing. */
     acknowledged?: boolean;
+    /** A retry: the source run's acknowledgement, carried over as given. */
+    acknowledgement?: SpecialCategoryAcknowledgement;
   },
   actor: string,
 ) {
@@ -344,7 +353,11 @@ async function freezeRun(
   } catch (error) {
     throw new ApiError(400, (error as Error).message);
   }
-  const specialCategory = hostedGate(profile, acknowledged);
+  const specialCategory = hostedGate(
+    profile,
+    { suite, config },
+    acknowledged || !!acknowledgement,
+  );
   if (e.runs.filter((r) => ["queued", "running"].includes(r.state)).length >= 3)
     throw new ApiError(429, "Complete or cancel outstanding runs first");
   const { a: dataset, csv } = await datasetCSV(e, datasetId);
@@ -418,7 +431,7 @@ async function freezeRun(
     ],
     ...(specialCategory
       ? {
-          specialCategoryAcknowledgement: {
+          specialCategoryAcknowledgement: acknowledgement ?? {
             column: config.groupColumn,
             acknowledgedBy: actor,
             acknowledgedAt: now(),

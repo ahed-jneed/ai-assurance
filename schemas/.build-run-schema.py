@@ -104,8 +104,10 @@ defs['specialCategoryBasis'] = {'type': 'object', 'required': ['id', 'kind', 'co
 defs['specialCategoryDeclaration'] = obj({'column': st(1, 300), 'specialCategory': {'type': 'boolean'}, 'route': en('client_side', 'hosted'), 'basis': nullable(ref('specialCategoryBasis')), 'declaredBy': ref('actorId'), 'declaredAt': date})
 defs['evaluationProfile']['properties']['specialCategory'] = ref('specialCategoryDeclaration')
 defs['runManifest'] = obj({'schemaVersion': {'const': '1.0'}, 'model': ref('registeredModel'), 'dataset': ref('predictionDataset'), 'profile': nullable(ref('evaluationProfile')), 'executionMode': {'const': 'saved_predictions'}, 'lineage': {'const': 'registered_prediction_artifact'}, 'testDefinitionVersion': {**st(1, 100), 'pattern': r'^traditional-ml-\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$'}, 'limitations': ref('stringNotes')})
-# A hosted run on special-category data records who acknowledged it (#60).
-defs['runManifest']['properties']['specialCategoryAcknowledgement'] = obj({'column': st(1, 300), 'acknowledgedBy': ref('actorId'), 'acknowledgedAt': date})
+# A hosted run on special-category data records who acknowledged it (#60). A
+# retry carries the source run's acknowledgement over unchanged and names that
+# run in inheritedFrom.
+defs['runManifest']['properties']['specialCategoryAcknowledgement'] = obj({'column': st(1, 300), 'acknowledgedBy': ref('actorId'), 'acknowledgedAt': date, 'inheritedFrom': ref('id')}, ['column', 'acknowledgedBy', 'acknowledgedAt'])
 defs['runManifest']['properties']['model'] = {'allOf': [ref('registeredModel'), {'properties': {'format': {'const': 'Prediction file'}, 'status': {'const': 'registered'}, 'task': hostedTasks}}]}
 defs['hostedThresholds'] = obj({'source': {'const': 'internal_policy'}, 'policyId': st(1, 300), 'policyVersion': st(1, 300), 'frozenAt': date, 'frozenBy': ref('actorId'), **copy.deepcopy(configProps)})
 defs['hostedThresholds']['properties']['performancePositiveLabel'] = st(0, 300)
