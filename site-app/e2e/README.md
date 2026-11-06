@@ -66,6 +66,8 @@ the list.
 ## In CI
 
 The `e2e` job in `.github/workflows/ci.yml` builds the Worker, restores
-Chromium from the cache (keyed by the Playwright version) or downloads it, and
-runs the suite. On failure it uploads `playwright-report/` and `test-results/`
+Chromium's headless shell from the cache (keyed by the Playwright version) or
+downloads it with `npx playwright install --only-shell chromium`, and runs the
+suite. It skips `--with-deps`: the runner image has Chromium's libraries, and
+the optional font packages it would add took ten minutes from the apt mirror. On failure it uploads `playwright-report/` and `test-results/`
 (traces and screenshots) as the `playwright-report` artifact.
