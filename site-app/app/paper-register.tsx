@@ -180,11 +180,15 @@ export function WorkingPaperRegister({
                   </button>
                   <small className="paper-register-reference">
                     {row.paper.templateId} · {row.paper.stage}
-                    {!row.paper.required
-                      ? row.paper.body.conclusionStatus === "not_applicable"
-                        ? " · Applicability exclusion"
-                        : " · Supplementary"
-                      : ""}
+                    {row.paper.supersededBy
+                      ? " · Superseded"
+                      : row.paper.retired
+                        ? " · Retired"
+                        : !row.paper.required
+                          ? row.paper.body.conclusionStatus === "not_applicable"
+                            ? " · Applicability exclusion"
+                            : " · Supplementary"
+                          : ""}
                   </small>
                 </TableCell>
                 <TableCell data-label="Prepared by">
