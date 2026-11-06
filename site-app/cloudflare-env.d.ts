@@ -15,5 +15,6 @@ declare namespace Cloudflare {
     SELF_SIGNUP?: string;
     TENANT_MAX_ENGAGEMENTS?: string;
     TENANT_MAX_SAVES_PER_HOUR?: string;
+    EQR_COOLING_OFF_DAYS?: string;
   }
 }

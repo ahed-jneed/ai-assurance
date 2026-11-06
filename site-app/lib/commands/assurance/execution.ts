@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
-import type { Result, Run } from "../../domain";
+import type { Outcome, Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
 import {
   assertClaimFits,
@@ -20,6 +20,34 @@ import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
+const OUTCOMES = new Set(["pass", "fail", "inconclusive", "not_applicable"]);
+/**
+ * The hosted results of an imported packet. A packet without results has
+ * nothing to compile, so it is refused rather than recorded as a run.
+ */
+export function hostedResults(results: unknown): Result[] {
+  if (!Array.isArray(results) || !results.length)
+    throw new ApiError(409, "The result holds no hosted results to compile");
+  return results as Result[];
+}
+/**
+ * The overall outcome of an imported external run, by the rule hosted runs
+ * use (statistics `aggregate`, section 4.6): any fail is a fail, then
+ * inconclusive, then pass. The packet is untrusted, so a missing or unknown
+ * outcome counts as inconclusive, never as a pass. When the results carry
+ * decisions (run contract 1.5), only confirmatory criteria decide; a result
+ * whose role is not "exploratory" decides, so a missing role cannot drop it.
+ */
+export function importedOutcome(
+  results: readonly Pick<Result, "outcome" | "decision">[] | undefined,
+  decided = false,
+): Outcome {
+  return aggregate(
+    hostedResults(results)
+      .filter((r) => !decided || r?.decision?.role !== "exploratory")
+      .map((r) => (OUTCOMES.has(r?.outcome) ? r.outcome : "inconclusive")),
+  );
+}
 // Columns of a succeeded execution_jobs row as importJob reads them.
 type SucceededJobRow = {
   id: string;
@@ -383,11 +411,11 @@ export const execution: AssuranceModule = defineCommands({
       if ((await sha256(bytes)) !== job.result_sha256)
         throw new ApiError(409, "Result integrity check failed");
       const packet = JSON.parse(new TextDecoder().decode(bytes)),
+        results = hostedResults(packet.hostedResults),
         frozen = JSON.parse(job.request),
         p = templatePaper("WP-A15-01", ctx.user.userId);
       p.required = false;
       p.title = "External execution — " + v.jobId;
-      const results: Result[] = packet.hostedResults;
       // Worker 1.2.0 copies the engine's statistics 1.0.0 decision into every
       // result, which compiles into run contract 1.5; results without
       // decisions keep the frozen 1.2 projection.
@@ -442,18 +470,14 @@ export const execution: AssuranceModule = defineCommands({
       p.evidenceIds = [job.id];
       p.runIds = [job.id];
       const binding = {
-          procedureId: frozen.procedure.id,
-          procedureRevision: frozen.procedure.revision,
-          briefRevision: frozen.procedure.briefRevision,
-          programRevision: frozen.procedure.programRevision,
-        },
-        // Section 4.6: confirmatory criteria decide a 1.5 run; failing
-        // exploratory criteria become review flags.
-        outcome = aggregate(
-          results
-            .filter((r) => !decided || r.decision!.role === "confirmatory")
-            .map((r) => r.outcome),
-        );
+        procedureId: frozen.procedure.id,
+        procedureRevision: frozen.procedure.revision,
+        briefRevision: frozen.procedure.briefRevision,
+        programRevision: frozen.procedure.programRevision,
+      };
+      // Section 4.6: confirmatory criteria decide a 1.5 run; failing
+      // exploratory criteria become review flags.
+      const outcome = importedOutcome(results, decided);
       const {
         sha256: declaredHash,
         size: declaredSize,

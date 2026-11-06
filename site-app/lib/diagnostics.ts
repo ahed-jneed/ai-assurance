@@ -13,8 +13,9 @@ const numericCell = (v: string) =>
 /**
  * Parses a CSV with a header row. A record whose cells are all empty is a
  * row with every value missing: `blankRows: "reject"` refuses it (line
- * breaks that end the file are not rows), the default `"skip"` drops it as
- * audit sampling has. Evaluations reject blank rows.
+ * breaks that end the file are not rows), the default `"skip"` drops it.
+ * Every production caller (evaluations and audit sampling) rejects blank
+ * rows; only the parser's own tests use the default.
  */
 export function parseCSV(
   text: string,

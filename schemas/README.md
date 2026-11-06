@@ -67,6 +67,17 @@ node schemas/validate-working-paper-schema.mjs
 
 The validator checks the engine example drafts, the blank template and the status gates. The extracted runtime package has no `templates/` folder, so there it checks the engine drafts only.
 
+## GenAI evaluation evidence
+
+`genai-evidence-item.schema.json` is the per-item record (`genai-evidence-item/0.1`) and the required run metadata (`$defs/runMetadata`) of `docs/design/genai-evidence.md`. `genai-result.schema.json` is the `genai-result/0.1` envelope that `python -m engine.genai ingest` writes (see `engine/GENAI.md`), its computation (`$defs/computation`), the Art. 50 marking-check record (`$defs/markingCheck`) and the input contracts `genai-plan/0.1` (`$defs/plan`) and `genai-bundle/0.1` (`$defs/manifest`, whose families reference the item schema's `$defs/family`). Hashed parts of the envelope are exact strings: verify SHA-256 over the UTF-8 bytes of `computationJSON` and `itemsJSONL` before parsing them, and never re-serialise. `fixtures/genai-result.example.json` is the envelope of the #33 acceptance scenario (`inspect/judged_qa_30.eval` with a validated judge); `engine/tests/test_genai_envelope.py` keeps it equal to a fresh computation.
+
+```powershell
+node schemas/validate-genai-schema.mjs                     # schemas, reference records, example envelope, rejections
+node schemas/validate-genai-schema.mjs path/to/result.json # another envelope
+```
+
+The validator compiles both schemas with Ajv 2020 in strict mode, validates the 122 reference records and 13 run-metadata blocks of `engine/tests/fixtures/genai/`, recomputes both envelope hashes, validates the computation and every item line, and proves that malformed and tampered envelopes, items, manifests and plans are rejected. CI runs it in the `engine` job. Schema validity establishes neither the origin of the inputs nor the correctness of a tool's scoring.
+
 ## Rule pack
 
 `rule-pack.schema.json` (Draft 2020-12) defines the EU AI Act rule pack, the `regulatorySnapshot` of `templates/catalog.json`: per-provision application dates with sources, verification date, legal-review flags, approval metadata and change history; authority deadlines; the dated Article 5 practices; the Article 4a conditions for special-category data in bias detection and the provisions Regulation (EU) 2026/1744 changed; the standards and guidance registers; the legal-review items, unverified claims and the source register. From the workspace root:

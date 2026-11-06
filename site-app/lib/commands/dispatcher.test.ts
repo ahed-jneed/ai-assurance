@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/workspace/route";
 import { commandModules, dispatch } from "@/lib/commands";
 import { roles, type Engagement, type Role, type Run } from "@/lib/domain";
+import { qualityReviewerOps } from "@/lib/domain/quality-review";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { evidenceRequestOps } from "@/lib/evidence-requests";
 import { ApiError } from "@/lib/http";
@@ -138,7 +139,10 @@ describe("POST /api/workspace", () => {
   it.each(["createClient", "createEngagement", "grantMember"])(
     "refers %s to client and user management for every role that writes",
     async (op) => {
-      for (const role of roles.filter((r) => r !== "Client Viewer")) {
+      // Client Viewers and Engagement Quality Reviewers write no audit work.
+      for (const role of roles.filter(
+        (r) => !["Client Viewer", "Engagement Quality Reviewer"].includes(r),
+      )) {
         const e = stored();
         load(e, caller(role));
         const response = await post(envelope(e, op));
@@ -246,6 +250,9 @@ describe("command registry", () => {
     openFollowup: ["Lead Auditor"],
     createReport: ["Lead Auditor"],
     setPaperAudience: ["Lead Auditor"],
+    appointQualityReviewer: ["Lead Auditor"],
+    saveQualityReview: ["Engagement Quality Reviewer"],
+    signOffQualityReview: ["Engagement Quality Reviewer"],
   };
   const managementOps = ["createClient", "createEngagement", "grantMember"];
 
@@ -262,6 +269,34 @@ describe("command registry", () => {
     );
   });
 
+  // An Engagement Quality Reviewer reads the engagement and records only the
+  // quality review: every other op refuses them before its own checks run.
+  it("refuses an Engagement Quality Reviewer every op outside the quality review", async () => {
+    const ops = commandModules
+      .flatMap((m) => m.ops)
+      .filter((op) => !qualityReviewerOps.includes(op));
+    expect(ops.length).toBeGreaterThan(60);
+    for (const op of ops) {
+      const e = stored(),
+        before = JSON.stringify(e);
+      const outcome = await dispatch(
+        e,
+        op,
+        {},
+        caller("Engagement Quality Reviewer"),
+      ).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(outcome, op).toMatchObject({
+        status: 403,
+        message:
+          "An Engagement Quality Reviewer reviews the engagement but cannot change its audit work",
+      });
+      expect(JSON.stringify(e), op).toBe(before);
+    }
+  });
+
   it.each(Object.entries(allowed))(
     "lets only the permitted roles issue %s",
     async (op, permitted) => {
@@ -270,10 +305,14 @@ describe("command registry", () => {
           () => undefined,
           (error: unknown) => error,
         );
+        // An Engagement Quality Reviewer is refused every op outside the
+        // quality review before the op's role check.
         const refused =
           outcome instanceof ApiError &&
           outcome.status === 403 &&
-          outcome.message === "Your role cannot perform this action";
+          (outcome.message === "Your role cannot perform this action" ||
+            (role === "Engagement Quality Reviewer" &&
+              !qualityReviewerOps.includes(op)));
         expect(refused, role).toBe(!permitted.includes(role));
       }
     },

@@ -5,6 +5,7 @@ import { ApiError } from "../http";
 import {
   artifact,
   command,
+  completedQualityReview,
   finding,
   paper,
   procedureId,
@@ -21,6 +22,12 @@ vi.mock("../assurance-store", async (importOriginal) => ({
   assurancePins: vi.fn(async () => []),
   jobs: vi.fn(async () => []),
   assuranceGates: vi.fn(async () => []),
+}));
+
+// The reviewer's recorded team work is read from D1 too; none exists here.
+vi.mock("../quality-review-records", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../quality-review-records")>()),
+  assertReviewerIndependent: vi.fn(async () => {}),
 }));
 
 const particulars = {
@@ -53,6 +60,7 @@ async function issuable() {
   const paperId = procedureOf(e, procedureId).paperId;
   e.papers.find((p) => p.id === paperId)!.status = "signed";
   e.stage = "Sign-off";
+  e.qualityReview = completedQualityReview();
   recordAcceptance(e);
   e.classification.approvedBy = "user-approver-7";
   e.artifacts.push(

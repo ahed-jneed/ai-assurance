@@ -10,16 +10,10 @@ import {
   checkAssignable,
   engagementIds,
   grantStatements,
+  memberRole,
   withdrawAll,
 } from "./engagement-grants";
 
-const memberRole = z.enum([
-  "Auditor",
-  "Lead Auditor",
-  "Client Viewer",
-  "Client Contributor",
-  "Reviewer",
-]);
 type Existing = {
   role: string;
   status: string;
