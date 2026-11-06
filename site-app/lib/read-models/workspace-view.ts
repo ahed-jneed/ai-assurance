@@ -1,6 +1,7 @@
 import catalog from "../catalog.json";
 import { sanitize } from "../client-projection";
 import type { Engagement } from "../domain";
+import { parseReportSettings } from "../domain/report-model";
 import { db, getEngagement, storedSize } from "../engagement-repo";
 import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
 import type { Context } from "../tenancy";
@@ -205,12 +206,19 @@ export async function workspaceView(
           .all()
       ).results
     : [];
-  const managementVersion = (await db()
-    .prepare("SELECT version FROM tenants WHERE id=?")
+  const practiceRow = (await db()
+    .prepare("SELECT version,report_settings FROM tenants WHERE id=?")
     .bind(ctx.tenantId)
     .first<{
       version: number;
-    }>())!.version;
+      report_settings: string | null;
+    }>())!;
+  const managementVersion = practiceRow.version;
+  // What a new report states unless the Lead Auditor overrides it; clients
+  // read reports only as issued.
+  const reportSettings = isInternalRole(ctx.role)
+    ? parseReportSettings(practiceRow.report_settings)
+    : null;
   const managementEvents = ctx.practiceAdmin
     ? (
         await db()
@@ -241,6 +249,7 @@ export async function workspaceView(
     people,
     managementVersion,
     managementEvents,
+    reportSettings,
     events: trail?.events ?? [],
     catalog: isClientRole(ctx.role) ? null : catalog,
   };

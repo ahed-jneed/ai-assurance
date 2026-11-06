@@ -16,6 +16,14 @@ vi.mock("./assurance-store", async (importOriginal) => ({
   jobs: vi.fn(async () => []),
   assuranceGates: vi.fn(async () => []),
 }));
+// The practice's report settings are read from D1; none are set here.
+vi.mock("./report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
+}));
 
 const stamp2026_11_2: RulePackStamp = {
   version: "2026.11.2",
