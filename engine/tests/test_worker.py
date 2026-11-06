@@ -34,6 +34,8 @@ PLATFORM = "dummy-platform-service-token-for-tests"
 WORKER_ID = "worker-fixture"
 IMAGE = "sha256:"+"a"*64
 CSV = b"actual,predicted,group\n1,1,A\n1,1,A\n0,0,A\n0,0,A\n1,1,B\n1,0,B\n0,0,B\n0,0,B\n"
+# Meets the statistics 1.0.0 floors: A is predicted perfectly; B misses half of its 200 positives.
+BIG = ("actual,predicted,group\n"+"1,1,A\n"*200+"0,0,A\n"*200+"1,1,B\n"*100+"1,0,B\n"*100+"0,0,B\n"*200).encode()
 
 
 def hosted_request(data=CSV, *, task="Binary classification", suite=None):
@@ -42,6 +44,16 @@ def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     # Like the platform's frozen request, the evaluation profile travels too.
     profile = {"id": "fixture-policy", "version": "1", "task": task, "suite": suite, "config": c}
     return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": profile, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite, "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
+
+
+def translated_report(path, legacy):
+    """Run a golden hosted_config case (section 13.1) through the worker translation: an engineConfig 1.1
+    request with the legacy profile, as the platform freezes it, translated and run by the engine."""
+    data = Path(path).read_bytes()
+    request = hosted_request(data, task=legacy["task"], suite=legacy["suite"])
+    request["engineConfig"]["config"] = request["profile"]["config"] = dict(legacy["config"])
+    rows, _ = read_csv(path)
+    return run(path, translate_config(request, rows))
 
 
 def claim_body(request=None, *, job="JOB-0123456789ab", attempt="ATTEMPT-0123456789ab", lease_seconds=120):
@@ -412,67 +424,116 @@ class WorkerTests(unittest.TestCase):
         self.assertNotEqual(result_signature(TOKEN, body+b"\n"), expected)
 
     def test_binary_and_individual_fairness_golden_values(self):
-        report, results = self.evaluate(hosted_request())
+        request = hosted_request(BIG)
+        request["engineConfig"]["config"]["minimumRecall"] = .6
+        report, results = self.evaluate(request, BIG)
         values = {r["testId"]: {m["name"]: m["value"] for m in r["metrics"]} for r in results}
-        self.assertEqual([r["testId"] for r in results], hosted_request()["engineConfig"]["suite"])
-        self.assertEqual(values["performance"]["accuracy"], 7/8)
+        self.assertEqual([r["testId"] for r in results], request["engineConfig"]["suite"])
+        self.assertEqual(values["performance"]["accuracy"], 700/800)
         self.assertEqual(values["performance"]["recall"], .75)
         self.assertEqual(values["demographic_parity"]["maximum_selection_rate_gap"], .25)
         self.assertEqual(values["disparate_impact"]["minimum_selection_rate_ratio"], .5)
         self.assertEqual(values["equalized_odds"]["maximum_tpr_fpr_gap"], .5)
         self.assertEqual([r["outcome"] for r in results], ["pass", "fail", "fail", "fail"])
-        self.assertEqual(report["results"][0]["outcome"], "inconclusive")
+        # The projection copies the engine's decisions; it never re-decides (section 12).
+        engine = {r["testId"]: r for r in report["results"]}
+        for result in results:
+            self.assertEqual(result["decision"], engine[result["testId"]]["decision"])
+            self.assertEqual(result["outcome"], engine[result["testId"]]["outcome"])
+        self.assertEqual(report["configuration"]["statistics"]["derivedFrom"], {"source": "hosted_config", "contractVersion": "1.1"})
         self.assertIsNotNone(results[0]["metrics"][0]["confidenceInterval"])
-        self.assertTrue(any(m["details"]["acceptanceRole"] == "supplemental_descriptive" for m in results[0]["metrics"]))
+        self.assertTrue(any(m["details"]["role"] == "descriptive" for m in results[0]["metrics"]))
+        self.assertEqual(results[1]["metrics"][0]["details"]["role"], "headline")
+        self.assertTrue(result_envelope_ok({"schemaVersion": "1.0", "externalReport": report, "hostedResults": results, "provenance": {"requestSha256": "a"*64, "inputHashes": {}}}))
 
     def test_unselected_fairness_is_not_emitted(self):
-        request = hosted_request(suite=["demographic_parity"])
-        report, results = self.evaluate(request)
-        self.assertEqual(len(report["results"]), 3)
+        request = hosted_request(BIG, suite=["demographic_parity"])
+        report, results = self.evaluate(request, BIG)
+        self.assertEqual([r["testId"] for r in report["results"]], ["demographic_parity"])
         self.assertEqual([r["testId"] for r in results], ["demographic_parity"])
 
     def test_regression_and_multiclass_golden_values(self):
-        data = b"actual,predicted\n1,2\n2,2\n3,4\n4,4\n"
+        errors = (0, .5, -.5, 1, -1, 0)
+        data = ("actual,predicted\n"+"".join(f"{i},{i+errors[i % 6]}\n" for i in range(60))).encode()
         request = hosted_request(data, task="Regression", suite=["regression"])
         _, result = self.evaluate(request, data)
         metrics = {m["name"]: m["value"] for m in result[0]["metrics"]}
-        self.assertAlmostEqual(metrics["mae"], .5)
-        self.assertAlmostEqual(metrics["rmse"], .5**.5)
-        self.assertAlmostEqual(metrics["r2"], .6)
+        self.assertAlmostEqual(metrics["mae"], 0.5)
+        self.assertAlmostEqual(metrics["rmse"], (2.5/6)**.5)
         self.assertEqual(result[0]["outcome"], "pass")
-        multi = b"actual,predicted\nA,A\nA,A\nB,B\nB,C\nC,B\nC,C\n"
+        self.assertEqual(result[0]["decision"]["kind"], "regression_performance")
+        multi = ("actual,predicted\n"+"".join(f"{label},{label if i < 32 else nxt}\n" for label, nxt in (("A", "B"), ("B", "C"), ("C", "A")) for i in range(40))).encode()
         request = hosted_request(multi, task="Multiclass classification", suite=["performance"])
         request["engineConfig"]["config"]["minimumAccuracy"] = .6
-        _, result = self.evaluate(request, multi)
+        report, result = self.evaluate(request, multi)
         metrics = {m["name"]: m["value"] for m in result[0]["metrics"]}
-        self.assertAlmostEqual(metrics["accuracy"], 2/3)
-        self.assertAlmostEqual(metrics["macro_f1"], 2/3)
+        self.assertAlmostEqual(metrics["accuracy"], .8)
+        self.assertAlmostEqual(metrics["macro_f1"], .8)
+        # Multiclass macro recall travels under the hosted name balanced_accuracy, with the 1/k chance baseline.
+        self.assertAlmostEqual(metrics["balanced_accuracy"], .8)
+        self.assertNotIn("macro_recall", metrics)
+        self.assertEqual(report["configuration"]["statistics"]["criteria"][0]["members"][1]["band"]["lower"], 1/3)
         self.assertEqual(result[0]["outcome"], "pass")
 
     def test_small_group_absent_class_and_constant_target_semantics(self):
-        request = hosted_request()
-        request["engineConfig"]["config"]["minimumGroupSize"] = 5
-        _, results = self.evaluate(request)
+        request = hosted_request(BIG)
+        request["engineConfig"]["config"]["minimumGroupSize"] = 500
+        _, results = self.evaluate(request, BIG)
         self.assertTrue(all(r["outcome"] == "inconclusive" for r in results[1:]))
-        absent = b"actual,predicted\n0,1\n0,0\n0,1\n0,0\n"
+        self.assertTrue(all("group_suppressed_below_minimum" in r["decision"]["reasons"] for r in results[1:]))
+        absent = b"actual,predicted\n"+b"0,0\n"*40
         request = hosted_request(absent, suite=["performance"])
         _, results = self.evaluate(request, absent)
         self.assertEqual(results[0]["outcome"], "inconclusive")
         self.assertIsNone(next(m["value"] for m in results[0]["metrics"] if m["name"] == "recall"))
+        self.assertIn("single_class", results[0]["decision"]["reasons"])
         constant = b"actual,predicted\n2,2\n2,2\n"
         request = hosted_request(constant, task="Regression", suite=["regression"])
         _, results = self.evaluate(request, constant)
-        self.assertEqual(results[0]["outcome"], "pass")
+        # A constant target with exact predictions: zero-variance errors and below the minimum sample size.
+        self.assertEqual(results[0]["outcome"], "inconclusive")
+        self.assertTrue({"degenerate_interval", "below_minimum_sample_size"} <= set(results[0]["decision"]["reasons"]))
         self.assertIsNone(next(m["value"] for m in results[0]["metrics"] if m["name"] == "r2"))
 
-    def test_minimum_one_is_explicit_separate_projection(self):
-        data = b"actual,predicted\n1,1\n0,0\n"
-        request = hosted_request(data, suite=["performance"])
+    def test_minimum_class_count_of_one_is_raised_to_the_floor_and_recorded(self):
+        request = hosted_request(BIG, suite=["performance"])
         request["engineConfig"]["config"]["minimumClassCount"] = 1
-        report, results = self.evaluate(request, data)
-        self.assertEqual(report["results"][0]["outcome"], "inconclusive")
-        self.assertEqual(results[0]["outcome"], "pass")
-        self.assertTrue(any("minimum of one" in note for note in results[0]["limitations"]))
+        report, results = self.evaluate(request, BIG)
+        plan = report["configuration"]["statistics"]
+        self.assertEqual(plan["configuredMinimums"], {"sampleSize": 2, "groupSize": 2, "classCount": 1})
+        self.assertEqual(plan["minimums"], {"sampleSize": 30, "groupSize": 30, "classCount": 10})
+        self.assertEqual(report["configuration"]["hostedTranslation"]["minimums"], {"configured": plan["configuredMinimums"], "applied": plan["minimums"]})
+        self.assertFalse(any("minimum of one" in note for note in results[0]["limitations"]))
+
+    def test_engine_config_1_4_carries_its_explicit_plan(self):
+        request = hosted_request(BIG, suite=["performance", "demographic_parity"])
+        engine_config = request["engineConfig"]
+        engine_config["contractVersion"] = "1.4"
+        engine_config["config"] = {"labelColumn": "actual", "predictionColumn": "predicted", "groupColumn": "group", "positiveLabel": "1", "negativeLabel": "0"}
+        engine_config["statistics"] = {"criteria": [
+            {"id": "accuracy-minimum", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": .8}}]},
+            {"id": "parity-screen", "kind": "group_comparison", "metric": "selection_rate_difference", "band": {"lower": -.1, "upper": .1}},
+        ]}
+        report, results = self.evaluate(request, BIG)
+        self.assertEqual([r["testId"] for r in results], ["accuracy-minimum", "parity-screen"])
+        self.assertEqual([r["article"] for r in results], ["15", "10"])
+        self.assertIsNone(report["configuration"]["statistics"]["derivedFrom"])
+        self.assertEqual(report["configuration"]["hostedTranslation"]["sourceContract"], "1.4")
+        for mutate in (
+            lambda c: c.update(negativeLabel="no"),
+            lambda c: c.update(suite=["performance"]),
+            lambda c: c["config"].update(minimumAccuracy=.8),
+            lambda c: c["statistics"]["criteria"][0]["members"][0].update(band={"lower": 1.5}),
+            lambda c: c["statistics"].update(minimums={"sampleSize": 10}),
+        ):
+            changed = copy.deepcopy(request)
+            mutate(changed["engineConfig"])
+            with self.assertRaises(ValueError):
+                validate_request(changed)
+        legacy = copy.deepcopy(request)
+        legacy["engineConfig"]["contractVersion"] = "1.1"
+        with self.assertRaisesRegex(ValueError, "1.4"):
+            validate_request(legacy)
 
     def test_single_observed_label_is_inconclusive_not_rejected(self):
         data = b"actual,predicted,group\n1,1,A\n1,1,A\n1,1,B\n1,1,B\n"
@@ -604,7 +665,9 @@ class WorkerTests(unittest.TestCase):
         packet = verify_result_bytes((outputs/"result.json").read_bytes(), claim, IMAGE)
         performance = packet["hostedResults"][0]
         self.assertEqual(next(m["value"] for m in performance["metrics"] if m["name"] == "accuracy"), 1.0)
-        self.assertEqual(performance["outcome"], "pass")
+        # Twenty scored rows sit below the minimum sample size of 30, so the interval cannot decide.
+        self.assertEqual(performance["outcome"], "inconclusive")
+        self.assertIn("below_minimum_sample_size", performance["decision"]["reasons"])
         self.assertEqual(packet["provenance"]["inputHashes"]["modelArtifact"], sha256(model))
 
     @requires_numpy

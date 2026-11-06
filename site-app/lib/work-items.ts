@@ -1,4 +1,5 @@
 import type { Engagement, Role } from "./domain";
+import { isReleaseTimeRecord } from "./domain/release-time";
 import { currentExecution } from "./workflow-state";
 import { stagePaperQueue } from "./auditor-workflow";
 import { paperNextAction } from "./paper-workflow";
@@ -87,6 +88,10 @@ export function procedureWork(
     !paper?.comments.some((c) => !c.resolved) &&
     p.state === "reviewed" &&
     paper?.status === "signed";
+  // WP-RP-02 and MEM-SO-01 are recorded when the final package is approved
+  // and released, never executed here: no execution work is due, ready,
+  // waiting or overdue for them.
+  const releaseTime = isReleaseTimeRecord(p.templateId);
   return {
     p,
     requests,
@@ -98,25 +103,28 @@ export function procedureWork(
     reviewed,
     accepted,
     complete,
-    corrections,
-    overdue: !!p.dueDate && p.dueDate < today && !complete,
+    releaseTime,
+    corrections: !releaseTime && corrections,
+    overdue: !releaseTime && !!p.dueDate && p.dueDate < today && !complete,
     readyToEvaluate:
+      !releaseTime &&
       approved &&
       current &&
       accepted &&
       p.state === "executed" &&
       !outstanding.length,
     waiting:
-      outstanding.length > 0 ||
-      !approved ||
-      (!current && (!!p.execution || p.state !== "planned")) ||
-      (!!p.execution && !accepted) ||
-      (p.state === "submitted" &&
-        (!compiled || paper?.status !== "in_review")) ||
-      (p.state === "reviewed" &&
-        (!compiled ||
-          !reviewed ||
-          !["reviewed", "signed"].includes(paper?.status ?? ""))),
+      !releaseTime &&
+      (outstanding.length > 0 ||
+        !approved ||
+        (!current && (!!p.execution || p.state !== "planned")) ||
+        (!!p.execution && !accepted) ||
+        (p.state === "submitted" &&
+          (!compiled || paper?.status !== "in_review")) ||
+        (p.state === "reviewed" &&
+          (!compiled ||
+            !reviewed ||
+            !["reviewed", "signed"].includes(paper?.status ?? "")))),
   };
 }
 export function engagementWork(
@@ -264,6 +272,11 @@ export function engagementWork(
         section = "plan";
         state = "planning";
         personal = writer && lead;
+      } else if (x.releaseTime) {
+        // Program submission still asks for its assignment and deadline
+        // (above); once planned, approving and releasing the final package
+        // records it, so the server refuses execution and no task is due.
+        continue;
       } else if (!x.approved) {
         action = "Open procedure plan";
         reason =

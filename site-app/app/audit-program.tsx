@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Engagement, Paper, Report, Role, Finding } from "@/lib/domain";
+import { isReleaseTimeRecord } from "@/lib/domain";
 import type {
   BriefFields,
   Procedure,
@@ -1864,8 +1865,16 @@ export function AuditProgram({
                         No execution has been recorded.
                       </p>
                     )}
+                    {isReleaseTimeRecord(p.templateId) && (
+                      <p className="subtle">
+                        Recorded at release. Approving and releasing the final
+                        package records {p.templateId} against both package
+                        hashes, so it is not executed or signed here and counts
+                        towards no gate.
+                      </p>
+                    )}
                     <div className="row-actions">
-                      {writer && (
+                      {writer && !isReleaseTimeRecord(p.templateId) && (
                         <Button
                           disabled={
                             busy ||
@@ -1887,7 +1896,7 @@ export function AuditProgram({
                             : "Record work performed"}
                         </Button>
                       )}
-                      {writer && (
+                      {writer && !isReleaseTimeRecord(p.templateId) && (
                         <Button
                           variant="outline"
                           disabled={busy}
@@ -2261,7 +2270,7 @@ export function ReportRelease({
                 title: "Authorize client release",
                 action: "Release to client",
                 description:
-                  "This makes the captured client package visible to authorized Client Viewers and granted Client Contributors belonging to this engagement’s client.",
+                  "This makes the captured client package visible to authorized Client Viewers and granted Client Contributors belonging to this engagement’s client. A report released before is superseded, and the release records the client notification.",
                 fields: [
                   area(
                     "recipientScope",
@@ -2270,7 +2279,7 @@ export function ReportRelease({
                   ),
                   choice(
                     "supersedes",
-                    "Replace a released report",
+                    "Released report it replaces (the latest if none is chosen)",
                     reports
                       .filter(
                         (q) => q.id !== r.id && releaseState(q) === "released",
@@ -2329,9 +2338,16 @@ export function ReportRelease({
         <p className="hash-text">
           Client {r.clientSha256 ?? "No projection captured"}
         </p>
+        {r.release?.completion && (
+          <p>
+            Completion and issue records{" "}
+            {r.release.completion.templateIds.join(", ")} bound to both approved
+            digests at release
+          </p>
+        )}
         {r.release?.history.map((h, i) => (
           <p key={i}>
-            {new Date(h.at).toLocaleString()} · {h.action} · {h.reason}
+            {new Date(h.at).toLocaleString()} · {label(h.action)} · {h.reason}
           </p>
         ))}
       </details>

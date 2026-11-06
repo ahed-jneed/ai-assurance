@@ -54,6 +54,22 @@ export type Paper = {
   contributors: string[];
   updatedAt: string;
   status: "draft" | "in_review" | "reviewed" | "signed";
+  /**
+   * The paper a recompiled procedure revision replaced this signed paper
+   * with. A superseded paper keeps its signed content as history: it is
+   * immutable, no longer required, and the gates, the Annex IV index and
+   * report snapshots leave it out.
+   */
+  supersededBy?: string;
+  supersededAt?: string;
+  /** The signed paper this compiled paper replaced. */
+  supersedes?: string;
+  /**
+   * Set on an evidence request's limitation memo while the request is
+   * reopened: the memo no longer applies, so it counts towards nothing until
+   * closing the request again revises it.
+   */
+  retired?: { requestId: string; actor: string; at: string; reason: string };
   plannedGuidance?: string;
   body: Record<string, string>;
   evidenceIds: string[];
@@ -336,6 +352,12 @@ export type Report = {
   clientSnapshot?: Record<string, unknown>;
   clientSha256?: string;
   release?: Release;
+  /**
+   * The earlier released reports this released report replaced, by id. Set
+   * on the client projection, which shows no release records, so a client
+   * sees why an earlier report is no longer listed.
+   */
+  replaces?: string[];
 };
 export type Engagement = {
   workflow?: Workflow;

@@ -84,13 +84,17 @@ Use SIWC for account pages, user-specific dashboards, saved records, and write a
 
 ## Local D1 migrations
 
-For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. From the project root, apply each pending migration in order:
+For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. Then apply the pending migrations:
 
 ```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_example.sql
+npm run db:migrate:local
 ```
 
-Replace the filename with the pending migration and `DB` with your D1 binding name if different. Use `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories. Do not replay migrations already applied locally. This updates only the preview database; publishing applies production migrations separately.
+`scripts/db-migrate-local.mjs` applies every `drizzle/*.sql` file not yet applied, in order, through `wrangler d1 execute --local`, and records each one in the local table `local_migrations`, so running it again changes nothing. A database whose migrations were applied by hand before the script existed is adopted once: a migration counts as applied when every table, index, trigger and added column it creates exists, and a data-only migration (such as `0005`) when a later migration is applied. Pass `--persist-to <dir>` for another state directory (default `.wrangler/state`, not `.wrangler/state/v3`; Wrangler adds the versioned directories) and `--binding <name>` if the D1 binding is not `DB`. This updates only the preview database; publishing applies production migrations separately.
+
+## End-to-end tests
+
+`npm run test:e2e` runs the Playwright persona suite with axe accessibility checks against the built Worker on a fresh database in `.wrangler/e2e-state` (run `npm run build` and, once, `npx playwright install chromium` first). See [`e2e/README.md`](e2e/README.md) for the flows, the tracked accessibility exceptions and the CI job.
 
 ## Diagnostic Commands
 
@@ -100,6 +104,8 @@ Replace the filename with the pending migration and `DB` with your D1 binding na
 - `npm run start`: preview the built Worker locally with D1/R2 support
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 - `npm run seed:demo`: seed the persona demo practice into a running dev server
+- `npm run db:migrate:local`: apply the pending D1 migrations to the local database (idempotent)
+- `npm run test:e2e`: run the Playwright persona suite against the built Worker (not part of `npm run check`; CI runs it in the `e2e` job)
 - `npm run check`: run everything CI runs for this workspace (`format:check`, `typecheck`, `lint`, `test`, `build`, `check:harnesses`); each step is also its own script
 
 When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.

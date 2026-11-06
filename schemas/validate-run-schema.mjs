@@ -41,6 +41,52 @@ function negative(label, fixture, mutate) {
   rejected++;
 }
 
+// RFC 8785 canonical JSON: keys sorted by UTF-16 code units, ECMAScript number text (section 9.2).
+const jcs = value => Array.isArray(value) ? '[' + value.map(jcs).join(',') + ']'
+  : value !== null && typeof value === 'object' ? '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + jcs(value[key])).join(',') + '}'
+  : JSON.stringify(value);
+const close = (a, b) => Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b));
+function benjaminiHochberg(values) {
+  const order = values.map((_, index) => index).sort((a, b) => values[a] - values[b]);
+  const adjusted = new Array(values.length).fill(1);
+  let running = 1;
+  for (let rank = values.length - 1; rank >= 0; rank--) {
+    running = Math.min(running, values.length * values[order[rank]] / (rank + 1));
+    adjusted[order[rank]] = Math.min(1, running);
+  }
+  return adjusted;
+}
+
+// Statistics 1.0.0 cross-field rules (docs/design/audit-statistics.md section 11.6) shared by engine
+// report 1.3 and external run 1.5: plan hash, result ids in plan order, outcome against the decision,
+// family adjustments, run aggregation over confirmatory criteria and undecided results, review flags.
+function statisticsBindings(run, plan = run.configuration?.statistics, planHash = run.provenance?.statisticsPlanSha256) {
+  const decided = run.results.filter(result => result.decision);
+  if (plan === null) {
+    assert.equal(decided.length, 0);
+  } else {
+    assert.equal(createHash('sha256').update(jcs(plan), 'utf8').digest('hex'), planHash, 'statistics plan hash');
+    assert.deepEqual(decided.map(result => result.testId), plan.criteria.map(criterion => criterion.id), 'results follow the plan order');
+    const alpha = 1 - plan.confidenceLevel;
+    for (const role of ['confirmatory', 'exploratory']) {
+      const family = decided.filter(result => result.decision.role === role);
+      const bh = benjaminiHochberg(family.map(result => result.decision.pValue));
+      family.forEach((result, index) => {
+        const d = result.decision;
+        assert.equal(d.familySize, family.length);
+        assert.ok(close(d.adjustedPValue, role === 'confirmatory' ? Math.min(1, family.length * d.pValue) : bh[index]), `${result.testId}: family adjustment`);
+        const outcome = p => (d.direction === 'pass' || d.direction === 'fail') && p <= alpha + 1e-12 ? d.direction : 'inconclusive';
+        assert.equal(result.outcome, outcome(d.adjustedPValue), `${result.testId}: outcome follows the adjusted decision`);
+        assert.equal(d.unadjustedOutcome, outcome(d.pValue));
+      });
+    }
+  }
+  const counted = run.results.filter(result => !result.decision || result.decision.role === 'confirmatory').map(result => result.outcome);
+  const aggregate = ['fail', 'inconclusive', 'pass'].find(outcome => counted.includes(outcome)) ?? 'not_applicable';
+  assert.equal(run.outcome, aggregate, 'run outcome aggregates confirmatory criteria and undecided results');
+  assert.deepEqual(run.reviewFlags, decided.filter(result => result.decision.role === 'exploratory' && result.outcome === 'fail').map(result => result.testId));
+}
+
 // Equality, checksum recomputation and order are outside portable JSON Schema.
 // These fixture assertions mirror the application's frozen-manifest checks;
 // they are not a substitute for authorization, custody verification or review.
@@ -85,6 +131,26 @@ function hostedBindings(run) {
 
 for (const name of ['report.json', 'report-v1.1.1.json']) {
   positive(`Python ${name}`, json(resolve(workspace, 'engine/examples', name)));
+}
+// Engine report 1.3 (statistics 1.0.0): decided criteria carry a decision and the shared metric shape.
+const engine13 = json(resolve(workspace, 'engine/examples/report-v1.3.json'));
+positive('Python report-v1.3.json', engine13);
+statisticsBindings(engine13);
+const firstDecided = engine13.results.findIndex(result => result.decision);
+const firstDescriptive = engine13.results[firstDecided].metrics.findIndex(metric => metric.details.role === 'descriptive');
+for (const [label, mutate] of [
+  ['1.3 decided result without its decision', run => { delete run.results[firstDecided].decision; }],
+  ['1.3 descriptive entry with a p-value', run => { run.results[firstDecided].metrics[firstDescriptive].pValue = 0.01; }],
+  ['1.3 descriptive entry with a band', run => { run.results[firstDecided].metrics[firstDescriptive].details.band = { lower: 0.5, upper: null }; }],
+  ['1.3 unknown reason code', run => { run.results[firstDecided].decision.reasons.push('point_estimate_passes'); }],
+  ['1.3 Holm adjustment', run => { run.results[firstDecided].decision.adjustment = 'holm'; }],
+  ['1.3 configuration minimums below the floors', run => { run.configuration.contractVersion = '1.3'; run.configuration.minSampleSize = 20; }],
+  ['1.3 plan below the floors', run => { run.configuration.statistics.minimums.sampleSize = 20; }],
+  ['1.3 missing plan hash', run => { delete run.provenance.statisticsPlanSha256; }],
+  ['1.3 missing review flags', run => { delete run.reviewFlags; }],
+  ['1.3 group result under article 15', run => { run.results.find(result => result.decision?.kind === 'group_comparison').article = '15'; }],
+]) {
+  negative(label, engine13, mutate);
 }
 const fixturePath = resolve(option('--fixtures') ?? resolve(directory, 'fixtures/hosted-runs.v1.1.json'));
 assert.ok(existsSync(fixturePath), `Missing hosted fixtures: ${fixturePath}`);
@@ -220,13 +286,13 @@ for (const [label, mutate] of [
 // Its 1.2 projection uses frozen request declarations, one compilation paper,
 // and the worker's rich metric evidence. These are synthetic local fixtures;
 // signature validity, enrolled origin and native execution are not asserted.
-function externalBindings(fixture) {
+function externalBindings(fixture, version = '1.2') {
   const { run, requestJSON, resultJSON } = fixture;
   const request = JSON.parse(requestJSON);
   const packet = JSON.parse(resultJSON);
   const { profile, model, dataset } = run.manifest;
   const hashes = run.provenance.inputHashes;
-  assert.equal(run.contractVersion, '1.2');
+  assert.equal(run.contractVersion, version);
   assert.equal(run.externalJobId, run.id);
   assert.equal(run.id, request.engineConfig.id);
   assert.equal(run.engagementId, request.engineConfig.engagementId);
@@ -266,17 +332,68 @@ function externalBindings(fixture) {
     assert.equal(packet.provenance.inputHashes.modelArtifact, hashes.modelArtifact);
   }
   assert.deepEqual(run.results, packet.hostedResults);
-  assert.deepEqual(run.results.map(result => result.testId).sort(), [...run.suite].sort());
   const sampleCount = Math.max(0, ...run.results.flatMap(result => result.metrics.map(metric => metric.sampleSize)));
   assert.equal(dataset.rowCount, sampleCount, 'Projection sample count is derived, not a population census');
   assert.deepEqual(dataset.columns, [run.config.labelColumn, run.config.predictionColumn]);
   assert.equal(run.paperIds.length, 1, 'External compilation creates one supplementary paper');
+  if (version === '1.5') {
+    // Statistics 1.0.0: the result-id rule replaces the suite check; the worker copied the engine's plan
+    // and decisions, and the run aggregates confirmatory criteria only (sections 4.6 and 11.6).
+    const plan = run.manifest.statistics;
+    assert.deepEqual(plan, packet.externalReport.configuration.statistics);
+    assert.equal(packet.externalReport.contractVersion, '1.3');
+    const families = { selection_rate_difference: 'demographic_parity', selection_rate_ratio: 'disparate_impact', equalized_odds: 'equalized_odds' };
+    const suite = new Set(plan.criteria.map(c => c.kind === 'group_comparison' ? families[c.metric] : c.kind === 'regression_performance' ? 'regression' : 'performance'));
+    assert.deepEqual([...suite].sort(), [...run.suite].sort(), 'suite equals the families of the plan criteria');
+    const engineResults = Object.fromEntries(packet.externalReport.results.filter(result => result.decision).map(result => [result.testId, result]));
+    for (const result of run.results) {
+      assert.deepEqual(result.decision, engineResults[result.testId].decision, 'decisions are copied, never re-decided');
+      assert.equal(result.outcome, engineResults[result.testId].outcome);
+    }
+    statisticsBindings(run, plan, hashes.statisticsPlan);
+    return;
+  }
+  assert.deepEqual(run.results.map(result => result.testId).sort(), [...run.suite].sort());
   const outcomes = run.results.map(result => result.outcome);
   const aggregate = ['fail', 'inconclusive', 'pass', 'not_applicable'].find(outcome => outcomes.includes(outcome)) ?? 'inconclusive';
   assert.equal(run.outcome, aggregate);
   assert.equal(run.overallOutcome, aggregate);
   assert.ok(Date.parse(run.startedAt) >= Date.parse(run.createdAt));
   assert.ok(Date.parse(run.completedAt) >= Date.parse(run.startedAt));
+}
+
+// Compiled external audit run 1.5 (statistics 1.0.0) from actual worker computations.
+const external15 = json(resolve(option('--external-fixtures-1.5') ?? resolve(directory, 'fixtures/external-runs.v1.5.json')));
+assert.ok(Array.isArray(external15) && external15.length >= 5, 'Expected binary, multiclass, regression, client-local and explicit-plan 1.5 fixtures');
+for (const fixture of external15) {
+  positive(`External 1.5 ${fixture.fixture}`, fixture.run);
+  positive(`Worker report 1.3 ${fixture.fixture}`, JSON.parse(fixture.resultJSON).externalReport);
+  externalBindings(fixture, '1.5');
+}
+const explicit15 = external15.find(fixture => fixture.run.manifest.statistics.derivedFrom === null);
+assert.ok(explicit15 && explicit15.run.results.some(result => !explicit15.run.suite.includes(result.testId)), 'An explicit plan uses ids that differ from the suite names');
+const ext15 = external15[0].run;
+for (const [label, mutate] of [
+  ['1.5 result without decision', run => { delete run.results[0].decision; }],
+  ['1.5 missing plan', run => { delete run.manifest.statistics; }],
+  ['1.5 missing plan hash', run => { delete run.provenance.inputHashes.statisticsPlan; }],
+  ['1.5 missing review flags', run => { delete run.reviewFlags; }],
+  ['1.5 group criterion under article 15', run => { run.results.find(result => result.decision.kind === 'group_comparison').article = '15'; }],
+  ['1.5 regression criterion in a binary run', run => { run.results[0].decision.kind = 'regression_performance'; }],
+  ['1.5 more than 20 criteria', run => { run.results = Array.from({ length: 21 }, () => copy(run.results[0])); }],
+]) {
+  negative(label, ext15, mutate);
+}
+for (const [label, mutate] of [
+  ['1.5 re-decided outcome', fixture => { fixture.run.results[0].outcome = fixture.run.results[0].outcome === 'pass' ? 'fail' : 'pass'; }],
+  ['1.5 changed plan hash', fixture => { fixture.run.provenance.inputHashes.statisticsPlan = 'c'.repeat(64); }],
+  ['1.5 reordered criteria', fixture => { fixture.run.results.reverse(); }],
+  ['1.5 exploratory flag invented', fixture => { fixture.run.reviewFlags = ['performance']; }],
+]) {
+  const fixture = copy(external15[0]);
+  mutate(fixture);
+  assert.throws(() => externalBindings(fixture, '1.5'), undefined, `${label}: binding tamper accepted`);
+  rejected++;
 }
 
 const external = json(resolve(option('--external-fixtures') ?? resolve(directory, 'fixtures/external-runs.v1.2.json')));
@@ -360,4 +477,4 @@ negative('Python runtime missing implementation', engine, run => { delete run.pr
 negative('Python dependency version is not text', engine, run => { run.provenance.dependencies.packages.numpy = {}; });
 negative('Python definition version is malformed', engine, run => { run.provenance.inputs.testDefinitions['PERF-BINARY'] = 'latest'; });
 negative('Python unknown configuration option', engine, run => { run.configuration.arbitrary = {}; });
-console.log(`PASS: Draft 2020-12 schema selfcheck; ${accepted} valid runs; ${rejected} rejected malformed runs/bindings; ${hosted.length} frozen hosted and ${external.length} exact-byte external fixtures verified.`);
+console.log(`PASS: Draft 2020-12 schema selfcheck; ${accepted} valid runs; ${rejected} rejected malformed runs/bindings; ${hosted.length} frozen hosted, ${external.length} exact-byte external 1.2 and ${external15.length} external 1.5 fixtures verified.`);

@@ -1,7 +1,11 @@
 """Deterministic, dependency-free diagnostics over precomputed predictions.
 
-Acceptance thresholds are frozen internal audit policies. These metrics are
-evidence for a qualified reviewer, not an EU AI Act compliance determination.
+Performance, calibration and group criteria are decided by statistics 1.0.0
+(docs/design/audit-statistics.md): the interval decides against a pre-registered
+band, with Bonferroni over the confirmatory family. A 1.0 configuration's
+thresholds become a derived plan; a 1.3 configuration carries its plan. Reports
+use contract 1.3. These metrics are evidence for a qualified reviewer, not an
+EU AI Act compliance determination.
 """
 from __future__ import annotations
 
@@ -11,20 +15,20 @@ import hashlib
 import io
 import json
 import math
-import statistics
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from . import __version__
+from . import statistics as stats
+from .criteria import evaluate_plan_results, group_columns, multiclass_data, threshold_for
 from .errors import EngineError
 from .provenance import definition_versions, runtime_dependencies
 
 MAX_BYTES = 100 * 1024 * 1024
 MAX_ROWS = 1_000_000
 MAX_COLUMNS = 1000
-CONFIDENCE = 0.95
+MAX_GROUP_LABELS = 1000
 SUPPORTED_SUITES = {"performance", "fairness", "drift"}
 UNAVAILABLE_SUITES = {
     "shap": ("EXPL-SHAP", "SHAP explanation", "10, 13", "A fitted-model adapter and its validated background dataset are required."),
@@ -103,13 +107,23 @@ def read_csv(path: str | Path) -> tuple[list[dict[str, str]], dict[str, Any]]:
     return rows, {"name": source.name, "sha256": sha256(data), "bytes": len(data), "rowCount": len(rows), "columns": columns}
 
 
+CONFIG_VERSIONS = {"1.0", "1.3"}
+REPORT_CONTRACT = "1.3"
+MINIMUM_FIELDS = (("minSampleSize", "sampleSize"), ("minGroupSize", "groupSize"), ("minClassCount", "classCount"))
+TASK_KINDS = {"binary_classification": {"performance", "group_comparison", "calibration"}, "multiclass_classification": {"multiclass_performance"}, "regression": {"regression_performance"}}
+DRIFT_LIMITATION = "Point-estimate screening; not interval-based. Drift results carry no statistical decision and are outside the multiplicity families (statistics 1.0.0, Q6)."
+
+
 def validate_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate an engine configuration: 1.0 (legacy thresholds; the plan is derived at run time) or 1.3
+    (an explicit statistics plan, section 9). Returns a frozen copy."""
     if not isinstance(config, dict):
         raise ValueError("Configuration must be an object")
     # Round-trip also copies configuration: a caller cannot mutate a running policy.
     frozen = json.loads(canonical_bytes(config))
-    if frozen.get("contractVersion") != "1.0":
-        raise ValueError("contractVersion must be '1.0'")
+    version = frozen.get("contractVersion")
+    if version not in CONFIG_VERSIONS:
+        raise ValueError("contractVersion must be '1.0' or '1.3'")
     for field in ("id", "engagementId", "modelId", "datasetId"):
         if not isinstance(frozen.get(field), str) or not frozen[field].strip():
             raise ValueError(f"{field} must be a nonempty string")
@@ -132,7 +146,7 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         for field in ("target", "prediction"):
             if not isinstance(columns.get(field), str) or not columns[field]:
                 raise ValueError(f"columns.{field} is required")
-    if "fairness" in suites and frozen["task"] == "binary_classification":
+    if "fairness" in suites and frozen["task"] == "binary_classification" and version == "1.0":
         if not isinstance(columns.get("protected"), str) or not columns["protected"]:
             raise ValueError("columns.protected is required for binary fairness")
     for field in ("score", "protected"):
@@ -167,35 +181,82 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(specification, dict) or specification.get("operator") not in {"<=", ">="}:
             raise ValueError(f"Threshold {name} requires operator <= or >=")
         specification["value"] = finite_number(specification.get("value"), f"Threshold {name}")
+    if version == "1.0":
+        if "statistics" in frozen:
+            raise ValueError("A statistics plan requires contractVersion 1.3")
+        return frozen
+    return _validate_plan_config(frozen, original=config)
+
+
+def _validate_plan_config(frozen: dict[str, Any], original: dict[str, Any]) -> dict[str, Any]:
+    """Section 9.1: a 1.3 configuration carries an explicit plan and never legacy thresholds beside it.
+    Only the worker's translation of a hosted engineConfig 1.1 carries a derived plan (section 9.3); its
+    bands are kept as derived, and an invalid one evaluates as invalid_band."""
+    if not isinstance(frozen.get("statistics"), dict):
+        raise ValueError("A 1.3 configuration requires a statistics plan")
+    statistics = frozen["statistics"]
+    if statistics.get("derivedFrom") is not None:
+        if not isinstance(frozen.get("hostedTranslation"), dict) or statistics["derivedFrom"] != {"source": "hosted_config", "contractVersion": "1.1"}:
+            raise ValueError("statistics.derivedFrom is set only by legacy derivation")
+        try:
+            plan = stats.normalize_plan(statistics)
+        except (KeyError, TypeError) as exc:
+            raise ValueError("statistics plan is malformed") from exc
+        if plan != statistics:
+            raise ValueError("A derived statistics plan must be normalised")
+    else:
+        plan = stats.validate_plan(statistics)
+    if plan["clusterField"] is not None:
+        # Section 5.11 requires the cluster bootstrap for every member; this runner does not implement it.
+        raise ValueError("statistics.clusterField needs the cluster bootstrap, which this runner does not implement")
+    if frozen["thresholds"]["values"]:
+        raise ValueError("A 1.3 configuration with statistics must have empty thresholds.values")
+    for field, key in MINIMUM_FIELDS:
+        if field in original and original[field] != plan["minimums"][key]:
+            raise ValueError(f"{field} must equal the plan's applied minimum statistics.minimums.{key}")
+        frozen[field] = plan["minimums"][key]
+    if "calibrationBins" in original and original["calibrationBins"] != plan["calibrationBins"]:
+        raise ValueError("calibrationBins must equal statistics.calibrationBins")
+    frozen["calibrationBins"] = plan["calibrationBins"]
+    kinds = {c["kind"] for c in plan["criteria"]}
+    if kinds - TASK_KINDS[frozen["task"]]:
+        raise ValueError("Criterion kinds " + ", ".join(sorted(kinds - TASK_KINDS[frozen["task"]])) + " do not apply to task " + frozen["task"])
+    if kinds & {"performance", "multiclass_performance", "regression_performance", "calibration"} and "performance" not in frozen["suite"]:
+        raise ValueError("suite must include performance when the plan has a performance or calibration criterion")
+    if "group_comparison" in kinds and "fairness" not in frozen["suite"]:
+        raise ValueError("suite must include fairness when the plan has a group criterion")
+    if "calibration" in kinds and not frozen["columns"].get("score"):
+        raise ValueError("A calibration criterion requires columns.score")
+    if any(c["kind"] == "group_comparison" and not c["groupFields"] for c in plan["criteria"]) and not frozen["columns"].get("protected"):
+        raise ValueError("A group criterion without groupFields requires columns.protected")
+    frozen["statistics"] = plan
     return frozen
 
 
-def wilson(successes: int, total: int) -> dict[str, Any] | None:
-    if total == 0:
+def derived_plan(frozen: dict[str, Any], observations: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The plan that decides this run: the 1.3 configuration's own, or for 1.0 the section 9.3 derivation
+    (k for the multiclass chance baseline comes from the evaluated rows). None when no suite needs one."""
+    if frozen["contractVersion"] == "1.3":
+        return frozen["statistics"]
+    data = multiclass_data(observations) if frozen["task"] == "multiclass_classification" else None
+    plan = stats.derive_engine({"config": frozen}, data)
+    if not plan["criteria"]:
         return None
-    z = 1.959963984540054
-    p = successes / total
-    denominator = 1 + z*z/total
-    center = (p + z*z/(2*total)) / denominator
-    radius = z * math.sqrt(p*(1-p)/total + z*z/(4*total*total)) / denominator
-    return {"lower": 0.0 if successes == 0 else max(0.0, center-radius), "upper": 1.0 if successes == total else min(1.0, center+radius), "level": CONFIDENCE, "method": "Wilson score; IID binomial assumption"}
-
-
-def threshold_for(config: dict[str, Any], name: str) -> dict[str, Any] | None:
-    policy = config["thresholds"]
-    spec = policy["values"].get(name)
-    if spec is None:
-        return None
-    return {**spec, "policyId": policy["policyId"], "policyVersion": policy["policyVersion"], "source": "internal_policy"}
+    # The engine bins with the configuration's calibrationBins, so the recorded plan says so.
+    if frozen["calibrationBins"] != 10:
+        plan["calibrationBins"] = frozen["calibrationBins"]
+    return stats.normalize_plan(plan)
 
 
 def metric(config: dict[str, Any], name: str, value: float | None, sample_size: int, *, unit: str = "ratio", numerator: int | None = None, denominator: int | None = None, details: dict[str, Any] | None = None, slices: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """A metric of a result this specification does not govern (drift, model-backed procedures)."""
     if value is not None and not math.isfinite(value):
         raise EngineError("invalid_numeric_value", f"Computed metric {name} overflowed; rescale numeric inputs")
-    return {"name": name, "value": value, "threshold": threshold_for(config, name), "unit": unit, "sampleSize": sample_size, "numerator": numerator, "denominator": denominator, "confidenceInterval": wilson(numerator, denominator) if numerator is not None and denominator is not None else None, "slices": slices or [], "details": details or {}}
+    return {"name": name, "value": value, "threshold": threshold_for(config, name), "unit": unit, "sampleSize": sample_size, "numerator": numerator, "denominator": denominator, "confidenceInterval": None, "slices": slices or [], "details": details or {}}
 
 
 def evaluate(m: dict[str, Any]) -> str:
+    """Point-estimate screening of a metric against its frozen rule; used only for results without a decision."""
     if m["value"] is None or m["threshold"] is None:
         return "inconclusive"
     rule = m["threshold"]
@@ -212,10 +273,12 @@ def result(test_id: str, label: str, article: str, metrics: list[dict[str, Any]]
     return {"testId": test_id, "label": label, "article": article, "outcome": outcome, "metrics": metrics, "limitations": notes}
 
 
-def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
+def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any], group_fields: list[str] | tuple[str, ...] = ()) -> tuple[list[dict[str, Any]], int]:
+    """Validated observations: target, prediction, score and the values of the plan's group columns."""
     columns = config["columns"]
     required = [columns["target"], columns["prediction"]]
-    required += [columns[c] for c in ("score", "protected") if c in columns]
+    required += [columns["score"]] if "score" in columns else []
+    required += list(group_fields)
     missing = set(required) - set(rows[0])
     if missing:
         raise EngineError("missing_column", "Missing CSV columns: " + ", ".join(sorted(missing)))
@@ -234,148 +297,25 @@ def prediction_rows(rows: list[dict[str, str]], config: dict[str, Any]) -> tuple
             continue
         if config["task"] == "binary_classification" and (target not in {config["positiveLabel"], config["negativeLabel"]} or predicted not in {config["positiveLabel"], config["negativeLabel"]}):
             raise EngineError("label_set_mismatch", f"Unexpected binary label in row {row_number}; configure positiveLabel and negativeLabel")
-        observations.append({"target": target, "prediction": predicted, "score": score, "group": label_cell(row[columns["protected"]]) if "protected" in columns else None})
+        observations.append({"target": target, "prediction": predicted, "score": score, "fields": {field: label_cell(row[field]) for field in group_fields}})
     return observations, len(rows)-len(observations)
 
 
-def counts(observations: list[dict[str, Any]], positive: str) -> dict[str, int]:
-    return {"tp": sum(o["target"] == positive and o["prediction"] == positive for o in observations), "fp": sum(o["target"] != positive and o["prediction"] == positive for o in observations), "tn": sum(o["target"] != positive and o["prediction"] != positive for o in observations), "fn": sum(o["target"] == positive and o["prediction"] != positive for o in observations)}
-
-
-def ratio(a: float, b: float) -> float | None:
-    return a/b if b else None
-
-
-def binary_performance(observations: list[dict[str, Any]], config: dict[str, Any], omitted: int) -> list[dict[str, Any]]:
-    c = counts(observations, config["positiveLabel"])
-    n = len(observations)
-    tpr = ratio(c["tp"], c["tp"]+c["fn"])
-    tnr = ratio(c["tn"], c["tn"]+c["fp"])
-    details = {"confusionMatrix": c, "positiveLabel": config["positiveLabel"], "excludedMissingTargetOrPrediction": omitted}
-    measurements = [metric(config, "accuracy", ratio(c["tp"]+c["tn"], n), n, numerator=c["tp"]+c["tn"], denominator=n, details=details), metric(config, "precision", ratio(c["tp"], c["tp"]+c["fp"]), n, numerator=c["tp"], denominator=c["tp"]+c["fp"], details=details), metric(config, "recall", tpr, n, numerator=c["tp"], denominator=c["tp"]+c["fn"], details=details), metric(config, "f1", ratio(2*c["tp"], 2*c["tp"]+c["fp"]+c["fn"]), n, details=details), metric(config, "balanced_accuracy", (tpr+tnr)/2 if tpr is not None and tnr is not None else None, n, details=details)]
-    limitations = ["Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity, and target leakage require review."]
-    if omitted:
-        limitations.append(f"Excluded {omitted} rows missing target or prediction; this may bias results.")
-    insufficient = n < config["minSampleSize"] or min(c["tp"]+c["fn"], c["tn"]+c["fp"]) < config["minClassCount"]
-    if insufficient:
-        limitations.append("Insufficient sample size or target-class support under the frozen run configuration.")
-    output = [result("PERF-BINARY", "Binary classification performance", "15", measurements, limitations, "inconclusive" if insufficient else None)]
-    scored = [o for o in observations if o["score"] is not None]
-    if not scored:
-        output.append(result("PERF-CAL", "Probability calibration", "15", [], ["No probability scores supplied; calibration was skipped."], "not_applicable"))
-        return output
-    bins = [[] for _ in range(config["calibrationBins"])]
-    for o in scored:
-        bins[min(int(o["score"]*len(bins)), len(bins)-1)].append(o)
-    slices = []
-    ece = 0.0
-    for index, entries in enumerate(bins):
-        if not entries:
-            continue
-        positives = sum(o["target"] == config["positiveLabel"] for o in entries)
-        mean_score = statistics.fmean(o["score"] for o in entries)
-        observed = positives/len(entries)
-        ece += len(entries)/len(scored)*abs(mean_score-observed)
-        slices.append({"slice": f"probability_bin_{index}", "lower": index/len(bins), "upper": (index+1)/len(bins), "n": len(entries), "meanProbability": mean_score, "observedRate": observed, "numerator": positives, "denominator": len(entries), "confidenceInterval": wilson(positives, len(entries))})
-    brier = statistics.fmean((o["score"]-int(o["target"] == config["positiveLabel"]))**2 for o in scored)
-    notes = [f"Calibration uses {len(scored)} of {n} valid prediction rows; probability scores refer to positive label {config['positiveLabel']!r}.", "ECE depends on fixed equal-width probability bins; sparse bins and prevalence shift require review."]
-    if len(scored) < config["minSampleSize"]:
-        notes.append("Calibration has insufficient scored observations.")
-    output.append(result("PERF-CAL", "Probability calibration", "15", [metric(config, "brier_score", brier, len(scored), details={"formula": "mean squared probability error"}), metric(config, "expected_calibration_error", ece, len(scored), slices=slices, details={"bins": len(bins), "excludedMissingScore": n-len(scored)})], notes, "inconclusive" if len(scored) < config["minSampleSize"] else None))
-    return output
-
-
-def multiclass_performance(observations: list[dict[str, Any]], config: dict[str, Any], omitted: int) -> list[dict[str, Any]]:
-    labels = sorted({o["target"] for o in observations} | {o["prediction"] for o in observations})
-    if len(labels) > 100:
+def statistical_results(observations: list[dict[str, Any]], frozen: dict[str, Any], plan: dict[str, Any], omitted: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Every plan criterion as a result with a decision (statistics 1.0.0)."""
+    for fields in _group_field_sets(plan, frozen):
+        labels = {tuple(o["fields"].get(f) for f in fields) for o in observations}
+        if len({values for values in labels if None not in values}) > MAX_GROUP_LABELS:
+            raise EngineError("cardinality_limit_exceeded", "Group comparisons are limited to 1000 groups per criterion; revise the grouping protocol")
+    if frozen["task"] == "multiclass_classification" and len({o["target"] for o in observations} | {o["prediction"] for o in observations}) > 100:
         raise EngineError("cardinality_limit_exceeded", "Multiclass evaluation is limited to 100 labels; revise the protocol for high-cardinality outcomes")
-    n = len(observations)
-    cells = defaultdict(int)
-    for observation in observations:
-        cells[(observation["target"], observation["prediction"])] += 1
-    confusion = [[cells[(actual, predicted)] for predicted in labels] for actual in labels]
-    slices = []
-    for i, label in enumerate(labels):
-        tp = confusion[i][i]
-        support = sum(confusion[i])
-        predicted = sum(row[i] for row in confusion)
-        precision = ratio(tp, predicted)
-        recall = ratio(tp, support)
-        f1 = ratio(2*tp, support+predicted)
-        slices.append({"slice": label, "n": support, "tp": tp, "predictedCount": predicted, "precision": precision, "recall": recall, "f1": f1, "recallConfidenceInterval": wilson(tp, support)})
-    macro = lambda name: statistics.fmean(s[name] for s in slices) if slices and all(s[name] is not None for s in slices) else None
-    correct = sum(confusion[i][i] for i in range(len(labels)))
-    details = {"labels": labels, "confusionMatrix": confusion, "excludedMissingTargetOrPrediction": omitted, "undefinedClassPolicy": "Undefined per-class metric makes macro metric inconclusive; it is not silently coerced to zero."}
-    measurements = [metric(config, "accuracy", ratio(correct, n), n, numerator=correct, denominator=n, details=details, slices=slices), metric(config, "macro_precision", macro("precision"), n, slices=slices, details=details), metric(config, "macro_recall", macro("recall"), n, slices=slices, details=details), metric(config, "macro_f1", macro("f1"), n, slices=slices, details=details)]
-    insufficient = n < config["minSampleSize"] or len(labels) < 2 or any(s["n"] < config["minClassCount"] for s in slices)
-    notes = ["Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage."]
-    if omitted:
-        notes.append(f"Excluded {omitted} rows missing target or prediction.")
-    if insufficient:
-        notes.append("Insufficient total or per-class support under the frozen run configuration.")
-    return [result("PERF-MULTI", "Multiclass classification performance", "15", measurements, notes, "inconclusive" if insufficient else None)]
+    notes = [f"Excluded {omitted} rows missing target or prediction; this may bias results."] if omitted else []
+    return evaluate_plan_results(plan, observations, frozen, notes)
 
 
-def regression_performance(observations: list[dict[str, Any]], config: dict[str, Any], omitted: int) -> list[dict[str, Any]]:
-    n = len(observations)
-    if n:
-        errors = [o["prediction"]-o["target"] for o in observations]
-        mae = statistics.fmean(abs(e) for e in errors)
-        squared_errors = [e*e for e in errors]
-        rmse = math.sqrt(statistics.fmean(squared_errors))
-        mean_target = statistics.fmean(o["target"] for o in observations)
-        total_sum_squares = sum((o["target"]-mean_target)**2 for o in observations)
-        r2 = 1-sum(squared_errors)/total_sum_squares if n >= 2 and total_sum_squares > 0 else None
-    else:
-        mae = rmse = r2 = None
-    notes = ["R² is undefined for a constant target; no interval is fabricated for regression error metrics.", "Saved predictions do not establish cross-validation, dataset independence, or freedom from leakage."]
-    if omitted:
-        notes.append(f"Excluded {omitted} rows missing target or prediction.")
-    if n < config["minSampleSize"]:
-        notes.append("Insufficient valid regression observations.")
-    return [result("PERF-REG", "Regression performance", "15", [metric(config, "mae", mae, n, unit="target_units"), metric(config, "rmse", rmse, n, unit="target_units"), metric(config, "r2", r2, n, unit="dimensionless")], notes, "inconclusive" if n < config["minSampleSize"] else None)]
-
-
-def fairness(observations: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
-    if config["task"] != "binary_classification":
-        return [result("FAIR-SCOPE", "Binary outcome fairness suite", "10", [], ["These fairness definitions require a binary decision. A task-specific group-fairness protocol is required for regression or multiclass tasks."], "not_applicable")]
-    groups = defaultdict(list)
-    for observation in observations:
-        if observation["group"] is not None:
-            groups[observation["group"]].append(observation)
-    if len(groups) > 1000:
-        raise EngineError("cardinality_limit_exceeded", "Fairness evaluation is limited to 1000 protected groups; revise the grouping protocol")
-    slices = []
-    for group in sorted(groups):
-        entries = groups[group]
-        c = counts(entries, config["positiveLabel"])
-        positives = c["tp"]+c["fn"]
-        negatives = c["tn"]+c["fp"]
-        selected = c["tp"]+c["fp"]
-        slices.append({"slice": group, "n": len(entries), "selectionRate": selected/len(entries), "selectionNumerator": selected, "selectionDenominator": len(entries), "selectionConfidenceInterval": wilson(selected, len(entries)), "tpr": ratio(c["tp"], positives), "tprNumerator": c["tp"], "tprDenominator": positives, "tprConfidenceInterval": wilson(c["tp"], positives), "fpr": ratio(c["fp"], negatives), "fprNumerator": c["fp"], "fprDenominator": negatives, "fprConfidenceInterval": wilson(c["fp"], negatives), "confusionMatrix": c})
-    valid_n = sum(s["n"] for s in slices)
-    base_notes = ["Descriptive group comparisons are not a causal finding of discrimination or a legal compliance verdict.", "Metrics may conflict; protected-attribute collection requires an independently established lawful basis and access controls.", "Intervals assume independent observations; clustered or repeated records require a different protocol."]
-    missing = len(observations)-valid_n
-    if missing:
-        base_notes.append(f"Excluded {missing} prediction rows with missing protected-group membership; representativeness requires review.")
-    sufficient = len(slices) >= 2 and all(s["n"] >= config["minGroupSize"] for s in slices)
-    if not sufficient:
-        base_notes.append("Fewer than two eligible groups or at least one group below minGroupSize; all observed groups remain visible, and acceptance is inconclusive.")
-    rates = [s["selectionRate"] for s in slices]
-    difference = max(rates)-min(rates) if len(rates) >= 2 else None
-    di = min(rates)/max(rates) if len(rates) >= 2 and max(rates) > 0 else None
-    dp_details = {"comparison": "maximum minus minimum group selection rate", "minGroupSize": config["minGroupSize"], "missingGroupCount": missing}
-    di_details = {"comparison": "minimum divided by maximum group selection rate", "reference": "highest observed selection rate", "zeroDenominatorPolicy": "undefined; inconclusive"}
-    dp = result("FAIR-DP", "Demographic parity difference", "10", [metric(config, "demographic_parity_difference", difference, valid_n, slices=slices, details=dp_details)], base_notes, "inconclusive" if not sufficient else None)
-    di_result = result("FAIR-DI", "Disparate impact ratio", "10", [metric(config, "disparate_impact_ratio", di, valid_n, slices=slices, details=di_details)], base_notes, "inconclusive" if not sufficient else None)
-    eo_sufficient = sufficient and all(min(s["tprDenominator"], s["fprDenominator"]) >= config["minClassCount"] for s in slices)
-    all_rates_defined = len(slices) >= 2 and all(s["tpr"] is not None and s["fpr"] is not None for s in slices)
-    tpr_gap = max(s["tpr"] for s in slices)-min(s["tpr"] for s in slices) if all_rates_defined else None
-    fpr_gap = max(s["fpr"] for s in slices)-min(s["fpr"] for s in slices) if all_rates_defined else None
-    eo = max(tpr_gap, fpr_gap) if all_rates_defined else None
-    eo_notes = base_notes + ([] if eo_sufficient else ["Insufficient positive/negative target support in at least one group for equalized odds."])
-    eo_result = result("FAIR-EO", "Equalized odds difference", "10", [metric(config, "equalized_odds_difference", eo, valid_n, slices=slices, details={"tprGap": tpr_gap, "fprGap": fpr_gap, "comparison": "maximum of TPR range and FPR range", "minClassCount": config["minClassCount"]})], eo_notes, "inconclusive" if not eo_sufficient else None)
-    return [dp, di_result, eo_result]
+def _group_field_sets(plan: dict[str, Any], frozen: dict[str, Any]) -> list[list[str]]:
+    protected = frozen["columns"].get("protected")
+    return [c["groupFields"] or [protected] for c in plan["criteria"] if c["kind"] == "group_comparison"]
 
 
 def reference_edges(values: list[float], bins: int) -> list[float]:
@@ -425,7 +365,7 @@ def wasserstein(reference: list[float], current: list[float]) -> float:
 
 def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, config: dict[str, Any]) -> list[dict[str, Any]]:
     if reference is None:
-        return [result("DRIFT-INPUT", "Numeric distribution drift", "10, 15", [], ["Reference dataset is absent; no baseline was invented."], "inconclusive")]
+        return [result("DRIFT-INPUT", "Numeric distribution drift", "10, 15", [], [DRIFT_LIMITATION, "Reference dataset is absent; no baseline was invented."], "inconclusive")]
     output = []
     # Test IDs must match the shared schema's identifier pattern. Column names
     # may contain spaces or any Unicode, so they stay in labels and details.
@@ -439,13 +379,13 @@ def drift(rows: list[dict[str, str]], reference: list[dict[str, str]] | None, co
         b = [v for v in b_raw if v is not None]
         missing_details = {"feature": feature, "referenceN": len(a), "currentN": len(b), "referenceMissing": len(a_raw)-len(a), "currentMissing": len(b_raw)-len(b), "referenceMissingRate": (len(a_raw)-len(a))/len(a_raw), "currentMissingRate": (len(b_raw)-len(b))/len(b_raw)}
         if not a or not b:
-            output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", [], ["At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
+            output.append(result(test_id, f"Distribution drift: {feature}", "10, 15", [], [DRIFT_LIMITATION, "At least one dataset has no finite observed feature values; missingness is not evidence of distribution stability."], "inconclusive"))
             continue
         psi_value, psi_details = psi(a, b, config["psiBins"])
         ks = ks_statistic(a, b)
         ks_details = {**missing_details, "asymptoticPValue": ks_asymptotic_pvalue(ks, len(a), len(b)), "pValueMethod": "two-sample asymptotic Kolmogorov approximation; not exact; ties/discrete data violate its continuous-distribution assumption", "decisionUses": "KS statistic threshold, not p-value", "multiplicity": "No multiplicity-corrected inference; each feature is a descriptive screening control."}
         measurements = [metric(config, "psi:"+feature, psi_value, len(b), unit="dimensionless", details={**missing_details, **psi_details}), metric(config, "ks:"+feature, ks, len(b), details=ks_details), metric(config, "wasserstein:"+feature, wasserstein(a, b), len(b), unit="feature_units", details=missing_details)]
-        notes = ["Distribution change does not itself establish model degradation or regulatory noncompliance.", "Missing values are excluded and missingness rates are separately recorded; review missingness change.", "Reference selection, seasonality, dependence, multiple-feature testing, and feature scale require review."]
+        notes = [DRIFT_LIMITATION, "Distribution change does not itself establish model degradation or regulatory noncompliance.", "Missing values are excluded and missingness rates are separately recorded; review missingness change.", "Reference selection, seasonality, dependence, multiple-feature testing, and feature scale require review."]
         insufficient = min(len(a), len(b)) < config["minSampleSize"]
         if insufficient:
             notes.append("Insufficient current or reference numeric observations.")
@@ -517,18 +457,15 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
                 # freshly computed predictions.
                 for row in rows:
                     row[score_column] = ""
-    diagnostics = []
+    diagnostics, plan = [], None
     if {"performance", "fairness"}.intersection(frozen["suite"]):
-        observations, omitted = prediction_rows(rows, frozen)
-        if "performance" in frozen["suite"]:
-            handlers = {"binary_classification": binary_performance, "multiclass_classification": multiclass_performance, "regression": regression_performance}
-            diagnostics.extend(handlers[frozen["task"]](observations, frozen, omitted))
-        if "fairness" in frozen["suite"]:
-            fairness_results = fairness(observations, frozen)
-            if omitted:
-                for diagnostic in fairness_results:
-                    diagnostic["limitations"].append(f"Excluded {omitted} input rows missing target or prediction before group comparison.")
-            diagnostics.extend(fairness_results)
+        declared = frozen["statistics"] if frozen["contractVersion"] == "1.3" else None
+        observations, omitted = prediction_rows(rows, frozen, group_columns(declared, frozen))
+        plan = derived_plan(frozen, observations)
+        if plan is not None:
+            diagnostics.extend(statistical_results(observations, frozen, plan, omitted)[0])
+        if "fairness" in frozen["suite"] and frozen["task"] != "binary_classification":
+            diagnostics.append(result("FAIR-SCOPE", "Binary outcome fairness suite", "10", [], ["These fairness definitions require a binary decision. A task-specific group-fairness protocol is required for regression or multiclass tasks."], "not_applicable"))
     from_predictions = list(diagnostics)
     if "drift" in frozen["suite"]:
         diagnostics.extend(drift(rows, reference_rows, frozen))
@@ -549,25 +486,35 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     adapter_notes = list(getattr(adapter, "limitations", None) or ()) if adapter is not None else []
     for diagnostic in from_predictions:
         diagnostic["limitations"].extend(adapter_notes)
-    outcomes = [r["outcome"] for r in diagnostics]
-    overall = "fail" if "fail" in outcomes else "inconclusive" if "inconclusive" in outcomes else "pass" if "pass" in outcomes else "not_applicable"
+    overall, review_flags = run_outcome(diagnostics)
     input_hashes = {"data": current_meta["sha256"], "reference": reference_meta["sha256"] if reference_meta else None}
     if adapter is not None:
         input_hashes["model"] = adapter.descriptor.artifact_sha256
     dependencies, dependency_notes = runtime_dependencies(adapter, (current_meta, reference_meta))
-    report = {"contractVersion": "1.0", "id": frozen["id"], "engagementId": frozen["engagementId"], "modelId": frozen["modelId"], "datasetId": frozen["datasetId"], "suite": frozen["suite"], "thresholds": frozen["thresholds"], "seed": frozen["seed"], "state": "succeeded", "outcome": overall, "overallOutcome": overall, "startedAt": started_at, "configuration": frozen, "provenance": {"runnerVersion": __version__, "inputHashes": input_hashes, "configSha256": sha256(canonical_bytes(frozen)), "inputs": {"data": current_meta, "reference": reference_meta}, "determinism": "No sampling or randomized computation; seed reserved for adapter protocols", "dependencies": dependencies}, "results": diagnostics, "limitations": ["This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.", "Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody."], "paperIds": [], "workingPapers": []}
-    report["provenance"]["inputs"]["testDefinitions"] = definition_versions(diagnostic["testId"] for diagnostic in diagnostics)
+    # The configuration snapshot records the plan that decided (a 1.0 configuration's derived plan included).
+    configuration = {**frozen, "statistics": plan}
+    determinism = "Deterministic statistics; the descriptive percentile bootstrap (expected calibration error, R²) uses random.Random(seed)"
+    report = {"contractVersion": REPORT_CONTRACT, "id": frozen["id"], "engagementId": frozen["engagementId"], "modelId": frozen["modelId"], "datasetId": frozen["datasetId"], "suite": frozen["suite"], "thresholds": frozen["thresholds"], "seed": frozen["seed"], "state": "succeeded", "outcome": overall, "overallOutcome": overall, "reviewFlags": review_flags, "startedAt": started_at, "configuration": configuration, "provenance": {"runnerVersion": __version__, "inputHashes": input_hashes, "configSha256": sha256(canonical_bytes(configuration)), "statisticsPlanSha256": stats.plan_sha256(plan) if plan is not None else None, "inputs": {"data": current_meta, "reference": reference_meta}, "determinism": determinism, "dependencies": dependencies}, "results": diagnostics, "limitations": ["This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.", "Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody."], "paperIds": [], "workingPapers": []}
+    report["provenance"]["inputs"]["testDefinitions"] = definition_versions((diagnostic["testId"] for diagnostic in diagnostics), {d["testId"]: d["decision"]["kind"] for d in diagnostics if "decision" in d})
     report["limitations"].extend(dependency_notes+adapter_notes)
     report["workingPapers"] = [paper_for(report, diagnostic) for diagnostic in diagnostics]
     report["provenance"]["policyVersion"] = frozen["thresholds"]["policyVersion"]
     if adapter is not None:
         report["provenance"]["adapterVersion"] = adapter.descriptor.adapter_version
         report["provenance"]["inputs"]["model"] = {"sha256": adapter.descriptor.artifact_sha256, "format": adapter.descriptor.format, "featureColumns": [feature.name for feature in adapter.descriptor.feature_schema]}
-        report["provenance"]["determinism"] = "Seeded permutation protocol; deterministic feature perturbations; adapter-native determinism requires separate validation"
+        report["provenance"]["determinism"] = "Seeded permutation protocol; deterministic feature perturbations; adapter-native determinism requires separate validation. " + determinism
     report["paperIds"] = [paper["id"] for paper in report["workingPapers"]]
     report["completedAt"] = datetime.now(timezone.utc).isoformat()
     report["reportSha256"] = sha256(canonical_bytes(report))
     return report
+
+
+def run_outcome(results: list[dict[str, Any]]) -> tuple[str, list[str]]:
+    """Section 4.6: confirmatory criteria and results without a decision decide the run; exploratory
+    criteria never do, and each failing one is listed in reviewFlags."""
+    counted = [r["outcome"] for r in results if "decision" not in r or r["decision"]["role"] == "confirmatory"]
+    overall = next((state for state in ("fail", "inconclusive", "pass") if state in counted), "not_applicable")
+    return overall, [r["testId"] for r in results if "decision" in r and r["decision"]["role"] == "exploratory" and r["outcome"] == "fail"]
 
 
 def write_report(report: dict[str, Any], output_path: str | Path) -> None:

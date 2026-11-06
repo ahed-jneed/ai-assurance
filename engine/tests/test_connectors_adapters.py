@@ -271,7 +271,8 @@ class ConnectorAdapterTests(unittest.TestCase):
         self.assertEqual(adapter.limitations, [])
         performance = report["results"][0]
         self.assertEqual(performance["metrics"][0]["value"], 1.0)
-        self.assertEqual(performance["metrics"][0]["details"]["confusionMatrix"], {"tp": 15, "fp": 0, "tn": 5, "fn": 0})
+        balanced = next(m for m in performance["metrics"] if m["name"] == "balanced_accuracy")
+        self.assertEqual(balanced["details"]["counts"], {"tp": 15, "positives": 15, "tn": 5, "negatives": 5})
         validate_report(report)
         if jsonschema:
             self.assertEqual(schema_violations(report), [])
@@ -322,7 +323,10 @@ class ConnectorAdapterTests(unittest.TestCase):
         report = run(path, cfg, adapter=adapter)
         validate_report(report)
         self.assertEqual(report["provenance"]["inputHashes"]["model"], adapter.descriptor.artifact_sha256)
-        self.assertEqual(report["results"][1]["outcome"], "not_applicable")
+        # Saved scores never attach to fresh predictions, so calibration has no scored rows to decide on.
+        self.assertEqual(report["results"][1]["testId"], "PERF-CAL")
+        self.assertEqual(report["results"][1]["outcome"], "inconclusive")
+        self.assertEqual(report["results"][1]["decision"]["sampleSize"], 0)
         self.assertEqual(report["results"][2]["testId"], "EXPL-PERM")
 
 

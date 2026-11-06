@@ -186,6 +186,12 @@ export function ReportWorkspace({
                       findings
                     </dd>
                   </div>
+                  {!!r.replaces?.length && (
+                    <div>
+                      <dt>Replaces</dt>
+                      <dd>{r.replaces.join(", ")}</dd>
+                    </div>
+                  )}
                 </dl>
                 <div className="report-card-actions">
                   <Button variant="outline" onClick={() => onOpen(r)}>
@@ -244,6 +250,8 @@ export function ReportWorkspace({
                         ? r.snapshot.findings.length
                         : 0}{" "}
                       findings
+                      {!!r.replaces?.length &&
+                        " · replaces " + r.replaces.join(", ")}
                     </small>
                   </TableCell>
                   <TableCell>
