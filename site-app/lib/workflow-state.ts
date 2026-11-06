@@ -18,6 +18,17 @@ export const isReleased = (report: Report) =>
   !!report.clientSnapshot &&
   !!report.clientSha256;
 /**
+ * Whether a client may read the report: the released one, and every report a
+ * later release superseded. The client was issued that opinion, so it stays
+ * readable, labelled with the report that superseded it.
+ */
+export const isClientVisible = (report: Report) =>
+  report.kind === "final" &&
+  ["released", "superseded"].includes(releaseState(report)) &&
+  !!report.release?.releasedAt &&
+  !!report.clientSnapshot &&
+  !!report.clientSha256;
+/**
  * The user's live client request grants: active, unexpired and, given
  * `since` (the start of the user's current membership grant), issued at or
  * after it, so a revoked or re-roled contributor never regains old requests.

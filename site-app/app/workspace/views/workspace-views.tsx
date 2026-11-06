@@ -332,11 +332,20 @@ export function WorkspaceViews({
             role={role}
             userId={data.identity.id}
             busy={busy}
-            opinion={url.reportOpinion}
-            onOpinion={url.setReportOpinion}
+            terms={url.reportTerms}
+            onTerms={url.setReportTerms}
+            onAudience={(paperId, audience) =>
+              safeAct("setPaperAudience", { paperId, audience })
+            }
             onGate={nav.openGate}
             onCreate={(kind) =>
-              onModal("report", { kind, opinion: url.reportOpinion })
+              onModal("report", {
+                kind,
+                engagementType: url.reportTerms.engagementType,
+                assuranceLevel: url.reportTerms.assuranceLevel ?? "",
+                conclusion: url.reportTerms.conclusion,
+                addressee: e.workflow?.brief?.audience ?? "",
+              })
             }
             onOpen={(r) => onDetail(reportTitle(r), r)}
             section={url.reportSection}

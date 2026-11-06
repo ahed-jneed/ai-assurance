@@ -71,6 +71,12 @@ export type Paper = {
    */
   retired?: { requestId: string; actor: string; at: string; reason: string };
   plannedGuidance?: string;
+  /**
+   * Who a signed paper is written for. Released client snapshots include
+   * only client papers. Absent means the default: internal for memos,
+   * client for working papers (`paperAudience` in lib/client-projection.ts).
+   */
+  audience?: "internal" | "client";
   body: Record<string, string>;
   evidenceIds: string[];
   runIds: string[];
@@ -365,6 +371,13 @@ export type Report = {
    * sees why an earlier report is no longer listed.
    */
   replaces?: string[];
+  /**
+   * The released report that superseded this one. Set on the client
+   * projection: a superseded report stays readable to the client, which was
+   * issued that opinion, labelled with its successor (or, when the successor
+   * was withdrawn and the client cannot read it, without naming it).
+   */
+  supersededBy?: string;
 };
 export type Engagement = {
   workflow?: Workflow;
