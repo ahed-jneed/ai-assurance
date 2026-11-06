@@ -140,16 +140,21 @@ export async function POST(request: Request) {
       hashes: string[] = [];
     scope = { tenantId: ctx.tenantId, engagementId: e.id, submissionId };
     // A client cannot declare columns free of special-category data: such
-    // columns need the basis the audit team records first (#60, D-11).
-    for (const file of bundle)
-      uploadGate(e, {
+    // columns need the basis the audit team records first (#60, D-11). The
+    // audit event records each gated file's columns and bases.
+    const ids = bundle.map(() => id("EV")),
+      specialCategory: Record<string, ReturnType<typeof uploadGate>> = {};
+    for (const [i, file] of bundle.entries()) {
+      const gate = uploadGate(e, {
         category: g.category,
         headers: uploadHeader(file.name, await file.arrayBuffer()),
         handlingBasis: g.handlingBasis,
         declaration: null,
       });
-    for (const file of bundle) {
-      const artifactId = id("EV"),
+      if (gate) specialCategory[ids[i]] = gate;
+    }
+    for (const [i, file] of bundle.entries()) {
+      const artifactId = ids[i],
         payload = await file.arrayBuffer(),
         hash = await sha256(payload),
         key = ctx.tenantId + "/" + e.id + "/" + artifactId + "/" + hash;
@@ -210,6 +215,7 @@ export async function POST(request: Request) {
       hashes,
       handlingBasis: g.handlingBasis,
       delivery: delivery.delivery,
+      ...(Object.keys(specialCategory).length ? { specialCategory } : {}),
     });
     keys.length = 0;
     return Response.json({

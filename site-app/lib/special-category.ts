@@ -296,18 +296,33 @@ export function csvHeader(text: string): string[] | null {
 }
 /** Bytes read from the start of an upload to find its header row. */
 export const headerScanBytes = 64 * 1024;
-/** The header of a CSV upload's first bytes, or null for another format. */
+/**
+ * The header of an upload whose first bytes are UTF-8 text, whatever its
+ * name: the external worker reads every Dataset as CSV, so a file without a
+ * .csv extension is inspected too. Tab-separated when the name says so, or
+ * when the first line holds tabs and no commas. Null for binary formats
+ * (Parquet, spreadsheets), which cannot be inspected.
+ */
 export function uploadHeader(name: string, bytes: ArrayBuffer) {
-  if (!/\.(csv|tsv|txt)$/i.test(name)) return null;
-  const text = new TextDecoder("utf-8").decode(bytes.slice(0, headerScanBytes));
-  return /\.tsv$/i.test(name)
-    ? (text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "")
+  let text: string;
+  try {
+    // `stream` tolerates a multi-byte character cut at the scan limit.
+    text = new TextDecoder("utf-8", { fatal: true }).decode(
+      bytes.slice(0, headerScanBytes),
+      { stream: true },
+    );
+  } catch {
+    return null;
+  }
+  if (!text || text.includes("\u0000")) return null;
+  const first = text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
+  return /\.tsv$/i.test(name) || (first.includes("\t") && !first.includes(","))
+    ? first
         .split("\t")
         .map((c) => c.trim())
         .filter(Boolean)
     : csvHeader(text);
 }
-
 /**
  * The upload gate: a Dataset upload whose header holds special-category
  * columns needs the client's recorded basis for each of them, unless the

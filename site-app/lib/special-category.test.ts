@@ -5,6 +5,7 @@
 import { env } from "cloudflare:workers";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST as submit } from "@/app/api/client-submission/route";
 import { POST as upload } from "@/app/api/evidence/route";
 import { POST as workspace } from "@/app/api/workspace/route";
 import { caller, postRequest, stored } from "./commands/test-fixtures";
@@ -23,6 +24,7 @@ import {
 } from "./special-category";
 import { context } from "./tenancy";
 import { sqliteD1 } from "./test-d1";
+import { seedWorkflow } from "./workflow-seed";
 
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenancy")>()),
@@ -60,7 +62,27 @@ describe("column detection", () => {
     expect(csvHeader("")).toBeNull();
     const bytes = (text: string) => new TextEncoder().encode(text).buffer;
     expect(uploadHeader("data.tsv", bytes("a\tb\n1\t2"))).toEqual(["a", "b"]);
-    expect(uploadHeader("model.onnx", bytes("a,b"))).toBeNull();
+    // Any text upload is inspected, whatever its name: the external worker
+    // reads every Dataset as CSV.
+    expect(uploadHeader("dataset", bytes("id,ethnicity\n1,A"))).toEqual([
+      "id",
+      "ethnicity",
+    ]);
+    expect(uploadHeader("data.bin", bytes("a\tethnicity\n1\t2"))).toEqual([
+      "a",
+      "ethnicity",
+    ]);
+    // A character cut by the scan limit does not hide the header.
+    const long = bytes("ethnicity," + "é".repeat(40_000));
+    expect(uploadHeader("dataset", long)?.[0]).toBe("ethnicity");
+    // Binary formats cannot be inspected.
+    expect(
+      uploadHeader(
+        "model.onnx",
+        new Uint8Array([0x08, 0x00, 0xff, 0xfe]).buffer,
+      ),
+    ).toBeNull();
+    expect(uploadHeader("x.parquet", bytes("PAR1\u0000\u0001"))).toBeNull();
   });
 
   it("recognises names of GDPR Art 9(1) categories", () => {
@@ -248,7 +270,7 @@ describe("POST /api/evidence", () => {
       id: string;
       version: number;
     };
-  function send(csv: string) {
+  function send(csv: string, name = "applicants.csv") {
     const { id, version } = engagement(),
       form = new FormData();
     form.set("tenantId", "tenant-1");
@@ -257,7 +279,7 @@ describe("POST /api/evidence", () => {
     form.set("category", "Dataset");
     form.set("visibility", "internal");
     form.set("handlingBasis", "synthetic");
-    form.set("file", new File([csv], "applicants.csv", { type: "text/csv" }));
+    form.set("file", new File([csv], name, { type: "text/csv" }));
     return upload(
       new Request("https://workspace.test/api/evidence", {
         method: "POST",
@@ -331,6 +353,148 @@ describe("POST /api/evidence", () => {
     ]);
   });
 
+  const record = async (columns = ["ethnicity"]) => {
+    const { id, version } = engagement();
+    const recorded = await workspace(
+      postRequest("/api/workspace", {
+        tenantId: "tenant-1",
+        engagementId: id,
+        expectedVersion: version,
+        op: "recordSpecialCategoryBasis",
+        data: {
+          kind: "gdpr_art9",
+          point: "g",
+          statement: "Substantial public interest under national equality law",
+          columns,
+          confirmedBy: "Client DPO",
+          confirmedOn: "2026-11-01",
+        },
+      }),
+    );
+    expect(recorded.status).toBe(200);
+    return ((await recorded.json()) as { details: { basisId: string } }).details
+      .basisId;
+  };
+
+  it("inspects a Dataset uploaded without a file extension", async () => {
+    const refused = await send(csv, "dataset");
+    expect(refused.status).toBe(409);
+    expect(objects.size).toBe(0);
+  });
+
+  it("gates a client submission and records the gate in its audit event", async () => {
+    // A client contributor with an active grant on an open request.
+    const row = sqlite.prepare("SELECT body FROM engagements").get() as {
+        body: string;
+      },
+      e = JSON.parse(row.body) as Engagement,
+      at = "2026-11-01T00:00:00.000Z";
+    e.workflow = seedWorkflow("user-lead", at);
+    e.evidenceRequests = [
+      {
+        id: "REQ-1",
+        subject: "Fairness data",
+        description: "Applicant outcomes",
+        responsibleParty: "Client",
+        periodVersion: "2026",
+        handling: "synthetic",
+        dueDate: "2026-12-01",
+        paperIds: [],
+        evidenceIds: [],
+        required: true,
+        status: "open",
+        response: "",
+        assessment: "",
+        createdBy: "user-lead",
+        createdAt: at,
+        updatedBy: "user-lead",
+        updatedAt: at,
+        revision: 1,
+        history: [],
+      },
+    ];
+    e.workflow.clientGrants = [
+      {
+        id: "GRANT-1",
+        userId: "user-client",
+        requestId: "REQ-1",
+        prompt: "Upload the applicant outcomes",
+        instructions: "",
+        category: "Dataset",
+        handlingBasis: "synthetic",
+        expiresAt: "2999-01-01T00:00:00.000Z",
+        active: true,
+        actor: "user-lead",
+        at,
+      },
+    ];
+    sqlite
+      .prepare("UPDATE engagements SET body=?")
+      .run(JSON.stringify({ ...e, version: undefined }));
+    sqlite.exec(
+      "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name) VALUES ('tenant-1','user-client','Client Contributor','CL-1','Client')",
+    );
+    const asClient = () =>
+      vi.mocked(context).mockResolvedValue({
+        ...caller("Client Contributor", false),
+        user: {
+          userId: "user-client",
+          displayName: "Client",
+          email: "client@fixture.invalid",
+        },
+        clientId: "CL-1",
+      });
+    const deliver = () => {
+      const { id, version } = engagement(),
+        form = new FormData();
+      form.set("tenantId", "tenant-1");
+      form.set("engagementId", id);
+      form.set("grantId", "GRANT-1");
+      form.set("expectedVersion", String(version));
+      form.set("note", "Outcomes attached");
+      form.set("delivery", "complete");
+      form.set("remaining", "");
+      form.append("file", new File(["id,label\n1,0\n"], "readme.csv"));
+      form.append("file", new File([csv], "applicants.csv"));
+      return submit(
+        new Request("https://workspace.test/api/client-submission", {
+          method: "POST",
+          headers: { origin: "https://workspace.test" },
+          body: form,
+        }),
+      );
+    };
+
+    asClient();
+    const refused = await deliver();
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toContain(
+      "Ask the audit team to record your Art 4a or GDPR Art 9(2) basis",
+    );
+    expect(objects.size).toBe(0);
+    expect(audit()).toEqual([]);
+
+    vi.mocked(context).mockResolvedValue(caller("Lead Auditor"));
+    const basisId = await record();
+    asClient();
+    const accepted = await deliver();
+    expect(accepted.status).toBe(200);
+    const { artifactIds } = (await accepted.json()) as {
+      artifactIds: string[];
+    };
+    expect(objects.size).toBe(2);
+    expect(audit().at(-1)).toEqual({
+      action: "clientSubmission",
+      details: expect.objectContaining({
+        artifactIds,
+        // Only the file with a gated column is recorded, by artifact id.
+        specialCategory: {
+          [artifactIds[1]]: { columns: ["ethnicity"], bases: [basisId] },
+        },
+      }),
+    });
+  });
+
   it("refuses a basis the client confirms in the future", async () => {
     const { id, version } = engagement();
     const refused = await workspace(
@@ -350,6 +514,42 @@ describe("POST /api/evidence", () => {
       }),
     );
     expect(refused.status).toBe(400);
+  });
+
+  it("allows the client's own date a day ahead of UTC and lists each column once", async () => {
+    const post = (confirmedOn: string, columns: string[]) => {
+      const { id, version } = engagement();
+      return workspace(
+        postRequest("/api/workspace", {
+          tenantId: "tenant-1",
+          engagementId: id,
+          expectedVersion: version,
+          op: "recordSpecialCategoryBasis",
+          data: {
+            kind: "gdpr_art9",
+            point: "a",
+            statement: "Explicit consent",
+            columns,
+            confirmedBy: "Client DPO",
+            confirmedOn,
+          },
+        }),
+      );
+    };
+    const day = 86_400_000,
+      date = (offset: number) =>
+        new Date(Date.now() + offset).toISOString().slice(0, 10);
+    // Duplicates are found the way columns are matched.
+    const duplicate = await post(date(0), [
+      "applicantEthnicity",
+      "applicant ethnicity",
+    ]);
+    expect(duplicate.status).toBe(400);
+    expect(((await duplicate.json()) as { error: string }).error).toBe(
+      "List each column once",
+    );
+    expect((await post(date(2 * day), ["ethnicity"])).status).toBe(400);
+    expect((await post(date(day), ["ethnicity"])).status).toBe(200);
   });
 });
 

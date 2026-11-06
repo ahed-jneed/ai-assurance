@@ -63,7 +63,10 @@ function UploadFields({
             label="Category"
             value={choices.category}
             values={evidenceCategories}
-            onChange={(v) => choice("category", v)}
+            onChange={(v) => {
+              choice("category", v);
+              check("specialCategoryNotPersonal", false);
+            }}
           />
         </label>
         <label>
@@ -101,7 +104,11 @@ function UploadFields({
               label: "Independently reviewed processing route",
             },
           ]}
-          onChange={(v) => choice("handlingBasis", v)}
+          onChange={(v) => {
+            choice("handlingBasis", v);
+            // The declaration holds only for the basis it was ticked under.
+            check("specialCategoryNotPersonal", false);
+          }}
         />
       </label>
       {choices.handlingBasis === "reviewed" && (
@@ -137,6 +144,7 @@ function UploadFields({
                 uncovered.map((c) => c.column).join(", ") +
                 " under Testing lab › Datasets before uploading, or upload only approved aggregates."
               : "The recorded basis is logged with this upload."}{" "}
+            Only Dataset evidence is gated; runs read only Dataset evidence.{" "}
             <PendingLegalReview />
           </p>
           {uncovered.length > 0 &&

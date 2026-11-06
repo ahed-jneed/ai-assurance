@@ -2,9 +2,14 @@ import { ApiError } from "../http";
 import { id, now } from "../ids";
 import {
   basisInputSchema,
+  normalizeColumn,
   type SpecialCategoryBasis,
 } from "../special-category";
 import { defineCommands } from "./command";
+/** The UTC calendar date after the instant `at`. */
+function tomorrow(at: string) {
+  return new Date(Date.parse(at) + 86_400_000).toISOString().slice(0, 10);
+}
 /**
  * The client's bases for special-category data (#60, D-11): recorded before
  * such data reach the platform, then declared with fairness protocols.
@@ -16,12 +21,11 @@ export const specialCategory = defineCommands({
     handle(e, d, ctx) {
       const v = basisInputSchema.parse(d),
         at = now();
-      if (v.confirmedOn > at.slice(0, 10))
+      // One day of slack: a client east of UTC confirms on its own date,
+      // which can be a day ahead of the UTC date.
+      if (v.confirmedOn > tomorrow(at))
         throw new ApiError(400, "The client cannot confirm a basis in future");
-      if (
-        new Set(v.columns.map((c) => c.toLocaleLowerCase("en"))).size !==
-        v.columns.length
-      )
+      if (new Set(v.columns.map(normalizeColumn)).size !== v.columns.length)
         throw new ApiError(400, "List each column once");
       const b: SpecialCategoryBasis = {
         ...v,
