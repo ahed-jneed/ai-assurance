@@ -28,7 +28,11 @@ describe("positionLabel", () => {
     ).toBe("Estimate on the band edge");
     // decide=false: a member whose derived band is invalid stays undecided.
     expect(
-      positionLabel({ ...member, direction: "none", reasons: ["invalid_band"] }),
+      positionLabel({
+        ...member,
+        direction: "none",
+        reasons: ["invalid_band"],
+      }),
     ).toBe("Not decided");
     expect(positionLabel({ ...member, direction: "none", reasons: [] })).toBe(
       "Not decided",
@@ -48,9 +52,9 @@ describe("positionLabel", () => {
   });
 
   it("says when an evaluated entry has no band", () => {
-    expect(
-      positionLabel({ ...member, band: null, direction: "none" }),
-    ).toBe("No band");
+    expect(positionLabel({ ...member, band: null, direction: "none" })).toBe(
+      "No band",
+    );
   });
 
   it("shows a headline without a decision as not decided", () => {
