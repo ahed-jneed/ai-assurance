@@ -1,5 +1,8 @@
 import type { Engagement, Role } from "./domain";
-import { checklistProblem } from "./domain/quality-review";
+import {
+  checklistProblem,
+  qualityReviewSignedOff,
+} from "./domain/quality-review";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import { currentExecution } from "./workflow-state";
 import { stagePaperQueue } from "./auditor-workflow";
@@ -545,13 +548,7 @@ export function engagementWork(
         (r) =>
           r.kind === "final" &&
           (!r.release || ["internal", "approved"].includes(r.release.state)) &&
-          !eqr.signOffs.some(
-            (s) =>
-              s.reportId === r.id &&
-              s.userId === userId &&
-              s.internalHash === r.sha256 &&
-              s.checklistRevision === eqr.revision,
-          ),
+          !qualityReviewSignedOff(eqr, r),
       );
     if (problem || unsigned.length)
       add(
