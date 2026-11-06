@@ -56,11 +56,15 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_definitions_are_versioned_and_unknown_tests_are_rejected(self):
         versions = definition_versions(["PERF-BINARY", "DRIFT-age"])
-        self.assertEqual(versions, {"PERF-BINARY": "1.0.0", "DRIFT-age": "1.0.0"})
+        self.assertEqual(versions, {"PERF-BINARY": "2.0.0", "DRIFT-age": "1.0.0"})
         versions["PERF-BINARY"] = "changed-copy"
-        self.assertEqual(TEST_DEFINITION_VERSIONS["PERF-BINARY"], "1.0.0")
+        self.assertEqual(TEST_DEFINITION_VERSIONS["PERF-BINARY"], "2.0.0")
         with self.assertRaises(ValueError):
             definition_versions(["UNREGISTERED-TEST"])
+        # A criterion of an explicit statistics plan takes its kind's definition.
+        self.assertEqual(definition_versions(["parity-screen"], {"parity-screen": "group_comparison"}), {"parity-screen": "2.0.0"})
+        with self.assertRaises(ValueError):
+            definition_versions(["criterion:performance"])
 
     def test_paper_identity_is_stable_for_retry_and_separates_version_changes(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -75,8 +79,8 @@ class ProvenanceTests(unittest.TestCase):
                 revised_runner = run(path, config())
             self.assertTrue(all(a != b for a, b in zip(first["paperIds"], revised_runner["paperIds"])))
             self.assertTrue(all(p["procedure"]["runnerVersion"] == "1.1.999-test" for p in revised_runner["workingPapers"]))
-            with patch.dict(TEST_DEFINITION_VERSIONS, {"PERF-BINARY": "2.0.0"}):
+            with patch.dict(TEST_DEFINITION_VERSIONS, {"PERF-BINARY": "2.0.1"}):
                 revised_definition = run(path, config())
             self.assertNotEqual(first["paperIds"][0], revised_definition["paperIds"][0])
             self.assertEqual(first["paperIds"][1:], revised_definition["paperIds"][1:])
-            self.assertEqual(revised_definition["workingPapers"][0]["procedure"]["testDefinitionVersion"], "2.0.0")
+            self.assertEqual(revised_definition["workingPapers"][0]["procedure"]["testDefinitionVersion"], "2.0.1")

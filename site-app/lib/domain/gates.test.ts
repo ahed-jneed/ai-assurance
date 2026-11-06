@@ -3,9 +3,15 @@ import catalog from "../catalog.json";
 import {
   completionGates,
   finalReportGates,
+  gatesStage,
+  isReleaseTimeRecord,
+  paperCurrent,
   paperRequired,
+  releaseRequirements,
+  releaseTimeTemplates,
   reportBlockers,
   stageGates,
+  workStage,
   type Engagement,
   type Paper,
 } from "../domain";
@@ -115,11 +121,11 @@ describe("lifecycle stage gates", () => {
     ).toHaveLength(0);
   });
 
-  it("needs signed applicability exclusions before Reporting", () => {
+  it("needs signed applicability exclusions of earlier stages", () => {
     const excluded = {
       ...base,
       id: "excluded",
-      stage: "Reporting",
+      stage: "Fieldwork",
       required: false,
       body: { ...base.body, conclusionStatus: "not_applicable" },
     };
@@ -127,6 +133,20 @@ describe("lifecycle stage gates", () => {
       stageGates(
         { ...audit, stage: "Evidence evaluation", papers: [excluded] },
         "Reporting",
+      )[0].recordId,
+    ).toBe("excluded");
+    // A Reporting exclusion is Reporting work: it gates Sign-off only.
+    const reporting = { ...excluded, stage: "Reporting" };
+    expect(
+      stageGates(
+        { ...audit, stage: "Evidence evaluation", papers: [reporting] },
+        "Reporting",
+      ),
+    ).toEqual([]);
+    expect(
+      stageGates(
+        { ...audit, stage: "Reporting", papers: [reporting] },
+        "Sign-off",
       )[0].recordId,
     ).toBe("excluded");
   });
@@ -629,6 +649,169 @@ describe("structured engagements", () => {
     e.papers = [{ ...e.papers[0], stage: "Planning", status: "draft" }];
     expect(stageGates(e, "Fieldwork")).toEqual([]);
     p.selected = true;
-    expect(kinds(e, "Fieldwork")).toEqual(["paper"]);
+    expect(kinds(e, "Fieldwork")).toEqual(["workflow", "paper"]);
+  });
+
+  it("gates Fieldwork on the work of selected Planning procedures", () => {
+    const e = signed();
+    e.stage = "Planning";
+    const p = procedureOf(e);
+    p.stage = "Planning";
+    e.papers[0].stage = "Planning";
+    expect(stageGates(e, "Fieldwork")).toEqual([]);
+    p.state = "evaluated";
+    expect(stageGates(e, "Fieldwork").map((g) => g.message)).toEqual([review]);
+    p.state = "reviewed";
+    e.papers[0].revision = 3;
+    expect(stageGates(e, "Fieldwork").map((g) => g.message)).toEqual([sign]);
+  });
+});
+
+describe("stage-scoped gates", () => {
+  const signedPaper = (templateId: string): Paper => ({
+    ...templatePaper(templateId),
+    status: "signed",
+    body: { conclusionStatus: "supported" },
+  });
+  // A legacy engagement under an approved workflow without procedures: every
+  // catalog working paper is signed except WP-RP-01 (Reporting work) and the
+  // release-time records WP-RP-02 and MEM-SO-01.
+  const legacy = (stage: string) =>
+    engagement({
+      workflow: approvedWorkflow(),
+      stage,
+      papers: [
+        ...catalog.items
+          .filter(
+            (t) => t.kind === "working_paper" && !t.id.startsWith("WP-RP"),
+          )
+          .map((t) => signedPaper(t.id)),
+        templatePaper("WP-RP-01"),
+        templatePaper("WP-RP-02"),
+        { ...templatePaper("MEM-SO-01"), required: true },
+      ],
+    });
+  const signReporting = (e: Engagement) => {
+    const rp01 = e.papers.find((p) => p.templateId === "WP-RP-01")!;
+    rp01.status = "signed";
+    rp01.body = { conclusionStatus: "supported" };
+  };
+
+  it("lets Reporting start without Reporting or Sign-off work", () => {
+    expect(stageGates(legacy("Evidence evaluation"), "Reporting")).toEqual([]);
+  });
+
+  it("needs the Reporting work, not the release-time records, for Sign-off", () => {
+    const e = legacy("Reporting");
+    expect(stageGates(e, "Sign-off").map((g) => g.message)).toEqual([
+      "WP-RP-01 is not signed",
+    ]);
+    signReporting(e);
+    expect(stageGates(e, "Sign-off")).toEqual([]);
+  });
+
+  it("never asks for WP-RP-02 or MEM-SO-01 before final issuance", () => {
+    const e = legacy("Sign-off");
+    signReporting(e);
+    for (const opinion of ["Readiness assessment", ...opinions])
+      expect(finalReportGates(e, opinion)).toEqual([]);
+    const records = e.papers.filter((p) => isReleaseTimeRecord(p.templateId));
+    expect(records.map((p) => p.templateId)).toEqual(["WP-RP-02", "MEM-SO-01"]);
+    for (const p of records) expect(paperRequired(e, p)).toBe(false);
+  });
+
+  it("scopes structured procedures to the stage they belong to", () => {
+    const procedure = (templateId: string): Procedure => ({
+      ...seedWorkflow("lead", at).procedures.find(
+        (p) => p.templateId === templateId,
+      )!,
+      selected: true,
+      applicability: "applicable",
+    });
+    const e = engagement({
+      workflow: approvedWorkflow(
+        ["WP-PL-01", "WP-A10-01", "WP-EV-01", "WP-RP-01", "WP-RP-02"].map(
+          procedure,
+        ),
+      ),
+    });
+    const ids = (gates: { recordId?: string }[]) =>
+      gates.map((g) => g.recordId).filter(Boolean);
+    const gated = (target: string) =>
+      ids(completionGates(e, "Adverse conclusion", target));
+    expect(ids(stageGates(e, "Fieldwork"))).toEqual(["PROC-WP-PL-01"]);
+    expect(gated("Evidence evaluation")).toEqual([
+      "PROC-WP-PL-01",
+      "PROC-WP-A10-01",
+    ]);
+    expect(gated("Reporting")).toEqual([
+      "PROC-WP-PL-01",
+      "PROC-WP-A10-01",
+      "PROC-WP-EV-01",
+    ]);
+    const beforeSignOff = [
+      "PROC-WP-PL-01",
+      "PROC-WP-A10-01",
+      "PROC-WP-EV-01",
+      "PROC-WP-RP-01",
+    ];
+    expect(gated("Sign-off")).toEqual(beforeSignOff);
+    // Final issuance and release: everything but the release-time record.
+    expect(ids(completionGates(e, "Adverse conclusion"))).toEqual(
+      beforeSignOff,
+    );
+    expect(ids(releaseRequirements(e))).toEqual(beforeSignOff);
+  });
+
+  it("places work in lifecycle stages without regard to case", () => {
+    expect(workStage("Planning")).toBe(0);
+    expect(workStage("Evidence Evaluation")).toBe(2);
+    expect(workStage("Sign-off")).toBe(4);
+    expect(workStage("Remediation and Monitoring")).toBe(-1);
+    expect(workStage("Unknown")).toBe(1);
+    expect(gatesStage("Reporting", "WP-RP-01", "Reporting")).toBe(false);
+    expect(gatesStage("Reporting", "WP-RP-01", "Sign-off")).toBe(true);
+    expect(gatesStage("Reporting", "WP-RP-01")).toBe(true);
+    expect(gatesStage("Sign-off", "WP-RP-02")).toBe(false);
+    expect(gatesStage("Sign-off", "MEM-SO-01")).toBe(false);
+    expect(gatesStage("Remediation and Monitoring", "WP-RM-01")).toBe(false);
+    expect(releaseTimeTemplates).toEqual(["WP-RP-02", "MEM-SO-01"]);
+  });
+});
+
+describe("superseded and retired papers", () => {
+  const qualified: Paper = {
+    ...base,
+    status: "signed",
+    body: { ...base.body, conclusionStatus: "qualified" },
+  };
+
+  it("are not current, not required and gate nothing", () => {
+    const superseded: Paper = { ...qualified, id: "old", supersededBy: "new" };
+    const retired: Paper = {
+      ...base,
+      id: "memo",
+      retired: { requestId: "REQ-1", actor: "lead", at, reason: "Reopened" },
+    };
+    const e = engagement({
+      ...complete,
+      findings: [],
+      papers: [{ ...planning, status: "signed" }, superseded, retired],
+    });
+    for (const p of [superseded, retired]) {
+      expect(paperCurrent(p)).toBe(false);
+      expect(paperRequired(e, p)).toBe(false);
+    }
+    expect(finalReportGates(e, "Readiness assessment")).toEqual([]);
+    expect(
+      stageGates({ ...e, stage: "Evidence evaluation" }, "Reporting"),
+    ).toEqual([]);
+    // The same qualified paper, while current, keeps a readiness opinion out.
+    expect(
+      finalReportGates(
+        { ...e, papers: [{ ...qualified, id: "current" }] },
+        "Readiness assessment",
+      ).map((g) => g.kind),
+    ).toEqual(["conclusion"]);
   });
 });

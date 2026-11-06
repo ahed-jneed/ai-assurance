@@ -13,10 +13,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from engine.assurance import (
-    bootstrap_interval, build_dossier, canonical_bytes, collect_jsonl,
-    compare_replay, intersectional_slices, main, quality_checks, read_json,
+    _bootstrap_protocol, bootstrap_interval, build_dossier, canonical_bytes, collect_jsonl,
+    compare_replay, intersectional_slices, main, power, quality_checks, read_json,
     sample_records, sign_dossier, verify_dossier,
 )
+from engine.tests.test_statistics_golden import GOLDEN
 
 try:
     from cryptography.hazmat.primitives import serialization
@@ -190,6 +191,64 @@ class StatisticalTests(unittest.TestCase):
         rows[1]["predicted"] = "unexpected"
         with self.assertRaises(ValueError):
             intersectional_slices(rows, protected_fields=["region"])
+
+    def test_bootstrap_protocol_purposes_and_budgets(self):
+        # Descriptive: 100-10000 replicates within rows x replicates <= 5,000,000 (section 5.11).
+        _bootstrap_protocol(400, 1, 10000, 0.95, 30, 10)
+        with self.assertRaises(ValueError):
+            _bootstrap_protocol(600, 1, 10000, 0.95, 30, 10)
+        # Decision: 1000-10000 replicates within clusters x replicates <= 50,000,000 draws.
+        _bootstrap_protocol(25000, 1, 2000, 0.95, 30, 10, purpose="decision")
+        for n, replicates in ((25001, 2000), (100, 999)):
+            with self.assertRaises(ValueError):
+                _bootstrap_protocol(n, 1, replicates, 0.95, 30, 10, purpose="decision")
+        with self.assertRaises(ValueError):
+            _bootstrap_protocol(10, 1, 1000, 0.95, 30, 10, purpose="other")
+
+    def test_intersectional_strata_decided_like_golden_cases_22_and_23(self):
+        for case_id in ("GC-22", "GC-23"):
+            case = next(c for c in GOLDEN["cases"] if c["id"] == case_id)
+            criterion = case["plan"]["criteria"][0]
+            rows, index = [], 0
+            for g in case["data"]["groups"]:
+                sex, band = g["group"].split("/")
+                for actual, predicted, count in (("1", "1", g["selected"]), ("0", "0", g["n"] - g["selected"])):
+                    for _ in range(count):
+                        rows.append({"id": f"r{index}", "actual": actual, "predicted": predicted, "sex": sex, "band": band})
+                        index += 1
+            result = intersectional_slices(rows, protected_fields=["sex", "band"], replicates=100, bands={criterion["metric"]: criterion["band"]}, minimum_coverage=criterion["minimumCoverage"])
+            decided = result["statistics"]["criteria"][0]
+            expected = case["expected"]["criteria"][0]
+            self.assertEqual(decided["outcome"], expected["outcome"], case_id)
+            self.assertAlmostEqual(decided["decision"]["pValue"], expected["decision"]["pValue"], delta=1e-9 + 1e-5 * expected["decision"]["pValue"])
+            for key, value in expected["decision"]["coverage"].items():
+                self.assertAlmostEqual(decided["decision"]["coverage"][key], value, delta=1e-9)
+            self.assertEqual(set(decided["decision"]["reasons"]), set(expected["decision"]["reasons"]))
+            self.assertEqual(decided["decision"]["role"], "exploratory")
+            self.assertEqual(len(decided["decision"]["suppressedGroups"]), 2)
+        self.assertIsNone(intersectional_slices(population(), protected_fields=["region"], min_support=5, min_class_count=1, replicates=100)["statistics"])
+        with self.assertRaises(ValueError):
+            intersectional_slices(population(), protected_fields=["region"], replicates=100, bands={"selection_rate_difference": {"lower": -0.1}})
+
+    def test_power_for_a_case_and_for_a_plan(self):
+        case = next(c for c in GOLDEN["cases"] if c["id"] == "GC-27")
+        result = power(case["input"])["result"]
+        self.assertAlmostEqual(result["passProbability"], case["expected"]["passProbability"], delta=1e-6)
+        self.assertEqual(result["requiredGroupSizeForPass"], case["expected"]["requiredGroupSizeForPass"])
+        plan = {"criteria": [dict(case["input"]["criterion"], id="four-fifths"), {"id": "accuracy-minimum", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": 0.8}}]}]}
+        report = power(plan)
+        self.assertEqual([c["familySize"] for c in report["criteria"]], [2, 2])
+        self.assertEqual(report["criteria"][1]["status"], "not_computed")
+        self.assertTrue(report["acknowledgementRequired"])
+        self.assertEqual(report["shortfalls"], ["four-fifths", "accuracy-minimum"])
+        with tempfile.TemporaryDirectory() as directory:
+            source, output = Path(directory)/"plan.json", Path(directory)/"power.json"
+            source.write_text(json.dumps(plan), encoding="utf-8")
+            self.assertEqual(main(["power", "--input", str(source), "--output", str(output)]), 0)
+            self.assertEqual(json.loads(output.read_text(encoding="utf-8"))["planSha256"], report["planSha256"])
+            source.write_text(json.dumps({"criteria": [{"id": "x", "kind": "performance", "members": []}]}), encoding="utf-8")
+            with redirect_stderr(io.StringIO()):
+                self.assertEqual(main(["power", "--input", str(source)]), 2)
 
     def test_intersectional_cluster_protocol(self):
         result = intersectional_slices(population(), protected_fields=["region"], cluster_field="cluster", min_support=5, min_clusters=5, min_class_count=1, replicates=100)

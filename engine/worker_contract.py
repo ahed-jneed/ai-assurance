@@ -1,4 +1,4 @@
-"""Versioned worker transport and hosted-v1.1/external-v1.0 translation.
+"""Versioned worker transport and hosted engineConfig 1.1/1.4 to engine 1.3 translation.
 
 Transport hashes refer to exact UTF-8 bytes. An engine report's own checksum
 uses its existing canonical JSON contract; these are different digests.
@@ -15,11 +15,15 @@ from datetime import datetime
 from typing import Any
 
 from .contract import HASH, ID, validate_report
+from . import statistics as stats
 from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, validate_config
 from .errors import EngineError
 
-WORKER_VERSION = "1.1.0"
-TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.1.0"
+WORKER_VERSION = "1.2.0"
+# 2.0.0: hosted engineConfig 1.1 (derived plan) and 1.4 (explicit plan) become engine configuration 1.3,
+# and hostedResults copy the engine's statistics 1.0.0 decisions (docs/design/audit-statistics.md E4).
+TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.0.0"
+ENGINE_CONFIG_VERSIONS = {"1.1", "1.4"}
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
 MAX_COMPLETION_BYTES = 10 * 1024 * 1024
@@ -189,8 +193,8 @@ def validate_request(request):
     if request["inputHashes"].get("dataset") != digest:
         raise ValueError("Dataset manifest/hash mismatch")
     config = request["engineConfig"]
-    if config.get("contractVersion") != "1.1":
-        raise ValueError("Worker requires frozen hosted engineConfig contractVersion 1.1")
+    if config.get("contractVersion") not in ENGINE_CONFIG_VERSIONS:
+        raise ValueError("Worker requires frozen hosted engineConfig contractVersion 1.1 or 1.4")
     for key in ("id", "engagementId", "modelId", "datasetId"):
         valid_id(config.get(key), "engineConfig."+key)
     if config["datasetId"] != data["id"] or config["modelId"] != request["model"]["id"]:
@@ -224,6 +228,10 @@ def validate_request(request):
     for field in ("policyId", "policyVersion"):
         if not isinstance(config.get(field), str) or not config[field].strip():
             raise ValueError("Named frozen internal policy is required")
+    if config["contractVersion"] == "1.4":
+        validate_plan_request(config)
+    elif "statistics" in config:
+        raise ValueError("A statistics plan requires engineConfig contractVersion 1.4")
     if "modelSpec" in config:
         validate_model_spec(config["modelSpec"], TASKS[config["task"]])
         if request["executionMode"] == "auditor_model" and config["task"] == "Binary classification":
@@ -255,15 +263,81 @@ def validate_model_spec(spec, task):
             raise ValueError("Invalid declared tensor/field output")
 
 
-def integer(config, key, default, maximum=1_000_000, minimum=2):
+def integer(config, key, default, maximum=1_000_000, minimum=1):
     value = config.get(key, default)
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
         raise ValueError("Invalid "+key)
     return value
 
 
+def plan_families(plan):
+    """Section 11.2: the hosted test families a plan's criteria use (a 1.4 profile's suite, as a set)."""
+    names = {"selection_rate_difference": "demographic_parity", "selection_rate_ratio": "disparate_impact", "equalized_odds": "equalized_odds"}
+    return {"regression" if c["kind"] == "regression_performance" else names[c["metric"]] if c["kind"] == "group_comparison" else "performance" for c in plan["criteria"]}
+
+
+def validate_plan_request(config):
+    """engineConfig 1.4 (section 11.1): an explicit plan, the profile's declared label pair, and a suite
+    that is exactly the families of the plan's criteria. Hosted plans have no calibration criteria."""
+    plan = stats.validate_plan(config.get("statistics"))
+    if any(c["kind"] == "calibration" for c in plan["criteria"]):
+        raise ValueError("A hosted plan cannot contain calibration criteria")
+    if plan["clusterField"] is not None:
+        raise ValueError("A hosted plan cannot declare a cluster design")
+    if plan_families(plan) != set(config["suite"]):
+        raise ValueError("engineConfig suite must equal the families of the plan's criteria")
+    allowed = {"labelColumn", "predictionColumn", "groupColumn", "positiveLabel", "negativeLabel", "performancePositiveLabel"}
+    if set(config["config"]) - allowed:
+        raise ValueError("engineConfig 1.4 config holds only column mappings and the declared labels")
+    if config["task"] == "Binary classification" and config.get("negativeLabel") != config["config"].get("negativeLabel"):
+        raise ValueError("engineConfig.negativeLabel must equal config.negativeLabel")
+    return plan
+
+
+def target_label_count(rows, column):
+    """k for the multiclass chance baseline: the labels that occur in the target column (section 9.3)."""
+    return len({str(row[column]).strip() for row in rows if str(row.get(column, "")).strip()})
+
+
+def hosted_plan(hosted, rows, task, target_column):
+    """Section 9.3: derive the hosted plan of an engineConfig 1.1 request, minimums raised to the floors."""
+    c = hosted["config"]
+    selected = hosted["suite"]
+
+    def criterion(field, default=None, upper=1.0):
+        value = finite_number(c.get(field, default), field)
+        if not 0 <= value <= upper:
+            raise ValueError("Invalid acceptance criterion "+field)
+        return value
+
+    legacy = {"minimumGroupSize": integer(c, "minimumGroupSize", 30), "minimumSampleSize": integer(c, "minimumSampleSize", 20), "minimumClassCount": integer(c, "minimumClassCount", 5)}
+    if "performance" in selected:
+        legacy["minimumAccuracy"] = criterion("minimumAccuracy")
+        if task == "binary_classification":
+            legacy["minimumRecall"] = criterion("minimumRecall", .7)
+        else:
+            legacy["minimumMacroF1"] = criterion("minimumMacroF1", .7)
+    if "regression" in selected:
+        legacy["maximumRmse"] = criterion("maximumRmse", 1, 1e100)
+    if {"demographic_parity", "equalized_odds"} & set(selected):
+        legacy["maximumParityGap"] = criterion("maximumParityGap", .1)
+    if "equalized_odds" in selected:
+        legacy["maximumOddsGap"] = criterion("maximumOddsGap", legacy["maximumParityGap"])
+    if "disparate_impact" in selected:
+        legacy["minimumImpactRatio"] = criterion("minimumImpactRatio")
+    for key in ("minimumAccuracy", "maximumParityGap", "minimumImpactRatio"):
+        legacy.setdefault(key, 0.0)
+    k = target_label_count(rows, target_column) if task == "multiclass_classification" else 0
+    data = {"matrix": [[1]] * k} if task == "multiclass_classification" else None
+    plan = stats.derive_hosted({"task": hosted["task"], "suite": selected, "config": legacy}, data)
+    return stats.normalize_plan(plan)
+
+
 def translate_config(request, rows):
-    """Translate selected tests without claiming supplemental metrics passed."""
+    """Translate a hosted engineConfig into an engine 1.3 configuration whose plan decides every result.
+
+    engineConfig 1.1 derives the hosted plan (section 9.3); engineConfig 1.4 carries its own plan. The
+    configured and applied minimums are both recorded (section 7)."""
     validate_request(request)
     hosted = request["engineConfig"]
     c = hosted["config"]
@@ -295,32 +369,22 @@ def translate_config(request, rows):
     if "protected" in columns and len({row[columns["protected"]].strip() for row in rows}) > 1000:
         raise EngineError("cardinality_limit_exceeded", "Protected-group cardinality exceeds engine bounds")
     suites = list(dict.fromkeys(s for test in selected for s in SUITES[test]))
-    values = {}
-
-    def criterion(field, metric, operator, default=None, upper=1.0):
-        value = c.get(field, default)
-        number = finite_number(value, field)
-        if not 0 <= number <= upper:
-            raise ValueError("Invalid acceptance criterion "+field)
-        values[metric] = {"operator": operator, "value": number}
-
-    if "performance" in selected:
-        criterion("minimumAccuracy", "accuracy", ">=")
-        criterion("minimumRecall" if task == "binary_classification" else "minimumMacroF1", "recall" if task == "binary_classification" else "macro_f1", ">=", .7)
-    if "regression" in selected:
-        criterion("maximumRmse", "rmse", "<=", 1, 1e100)
-    if "demographic_parity" in selected:
-        criterion("maximumParityGap", "demographic_parity_difference", "<=")
-    if "disparate_impact" in selected:
-        criterion("minimumImpactRatio", "disparate_impact_ratio", ">=")
-    if "equalized_odds" in selected:
-        criterion("maximumOddsGap", "equalized_odds_difference", "<=", c.get("maximumParityGap", .1))
-    native = {"contractVersion": "1.0", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "minSampleSize": integer(c, "minimumSampleSize", 20), "minClassCount": max(2, integer(c, "minimumClassCount", 5, minimum=1)), "minGroupSize": integer(c, "minimumGroupSize", 30), "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": values}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": "1.1", "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimumClassCount": c.get("minimumClassCount", 5), "supplementalMetricPolicy": "descriptive; only selected named acceptance criteria determine hostedResults"}}
+    if hosted["contractVersion"] == "1.4":
+        plan = validate_plan_request(hosted)
+        configured = None
+    else:
+        plan = hosted_plan(hosted, rows, task, columns["target"])
+        configured = plan["configuredMinimums"]
+    applied = plan["minimums"]
+    native = {"contractVersion": "1.3", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "statistics": plan, "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": {}}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": hosted["contractVersion"], "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimums": {"configured": configured, "applied": applied}, "supplementalMetricPolicy": "Every result is a criterion of the recorded statistics plan; metrics without a band are descriptive and never decide."}}
     if task == "binary_classification":
         native.update(binary_labels(hosted, rows, columns, inference=inference))
     if "modelSpec" in hosted:
         native["modelSpec"] = copy.deepcopy(hosted["modelSpec"])
-    return validate_config(native)
+    try:
+        return validate_config(native)
+    except stats.StatisticsError as exc:
+        raise EngineError("protocol_config_invalid", str(exc)) from exc
 
 
 def binary_labels(hosted, rows=None, columns=None, *, inference):
@@ -328,10 +392,11 @@ def binary_labels(hosted, rows=None, columns=None, *, inference):
 
     The platform freezes engineConfig.negativeLabel, so the label pair never
     depends on which labels happen to occur: a dataset with a single
-    observed class is evaluated and reported as inconclusive. A model's
-    outputLabels must be exactly that pair, and observed labels outside it
-    are rejected when predictions are read. Only a request frozen without
-    negativeLabel and without a model reads `rows` (the `columns` roles).
+    observed class is evaluated (statistics 1.0.0 decides what it supports).
+    A model's outputLabels must be exactly that pair, and observed labels
+    outside it are rejected when predictions are read. Only an engineConfig
+    1.1 request frozen without negativeLabel and without a model reads `rows`
+    (the `columns` roles).
     """
     positive = hosted["config"].get("positiveLabel")
     if not isinstance(positive, str) or not positive.strip():
@@ -340,6 +405,8 @@ def binary_labels(hosted, rows=None, columns=None, *, inference):
     declared = set(labels) if inference else None
     negative = hosted.get("negativeLabel")
     if negative is None:
+        if hosted.get("contractVersion") == "1.4":
+            raise EngineError("protocol_config_invalid", "engineConfig 1.4 declares negativeLabel")
         # Requests frozen without negativeLabel: derive the other label.
         names = declared if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
         others = names-{positive}
@@ -354,62 +421,30 @@ def binary_labels(hosted, rows=None, columns=None, *, inference):
     return {"positiveLabel": positive, "negativeLabel": negative}
 
 
-def _selected_sources(report, test, task):
-    ids = {"performance": ["PERF-BINARY" if task == "binary_classification" else "PERF-MULTI"], "regression": ["PERF-REG"], **{name: [result_id] for name, result_id in FAIRNESS.items()}}
-    return [result for result in report["results"] if result["testId"] in ids[test]]
-
-
 def hosted_results(report, request):
-    """Retain engine evidence; evaluate only frozen selected hosted criteria.
-
-    The core engine is deliberately conservative when supplementary metrics
-    have no thresholds. This separate projection never rewrites that report.
-    """
+    """The engine's decisions, copied (section 12): one result per criterion of the recorded plan, in plan
+    order, never re-decided. Headline names take the hosted aliases and multiclass macro_recall becomes
+    balanced_accuracy; the article follows the criterion kind."""
     validate_report(report)
-    c = request["engineConfig"]["config"]
-    task = report["configuration"]["task"]
-    minimum_n = c.get("minimumSampleSize", 20)
-    minimum_class = c.get("minimumClassCount", 5)
+    plan = report["configuration"].get("statistics")
+    if plan is None:
+        raise ValueError("Requested tests produced no statistics plan")
+    by_id = {result["testId"]: result for result in report["results"] if "decision" in result}
+    multiclass = report["configuration"]["task"] == "multiclass_classification"
     result_list = []
-    for test in request["engineConfig"]["suite"]:
-        sources = _selected_sources(report, test, task)
-        if not sources:
+    for criterion in plan["criteria"]:
+        source = by_id.get(criterion["id"])
+        if source is None:
             raise ValueError("Requested test produced no evidence")
-        # Engine measurements may share one confusion/details object. Copy
-        # each separately so acceptance metadata survives JSON round trips.
-        metrics = [copy.deepcopy(m) for source in sources for m in source["metrics"]]
-        limitations = list(dict.fromkeys(note for source in sources for note in source["limitations"]))
-        selected_metrics = [m for m in metrics if m["threshold"] is not None]
-        eligible = bool(metrics) and min((m["sampleSize"] for m in metrics), default=0) >= minimum_n
-        if test == "performance" and task == "binary_classification":
-            confusion = metrics[0]["details"]["confusionMatrix"]
-            eligible &= min(confusion["tp"]+confusion["fn"], confusion["tn"]+confusion["fp"]) >= minimum_class
-        elif test == "performance":
-            slices = metrics[0]["slices"]
-            eligible &= len(slices) >= 2 and all(s["n"] >= minimum_class for s in slices)
-        elif test in FAIRNESS:
-            slices = metrics[0]["slices"]
-            eligible &= len(slices) >= 2 and all(s["n"] >= c["minimumGroupSize"] for s in slices)
-            if test == "equalized_odds":
-                eligible &= all(min(s["tprDenominator"], s["fprDenominator"]) >= minimum_class for s in slices)
-        if not eligible or not selected_metrics or any(m["value"] is None for m in selected_metrics):
-            outcome = "inconclusive"
-            limitations.append("Selected acceptance is inconclusive because evidence, eligibility, or a frozen criterion is unavailable.")
-        else:
-            def accepted(m):
-                a, b = m["value"], m["threshold"]["value"]
-                epsilon = 1e-12 * max(1, abs(a), abs(b))
-                return a <= b+epsilon if m["threshold"]["operator"] == "<=" else a >= b-epsilon
-            outcome = "pass" if all(accepted(m) for m in selected_metrics) else "fail"
+        metrics = copy.deepcopy(source["metrics"])
         for m in metrics:
-            m["details"]["acceptanceRole"] = "criterion" if m["threshold"] is not None else "supplemental_descriptive"
-            if m["name"] in METRIC_ALIASES:
-                m["details"]["engineMetricName"] = m["name"]
-                m["name"] = METRIC_ALIASES[m["name"]]
-        limitations.append("Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.")
-        if minimum_class == 1:
-            limitations.append("The engine's full report applies a conservative minimum class count of two; this hosted projection separately applies the frozen minimum of one.")
-        result_list.append({"testId": test, "label": LABELS[test], "article": "10" if test in FAIRNESS else "15", "outcome": outcome, "metrics": metrics, "limitations": list(dict.fromkeys(limitations))})
+            if m["details"]["role"] == "headline":
+                m["name"] = METRIC_ALIASES.get(m["name"], m["name"])
+            elif multiclass and m["name"] == "macro_recall":
+                m["name"] = "balanced_accuracy"
+        article = "10" if criterion["kind"] == "group_comparison" else "15"
+        limitations = list(dict.fromkeys(source["limitations"] + ["The external worker copies the engine's statistics 1.0.0 decision for this criterion; it does not re-decide."]))
+        result_list.append({"testId": criterion["id"], "label": LABELS.get(criterion["id"], source["label"]), "article": article, "outcome": source["outcome"], "metrics": metrics, "limitations": limitations, "decision": copy.deepcopy(source["decision"])})
     return result_list
 
 

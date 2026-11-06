@@ -1,4 +1,5 @@
 import {
+  paperCurrent,
   stages,
   type Artifact,
   type Engagement,
@@ -13,7 +14,9 @@ export function auditStageIndex(stage: string) {
   );
 }
 export function stagePaperQueue(e: Engagement, role: Role, userId: string) {
-  const queue = personalPaperQueue(e.papers, e.artifacts, role, userId),
+  // Superseded papers and retired memos are history, never work.
+  const papers = e.papers.filter(paperCurrent),
+    queue = personalPaperQueue(papers, e.artifacts, role, userId),
     current = auditStageIndex(e.stage);
   const stageOrder = (p: Paper) => {
     const i = auditStageIndex(p.stage);
@@ -40,7 +43,7 @@ export function stagePaperQueue(e: Engagement, role: Role, userId: string) {
     (auditStageIndex(p.stage) >= 0 && auditStageIndex(p.stage) <= current);
   const active = ordered.filter((item) => dueNow(item.paper)),
     later = ordered.filter((item) => !dueNow(item.paper));
-  const unfinished = e.papers.filter(
+  const unfinished = papers.filter(
     (p) =>
       p.status !== "signed" &&
       (current < 0 ||
