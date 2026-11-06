@@ -972,7 +972,9 @@ def group_members(spec, data, mins, level):
     suppressed = [{"group": name, "n": size[name]} for name in names if size[name] < mins["groupSize"]]
     unknown = data.get("unknownGroupRows", 0)
     population = sum(size.values()) + unknown + data.get("withheldRows", 0) - sum(withheld.values())
-    eligible_rows = sum(size[name] for name in eligible)
+    # A row left out for another column set still belongs to its eligible group here (withheldMembers).
+    members_withheld = data.get("withheldMembers") or {}
+    eligible_rows = sum(size[name] + members_withheld.get(name, 0) for name in eligible)
     coverage = {"eligibleRows": eligible_rows, "populationRows": population, "unknownGroupRows": unknown, "value": eligible_rows / population if population else 0.0, "minimum": spec["minimumCoverage"]}
     metrics = ["tpr_difference", "fpr_difference"] if spec["metric"] == "equalized_odds" else [spec["metric"]]
     keys = list(dict.fromkeys(RATE_KEYS[metric] for metric in metrics))

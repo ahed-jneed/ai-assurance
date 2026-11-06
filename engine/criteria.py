@@ -109,7 +109,9 @@ def multiclass_data(observations):
 
 def group_data(criterion, observations, config, withheld=()):
     """withheld: the observations a client-held run leaves out (#102). A group with no other rows is passed
-    as withheld with its size, and the coverage population counts every withheld row."""
+    as withheld with its size, and the coverage population counts every withheld row. A withheld row whose
+    group in these columns kept other rows (it was left out for another column set's small group or missing
+    value) is passed in withheldMembers, so it counts as eligible for coverage as in a run on every row."""
     fields = criterion.get("groupFields") or [config["columns"]["protected"]]
     groups, unknown = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0, "tn": 0}), 0
     positive = config["positiveLabel"]
@@ -123,8 +125,8 @@ def group_data(criterion, observations, config, withheld=()):
         cm["tp" if actual and predicted else "fn" if actual else "fp" if predicted else "tn"] += 1
     data = {"groups": [{"group": name, **groups[name]} for name in sorted(groups, key=st.code_point_key)], "unknownGroupRows": unknown}
     if withheld:
-        labels = Counter(label for label in (stratum(o["fields"], fields) for o in withheld) if label is not None and label not in groups)
-        data.update(withheldGroups=dict(labels), withheldRows=len(withheld))
+        labels = Counter(label for label in (stratum(o["fields"], fields) for o in withheld) if label is not None)
+        data.update(withheldGroups={label: n for label, n in labels.items() if label not in groups}, withheldMembers={label: n for label, n in labels.items() if label in groups}, withheldRows=len(withheld))
     return data
 
 
@@ -138,9 +140,11 @@ def withheld_strata(observations, plan, config):
     """For a run on a client-held dataset (#102): the groups whose rows are left out of every criterion, as
     {columns: labels}. A group is left out when fewer than the minimum group size of the remaining observations
     fall in it, in any column set the plan groups or subsets by (the protected column, each criterion's group
-    fields, each calibration subgroup's field). Leaving rows out can shrink a group of another column set below
-    the minimum, so this repeats until nothing changes: every group that remains then has at least the minimum
-    number of rows in every column set, and no total in the result includes a left-out row."""
+    fields, each calibration subgroup's field). The rows with no value in a column set are left out the same
+    way (as the label None) when fewer than the minimum of them remain, since the totals minus the groups would
+    give them back too. Leaving rows out can shrink a group of another column set below the minimum, so this
+    repeats until nothing changes: every group that remains then has at least the minimum number of rows in
+    every column set, and no total in the result includes a left-out row."""
     minimum = plan["minimums"]["groupSize"]
     protected = config["columns"].get("protected")
     sets = [(protected,)] if protected else []
@@ -155,7 +159,7 @@ def withheld_strata(observations, plan, config):
     while True:
         changed = False
         for columns in sets:
-            counts = Counter(label for label in (stratum(o["fields"], columns) for o in remaining) if label is not None)
+            counts = Counter(stratum(o["fields"], columns) for o in remaining)
             small = {label for label, n in counts.items() if n < minimum}
             if small:
                 strata[columns] |= small
@@ -166,7 +170,8 @@ def withheld_strata(observations, plan, config):
 
 
 def is_withheld(fields, strata):
-    """Whether a row with these group values (column -> label or None) belongs to a withheld group."""
+    """Whether a row with these group values (column -> label or None) belongs to a withheld group (the label
+    None stands for the rows with no value in those columns)."""
     return any(stratum(fields, columns) in labels for columns, labels in strata.items())
 
 
@@ -402,8 +407,8 @@ def criterion_result(spec, outcome, config, plan, notes, context=None):
 
 # Client-held datasets (#102): what a result keeps of a group or calibration bin below the minimum group size.
 WITHHELD_ROWS_NOTE = ("The dataset is held by the client: the rows of groups below the minimum group size, in any column the "
-    "plan groups by, are left out of every criterion, performance and calibration included, and of the reported row "
-    "count. These results therefore describe only the other rows and can differ from a run on every row. The number of "
+    "plan groups by, and the rows with no value in such a column when there are fewer than the minimum group size of "
+    "them, are left out of every criterion, performance and calibration included, and of the reported row count.These results therefore describe only the other rows and can differ from a run on every row. The number of "
     "rows left out and the group comparisons' coverage counts are not reported; whether coverage met its minimum still decides.")
 WITHHELD_NOTE = ("The dataset is held by the client: groups and calibration bins below the minimum group size are withheld: "
     "only their labels are reported, without their row counts, rates, intervals or comparisons.")

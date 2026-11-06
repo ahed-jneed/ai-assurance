@@ -927,10 +927,50 @@ class WorkerTests(unittest.TestCase):
         observations = [{"fields": {"eth": e, "sex": x}} for e, x, n in (("A", "F", 40), ("A", "M", 40), ("B", "F", 31), ("C", "M", 5), ("D", "X", 25), ("A", "X", 6), (None, "F", 3)) for _ in range(n)]
         plan = {"minimums": {"groupSize": 30}, "criteria": [{"kind": "group_comparison", "groupFields": ["eth"]}, {"kind": "group_comparison", "groupFields": ["sex"]}]}
         strata = withheld_strata(observations, plan, {"columns": {}})
-        self.assertEqual(strata, {("eth",): {"C", "D"}, ("sex",): {"X"}})
+        # The three rows without an ethnicity are fewer than the minimum, so they go too (None).
+        self.assertEqual(strata, {("eth",): {"C", "D", None}, ("sex",): {"X"}})
         from engine.criteria import is_withheld
         remaining = [o for o in observations if not is_withheld(o["fields"], strata)]
-        self.assertEqual(len(remaining), 40+40+31+3)
+        self.assertEqual(len(remaining), 40+40+31)
+        # At or above the minimum, rows without a value stay, like a group.
+        observations += [{"fields": {"eth": None, "sex": "F"}} for _ in range(27)]
+        self.assertEqual(withheld_strata(observations, plan, {"columns": {}}), {("eth",): {"C", "D"}, ("sex",): {"X"}})
+
+    def client_held_pair(self, extra):
+        """A run on 200 rows (group A/B x sex F/M, 50 each) plus `extra` CSV rows, by the platform and client-held."""
+        def criterion(id, fields):
+            return {"id": id, "role": "confirmatory", "kind": "group_comparison", "metric": "selection_rate_difference", "groupFields": fields, "comparison": {"mode": "all_pairs"}, "band": {"lower": -0.2, "upper": 0.2}, "minimumCoverage": 1.0}
+        plan = {"criteria": [{"id": "acc", "role": "confirmatory", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": 0.1, "upper": 0.99}}]}, criterion("par-g", ["group"]), criterion("par-s", ["sex"]), criterion("par-gs", ["group", "sex"])]}
+        config = {"contractVersion": "1.3", "id": "run-two-columns", "engagementId": "eng", "modelId": "model", "datasetId": "data", "task": "binary_classification", "suite": ["performance", "fairness"], "seed": 1729, "columns": {"target": "actual", "prediction": "predicted", "protected": "group"}, "statistics": plan, "thresholds": {"policyId": "p", "policyVersion": "1", "source": "internal_policy", "values": {}}, "positiveLabel": "1", "negativeLabel": "0"}
+        lines = ["actual,predicted,group,sex"] + [f"{i % 2},{i // 2 % 2},{g},{s}" for g in "AB" for s in "FM" for i in range(50)] + list(extra)
+        path = self.root/"two-columns.csv"
+        path.write_text("\n".join(lines)+"\n", encoding="utf-8")
+        return ({r["testId"]: r for r in run(path, config, withhold_small_groups=held)["results"]} for held in (False, True))
+
+    def test_client_held_coverage_counts_rows_left_out_for_another_column(self):
+        # C,F is left out because C is small in the group column; in the sex column it belongs to F, which is
+        # eligible, so par-s still passes with full coverage as on the platform-held rows.
+        platform, client = self.client_held_pair(["1,1,C,F"])
+        self.assertEqual((platform["par-s"]["outcome"], platform["par-s"]["decision"]["coverage"]["value"]), ("pass", 1.0))
+        for test_id, r in platform.items():
+            with self.subTest(test_id):
+                self.assertEqual(client[test_id]["outcome"], r["outcome"])
+                self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
+        self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
+
+    def test_client_held_runs_leave_out_a_few_rows_without_a_group_value(self):
+        # One row without a group: kept, performance minus the group comparisons would give back its sex, label
+        # and prediction. Fewer than the minimum such rows are left out; coverage decides as before.
+        platform, client = self.client_held_pair(["1,0,,F"])
+        self.assertEqual(platform["acc"]["decision"]["sampleSize"], 201)
+        for test_id, r in platform.items():
+            with self.subTest(test_id):
+                self.assertEqual(client[test_id]["outcome"], r["outcome"])
+                self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
+                self.assertEqual(client[test_id]["decision"]["sampleSize"], 200)
+        self.assertIn("insufficient_coverage", client["par-g"]["decision"]["reasons"])
+        self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
+        self.assertTrue(all(s["n"] == 50 for s in client["par-gs"]["metrics"][0]["slices"]))
 
     def test_client_held_calibration_withholds_small_bins(self):
         from engine.criteria import withhold_small_groups
