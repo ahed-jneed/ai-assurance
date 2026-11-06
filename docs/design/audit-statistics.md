@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | Issue | #9 (milestone M1, "Defensible core") |
-| Status | Proposed design. Statistics specification version **1.0.0** (revised after independent review and re-review; its questions were decided on 5 November 2026, section 15; nothing implements it yet) |
+| Status | Statistics specification version **1.0.0** (revised after independent review and re-review; its questions were decided on 5 November 2026, section 15). Implemented in the engine by #21 (PR #87: `engine/statistics.py`, engine report 1.3, worker translation of `engineConfig` 1.1 and 1.4) and in the hosted runner by #22 (`site-app/lib/statistics.ts`, hosted run 1.4, external intake 1.5). Both runners pass every golden case they run. |
 | Date | 5 November 2026 |
-| Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`) |
+| Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`; threshold library data in `schemas/threshold-library.json`) |
 | Consumed by | #30 (NYC Local Law 144 pack), #15 (binary performance fixes) |
 | Contract files | `schemas/fixtures/statistics-golden.json` (51 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
 
@@ -291,7 +291,12 @@ The consequences for performance and calibration criteria, compared with today's
 - **Engine-derived classification criteria** can now pass without a threshold on every metric. This is the intended change, and the chance baseline with its gate keeps degenerate models out.
 - **Engine-derived regression and calibration criteria** never pass in 1.0.0. Today they pass only when R² or ECE meets its threshold by point estimate, and 1.0.0 never decides by point estimate.
 
-Explicit plans are taken as written. Whether they must also carry a baseline is a product decision for #15 (F-06).
+**Explicit hosted plans (decided 6 November 2026, extending D-19 from derived criteria to explicit plans).** Without a baseline, an accuracy-only explicit plan passes a constant predictor, the F-06 failure that #15 fixed for derived plans. So an explicit hosted performance criterion also carries the chance baseline:
+- **Binary.** Normalisation of a hosted 1.1 profile inserts `balanced_accuracy ≥ 0.5` after the written members unless the criterion's `rationale` records why the baseline is left out. A written balanced-accuracy bound below 0.5 also needs a rationale.
+- **Multiclass.** The baseline is macro recall above 1/k, and k is not known when a plan is written by hand, so a multiclass criterion without a balanced-accuracy member and without a rationale is rejected. The testing lab's plan step fills 1/k from the number of classes in the registered dataset's reference column.
+- **Display.** The plan the approval screen shows lists every member, so a criterion without the baseline, and its rationale, are visible before approval.
+
+Engine 1.3 configurations are taken as written; the chance gate applies to them as to every plan (section 5.2).
 
 GC-38 and GC-49 pin descriptive entries and the derived plans of legacy hosted profiles. Every performance-kind golden case also carries its descriptive entries.
 
@@ -773,7 +778,7 @@ Every runner MUST derive the plan deterministically, so existing profiles keep t
 The derivation reads one fact from the data: for a multiclass task, k, the number of labels that occur in the target column of the evaluated rows, which sets the chance baseline 1/max(k, 2). Everything else comes from the configuration. Both runners already list the labels when they evaluate (the sorted union of target and prediction labels, `labels` in the engine and `names` in the hosted runner), and the worker's `translate_config` receives the rows. The recorded plan therefore carries the baseline as a number; for three classes it is 1/3 = 0.3333333333333333 in IEEE double.
 
 - **Today's hosted profile** (`schemaVersion` 1.0, with the configuration of hosted 1.1 runs, so `derivedFrom.contractVersion` is "1.1"; the worker uses the same rules for `engineConfig` 1.1; GC-38, GC-49). Each selected test becomes a confirmatory criterion with the test's id:
-  - `performance` (binary): accuracy ≥ `minimumAccuracy`, recall ≥ `minimumRecall` (default 0.7), and balanced accuracy ≥ 0.50.
+  - `performance` (binary): accuracy ≥ `minimumAccuracy`, recall ≥ `minimumRecall` (default 0.7), and balanced accuracy ≥ 0.50. Recall, precision, specificity and F1 refer to the profile's `performancePositiveLabel` (#15), or to `positiveLabel` when it is empty; group criteria count the favourable `positiveLabel`.
   - `performance` (multiclass): accuracy ≥ `minimumAccuracy`, the chance baseline balanced accuracy (macro recall) ≥ 1/k, and macro F1 ≥ `minimumMacroF1` (default 0.7), in that order.
   - `regression`: RMSE ≤ `maximumRmse` (default 1), with `passBlockedBy` empty, because today's hosted rule decides on RMSE alone.
   - `demographic_parity`: selection-rate difference within ±`maximumParityGap`.
@@ -789,13 +794,19 @@ The derivation reads one fact from the data: for a multiclass task, k, the numbe
   - `FAIR-DP`, `FAIR-DI` and `FAIR-EO` get the bands ±δ, [τ, 1/τ] and ±δ from `demographic_parity_difference`, `disparate_impact_ratio` and `equalized_odds_difference`.
   - A criterion whose policy has no value it can decide gets no member or band (`no_threshold`).
   - Thresholds on `expected_calibration_error` and `r2` are never applied: those metrics are descriptive entries, and `passBlockedBy` makes them block a pass whether or not the policy sets a threshold (section 4.8).
-- **Freezing.** Changing any field after approval MUST create a new profile version (#22 acceptance criterion).
+- **Freezing.** Changing any field after approval MUST create a new profile version (#22 acceptance criterion). Hosted profiles are immutable once saved: a profile with the same name and version is refused, and each run freezes the plan that decides it into `manifest.statistics`, with its hash in `provenance.inputHashes.statisticsPlan`.
+
+**Reconciliation with #15 (recorded for H2, 6 November 2026).** #15 (PR #56) changed the hosted point-estimate rule after this section was first written: binary performance gained `performancePositiveLabel`, failed when balanced accuracy did not exceed 1/2 (1/k for multiclass), and was inconclusive when accuracy did not exceed the majority-class share. Under 1.0.0:
+- `performancePositiveLabel` is kept. It is part of the hosted 1.0 configuration and of the 1.1 profile's `config`, and the binary performance criterion's counts are taken relative to it. The derived plan, and so its hash, does not change: the positive class decides which rows are counted, not which members the plan holds.
+- The "balanced accuracy above chance" rule becomes the chance-baseline member `balanced_accuracy ≥ 0.5` (macro recall ≥ 1/k), decided by its interval and, for a pass, by the chance gate of section 5.2. A point estimate at or below chance can no longer fail by itself: it fails only when the interval lies below the bound.
+- The majority-class rule has no member. Its purpose, keeping a model that ignores the truth from passing on accuracy, is met by the chance baseline and its gate, which bound such a pass at α/2 whatever the class balance (section 5.2). As decided for statistics 1.0.0, a chance-baseline fail does not get an extra exact (Fisher lower-tail) gate; section 6 documents its rate, and the gate is on the Later list.
+- #15's descriptive `prevalence` and `majority_baseline_accuracy` metrics are not part of the 1.4 standard metric set (section 4.8); the counts they come from are in the members' `details.counts`.
 
 ## 10. Threshold library
 
 ### 10.1 Library entries
 
-Library entries are versioned data, shipped identically in both runners (#22 adds the data file; the engine mirrors it).
+Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); the hosted runner reads its generated copy and `engine/statistics.py` mirrors the entries a criterion can reference, which `engine/tests/test_threshold_library.py` checks.
 - A plan references an entry by `id` and `version` and stores the parameter values (section 9.1).
 - Every result that uses an entry MUST show its `legalStatus` label and `caveat` text verbatim. `decision.libraryEntry` carries both.
 - The run schema's `threshold.source` stays `"internal_policy"`, because the auditor adopts every entry as an internal acceptance rule.
@@ -810,6 +821,13 @@ Library entries are versioned data, shipped identically in both runners (#22 add
 | `policy.eu-aia.equalized-odds@1` | equalized_odds (TPR and FPR differences), ±δ | δ (0.10; 0.01–0.30) | `no_legal_safe_harbour` | same | same |
 | `policy.eu-aia.declared-performance@1` | one performance metric, lower bound = declared − tolerance | `metric`, `declaredValue` (required), `tolerance` (required; 0–0.2) | `no_legal_safe_harbour` | "Checks consistency with the accuracy level declared under Art. 15(3); not a conformity assessment." | [Art. 15](https://artificialintelligenceact.eu/article/15/) |
 | `policy.eu-aia.calibration@1` (engine) | calibration_gap per bin, ±δ | δ (required; 0.01–0.2) | `no_legal_safe_harbour` | same as the EU fairness entries | [Annex IV](https://artificialintelligenceact.eu/annex/4/) |
+| `policy.eu-aia.art50-marking-presence@1` | marking presence rate (attribute sampling), lower bound | lower (0.95; 0.90–0.999) | `no_legal_safe_harbour` | "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity." | Art 50 research, MD-A50-01 |
+| `policy.eu-aia.art50-declared-detection@1` | detection rate on unaltered outputs, lower bound = declared − tolerance | declaredValue (0.97; 0–1), tolerance (0.02; 0–0.05) | `no_legal_safe_harbour` | same as the Art 50 entries | MD-A50-02 |
+| `policy.eu-aia.art50-false-positive@1` | false-positive rate of detection, upper bound = declared + tolerance | declaredValue (0.005; 0–0.045), tolerance (0.005; 0–0.005) | `no_legal_safe_harbour` | same | MD-A50-03 |
+| `policy.eu-aia.art50-disclosure-probe@1` | self-identification rate under probing, lower bound | lower (0.98; 0.95–0.999) | `no_legal_safe_harbour` | same | MD-A50-04 |
+| `policy.eu-aia.art50-disclosure-compliance@1` | disclosure compliance rate (labels, notices, exempt-feature classification, completeness), lower bound | lower (0.95; 0.90–0.99) | `no_legal_safe_harbour` | same | MD-A50-05 |
+
+The Art 50 entries come from the Art 50 research (#59, PR #71, A50-ED-40) and stay pending the qualified legal review of #57 (D-02). Their kind is `attribute_sampling`, which no plan criterion has in 1.0.0: they are data for the GenAI evidence work of M2, and no runner decides them until then (D-01). The research defaults for an undeclared rate (0.95 detection, 0.01 false positives) are the entries' default parameters, and a status note records the finding that no rate was declared.
 
 Status notes:
 

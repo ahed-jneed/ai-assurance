@@ -244,6 +244,7 @@ describe("command registry", () => {
     renameEngagement: ["Auditor", "Lead Auditor"],
     openFollowup: ["Lead Auditor"],
     createReport: ["Lead Auditor"],
+    setPaperAudience: ["Lead Auditor"],
   };
   const managementOps = ["createClient", "createEngagement", "grantMember"];
 

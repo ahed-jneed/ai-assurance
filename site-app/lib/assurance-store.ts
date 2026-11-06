@@ -5,6 +5,7 @@
 // the report gates and pins are computed in SQL.
 import type { AssuranceRecord } from "./assurance-core";
 import { db } from "./bindings";
+import { requiresSupport } from "./domain/report-model";
 import { getEngagement, save } from "./engagement-repo";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
@@ -382,7 +383,8 @@ type AssessmentRow = { kind: string; approved: number | null } & Record<
 const field = (json: string | null): unknown =>
   json === null ? undefined : JSON.parse(json);
 /**
- * Why the engagement's assessments do not yet support `opinion`, in record
+ * Why the engagement's assessments do not yet support `opinion` (a
+ * report-model conclusion id or a legacy opinion string), in record
  * order: each current assessment needs an approving independent review, and
  * its own conclusion must fit the opinion.
  */
@@ -411,7 +413,7 @@ export async function assuranceGates(
     if (
       row.kind === "assertion" &&
       (conclusion === "unassessed" ||
-        (opinion === "Readiness assessment" && conclusion !== "supported"))
+        (requiresSupport(opinion) && conclusion !== "supported"))
     )
       messages.push(
         "Assertion does not support this opinion: " + String(statement),
@@ -419,7 +421,7 @@ export async function assuranceGates(
     if (
       row.kind === "obligation" &&
       (applicability === "needs_information" ||
-        (opinion === "Readiness assessment" &&
+        (requiresSupport(opinion) &&
           applicability === "applicable" &&
           field(row.outcome) !== "supported"))
     )

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 const load = async (file) =>
   import(
     "data:text/javascript;base64," +
@@ -13,9 +14,12 @@ const load = async (file) =>
         }).outputText,
       ).toString("base64")
   );
-const { workspaceSearch } = await load("lib/workspace-search.ts");
-const { paperRows, evidenceRows, findingRows, reportRows } = await load(
-  "lib/register-views.ts",
+// Both import lib/domain/report-model.ts, so they load with their imports.
+const { workspaceSearch } = await import(
+  await sourceURL("lib/workspace-search.ts")
+);
+const { paperRows, evidenceRows, findingRows, reportRows } = await import(
+  await sourceURL("lib/register-views.ts")
 );
 const data = {
   identity: { role: "Lead Auditor" },

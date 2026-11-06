@@ -250,6 +250,8 @@ export function useWorkspaceNavigation({
         facet: "all",
       });
     else if (gate.kind === "stage") navigate("Overview");
+    // The checklist's report elements come from the brief and program.
+    else if (gate.kind === "report") navigate("Audit program");
     else if (gate.kind === "run") showRun(gate.recordId ?? "");
     else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
