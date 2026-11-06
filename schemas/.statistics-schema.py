@@ -165,6 +165,10 @@ def add_external_run(schema):
     its hash in provenance.inputHashes.statisticsPlan. A profile with a stored plan (schemaVersion 1.1)
     keeps only column mappings and the declared labels in config (section 9.1)."""
     defs = schema['$defs']
+    # Interim until #22 (H4) compiles 1.5 runs: worker 1.2.0 copies the engine's decision into every hosted
+    # result, and the platform still compiles those results into a 1.2 run. The 1.2 result therefore
+    # admits that copied decision; its other rules are unchanged.
+    defs['externalHostedResult']['properties']['decision'] = ref('statisticsDecision')
     profile = copy.deepcopy(defs['evaluationProfile'])
     profile['properties'].update(schemaVersion={'const': '1.1'}, config=ref('hostedPlanConfig'), statistics=ref('statisticsPlan'))
     profile['required'] = list(dict.fromkeys(profile['required'] + ['statistics']))

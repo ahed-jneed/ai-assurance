@@ -7750,6 +7750,9 @@
             "maxLength": 10000
           },
           "maxItems": 100
+        },
+        "decision": {
+          "$ref": "#/$defs/statisticsDecision"
         }
       },
       "allOf": [
