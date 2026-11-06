@@ -2587,9 +2587,11 @@ try {
     reason: "Lead releases the amended package",
   });
   assert.equal(replaced.details.supersedes, internalFinal.id);
-  const superseded = e.reports.find((r) => r.id === internalFinal.id).release;
-  assert.equal(superseded.state, "superseded");
-  assert.equal(superseded.supersededBy, replacement.id);
+  const supersededRelease = e.reports.find(
+    (r) => r.id === internalFinal.id,
+  ).release;
+  assert.equal(supersededRelease.state, "superseded");
+  assert.equal(supersededRelease.supersededBy, replacement.id);
   assert.equal(e.reports.at(-1).release.supersedes, internalFinal.id);
   assert(
     e.reports
