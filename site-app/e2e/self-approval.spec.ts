@@ -30,15 +30,23 @@ test("the preparer of a classification cannot approve it", async ({
 }) => {
   const lead = await api("qa-lead");
   const reviewer = await api("qa-reviewer");
+  // Tri-state facts (#19): every required fact for a deployer on the Annex
+  // III route is answered, so only independence decides the approval.
+  const practices = ["a", "b", "ba", "bb", "c", "d", "e", "f", "g", "h"];
   await lead.command(demo.tenantId, demo.engagementId, "classify", {
-    prohibited: false,
-    highRisk: true,
-    transparency: false,
-    profiling: true,
-    annexRoute: "Annex III point 5(b)",
+    annexRoute: "Annex III — sensitive use case",
     operatorRole: "Deployer",
     intendedPurpose: "Creditworthiness assessment of consumer loan applicants",
     rationale: "Credit scoring of natural persons is listed in Annex III.",
+    facts: {
+      ...Object.fromEntries(practices.map((p) => ["art5_1_" + p, "no"])),
+      annexIIIProfiling: "yes",
+      smeStatus: "neither",
+      deployerUsesEmotionRecognition: "no",
+      deployerUsesBiometricCategorisation: "no",
+      deployerGeneratesDeepFakes: "no",
+      deployerPublishesAiTextOnPublicInterest: "no",
+    },
   });
 
   const own = await attempt(lead, demo, "approveClassification", {});

@@ -118,6 +118,23 @@ function hostedBindings(run) {
   }
   if (run.startedAt) assert.ok(Date.parse(run.startedAt) >= Date.parse(run.createdAt));
   if (run.completedAt) assert.ok(Date.parse(run.completedAt) >= Date.parse(run.startedAt ?? run.createdAt));
+  if (run.contractVersion === '1.4') {
+    // Statistics 1.0.0 (section 11.6): the frozen plan decides; a 1.1 protocol's plan is the run's plan, and
+    // its suite is exactly the families of the plan's criteria (section 11.2).
+    const plan = run.manifest.statistics;
+    assert.equal(createHash('sha256').update(jcs(plan), 'utf8').digest('hex'), hashes.statisticsPlan, 'statistics plan hash');
+    if (profile?.schemaVersion === '1.1') {
+      assert.deepEqual(profile.statistics, plan);
+      const family = { performance: 'performance', multiclass_performance: 'performance', regression_performance: 'regression', selection_rate_difference: 'demographic_parity', selection_rate_ratio: 'disparate_impact', equalized_odds: 'equalized_odds' };
+      assert.deepEqual([...new Set(plan.criteria.map(c => family[c.kind === 'group_comparison' ? c.metric : c.kind]))].sort(), [...run.suite].sort());
+    } else assert.notEqual(plan.derivedFrom, null, 'a plan without a stored 1.1 protocol is derived');
+    if (run.state === 'succeeded') {
+      statisticsBindings(run, plan, hashes.statisticsPlan);
+      assert.equal(run.paperIds.length, new Set(run.results.map(result => result.article)).size);
+      for (const result of run.results) for (const metric of result.metrics) assert.ok(metric.sampleSize <= dataset.rowCount);
+    }
+    return;
+  }
   if (run.state === 'succeeded') {
     assert.deepEqual(run.results.map(result => result.testId).sort(), [...run.suite].sort());
     // Hosted working papers consolidate results by regulatory article.
@@ -152,13 +169,45 @@ for (const [label, mutate] of [
 ]) {
   negative(label, engine13, mutate);
 }
-const fixturePath = resolve(option('--fixtures') ?? resolve(directory, 'fixtures/hosted-runs.v1.1.json'));
-assert.ok(existsSync(fixturePath), `Missing hosted fixtures: ${fixturePath}`);
-const hosted = json(fixturePath);
-assert.ok(Array.isArray(hosted) && hosted.length > 0);
-for (const [index, run] of hosted.entries()) {
-  positive(`Hosted fixture ${index}: ${run.task}/${run.state}`, run);
+// Hosted runs: the frozen 1.1 fixture, the hosted 1.4 fixture (site-app/lib/hosted-runs-fixture.test.ts
+// keeps it equal to the runner's output) and, with --fixtures, runs the integration harness just made.
+const hosted = json(resolve(directory, 'fixtures/hosted-runs.v1.1.json'));
+const hosted14 = json(resolve(directory, 'fixtures/hosted-runs.v1.4.json'));
+const fresh = option('--fixtures') ? json(resolve(option('--fixtures'))) : [];
+assert.ok(Array.isArray(hosted) && hosted.length > 0 && Array.isArray(hosted14) && hosted14.length > 0);
+for (const [index, run] of [...hosted, ...hosted14, ...fresh].entries()) {
+  positive(`Hosted fixture ${index}: ${run.contractVersion} ${run.task}/${run.state}`, run);
   hostedBindings(run);
+}
+assert.ok(fresh.every(run => run.contractVersion === '1.4'), 'the hosted runner emits run contract 1.4');
+const planned14 = hosted14.find(run => run.state === 'succeeded' && run.manifest.profile?.schemaVersion === '1.1' && run.task === 'Binary classification');
+const derived14 = hosted14.find(run => run.state === 'succeeded' && run.manifest.statistics.derivedFrom !== null);
+assert.ok(planned14 && derived14, 'Expected a 1.4 run from a stored plan and one from a derived plan');
+assert.ok(planned14.results.some(result => !planned14.suite.includes(result.testId)), 'an explicit plan names its own criterion ids');
+const member14 = planned14.results[0].metrics.findIndex(metric => metric.details.role === 'member');
+for (const [label, fixture, mutate] of [
+  ['1.4 result without its decision', planned14, run => { delete run.results[0].decision; }],
+  ['1.4 result keyed by an invalid id', planned14, run => { run.results[0].testId = 'not an id'; }],
+  ['1.4 more than 20 results', planned14, run => { run.results = Array.from({ length: 21 }, () => copy(run.results[0])); }],
+  ['1.4 missing plan in the manifest', planned14, run => { delete run.manifest.statistics; }],
+  ['1.4 missing plan hash', planned14, run => { delete run.provenance.inputHashes.statisticsPlan; }],
+  ['1.4 succeeded without review flags', planned14, run => { delete run.reviewFlags; }],
+  ['1.4 plan below the floors', planned14, run => { run.manifest.statistics.minimums.groupSize = 5; }],
+  ['1.4 member without an interval method', planned14, run => { run.results[0].metrics[member14].confidenceInterval.method = 'point_estimate'; }],
+  ['1.4 not-applicable criterion outcome', planned14, run => { run.results[0].outcome = 'not_applicable'; }],
+  ['1.4 group criterion in a multiclass run', hosted14.find(run => run.task === 'Multiclass classification'), run => { run.results[0].decision.kind = 'group_comparison'; run.results[0].article = '10'; }],
+  ['1.4 plan profile with legacy thresholds', planned14, run => { run.manifest.profile.config.minimumAccuracy = 0.8; }],
+  ['1.4 legacy hosted metric names only', derived14, run => { run.results[0].metrics = [{ name: 'accuracy', value: 0.9, unit: 'ratio', sampleSize: 10 }]; }],
+]) negative(label, fixture, mutate);
+for (const [label, mutate] of [
+  ['1.4 changed plan after freezing', run => { run.manifest.statistics.criteria[0].members[0].band.lower = 0.5; }],
+  ['1.4 results out of plan order', run => { run.results.reverse(); }],
+  ['1.4 outcome counting an exploratory criterion', run => { run.results.find(r => r.decision.role === 'exploratory').outcome = 'fail'; run.results.find(r => r.decision.role === 'exploratory').decision.direction = 'fail'; }],
+]) {
+  const run = copy(planned14);
+  mutate(run);
+  assert.throws(() => hostedBindings(run), undefined, label);
+  rejected++;
 }
 
 // Keep the previous browser contract readable after the v1.1 migration.
@@ -441,6 +490,8 @@ const externalMutations = [
   ['external unknown metric attribute', run => { run.results[0].metrics[0].fabricated = true; }],
   ['external oversized dataset', run => { run.manifest.dataset.size = 104857601; }],
   ['external contradictory outcome', run => { run.overallOutcome = run.outcome === 'fail' ? 'pass' : 'fail'; }],
+  // Results with a copied decision compile into 1.5 (#22 H4); the frozen 1.2 result has none.
+  ['external 1.2 result with a copied decision', run => { run.results[0].decision = copy(engine13.results[firstDecided].decision); }],
 ];
 for (const [label, mutate] of externalMutations) negative(label, ext, mutate);
 for (const [label, mutate] of [
@@ -463,10 +514,12 @@ pinnedExternal.manifest.dataset.cardPin = copy(cardPin);
 positive('External run with dataset-card pin', pinnedExternal);
 negative('external dataset-card pin malformed hash', pinnedExternal, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
 // A fresh platform projection, e.g. the assurance harness's
-// tmp/assurance-worker-fixture/hosted-external-run.json.
-if (option('--external-run')) {
-  const current = json(resolve(option('--external-run')));
-  positive('Supplied external import projection', current);
+// tmp/assurance-worker-fixture/hosted-external-run.json and its run contract
+// 1.5 sibling. --external-run may be given more than once.
+for (const [position, flag] of args.entries()) {
+  if (flag !== '--external-run') continue;
+  const current = json(resolve(args[position + 1]));
+  positive(`Supplied external import projection (contract ${current.contractVersion})`, current);
   if (current.manifest?.dataset?.cardPin) {
     negative('Supplied projection malformed dataset-card hash', current, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
     negative('Supplied projection missing dataset-card identity', current, run => { delete run.manifest.dataset.cardPin.recordId; });

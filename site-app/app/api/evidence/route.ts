@@ -12,6 +12,7 @@ import {
   save,
   sha256,
 } from "@/lib/store";
+import { uploadGate, uploadHeader } from "@/lib/special-category";
 import { activeGrant, isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -71,8 +72,16 @@ export async function POST(request: Request) {
         400,
         "Link an accepted governance decision for the reviewed processing route",
       );
+    const payload = await file.arrayBuffer(),
+      // Special-category columns need the client's recorded basis before
+      // the bytes are stored (#60, D-11).
+      specialCategory = uploadGate(e, {
+        category,
+        headers: uploadHeader(file.name, payload),
+        handlingBasis,
+        declaration: String(form.get("specialCategoryDeclaration") ?? ""),
+      });
     const artifactId = id("EV"),
-      payload = await file.arrayBuffer(),
       hash = await sha256(payload),
       name = file.name.replace(/[\x00-\x1f/\\]/g, "_").slice(0, 200),
       key = ctx.tenantId + "/" + e.id + "/" + artifactId + "/" + hash;
@@ -104,6 +113,7 @@ export async function POST(request: Request) {
       category,
       handlingBasis,
       governanceArtifactId,
+      ...(specialCategory ? { specialCategory } : {}),
     });
     uploadedKey = undefined;
     return Response.json({ artifactId, sha256: hash });
@@ -127,9 +137,13 @@ export async function GET(request: Request) {
         (s) =>
           s.actor === ctx.user.userId &&
           s.evidenceIds.includes(a?.id ?? "") &&
-          activeGrant(e.workflow, ctx.user.userId).some(
-            (g) => g.id === s.grantId,
-          ),
+          activeGrant(
+            e.workflow,
+            ctx.user.userId,
+            undefined,
+            undefined,
+            ctx.accessSince,
+          ).some((g) => g.id === s.grantId),
       );
     if (
       !a ||

@@ -109,7 +109,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 **Production.** OpenAI Sites dispatch injects `oai-authenticated-user-id`, `-email` and (optionally) `-full-name`. `app/chatgpt-auth.ts` trusts these headers without any signature, JWT or session check, and the Worker entry passes them through unchanged. `context()` (`lib/store.ts`) then works as follows:
 1. Missing headers return 401.
-2. If the user has no membership at all, it creates `tenant-<sha256(userId)[:24]>`, named "Assurance practice", with the user as Lead Auditor plus an "Example client" and engagement `ENG-default`. If the user has only revoked memberships, it returns 403 "access revoked" instead.
+2. Without an active membership it first accepts the pending invitations for the user's email (`lib/invitations.ts`). If the user has no membership at all and self-signup is allowed (`SELF_SIGNUP`, open only on the development server by default; see `docs/security/identity.md`), it creates `tenant-<sha256(userId)[:24]>`, named after the user ("<name> practice"), with the user as Lead Auditor plus an "Example client" and engagement `ENG-default`; otherwise it returns 403. If the user has only revoked memberships, it returns 403 "access revoked" instead.
 3. It loads the active membership.
 4. It runs a legacy access-adoption write batch on every request.
 5. It sets the `practiceAdmin` flag.
@@ -198,7 +198,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
 
 1. **First sign-in and provisioning** (local_seedy or qa-lead)
    1. Open `/`.
-   2. Expect the sidebar to show "Assurance practice", the engagement "Example client / New AI assurance engagement", and the identity "… · Lead Auditor". Overview shows the legacy engagement with a paper sign-off counter (0 / 32) and "Set up audit program".
+   2. Expect the sidebar to show "<name> practice" (for example "QA Lead practice"), the engagement "Example client / New AI assurance engagement", and the identity "… · Lead Auditor". Overview shows the legacy engagement with a paper sign-off counter (0 / 32) and "Set up audit program".
    3. `GET /api/workspace` returns `identity.role:"Lead Auditor"`, `identity.practiceAdmin:true` and `engagement.id:"ENG-default"`.
    4. Reload. The `tenantId` is unchanged.
    - **Negative:** without identity headers (`npm start`), the request returns 401.
@@ -232,10 +232,11 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    - **Watch F-04** (a later due-date edit invalidates every execution) and **F-29** (the 150-revision cap).
 
 6. **Classification** (qa-auditor, qa-reviewer)
-   1. Regulatory mapping → Assess classification → Save classification (`classify`). Status shows "provisional".
-   2. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
-   3. qa-reviewer approves (`approveClassification`). Status becomes "approved".
-   - **Watch F-31:** route "Unassessed" plus a purpose shows "Minimal risk".
+   1. Regulatory mapping → Assess classification → answer the facts in each section (yes, no or "needs information") → Save classification (`classify`). Status shows "provisional".
+   2. While a required fact is unknown the label reads "Needs information" and "Approve independently" stays disabled, listing what the approval waits for (#19).
+   3. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
+   4. qa-reviewer approves (`approveClassification`). Status becomes "approved".
+   - **F-31 (fixed in #19):** an "Unassessed" route reads "Unassessed" and blocks approval; contradictory route and fact combinations are rejected.
 
 7. **Evidence custody** (qa-auditor)
    1. Evidence vault → Files → Upload evidence, using `public/example-predictions.csv`, category Dataset, and a handling basis → Upload for acceptance. The row shows "Awaiting acceptance" and the response contains the SHA-256.
@@ -259,7 +260,8 @@ Each flow lists the steps, the expected results, negative checks, and the known 
       - protocol: create new;
       - columns and favourable label;
       - procedures: performance, demographic parity, disparate impact, equalized odds;
-      - thresholds, protected-group column, handling basis.
+      - thresholds, protected-group column, handling basis;
+      - the sample's `group` column is synthetic: untick "holds special-category data", or record a client basis under Datasets and choose the hosted route (#60).
 
       Then Save protocol & run (`createEvaluationProfile`, `queueRun`, `executeRun`).
    4. Evaluations → Results show per-test outcomes, the overall outcome, group tables and auto-drafted Article 10/15 papers.

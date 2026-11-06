@@ -13,12 +13,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { FrozenReportDetails } from "./report-details";
 import { FindingActions } from "./finding-actions";
+import { SpecialCategoryRecord } from "./special-category";
 import {
   performanceBaselines,
   performancePositiveLabel,
   protocolConfigKeys,
 } from "@/lib/evaluation";
 import { humanLabel, readableResults } from "@/lib/presentation";
+import { describePlan } from "@/lib/hosted-statistics";
+import { StatisticsResult } from "./statistics-result";
+import { legacyConfig } from "@/lib/domain";
 import type {
   Engagement,
   Run,
@@ -377,8 +381,10 @@ function GroupDetail({ value }: { value: unknown }) {
     );
   return null;
 }
+/** The criterion text of a frozen 1.0-1.2 result, from its run's legacy thresholds. */
 function Criterion({ result, run }: { result: Result; run: Run }) {
-  const c = run.config;
+  const c = legacyConfig(run.config);
+  if (!c) return <span>Pre-registered statistics plan</span>;
   return (
     <span>
       {result.testId === "performance"
@@ -449,37 +455,43 @@ export function RunDetails({
                     <State value={result.outcome} />
                   </div>
                   <div className="content-pad">
-                    <p className="criterion">
-                      <Criterion result={result} run={run} />
-                      <span className="subtle"> · Internal policy</span>
-                    </p>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Metric</TableHead>
-                          <TableHead>Result</TableHead>
-                          <TableHead>Rows</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {result.metrics.map((metric) => (
-                          <TableRow key={metric.name}>
-                            <TableCell>{humanLabel(metric.name)}</TableCell>
-                            <TableCell>
-                              <b>{formatMetric(metric)}</b>
-                            </TableCell>
-                            <TableCell>
-                              {metric.sampleSize.toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {result.metrics
-                      .filter((m) => m.details)
-                      .map((m) => (
-                        <GroupDetail key={m.name} value={m.details} />
-                      ))}
+                    {result.decision ? (
+                      <StatisticsResult result={result} />
+                    ) : (
+                      <>
+                        <p className="criterion">
+                          <Criterion result={result} run={run} />
+                          <span className="subtle"> · Internal policy</span>
+                        </p>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Metric</TableHead>
+                              <TableHead>Result</TableHead>
+                              <TableHead>Rows</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {result.metrics.map((metric) => (
+                              <TableRow key={metric.name}>
+                                <TableCell>{humanLabel(metric.name)}</TableCell>
+                                <TableCell>
+                                  <b>{formatMetric(metric)}</b>
+                                </TableCell>
+                                <TableCell>
+                                  {metric.sampleSize.toLocaleString()}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        {result.metrics
+                          .filter((m) => m.details)
+                          .map((m) => (
+                            <GroupDetail key={m.name} value={m.details} />
+                          ))}
+                      </>
+                    )}
                     <details className="provenance">
                       <summary>Limitations</summary>
                       <ul className="record-list">
@@ -521,6 +533,17 @@ export function RunDetails({
                   ))}
                 </ul>
               </section>
+              {run.manifest.profile?.specialCategory && (
+                <section className="readable-section">
+                  <h3>Special-category data</h3>
+                  <SpecialCategoryRecord
+                    declaration={run.manifest.profile.specialCategory}
+                    acknowledgement={
+                      run.manifest.specialCategoryAcknowledgement
+                    }
+                  />
+                </section>
+              )}
               {run.manifest.profile && (
                 <details className="ml-more">
                   <summary>Captured dataset declarations & criteria</summary>
@@ -559,6 +582,13 @@ export function RunDetails({
                   ).includes(key),
                 ),
               ),
+              ...(run.manifest?.statistics
+                ? {
+                    statisticsPlan: describePlan(run.manifest.statistics),
+                    statisticsPlanSha256:
+                      run.provenance.inputHashes.statisticsPlan,
+                  }
+                : {}),
               policy: {
                 source: run.thresholds.source,
                 version: run.provenance.policyVersion,

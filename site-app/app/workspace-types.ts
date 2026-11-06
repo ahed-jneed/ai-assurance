@@ -18,6 +18,24 @@ export type Member = {
   role: Role;
   client_id: string | null;
   status: "active" | "revoked";
+  /** Whether the member administers the practice. */
+  practice_admin?: boolean;
+  /** The engagements the member may open now (live grants only). */
+  grants?: { id: string; title: string }[];
+  /** Active runner workers the member sponsored. */
+  sponsored_workers?: number;
+};
+/** A pending invitation by email into the practice. */
+export type Invitation = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  role: Role;
+  client_id: string | null;
+  engagement_ids: string[];
+  invited_by: string;
+  created_at: string;
+  expires_at: string;
 };
 export type WorkspaceData = {
   identity: { id: string; name: string; role: Role; practiceAdmin?: boolean };
@@ -35,6 +53,8 @@ export type WorkspaceData = {
   /** The selected engagement's stored size in bytes, for internal roles. */
   metadataBytes?: number | null;
   members: Member[];
+  /** Pending invitations, for practice administrators. */
+  invitations?: Invitation[];
   people: {
     user_id: string;
     display_name: string;

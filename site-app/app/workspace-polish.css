@@ -399,6 +399,24 @@ h1 {
 .account-id summary {
   color: #696f63;
 }
+.practice-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+.grant-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
 .assurance-workbench {
   max-width: none;
 }

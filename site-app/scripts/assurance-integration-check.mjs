@@ -27,6 +27,8 @@ const mf = new Miniflare({
   bindings: {
     IDENTITY_MODE: "trusted-headers",
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    // First sign-ins provision the fixture practices (lib/access-policy.ts).
+    SELF_SIGNUP: "open",
   },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
@@ -270,6 +272,8 @@ try {
       sensitiveDataBasis: "Synthetic data",
     },
     rationale: "Numerical integration fixture only",
+    // Synthetic groups hold no special-category data (#60).
+    specialCategory: { specialCategory: false },
   });
   const profileId = e.evaluationProfiles.at(-1).id;
   // Recall of "0" rather than of the favourable "1": the external worker
@@ -609,6 +613,62 @@ try {
   console.log(
     "PASS exact population pin and reproducible stratified sample manifest",
   );
+  // A binary model labelled "no"/"yes": queueExternal derives the other
+  // class from the system's output classes instead of freezing "0" (D-12).
+  const labelledCsv = csv
+      .split("\n")
+      .map((line, i) =>
+        !i || !line.trim()
+          ? line
+          : line
+              .split(",")
+              .map((cell, c) => (c < 2 ? (cell === "1" ? "yes" : "no") : cell))
+              .join(","),
+      )
+      .join("\n"),
+    labelledDatasetId = await upload("labelled-predictions.csv", labelledCsv);
+  await cmd("createModel", {
+    name: "Labelled fixture predictor",
+    version: "1",
+    task: "Binary classification",
+    format: "Prediction file",
+    intendedPurpose: "Synthetic tests only",
+    artifactId: labelledDatasetId,
+  });
+  const labelledModelId = e.models.at(-1).id;
+  await cmd("createEvaluationProfile", {
+    name: "Labelled acceptance",
+    version: "1",
+    task: "Binary classification",
+    suite: ["performance"],
+    config: { ...config, positiveLabel: "yes" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+  });
+  const labelledProfileId = e.evaluationProfiles.at(-1).id;
+  const labelledSystem = (
+    await assurance("registerSystem", {
+      ...system.body,
+      modelPins: undefined,
+      artifactPins: undefined,
+      name: "Labelled fixture system",
+      modelIds: [labelledModelId],
+      outputs: { ...system.body.outputs, classOrder: ["no", "yes"] },
+    })
+  ).record;
+  const labelledPrediction = (
+    await assurance("registerPrediction", {
+      modelId: labelledModelId,
+      systemId: labelledSystem.id,
+      datasetId: labelledDatasetId,
+      sourceDatasetId: labelledDatasetId,
+      producedAt: new Date().toISOString(),
+      producingRun: "synthetic-generation",
+      inferenceConfiguration: "Fixture deterministic predictions",
+      mode: "provided_predictions",
+      limitations: "Declared lineage only",
+    })
+  ).record;
   await cmd("adoptWorkflow", {});
   // Approved planning fixture isolates job/runtime tests; full approval transitions are exercised in integration-check.mjs.
   e.workflow.brief = {
@@ -667,11 +727,31 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
-  await testDb
-    .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
-    .bind(JSON.stringify(e), tenantId, e.id)
-    .run();
-  await refresh();
+  const labelledProcedure = e.workflow.procedures.find(
+    (p) => p.templateId === "WP-A15-03",
+  );
+  Object.assign(labelledProcedure, {
+    selected: true,
+    applicability: "readiness",
+    ownerId: owner,
+    reviewerId: reviewer,
+    method: "automated",
+    modelId: labelledModelId,
+    datasetId: labelledDatasetId,
+    profileId: labelledProfileId,
+    rationale: "Synthetic",
+    population: "Fixture",
+    sampling: "Full fixture",
+  });
+  // Writes the fixture engagement as edited here, bypassing the commands.
+  const writeEngagement = async () => {
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(e), tenantId, e.id)
+      .run();
+    await refresh();
+  };
+  await writeEngagement();
   const datasetCard = (
     await assurance("registerDataset", {
       schemaVersion: "1.0",
@@ -721,7 +801,7 @@ try {
       },
     );
     assert.equal(runtime.code, 0, runtime.out + runtime.error);
-    assert.equal(JSON.parse(runtime.out.trim()).state, "completed");
+    return JSON.parse(runtime.out.trim());
   };
   // The worker measures binary performance on the protocol's performance
   // positive class "0" (#65), and fairness would count the favourable "1".
@@ -730,7 +810,7 @@ try {
     profileId: classProfileId,
     procedureId: classProcedure.id,
   });
-  await runWorker();
+  assert.equal((await runWorker()).state, "completed");
   const classRow = await testDb
     .prepare("SELECT * FROM execution_jobs WHERE id=?")
     .bind(classJob.jobId)
@@ -768,8 +848,99 @@ try {
       note.includes("refer to the performance positive class '0'"),
     ),
   );
+  // Jobs the worker would refuse are refused at queue time (#58).
+  const jobCount = async () =>
+    (await testDb.prepare("SELECT COUNT(*) AS n FROM execution_jobs").first())
+      .n;
+  const jobsBefore = await jobCount();
+  const wrongOther = await assurance(
+    "queueExternal",
+    { ...plan, negativeLabel: "no" },
+    owner,
+    400,
+  );
+  assert.match(
+    wrongOther.error,
+    /must be '0', the system revision's other output class; the worker would refuse 'no'/,
+  );
+  const systemRevision = async (version, changes) =>
+    (
+      await assurance("registerSystem", {
+        ...system.body,
+        modelPins: undefined,
+        artifactPins: undefined,
+        version,
+        ...changes,
+      })
+    ).record;
+  const threeClass = await systemRevision("1-three-classes", {
+    outputs: { ...system.body.outputs, classOrder: ["0", "1", "2"] },
+  });
+  const notBinary = await assurance(
+    "queueExternal",
+    { ...plan, systemId: threeClass.id },
+    owner,
+    400,
+  );
+  assert.match(
+    notBinary.error,
+    /declare exactly two output classes; it declares 3 \('0', '1', '2'\)/,
+  );
+  const wide = await systemRevision("1-wide", {
+    features: Array.from({ length: 101 }, (_, i) => ({
+      name: "feature_" + i,
+      type: "number",
+      unit: "unitless",
+      nullable: false,
+      nullHandling: "reject",
+      categories: [],
+    })),
+  });
+  const securityId = await upload(
+    "adapter-review.txt",
+    "Synthetic adapter security review",
+    "Security",
+  );
+  // Model inference needs a portable model format; the fixture model is a
+  // prediction file, so it poses as ONNX for this refusal only.
+  const patchModel = async (changes) => {
+    Object.assign(
+      e.models.find((m) => m.id === modelId),
+      changes,
+    );
+    await writeEngagement();
+  };
+  await patchModel({ format: "ONNX" });
+  const tooWide = await assurance(
+    "queueExternal",
+    {
+      ...plan,
+      predictionId: undefined,
+      systemId: wide.id,
+      mode: "auditor_model",
+      securityReviewId: securityId,
+      predictionOutput: "label",
+    },
+    owner,
+    400,
+  );
+  assert.match(
+    tooWide.error,
+    /accepts 1 to 100 feature columns; this system revision declares 101/,
+  );
+  await patchModel({ format: "Prediction file" });
+  // A claim repeats the frozen request twice, so about 1.1 MB of model
+  // metadata makes a claim response the worker cannot read (2 MiB).
+  await patchModel({ intendedPurpose: "x".repeat(1100000) });
+  const tooLarge = await assurance("queueExternal", plan, owner, 413);
+  assert.match(tooLarge.error, /over its 2 MiB limit for a claim/);
+  await patchModel({ intendedPurpose: "Synthetic tests only" });
+  assert.equal(await jobCount(), jobsBefore);
+  console.log(
+    "PASS queue refuses a wrong other label, a non-binary system, more than 100 features and an oversized claim",
+  );
   const job = await assurance("queueExternal", plan);
-  await runWorker();
+  assert.equal((await runWorker()).state, "completed");
   const jobRow = await testDb
     .prepare("SELECT * FROM execution_jobs WHERE id=?")
     .bind(job.jobId)
@@ -847,6 +1018,282 @@ try {
   console.log(
     "PASS actual HTTP worker → pinned input → Python diagnostics → authenticated result → bound audit procedure",
   );
+  // No other label given: the platform freezes the system's other class.
+  const labelled = await assurance("queueExternal", {
+      systemId: labelledSystem.id,
+      modelId: labelledModelId,
+      datasetId: labelledDatasetId,
+      profileId: labelledProfileId,
+      procedureId: labelledProcedure.id,
+      mode: "provided_predictions",
+      predictionId: labelledPrediction.id,
+    }),
+    labelledFrozen = JSON.parse(
+      (
+        await testDb
+          .prepare("SELECT request FROM execution_jobs WHERE id=?")
+          .bind(labelled.jobId)
+          .first()
+      ).request,
+    );
+  assert.equal(labelledFrozen.engineConfig.config.positiveLabel, "yes");
+  assert.equal(labelledFrozen.engineConfig.negativeLabel, "no");
+  assert.equal((await runWorker()).state, "completed");
+  const labelledRow = await testDb
+    .prepare("SELECT state,result_key FROM execution_jobs WHERE id=?")
+    .bind(labelled.jobId)
+    .first();
+  assert.equal(labelledRow.state, "succeeded");
+  assert.equal(
+    JSON.parse(
+      await (await testBucket.get(labelledRow.result_key)).text(),
+    ).hostedResults[0].metrics.find((m) => m.name === "accuracy").value,
+    0.85,
+  );
+  console.log(
+    "PASS non-numeric binary labels: derived other class, accepted and run by the worker",
+  );
+  // A schemaVersion 1.1 protocol pre-registers an explicit plan whose
+  // criterion ids differ from the suite names: queueExternal freezes
+  // engineConfig 1.4, the worker decides it and importJob compiles run
+  // contract 1.5 with the frozen plan hash (docs/design/audit-statistics.md
+  // section 11).
+  const explicitPlan = {
+    confidenceLevel: 0.95,
+    criteria: [
+      {
+        id: "accuracy-gate",
+        kind: "performance",
+        members: [
+          { metric: "accuracy", band: { lower: 0.8 } },
+          { metric: "recall", band: { lower: 0.7 } },
+        ],
+      },
+      {
+        id: "parity-screen",
+        kind: "group_comparison",
+        metric: "selection_rate_difference",
+        libraryEntry: { id: "policy.eu-aia.selection-rate-difference" },
+      },
+    ],
+  };
+  const planProfile = async (version, negativeLabel) => {
+    await cmd("createEvaluationProfile", {
+      name: "External plan",
+      version,
+      task: "Binary classification",
+      config: {
+        labelColumn: "actual",
+        predictionColumn: "predicted",
+        groupColumn: "group",
+        positiveLabel: "1",
+        negativeLabel,
+      },
+      statistics: explicitPlan,
+      datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+      specialCategory: { specialCategory: false },
+      rationale: "Pre-registered external plan fixture",
+    });
+    const created = e.evaluationProfiles.at(-1);
+    assert.equal(created.schemaVersion, "1.1");
+    return created.id;
+  };
+  const mislabelledPlanId = await planProfile("1-other-no", "no"),
+    planProfileId = await planProfile("1", "0");
+  const planProcedure = e.workflow.procedures.find(
+    (p) => p.templateId === "WP-A10-01",
+  );
+  const pointPlanProcedure = async (id) => {
+    Object.assign(
+      e.workflow.procedures.find((p) => p.id === planProcedure.id),
+      {
+        selected: true,
+        applicability: "readiness",
+        ownerId: owner,
+        reviewerId: reviewer,
+        method: "automated",
+        modelId,
+        datasetId,
+        profileId: id,
+        rationale: "Synthetic",
+        population: "Fixture",
+        sampling: "Full fixture",
+      },
+    );
+    await writeEngagement();
+  };
+  const planQueue = {
+    systemId: system.id,
+    modelId,
+    datasetId,
+    procedureId: planProcedure.id,
+    mode: "provided_predictions",
+    predictionId: prediction.id,
+  };
+  // The protocol's declared other label must be the system's other class.
+  await pointPlanProcedure(mislabelledPlanId);
+  const mislabelled = await assurance(
+    "queueExternal",
+    { ...planQueue, profileId: mislabelledPlanId },
+    owner,
+    400,
+  );
+  assert.match(
+    mislabelled.error,
+    /declares the other binary class label 'no', but the system revision's other output class is '0'/,
+  );
+  await pointPlanProcedure(planProfileId);
+  const planJob = await assurance("queueExternal", {
+      ...planQueue,
+      profileId: planProfileId,
+    }),
+    planRow = async (jobId) =>
+      await testDb
+        .prepare("SELECT * FROM execution_jobs WHERE id=?")
+        .bind(jobId)
+        .first(),
+    planFrozen = JSON.parse((await planRow(planJob.jobId)).request);
+  assert.equal(planFrozen.engineConfig.contractVersion, "1.4");
+  assert.equal(planFrozen.engineConfig.negativeLabel, "0");
+  assert.deepEqual(
+    planFrozen.engineConfig.statistics.criteria.map((c) => c.id),
+    ["accuracy-gate", "parity-screen"],
+  );
+  assert.equal((await runWorker()).state, "completed");
+  const planDone = await planRow(planJob.jobId);
+  assert.equal(planDone.state, "succeeded", planDone.error ?? "");
+  const planEnvelope = JSON.parse(
+    await (await testBucket.get(planDone.result_key)).text(),
+  );
+  assert.deepEqual(
+    planEnvelope.hostedResults.map((r) => [r.testId, r.decision?.kind]),
+    [
+      ["accuracy-gate", "performance"],
+      ["parity-screen", "group_comparison"],
+    ],
+  );
+  // Forged completed jobs replaying the frozen request with an altered
+  // result; inserted directly, as only a compromised worker could deliver
+  // them. importJob must refuse each one.
+  const forge = async (suffix, change) => {
+    const forged = structuredClone(planEnvelope);
+    change(forged);
+    const text = JSON.stringify(forged),
+      jobId = planJob.jobId + "-" + suffix,
+      key = planDone.result_key + "-" + suffix;
+    await testBucket.put(key, text);
+    await testDb
+      .prepare(
+        "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at,attempt_id,fence,result_key,result_sha256,completed_at) VALUES (?,?,?,'succeeded',?,?,?,?,?,?,?,?,?)",
+      )
+      .bind(
+        jobId,
+        planDone.tenant_id,
+        planDone.engagement_id,
+        planDone.request,
+        planDone.request_sha256,
+        planDone.created_by,
+        planDone.created_at,
+        planDone.attempt_id,
+        planDone.fence,
+        key,
+        digest(text),
+        planDone.completed_at,
+      )
+      .run();
+    return (await assurance("importJob", { jobId }, owner, 409)).error;
+  };
+  assert.match(
+    await forge("tampered", (f) => {
+      f.externalReport.configuration.statistics.criteria[0].members[0].band.lower = 0.5;
+    }),
+    /decided a plan other than the frozen protocol's/,
+  );
+  assert.match(
+    await forge("reordered", (f) => f.hostedResults.reverse()),
+    /Results must follow the recorded plan/,
+  );
+  assert.match(
+    await forge("unplanned", (f) => {
+      delete f.externalReport.configuration.statistics;
+    }),
+    /Decided results need the recorded plan/,
+  );
+  assert.match(
+    await forge("undecided", (f) => {
+      delete f.hostedResults[1].decision;
+    }),
+    /froze a statistics plan; every result must carry its decision/,
+  );
+  await assurance("importJob", { jobId: planJob.jobId });
+  const planRun = e.runs.find((r) => r.externalJobId === planJob.jobId);
+  assert.equal(planRun.contractVersion, "1.5");
+  assert.deepEqual(
+    planRun.results.map((r) => r.testId),
+    ["accuracy-gate", "parity-screen"],
+  );
+  assert.deepEqual(
+    planRun.manifest.statistics,
+    planFrozen.engineConfig.statistics,
+  );
+  // The platform's RFC 8785 plan hash equals the engine's own.
+  assert.match(planRun.provenance.inputHashes.statisticsPlan, /^[a-f0-9]{64}$/);
+  assert.equal(
+    planRun.provenance.inputHashes.statisticsPlan,
+    planEnvelope.externalReport.provenance.statisticsPlanSha256,
+  );
+  // The runner route checks a delivery against the plan's criterion ids and
+  // kinds: results out of plan order are refused before they are stored.
+  const orderJob = await assurance("queueExternal", {
+      ...planQueue,
+      profileId: planProfileId,
+    }),
+    orderClaim = await api("/api/runner", {
+      body: {
+        op: "claim",
+        workerId: worker.workerId,
+        imageDigest: "sha256:" + "4".repeat(64),
+        formats: ["provided_predictions"],
+      },
+      headers: { Authorization: "Bearer " + worker.token },
+    });
+  assert.equal(orderClaim.jobId, orderJob.jobId);
+  const reordered = structuredClone(planEnvelope);
+  reordered.provenance.requestSha256 = orderClaim.requestSha256;
+  reordered.hostedResults.reverse();
+  const reorderedJSON = JSON.stringify(reordered),
+    orderBody = {
+      op: "complete",
+      jobId: orderClaim.jobId,
+      attemptId: orderClaim.attemptId,
+      fence: orderClaim.fence,
+      nonce: orderClaim.nonce,
+      requestSha256: orderClaim.requestSha256,
+      resultJSON: reorderedJSON,
+      resultSha256: digest(reorderedJSON),
+    };
+  const outOfOrder = await api("/api/runner", {
+    body: orderBody,
+    headers: {
+      Authorization: "Bearer " + worker.token,
+      "X-Result-Signature": signed(orderBody),
+    },
+    status: 400,
+  });
+  assert.match(outOfOrder.error, /Result definitions do not match/);
+  await assurance("cancelJob", {
+    jobId: orderJob.jobId,
+    reason: "Out-of-order delivery fixture",
+  });
+  await fs.writeFile(
+    path.resolve(
+      "../tmp/assurance-worker-fixture/hosted-external-run-1.5.json",
+    ),
+    JSON.stringify(planRun, null, 2),
+  );
+  console.log(
+    "PASS explicit plan: engineConfig 1.4 → worker → run contract 1.5 with the frozen plan hash; mislabelled protocol, tampered plan, reordered, unplanned and undecided results refused",
+  );
   const next = await assurance("queueExternal", plan),
     claim = await api("/api/runner", {
       body: {
@@ -858,6 +1305,49 @@ try {
       headers: { Authorization: "Bearer " + worker.token },
     });
   assert.equal(claim.jobId, next.jobId);
+  // The job guard binds the procedure's plan revision and the scope, not the
+  // program revision (#69): another procedure's approved change keeps this
+  // job running; a change to its own plan or to the scope stops it.
+  const heartbeat = (status = 200) =>
+    api("/api/runner", {
+      body: {
+        op: "heartbeat",
+        jobId: claim.jobId,
+        attemptId: claim.attemptId,
+        fence: claim.fence,
+        nonce: claim.nonce,
+        requestSha256: claim.requestSha256,
+      },
+      headers: { Authorization: "Bearer " + worker.token },
+      status,
+    });
+  const { body: planned } = await testDb
+    .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+    .bind(tenantId, e.id)
+    .first();
+  const replanned = async (change) => {
+    const b = JSON.parse(planned);
+    change(b.workflow, (id) => b.workflow.procedures.find((p) => p.id === id));
+    await testDb
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+      .bind(JSON.stringify(b), tenantId, e.id)
+      .run();
+  };
+  await replanned((wf, p) => {
+    p(classProcedure.id).revision++;
+    wf.program.revision++;
+  });
+  await heartbeat();
+  await replanned((wf, p) => {
+    p(procedure.id).revision++;
+    wf.program.revision++;
+  });
+  await heartbeat(409);
+  await replanned((wf) => wf.brief.revision++);
+  await heartbeat(409);
+  await replanned(() => {});
+  await refresh();
+  await heartbeat();
   await assurance("cancelJob", {
     jobId: next.jobId,
     reason: "Cancellation fence fixture",
@@ -908,7 +1398,9 @@ try {
   );
   await cmd("createReport", {
     kind: "draft",
-    opinion: "Qualified conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "limited",
+    conclusion: "qualified",
     summary: "Synthetic dossier export validation",
   });
   const report = e.reports.at(-1),
@@ -1020,7 +1512,9 @@ try {
   await refresh();
   await cmd("createReport", {
     kind: "draft",
-    opinion: "Qualified conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "limited",
+    conclusion: "qualified",
     summary: "Explicit withholding fixture",
   });
   const withheldReport = e.reports.at(-1);

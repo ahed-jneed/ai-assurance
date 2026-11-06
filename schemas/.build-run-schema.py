@@ -1,7 +1,7 @@
 """Regenerate test-run.schema.json from its committed sources: the hand-maintained
 test-run.base.json (legacy 1.0 run body and shared definitions), the definitions built
 here (legacy 1.0 and hosted 1.1), external 1.2 via .extend-assurance-schema.py, and
-engine report 1.3 and external run 1.5 (statistics 1.0.0) via .statistics-schema.py,
+engine report 1.3, hosted run 1.4 and external run 1.5 (statistics 1.0.0) via .statistics-schema.py,
 which embeds statistics-plan.schema.json.
 The generated file is never read back. Usage: python schemas/.build-run-schema.py [--check]
 
@@ -105,7 +105,18 @@ defs['predictionDataset'] = obj({'id': ref('id'), 'name': st(1, 5000), 'sha256':
 defs['datasetContext'] = obj({'split': en('test', 'validation', 'training', 'unknown'), 'population': st(1, 5000), 'predictionProvenance': st(1, 5000), 'independence': st(1, 5000), 'sensitiveDataBasis': st(0, 5000)})
 defs['evaluationProfile'] = obj({'id': ref('id'), 'schemaVersion': {'const': '1.0'}, 'name': st(1, 300), 'version': st(1, 300), 'task': hostedTasks, 'suite': hostedSuite, 'config': ref('hostedConfig'), 'datasetContext': ref('datasetContext'), 'rationale': st(1, 5000), 'createdAt': date, 'createdBy': ref('actorId')})
 defs['evaluationProfile']['allOf'] = taskSuiteRules()
+# Fairness protocols declare whether the group column holds special-category
+# data, the route its tests take and a copy of the client's recorded Art 4a or
+# GDPR Art 9(2) basis (#60). Protocols saved before declarations have none.
+# Application validation enforces the condition-by-condition statements.
+defs['specialCategoryBasis'] = {'type': 'object', 'required': ['id', 'kind', 'columns', 'confirmedBy', 'confirmedOn', 'recordedBy', 'recordedAt'], 'properties': {'id': ref('id'), 'kind': en('art4a', 'gdpr_art9'), 'columns': arr(st(1, 300), 1, 20, True), 'confirmedBy': st(1, 300), 'confirmedOn': {'type': 'string', 'format': 'date'}, 'recordedBy': ref('actorId'), 'recordedAt': date}}
+defs['specialCategoryDeclaration'] = obj({'column': st(1, 300), 'specialCategory': {'type': 'boolean'}, 'route': en('client_side', 'hosted'), 'basis': nullable(ref('specialCategoryBasis')), 'declaredBy': ref('actorId'), 'declaredAt': date})
+defs['evaluationProfile']['properties']['specialCategory'] = ref('specialCategoryDeclaration')
 defs['runManifest'] = obj({'schemaVersion': {'const': '1.0'}, 'model': ref('registeredModel'), 'dataset': ref('predictionDataset'), 'profile': nullable(ref('evaluationProfile')), 'executionMode': {'const': 'saved_predictions'}, 'lineage': {'const': 'registered_prediction_artifact'}, 'testDefinitionVersion': {**st(1, 100), 'pattern': r'^traditional-ml-\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$'}, 'limitations': ref('stringNotes')})
+# A hosted run on special-category data records who acknowledged it (#60). A
+# retry carries the source run's acknowledgement over unchanged and names that
+# run in inheritedFrom.
+defs['runManifest']['properties']['specialCategoryAcknowledgement'] = obj({'column': st(1, 300), 'acknowledgedBy': ref('actorId'), 'acknowledgedAt': date, 'inheritedFrom': ref('id')}, ['column', 'acknowledgedBy', 'acknowledgedAt'])
 defs['runManifest']['properties']['model'] = {'allOf': [ref('registeredModel'), {'properties': {'format': {'const': 'Prediction file'}, 'status': {'const': 'registered'}, 'task': hostedTasks}}]}
 defs['hostedThresholds'] = obj({'source': {'const': 'internal_policy'}, 'policyId': st(1, 300), 'policyVersion': st(1, 300), 'frozenAt': date, 'frozenBy': ref('actorId'), **copy.deepcopy(configProps)})
 defs['hostedThresholds']['properties']['performancePositiveLabel'] = st(0, 300)
@@ -141,7 +152,9 @@ for task, tests in [('Binary classification', ['performance', 'demographic_parit
     manifestTask = {'properties': {'model': {'properties': {'task': {'const': task}}}, 'profile': {'anyOf': [{'type': 'null'}, {'properties': {'task': {'const': task}}}]}}}
     resultTests = {'items': {'properties': {'testId': en(*tests)}}}
     run['allOf'].append(condition({'task': {'const': task}}, {'properties': {'manifest': manifestTask, 'results': resultTests}}))
-defs['procedureBinding'] = obj({'procedureId': ref('id'), 'procedureRevision': it(1, 2147483647), 'briefRevision': it(1, 2147483647), 'programRevision': it(1, 2147483647)})
+# planHash: the procedure plan hash the run was queued for (#69); absent on runs
+# queued before runs recorded it and on external job runs, which bind the plan revision.
+defs['procedureBinding'] = obj({'procedureId': ref('id'), 'procedureRevision': it(1, 2147483647), 'planHash': ref('sha256'), 'briefRevision': it(1, 2147483647), 'programRevision': it(1, 2147483647)}, ['procedureId', 'procedureRevision', 'briefRevision', 'programRevision'])
 run['properties']['procedureBinding'] = ref('procedureBinding')
 run['properties']['retryOf'] = ref('id')
 # Rule-pack stamp (#18): the rule pack and methodology the run was made under.
@@ -158,6 +171,7 @@ output = statistics['add_statistics'](output)
 extend = runpy.run_path(str(Path(__file__).with_name('.extend-assurance-schema.py')))['extend_schema']
 output = extend(output)
 output = statistics['add_external_run'](output)
+output = statistics['add_hosted_run'](output)
 text = json.dumps(output, indent=2, ensure_ascii=False) + '\n'
 if '--check' in sys.argv[1:]:
     if p.read_bytes() != text.encode('utf-8'):

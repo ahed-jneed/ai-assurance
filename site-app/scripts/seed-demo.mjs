@@ -12,7 +12,9 @@
 //   npm run seed:demo -- --trusted-headers http://127.0.0.1:8787
 //
 // --trusted-headers sends the persona as oai-* headers, for a built Worker
-// started in trusted-headers mode (docs/security/identity.md); otherwise each
+// started in trusted-headers mode (docs/security/identity.md) with
+// SELF_SIGNUP=open, so that qa-lead and qa-lead2 may provision their
+// practices (npm start -- --var SELF_SIGNUP:open ...); otherwise each
 // persona signs in through /signin-with-chatgpt?as=<id> like a browser.
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";

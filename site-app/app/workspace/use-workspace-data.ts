@@ -40,6 +40,12 @@ const manageMessages: Record<string, string> = {
   grantMember: "Member access saved",
   updateMember: "Access updated",
   revokeMember: "Practice access revoked",
+  grantAdmin: "Practice administration granted",
+  revokeAdmin: "Practice administration removed",
+  transferAdmin: "Practice administration transferred",
+  inviteMember: "Invitation saved",
+  cancelInvitation: "Invitation cancelled",
+  renamePractice: "Practice renamed",
 };
 const actMessages: Record<string, string> = {
   editPaper: "Revision saved",
@@ -59,6 +65,7 @@ const actMessages: Record<string, string> = {
   reopenEvidenceRequest: "Evidence request reopened",
   createFinding: "Finding recorded",
   createReport: "Report snapshot created",
+  setPaperAudience: "Paper audience updated",
   classify: "Classification saved",
   approveClassification: "Classification approved",
   setStage: "Engagement stage updated",

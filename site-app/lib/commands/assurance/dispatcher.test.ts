@@ -144,11 +144,21 @@ describe("POST /api/assurance", () => {
     async (role) => {
       const e = stored();
       load(e, caller(role));
-      for (const op of ["addLocation", "assist", "archiveEverything"]) {
+      // F-56: a Client Viewer is refused every op the bus accepts.
+      const ops =
+        role === "Client Viewer"
+          ? [...assuranceModules.flatMap((m) => m.ops), "archiveEverything"]
+          : ["addLocation", "assist", "archiveEverything"];
+      for (const op of ops) {
         const response = await post(e, op, location);
         expect(response.status, op).toBe(403);
-        expect(await response.json(), op).toEqual(internalOnly);
+        expect(await response.json(), op).toEqual(
+          role === "Client Viewer"
+            ? { error: "Client Viewers have read-only access" }
+            : internalOnly,
+        );
       }
+      expect(getEngagement).not.toHaveBeenCalled();
       expect(addRecord).not.toHaveBeenCalled();
       expect(recordsById).not.toHaveBeenCalled();
     },
@@ -252,6 +262,65 @@ describe("POST /api/assurance", () => {
     expect(await wrongKind.json()).toEqual({
       error: "Select an existing assertion record",
     });
+  });
+
+  it("answers assist on unknown or non-source records with 400", async () => {
+    const e = stored();
+    const ctx = caller("Auditor");
+    load(e, ctx);
+    const assertion = written(
+        "assertion",
+        { statement: "Approvals follow the policy", relations: [] },
+        "AS-7",
+      ),
+      system = written("system", { modelIds: [] }, "AS-9");
+    vi.mocked(recordsById).mockImplementation(async (_ctx, _id, ids) =>
+      [assertion, system].filter((r) => ids.includes(r.id)),
+    );
+    vi.mocked(addRecord).mockImplementation(async (_ctx, _id, kind, body) =>
+      written(kind, body, "AS-10"),
+    );
+    const cases: [string[], string][] = [
+      [
+        ["AS-404"],
+        "Select existing evidence locations or assertions; unknown record: AS-404",
+      ],
+      [
+        ["AS-7", "AS-404", "AS-404"],
+        "Select existing evidence locations or assertions; unknown record: AS-404",
+      ],
+      [
+        ["AS-9"],
+        "Select evidence locations or assertions only; not a source record: AS-9 (system)",
+      ],
+      [
+        ["AS-7", "AS-9"],
+        "Select evidence locations or assertions only; not a source record: AS-9 (system)",
+      ],
+    ];
+    for (const [sourceIds, error] of cases) {
+      const response = await post(e, "assist", {
+        sourceIds,
+        action: "unsupported",
+      });
+      expect(response.status, sourceIds.join()).toBe(400);
+      expect(await response.json(), sourceIds.join()).toEqual({ error });
+    }
+    expect(addRecord).not.toHaveBeenCalled();
+    // Only the selection was loaded, never the records it would cite.
+    expect(recordsById).toHaveBeenCalledTimes(cases.length);
+    // A selection of source records still writes its briefing.
+    const ok = await post(e, "assist", {
+      sourceIds: ["AS-7"],
+      action: "unsupported",
+    });
+    expect(ok.status).toBe(200);
+    expect(addRecord).toHaveBeenCalledWith(
+      ctx,
+      e.id,
+      "assistant",
+      expect.objectContaining({ sourceIds: ["AS-7"] }),
+    );
   });
 
   it("passes through the Response of an op that builds its own", async () => {

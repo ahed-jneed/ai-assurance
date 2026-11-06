@@ -1,0 +1,279 @@
+import { describe, expect, it } from "vitest";
+import {
+  conclusionStatement,
+  conclusionTypes,
+  engagementTypeIds,
+  engagementTypes,
+  legacyConclusion,
+  normalizeTerms,
+  opinionLabel,
+  reportTitle,
+  requiresSupport,
+  snapshotConclusion,
+  snapshotTerms,
+  termsLabel,
+  termsProblem,
+  type AssuranceLevel,
+  type ReportTerms,
+} from "./report-model";
+
+const assurance = (
+  conclusion: ReportTerms["conclusion"],
+  assuranceLevel: AssuranceLevel,
+  engagementType: ReportTerms["engagementType"] = "attestation",
+): ReportTerms => ({ engagementType, assuranceLevel, conclusion });
+const statement = (t: ReportTerms) =>
+  conclusionStatement(t, "the AI system Scorer", "the stated criteria");
+
+describe("report terms", () => {
+  it("requires a level for assurance engagements and none for the others", () => {
+    for (const type of ["attestation", "direct", "certification"] as const) {
+      expect(termsProblem(assurance("unmodified", "limited", type))).toBe("");
+      expect(termsProblem(assurance("unmodified", "reasonable", type))).toBe(
+        "",
+      );
+      expect(
+        termsProblem({
+          engagementType: type,
+          assuranceLevel: null,
+          conclusion: "unmodified",
+        }),
+      ).toMatch(/requires a limited or reasonable assurance level/);
+    }
+    expect(
+      termsProblem({
+        engagementType: "agreed_upon_procedures",
+        assuranceLevel: "limited",
+        conclusion: "factual_findings",
+      }),
+    ).toMatch(/provides no assurance/);
+    expect(
+      termsProblem({
+        engagementType: "readiness",
+        assuranceLevel: null,
+        conclusion: "readiness",
+      }),
+    ).toBe("");
+  });
+
+  it("lets each engagement type express only its own conclusions", () => {
+    expect(
+      termsProblem({
+        engagementType: "readiness",
+        assuranceLevel: null,
+        conclusion: "unmodified",
+      }),
+    ).toMatch(/cannot express an? unmodified/i);
+    expect(termsProblem(assurance("readiness", "limited"))).toMatch(
+      /cannot express/,
+    );
+    expect(
+      termsProblem({
+        engagementType: "agreed_upon_procedures",
+        assuranceLevel: null,
+        conclusion: "qualified",
+      }),
+    ).toMatch(/cannot express/);
+    for (const type of engagementTypeIds)
+      for (const c of engagementTypes[type].conclusions)
+        expect(
+          termsProblem(normalizeTerms({ engagementType: type, conclusion: c })),
+        ).toBe("");
+  });
+
+  it("normalizes a picker choice to valid terms", () => {
+    expect(normalizeTerms({})).toEqual({
+      engagementType: "attestation",
+      assuranceLevel: "limited",
+      conclusion: "unmodified",
+    });
+    expect(
+      normalizeTerms({
+        engagementType: "readiness",
+        assuranceLevel: "reasonable",
+        conclusion: "qualified",
+      }),
+    ).toEqual({
+      engagementType: "readiness",
+      assuranceLevel: null,
+      conclusion: "readiness",
+    });
+    expect(
+      normalizeTerms({
+        engagementType: "direct",
+        assuranceLevel: "reasonable",
+        conclusion: "disclaimer",
+      }),
+    ).toEqual(assurance("disclaimer", "reasonable", "direct"));
+  });
+});
+
+describe("ISAE 3000 conclusion wording", () => {
+  it("words reasonable assurance as an opinion", () => {
+    const unmodified = statement(assurance("unmodified", "reasonable"));
+    expect(unmodified.heading).toBe("Opinion");
+    expect(unmodified.text).toMatch(/^In our opinion, /);
+    expect(unmodified.text).toContain("in all material respects");
+    expect(unmodified.basisHeading).toBe("");
+    expect(unmodified.levelStatement).toContain("Reasonable assurance");
+    expect(statement(assurance("qualified", "reasonable"))).toMatchObject({
+      heading: "Qualified opinion",
+      basisHeading: "Basis for qualified opinion",
+    });
+    expect(statement(assurance("qualified", "reasonable")).text).toMatch(
+      /^In our opinion, except for the effects, or possible effects, of the matter/,
+    );
+  });
+
+  it("covers the possible effects of a scope limitation in either qualified wording", () => {
+    for (const level of ["limited", "reasonable"] as const)
+      expect(statement(assurance("qualified", level)).text).toContain(
+        "except for the effects, or possible effects, of the matter described",
+      );
+  });
+
+  it("words limited assurance as a negative-form conclusion", () => {
+    for (const c of ["unmodified", "qualified"] as const) {
+      const s = statement(assurance(c, "limited"));
+      expect(s.text).toContain(
+        "nothing has come to our attention that causes us to believe",
+      );
+      expect(s.text).not.toContain("In our opinion");
+      expect(s.levelStatement).toContain("substantially lower");
+    }
+    expect(statement(assurance("unmodified", "limited")).heading).toBe(
+      "Conclusion",
+    );
+    expect(statement(assurance("qualified", "limited"))).toMatchObject({
+      heading: "Qualified conclusion",
+      basisHeading: "Basis for qualified conclusion",
+    });
+  });
+
+  it("states an adverse conclusion as non-conformity at either level", () => {
+    for (const level of ["limited", "reasonable"] as const) {
+      const s = statement(assurance("adverse", level));
+      expect(s.text).toContain("is not in accordance with the stated criteria");
+      expect(s.text).not.toContain("nothing has come to our attention");
+      expect(s.basisHeading).toMatch(
+        /^Basis for adverse (opinion|conclusion)$/,
+      );
+    }
+  });
+
+  it("expresses no conclusion in a disclaimer", () => {
+    const opinion = statement(assurance("disclaimer", "reasonable")),
+      conclusion = statement(assurance("disclaimer", "limited"));
+    expect(opinion.heading).toBe("Disclaimer of opinion");
+    expect(opinion.text).toContain("we do not express an opinion");
+    expect(conclusion.heading).toBe("Disclaimer of conclusion");
+    expect(conclusion.text).toContain("we do not express a conclusion");
+    for (const s of [opinion, conclusion])
+      expect(s.text).toContain("sufficient appropriate evidence");
+  });
+
+  it("names the subject matter information in attestation engagements", () => {
+    expect(statement(assurance("unmodified", "limited")).text).toContain(
+      "the subject matter information on the AI system Scorer",
+    );
+    expect(
+      statement(assurance("unmodified", "limited", "direct")).text,
+    ).not.toContain("subject matter information");
+  });
+
+  it("labels readiness and agreed-upon procedures as not assurance", () => {
+    const readiness = statement({
+        engagementType: "readiness",
+        assuranceLevel: null,
+        conclusion: "readiness",
+      }),
+      aup = statement({
+        engagementType: "agreed_upon_procedures",
+        assuranceLevel: null,
+        conclusion: "factual_findings",
+      });
+    for (const s of [readiness, aup]) {
+      expect(s.notAssurance).toBe(true);
+      expect(s.heading).toContain("not an assurance engagement");
+      expect(s.levelStatement).toBe("");
+    }
+    expect(
+      reportTitle({
+        engagementType: "readiness",
+        assuranceLevel: null,
+        conclusion: "readiness",
+      }),
+    ).toContain("not an assurance report");
+    expect(reportTitle(assurance("unmodified", "limited"))).toBe(
+      "Independent limited assurance report",
+    );
+    expect(
+      reportTitle(assurance("unmodified", "reasonable", "certification")),
+    ).toBe("Independent certification audit report (reasonable assurance)");
+  });
+
+  it("labels each conclusion and level", () => {
+    expect(termsLabel(assurance("qualified", "limited"))).toBe(
+      "Qualified conclusion · limited assurance",
+    );
+    expect(termsLabel(assurance("unmodified", "reasonable"))).toBe(
+      "Unmodified opinion · reasonable assurance",
+    );
+    expect(
+      termsLabel({
+        engagementType: "readiness",
+        assuranceLevel: null,
+        conclusion: "readiness",
+      }),
+    ).toBe("Readiness assessment (not assurance)");
+  });
+});
+
+describe("positive conclusions", () => {
+  it("holds unmodified and readiness conclusions to the strict gates", () => {
+    expect(
+      Object.entries(conclusionTypes)
+        .filter(([, c]) => c.requiresSupport)
+        .map(([id]) => id),
+    ).toEqual(["unmodified", "readiness"]);
+    for (const c of ["qualified", "adverse", "disclaimer", "factual_findings"])
+      expect(requiresSupport(c)).toBe(false);
+    // An unknown value is held to the strict gates.
+    expect(requiresSupport("Clean opinion")).toBe(true);
+  });
+});
+
+describe("legacy reports", () => {
+  const legacy = {
+    "Readiness assessment": "readiness",
+    "Qualified conclusion": "qualified",
+    "Adverse conclusion": "adverse",
+    "Unable to conclude": "disclaimer",
+  };
+
+  it("maps each legacy opinion to its conclusion for the release gates", () => {
+    for (const [opinion, conclusion] of Object.entries(legacy)) {
+      expect(legacyConclusion(opinion)).toBe(conclusion);
+      expect(requiresSupport(opinion)).toBe(opinion === "Readiness assessment");
+      expect(snapshotConclusion({ opinion })).toBe(opinion);
+    }
+  });
+
+  it("renders a legacy snapshot's opinion exactly as it was issued", () => {
+    for (const opinion of Object.keys(legacy)) {
+      expect(snapshotTerms({ opinion })).toBeNull();
+      expect(opinionLabel({ opinion })).toBe(opinion);
+    }
+    expect(opinionLabel({})).toBe("Opinion not recorded");
+  });
+
+  it("reads the terms of a v2 snapshot", () => {
+    const terms = assurance("adverse", "limited");
+    const snapshot = { opinion: termsLabel(terms), terms };
+    expect(snapshotTerms(snapshot)).toEqual(terms);
+    expect(snapshotConclusion(snapshot)).toBe("adverse");
+    expect(opinionLabel(snapshot)).toBe(
+      "Adverse conclusion · limited assurance",
+    );
+  });
+});

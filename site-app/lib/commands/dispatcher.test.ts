@@ -136,9 +136,9 @@ describe("POST /api/workspace", () => {
   });
 
   it.each(["createClient", "createEngagement", "grantMember"])(
-    "refers %s to client and user management for every role",
+    "refers %s to client and user management for every role that writes",
     async (op) => {
-      for (const role of roles) {
+      for (const role of roles.filter((r) => r !== "Client Viewer")) {
         const e = stored();
         load(e, caller(role));
         const response = await post(envelope(e, op));
@@ -150,6 +150,25 @@ describe("POST /api/workspace", () => {
       expect(save).not.toHaveBeenCalled();
     },
   );
+
+  // F-56: Client Viewers only read. Every op the bus accepts, and any other
+  // op name, is refused before the engagement is loaded.
+  it("refuses every op with 403 to a Client Viewer before loading anything", async () => {
+    const e = stored();
+    load(e, caller("Client Viewer"));
+    for (const op of [
+      ...commandModules.flatMap((m) => m.ops),
+      "archiveEverything",
+    ]) {
+      const response = await post(envelope(e, op));
+      expect(response.status, op).toBe(403);
+      expect(await response.json(), op).toEqual({
+        error: "Client Viewers have read-only access",
+      });
+    }
+    expect(getEngagement).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
 
   it("returns what a self-persisting command saved without saving again", async () => {
     const e = stored();
@@ -219,11 +238,13 @@ describe("command registry", () => {
     executeRun: ["Auditor", "Lead Auditor"],
     recoverRun: ["Lead Auditor"],
     cancelRun: ["Auditor", "Lead Auditor"],
+    recordSpecialCategoryBasis: ["Auditor", "Lead Auditor"],
     acceptEvidence: ["Auditor", "Lead Auditor"],
     setStage: ["Lead Auditor"],
     renameEngagement: ["Auditor", "Lead Auditor"],
     openFollowup: ["Lead Auditor"],
     createReport: ["Lead Auditor"],
+    setPaperAudience: ["Lead Auditor"],
   };
   const managementOps = ["createClient", "createEngagement", "grantMember"];
 

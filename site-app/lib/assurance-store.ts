@@ -5,6 +5,7 @@
 // the report gates and pins are computed in SQL.
 import type { AssuranceRecord } from "./assurance-core";
 import { db } from "./bindings";
+import { requiresSupport } from "./domain/report-model";
 import { getEngagement, save } from "./engagement-repo";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
@@ -382,7 +383,8 @@ type AssessmentRow = { kind: string; approved: number | null } & Record<
 const field = (json: string | null): unknown =>
   json === null ? undefined : JSON.parse(json);
 /**
- * Why the engagement's assessments do not yet support `opinion`, in record
+ * Why the engagement's assessments do not yet support `opinion` (a
+ * report-model conclusion id or a legacy opinion string), in record
  * order: each current assessment needs an approving independent review, and
  * its own conclusion must fit the opinion.
  */
@@ -411,7 +413,7 @@ export async function assuranceGates(
     if (
       row.kind === "assertion" &&
       (conclusion === "unassessed" ||
-        (opinion === "Readiness assessment" && conclusion !== "supported"))
+        (requiresSupport(opinion) && conclusion !== "supported"))
     )
       messages.push(
         "Assertion does not support this opinion: " + String(statement),
@@ -419,7 +421,7 @@ export async function assuranceGates(
     if (
       row.kind === "obligation" &&
       (applicability === "needs_information" ||
-        (opinion === "Readiness assessment" &&
+        (requiresSupport(opinion) &&
           applicability === "applicable" &&
           field(row.outcome) !== "supported"))
     )
@@ -433,11 +435,18 @@ export async function jobs(ctx: Context, engagementId: string) {
   return (
     await db()
       .prepare(
-        "SELECT id,state,request_sha256,created_at,created_by,worker_id,attempt_id,fence,lease_until,result_sha256,error,completed_at,json_extract(request,'$.system.name') AS system_name,json_extract(request,'$.executionMode') AS mode FROM execution_jobs WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 100",
+        "SELECT id,state,request_sha256,created_at,created_by,worker_id,attempt_id,fence,lease_until,result_sha256,error,completed_at,json_extract(request,'$.system.name') AS system_name,json_extract(request,'$.executionMode') AS mode,json_extract(request,'$.model.format') AS model_format,json_extract(request,'$.engineConfig.config.positiveLabel') AS positive_label,json_extract(request,'$.engineConfig.negativeLabel') AS negative_label,json_extract(request,'$.engineConfig.modelSpec.decisionThreshold') AS decision_threshold,json_extract(request,'$.engineConfig.modelSpec.predictionKind') AS prediction_kind FROM execution_jobs WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 100",
       )
       .bind(ctx.tenantId, engagementId)
       .all()
   ).results;
 }
+/**
+ * SQL that keeps an external job alive: its creator still holds auditor
+ * access, the scope and the program are approved, and the job's procedure is
+ * selected with the plan revision and scope revision the job was queued for.
+ * The program revision is not compared, so a change to another procedure
+ * does not stop an unchanged procedure's job (see runBindsProcedure).
+ */
 export const activeJobGuard =
-  "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(e.body,'$.workflow.program.revision')=json_extract(execution_jobs.request,'$.procedure.programRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') AND json_extract(p.value,'$.selected')=1)";
+  "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') AND json_extract(p.value,'$.selected')=1)";
