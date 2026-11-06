@@ -61,11 +61,11 @@ describe("domain entry point", () => {
 
 describe("classify", () => {
   const assessed: Classification = {
-    prohibited: false,
-    highRisk: false,
-    transparency: false,
+    prohibited: true,
+    highRisk: true,
+    transparency: true,
     profiling: false,
-    annexRoute: "Annex III point 5(b)",
+    annexRoute: "Annex III — sensitive use case",
     operatorRole: "Provider",
     intendedPurpose: "Credit scoring",
     rationale: "",
@@ -74,30 +74,12 @@ describe("classify", () => {
     asOf: "2026-10-05",
   };
 
-  it("keeps an unassessed system without a purpose unassessed", () => {
-    expect(
-      classify({
-        ...assessed,
-        annexRoute: "Unassessed",
-        intendedPurpose: "",
-        prohibited: true,
-      }),
-    ).toBe("Unassessed");
+  // The full route x fact matrix is in lib/domain/classification.test.ts.
+  it("never reads the legacy flags: without answers a route needs information", () => {
+    expect(classify(assessed)).toBe("Needs information");
     expect(classify({ ...assessed, annexRoute: "Unassessed" })).toBe(
-      "Minimal risk",
+      "Unassessed",
     );
-  });
-
-  it("ranks prohibited above high risk above transparency", () => {
-    const all = { prohibited: true, highRisk: true, transparency: true };
-    expect(classify({ ...assessed, ...all })).toBe("Prohibited");
-    expect(classify({ ...assessed, ...all, prohibited: false })).toBe(
-      "High risk",
-    );
-    expect(classify({ ...assessed, transparency: true })).toBe(
-      "Specific transparency",
-    );
-    expect(classify(assessed)).toBe("Minimal risk");
   });
 });
 

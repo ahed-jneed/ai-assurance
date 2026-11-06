@@ -2,6 +2,32 @@ import type { Engagement, Finding } from "./domain";
 import type { Context } from "./tenancy";
 import { isClientRole, isReleased } from "./workflow-state";
 /** A client finding must not inherit new internal fields when the audit model grows. */
+/**
+ * The classification as the client sees it: the label and answers without the
+ * auditor's rationale, intended-purpose analysis or evidence references.
+ */
+export function clientClassification(
+  c: Engagement["classification"],
+): Engagement["classification"] {
+  return {
+    ...c,
+    rationale: "",
+    intendedPurpose: "",
+    ...(c.answers
+      ? {
+          answers: Object.fromEntries(
+            Object.entries(c.answers).map(([id, a]) => [
+              id,
+              { ...a, evidence: undefined },
+            ]),
+          ),
+        }
+      : {}),
+    ...(c.derogation
+      ? { derogation: { rationale: "", registrationEvidence: "" } }
+      : {}),
+  };
+}
 export function clientFinding(f: Finding): Finding {
   return {
     id: f.id,
@@ -55,7 +81,7 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
     version: e.version,
     createdAt: e.createdAt,
     eventHead: "",
-    classification: { ...e.classification, rationale: "", intendedPurpose: "" },
+    classification: clientClassification(e.classification),
     papers: [],
     models: [],
     runs: [],
