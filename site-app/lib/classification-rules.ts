@@ -82,8 +82,8 @@ export function classificationRules(
             title: g.title,
             status: g.status,
             reference: g.draftPublished
-              ? "Draft of " + g.draftPublished
-              : g.title,
+              ? "Draft for consultation"
+              : "Commission guidance",
             ...(g.draftPublished || g.listedDate
               ? { date: g.draftPublished ?? g.listedDate }
               : {}),

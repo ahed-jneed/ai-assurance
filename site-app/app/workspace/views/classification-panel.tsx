@@ -9,6 +9,7 @@ import {
   classificationFacts,
   classify,
   factDefinitions,
+  factLabel,
   highRiskRouteOf,
   reReviewTriggers,
   type Art50Status,
@@ -140,7 +141,7 @@ export function ClassificationPanel({
     competence = aiOfficeCompetence(c),
     triggers = reReviewTriggers(c, rules, today),
     route = highRiskRouteOf(c),
-    label = (id: string) => defs.find((d) => d.id === id)?.label ?? id;
+    label = (id: string) => factLabel(rules, id);
   return (
     <>
       <section className="panel">

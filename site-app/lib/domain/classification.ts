@@ -868,8 +868,17 @@ export function aiOfficeCompetence(
   };
 }
 
-const factLabel = (rules: ClassificationRules, id: string) =>
-  factDefinitions(rules).find((d) => d.id === id)?.label ?? id;
+/** Derived facts in words: the facts they are derived from. */
+const derivedLabels: Readonly<Record<string, string>> = {
+  generatesSyntheticContent: "the text, image, audio and video output facts",
+  deployerOperatesErOrBcSystem:
+    "the emotion recognition and biometric categorisation facts",
+  art50DisclosureApplies: "the Art 50(1) to (4) trigger facts",
+};
+export const factLabel = (rules: ClassificationRules, id: string) =>
+  factDefinitions(rules).find((d) => d.id === id)?.label ??
+  derivedLabels[id] ??
+  id;
 /**
  * The required facts that are still unknown, in words: the route, every
  * asked required fact and every Art 50 item that needs information.
