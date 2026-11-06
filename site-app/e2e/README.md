@@ -32,7 +32,10 @@ to `qa-contrib`), and a second run checks that seeding is idempotent.
 Outside CI, an already running server on the port is reused, so you can keep
 `node e2e/server.mjs` running between runs. Its database then keeps the records
 of earlier runs; the specs create uniquely named records, so they still pass.
-CI always starts a fresh server.
+A reused server must be `node e2e/server.mjs`: any other server on the port
+(`npm run dev`, `npm start`) is not in trusted-headers mode, ignores the persona
+headers, and every spec then fails with confusing sign-in or 403 errors. CI
+always starts a fresh server.
 
 ## Flows
 
@@ -45,6 +48,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `reviewer-reviews-paper.spec.ts` | Reviewer approves the review, the Lead Auditor signs the revision; the author's own review and an Auditor's review are refused |
 | `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the portal and the audit team sees it; internal commands are refused |
 | `client-viewer.spec.ts` | Client Viewer sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
+| `self-approval.spec.ts` | The Lead Auditor who classified the system or prepared the engagement brief cannot approve it; the Reviewer's approval of the classification succeeds |
 | `isolation.spec.ts` | An outsider is refused the demo practice in the UI and API; no cross-practice reads; practice switching for `qa-lead2`; a stale engagement version is refused |
 
 Setup steps that are not the subject of a spec (an evidence upload before a
@@ -57,7 +61,10 @@ The specs share one practice, so they run in one worker, in file order.
 `expectAccessible(page, label)` (`a11y.ts`) runs axe with the WCAG 2.x A and AA
 rules and fails on serious or critical violations. Known violations are listed
 in `TRACKED_EXCEPTIONS` with the issue that fixes them; they appear as
-`a11y-exception` annotations in the report instead of failing. Never skip a
+`a11y-exception` annotations in the report instead of failing. Each exception is
+scoped: `maxNodes` caps the failing elements one check may have, and an optional
+`selector` names the elements it covers, so a new violation of the same rule
+elsewhere still fails. Never skip a
 check: add an exception with its issue, or fix the violation. To review every
 violation, including tracked ones, run with `E2E_A11Y_SURVEY=1`: the survey
 prints them instead of failing. #36 fixes the tracked violations and empties
