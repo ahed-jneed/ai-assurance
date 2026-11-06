@@ -56,7 +56,15 @@ async function releasedReport() {
     actor: "lead",
     sha256: internalHash,
     clientSha256: clientHash,
+    // What capture freezes (lib/commands/reports.ts).
     snapshot: {
+      workflow: structuredClone(e.workflow),
+      engagement: {
+        id: e.id,
+        title: e.title,
+        stage: e.stage,
+        classification: structuredClone(e.classification),
+      },
       workingPapers: await paperRevisions(
         e.papers,
         paperContext(e, "tenant-1"),
@@ -134,6 +142,48 @@ describe("internal paper exports", () => {
     const result = validate(documents);
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
+  });
+
+  it("keeps an earlier release's memo when the engagement moves on", async () => {
+    const { e, r } = await releasedReport();
+    const before = await completionMemo(e, r, "tenant-1");
+    expect(before?.scope).toMatchObject({
+      systemId: e.workflow!.brief!.systemName,
+      periodStart: e.workflow!.brief!.periodStart,
+    });
+    // The reviewer is replaced and the checklist saved again ...
+    const q = e.qualityReview!;
+    q.reviewerId = "replacement-reviewer";
+    q.revision += 3;
+    // ... and the brief is revised for a successor report.
+    const brief = e.workflow!.brief!;
+    brief.systemName = "Successor system";
+    brief.periodStart = "2027-01-01";
+    brief.periodEnd = "2027-06-30";
+    brief.boundary = "The successor's boundary";
+    e.title = "Renamed engagement";
+    e.classification = {
+      ...e.classification,
+      operatorRole: "Importer / distributor",
+    };
+    const after = await completionMemo(e, r, "tenant-1");
+    expect(after).toEqual(before);
+    expect(after!.records!.qualityReview).toMatchObject({
+      reviewerId: signOff.userId,
+      checklistRevision: signOff.checklistRevision,
+    });
+  });
+
+  it("names the reviewer and checklist of the sign-off, not of the live review", async () => {
+    const { e, r } = await releasedReport();
+    e.qualityReview!.reviewerId = "replacement-reviewer";
+    e.qualityReview!.revision = 7;
+    const memo = (await completionMemo(e, r, "tenant-1"))!;
+    expect(memo.records!.qualityReview).toEqual({
+      reviewerId: "quality-reviewer",
+      checklistRevision: 2,
+      signOffs: [signOff],
+    });
   });
 
   it("has no completion memo before release", async () => {

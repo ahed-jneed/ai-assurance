@@ -4,31 +4,70 @@
 // release cover the exact package hashes. Once a final package is released,
 // the dossier and the report package export this record as the memo, citing
 // the engagement quality reviewer's sign-off of the same package (#24).
+//
+// The memo is not part of the hashed snapshot, so it is built only from what
+// cannot change after release: the snapshot's workflow, title and
+// classification, the engagement's fixed id, client and rule-pack stamp, the
+// release completion and the sign-offs themselves. Replacing the quality
+// reviewer, saving the checklist again or revising the brief for a successor
+// report leaves the memo of an earlier release unchanged.
+//
+// Release.completion.templateIds also names WP-RP-02 (completion, issue and
+// immutable package). It gets no document of its own: the release records it
+// as completed with the same approval, release and package hashes, which this
+// memo already carries.
 import catalog from "../catalog.json";
 import type { Engagement, Paper, Report } from "../domain";
 import {
-  paperContext,
   paperContentDigest,
   paperRevision,
+  scopeContext,
   type MemoRecords,
   type PaperRevision,
+  type ScopeSource,
 } from "./revision";
 
 const templateId = "MEM-SO-01";
 
-/** The quality reviewer's sign-offs of this exact package, if any. */
+/**
+ * The quality reviewer's sign-offs of this exact package, if any. The
+ * reviewer and checklist revision are the latest sign-off's own, not the live
+ * review's, which a replacement or a later checklist save changes.
+ */
 function packageSignOffs(e: Engagement, r: Report) {
-  const q = e.qualityReview;
-  if (!q) return undefined;
-  return {
-    reviewerId: q.reviewerId,
-    checklistRevision: q.revision,
-    signOffs: q.signOffs.filter(
+  const signOffs = (e.qualityReview?.signOffs ?? []).filter(
       (s) =>
         s.reportId === r.id &&
         s.internalHash === r.sha256 &&
         s.clientHash === r.clientSha256,
     ),
+    last = signOffs.at(-1);
+  if (!last) return undefined;
+  return {
+    reviewerId: last.userId,
+    checklistRevision: last.checklistRevision,
+    signOffs: structuredClone(signOffs),
+  };
+}
+
+/** The engagement as the report captured it; null before the contract. */
+function capturedScope(e: Engagement, r: Report): ScopeSource | null {
+  const s = r.snapshot as {
+    workflow?: Engagement["workflow"] | null;
+    engagement?: Partial<Pick<Engagement, "title" | "classification">>;
+  };
+  const title = s.engagement?.title,
+    classification = s.engagement?.classification;
+  if (typeof title !== "string" || !classification) return null;
+  return {
+    // Written once at creation.
+    id: e.id,
+    clientId: e.clientId,
+    rulePack: e.rulePack,
+    // As captured.
+    title,
+    classification,
+    workflow: s.workflow ?? null,
   };
 }
 
@@ -43,7 +82,8 @@ export async function completionMemo(
 ): Promise<PaperRevision | null> {
   const completion = r.release?.completion,
     template = catalog.items.find((t) => t.id === templateId);
-  if (!completion || !template) return null;
+  const scope = capturedScope(e, r);
+  if (!completion || !template || !scope) return null;
   const qualityReview = packageSignOffs(e, r),
     signOffs = qualityReview?.signOffs ?? [],
     records: MemoRecords = {
@@ -107,8 +147,12 @@ export async function completionMemo(
     signatures: [],
     history: [],
   };
+  // The memo cites only the release records, and no evidence or runs.
   const d = await paperRevision(memo, {
-    ...paperContext(e, tenantId),
+    ...scopeContext(scope, tenantId),
+    artifacts: [],
+    runs: [],
+    findings: [],
     records,
   });
   // The approvals are the release decisions, bound to the package they cover;

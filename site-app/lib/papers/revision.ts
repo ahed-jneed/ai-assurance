@@ -215,26 +215,48 @@ function citedAcceptance(a: Acceptance): MemoRecords["acceptance"] {
   return { ...fields, approval: approval ?? null };
 }
 
+/**
+ * What a document's identity and scope rest on: the engagement's fixed
+ * fields (id, client, rule pack stamp) and the workflow, title and
+ * classification, either live or as a report captured them.
+ */
+export type ScopeSource = Pick<
+  Engagement,
+  "id" | "clientId" | "title" | "classification" | "rulePack"
+> & { workflow?: Engagement["workflow"] | null };
+export type ScopeContext = Omit<
+  PaperContext,
+  "artifacts" | "runs" | "findings" | "records"
+>;
+
+/** The identity and scope fields of a projection context. */
+export function scopeContext(s: ScopeSource, tenantId: string): ScopeContext {
+  const brief = s.workflow?.brief,
+    acceptance = s.workflow?.acceptance,
+    pack = s.rulePack ?? currentRulePack;
+  return {
+    tenantId,
+    clientId: s.clientId,
+    engagementId: s.id,
+    systemId: brief?.systemName.trim() || s.title.trim() || s.id,
+    periodStart: calendarDate(brief?.periodStart ?? acceptance?.periodStart),
+    periodEnd: calendarDate(brief?.periodEnd ?? acceptance?.periodEnd),
+    boundary: brief?.boundary ?? acceptance?.systemBoundary ?? "",
+    operatorRole: s.classification.operatorRole,
+    rulePack: { version: pack.version, legalVersion: pack.legalVersion },
+    templateVersion: s.rulePack?.version ?? methodologyVersion,
+  };
+}
+
 /** The projection context of a live engagement, as report capture reads it. */
 export function paperContext(
   e: Engagement,
   tenantId: string,
   extra: Pick<MemoRecords, "qualityReview" | "releaseCompletion"> = {},
 ): PaperContext {
-  const brief = e.workflow?.brief,
-    acceptance = e.workflow?.acceptance,
-    pack = e.rulePack ?? currentRulePack;
+  const acceptance = e.workflow?.acceptance;
   return {
-    tenantId,
-    clientId: e.clientId,
-    engagementId: e.id,
-    systemId: brief?.systemName.trim() || e.title.trim() || e.id,
-    periodStart: calendarDate(brief?.periodStart ?? acceptance?.periodStart),
-    periodEnd: calendarDate(brief?.periodEnd ?? acceptance?.periodEnd),
-    boundary: brief?.boundary ?? acceptance?.systemBoundary ?? "",
-    operatorRole: e.classification.operatorRole,
-    rulePack: { version: pack.version, legalVersion: pack.legalVersion },
-    templateVersion: e.rulePack?.version ?? methodologyVersion,
+    ...scopeContext(e, tenantId),
     artifacts: e.artifacts,
     runs: e.runs,
     findings: e.findings,
