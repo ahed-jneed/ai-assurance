@@ -9,6 +9,7 @@ import { findings } from "./findings";
 import { papers } from "./papers";
 import { reports } from "./reports";
 import { runs } from "./runs";
+import { specialCategory } from "./special-category";
 import { workflow } from "./workflow";
 /** Every op POST /api/workspace accepts, each listed by exactly one module. */
 export const commandModules: readonly CommandModule[] = [
@@ -19,6 +20,7 @@ export const commandModules: readonly CommandModule[] = [
   classification,
   findings,
   runs,
+  specialCategory,
   reports,
 ];
 export async function dispatch(

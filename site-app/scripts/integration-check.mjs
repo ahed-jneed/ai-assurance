@@ -591,6 +591,8 @@ try {
       sensitiveDataBasis: "Synthetic groups; no personal data",
     },
     rationale: "Fixture acceptance rules assess arithmetic, not conformity",
+    // Synthetic groups hold no special-category data (#60).
+    specialCategory: { specialCategory: false },
   };
   await command(
     "createEvaluationProfile",
@@ -831,6 +833,40 @@ try {
     await command("acceptEvidence", { artifactId: u.artifactId });
     return u.artifactId;
   }
+  // A dataset with a special-category column needs the client's recorded
+  // basis before upload (#60, D-11).
+  const specialUpload = () => {
+    const f = new FormData();
+    f.set("tenantId", tenantId);
+    f.set("engagementId", e.id);
+    f.set("expectedVersion", String(e.version));
+    f.set("category", "Dataset");
+    f.set("visibility", "internal");
+    f.set("handlingBasis", "synthetic");
+    f.set(
+      "file",
+      new File(["actual,predicted,ethnicity\n1,1,A\n0,0,B"], "special.csv", {
+        type: "text/csv",
+      }),
+    );
+    return f;
+  };
+  const refusedUpload = await request("/api/evidence", {
+    method: "POST",
+    body: specialUpload(),
+    status: 409,
+  });
+  assert.match(refusedUpload.error, /recorded basis before upload: ethnicity/);
+  await command("recordSpecialCategoryBasis", {
+    kind: "gdpr_art9",
+    point: "g",
+    statement: "Fixture: substantial public interest basis named by the client",
+    columns: ["ethnicity"],
+    confirmedBy: "Fixture DPO",
+    confirmedOn: "2026-11-01",
+  });
+  await request("/api/evidence", { method: "POST", body: specialUpload() });
+  await refresh();
   for (const item of [
     {
       task: "Regression",
