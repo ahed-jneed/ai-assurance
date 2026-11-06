@@ -166,6 +166,22 @@ jobs:
         if: steps.browsers.outputs.cache-hit != 'true'
         run: npx playwright install --only-shell chromium
 
+      # TEMPORARY diagnostic for #119 (reverted before merge).
+      - name: Probe overlapping saves and reads (#119)
+        run: |
+          node e2e/server.mjs 8791 > /tmp/probe-server.log 2>&1 &
+          server=$!
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:8791/ && break; sleep 2; done
+          node scripts/seed-demo.mjs --trusted-headers http://127.0.0.1:8791 > /dev/null
+          node e2e/probe-119.mjs http://127.0.0.1:8791 40 0 1 || true
+          node e2e/probe-119.mjs http://127.0.0.1:8791 40 1 0 || true
+          node e2e/probe-119.mjs http://127.0.0.1:8791 40 1 1 || true
+          echo "Network connection lost lines: $(grep -c 'Network connection lost' /tmp/probe-server.log || true)"
+          grep -v '^\[wrangler:info\] \(GET\|POST\)' /tmp/probe-server.log | tail -80 || true
+          kill $server || true
+          sleep 3
+          pkill -f workerd || true
+
       - name: Persona suite
         run: npm run test:e2e
 
