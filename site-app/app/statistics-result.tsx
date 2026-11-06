@@ -13,6 +13,7 @@ import {
 import type { Metric, Result } from "@/lib/domain";
 import { REASON_TEXT, explainResult } from "@/lib/hosted-statistics";
 import { humanLabel } from "@/lib/presentation";
+import { positionLabel } from "./statistics-position";
 import { THRESHOLD_LIBRARY, type Band } from "@/lib/statistics";
 
 type Details = {
@@ -77,12 +78,6 @@ function bandShown(m: Metric, band: Band | null | undefined) {
       : `within [${show(m, lower)}, ${show(m, upper)}]`;
   return lower !== null ? `≥ ${show(m, lower)}` : `≤ ${show(m, upper)}`;
 }
-/** Where the point estimate lies against the band; the interval decides. */
-const POSITION: Record<string, string> = {
-  pass: "Estimate within band",
-  fail: "Estimate outside band",
-  none: "Estimate on the band edge",
-};
 const METHOD_NAMES: Record<string, string> = {
   wilson: "Wilson score",
   wilson_bonferroni_mean: "Wilson, Bonferroni-adjusted mean",
@@ -136,9 +131,7 @@ function MetricRow({ m }: { m: Metric }) {
       <TableCell>{(m.denominator ?? m.sampleSize).toLocaleString()}</TableCell>
       <TableCell>{d.band ? bandShown(m, d.band) : "–"}</TableCell>
       <TableCell>
-        {d.status === "evaluated"
-          ? (POSITION[d.direction] ?? humanLabel(d.direction))
-          : humanLabel(d.status)}
+        {positionLabel(d)}
         {d.role !== "descriptive" && m.pValue !== null && (
           <span className="subtle"> · p {p(m.pValue)}</span>
         )}
