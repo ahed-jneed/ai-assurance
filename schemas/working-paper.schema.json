@@ -1201,36 +1201,28 @@
       ],
       "properties": {
         "objective": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "scope": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "criteria": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "procedures": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "sampling": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "results": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "limitations": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "conclusion": {
-          "type": "string",
-          "maxLength": 30000
+          "type": "string"
         },
         "conclusionStatus": {
           "enum": [
