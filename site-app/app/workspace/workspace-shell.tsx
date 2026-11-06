@@ -108,7 +108,7 @@ export default function Workspace() {
   const modal = useModalState();
   const sheet = useRecordSheet();
   const paper = usePaperEditor(e);
-  const lab = useLabIntent(url.procedureContext);
+  const lab = useLabIntent(url.view);
   const [switchOpen, setSwitchOpen] = useState(false),
     [searchOpen, setSearchOpen] = useState(false),
     [sidebarWidth, setSidebarWidth] = useState(272),
@@ -266,7 +266,7 @@ export default function Workspace() {
                 paperRows={paperRows}
                 reporters={editing.reporters}
                 resolve={resolveName}
-                labIntent={lab.intent}
+                lab={lab}
                 onModal={modal.open}
                 onDetail={sheet.viewDetail}
                 onOnboard={() => setOnboarding(true)}

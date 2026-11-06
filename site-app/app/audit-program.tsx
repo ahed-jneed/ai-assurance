@@ -365,9 +365,12 @@ export function AuditProgram({
   onFollowup,
   onContext,
   onFinding,
+  onQueuedRun,
 }: {
   onFinding: (p: Procedure) => void;
   onContext: (id: string) => void;
+  /** A planned evaluation of the procedure was queued as `runId`. */
+  onQueuedRun: (procedureId: string, runId: string) => void;
   data: WorkspaceData;
   busy: boolean;
   act: WorkflowAct;
@@ -1866,10 +1869,12 @@ export function AuditProgram({
                               datasetId: p.datasetId,
                               profileId: p.profileId,
                             })
-                              .then(() => {
-                                onContext(p.id);
+                              .then((r) => {
                                 setSelected(undefined);
-                                onNavigate("Testing lab");
+                                // Shows the queued run; opening the setup
+                                // again would queue a duplicate.
+                                if (r.details?.runId)
+                                  onQueuedRun(p.id, r.details.runId);
                               })
                               .catch(() => {})
                           }

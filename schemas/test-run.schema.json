@@ -1684,6 +1684,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1e+100
+        },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
         }
       },
       "required": [
@@ -2940,6 +2945,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1e+100
+        },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
         }
       },
       "required": [
@@ -3252,6 +3262,9 @@
             "f1",
             "macro_f1",
             "balanced_accuracy",
+            "specificity",
+            "prevalence",
+            "majority_baseline_accuracy",
             "mae",
             "rmse",
             "r2",
@@ -3324,6 +3337,9 @@
                   "f1",
                   "macro_f1",
                   "balanced_accuracy",
+                  "specificity",
+                  "prevalence",
+                  "majority_baseline_accuracy",
                   "maximum_selection_rate_gap",
                   "minimum_selection_rate_ratio",
                   "maximum_tpr_fpr_gap"
@@ -3542,7 +3558,10 @@
                         "recall",
                         "f1",
                         "macro_f1",
-                        "balanced_accuracy"
+                        "balanced_accuracy",
+                        "specificity",
+                        "prevalence",
+                        "majority_baseline_accuracy"
                       ]
                     }
                   }

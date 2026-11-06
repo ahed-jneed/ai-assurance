@@ -5,8 +5,11 @@ export const tasks = [
   "Regression",
   "Classical NLP",
 ] as const;
-export const runnerVersion = "interactive-predictions-2.0.1";
-export const testDefinitionVersion = "traditional-ml-2.0.1";
+// Bump both when a metric or decision rule changes: a run queued under one
+// definition cannot execute under another, and its manifest names the
+// definition that produced its results.
+export const runnerVersion = "interactive-predictions-2.1.0";
+export const testDefinitionVersion = "traditional-ml-2.1.0";
 export const tests = [
   {
     id: "performance",
@@ -101,7 +104,13 @@ export const configSchema = z
     labelColumn: column.min(1),
     predictionColumn: column.min(1),
     groupColumn: column.default(""),
+    /** The favourable outcome: what fairness tests count as selection. */
     positiveLabel: column.default(""),
+    /**
+     * The class binary performance measures recall (sensitivity) on, which
+     * need not be the favourable outcome. Empty means the favourable label.
+     */
+    performancePositiveLabel: column.default(""),
     minimumGroupSize: z.number().int().min(2).max(1000),
     maximumParityGap: z.number().min(0).max(1),
     minimumImpactRatio: z.number().min(0).max(1),
@@ -147,6 +156,13 @@ export const profileSchema = z
     rationale: z.string().trim().min(1).max(5000),
   })
   .strict();
+/** The class binary performance measures recall on. */
+export function performancePositiveLabel(c: {
+  positiveLabel: string;
+  performancePositiveLabel?: string;
+}) {
+  return c.performancePositiveLabel || c.positiveLabel;
+}
 export function fairnessSelected(suite: string[]) {
   return suite.some((x) =>
     ["demographic_parity", "disparate_impact", "equalized_odds"].includes(x),
@@ -174,7 +190,9 @@ export function protocolConfigKeys(task: string, suite: string[]) {
     ...(suite.includes("performance")
       ? [
           "minimumAccuracy",
-          task === "Binary classification" ? "minimumRecall" : "minimumMacroF1",
+          ...(task === "Binary classification"
+            ? ["performancePositiveLabel", "minimumRecall"]
+            : ["minimumMacroF1"]),
         ]
       : []),
     ...(suite.includes("regression") ? ["maximumRmse"] : []),
