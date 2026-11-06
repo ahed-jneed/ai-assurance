@@ -59,6 +59,23 @@ paper is written, for example) go through the persona's API client
 (`api("qa-auditor")` in `fixtures.ts`), which makes the same calls as the UI.
 The specs share one practice, so they run in one worker, in file order.
 
+## Waiting for results
+
+A spec that checks the effect of a UI command through the API waits for the
+Worker's answer to that command first: `runCommand(page, op, () => click())`
+(`fixtures.ts`) clicks and waits for the `POST /api/workspace` response of
+that `op`, and fails on any status but 200. Only then does it read through the
+API, once, without `expect.poll`. In #119 a spec polled through the API while
+the UI's save was still in flight; that read was never answered, the poll timed
+out after 10 s, and the Worker logged `Network connection lost` when the test
+tore the hung request down. Never wait on a timer, and never read while the
+UI's command is unanswered.
+
+The suite runs with `retries: 0`, locally and in CI, so a flaky spec fails the
+run instead of passing on a second attempt. The API clients time out a request
+after 15 s, so a request the Worker never answers fails with its URL instead of
+an anonymous test timeout.
+
 ## Accessibility
 
 `expectAccessible(page, label)` (`a11y.ts`) runs axe with the WCAG 2.x A and AA
