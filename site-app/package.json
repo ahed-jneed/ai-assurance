@@ -18,6 +18,7 @@
     "check:harnesses": "node scripts/run-checks.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
     "db:migrate:local": "node scripts/db-migrate-local.mjs",
+    "test:e2e": "playwright test",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build && npm run check:harnesses",
     "db:generate": "drizzle-kit generate"
   },
@@ -48,8 +49,10 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@playwright/test": "1.64.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -60,6 +63,7 @@
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
     "json-rpc-2.0": "1.7.1",
+    "playwright-core": "1.64.1",
     "prettier": "3.9.10",
     "raw-body": "3.0.2",
     "react-server-dom-webpack": "19.2.6",
