@@ -869,7 +869,9 @@ try {
   );
   await cmd("createReport", {
     kind: "draft",
-    opinion: "Qualified conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "limited",
+    conclusion: "qualified",
     summary: "Synthetic dossier export validation",
   });
   const report = e.reports.at(-1),
@@ -981,7 +983,9 @@ try {
   await refresh();
   await cmd("createReport", {
     kind: "draft",
-    opinion: "Qualified conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "limited",
+    conclusion: "qualified",
     summary: "Explicit withholding fixture",
   });
   const withheldReport = e.reports.at(-1);

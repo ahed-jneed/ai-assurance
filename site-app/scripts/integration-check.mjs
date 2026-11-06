@@ -3,6 +3,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
 const base = process.argv[2] ?? "http://127.0.0.1:5173";
+// The report elements a final report states at capture (report model v2).
+const reportParticulars = {
+  addressee: "Fixture client board",
+  location: "Vienna, Austria",
+  signatory: "Fixture Assurance GmbH",
+  basisForModification:
+    "Synthetic unresolved nonconformity whose effects are material and pervasive.",
+};
 assert(
   ["127.0.0.1", "localhost", "::1"].includes(new URL(base).hostname),
   "This fixture identity test may run only against loopback development",
@@ -1170,7 +1178,8 @@ try {
   );
   await command("createReport", {
     kind: "draft",
-    opinion: "Readiness assessment",
+    engagementType: "readiness",
+    conclusion: "readiness",
     summary: "Fixture draft snapshot; internal evidence remains restricted.",
   });
   const report = e.reports.at(-1),
@@ -1217,7 +1226,10 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Adverse conclusion",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
       summary: "Blocked fixture final",
     },
     owner,
@@ -1945,7 +1957,8 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Readiness assessment",
+      engagementType: "readiness",
+      conclusion: "readiness",
       summary: "Positive readiness blocked by unresolved high finding",
     },
     owner,
@@ -2147,7 +2160,10 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Adverse conclusion",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
       summary: "Must wait for the independent review",
     },
     owner,
@@ -2190,7 +2206,10 @@ try {
   );
   await command("createReport", {
     kind: "final",
-    opinion: "Adverse conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "reasonable",
+    conclusion: "adverse",
+    ...reportParticulars,
     summary:
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
@@ -2524,7 +2543,19 @@ try {
   );
   assert.equal(print.status, 200);
   const html = await print.text();
-  assert(html.includes("Adverse conclusion"));
+  // The client's print view shows the ISAE 3000 report elements (#20).
+  for (const element of [
+    "Independent reasonable assurance report",
+    "To: Fixture client board",
+    "ISAE 3000 (Revised), attestation engagement",
+    "Basis for adverse opinion",
+    "Adverse opinion",
+    "In our opinion, because of the significance",
+    "Signed: Fixture Assurance GmbH",
+    "Location: Vienna, Austria",
+    "Results by criterion",
+  ])
+    assert(html.includes(element), element);
   assert(!html.includes("Internal restriction secret"));
   assert(!html.includes("Internal unavailable evidence fixture"));
   assert(!html.includes("predictions.csv"));
@@ -2567,7 +2598,10 @@ try {
   // A newer final report supersedes the released one automatically.
   await command("createReport", {
     kind: "final",
-    opinion: "Adverse conclusion",
+    engagementType: "attestation",
+    assuranceLevel: "reasonable",
+    conclusion: "adverse",
+    ...reportParticulars,
     summary: "Synthetic amended adverse report replacing the first release.",
   });
   const replacement = e.reports.at(-1);
@@ -2609,12 +2643,17 @@ try {
     "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
     { user: viewer },
   );
+  // The superseded report stays readable to the client, which was issued
+  // that opinion, labelled with its successor.
   assert.deepEqual(
-    clientReports.engagement.reports.map((r) => r.id),
-    [replacement.id],
+    clientReports.engagement.reports.map((r) => [r.id, r.supersededBy]),
+    [
+      [internalFinal.id, replacement.id],
+      [replacement.id, undefined],
+    ],
   );
   // The client sees which earlier report the released one replaced.
-  assert.deepEqual(clientReports.engagement.reports[0].replaces, [
+  assert.deepEqual(clientReports.engagement.reports[1].replaces, [
     internalFinal.id,
   ]);
   // The release-time records are recorded by the release, never prepared.
@@ -2817,7 +2856,8 @@ try {
     "createReport",
     {
       kind: "final",
-      opinion: "Readiness assessment",
+      engagementType: "readiness",
+      conclusion: "readiness",
       summary: "Must reject a positive prohibited-practice opinion",
     },
     owner,
