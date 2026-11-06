@@ -407,6 +407,44 @@ describe("access lifecycle (F-24)", () => {
     expect(own(d1)[2].sql).toMatch(/access_since=\?/);
   });
 
+  it("grants and changes to the Engagement Quality Reviewer role like any internal role (#24)", async () => {
+    const d1 = practice();
+    signIn(caller());
+    vi.mocked(getEngagement).mockResolvedValue(stored());
+    const response = await post("updateMember", {
+      userId: "user-2",
+      displayName: "Ada",
+      role: "Engagement Quality Reviewer",
+      engagementIds: ["ENG-1"],
+    });
+    expect(response.status).toBe(200);
+    expect((await reply(response)).details).toMatchObject({
+      role: "Engagement Quality Reviewer",
+      engagementIds: ["ENG-1"],
+      withdrawn: { engagementIds: [], workerIds: [] },
+    });
+    // The role change withdraws earlier grants, grants the one listed and is
+    // recorded as a management event in the same batch.
+    expect(tables(own(d1))).toEqual([
+      "engagement_access",
+      "runner_workers",
+      "memberships",
+      "engagement_access",
+    ]);
+    expect(d1.batches[0].at(-1)!.sql).toMatch(/management_events/);
+    const invite = practice();
+    expect(
+      (
+        await post("inviteMember", {
+          email: "eqr@example.test",
+          role: "Engagement Quality Reviewer",
+          engagementIds: ["ENG-1"],
+        })
+      ).status,
+    ).toBe(200);
+    expect(tables(own(invite))).toEqual(["invitations"]);
+  });
+
   it("keeps grants when only the name changes", async () => {
     const d1 = practice();
     signIn(caller());

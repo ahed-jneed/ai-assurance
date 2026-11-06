@@ -12,7 +12,12 @@ export async function GET(request: Request) {
   try {
     const u = new URL(request.url),
       ctx = await context(u.searchParams.get("tenantId") ?? undefined);
-    requireRole(ctx, ["Auditor", "Lead Auditor", "Reviewer"]);
+    requireRole(ctx, [
+      "Auditor",
+      "Lead Auditor",
+      "Reviewer",
+      "Engagement Quality Reviewer",
+    ]);
     const page = Number(u.searchParams.get("page") ?? 0);
     if (!Number.isInteger(page) || page < 0 || page > 10000)
       throw new ApiError(400, "Invalid inbox page");

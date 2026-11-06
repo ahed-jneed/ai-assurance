@@ -9,6 +9,7 @@ export type AccessSettings = {
   SELF_SIGNUP?: string;
   TENANT_MAX_ENGAGEMENTS?: string;
   TENANT_MAX_SAVES_PER_HOUR?: string;
+  EQR_COOLING_OFF_DAYS?: string;
 };
 
 const settings = () => env as AccessSettings;
@@ -49,6 +50,20 @@ export function tenantQuotas(config: AccessSettings = settings()) {
     engagements: limit(config.TENANT_MAX_ENGAGEMENTS, 200),
     savesPerHour: limit(config.TENANT_MAX_SAVES_PER_HOUR, 1000),
   };
+}
+
+/**
+ * The cooling-off period, in days, before someone who served on the team of
+ * a client's engagement may be its Engagement Quality Reviewer (ISQM 2 ¶19):
+ * EQR_COOLING_OFF_DAYS, two years by default; 0 checks only the engagement's
+ * own team.
+ */
+export function coolingOffDays(config: AccessSettings = settings()) {
+  const value = (config.EQR_COOLING_OFF_DAYS ?? "").trim();
+  const parsed = Number(value);
+  return value && Number.isInteger(parsed) && parsed >= 0 && parsed <= 3650
+    ? parsed
+    : 730;
 }
 
 /** Refuses a new engagement once the practice holds its quota of them. */

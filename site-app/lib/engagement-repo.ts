@@ -8,7 +8,7 @@ import { hydrate, dehydrate } from "./engagement-storage";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import { assertSaveQuota } from "./access-policy";
-import { refuseReadOnly, type Context } from "./tenancy";
+import { refuseQualityReviewer, refuseReadOnly, type Context } from "./tenancy";
 import {
   isClientRole,
   activeGrant,
@@ -90,6 +90,7 @@ export async function save(
   extra: (commandId: string) => D1PreparedStatement[] = () => [],
 ) {
   refuseReadOnly(ctx);
+  refuseQualityReviewer(ctx, action);
   if (
     ctx.role === "Client Contributor" &&
     !(
