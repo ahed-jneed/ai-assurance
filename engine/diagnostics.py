@@ -212,9 +212,6 @@ def _validate_plan_config(frozen: dict[str, Any], original: dict[str, Any]) -> d
             raise ValueError("A derived statistics plan must be normalised")
     else:
         plan = stats.validate_plan(statistics)
-    if plan["clusterField"] is not None:
-        # Section 5.11 requires the cluster bootstrap for every member; this runner does not implement it.
-        raise ValueError("statistics.clusterField needs the cluster bootstrap, which this runner does not implement")
     if frozen["thresholds"]["values"]:
         raise ValueError("A 1.3 configuration with statistics must have empty thresholds.values")
     for field, key in MINIMUM_FIELDS:
@@ -499,7 +496,7 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
     dependencies, dependency_notes = runtime_dependencies(adapter, (current_meta, reference_meta))
     # The configuration snapshot records the plan that decided (a 1.0 configuration's derived plan included).
     configuration = {**frozen, "statistics": plan}
-    determinism = "Deterministic statistics; the descriptive percentile bootstrap (expected calibration error, R²) uses random.Random(seed)"
+    determinism = "Deterministic statistics; the percentile bootstraps (the descriptive expected calibration error, R², MAE and RMSE intervals, and the cluster bootstrap of a plan with a clusterField) use random.Random(seed)"
     report = {"contractVersion": REPORT_CONTRACT, "id": frozen["id"], "engagementId": frozen["engagementId"], "modelId": frozen["modelId"], "datasetId": frozen["datasetId"], "suite": frozen["suite"], "thresholds": frozen["thresholds"], "seed": frozen["seed"], "state": "succeeded", "outcome": overall, "overallOutcome": overall, "reviewFlags": review_flags, "startedAt": started_at, "configuration": configuration, "provenance": {"runnerVersion": __version__, "inputHashes": input_hashes, "configSha256": sha256(canonical_bytes(configuration)), "statisticsPlanSha256": stats.plan_sha256(plan) if plan is not None else None, "inputs": {"data": current_meta, "reference": reference_meta}, "determinism": determinism, "dependencies": dependencies}, "results": diagnostics, "limitations": ["This is a diagnostic evidence report. It does not determine legal compliance or replace an authorized auditor's judgment.", "Local hashes and exclusive file creation support integrity; organizational immutability requires signed manifests, object-lock storage, retention controls, and authorized custody."], "paperIds": [], "workingPapers": []}
     report["provenance"]["inputs"]["testDefinitions"] = definition_versions((diagnostic["testId"] for diagnostic in diagnostics), {d["testId"]: d["decision"]["kind"] for d in diagnostics if "decision" in d})
     report["limitations"].extend(dependency_notes+adapter_notes)

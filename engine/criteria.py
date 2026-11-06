@@ -14,6 +14,7 @@ from collections import defaultdict
 from typing import Any
 
 from . import statistics as st
+from .errors import EngineError
 
 # Section 5.11: the descriptive row-level bootstrap (ECE and R2) stays within rows x replicates <= 5,000,000.
 MAX_DESCRIPTIVE_BOOTSTRAP_WORK = 5_000_000
@@ -44,9 +45,12 @@ REASON_TEXT = {
     "no_threshold": "The policy sets no threshold that statistics 1.0.0 can decide, so every metric is descriptive and no conclusion is drawn.",
     "undecidable_metric": "The policy depends on a metric that statistics 1.0.0 cannot decide by an interval (R² or expected calibration error), so a pass is not possible.",
     "invalid_band": "The configured acceptance band is not a valid band for this metric, so the criterion cannot decide.",
-    "bootstrap_budget_exceeded": "The descriptive bootstrap exceeds its work budget, so no bootstrap interval is reported.",
+    "bootstrap_budget_exceeded": "A bootstrap exceeds its work budget, so no bootstrap interval is reported; in a clustered design no member can then decide.",
     "bootstrap_insufficient_valid_replicates": "Too few bootstrap replicates are defined, so no bootstrap interval is reported.",
+    "small_cell_clustered": "A comparison has a cell under 5 in a clustered design. Fisher's exact test assumes independent rows, so that comparison supports no claim.",
+    "below_minimum_cluster_count": "A metric or compared group has fewer than 10 independent clusters, so it cannot support a pass.",
 }
+CLUSTER_NOTE = "Rows are clustered by '{field}': every member and descriptive interval is a cluster percentile bootstrap over {clusters} clusters ({replicates} replicates, seed {seed}). The per-group rates, prevalence and majority-class baseline intervals still assume independent rows."
 BASE_NOTES = {
     "performance": "Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity and target leakage require review.",
     "multiclass_performance": "Saved predictions do not establish cross-validation, dataset independence or freedom from leakage.",
@@ -71,6 +75,8 @@ def group_columns(plan: dict[str, Any] | None, config: dict[str, Any]) -> list[s
     protected = config.get("columns", {}).get("protected")
     if protected:
         columns.append(protected)
+    if (plan or {}).get("clusterField"):
+        columns.append(plan["clusterField"])
     for criterion in (plan or {}).get("criteria", []):
         columns.extend(criterion.get("groupFields") or [])
         if criterion.get("subgroup"):
@@ -81,6 +87,19 @@ def group_columns(plan: dict[str, Any] | None, config: dict[str, Any]) -> list[s
 def group_label(values: list[str]) -> str:
     """One protected column gives its value; several give an intersectional stratum label (a JSON array)."""
     return values[0] if len(values) == 1 else json.dumps(values, ensure_ascii=False, separators=(",", ":"))
+
+
+def cluster_ids(plan, observations):
+    """The clusters of a clustered plan in section 5.11 order, and each cluster's observations."""
+    field = plan["clusterField"]
+    parts = defaultdict(list)
+    for o in observations:
+        value = o["fields"].get(field)
+        if value is None:
+            raise EngineError("missing_value", f"Every evaluated row needs a cluster id in column {field!r} (statistics.clusterField)")
+        parts[value].append(o)
+    ordered = sorted(parts, key=st.cluster_key)
+    return ordered, [parts[cluster] for cluster in ordered]
 
 
 def performance_labels(config):
@@ -160,10 +179,7 @@ def bootstrap_interval(n, statistic, replicates, seed, level):
     return {"lower": quantile(values, tail), "upper": quantile(values, 1.0 - tail), "level": level, "method": "percentile_bootstrap"}, []
 
 
-def quantile(ordered, probability):
-    position = (len(ordered) - 1) * probability
-    lower, upper = math.floor(position), math.ceil(position)
-    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+quantile = st.quantile
 
 
 class Evaluation:
@@ -174,30 +190,48 @@ class Evaluation:
         self.task = config["task"]
         self.scored = {}
 
-    def data_for(self, criterion):
+    def data_for(self, criterion, observations=None):
         kind = criterion["kind"]
+        whole = observations is None
+        observations = self.observations if whole else observations
         if kind == "performance":
-            return {"groups": [{"group": "all", **binary_counts(self.observations, performance_labels(self.config)[0])}]}
+            return {"groups": [{"group": "all", **binary_counts(observations, performance_labels(self.config)[0])}]}
         if kind == "multiclass_performance":
-            return multiclass_data(self.observations)
+            return multiclass_data(observations)
         if kind == "regression_performance":
-            return {"errors": [o["prediction"] - o["target"] for o in self.observations], "targets": [o["target"] for o in self.observations]}
+            return {"errors": [o["prediction"] - o["target"] for o in observations], "targets": [o["target"] for o in observations]}
         if kind == "group_comparison":
-            return group_data(criterion, self.observations, self.config)
-        rows = scored_rows(criterion, self.observations, self.config)
+            return group_data(criterion, observations, self.config)
+        rows = scored_rows(criterion, observations, self.config)
         bins, index = calibration_bins(rows, self.plan["calibrationBins"])
-        self.scored[criterion["id"]] = (rows, index)
+        if whole:
+            self.scored[criterion["id"]] = (rows, index)
         return {"bins": bins, "brierErrors": [(score - label) ** 2 for score, label in rows]}
 
     def evaluate(self):
-        evaluation = st.evaluate_criteria(self.plan, self.data_for)
+        if self.plan["clusterField"] is None:
+            evaluation = st.evaluate_criteria(self.plan, self.data_for)
+        else:
+            # Section 5.11: every member is decided by the cluster bootstrap over one data object per cluster.
+            ids, parts = cluster_ids(self.plan, self.observations)
+            for criterion in self.plan["criteria"]:
+                if criterion["kind"] == "calibration":
+                    self.data_for(criterion)  # the whole sample's scored rows, for the descriptive ECE bootstrap
+            evaluation = st.evaluate_criteria(self.plan, None, clustered=(ids, lambda criterion: [self.data_for(criterion, rows) for rows in parts], self.config["seed"]))
         for spec, outcome in zip(self.plan["criteria"], evaluation["criteria"]):
             self.add_bootstrap(spec, outcome)
         return evaluation
 
     def add_bootstrap(self, spec, outcome):
-        """End to end, the engine adds descriptive percentile-bootstrap intervals for ECE and R2."""
+        """End to end, the engine adds descriptive percentile-bootstrap intervals for ECE and R2 and, for
+        independent rows, the MAE and RMSE sensitivity interval (section 5.9), which never decides."""
         replicates, seed, level = self.plan["bootstrap"]["replicates"], self.config["seed"], self.plan["confidenceLevel"]
+        if spec["kind"] == "regression_performance" and self.plan["clusterField"] is None:
+            errors = [o["prediction"] - o["target"] for o in self.observations]
+            for entry in outcome["members"] + outcome["descriptive"]:
+                if entry["metric"] in ("mae", "rmse") and entry["interval"] is not None:
+                    statistic = mean_absolute if entry["metric"] == "mae" else root_mean_square
+                    entry["sensitivityInterval"], entry["_sensitivityReasons"] = bootstrap_interval(len(errors), lambda draw, f=statistic: f(errors, draw), replicates, seed, level)
         for entry in outcome["descriptive"]:
             if entry["metric"] == "expected_calibration_error" and entry["estimate"] is not None:
                 rows, index = self.scored[spec["id"]]
@@ -222,6 +256,14 @@ def ece(rows, index, draw):
     return math.fsum(count / n * abs(positives / count - scores / count) for count, positives, scores in totals.values())
 
 
+def mean_absolute(errors, draw):
+    return math.fsum(abs(errors[i]) for i in draw) / len(draw)
+
+
+def root_mean_square(errors, draw):
+    return math.sqrt(math.fsum(errors[i] ** 2 for i in draw) / len(draw))
+
+
 def r_squared(targets, errors, draw):
     sample = [targets[i] for i in draw]
     mean = math.fsum(sample) / len(sample)
@@ -236,7 +278,10 @@ def _entry_metric(entry, role, name, unit, sample_size, config):
         "name": name, "value": entry["estimate"], "unit": unit, "sampleSize": sample_size,
         "numerator": counts["x"] if single else None, "denominator": counts["n"] if single else None,
         "threshold": threshold_for(config, name), "confidenceInterval": entry["interval"], "slices": [],
-        "details": {"role": role, "metric": entry["metric"], "subject": entry["subject"], "comparator": entry["comparator"], "counts": counts, "band": entry["band"], "status": entry["status"], "direction": entry["direction"], "smallCell": entry["smallCell"], "fisherExactP": entry["fisherExactP"], "chanceExactP": entry["chanceExactP"], "reasons": list(entry["reasons"])},
+        "details": {"role": role, "metric": entry["metric"], "subject": entry["subject"], "comparator": entry["comparator"], "counts": counts, "band": entry["band"], "status": entry["status"], "direction": entry["direction"], "smallCell": entry["smallCell"], "fisherExactP": entry["fisherExactP"], "chanceExactP": entry["chanceExactP"], "reasons": list(entry["reasons"]),
+                    # Section 5.11: the cluster bootstrap's replicates and clusters; section 5.9: the MAE/RMSE sensitivity interval.
+                    **({"bootstrap": entry["bootstrap"]} if "bootstrap" in entry else {}),
+                    **({"sensitivityInterval": entry["sensitivityInterval"]} if "sensitivityInterval" in entry else {})},
         "pValue": entry["pValue"],
     }
 
@@ -274,6 +319,11 @@ def baseline_note(outcome):
     if rmse is None or base is None or rmse["estimate"] is None or base["estimate"] is None:
         return []
     return [f"RMSE {short(rmse['estimate'], 4)} does not beat the mean-prediction baseline RMSE {short(base['estimate'], 4)} (gate p {short(base['counts']['gatePValue'], 3)}): the model is not shown to predict better than the mean of the reference values."]
+
+
+def cluster_count(outcome):
+    """The clusters a clustered criterion resampled: the largest count over its bootstrapped entries."""
+    return max((entry["bootstrap"]["clusters"] for entry in outcome["members"] + outcome["descriptive"] if "bootstrap" in entry), default=0)
 
 
 def class_table(observations, labels):
@@ -362,7 +412,13 @@ def criterion_result(spec, outcome, config, plan, notes, context=None):
     reasons = list(decision["reasons"])
     for entry in outcome["descriptive"]:
         reasons.extend(r for r in entry["reasons"] if r.startswith("bootstrap_"))
-    limitations = [BASE_NOTES[kind], *notes, *dict.fromkeys(REASON_TEXT[r] for r in reasons if r in REASON_TEXT), *baseline_note(outcome)]
+    if any(entry.get("_sensitivityReasons") for entry in outcome["members"] + outcome["descriptive"]):
+        notes = [*notes, "The MAE and RMSE bootstrap sensitivity interval exceeds its work budget (rows x replicates <= 5,000,000) or has too few valid replicates, so it is not reported."]
+    base = BASE_NOTES[kind]
+    if plan["clusterField"] is not None:
+        base = base.replace("; intervals assume independent observations.", ".")
+        notes = [*notes, CLUSTER_NOTE.format(field=plan["clusterField"], clusters=cluster_count(outcome), replicates=plan["bootstrap"]["replicates"], seed=config["seed"])]
+    limitations = [base, *notes, *dict.fromkeys(REASON_TEXT[r] for r in reasons if r in REASON_TEXT), *baseline_note(outcome)]
     if decision["libraryEntry"]:
         limitations.append(f"{decision['libraryEntry']['legalStatus']}: {decision['libraryEntry']['caveat']}")
     label = KIND_LABELS.get(kind) or GROUP_LABELS[spec["metric"]]
