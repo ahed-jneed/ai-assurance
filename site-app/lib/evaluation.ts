@@ -213,7 +213,7 @@ const atLeastVersion = (v: number[] | null, minimum: number[]) =>
 /**
  * The baselines a run's performance result was decided against, besides its
  * accuracy and recall (macro F1) criteria. Hosted runs under test definitions
- * traditional-ml-2.1.0 require balanced accuracy above chance and accuracy
+ * traditional-ml-2.1.x require balanced accuracy above chance and accuracy
  * above the majority-class baseline. External runs translated by the worker
  * from 2.0.0 (statistics 1.0.0) carry the chance baseline as a plan member;
  * the majority-class baseline is reported there but does not decide. Earlier
@@ -236,7 +236,10 @@ export function performanceBaselines(run: {
     )
       ? [chance]
       : [];
-  return atLeastVersion(semver(version, "traditional-ml-"), [2, 1, 0])
+  const hosted = semver(version, "traditional-ml-");
+  // From 3.0.0 hosted results carry their statistics 1.0.0 decision, whose
+  // plan names its members; the majority-class rule ended with 2.x.
+  return atLeastVersion(hosted, [2, 1, 0]) && !atLeastVersion(hosted, [3, 0, 0])
     ? [chance, "Accuracy above the majority-class baseline"]
     : [];
 }

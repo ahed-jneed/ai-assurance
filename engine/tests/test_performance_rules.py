@@ -4,7 +4,8 @@ Binary performance is measured on the frozen performancePositiveLabel while
 fairness keeps counting the favourable label, and performance results report
 prevalence, the majority-class baseline, a per-class table and predicted labels
 absent from the reference column. schemas/fixtures/performance-rules-golden.json
-is shared with the hosted runner (site-app/lib/performance-rules-golden.test.ts).
+is shared with the hosted runner (site-app/lib/performance-rules-golden.test.ts),
+which decides by the same statistics 1.0.0 plan.
 """
 import copy
 import json
@@ -52,18 +53,21 @@ class PerformanceRuleTests(unittest.TestCase):
         return {**json.loads(GOLDEN.read_text(encoding="utf-8"))["cases"][0]["config"], **changes}
 
     def test_shared_golden_cases_match_the_hosted_runner(self):
+        # Both runners decide by statistics 1.0.0, so a case has one outcome and one decision.
         golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
-        self.assertTrue(any(case["outcome"]["hosted"] == case["outcome"]["engine"] for case in golden["cases"]))
+        self.assertEqual({case["outcome"] for case in golden["cases"]}, {"pass", "fail", "inconclusive"})
         for case in golden["cases"]:
             with self.subTest(case=case["id"]):
                 _, report, results = self.evaluate(csv_bytes(case["rows"], golden["columns"]), case["config"], case["negativeLabel"])
-                self.assertEqual(results[0]["outcome"], case["outcome"]["engine"])
+                self.assertEqual(results[0]["outcome"], case["outcome"])
+                decision, expected = results[0]["decision"], case["decision"]
+                self.assertEqual(
+                    (decision["direction"], decision.get("decidingMemberId"), decision["reasons"]),
+                    (expected["direction"], expected["decidingMemberId"], expected["reasons"]))
+                self.assertLess(abs(decision["pValue"]-expected["pValue"])/max(expected["pValue"], 1e-300), 1e-9)
                 values = metric_values(results[0])
-                for name, expected in case["metrics"].items():
-                    self.assertAlmostEqual(values[name], expected, delta=1e-12, msg=name)
-                # A hosted fail is never an engine pass.
-                if case["outcome"]["hosted"] == "fail":
-                    self.assertNotEqual(results[0]["outcome"], "pass")
+                for name, value in {**case["metrics"], **case["engineMetrics"]}.items():
+                    self.assertAlmostEqual(values[name], value, delta=1e-12, msg=name)
                 self.assertEqual(report["configuration"]["hostedTranslation"]["version"], TRANSLATION_VERSION)
 
     def test_always_approve_predictor_never_passes(self):
