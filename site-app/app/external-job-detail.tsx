@@ -1,3 +1,4 @@
+import { usesModelLabelOutput } from "@/lib/external-decision-rule";
 import { explainWorkerFailure } from "@/lib/worker-failures";
 
 // The frozen fields of an external job that the job list explains, as
@@ -22,9 +23,10 @@ export function ExternalJobDetail({ job }: { job: ExternalJobFields }) {
     job.state === "failed" ? explainWorkerFailure(job.error) : null;
   // The worker applies the threshold to P(favourable label); a model that
   // outputs class labels decides by its own rule (engine/WORKER.md).
-  const labelOutput =
-    job.prediction_kind === "label" &&
-    ["ONNX", "PMML"].includes(job.model_format ?? "");
+  const labelOutput = usesModelLabelOutput(
+    job.model_format,
+    job.prediction_kind,
+  );
   return (
     <>
       {job.negative_label !== null && (
