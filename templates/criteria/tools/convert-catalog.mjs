@@ -13,6 +13,14 @@
  * that already exists is never overwritten with different content: released
  * documents are immutable, so a changed catalogue needs a new methodology
  * version. The index entries are added by hand after review (section 11.2).
+ *
+ * Since phase 2 (#61) the pack also carries the Annex IV map
+ * (templates/annex-iv-map.json) as `annexIvMap`, and the obligation file and
+ * the map are generated from the default pack by `npm run sync` in site-app,
+ * so converting a new methodology version carries both forward unchanged.
+ * Pack #1 2026.11.2 was converted before the map was embedded; 2026.11.3 is
+ * that pack with the map added. The module's projections and `serialise` are
+ * also what the sync script generates the two files with.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -103,10 +111,11 @@ const MIGRATED_JUSTIFICATION = (item, refs) =>
   `Migrated from the catalogue regulatoryRefs of ${item.id} (${refs.join(', ')}). The catalogue does not say how much of the provision the paper tests, so the link claims partial overlap only until a methodology reviewer replaces it.`;
 
 /**
- * Converts the catalogue and obligation file into {framework, pack}. Inputs
- * are parsed JSON; they are not modified.
+ * Converts the catalogue and obligation file into {framework, pack}, with the
+ * Annex IV map in the pack when one is given. Inputs are parsed JSON; they
+ * are not modified.
  */
-export function convertCatalog(catalog, obligations) {
+export function convertCatalog(catalog, obligations, annexMap) {
   const snapshot = catalog.regulatorySnapshot;
   const version = catalog.methodologyVersion;
   const edition = snapshot.celex;
@@ -248,6 +257,7 @@ export function convertCatalog(catalog, obligations) {
     },
     controlObjectives: objectives,
     items,
+    ...(annexMap ? { annexIvMap: structuredClone(annexMap) } : {}),
     notes: `Pack #1, converted from templates/catalog.json (methodology ${version}) by templates/criteria/tools/convert-catalog.mjs. Every link is migrated from the catalogue regulatoryRefs and claims partial overlap only (section 9.9 of docs/design/criteria-model.md).`,
     compat: { catalog: { schemaVersion: catalog.schemaVersion, regulatorySnapshot: structuredClone(snapshot) } },
   };
@@ -324,7 +334,7 @@ export const documentPaths = ({ framework, pack }) => ({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const read = file => JSON.parse(readFileSync(resolve(repo, file), 'utf8'));
-  const converted = convertCatalog(read('templates/catalog.json'), read('docs/obligation-subitems.json'));
+  const converted = convertCatalog(read('templates/catalog.json'), read('docs/obligation-subitems.json'), read('templates/annex-iv-map.json'));
   const paths = documentPaths(converted);
   const write = process.argv.includes('--write');
   let failed = false;

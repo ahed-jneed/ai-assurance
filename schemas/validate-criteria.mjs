@@ -83,8 +83,20 @@ export function readCriteria(root = criteriaRoot) {
   return { index: readJSON(join(root, 'index.json')), documents };
 }
 
-/** templates/annex-iv-map.json, which rule 8 reads. */
-export const readAnnexMap = () => readJSON(resolve(workspace, 'templates/annex-iv-map.json'));
+/**
+ * The Annex IV map a pack with features.annexIvIndex is served: its own
+ * annexIvMap or, for a version released before phase 2 embedded the map, that
+ * of the current (highest released, not withdrawn) version of the same pack
+ * id, which is what the build before phase 2 served it from
+ * templates/annex-iv-map.json. Mirrors annexIvMapOf in site-app/lib/criteria.
+ */
+export function servedAnnexMap({ index, documents }, pack) {
+  if (pack.annexIvMap) return pack.annexIvMap;
+  const current = (index.documents ?? [])
+    .filter(e => e.documentType === 'pack' && e.id === pack.id && e.status === 'released')
+    .sort((a, b) => compareVersions(b.version, a.version))[0];
+  return (current && documents.get(current.path)?.annexIvMap) ?? null;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -130,7 +142,7 @@ function indexer(index, documents) {
  * Runs the schema and integrity rules over an index and its documents.
  * Returns {errors, warnings}; each message starts with its rule number.
  */
-export function checkCriteria({ index, documents, validate = loadValidator(), annexMap = readAnnexMap() }) {
+export function checkCriteria({ index, documents, validate = loadValidator() }) {
   const errors = [],
     warnings = [];
   const fail = (rule, message) => errors.push(`rule ${rule}: ${message}`);
@@ -275,9 +287,13 @@ export function checkCriteria({ index, documents, validate = loadValidator(), an
       for (const templateId of typeof value === 'string' ? [value] : Object.values(value))
         if (!itemIds.has(templateId)) fail(8, `${name}: role ${role} names ${templateId}, which is not an item`);
     const features = pack.features ?? {};
-    if (features.annexIvIndex)
-      for (const section of annexMap.sections ?? [])
-        for (const paperId of section.paperIds ?? []) if (!itemIds.has(paperId)) fail(8, `${name}: annexIvIndex needs ${paperId} of the Annex IV map as an item`);
+    if (features.annexIvIndex) {
+      const annexMap = servedAnnexMap({ index, documents }, pack);
+      if (!annexMap) fail(8, `${name}: annexIvIndex needs an annexIvMap, on the pack or on the current version of ${pack.id}`);
+      else
+        for (const section of annexMap.sections)
+          for (const paperId of section.paperIds) if (!itemIds.has(paperId)) fail(8, `${name}: annexIvIndex needs ${paperId} of the Annex IV map as an item`);
+    }
     const aiAct = sets.get('eu-ai-act');
     if ((features.aiActClassification || features.obligationAssessments) && !aiAct) fail(8, `${name}: AI Act features need an eu-ai-act criteria set`);
     if (features.obligationAssessments && aiAct) {
@@ -510,17 +526,20 @@ export function stampDigests({ index, documents }) {
 }
 
 /**
- * Phase 1 keeps templates/catalog.json and docs/obligation-subitems.json as
- * the methodology files people edit, while the build serves the pinned pack.
- * The default pack must therefore project back to the catalogue exactly, and
- * its AI Act framework to the obligation file: otherwise an edit would
- * silently have no effect. The remedy is a new methodology version, converted
- * with templates/criteria/tools/convert-catalog.mjs.
+ * templates/catalog.json stays the methodology file people edit, while the
+ * build serves the pinned pack: the default pack must project back to it
+ * exactly, otherwise an edit would silently have no effect, and the remedy is
+ * a new methodology version converted with
+ * templates/criteria/tools/convert-catalog.mjs. Since phase 2 (#61)
+ * docs/obligation-subitems.json and templates/annex-iv-map.json are generated
+ * from the default pack's AI Act framework and Annex IV map by `npm run sync`
+ * in site-app, so a hand edit of either is drift too.
  */
 export async function checkMethodologyDrift({ index, documents }, files = {}) {
   const { legacyCatalog, obligationCatalog } = await import(pathToFileURL(join(criteriaRoot, 'tools/convert-catalog.mjs')).href);
   const catalog = files.catalog ?? readJSON(resolve(workspace, 'templates/catalog.json'));
   const obligations = files.obligations ?? readJSON(resolve(workspace, 'docs/obligation-subitems.json'));
+  const annexMap = files.annexMap ?? readJSON(resolve(workspace, 'templates/annex-iv-map.json'));
   const entry = index.documents.find(e => e.documentType === 'pack' && e.id === index.defaults.pack.id && e.version === index.defaults.pack.version);
   const pack = entry && documents.get(entry.path);
   if (!pack) return [];
@@ -532,7 +551,10 @@ export async function checkMethodologyDrift({ index, documents }, files = {}) {
   const fwEntry = set && index.documents.find(e => e.documentType === 'framework' && e.id === set.framework && e.edition === set.edition && e.version === set.version);
   const framework = fwEntry && documents.get(fwEntry.path);
   if (framework && canonicalize(obligationCatalog(framework)) !== canonicalize(obligations))
-    errors.push(`drift: docs/obligation-subitems.json differs from the framework ${framework.id} ${framework.version} of the default pack; ${remedy}`);
+    errors.push(`drift: docs/obligation-subitems.json differs from the framework ${framework.id} ${framework.version} of the default pack; it is generated, so run npm run sync in site-app`);
+  const served = pack.features?.annexIvIndex ? servedAnnexMap({ index, documents }, pack) : null;
+  if (served && canonicalize(served) !== canonicalize(annexMap))
+    errors.push(`drift: templates/annex-iv-map.json differs from the Annex IV map of the default pack ${pack.id} ${pack.version}; it is generated, so run npm run sync in site-app`);
   return errors;
 }
 
