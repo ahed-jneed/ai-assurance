@@ -1,0 +1,637 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:genai-result:0.1",
+  "title": "GenAI evaluation evidence: result envelope (genai-result/0.1)",
+  "description": "The envelope that `python -m engine.genai ingest` writes and the genai_ingest worker job will return (docs/design/genai-evidence.md section 10.3). Hashed parts travel as exact strings: verify SHA-256 over the UTF-8 bytes of computationJSON and itemsJSONL, then parse them; never re-serialise. computationJSON validates against $defs/computation, every itemsJSONL line against genai-evidence-item.schema.json. $defs/plan and $defs/manifest are the input contracts genai-plan/0.1 and genai-bundle/0.1. Schema validity establishes neither the origin of the inputs nor the correctness of the tools' scoring.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "computationJSON", "computationSha256", "itemsJSONL", "itemsSha256", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": "genai-result/0.1" },
+    "computationJSON": { "type": "string", "minLength": 2 },
+    "computationSha256": { "$ref": "#/$defs/sha256" },
+    "itemsJSONL": { "type": ["string", "null"], "description": "Canonical JSON lines sorted by itemKey, each ending in a line feed; null when the items do not fit (size procedure of section 10.3). itemsSha256 always pins them." },
+    "itemsSha256": { "$ref": "#/$defs/sha256" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "producedAt", "requestSha256", "inputHashes", "workerVersion", "imageDigest", "executionMode"],
+      "properties": {
+        "channel": { "enum": ["runner", "cli"] },
+        "producedAt": { "type": ["string", "null"], "format": "date-time" },
+        "requestSha256": { "$ref": "#/$defs/nullableSha256" },
+        "inputHashes": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "propertyNames": { "pattern": "^(0|[1-9][0-9]?)$" },
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        },
+        "workerVersion": { "type": ["string", "null"], "maxLength": 100 },
+        "imageDigest": { "type": ["string", "null"], "maxLength": 100 },
+        "executionMode": { "const": "genai_ingest" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "key": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/key" },
+    "format": {
+      "enum": ["inspect_eval", "inspect_json", "lm_eval_samples", "promptfoo_results", "garak_report", "pyrit_export", "deepeval_test_run", "ragas_results", "judge_validation_jsonl", "marking_check_jsonl"]
+    },
+    "family": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/family" },
+    "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lower": { "type": ["number", "null"], "exclusiveMinimum": -1, "exclusiveMaximum": 1 },
+        "upper": { "type": ["number", "null"], "exclusiveMinimum": 0, "exclusiveMaximum": 1 }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "runKey": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "task": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "format": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "successRule": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "tool_native" } } },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "values"],
+          "properties": { "type": { "const": "value_in" }, "values": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": ["string", "number", "boolean"] } } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "operator", "value"],
+          "properties": { "type": { "const": "threshold" }, "operator": { "enum": [">=", ">", "<=", "<"] }, "value": { "type": "number" } }
+        }
+      ]
+    },
+    "criterionSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "band"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "kind": { "enum": ["genai_mean", "genai_attack_success", "genai_pass_k", "genai_paired_difference", "genai_marking"] },
+        "role": { "enum": ["confirmatory", "exploratory"] },
+        "metric": {
+          "enum": ["accuracy", "score_mean", "task_success", "marking_presence", "detection_rate", "false_positive_rate", "detection_rate_after_transformation", "self_identification_rate"]
+        },
+        "band": { "$ref": "#/$defs/band" },
+        "select": { "$ref": "#/$defs/selector" },
+        "primaryScore": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "groupBy": { "enum": ["technique", "variant", "technique_variant", "category", "none"] },
+        "k": { "type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": { "type": "integer", "minimum": 1, "maximum": 1000 } },
+        "candidate": { "$ref": "#/$defs/selector" },
+        "baseline": { "$ref": "#/$defs/selector" },
+        "epochReducer": { "enum": ["mean", "any", "all", "majority"] },
+        "successRule": { "$ref": "#/$defs/successRule" },
+        "stratum": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "transformation": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "plan": {
+      "title": "genai-plan/0.1 (frozen before ingestion, design section 8.1)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "criteria"],
+      "properties": {
+        "schemaVersion": { "const": "genai-plan/0.1" },
+        "statisticsVersion": { "const": "1.0.0" },
+        "confidenceLevel": { "enum": [0.9, 0.95, 0.99] },
+        "minimums": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sampleSize": { "type": "integer", "minimum": 30 },
+            "memberSize": { "type": "integer", "minimum": 10 },
+            "clusters": { "type": "integer", "minimum": 10 }
+          }
+        },
+        "primaryScore": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+        "successRule": { "$ref": "#/$defs/successRule" },
+        "epochReducer": { "enum": ["mean", "any", "all", "majority", null] },
+        "scorePolicy": { "enum": ["original", "as_edited"] },
+        "clusterKey": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 300 },
+            { "type": "object", "minProperties": 1, "maxProperties": 1000, "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 300 } }
+          ]
+        },
+        "techniqueKey": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+        "variantKey": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+        "taskTypes": { "type": "object", "maxProperties": 1000, "additionalProperties": { "enum": ["qa", "attack", "rag", "agent_task"] } },
+        "categories": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/categoryKey" } },
+            "byTechnique": { "type": "object", "additionalProperties": { "type": "array", "uniqueItems": true, "items": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/categoryKey" } } }
+          }
+        },
+        "maxUnscoredFraction": { "type": "number", "minimum": 0, "maximum": 0.05 },
+        "maxErrorFraction": { "type": "number", "minimum": 0, "maximum": 0.05 },
+        "criteria": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/criterionSpec" } },
+        "judgeValidation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "minimumItems": { "type": "integer", "minimum": 50 },
+            "minimumKappaLowerBound": { "type": "number", "minimum": 0.6, "exclusiveMaximum": 1 },
+            "requireDifferentFamily": { "const": true },
+            "pairwiseMinimumConsistencyLowerBound": { "type": "number", "minimum": 0.8, "exclusiveMaximum": 1 }
+          }
+        },
+        "excerpts": { "const": "none", "description": "Engine 0.1.0 produces no excerpts; failures and all are reserved." },
+        "allowUnverifiedFormatVersion": { "type": "boolean" },
+        "reconciliationTolerance": { "type": "number", "minimum": 0, "maximum": 0.001 }
+      }
+    },
+    "versionedDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"], "minLength": 1, "maxLength": 300 },
+        "version": { "type": ["string", "null"], "minLength": 1, "maxLength": 100 },
+        "sha256": { "$ref": "#/$defs/nullableSha256" }
+      }
+    },
+    "manifest": {
+      "title": "genai-bundle/0.1 (declarations by an auditor, design section 6.3)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "origin", "inputs"],
+      "properties": {
+        "schemaVersion": { "const": "genai-bundle/0.1" },
+        "origin": { "enum": ["auditee_supplied", "auditor_rerun"] },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "sha256", "bytes", "format", "role"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+              "sha256": { "$ref": "#/$defs/sha256" },
+              "bytes": { "type": "integer", "minimum": 0 },
+              "format": { "$ref": "#/$defs/format" },
+              "role": { "enum": ["log", "samples", "results", "hitlog", "judge_validation", "attack_set", "marking"] },
+              "judgeRef": { "type": "string", "pattern": "^J[0-9]{1,3}$" },
+              "runKey": { "type": "string", "pattern": "^[A-Za-z0-9._:/#@+=-]{1,128}$" }
+            }
+          }
+        },
+        "declared": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "harness": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "name": { "type": ["string", "null"], "maxLength": 300 }, "version": { "type": ["string", "null"], "maxLength": 100 } }
+            },
+            "systemUnderTest": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "model": { "type": ["string", "null"], "maxLength": 300 },
+                "snapshot": { "type": ["string", "null"], "maxLength": 300 },
+                "provider": { "type": ["string", "null"], "maxLength": 100 },
+                "family": { "$ref": "#/$defs/family" }
+              }
+            },
+            "systemPrompt": { "type": "object", "additionalProperties": false, "required": ["sha256"], "properties": { "sha256": { "$ref": "#/$defs/sha256" } } },
+            "decoding": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "temperature": { "type": ["number", "null"] },
+                "topP": { "type": ["number", "null"] },
+                "topK": { "type": ["integer", "null"] },
+                "maxTokens": { "type": ["integer", "null"] },
+                "seed": { "type": ["integer", "null"] },
+                "generationsPerItem": { "type": ["integer", "null"], "minimum": 1 }
+              }
+            },
+            "tools": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["agentic", "offered"],
+              "properties": {
+                "agentic": { "type": "boolean" },
+                "offered": {
+                  "type": "array",
+                  "maxItems": 200,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["name", "permission"],
+                    "properties": {
+                      "name": { "type": "string", "minLength": 1, "maxLength": 300 },
+                      "permission": { "enum": ["read", "write", "execute", "network", "unknown"] },
+                      "definitionSha256": { "$ref": "#/$defs/nullableSha256" }
+                    }
+                  }
+                }
+              }
+            },
+            "dataset": { "$ref": "#/$defs/versionedDeclaration" },
+            "attackSet": { "$ref": "#/$defs/versionedDeclaration" },
+            "judges": {
+              "type": "array",
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["ref", "model"],
+                "properties": {
+                  "ref": { "type": "string", "pattern": "^J[0-9]{1,3}$" },
+                  "model": { "type": "string", "minLength": 1, "maxLength": 300 },
+                  "snapshot": { "type": ["string", "null"], "maxLength": 300 },
+                  "family": { "$ref": "#/$defs/family" },
+                  "promptTemplateSha256": { "$ref": "#/$defs/nullableSha256" },
+                  "scores": { "type": "array", "maxItems": 50, "items": { "type": "string", "minLength": 1, "maxLength": 300 } },
+                  "pairwise": { "type": "boolean" }
+                }
+              }
+            },
+            "scorers": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["score", "kind", "rationale"],
+                "properties": {
+                  "score": { "type": "string", "minLength": 1, "maxLength": 300 },
+                  "kind": { "const": "deterministic" },
+                  "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+                }
+              }
+            },
+            "dates": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": { "utcOffset": { "type": ["string", "null"], "pattern": "^[+-](0[0-9]|1[0-4]):[0-5][0-9]$" } }
+            }
+          }
+        },
+        "declaredBy": { "type": ["string", "null"], "maxLength": 300 },
+        "declaredAt": { "type": ["string", "null"], "maxLength": 64 }
+      }
+    },
+    "interval": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["lower", "upper", "level", "method"],
+      "properties": {
+        "lower": { "type": "number" },
+        "upper": { "type": "number" },
+        "level": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1 },
+        "method": { "enum": ["wilson", "wilson_effective_n", "normal_paired", "worst_member_bounds"] }
+      }
+    },
+    "member": {
+      "type": "object",
+      "required": ["memberId", "metric", "estimate", "interval", "status", "direction", "pValue", "reasons"],
+      "properties": {
+        "memberId": { "type": "string", "minLength": 1 },
+        "metric": { "type": "string", "minLength": 1 },
+        "subject": { "type": ["string", "null"] },
+        "estimate": { "type": ["number", "null"] },
+        "interval": { "$ref": "#/$defs/interval" },
+        "status": { "enum": ["evaluated", "insufficient_support", "undefined"] },
+        "direction": { "enum": ["pass", "fail", "none"] },
+        "pValue": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "reasons": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statisticsVersion", "confidenceLevel", "role", "kind", "direction", "pValue", "adjustedPValue", "adjustment", "familySize", "unadjustedOutcome", "decidingMemberId", "sampleSize", "reasons"],
+      "properties": {
+        "statisticsVersion": { "const": "1.0.0" },
+        "confidenceLevel": { "enum": [0.9, 0.95, 0.99] },
+        "role": { "enum": ["confirmatory", "exploratory"] },
+        "kind": { "type": "string" },
+        "direction": { "enum": ["pass", "fail", "none"] },
+        "pValue": { "$ref": "#/$defs/probability" },
+        "adjustedPValue": { "$ref": "#/$defs/probability" },
+        "adjustment": { "enum": ["bonferroni", "benjamini_hochberg"] },
+        "familySize": { "type": "integer", "minimum": 1 },
+        "unadjustedOutcome": { "enum": ["pass", "fail", "inconclusive"] },
+        "decidingMemberId": { "type": ["string", "null"] },
+        "sampleSize": { "type": "integer", "minimum": 0 },
+        "reasons": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "outcome", "headline", "members", "decision", "runKeys", "scoreKinds", "flags"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["genai_mean", "genai_attack_success", "genai_pass_k", "genai_paired_difference", "genai_marking"] },
+        "outcome": { "enum": ["pass", "fail", "inconclusive"] },
+        "headline": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["memberId", "estimate", "interval"],
+          "properties": { "memberId": { "type": "string" }, "estimate": { "type": "number" }, "interval": { "$ref": "#/$defs/interval" } }
+        },
+        "members": { "type": "array", "items": { "$ref": "#/$defs/member" } },
+        "decision": { "$ref": "#/$defs/decision" },
+        "runKeys": { "type": "array", "items": { "type": "string" } },
+        "scoreKinds": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": { "type": "array", "items": { "enum": ["deterministic", "model_graded", "human", "tool_detector", "unknown"] } }
+          }
+        },
+        "flags": {
+          "type": "array",
+          "description": "Gate conditions the workspace enforces (design section 12.3); the engine still decides.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["flag", "runKey", "score", "judgeRef", "reasons"],
+            "properties": {
+              "flag": { "enum": ["judge_not_validated", "scorer_kind_declared"] },
+              "runKey": { "type": "string" },
+              "score": { "type": "string" },
+              "judgeRef": { "type": ["string", "null"], "pattern": "^J[0-9]{1,3}$" },
+              "reasons": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+            }
+          }
+        }
+      }
+    },
+    "warning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "count", "examples"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "count": { "type": "integer", "minimum": 1 },
+        "examples": { "type": "array", "maxItems": 20, "items": { "type": "string" } }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric", "tool", "ours", "absDiff", "status"],
+      "properties": {
+        "metric": { "type": "string" },
+        "tool": { "type": ["number", "null"] },
+        "ours": { "type": ["number", "null"] },
+        "absDiff": { "type": ["number", "null"], "minimum": 0 },
+        "status": { "enum": ["match", "mismatch", "not_comparable", "information"] }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runKey", "format", "inputs", "runMetadata", "statusCounts", "scoreKinds", "declaredDeterministicScores", "postRunEdits", "reconciliation", "items", "evidenceLevel", "levelReasons", "incomplete", "claimScope", "warnings"
+      ],
+      "properties": {
+        "runKey": { "$ref": "#/$defs/key" },
+        "format": { "$ref": "#/$defs/format" },
+        "inputs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sha256" } },
+        "runMetadata": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/runMetadata" },
+        "statusCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scored", "unscored", "error", "invalidated"],
+          "properties": {
+            "scored": { "type": "integer", "minimum": 0 },
+            "unscored": { "type": "integer", "minimum": 0 },
+            "error": { "type": "integer", "minimum": 0 },
+            "invalidated": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "scoreKinds": { "type": "object", "additionalProperties": { "type": "array", "items": { "enum": ["deterministic", "model_graded", "human", "tool_detector", "unknown"] } } },
+        "declaredDeterministicScores": { "type": "array", "items": { "type": "string" } },
+        "postRunEdits": {
+          "type": ["object", "null"],
+          "required": ["logUpdates", "scoreEdits", "invalidations", "logInvalidated", "tagsChanged", "metadataChanged", "counts"],
+          "properties": {
+            "logUpdates": { "type": "array" },
+            "scoreEdits": { "type": "array" },
+            "invalidations": { "type": "array" },
+            "logInvalidated": { "type": "boolean" },
+            "tagsChanged": { "type": "boolean" },
+            "metadataChanged": { "type": "boolean" },
+            "counts": { "type": "object" }
+          }
+        },
+        "reconciliation": { "type": "array", "items": { "$ref": "#/$defs/reconciliation" } },
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count", "sha256"],
+          "properties": { "count": { "type": "integer", "minimum": 0 }, "sha256": { "$ref": "#/$defs/sha256" } }
+        },
+        "evidenceLevel": { "enum": ["L0", "L1", "L2"], "description": "Engine level (design section 4.2). The workspace caps uploaded envelopes at L1 and derives L3 from an authenticated worker completion plus an attestation." },
+        "levelReasons": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } },
+        "incomplete": { "type": "boolean" },
+        "claimScope": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+      }
+    },
+    "judgeValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputSha256", "declaredJudgeRef", "judge", "sampledFrom", "labelSet", "n", "table", "observedAgreement", "chanceAgreement", "kappa", "se", "lower", "upper", "level", "positionConsistency", "evidenceLevel", "reasons", "bindings"
+      ],
+      "properties": {
+        "inputSha256": { "$ref": "#/$defs/sha256" },
+        "declaredJudgeRef": { "type": ["string", "null"], "pattern": "^J[0-9]{1,3}$" },
+        "judge": { "type": "object" },
+        "sampledFrom": { "type": "object" },
+        "labelSet": { "type": "array", "minItems": 2, "items": { "type": "string" } },
+        "n": { "type": "integer", "minimum": 0 },
+        "table": { "type": "array", "items": { "type": "array", "items": { "type": "integer", "minimum": 0 } } },
+        "observedAgreement": { "type": ["number", "null"] },
+        "chanceAgreement": { "type": ["number", "null"] },
+        "kappa": { "type": ["number", "null"] },
+        "se": { "type": ["number", "null"] },
+        "lower": { "type": ["number", "null"] },
+        "upper": { "type": ["number", "null"] },
+        "level": { "type": "number" },
+        "positionConsistency": { "type": "object" },
+        "evidenceLevel": { "const": "L2" },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["runKey", "judgeRef", "binding", "validated", "reasons", "labelRowsReferencingRun"],
+            "properties": {
+              "runKey": { "type": "string" },
+              "judgeRef": { "type": "string", "pattern": "^J[0-9]{1,3}$" },
+              "binding": { "type": "object" },
+              "validated": { "type": "boolean" },
+              "reasons": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } },
+              "labelRowsReferencingRun": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "markingCheck": {
+      "title": "One Art. 50 marking check (genai-marking-check/0.1; research edit A50-ED-30)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "recordKey", "checkId", "runKey", "source", "outputSha256", "modality", "format", "channel", "stratum", "transformation", "metadata", "watermark", "groundTruth", "selfIdentification"],
+      "properties": {
+        "schemaVersion": { "const": "genai-marking-check/0.1" },
+        "recordKey": { "$ref": "#/$defs/key" },
+        "checkId": { "type": "string", "pattern": "^[A-Za-z0-9._@+=/#-]{1,128}$" },
+        "runKey": { "$ref": "#/$defs/key" },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fileSha256", "locator"],
+          "properties": { "fileSha256": { "$ref": "#/$defs/sha256" }, "locator": { "type": "string", "minLength": 1, "maxLength": 1024 } }
+        },
+        "outputSha256": { "$ref": "#/$defs/sha256" },
+        "modality": { "enum": ["text", "image", "audio", "video", "multimodal"] },
+        "format": { "type": ["string", "null"], "maxLength": 100 },
+        "channel": { "type": ["string", "null"], "maxLength": 100 },
+        "stratum": { "type": "object", "maxProperties": 20, "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 300 } },
+        "transformation": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["id", "parameters"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" },
+            "parameters": { "type": "object", "maxProperties": 20, "additionalProperties": { "type": ["string", "number", "boolean"] } }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["standard", "present", "validationStatus", "signer", "signatureClaimed", "signatureVerifiedByEngine"],
+          "properties": {
+            "standard": { "type": ["string", "null"], "maxLength": 100 },
+            "present": { "type": "boolean" },
+            "validationStatus": { "type": "array", "maxItems": 50, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" } },
+            "signer": { "type": ["string", "null"], "maxLength": 300 },
+            "signatureClaimed": { "type": ["boolean", "null"] },
+            "signatureVerifiedByEngine": { "const": false, "description": "Engine 0.1.0 does not verify signatures; a claimed verification is the provider's or validator's statement." }
+          }
+        },
+        "watermark": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["detectorId", "detectorVersion", "score", "threshold", "decision"],
+          "properties": {
+            "detectorId": { "type": "string", "minLength": 1, "maxLength": 100 },
+            "detectorVersion": { "type": ["string", "null"], "maxLength": 100 },
+            "score": { "type": ["number", "null"] },
+            "threshold": { "type": ["number", "null"] },
+            "decision": { "enum": ["marked", "not_marked", "inconclusive"] }
+          }
+        },
+        "groundTruth": { "enum": ["marked", "human_made", "other_ai"] },
+        "selfIdentification": { "type": ["boolean", "null"] }
+      }
+    },
+    "computation": {
+      "title": "genai-computation/0.1: the content of computationJSON",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "engine", "plan", "manifest", "inputs", "runs", "criteria", "overallOutcome", "reviewFlags", "judgeValidation", "marking", "warnings"],
+      "properties": {
+        "schemaVersion": { "const": "genai-computation/0.1" },
+        "engine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "genaiVersion", "parsers", "statisticsVersion", "taxonomyVersion"],
+          "properties": {
+            "version": { "type": "string" },
+            "genaiVersion": { "type": "string" },
+            "parsers": { "type": "object", "additionalProperties": { "type": "string" } },
+            "statisticsVersion": { "const": "1.0.0" },
+            "taxonomyVersion": { "type": "string" }
+          }
+        },
+        "plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["planSha256", "normalized"],
+          "properties": { "planSha256": { "$ref": "#/$defs/sha256" }, "normalized": { "$ref": "#/$defs/plan" } }
+        },
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["manifestSha256", "origin", "declaredBy", "declaredAt"],
+          "properties": {
+            "manifestSha256": { "$ref": "#/$defs/sha256" },
+            "origin": { "enum": ["auditee_supplied", "auditor_rerun"] },
+            "declaredBy": { "type": ["string", "null"] },
+            "declaredAt": { "type": ["string", "null"] }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "sha256", "bytes", "format", "formatVersion", "role"],
+            "properties": {
+              "name": { "type": "string" },
+              "sha256": { "$ref": "#/$defs/sha256" },
+              "bytes": { "type": "integer", "minimum": 0 },
+              "format": { "$ref": "#/$defs/format" },
+              "formatVersion": { "type": ["string", "null"] },
+              "role": { "type": "string" }
+            }
+          }
+        },
+        "runs": { "type": "array", "items": { "$ref": "#/$defs/run" } },
+        "criteria": { "type": "array", "items": { "$ref": "#/$defs/criterion" } },
+        "overallOutcome": { "enum": ["pass", "fail", "inconclusive", "not_applicable"] },
+        "reviewFlags": { "type": "array", "items": { "type": "string" } },
+        "judgeValidation": { "type": "array", "items": { "$ref": "#/$defs/judgeValidation" } },
+        "marking": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["runKey", "inputSha256", "evidenceLevel", "records", "count"],
+            "properties": {
+              "runKey": { "$ref": "#/$defs/key" },
+              "inputSha256": { "$ref": "#/$defs/sha256" },
+              "evidenceLevel": { "enum": ["L1", "L2"] },
+              "records": { "type": "array", "items": { "$ref": "#/$defs/markingCheck" } },
+              "count": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } }
+      }
+    }
+  }
+}

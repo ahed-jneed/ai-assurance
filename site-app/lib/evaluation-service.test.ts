@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Artifact, Engagement, Model } from "./domain";
 import { runnerVersion, testDefinitionVersion } from "./evaluation";
 import {
-  assertExternalProtocol,
   executionCSV,
   queueEvaluation,
   queueRetry,
@@ -232,45 +231,6 @@ describe("queueEvaluation", () => {
       manifest: { testDefinitionVersion, dataset: { rowCount: 40 } },
     });
     expect(await executionCSV(e, run)).toMatchObject({ csv: predictions });
-  });
-});
-
-describe("assertExternalProtocol", () => {
-  it("refuses a performance positive class the external worker does not measure", () => {
-    const profile = registerProfile(
-      e,
-      binaryProtocol({
-        config: { ...criteria, performancePositiveLabel: "0" },
-      }),
-      "auditor",
-    );
-    const refused = thrown(() => assertExternalProtocol(profile));
-    expect(refused.status).toBe(400);
-    expect(refused.message).toContain(
-      "External execution measures binary recall on the favourable label '1' only, so it cannot apply this protocol's performance positive class '0'.",
-    );
-  });
-
-  it("accepts protocols whose recall the worker measures as frozen", () => {
-    for (const profile of [
-      registerProfile(e, binaryProtocol(), "auditor"),
-      registerProfile(
-        e,
-        binaryProtocol({
-          version: "2.0",
-          config: { ...criteria, performancePositiveLabel: "1" },
-        }),
-        "auditor",
-      ),
-      registerProfile(e, fairnessOnly("3.0"), "auditor"),
-      // Frozen before registration dropped a deselected test's class.
-      {
-        task: "Binary classification",
-        suite: ["demographic_parity"],
-        config: { ...criteria, performancePositiveLabel: "fraud" },
-      },
-    ])
-      expect(() => assertExternalProtocol(profile)).not.toThrow();
   });
 });
 

@@ -1,10 +1,13 @@
 import catalog from "./catalog.json";
+import { templateCriterion } from "./catalog-criteria";
 import type { Workflow } from "./workflow-types";
 export function seedWorkflow(userId: string, at: string): Workflow {
   return {
     schemaVersion: "1.0",
     adoptedBy: userId,
     adoptedAt: at,
+    // New workflows leave Planning only through the acceptance gate.
+    acceptanceRequired: true,
     program: {
       revision: 1,
       briefRevision: 0,
@@ -28,7 +31,7 @@ export function seedWorkflow(userId: string, at: string): Workflow {
         selected: false,
         applicability: "pending",
         rationale: "",
-        criterion: t.regulatoryRefs.join("; "),
+        criterion: templateCriterion(t),
         sourceVersion: t.regulatoryRefs.length
           ? catalog.regulatorySnapshot.celex
           : catalog.methodologyVersion,

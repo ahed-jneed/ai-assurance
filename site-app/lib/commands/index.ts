@@ -1,12 +1,13 @@
 import type { Engagement } from "../domain";
 import { ApiError } from "../http";
-import type { Context } from "../tenancy";
+import { refuseQualityReviewer, type Context } from "../tenancy";
 import { classification } from "./classification";
 import type { CommandData, CommandModule, CommandResult } from "./command";
 import { engagement } from "./engagement";
 import { evidenceRequests } from "./evidence-requests";
 import { findings } from "./findings";
 import { papers } from "./papers";
+import { qualityReview } from "./quality-review";
 import { reports } from "./reports";
 import { runs } from "./runs";
 import { specialCategory } from "./special-category";
@@ -22,6 +23,7 @@ export const commandModules: readonly CommandModule[] = [
   runs,
   specialCategory,
   reports,
+  qualityReview,
 ];
 export async function dispatch(
   e: Engagement,
@@ -31,5 +33,6 @@ export async function dispatch(
 ): Promise<CommandResult> {
   const target = commandModules.find((m) => m.ops.includes(op));
   if (!target) throw new ApiError(400, "Unknown command");
+  refuseQualityReviewer(ctx, op);
   return target.run(e, op, data, ctx);
 }

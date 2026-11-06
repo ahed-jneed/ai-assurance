@@ -337,6 +337,7 @@ export function WorkspaceViews({
             tenantId={data.tenantId}
             role={role}
             userId={data.identity.id}
+            people={data.people}
             busy={busy}
             terms={url.reportTerms}
             onTerms={url.setReportTerms}
@@ -354,6 +355,7 @@ export function WorkspaceViews({
               })
             }
             onOpen={(r) => onDetail(reportTitle(r), r)}
+            onAct={safeAct}
             section={url.reportSection}
             onSection={url.setReportSection}
             query={url.registerQuery}

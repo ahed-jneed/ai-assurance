@@ -8,6 +8,7 @@ import {
   engagementFacts,
   engagementPeriod,
   isIsoDate,
+  laterRevisions,
   legalDate,
   obligationsByDate,
   openReviewItems,
@@ -59,10 +60,10 @@ const rowOf = (e: Engagement, id: string) =>
     .flatMap((g) => g.rows)
     .find((r) => r.entry.id === id)!;
 
-describe("rule pack 2026.11.1 data", () => {
+describe("rule pack 2026.11.2 data", () => {
   it("is the catalogue's rule pack, researched 5 November 2026 against 02024R1689-20260727", () => {
     expect(pack.rulePackVersion).toBe(catalog.methodologyVersion);
-    expect(pack.rulePackVersion).toBe("2026.11.1");
+    expect(pack.rulePackVersion).toBe("2026.11.2");
     expect(pack.celex).toBe("02024R1689-20260727");
     expect(pack.researchedAsOf).toBe("2026-11-05");
     expect(pack.applicationDates).toHaveLength(19);
@@ -121,12 +122,14 @@ describe("rule pack 2026.11.1 data", () => {
       reviewer: null,
       approvedAt: null,
     });
-    expect(pack.legalReviewItems.map((i) => i.id)).toEqual(
-      Array.from(
+    expect(pack.legalReviewItems.map((i) => i.id)).toEqual([
+      ...Array.from(
         { length: 10 },
         (_, i) => "LR-" + String(i + 1).padStart(2, "0"),
       ),
-    );
+      "LR-A50-01",
+      "LR-A50-10",
+    ]);
     expect(pack.legalReviewItems.every((i) => i.status === "pending")).toBe(
       true,
     );
@@ -491,5 +494,104 @@ describe("legal dates", () => {
     expect(legalDate("2030-12-31")).toBe("31 December 2030");
     expect(isIsoDate("2026-02-30")).toBe(false);
     expect(legalDate("2026-02-30")).toBe("2026-02-30");
+  });
+});
+
+describe("rule pack 2026.11.2: the Art 50 research edits (#77)", () => {
+  const guidance = (id: string) =>
+    pack.guidanceDocuments.find((g) => g.id === id)!;
+
+  it("names the Art 50 research as the revision and applies A50-ED-10 to A50-ED-15", () => {
+    expect(pack.research.revisions).toEqual([
+      expect.objectContaining({
+        rulePackVersion: "2026.11.2",
+        data: "docs/research/art50-transparency-2026-11.json",
+        edits: [
+          "A50-ED-10",
+          "A50-ED-11",
+          "A50-ED-12",
+          "A50-ED-13",
+          "A50-ED-14",
+          "A50-ED-15",
+        ],
+        resolvesUnverified: ["UV-05", "UV-07"],
+      }),
+    ]);
+  });
+
+  it("records the adopted Art 50 guidelines, the Code, its adequacy opinion and signatory list", () => {
+    expect(guidance("GUID-ART50-TRANSPARENCY")).toMatchObject({
+      status: "adopted",
+      reference: "C(2026) 7702 final",
+      researchRef: "GUID-A50-GUIDELINES",
+    });
+    expect(
+      guidance("GUID-ART50-TRANSPARENCY").dates?.map((d) => d.date),
+    ).toEqual(["2026-05-08", "2026-06-03", "2026-07-20", "2026-11-05"]);
+    expect(guidance("GUID-ART50-COP-OPINION")).toMatchObject({
+      status: "assessed_adequate",
+      reference: "C(2026) 4839 final; AI Board conclusion",
+    });
+    expect(guidance("GUID-ART50-COP").dates?.at(-1)).toEqual({
+      event: "Final code published",
+      date: "2026-06-10",
+    });
+    expect(guidance("GUID-ART50-COP-SIGNATORIES").sourceIds).toContain(
+      "SRC-EC-COP-SIGNATORIES",
+    );
+  });
+
+  it("adds points 153 and 154, recital (41), LR-A50-01 and LR-A50-10 to the Art 50 entry and keeps the Art 111(4) predicate", () => {
+    const art50 = entry("aia-2026-08-02-art50-transparency");
+    expect(art50.date).toBe("2026-08-02");
+    expect(art50.notes).toMatch(/point 153/);
+    expect(art50.notes).toMatch(/Point 154/);
+    expect(art50.notes).toMatch(/Recital \(41\)/);
+    expect(art50.legalReview.itemIds).toEqual([
+      "LR-03",
+      "LR-04",
+      "LR-A50-01",
+      "LR-A50-10",
+    ]);
+    expect(art50.history.at(-1)).toMatchObject({
+      rulePackVersion: "2026.11.2",
+      change: "revised",
+    });
+    expect(
+      entry("aia-2026-12-02-art50-2-legacy-transition").appliesIf,
+    ).toContainEqual({
+      fact: "placedOnMarketDate",
+      op: "before",
+      value: "2026-08-02",
+    });
+    const row = rowOf(
+      auditOf("2026-09-01", "2026-12-31"),
+      "aia-2026-08-02-art50-transparency",
+    );
+    expect(row.pendingReview).toEqual([
+      "LR-03",
+      "LR-04",
+      "LR-A50-01",
+      "LR-A50-10",
+    ]);
+  });
+
+  it("drops UV-05 and UV-07 from the unverified claims", () => {
+    expect(pack.unverified.map((u) => u.id)).toEqual([
+      "UV-01",
+      "UV-02",
+      "UV-03",
+      "UV-04",
+      "UV-06",
+    ]);
+  });
+
+  it("lists the revisions made after an engagement's stamp", () => {
+    expect(
+      laterRevisions(pack, "2026.11.1").map((r) => r.rulePackVersion),
+    ).toEqual(["2026.11.2"]);
+    expect(laterRevisions(pack, "2026.11.2")).toEqual([]);
+    expect(laterRevisions(pack, "2026.10.1")).toHaveLength(1);
+    expect(laterRevisions(pack, "2027.1.1")).toEqual([]);
   });
 });

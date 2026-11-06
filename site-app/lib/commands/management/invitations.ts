@@ -8,7 +8,11 @@ import { isClientRole } from "../../workflow-state";
 import { defineCommands } from "../command";
 import { short } from "../fields";
 import type { ManagementModule } from "./batch";
-import { checkAssignable, engagementIds } from "./engagement-grants";
+import {
+  checkAssignable,
+  engagementIds,
+  memberRole,
+} from "./engagement-grants";
 import { clientScope } from "./members";
 /**
  * Invitations by email into this practice (F-44): the invitee joins with the
@@ -28,13 +32,7 @@ export const invitations: ManagementModule = defineCommands({
             .email("Enter a valid email address")
             .max(320),
           displayName: short.optional(),
-          role: z.enum([
-            "Auditor",
-            "Lead Auditor",
-            "Client Viewer",
-            "Client Contributor",
-            "Reviewer",
-          ]),
+          role: memberRole,
           clientId: z.string().max(300).nullable().optional(),
           engagementIds: engagementIds.optional(),
         })

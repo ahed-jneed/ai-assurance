@@ -114,7 +114,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 4. It runs a legacy access-adoption write batch on every request.
 5. It sets the `practiceAdmin` flag.
 
-**Roles.** There are five: Auditor, Lead Auditor, Reviewer, Client Viewer, Client Contributor, plus the practice-admin flag.
+**Roles.** There are six: Auditor, Lead Auditor, Reviewer, Engagement Quality Reviewer (reads its engagements and records only the quality review, #24), Client Viewer, Client Contributor, plus the practice-admin flag.
 - Internal roles need a per-engagement `engagement_access` row.
 - Client roles are scoped by their membership's `client_id`. Contributors also need an unexpired grant inside the engagement JSON.
 
@@ -188,6 +188,7 @@ A second identity is impossible in this mode: the mock strips inbound `oai-*` he
 | `qa-auditor` | Auditor | Brief and program preparation, procedures, classification, evidence, findings |
 | `qa-reviewer` | Reviewer | Independent approvals: brief, program, procedure review, classification, retest and closure, report package |
 | `qa-lead2` | Lead Auditor (optional) | A second signer or releaser when qa-lead prepared the content |
+| `qa-eqr` | Engagement Quality Reviewer | Quality review checklist and package sign-off; never edits audit work |
 | `qa-contrib` | Client Contributor (Acme) | Client portal submissions |
 | `qa-viewer` | Client Viewer (Acme) | Released reports; isolation checks |
 | `qa-outsider` | Never granted | Cross-tenant isolation checks |

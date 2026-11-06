@@ -39,6 +39,14 @@
       "purpose": "A second Lead Auditor for independent approvals; also leads a practice of their own, so practice switching is reachable."
     },
     {
+      "id": "qa-eqr",
+      "userId": "persona-qa-eqr",
+      "email": "qa-eqr@personas.test",
+      "name": "QA Quality Reviewer",
+      "role": "Engagement Quality Reviewer",
+      "purpose": "Engagement Quality Reviewer outside the Acme engagement team: stand-back checklist and package sign-off; reads but never edits audit work."
+    },
+    {
       "id": "qa-contrib",
       "userId": "persona-qa-contrib",
       "email": "qa-contrib@personas.test",

@@ -1574,7 +1574,7 @@ try {
       .map((p) => ({ id: p.id, body: p.body, signatures: p.signatures })),
   );
   await command("adoptWorkflow", {});
-  assert.equal(e.workflow.procedures.length, 33);
+  assert.equal(e.workflow.procedures.length, 36);
   assert(
     e.workflow.procedures.every(
       (p) => p.applicability === "pending" && !p.selected,
@@ -2152,6 +2152,80 @@ try {
   console.log(
     "PASS scoped client grants, safe request projection, own-file downloads, partial deliveries, client role isolation and revocation",
   );
+  // Planning exit: acceptance, independence and competence (#23).
+  await command("setStage", { stage: "Fieldwork" }, owner, 400);
+  const met = (basis) => ({ met: true, basis });
+  await command("saveAcceptance", {
+    decision: "acceptance",
+    preconditions: {
+      subjectMatter: met("Synthetic scoring v1 is identifiable"),
+      criteria: met("Fixture methodology criteria"),
+      evidence: met("Synthetic evidence access agreed"),
+      purpose: met("Fixture readiness decision"),
+    },
+    scope: "Synthetic fixture readiness engagement",
+    periodStart: brief.periodStart,
+    periodEnd: brief.periodEnd,
+    systemBoundary: brief.boundary,
+    accessLevel: "grey",
+    engagementLetter: "EL-FIXTURE-1",
+    team: [owner],
+    competenceConclusion: "Fixture team covers assurance and statistics",
+    changeReason: "",
+  });
+  const competence = {
+    assurance: "proficient",
+    ai_systems: "foundation",
+    statistics: "proficient",
+    regulation: "foundation",
+    management_systems: "none",
+    data_protection: "foundation",
+    security: "none",
+    domain: "none",
+  };
+  const declaration = {
+    priorWork: "",
+    threats: [],
+    exclusions: [],
+    competence,
+    expertField: "",
+    confirmed: true,
+  };
+  await command("saveDeclaration", declaration);
+  await command(
+    "saveDeclaration",
+    {
+      ...declaration,
+      threats: [
+        {
+          kind: "familiarity",
+          description: "Fixture: earlier joint project with the provider",
+          safeguards: "Fixture: review rotated",
+        },
+      ],
+    },
+    reviewer,
+  );
+  await command(
+    "approveAcceptance",
+    { revision: e.workflow.acceptance.revision, reason: "Blocked by threat" },
+    owner,
+    409,
+  );
+  // Declaring again cannot clear the declarant's own unresolved threat.
+  await command("saveDeclaration", declaration, reviewer, 409);
+  await command("resolveDeclaredThreat", {
+    declarationId: e.workflow.declarations.at(-1).id,
+    kind: "familiarity",
+    reason: "Rotation reduces the threat to an acceptable level",
+  });
+  await command("approveAcceptance", {
+    revision: e.workflow.acceptance.revision,
+    reason: "Preconditions met and declarations current",
+  });
+  console.log(
+    "PASS acceptance record, per-person declarations and threat resolution gate Fieldwork",
+  );
   await command("setStage", { stage: "Fieldwork" });
   await command("setStage", { stage: "Evidence evaluation" });
   await command("setStage", { stage: "Reporting" }, owner, 400);
@@ -2418,6 +2492,120 @@ try {
       recordIds.length +
       " assurance records: cursor-paged workbench and kind listings, record lookups, review gate and cited briefing",
   );
+  // #24: an assurance package needs an engagement quality review. The
+  // reviewer gets the role and engagement access through member management,
+  // and a Lead appoints them; nobody on the team can be appointed.
+  const quality = "fixture-quality-reviewer-" + stamp;
+  await management("grantMember", {
+    userId: quality,
+    displayName: "Fixture Quality Reviewer",
+    role: "Engagement Quality Reviewer",
+    engagementIds: [e.id],
+  });
+  assert.equal(
+    workspace.managementEvents[0].action,
+    "grantMember",
+    "The role grant is a recorded management event",
+  );
+  const unreviewed = await command(
+    "createReport",
+    {
+      kind: "final",
+      engagementType: "attestation",
+      assuranceLevel: "reasonable",
+      conclusion: "adverse",
+      ...reportParticulars,
+      summary: "Must wait for the engagement quality review",
+    },
+    owner,
+    400,
+  );
+  assert.equal(
+    unreviewed.error,
+    "An assurance engagement needs an engagement quality reviewer before final issuance",
+  );
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: reviewer, reason: "A team member is not eligible" },
+        owner,
+        400,
+      )
+    ).error,
+    "Select an active member with the Engagement Quality Reviewer role",
+  );
+  // A team member who is given the role is still on the team: the reviewer
+  // commented on and reviewed this engagement's papers above.
+  const asRole = (role) =>
+    management("updateMember", {
+      userId: reviewer,
+      displayName: "Independent Reviewer",
+      role,
+      clientId: null,
+      engagementIds: [e.id],
+    });
+  await asRole("Engagement Quality Reviewer");
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: reviewer, reason: "A former team member is not eligible" },
+        owner,
+        409,
+      )
+    ).error,
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+  );
+  await asRole("Reviewer");
+  await command("appointQualityReviewer", {
+    userId: quality,
+    reason: "Independent of the fixture engagement team",
+  });
+  assert.equal(
+    (
+      await command(
+        "editPaper",
+        { paperId: e.papers[0].id, body: {} },
+        quality,
+        403,
+      )
+    ).error,
+    "An Engagement Quality Reviewer reviews the engagement but cannot change its audit work",
+  );
+  await command(
+    "saveQualityReview",
+    {
+      items: [
+        "understanding",
+        "judgments",
+        "documentation",
+        "independence",
+        "consultation",
+        "involvement",
+        "report",
+      ].map((id) => ({
+        id,
+        status: "satisfied",
+        notes: "Evaluated for the fixture",
+      })),
+    },
+    quality,
+  );
+  const qualitySignOff = (report) =>
+    command(
+      "signOffQualityReview",
+      {
+        reportId: report.id,
+        internalHash: report.sha256,
+        clientHash: report.clientSha256,
+        conclusion: "Significant judgments and the conclusion are appropriate",
+      },
+      quality,
+    );
+  console.log(
+    "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
+  );
   await command("createReport", {
     kind: "final",
     engagementType: "attestation",
@@ -2495,6 +2683,30 @@ try {
     },
     reviewer,
   );
+  // Release waits for the quality reviewer's sign-off of both exact packages.
+  const qualityInbox = await request(inboxPath, { user: quality });
+  assert.equal(
+    qualityInbox.items.find(
+      (i) => i.engagementId === e.id && i.title === "Engagement quality review",
+    )?.action,
+    "Sign off final package",
+  );
+  assert.equal(
+    (
+      await command(
+        "releaseReport",
+        {
+          reportId: internalFinal.id,
+          recipientScope: "Fixture client members",
+          reason: "Must reject before the quality review sign-off",
+        },
+        owner,
+        409,
+      )
+    ).error,
+    "The engagement quality reviewer must sign off both exact packages before release",
+  );
+  await qualitySignOff(internalFinal);
   const releaseInbox = await request(inboxPath),
     approvalInbox = await request(inboxPath, { user: reviewer });
   const leadReleaseTask = releaseInbox.items.find(
@@ -2835,6 +3047,7 @@ try {
     },
     reviewer,
   );
+  await qualitySignOff(replacement);
   const replaced = await command("releaseReport", {
     reportId: replacement.id,
     recipientScope: "Authorized fixture client members",

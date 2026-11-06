@@ -11,7 +11,12 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url),
       ctx = await context(url.searchParams.get("tenantId") ?? "");
-    requireRole(ctx, ["Auditor", "Lead Auditor", "Reviewer"]);
+    requireRole(ctx, [
+      "Auditor",
+      "Lead Auditor",
+      "Reviewer",
+      "Engagement Quality Reviewer",
+    ]);
     const e = await getEngagement(
         ctx,
         url.searchParams.get("engagementId") ?? "",
