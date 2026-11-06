@@ -104,7 +104,9 @@ const cardFixture = hosted.find(run => run.manifest.model.card);
 assert.ok(complete && queued && regression && multiclass && cardFixture, 'Expected queued, binary, regression, multiclass and full-card fixtures');
 const legacy = copy(complete);
 legacy.contractVersion = '1.0';
-for (const key of ['task', 'profileId', 'manifest']) delete legacy[key];
+// Contract 1.0 also predates the rule-pack and methodology stamps that fresh
+// `--fixtures` runs carry.
+for (const key of ['task', 'profileId', 'manifest', 'rulePack', 'methodologyVersion']) delete legacy[key];
 // Contract 1.0 predates the performance positive class of test definitions
 // 2.1.0, which fresh `--fixtures` runs freeze.
 delete legacy.config.performancePositiveLabel;
