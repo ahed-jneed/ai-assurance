@@ -1703,6 +1703,61 @@
         "maximumRmse"
       ]
     },
+    "hostedTranslation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "sourceContract": {
+          "const": "1.1"
+        },
+        "selectedTests": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "performance",
+              "regression",
+              "demographic_parity",
+              "disparate_impact",
+              "equalized_odds",
+              "drift",
+              "permutation",
+              "perturbation",
+              "explainability",
+              "cross_validation"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true
+        },
+        "sourceConfiguration": {
+          "$ref": "#/$defs/hostedConfig"
+        },
+        "minimumClassCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "supplementalMetricPolicy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        }
+      },
+      "required": [
+        "version",
+        "sourceContract",
+        "selectedTests",
+        "sourceConfiguration",
+        "minimumClassCount",
+        "supplementalMetricPolicy"
+      ]
+    },
     "legacyInteractiveConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -3696,6 +3751,36 @@
         }
       ]
     },
+    "procedureBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "procedureId": {
+          "$ref": "#/$defs/id"
+        },
+        "procedureRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "briefRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "programRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "procedureId",
+        "procedureRevision",
+        "briefRevision",
+        "programRevision"
+      ]
+    },
     "hostedRun": {
       "type": "object",
       "additionalProperties": false,
@@ -4461,36 +4546,6 @@
         }
       ]
     },
-    "procedureBinding": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "procedureId": {
-          "$ref": "#/$defs/id"
-        },
-        "procedureRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        },
-        "briefRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        },
-        "programRevision": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 2147483647
-        }
-      },
-      "required": [
-        "procedureId",
-        "procedureRevision",
-        "briefRevision",
-        "programRevision"
-      ]
-    },
     "externalPredictionDataset": {
       "type": "object",
       "additionalProperties": false,
@@ -4604,6 +4659,121 @@
         "testDefinitionVersion",
         "limitations"
       ]
+    },
+    "externalMetric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value",
+        "unit",
+        "sampleSize"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "sampleSize": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "numerator": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "denominator": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/thresholdRule"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidenceInterval": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper",
+            "level",
+            "method"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            },
+            "level": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "slices": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "details": {},
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "inconclusive",
+            "not_applicable"
+          ]
+        },
+        "pValue": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "externalHostedResult": {
       "type": "object",
@@ -5528,176 +5698,6 @@
           }
         }
       ]
-    },
-    "hostedTranslation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "sourceContract": {
-          "const": "1.1"
-        },
-        "selectedTests": {
-          "type": "array",
-          "items": {
-            "enum": [
-              "performance",
-              "regression",
-              "demographic_parity",
-              "disparate_impact",
-              "equalized_odds",
-              "drift",
-              "permutation",
-              "perturbation",
-              "explainability",
-              "cross_validation"
-            ]
-          },
-          "minItems": 1,
-          "maxItems": 10,
-          "uniqueItems": true
-        },
-        "sourceConfiguration": {
-          "$ref": "#/$defs/hostedConfig"
-        },
-        "minimumClassCount": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 1000
-        },
-        "supplementalMetricPolicy": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 5000
-        }
-      },
-      "required": [
-        "version",
-        "sourceContract",
-        "selectedTests",
-        "sourceConfiguration",
-        "minimumClassCount",
-        "supplementalMetricPolicy"
-      ]
-    },
-    "externalMetric": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "name",
-        "value",
-        "unit",
-        "sampleSize"
-      ],
-      "properties": {
-        "name": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "value": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unit": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        },
-        "sampleSize": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 1000000
-        },
-        "numerator": {
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "denominator": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "threshold": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/thresholdRule"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "confidenceInterval": {
-          "type": [
-            "object",
-            "null"
-          ],
-          "additionalProperties": false,
-          "required": [
-            "lower",
-            "upper",
-            "level",
-            "method"
-          ],
-          "properties": {
-            "lower": {
-              "type": "number"
-            },
-            "upper": {
-              "type": "number"
-            },
-            "level": {
-              "type": "number",
-              "exclusiveMinimum": 0,
-              "exclusiveMaximum": 1
-            },
-            "method": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "slices": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "details": {},
-        "outcome": {
-          "enum": [
-            "pass",
-            "fail",
-            "inconclusive",
-            "not_applicable"
-          ]
-        },
-        "pValue": {
-          "type": [
-            "number",
-            "null"
-          ],
-          "minimum": 0,
-          "maximum": 1
-        },
-        "limitations": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
     }
   }
 }
