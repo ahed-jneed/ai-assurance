@@ -6,6 +6,8 @@ import {
   aiOfficeCompetence,
   approvalBlockers,
   art50Assessment,
+  awaitsReclassification,
+  capturedBeforeMigration,
   classificationFacts,
   classify,
   factDefinitions,
@@ -140,6 +142,12 @@ export function ClassificationPanel({
     blockers = approvalBlockers(c, rules),
     competence = aiOfficeCompetence(c),
     triggers = reReviewTriggers(c, rules, today),
+    stalePackages = e.reports.filter(
+      (r) =>
+        r.kind === "final" &&
+        (!r.release || ["internal", "approved"].includes(r.release.state)) &&
+        capturedBeforeMigration(r.snapshot),
+    ).length,
     route = highRiskRouteOf(c),
     label = (id: string) => factLabel(rules, id);
   return (
@@ -169,14 +177,23 @@ export function ClassificationPanel({
             <b>Intended purpose:</b> {c.intendedPurpose || "Unrecorded"}
           </p>
           {c.legacy && (
-            <p className="context-strip">
+            <p className="context-strip" data-testid="classification-migration">
               Recorded before tri-state facts with four flags
               {c.legacy.status === "approved"
                 ? ", approved by " + (c.legacy.approvedBy ?? "a reviewer")
                 : ""}
-              . Every fact is now unknown: classify again and approve
-              independently. The earlier approval stays in the history and the
-              audit trail.
+              .{" "}
+              {awaitsReclassification(c)
+                ? "Every fact is now unknown: classify again and approve independently."
+                : "Classified again with the guided assessment."}{" "}
+              The earlier approval stays in the history and the audit trail.
+              {stalePackages > 0 &&
+                " " +
+                  stalePackages +
+                  (stalePackages === 1
+                    ? " final report package was"
+                    : " final report packages were") +
+                  " captured before the migration and must be captured again."}
             </p>
           )}
           {blockers.length > 0 && (

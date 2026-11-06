@@ -19,6 +19,8 @@ import type { WorkspaceData } from "./workspace-types";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
 import { localWorkDay, workKindLabels } from "@/lib/work-inbox";
 import { linkQuery } from "@/lib/workspace-links";
+import { classificationRules } from "@/lib/classification-rules";
+import { asRulePack } from "@/lib/rule-pack";
 import {
   defaultPreferences,
   type PersonalPreferences,
@@ -188,7 +190,12 @@ export function TaskRows({
               })
             : "",
           until = reminders.get(i.id);
-        const kind = ["scope", "program", "monitoring"].includes(i.kind)
+        const kind = [
+          "scope",
+          "classification",
+          "program",
+          "monitoring",
+        ].includes(i.kind)
           ? ""
           : i.kind;
         const href =
@@ -332,6 +339,8 @@ export function EngagementTaskQueue({
         data.identity.role,
         data.identity.id,
         data.clients.find((c) => c.id === e.clientId)?.name,
+        undefined,
+        classificationRules(asRulePack(data.catalog?.regulatorySnapshot)),
       ),
     ).filter((i) => i.personal),
     [all, setAll] = useState(false);

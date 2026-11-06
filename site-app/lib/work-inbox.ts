@@ -29,6 +29,7 @@ export const defaultInboxQuery: InboxQuery = {
 };
 export const workKindLabels: Record<WorkItem["kind"], string> = {
   scope: "Scope",
+  classification: "Classification",
   program: "Audit program",
   procedure: "Procedure",
   paper: "Working paper",

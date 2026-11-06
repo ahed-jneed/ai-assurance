@@ -12,6 +12,7 @@ import {
   requireRole,
   responseError,
 } from "@/lib/store";
+import { currentClassificationRules } from "@/lib/commands/classification";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
 export const dynamic = "force-dynamic";
 /**
@@ -52,7 +53,14 @@ export async function GET(request: Request) {
             reports: openFinalReport,
           });
           return {
-            items: engagementWork(e, ctx.role, ctx.user.userId, row.client),
+            items: engagementWork(
+              e,
+              ctx.role,
+              ctx.user.userId,
+              row.client,
+              undefined,
+              currentClassificationRules,
+            ),
           };
         } catch (error) {
           if (error instanceof IntegrityError) {
