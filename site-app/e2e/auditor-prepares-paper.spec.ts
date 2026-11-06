@@ -1,7 +1,14 @@
 // Auditor: creates a working paper, records results and a reasoned
 // conclusion, links accepted evidence and submits the paper for review.
 import { expectAccessible } from "./a11y";
-import { choose, expect, test, unique, workspacePath } from "./fixtures";
+import {
+  choose,
+  expect,
+  runCommand,
+  test,
+  unique,
+  workspacePath,
+} from "./fixtures";
 
 const TEMPLATE = "WP-A15-01 · Performance, calibration and validation";
 const TITLE = "Performance, calibration and validation";
@@ -39,12 +46,19 @@ test("the Auditor prepares a working paper and submits it for review", async ({
     name: "New working paper or memo",
   });
   await choose(dialog, "Template", TEMPLATE);
-  await dialog.getByRole("button", { name: "Create paper" }).click();
+  // Every API read below follows the Worker's answer to the UI's command: a
+  // read sent while that save is still in flight races it (#119).
+  const created = await runCommand(page, "createPaper", () =>
+    dialog.getByRole("button", { name: "Create paper" }).click(),
+  );
+  const { paperId } = (await created.json()).details as { paperId: string };
   await expect(dialog).toBeHidden();
 
   const w = await auditor.workspace(demo.tenantId, demo.engagementId);
   expect(w.engagement.papers).toHaveLength(before + 1);
-  const paper = w.engagement.papers.at(-1);
+  const paper = w.engagement.papers.find(
+    (p: { id: string }) => p.id === paperId,
+  );
   expect(paper.authorId).toBe(auditor.who.userId);
 
   // The editor opens on the new paper.
@@ -59,17 +73,17 @@ test("the Auditor prepares a working paper and submits it for review", async ({
   await choose(editor, "Conclusion status", "Supported");
   await editor.getByRole("checkbox", { name: "Link " + evidenceName }).click();
   // Typing keeps a recovery copy; the revision is saved explicitly.
-  await editor.getByRole("button", { name: "Save revision" }).click();
+  await runCommand(page, "editPaper", () =>
+    editor.getByRole("button", { name: "Save revision" }).click(),
+  );
   await expect(editor.getByText("All changes saved")).toBeVisible();
   await expectAccessible(page, "Working paper editor");
 
-  await editor.getByRole("button", { name: "Submit for review" }).click();
-  await expect
-    .poll(async () => {
-      const now = await auditor.workspace(demo.tenantId, demo.engagementId);
-      return now.engagement.papers.find(
-        (p: { id: string }) => p.id === paper.id,
-      )?.status;
-    })
-    .toBe("in_review");
+  await runCommand(page, "submitPaper", () =>
+    editor.getByRole("button", { name: "Submit for review" }).click(),
+  );
+  const now = await auditor.workspace(demo.tenantId, demo.engagementId);
+  expect(
+    now.engagement.papers.find((p: { id: string }) => p.id === paperId)?.status,
+  ).toBe("in_review");
 });
