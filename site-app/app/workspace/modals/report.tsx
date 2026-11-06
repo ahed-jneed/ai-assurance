@@ -7,7 +7,7 @@ import {
   assuranceLevelIds,
   assuranceLevels,
   conclusionTypes,
-  engagementTypeIds,
+  offeredEngagementTypes,
   engagementTypes,
   normalizeTerms,
   termsLabel,
@@ -90,7 +90,9 @@ function ReportFields({
           <Choice
             label="Engagement type"
             value={report.engagementType}
-            values={engagementTypeIds.map((t) => ({
+            values={offeredEngagementTypes(
+              packFeatures(data).certificationRecommendation,
+            ).map((t) => ({
               value: t,
               label: engagementTypes[t].label,
             }))}

@@ -99,15 +99,23 @@ export type WorkspaceData = {
   /** The packs a practice administrator may pin a new engagement to. */
   selectablePacks?: PackSummary[];
 };
-/** What the selected engagement's pack switches on; pack #1 (all on) without one. */
+/**
+ * What the selected engagement's pack switches on, with its Statement of
+ * Applicability controls for the gates; pack #1 (the AI Act features on)
+ * without one.
+ */
 export function packFeatures(
   data: Pick<WorkspaceData, "criteria"> | null | undefined,
 ) {
-  return (
-    data?.criteria?.features ?? {
+  return {
+    ...(data?.criteria?.features ?? {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
-    }
-  );
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
+    }),
+    soaControls: data?.criteria?.managementSystem?.controls ?? [],
+  };
 }
