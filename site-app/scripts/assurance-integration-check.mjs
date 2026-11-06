@@ -750,7 +750,10 @@ try {
   );
   const classMetrics = classEnvelope.hostedResults[0].metrics,
     classMetric = (name) => classMetrics.find((m) => m.name === name);
-  // Recall of "0": 34 of its 40 reference rows predicted "0".
+  // Recall of "0": 34 of its 40 reference rows predicted "0". The fixture is
+  // symmetric (34/40 correct in each class, prevalence 0.5), so these values
+  // would hold for either class; the native configuration above, the slice
+  // order and the limitation note below are what identify class "0".
   assert.deepEqual(
     [classMetric("recall").numerator, classMetric("recall").denominator],
     [34, 40],
