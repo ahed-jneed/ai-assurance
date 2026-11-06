@@ -34,6 +34,10 @@ def extend_schema(schema):
         'reported metric sample size in this projection, not a verified source-population census.')
     dataset['properties']['size']['maximum'] = 104857600
     dataset['properties']['rowCount'].update(minimum=0, maximum=1000000)
+    # A client-held dataset pin (#102): the client's worker read the file in the client's environment by
+    # this SHA-256, and the platform never held its bytes.
+    dataset['properties']['custody'] = {'const': 'client', 'description': ('The dataset stayed in the '
+        "client's environment; the platform holds only its name, size and SHA-256.")}
     defs['externalPredictionDataset'] = dataset
     manifest['properties']['dataset'] = {'$ref': '#/$defs/externalPredictionDataset'}
     defs['externalRunManifest'] = manifest

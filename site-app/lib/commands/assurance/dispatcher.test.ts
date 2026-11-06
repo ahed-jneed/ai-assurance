@@ -25,8 +25,12 @@ import {
 } from "@/lib/domain";
 import { getEngagement, loadEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
+import { sha256 } from "@/lib/ids";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
+import { at, declaration } from "@/lib/workflow/test-fixtures";
+import { resolveNew } from "@/lib/criteria/pin";
+import { seedWorkflow } from "@/lib/workflow-seed";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -349,7 +353,8 @@ describe("POST /api/assurance", () => {
     ]);
   });
 
-  it("freezes an external job and answers it uncached", async () => {
+  // An approved procedure ready for an external job on `data`.
+  function externalFixture(data: Artifact = dataset) {
     const e = stored();
     const model: Model = {
         id: "MODEL-1",
@@ -369,7 +374,7 @@ describe("POST /api/assurance", () => {
         suite: ["performance"],
         config: { positiveLabel: "1" },
       } as EvaluationProfile;
-    e.artifacts.push(dataset, {
+    e.artifacts.push(data, {
       ...dataset,
       id: "EV-2",
       name: "scores.csv",
@@ -384,6 +389,7 @@ describe("POST /api/assurance", () => {
         {
           id: "PROC-1",
           revision: 1,
+          instructions: [],
           selected: true,
           applicability: "applicable",
           modelId: model.id,
@@ -418,15 +424,26 @@ describe("POST /api/assurance", () => {
     vi.mocked(recordsById).mockImplementation(async (_ctx, _id, ids) =>
       [system, prediction].filter((r) => ids.includes(r.id)),
     );
-    const response = await post(e, "queueExternal", {
-      systemId: system.id,
-      modelId: model.id,
-      datasetId: dataset.id,
-      profileId: profile.id,
-      procedureId: "PROC-1",
-      mode: "provided_predictions",
-      predictionId: prediction.id,
-    });
+    return {
+      e,
+      system,
+      prediction,
+      queue: (mode: string) =>
+        post(e, "queueExternal", {
+          systemId: system.id,
+          modelId: model.id,
+          datasetId: dataset.id,
+          profileId: profile.id,
+          procedureId: "PROC-1",
+          mode,
+          predictionId: prediction.id,
+        }),
+    };
+  }
+
+  it("freezes an external job and answers it uncached", async () => {
+    const { e, system, prediction, queue } = externalFixture();
+    const response = await queue("provided_predictions");
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     const reply = (await response.json()) as Record<string, string>;
@@ -440,7 +457,112 @@ describe("POST /api/assurance", () => {
       "freezeExternalExecution",
       { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
+    // The job binds the plan content: a procedure planned before plan hashes
+    // keeps the hash it was queued with (#105).
+    expect(e.workflow!.procedures[0].planHash).toMatch(/^[a-f0-9]{64}$/);
   });
+
+  it("queues a client-held dataset pin only in client-local mode (#102)", async () => {
+    const { queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+    });
+    for (const mode of ["provided_predictions", "auditor_model"]) {
+      const refused = await queue(mode);
+      expect(refused.status).toBe(409);
+      expect(((await refused.json()) as { error: string }).error).toContain(
+        "held by the client: queue it in client-local mode",
+      );
+    }
+    expect(save).not.toHaveBeenCalled();
+    expect((await queue("client_local")).status).toBe(200);
+    // The frozen request carries the custody, so no worker downloads it.
+    const { db } = fakeD1();
+    env.DB = db;
+    const batch = vi.mocked(save).mock.calls[0][5] as unknown as (
+      cmd: string,
+    ) => { sql: string; args: unknown[] }[];
+    const insert = batch("CMD-1").find((s) =>
+      s.sql.startsWith("INSERT INTO execution_jobs"),
+    )!;
+    const frozen = JSON.parse(String(insert.args[3]));
+    expect(frozen.executionMode).toBe("client_local");
+    expect(frozen.dataset).toMatchObject({
+      id: dataset.id,
+      sha256: dataset.sha256,
+      size: dataset.size,
+      custody: "client",
+    });
+    expect(frozen.limitations.at(-1)).toContain(
+      "The dataset stays in the client's environment",
+    );
+  });
+
+  it.each([
+    ["client", "platform"],
+    ["platform", "client"],
+    ["client", undefined],
+  ] as const)(
+    "importJob refuses a result whose custody differs from the frozen %s request (#102)",
+    async (frozenCustody, stated) => {
+      const e = stored();
+      // The job binds the procedure's current plan, so only the custody
+      // differs (#123).
+      e.workflow = {
+        brief: { status: "approved", revision: 2 },
+        program: { status: "approved", revision: 3 },
+        procedures: [{ id: "PROC-1", revision: 1, planHash: "a".repeat(64) }],
+      } as unknown as Engagement["workflow"];
+      load(e);
+      const bytes = new TextEncoder().encode(
+        JSON.stringify({
+          schemaVersion: "1.0",
+          hostedResults: [
+            { testId: "performance", outcome: "pass", metrics: [] },
+          ],
+          provenance: {
+            execution: stated ? { datasetCustody: stated } : {},
+          },
+        }),
+      );
+      const job = {
+        id: "JOB-1",
+        state: "succeeded",
+        result_key: "results/JOB-1",
+        result_sha256: await sha256(bytes.buffer as ArrayBuffer),
+        request: JSON.stringify({
+          dataset: {
+            id: dataset.id,
+            ...(frozenCustody === "client" ? { custody: "client" } : {}),
+          },
+          engineConfig: {},
+          procedure: {
+            id: "PROC-1",
+            revision: 1,
+            planHash: "a".repeat(64),
+            briefRevision: 2,
+          },
+        }),
+      };
+      env.DB = fakeD1((sql) =>
+        sql.includes("FROM execution_jobs") ? job : null,
+      ).db;
+      env.BUCKET = {
+        get: async () => ({ arrayBuffer: async () => bytes.buffer }),
+      } as unknown as R2Bucket;
+      try {
+        const response = await post(e, "importJob", { jobId: job.id });
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual({
+          error: "The result's dataset custody differs from the frozen request",
+        });
+        expect(save).not.toHaveBeenCalled();
+      } finally {
+        delete env.BUCKET;
+      }
+    },
+  );
 });
 
 describe("GET /api/assurance", () => {
@@ -568,6 +690,55 @@ describe("GET /api/assurance", () => {
     expect(recordPage).toHaveBeenCalledWith(ctx, e.id, options);
     expect(recordCount).not.toHaveBeenCalled();
     expect(jobs).not.toHaveBeenCalled();
+  });
+});
+
+describe("setAccess and declared conflicts (#112)", () => {
+  function conflicted() {
+    const e = stored();
+    e.workflow = {
+      ...seedWorkflow(resolveNew(), "user-lead", at),
+      declarations: [
+        declaration("auditor", {
+          userId: "user-2",
+          exclusions: ["financial_interest"],
+        }),
+      ],
+    };
+    env.DB = fakeD1((sql) =>
+      sql.startsWith("SELECT 1 FROM memberships") ? { 1: 1 } : null,
+    ).db;
+    load(e);
+    statements();
+    return e;
+  }
+
+  it("refuses to grant access to a person with a declared conflict", async () => {
+    const e = conflicted();
+    const response = await post(e, "setAccess", {
+      userId: "user-2",
+      active: true,
+      reason: "Joins the review",
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+    });
+    expect(recordStatement).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("still revokes their access, and grants others", async () => {
+    const e = conflicted();
+    for (const data of [
+      { userId: "user-2", active: false, reason: "Leaves the team" },
+      { userId: "user-3", active: true, reason: "Joins the review" },
+    ]) {
+      const response = await post(e, "setAccess", data);
+      expect(response.status, data.userId).toBe(200);
+    }
+    expect(save).toHaveBeenCalledTimes(2);
   });
 });
 

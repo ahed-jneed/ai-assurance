@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:ai-assurance:criteria-pack:1.0.0",
   "title": "Criteria documents: frameworks, engagement packs, crosswalks, index and bundles",
-  "description": "DRAFT (design issue #26, see docs/design/criteria-model.md). One schema validates the five criteria document types, selected by documentType. JSON Schema checks shape only. Referential integrity, licence policy, digest immutability and coverage semantics are enforced by the companion validator specified in section 14 of the design.",
+  "description": "Criteria model of docs/design/criteria-model.md (design #26, phase 1 #27). One schema validates the five criteria document types, selected by documentType. JSON Schema checks shape only. Referential integrity, licence policy, digest immutability and coverage semantics are enforced by the companion validator specified in section 14 of the design.",
   "oneOf": [
     { "$ref": "#/$defs/frameworkDocument" },
     { "$ref": "#/$defs/packDocument" },
@@ -537,7 +537,7 @@
       }
     },
     "item": {
-      "description": "A working-paper or memo template. The first twelve properties are the catalogue item fields of templates/catalog.json, unchanged; objectiveIds, phase and derivedFrom are new.",
+      "description": "A working-paper or memo template. The first twelve properties and researchProcedures are the catalogue item fields of templates/catalog.json, unchanged; objectiveIds, phase and derivedFrom are new.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -593,6 +593,15 @@
           "items": { "$ref": "#/$defs/shortText" }
         },
         "signOffGate": { "$ref": "#/$defs/text" },
+        "researchProcedures": {
+          "description": "Catalogue field, kept verbatim: the research procedures an item's steps come from, with their pass, fail and inconclusive criteria (lib/catalog-criteria.ts).",
+          "type": "object",
+          "required": ["data", "procedures"],
+          "properties": {
+            "data": { "type": "string", "pattern": "^docs/[A-Za-z0-9._/-]+\\.json$" },
+            "procedures": { "type": "array", "minItems": 1, "items": { "type": "object" } }
+          }
+        },
         "objectiveIds": {
           "type": "array",
           "uniqueItems": true,

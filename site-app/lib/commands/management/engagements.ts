@@ -2,6 +2,7 @@ import { z } from "zod";
 import { assertEngagementQuota } from "../../access-policy";
 import { db } from "../../bindings";
 import { roles } from "../../domain";
+import { resolveNew } from "../../criteria/pin";
 import { freshEngagement } from "../../factories";
 import { ApiError } from "../../http";
 import { sha256 } from "../../ids";
@@ -17,7 +18,18 @@ export const engagements: ManagementModule = defineCommands({
   createEngagement: {
     roles,
     async handle({ commandId, timestamp, guard, statements }, data, ctx) {
-      const a = z.object({ clientId: short, title: short }).parse(data);
+      const a = z
+        .object({
+          clientId: short,
+          title: short,
+          // The criteria pack (docs/design/criteria-model.md section 10):
+          // the default pack, or the current version of the chosen one.
+          packId: short.optional(),
+          packVersion: short.optional(),
+        })
+        .refine((v) => !v.packVersion || v.packId, "Choose a criteria pack")
+        .parse(data);
+      const resolved = resolveNew(a.packId, a.packVersion);
       if (
         !(await db()
           .prepare("SELECT id FROM clients WHERE tenant_id=? AND id=?")
@@ -27,6 +39,7 @@ export const engagements: ManagementModule = defineCommands({
         throw new ApiError(404, "Client not found");
       await assertEngagementQuota(db(), ctx.tenantId);
       const engagement = freshEngagement(
+          resolved,
           a.clientId,
           a.title,
           ctx.user.userId,
@@ -102,6 +115,11 @@ export const engagements: ManagementModule = defineCommands({
         engagementId: engagement.id,
         clientId: a.clientId,
         title: a.title,
+        pack: {
+          id: resolved.pin.packId,
+          version: resolved.pin.packVersion,
+          sha256: resolved.pin.packSha256,
+        },
       };
     },
   },

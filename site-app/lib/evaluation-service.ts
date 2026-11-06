@@ -18,9 +18,10 @@ import {
   resolvePlan,
   validateHostedPlan,
 } from "./hosted-statistics";
-import { recordVersions } from "./rule-pack-current";
+import { recordVersions } from "./criteria/pin";
 import { StatisticsError, planSha256 } from "./statistics";
 import {
+  assertPlatformBytes,
   declarationInputSchema,
   declareProtocol,
   hostedGate,
@@ -299,6 +300,7 @@ export async function datasetCSV(e: Engagement, artifactId: string) {
     !a.name.toLowerCase().endsWith(".csv")
   )
     throw new ApiError(400, "Select accepted Dataset CSV evidence");
+  assertPlatformBytes(a);
   if (a.size > 1024 * 1024)
     throw new ApiError(
       400,
@@ -475,7 +477,7 @@ async function freezeRun(
     results: [],
     paperIds: [],
     createdAt: now(),
-    ...recordVersions(),
+    ...recordVersions(e),
     provenance: {
       inputHashes: {
         dataset: dataset.sha256,

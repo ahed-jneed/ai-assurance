@@ -28,6 +28,7 @@ import {
   run,
   templatePaper,
 } from "../workflow/test-fixtures";
+import { resolveNew } from "../criteria/pin";
 
 const opinions = [
   "Qualified conclusion",
@@ -403,7 +404,7 @@ describe("evidence request gates", () => {
 
 describe("structured engagements", () => {
   const seeded = (templateId: string): Procedure => {
-    const p = seedWorkflow("lead", at).procedures.find(
+    const p = seedWorkflow(resolveNew(), "lead", at).procedures.find(
       (p) => p.templateId === templateId,
     );
     if (!p) throw new Error("Unknown template " + templateId);
@@ -722,7 +723,7 @@ describe("stage-scoped gates", () => {
 
   it("scopes structured procedures to the stage they belong to", () => {
     const procedure = (templateId: string): Procedure => ({
-      ...seedWorkflow("lead", at).procedures.find(
+      ...seedWorkflow(resolveNew(), "lead", at).procedures.find(
         (p) => p.templateId === templateId,
       )!,
       selected: true,

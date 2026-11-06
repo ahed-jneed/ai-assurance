@@ -332,6 +332,8 @@ export function EngagementTaskQueue({
         data.identity.role,
         data.identity.id,
         data.clients.find((c) => c.id === e.clientId)?.name,
+        undefined,
+        (id) => data.people.find((m) => m.user_id === id)?.display_name,
       ),
     ).filter((i) => i.personal),
     [all, setAll] = useState(false);

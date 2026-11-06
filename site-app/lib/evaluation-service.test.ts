@@ -602,18 +602,27 @@ describe("special-category fairness data (#60)", () => {
     expect(refused.message).toContain("predates special-category declarations");
   });
 
-  it("lets the client's own worker run without a basis, and no other worker", () => {
+  it("lets only the client's own worker on a client-held pin run without a basis", () => {
     const p = registerProfile(e, special("1.0"), "auditor");
-    expect(() => externalGate(p, "client_local")).not.toThrow();
-    const refused = thrown(() => externalGate(p, "provided_predictions"));
+    expect(() => externalGate(p, "client_local", true)).not.toThrow();
+    const refused = thrown(() =>
+      externalGate(p, "provided_predictions", false),
+    );
     expect(refused.status).toBe(409);
     expect(refused.message).toContain("client-local mode");
+    // Client-local on uploaded bytes: the platform holds the column (#102).
+    const uploaded = thrown(() => externalGate(p, "client_local", false));
+    expect(uploaded.status).toBe(409);
+    expect(uploaded.message).toContain(
+      "this dataset's bytes are on the platform",
+    );
     e.specialCategoryBases = [basis];
     const recorded = registerProfile(
       e,
       special("2.0", { basisId: "BASIS-1" }),
       "auditor",
     );
-    expect(() => externalGate(recorded, "auditor_model")).not.toThrow();
+    expect(() => externalGate(recorded, "auditor_model", false)).not.toThrow();
+    expect(() => externalGate(recorded, "client_local", false)).not.toThrow();
   });
 });

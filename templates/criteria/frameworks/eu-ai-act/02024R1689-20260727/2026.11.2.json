@@ -1,0 +1,3722 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "eu-ai-act",
+  "edition": "02024R1689-20260727",
+  "version": "2026.11.2",
+  "title": "Regulation (EU) 2024/1689 (Artificial Intelligence Act), consolidated text as amended by Regulation (EU) 2026/1744",
+  "shortTitle": "EU AI Act (amended)",
+  "kind": "legislation",
+  "publisher": "European Union",
+  "jurisdiction": "EU",
+  "status": "in_force",
+  "consolidatedAsOf": "2026-07-27",
+  "researchedAsOf": "2026-11-05",
+  "amendingActs": [
+    "(EU) 2026/1744"
+  ],
+  "sources": [
+    {
+      "role": "official_text",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727"
+    },
+    {
+      "role": "authentic_amendment",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744"
+    },
+    {
+      "role": "explorer",
+      "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act-explorer"
+    },
+    {
+      "role": "timeline",
+      "url": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act"
+    },
+    {
+      "role": "consolidated_html",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727"
+    }
+  ],
+  "licence": {
+    "holder": "European Union",
+    "textPolicy": "full_text",
+    "status": "confirmed",
+    "basis": "Commission Decision 2011/833/EU on the reuse of Commission documents: reuse is authorised provided the source is acknowledged. Consolidated texts are research aids; the Official Journal acts are authentic.",
+    "url": "https://eur-lex.europa.eu/eli/dec/2011/833/oj",
+    "attribution": "© European Union, https://eur-lex.europa.eu"
+  },
+  "applicationSummary": [
+    {
+      "reference": "Original Art 5 prohibitions, points (a) to (h)",
+      "date": "2025-02-02"
+    },
+    {
+      "reference": "AI literacy (Art 4)",
+      "date": "2025-02-02"
+    },
+    {
+      "reference": "Obligations of general-purpose AI model providers (Chapter V)",
+      "date": "2025-08-02"
+    },
+    {
+      "reference": "Notified bodies, governance, penalties and confidentiality",
+      "date": "2025-08-02"
+    },
+    {
+      "reference": "Digital Omnibus on AI enters into force",
+      "date": "2026-07-27"
+    },
+    {
+      "reference": "Art 4a legal basis for special-category data in bias detection",
+      "date": "2026-07-27"
+    },
+    {
+      "reference": "General date of application (Art 113, second paragraph)",
+      "date": "2026-08-02"
+    },
+    {
+      "reference": "Art 50 transparency obligations",
+      "date": "2026-08-02"
+    },
+    {
+      "reference": "Commission enforcement and fines for GPAI model providers",
+      "date": "2026-08-02"
+    },
+    {
+      "reference": "AI Office supervision and enforcement (Art 75, Arts 75a to 75d)",
+      "date": "2026-08-02"
+    },
+    {
+      "reference": "High-risk-linked provisions dated by the general date",
+      "date": "2026-08-02"
+    },
+    {
+      "reference": "New Art 5 prohibitions, points (ba) and (bb)",
+      "date": "2026-12-02"
+    },
+    {
+      "reference": "Art 50(2) marking for generative systems already on the market",
+      "date": "2026-12-02"
+    },
+    {
+      "reference": "Legacy general-purpose AI models comply (Art 111(3))",
+      "date": "2027-08-02"
+    },
+    {
+      "reference": "High-risk rules for Annex III systems (Chapter III Sections 1 to 3)",
+      "date": "2027-12-02"
+    },
+    {
+      "reference": "High-risk rules for Annex I systems (Chapter III Sections 1 to 3)",
+      "date": "2028-08-02"
+    },
+    {
+      "reference": "Legacy Annex III systems used by public authorities comply",
+      "date": "2030-08-02"
+    },
+    {
+      "reference": "Legacy Annex I systems used by public authorities comply",
+      "date": "2030-08-02"
+    },
+    {
+      "reference": "Components of Annex X large-scale IT systems comply",
+      "date": "2030-12-31"
+    }
+  ],
+  "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law. From 2 December 2026, screen Art 5(1), first subparagraph, points (ba) and (bb) (non-consensual intimate imagery of an identifiable person; child sexual abuse material) under the provider and deployer conditions of Art 5(1a) and Art 5(1b). Art 4a(1) covers providers of high-risk systems under six cumulative conditions; Art 4a(2) extends the same safeguards to other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection. Art 50: the Commission guidelines C(2026) 7702 final are non-binding; the Code of Practice of 10 Jun 2026 is assessed adequate for Art 50(2), (4) and (5), but adherence is not conclusive evidence of compliance and gives no presumption of conformity. Entries flagged for legal review are pending qualified legal review and must not be presented as settled law.",
+  "triggerProfiles": {
+    "provider_high_risk": {
+      "actor": "Provider",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Provider"
+    },
+    "provider_datasets": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "datasetUsed",
+          "equals": true
+        }
+      ],
+      "scopeNote": "Apply the dataScope policy; an absent training dataset is not a blanket exemption from testing-data duties."
+    },
+    "provider_annex_i_a": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "annexISectionAProduct",
+          "equals": true
+        }
+      ]
+    },
+    "provider_annex_iii_1a": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "annexIII1a",
+          "equals": true
+        }
+      ]
+    },
+    "deployer_high_risk": {
+      "actor": "Deployer",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Deployer"
+    },
+    "importer_high_risk": {
+      "actor": "Importer",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Importer"
+    },
+    "distributor_high_risk": {
+      "actor": "Distributor",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Distributor"
+    },
+    "operator_role_change": {
+      "anyRole": [
+        "Importer",
+        "Distributor",
+        "Deployer",
+        "Other operator"
+      ],
+      "all": [
+        {
+          "fact": "roleChangeCandidate",
+          "equals": true
+        }
+      ],
+      "scopeNote": "Review branding, substantial modification and intended-purpose changes against Article 25(1), including relevant contractual qualifications. Do not automatically reassign provider duties."
+    },
+    "provider_art50": {
+      "actor": "Provider",
+      "all": [],
+      "roleRequired": "Provider",
+      "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."
+    },
+    "deployer_art50": {
+      "actor": "Deployer",
+      "all": [],
+      "roleRequired": "Deployer",
+      "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."
+    },
+    "operator_art50": {
+      "anyRole": [
+        "Provider",
+        "Deployer"
+      ],
+      "all": [],
+      "scopeNote": "Article 50(5) attaches to the information duties of providers and deployers alike."
+    }
+  },
+  "factTypes": {
+    "highRiskConfirmed": "boolean_or_unknown",
+    "operatorRoles": "array_of_reviewed_actor_roles_or_unknown",
+    "annexISectionAProduct": "boolean_or_unknown",
+    "annexIII1a": "boolean_or_unknown",
+    "trainingUsesData": "boolean_or_unknown",
+    "datasetUsed": "boolean_or_unknown",
+    "under18OrVulnerableImpact": "boolean_or_unknown",
+    "preDeterminedChanges": "boolean_or_unknown",
+    "subgroupPerformanceRelevant": "boolean_or_unknown",
+    "inputSpecificationsRelevant": "boolean_or_unknown",
+    "logMechanismsRelevant": "boolean_or_unknown",
+    "learningContinuesAfterDeployment": "boolean_or_unknown",
+    "deployerControlsInputData": "boolean_or_unknown",
+    "deployerControlsLogs": "boolean_or_unknown",
+    "annexIIIDecisionsAboutPersons": "boolean_or_unknown",
+    "roleChangeCandidate": "boolean_or_unknown",
+    "generatesSyntheticContent": "boolean_or_unknown",
+    "placedOnMarketDate": "date_or_unknown",
+    "highRiskRoute": "enumeration_or_unknown",
+    "firstPlacedOnMarketOrPutIntoServiceDate": "date_or_unknown",
+    "significantDesignChangeOnOrAfterChapterIIIDate": "boolean_or_unknown",
+    "intendedForUseByPublicAuthorities": "boolean_or_unknown",
+    "annexXLargeScaleItComponent": "boolean_or_unknown",
+    "gpaiModelPlacedOnMarketDate": "date_or_unknown",
+    "generatesSyntheticText": "boolean_or_unknown",
+    "generatesSyntheticImage": "boolean_or_unknown",
+    "generatesSyntheticAudio": "boolean_or_unknown",
+    "generatesSyntheticVideo": "boolean_or_unknown",
+    "putIntoServiceDate": "date_or_unknown",
+    "interactsDirectlyWithNaturalPersons": "boolean_or_unknown",
+    "obviousToReasonablyWellInformedPerson": "boolean_or_unknown",
+    "authorisedByLawForCriminalOffences": "boolean_or_unknown",
+    "availableToPublicToReportCriminalOffence": "boolean_or_unknown",
+    "scientificResearchOnly": "boolean_or_unknown",
+    "isAiAgent": "boolean_or_unknown",
+    "interactsWithChildrenOrVulnerableGroups": "boolean_or_unknown",
+    "onlyAssistiveStandardEditing": "boolean_or_unknown",
+    "noSubstantialAlterationOfInput": "boolean_or_unknown",
+    "outputsOnlyOutOfScopeContent": "boolean_or_unknown",
+    "b2bIndustrialConditionsMet": "boolean_or_unknown",
+    "closedPhysicalProductEnvironment": "boolean_or_unknown",
+    "ephemeralRealTimeOnly": "boolean_or_unknown",
+    "builtOnOwnGpaiModel": "boolean_or_unknown",
+    "integratedIntoVlopOrVlose": "boolean_or_unknown",
+    "art75ExceptedSystem": "boolean_or_unknown",
+    "deployerIsProviderOrSameUndertaking": "boolean_or_unknown",
+    "codeSignatorySection1": "boolean_or_unknown",
+    "codeSignatorySection2": "boolean_or_unknown",
+    "deployerUsesEmotionRecognition": "boolean_or_unknown",
+    "deployerUsesBiometricCategorisation": "boolean_or_unknown",
+    "deployerOperatesErOrBcSystem": "boolean_or_unknown",
+    "lawEnforcementPermittedErBc": "boolean_or_unknown",
+    "personalNonProfessionalUseOnly": "boolean_or_unknown",
+    "deployerGeneratesDeepFakes": "boolean_or_unknown",
+    "evidentlyArtisticCreativeSatiricalFictional": "boolean_or_unknown",
+    "deployerPublishesAiTextOnPublicInterest": "boolean_or_unknown",
+    "editorialExceptionReliedOn": "boolean_or_unknown",
+    "art50DisclosureApplies": "boolean_or_unknown"
+  },
+  "requirements": [
+    {
+      "id": "AIA-ART-2",
+      "ref": "Art. 2",
+      "title": "Scope",
+      "type": "requirement",
+      "aliases": [
+        "Art.2"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-3",
+      "ref": "Art. 3",
+      "title": "Definitions",
+      "type": "requirement",
+      "aliases": [
+        "Art.3"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-4",
+      "ref": "Art. 4",
+      "title": "AI literacy",
+      "type": "requirement",
+      "aliases": [
+        "Art.4"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-4A",
+      "ref": "Art. 4a",
+      "title": "Processing of special categories of personal data for bias detection and correction",
+      "type": "requirement",
+      "aliases": [
+        "Art.4a"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-5",
+      "ref": "Art. 5",
+      "title": "Prohibited AI practices",
+      "type": "requirement",
+      "aliases": [
+        "Art.5"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-6",
+      "ref": "Art. 6",
+      "title": "Classification rules for high-risk AI systems",
+      "type": "requirement",
+      "aliases": [
+        "Art.6"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-9",
+      "ref": "Art. 9",
+      "title": "Risk management system",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.9"
+      ],
+      "provenance": {
+        "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-9",
+        "sourceKind": "official_consolidation",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+      }
+    },
+    {
+      "id": "AIA-9-1",
+      "ref": "Art. 9(1)",
+      "title": "Lifecycle risk-management system",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-2A",
+      "ref": "Art. 9(2)(a)",
+      "title": "Intended-use risks",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-2B",
+      "ref": "Art. 9(2)(b)",
+      "title": "Foreseeable-misuse risk evaluation",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-2C",
+      "ref": "Art. 9(2)(c)",
+      "title": "Post-market risk feedback",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-2D",
+      "ref": "Art. 9(2)(d)",
+      "title": "Targeted risk treatments",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Pipeline code"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-5",
+      "ref": "Art. 9(4)-(5)",
+      "title": "Control interactions and residual-risk judgment",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-5ABC",
+      "ref": "Art. 9(5)(a)-(c)",
+      "title": "Design, mitigation and deployer information",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Governance",
+        "Instructions"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-TEST",
+      "ref": "Art. 9(6),(8)",
+      "title": "Testing against prior suitable criteria",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Governance",
+        "Training log"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-9-9",
+      "ref": "Art. 9(9)",
+      "title": "Children and vulnerable-group consideration",
+      "type": "requirement",
+      "parent": "AIA-ART-9",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Dataset",
+        "Validation"
+      ],
+      "reviewNote": "Assess whether adverse impacts are likely; do not omit this consideration merely because affected groups were not identified in the supplied dataset.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-10",
+      "ref": "Art. 10",
+      "title": "Data and data governance",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.10"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-10-2A",
+      "ref": "Art. 10(2)(a)",
+      "title": "Data design choices",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2B",
+      "ref": "Art. 10(2)(b)",
+      "title": "Collection origin and original purpose",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2C",
+      "ref": "Art. 10(2)(c)",
+      "title": "Preparation and labelling",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Pipeline code",
+        "Training log"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2D",
+      "ref": "Art. 10(2)(d)",
+      "title": "Data measurement assumptions",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2E",
+      "ref": "Art. 10(2)(e)",
+      "title": "Dataset availability and suitability",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2F",
+      "ref": "Art. 10(2)(f)",
+      "title": "Bias and feedback examination",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2G",
+      "ref": "Art. 10(2)(g)",
+      "title": "Bias detection and mitigation",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Dataset",
+        "Pipeline code",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-2H",
+      "ref": "Art. 10(2)(h)",
+      "title": "Data-gap identification and treatment",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-3",
+      "ref": "Art. 10(3)",
+      "title": "Relevance, representativeness and quality",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-4",
+      "ref": "Art. 10(4)",
+      "title": "Intended-context data coverage",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-10-6",
+      "ref": "Art. 10(6)",
+      "title": "Non-training testing-data scope",
+      "type": "requirement",
+      "parent": "AIA-ART-10",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "trainingUsesData",
+            "equals": false
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727",
+        "dependencies": [
+          "10(2)-(4)",
+          "4a(1)"
+        ]
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-11",
+      "ref": "Art. 11",
+      "title": "Technical documentation",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.11"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-11-1",
+      "ref": "Art. 11(1)",
+      "title": "Pre-market and current technical documentation",
+      "type": "requirement",
+      "parent": "AIA-ART-11",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Validation"
+      ],
+      "reviewNote": "Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs. A simplified submission uses the Commission's form, which notified bodies must accept (Article 11(1), second subparagraph, as replaced). A generated audit report is not automatically the provider's complete technical documentation.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-11-2",
+      "ref": "Art. 11(2)",
+      "title": "Combined product technical documentation",
+      "type": "requirement",
+      "parent": "AIA-ART-11",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_i_a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-12",
+      "ref": "Art. 12",
+      "title": "Record-keeping",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.12"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-12-1",
+      "ref": "Art. 12(1)",
+      "title": "Automatic lifecycle event recording",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Validation",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-12-2",
+      "ref": "Art. 12(2)(a)-(c)",
+      "title": "Risk, monitoring and operation traceability",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance",
+        "Validation"
+      ],
+      "reviewNote": "Platform activity and metric-execution logs are not substitutes for the audited system's operational events.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-12-3A",
+      "ref": "Art. 12(3)(a)",
+      "title": "Biometric use start/end periods",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Pipeline code",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-12-3B",
+      "ref": "Art. 12(3)(b)",
+      "title": "Biometric reference-database identity",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Dataset",
+        "Pipeline code"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-12-3C",
+      "ref": "Art. 12(3)(c)",
+      "title": "Biometric matched-input trace",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Dataset",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-12-3D",
+      "ref": "Art. 12(3)(d)",
+      "title": "Biometric verifier identities",
+      "type": "requirement",
+      "parent": "AIA-ART-12",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Oversight"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-13",
+      "ref": "Art. 13",
+      "title": "Transparency and provision of information to deployers",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.13"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-13-12",
+      "ref": "Art. 13(1)-(2)",
+      "title": "Usable transparency and instructions",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3A",
+      "ref": "Art. 13(3)(a)",
+      "title": "Provider and representative contacts",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3B-I-III",
+      "ref": "Art. 13(3)(b)(i)-(iii)",
+      "title": "Purpose, validated performance and foreseeable risks",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Security",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3B-EXPL",
+      "ref": "Art. 13(3)(b)(iv),(vii)",
+      "title": "Output explanation and interpretation information",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "reviewNote": "These subitems contain where-applicable qualifications; assess them explicitly. A SHAP plot alone is not evidence of deployer comprehension.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3B-V",
+      "ref": "Art. 13(3)(b)(v)",
+      "title": "Relevant group-performance information",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "subgroupPerformanceRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Dataset"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3B-VI",
+      "ref": "Art. 13(3)(b)(vi)",
+      "title": "Relevant input and dataset specifications",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "inputSpecificationsRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Dataset",
+        "Model"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3C",
+      "ref": "Art. 13(3)(c)",
+      "title": "Pre-determined changes in instructions",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "preDeterminedChanges",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3D",
+      "ref": "Art. 13(3)(d)",
+      "title": "Oversight and interpretation measures",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3E",
+      "ref": "Art. 13(3)(e)",
+      "title": "Resources, lifetime, maintenance and updates",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-13-3F",
+      "ref": "Art. 13(3)(f)",
+      "title": "Log collection, storage and interpretation instructions",
+      "type": "requirement",
+      "parent": "AIA-ART-13",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "logMechanismsRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Other",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-14",
+      "ref": "Art. 14",
+      "title": "Human oversight",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.14"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-14-123",
+      "ref": "Art. 14(1)-(3)",
+      "title": "Risk-proportionate oversight design",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Pipeline code",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-4A",
+      "ref": "Art. 14(4)(a)",
+      "title": "Capacity, limitations and anomaly monitoring",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-4B",
+      "ref": "Art. 14(4)(b)",
+      "title": "Automation-bias awareness",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-4C",
+      "ref": "Art. 14(4)(c)",
+      "title": "Correct output interpretation",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-4D",
+      "ref": "Art. 14(4)(d)",
+      "title": "Disregard, override and reversal",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Validation",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-4E",
+      "ref": "Art. 14(4)(e)",
+      "title": "Intervention and safe stop",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Pipeline code",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-14-5",
+      "ref": "Art. 14(5)",
+      "title": "Biometric separate dual verification",
+      "type": "requirement",
+      "parent": "AIA-ART-14",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Other",
+        "Governance"
+      ],
+      "reviewNote": "Review proportionality exceptions for law enforcement, migration, border control and asylum under applicable Union/national law. This is audited-system oversight, not the audit platform's reviewer/signer workflow.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-15",
+      "ref": "Art. 15",
+      "title": "Accuracy, robustness and cybersecurity",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.15"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-15-1",
+      "ref": "Art. 15(1)",
+      "title": "Lifecycle accuracy, robustness and security",
+      "type": "requirement",
+      "parent": "AIA-ART-15",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Security",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-15-3",
+      "ref": "Art. 15(3)",
+      "title": "Declared accuracy and metrics",
+      "type": "requirement",
+      "parent": "AIA-ART-15",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-15-4",
+      "ref": "Art. 15(4), first and second subparagraphs",
+      "title": "Fault resilience and fail-safe measures",
+      "type": "requirement",
+      "parent": "AIA-ART-15",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Pipeline code",
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-15-4-FEEDBACK",
+      "ref": "Art. 15(4), third subparagraph",
+      "title": "Continual-learning feedback mitigation",
+      "type": "requirement",
+      "parent": "AIA-ART-15",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "learningContinuesAfterDeployment",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Pipeline code",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-15-5",
+      "ref": "Art. 15(5)",
+      "title": "Contextual and AI-specific cybersecurity",
+      "type": "requirement",
+      "parent": "AIA-ART-15",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Security",
+        "Validation",
+        "Pipeline code",
+        "Governance"
+      ],
+      "reviewNote": "Article 15(2) is a Commission benchmark-development provision, not a separate private-operator pass/fail obligation.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-16",
+      "ref": "Art. 16",
+      "title": "Obligations of providers of high-risk AI systems",
+      "type": "requirement",
+      "aliases": [
+        "Art.16"
+      ],
+      "provenance": {
+        "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-16",
+        "sourceKind": "official_consolidation",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+      }
+    },
+    {
+      "id": "AIA-ART-17",
+      "ref": "Art. 17",
+      "title": "Quality management system",
+      "type": "requirement",
+      "aliases": [
+        "Art.17"
+      ],
+      "provenance": {
+        "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-17",
+        "sourceKind": "official_consolidation",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+      }
+    },
+    {
+      "id": "AIA-ART-18",
+      "ref": "Art. 18",
+      "title": "Documentation keeping",
+      "type": "requirement",
+      "aliases": [
+        "Art.18"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-19",
+      "ref": "Art. 19",
+      "title": "Automatically generated logs",
+      "type": "requirement",
+      "aliases": [
+        "Art.19"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-20",
+      "ref": "Art. 20",
+      "title": "Corrective actions and duty of information",
+      "type": "requirement",
+      "aliases": [
+        "Art.20"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-22",
+      "ref": "Art. 22",
+      "title": "Authorised representatives of providers of high-risk AI systems",
+      "type": "requirement",
+      "aliases": [
+        "Art.22"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-23",
+      "ref": "Art. 23",
+      "title": "Obligations of importers",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.23"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-23-1B",
+      "ref": "Art. 23(1)(b)",
+      "title": "Importer technical-documentation verification",
+      "type": "requirement",
+      "parent": "AIA-ART-23",
+      "actors": [
+        "Importer"
+      ],
+      "trigger": {
+        "profile": "importer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-24",
+      "ref": "Art. 24",
+      "title": "Obligations of distributors",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.24"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-24-1",
+      "ref": "Art. 24(1)",
+      "title": "Distributor markings, declaration and instructions checks",
+      "type": "requirement",
+      "parent": "AIA-ART-24",
+      "actors": [
+        "Distributor"
+      ],
+      "trigger": {
+        "profile": "distributor_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Instructions",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-25",
+      "ref": "Art. 25",
+      "title": "Responsibilities along the AI value chain",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.25"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-25-1",
+      "ref": "Art. 25(1)(a)-(c)",
+      "title": "Provider-role reassessment after changes",
+      "type": "requirement",
+      "parent": "AIA-ART-25",
+      "actors": [
+        "Importer",
+        "Distributor",
+        "Deployer",
+        "Other operator"
+      ],
+      "trigger": {
+        "profile": "operator_role_change",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Instructions"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-26",
+      "ref": "Art. 26",
+      "title": "Obligations of deployers of high-risk AI systems",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.26"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-26-1",
+      "ref": "Art. 26(1)",
+      "title": "Deployer use according to instructions",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-26-2",
+      "ref": "Art. 26(2)",
+      "title": "Competent, supported oversight personnel",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-26-4",
+      "ref": "Art. 26(4)",
+      "title": "Controlled input-data relevance and coverage",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "deployerControlsInputData",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-26-5",
+      "ref": "Art. 26(5)",
+      "title": "Operational monitoring and risk/incident response",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance",
+        "Instructions",
+        "Validation"
+      ],
+      "reviewNote": "Assess triggering events, recipient/escalation duties and actor/sector exceptions; no notification is sent automatically by catalog selection.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-26-6",
+      "ref": "Art. 26(6)",
+      "title": "Retention of controlled system logs",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "deployerControlsLogs",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance"
+      ],
+      "reviewNote": "Purpose-appropriate period of at least six months unless applicable law provides otherwise; assess data-protection and financial-sector qualifications.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-26-11",
+      "ref": "Art. 26(11)",
+      "title": "Notice to affected natural persons",
+      "type": "requirement",
+      "parent": "AIA-ART-26",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "annexIIIDecisionsAboutPersons",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Assess Annex III use and law-enforcement qualifications; Article 50 obligations remain separately applicable.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-27",
+      "ref": "Art. 27",
+      "title": "Fundamental rights impact assessment for high-risk AI systems",
+      "type": "requirement",
+      "aliases": [
+        "Art.27"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-40",
+      "ref": "Art. 40",
+      "title": "Harmonised standards and standardisation deliverables",
+      "type": "requirement",
+      "aliases": [
+        "Art.40"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-41",
+      "ref": "Art. 41",
+      "title": "Common specifications",
+      "type": "requirement",
+      "aliases": [
+        "Art.41"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-43",
+      "ref": "Art. 43",
+      "title": "Conformity assessment",
+      "type": "requirement",
+      "aliases": [
+        "Art.43"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-47",
+      "ref": "Art. 47",
+      "title": "EU declaration of conformity",
+      "type": "requirement",
+      "aliases": [
+        "Art.47"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-48",
+      "ref": "Art. 48",
+      "title": "CE marking",
+      "type": "requirement",
+      "aliases": [
+        "Art.48"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-49",
+      "ref": "Art. 49",
+      "title": "Registration",
+      "type": "requirement",
+      "aliases": [
+        "Art.49"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-50",
+      "ref": "Art. 50",
+      "title": "Transparency obligations for providers and deployers of certain AI systems",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Art.50"
+      ],
+      "provenance": {
+        "source": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/article-50",
+        "sourceKind": "official_consolidation",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Article heading as shown by the Commission AI Act Service Desk, which reproduces the EUR-Lex consolidated text of 27 July 2026."
+      }
+    },
+    {
+      "id": "AIA-50-1",
+      "ref": "Art. 50(1)",
+      "title": "AI-interaction disclosure by design",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_art50",
+        "conditions": [
+          {
+            "fact": "interactsDirectlyWithNaturalPersons",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "exclusions": [
+          {
+            "id": "EX-SCOPE-RD",
+            "label": "Sole purpose of scientific research and development (Art 2(6))",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "scientificResearchOnly",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "exceptionsTestedPerItem": [
+          {
+            "id": "EX-50-1-OBVIOUS",
+            "label": "Interaction obvious to a reasonably well-informed, observant and circumspect person",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "obviousToReasonablyWellInformedPerson",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-06"
+              ]
+            }
+          },
+          {
+            "id": "EX-50-1-LE",
+            "label": "Authorised by law for criminal offences and not available to the public to report crime",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "authorisedByLawForCriminalOffences",
+                "equals": true
+              },
+              {
+                "fact": "availableToPublicToReportCriminalOffence",
+                "equals": false
+              }
+            ]
+          }
+        ],
+        "procedureIds": [
+          "A50-P-00",
+          "A50-P-01"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-50-2",
+      "ref": "Art. 50(2)",
+      "title": "Machine-readable marking and detectability of synthetic outputs",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_art50",
+        "conditions": [
+          {
+            "fact": "generatesSyntheticContent",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Validation",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Article 111(4): systems placed on the market before 2 August 2026 mark their outputs from 2 December 2026 (rule-pack entry aia-2026-12-02-art50-2-legacy-transition); systems only put into service before that date are pending legal review (LR-A50-01).",
+      "extensions": {
+        "exclusions": [
+          {
+            "id": "EX-50-2-LE",
+            "label": "Authorised by law to detect, prevent, investigate or prosecute criminal offences",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "authorisedByLawForCriminalOffences",
+                "equals": true
+              }
+            ]
+          },
+          {
+            "id": "EX-50-2-EDIT",
+            "label": "Only assistive functions for standard editing (system-wide)",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "onlyAssistiveStandardEditing",
+                "equals": true
+              }
+            ]
+          },
+          {
+            "id": "EX-50-2-NOSUB",
+            "label": "No substantial alteration of the deployer's input or its semantics (system-wide)",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "noSubstantialAlterationOfInput",
+                "equals": true
+              }
+            ]
+          },
+          {
+            "id": "EX-50-2-OUTOFSCOPE",
+            "label": "Only outputs the guidelines place outside Art 50(2)",
+            "basis": "guidance",
+            "ifAll": [
+              {
+                "fact": "outputsOnlyOutOfScopeContent",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-03"
+              ]
+            }
+          },
+          {
+            "id": "EX-50-2-B2B",
+            "label": "Industrial or business-to-business application meeting guidelines point 87",
+            "basis": "guidance",
+            "ifAll": [
+              {
+                "fact": "b2bIndustrialConditionsMet",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-03"
+              ]
+            }
+          },
+          {
+            "id": "EX-50-2-EPHEMERAL",
+            "label": "Real-time ephemeral content where marking is infeasible and persons are told",
+            "basis": "guidance",
+            "ifAll": [
+              {
+                "fact": "ephemeralRealTimeOnly",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-03"
+              ]
+            }
+          },
+          {
+            "id": "EX-SCOPE-RD",
+            "label": "Sole purpose of scientific research and development (Art 2(6))",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "scientificResearchOnly",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "exceptionsTestedPerItem": [],
+        "procedureIds": [
+          "A50-P-00",
+          "A50-P-02A",
+          "A50-P-02B",
+          "A50-P-02C",
+          "A50-P-02D",
+          "A50-P-02E",
+          "A50-P-02F"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-50-3",
+      "ref": "Art. 50(3)",
+      "title": "Notice of emotion recognition or biometric categorisation",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerOperatesErOrBcSystem",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Screen Article 5(1)(f) and (g) first: a notice under Article 50(3) does not make a prohibited use lawful.",
+      "extensions": {
+        "exclusions": [
+          {
+            "id": "EX-SCOPE-PERSONAL",
+            "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "personalNonProfessionalUseOnly",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "exceptionsTestedPerItem": [
+          {
+            "id": "EX-50-3-LE",
+            "label": "Permitted by law to detect, prevent or investigate criminal offences, with safeguards",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "lawEnforcementPermittedErBc",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-11"
+              ]
+            }
+          }
+        ],
+        "procedureIds": [
+          "A50-P-00",
+          "A50-P-03"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-50-4-DF",
+      "ref": "Art. 50(4), first subparagraph",
+      "title": "Deep-fake disclosure",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerGeneratesDeepFakes",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "An evidently artistic, creative, satirical or fictional work changes the form of the disclosure, not whether it applies (LR-A50-08).",
+      "extensions": {
+        "exclusions": [
+          {
+            "id": "EX-SCOPE-PERSONAL",
+            "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "personalNonProfessionalUseOnly",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "exceptionsTestedPerItem": [
+          {
+            "id": "EX-50-4-LE",
+            "label": "Use authorised by law to detect, prevent, investigate or prosecute criminal offences",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "authorisedByLawForCriminalOffences",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "procedureIds": [
+          "A50-P-00",
+          "A50-P-04A"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-50-4-TXT",
+      "ref": "Art. 50(4), second subparagraph",
+      "title": "Disclosure of AI-generated text on matters of public interest",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerPublishesAiTextOnPublicInterest",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "extensions": {
+        "exclusions": [
+          {
+            "id": "EX-SCOPE-PERSONAL",
+            "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "personalNonProfessionalUseOnly",
+                "equals": true
+              }
+            ]
+          }
+        ],
+        "exceptionsTestedPerItem": [
+          {
+            "id": "EX-50-4T-LE",
+            "label": "Use authorised by law to detect, prevent, investigate or prosecute criminal offences",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "authorisedByLawForCriminalOffences",
+                "equals": true
+              }
+            ]
+          },
+          {
+            "id": "EX-50-4T-EDITORIAL",
+            "label": "Human review or editorial control with editorial responsibility for the publication",
+            "basis": "statutory",
+            "ifAll": [
+              {
+                "fact": "editorialExceptionReliedOn",
+                "equals": true
+              }
+            ],
+            "legalReview": {
+              "required": true,
+              "itemIds": [
+                "LR-A50-09"
+              ]
+            }
+          }
+        ],
+        "procedureIds": [
+          "A50-P-00",
+          "A50-P-04B"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-50-5",
+      "ref": "Art. 50(5)",
+      "title": "Clear, distinguishable, timely and accessible information",
+      "type": "requirement",
+      "parent": "AIA-ART-50",
+      "actors": [
+        "Provider",
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "operator_art50",
+        "conditions": [
+          {
+            "fact": "art50DisclosureApplies",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Other"
+      ],
+      "extensions": {
+        "exclusions": [],
+        "exceptionsTestedPerItem": [],
+        "followsItems": [
+          "AIA-50-1",
+          "AIA-50-2",
+          "AIA-50-3",
+          "AIA-50-4-DF",
+          "AIA-50-4-TXT"
+        ],
+        "procedureIds": [
+          "A50-P-05"
+        ],
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-ART-72",
+      "ref": "Art. 72",
+      "title": "Post-market monitoring by providers and post-market monitoring plan for high-risk AI systems",
+      "type": "requirement",
+      "aliases": [
+        "Art.72"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-73",
+      "ref": "Art. 73",
+      "title": "Reporting of serious incidents",
+      "type": "requirement",
+      "aliases": [
+        "Art.73"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-111",
+      "ref": "Art. 111",
+      "title": "AI systems already placed on the market or put into service and general-purpose AI models already placed on the market",
+      "type": "requirement",
+      "aliases": [
+        "Art.111"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ART-113",
+      "ref": "Art. 113",
+      "title": "Entry into force and application",
+      "type": "requirement",
+      "aliases": [
+        "Art.113"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ANNEX-I",
+      "ref": "Annex I",
+      "title": "List of Union harmonisation legislation",
+      "type": "requirement",
+      "aliases": [
+        "Annex I"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ANNEX-III",
+      "ref": "Annex III",
+      "title": "High-risk AI systems referred to in Article 6(2)",
+      "type": "requirement",
+      "aliases": [
+        "Annex III"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-ANNEX-IV",
+      "ref": "Annex IV",
+      "title": "Technical documentation referred to in Article 11(1)",
+      "type": "group",
+      "exhaustive": false,
+      "aliases": [
+        "Annex IV"
+      ],
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Heading from the converter table (templates/criteria/tools/convert-catalog.mjs); not yet checked against the consolidated text."
+      }
+    },
+    {
+      "id": "AIA-AIV-1",
+      "ref": "Annex IV, point 1(a)-(h)",
+      "title": "System description and deployment forms",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Model",
+        "Pipeline code",
+        "Governance",
+        "Instructions",
+        "Oversight",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-2",
+      "ref": "Annex IV, point 2(a)-(h)",
+      "title": "Development, architecture, data, tests and security",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Model",
+        "Dataset",
+        "Training log",
+        "Pipeline code",
+        "Validation",
+        "Oversight",
+        "Security"
+      ],
+      "reviewNote": "Point 2(g) calls for dated/signed responsible-person test reports; these are not supplied merely by an unsigned diagnostic output.",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-3",
+      "ref": "Annex IV, point 3",
+      "title": "Monitoring, functioning and control information",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Oversight",
+        "Dataset",
+        "Instructions",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-4",
+      "ref": "Annex IV, point 4",
+      "title": "Performance-metric appropriateness",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Governance"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-5",
+      "ref": "Annex IV, point 5",
+      "title": "Risk-management description",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-6",
+      "ref": "Annex IV, point 6",
+      "title": "Provider lifecycle changes",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Validation"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-7",
+      "ref": "Annex IV, point 7",
+      "title": "Standards and alternative solutions",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727"
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-8",
+      "ref": "Annex IV, point 8; Article 47",
+      "title": "Actual EU declaration of conformity",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Pending legal review (LR-02): Article 47 sits in Chapter III Section 5, which applies from the 2 August 2026 general date on the text, but the declaration attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727",
+        "specificDocumentRequired": "EU declaration of conformity",
+        "categoryMatchIsInsufficient": true,
+        "legalReview": {
+          "required": true,
+          "itemIds": [
+            "LR-02"
+          ]
+        }
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    },
+    {
+      "id": "AIA-AIV-9",
+      "ref": "Annex IV, point 9; Article 72",
+      "title": "Post-market evaluation and monitoring plan",
+      "type": "requirement",
+      "parent": "AIA-ANNEX-IV",
+      "actors": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "reviewNote": "Pending legal review (LR-02): Article 72 sits in Chapter IX, which applies from the 2 August 2026 general date on the text, but the plan attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).",
+      "extensions": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727",
+        "legalReview": {
+          "required": true,
+          "itemIds": [
+            "LR-02"
+          ]
+        }
+      },
+      "provenance": {
+        "source": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "Migrated from docs/obligation-subitems.json (catalogVersion 2026.11.06-proposed, status proposed_for_methodology_review)."
+      }
+    }
+  ],
+  "notes": "Converted from templates/catalog.json (methodology 2026.11.2, rule pack 2026.11.2) and docs/obligation-subitems.json (2026.11.06-proposed) by templates/criteria/tools/convert-catalog.mjs. Article nodes come from the catalogue regulatoryRefs, child requirements from the obligation catalogue, which is selective, so every group is non-exhaustive. The dated application entries of the rule pack stay in the pack's compat.catalog.regulatorySnapshot; applicationSummary lists their titles and dates. Requirement-level applicability rows are not yet derived from them.",
+  "compat": {
+    "obligations": {
+      "schemaVersion": "1.0",
+      "catalogVersion": "2026.11.06-proposed",
+      "rulePackVersion": "2026.11.2",
+      "status": "proposed_for_methodology_review",
+      "scope": "Selective audit prompts for Articles 9-15, Annex IV, Article 50 and associated actor duties; grouped references are explicit and this is not an exhaustive EU AI Act catalog.",
+      "source": {
+        "legalSource": "EUR-Lex",
+        "version": "02024R1689-20260727",
+        "consolidatedAsOf": "2026-07-27",
+        "researchedAsOf": "2026-11-05",
+        "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:02024R1689-20260727",
+        "authenticAmendment": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744",
+        "baseActEli": "http://data.europa.eu/eli/reg/2024/1689/oj",
+        "authenticAmendmentEli": "http://data.europa.eu/eli/reg/2026/1744/oj",
+        "consolidatedAccessUrl": "https://publications.europa.eu/resource/celex/02024R1689-20260727",
+        "authenticAmendmentAccessUrl": "https://publications.europa.eu/resource/celex/32026R1744",
+        "accessNote": "EUR-Lex challenges automated clients; automated source checks read the same Official Journal documents from the Publications Office (CELLAR) access URLs."
+      },
+      "applicationContext": {
+        "legalSource": "Article 113, third paragraph, point (c)(i) and (ii), as replaced by Regulation (EU) 2026/1744, Art 1, point (40)(b)",
+        "annexIIIArticle6_2": "2027-12-02",
+        "annexIArticle6_1": "2028-08-02",
+        "covers": "Chapter III Sections 1, 2 and 3 except Article 6(5)",
+        "approvalRule": "Dates inform review; they do not automatically approve applicability. Assess Articles 2 and 111, route, actor, intended use, relevant modifications and sectoral rules. Article 111(2), as replaced: for high-risk systems placed on the market or put into service before the Chapter III date of their route (2 December 2027 for Annex III, 2 August 2028 for Annex I), the Regulation applies only if their design changes significantly from that date, and the first unit of the type and model sets the date (recital (39) of Regulation (EU) 2026/1744); the cut-off is no longer the fixed 2 August 2026. Legacy systems intended for use by public authorities comply by 2 August 2030 whatever their design changes; components of the Annex X large-scale IT systems placed on the market or put into service before 2 August 2027 sit outside Article 111(2) and comply by 31 December 2030 (Article 111(1)). Article 5 applies to legacy systems. Annex I Section B requires sectoral-route analysis under Article 2(2), rather than automatic direct Section 2 application. These rules are pending legal review (LR-03, LR-10).",
+        "sourceCurrencyRule": "Source publication, research and application dates have different meanings. A new source version creates an impact-review candidate and never rewrites a historical decision."
+      },
+      "decisionPolicy": {
+        "candidateStates": [
+          "suggested",
+          "needs_information"
+        ],
+        "humanDecisionStates": [
+          "applicable",
+          "readiness",
+          "not_applicable",
+          "needs_information"
+        ],
+        "requiresHumanRationale": true,
+        "requiresIndependentReview": true,
+        "defaultAssessment": "not_assessed",
+        "categoryMatches": "candidate_evidence_only",
+        "unknownFacts": "needs_information_not_false_or_minimal_risk",
+        "automatedOutputs": "diagnostic_or_collection_signals_never_legal_approval",
+        "providerResponsibility": "Articles 9-15 are system requirements; provider responsibility is linked through Article 16(a). A deployer may inspect provider evidence but does not thereby assume every provider duty. Article 25 role changes need separate review.",
+        "dataScope": "Under Article 10(1), datasets used for data-trained models are assessed; Article 10(6) limits Article 10(2)-(4) and Article 4a(1) to testing datasets for systems without model training. Article 10(5) was deleted; special-category processing is a separate Article 4a/data-protection assessment, not an upload permission. Article 4a(2) extends the same conditions and safeguards to providers and deployers of other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection and correction.",
+        "retention": "Retention is actor, control, purpose and law dependent. Article 26(6) is not one universal evidence-vault retention policy.",
+        "excludedActorDuties": "Other provider, deployer, representative, importer, distributor, sectoral, conformity, registration and fundamental-rights duties must be added where applicable. This selective catalog does not waive them."
+      },
+      "factValues": {
+        "highRiskRoute": [
+          "annex_iii",
+          "annex_i_section_a",
+          "annex_i_section_b",
+          "not_high_risk"
+        ]
+      },
+      "factDerivations": {
+        "rule": "A derived fact is true if any listed fact is true, false if all are false, otherwise unknown (docs/research/art50-transparency-2026-11.json, vocabularies.derivationRule). Classification never asks a derived fact directly. For art50DisclosureApplies, the facts of a role the operator does not hold (provider: interactsDirectlyWithNaturalPersons, generatesSyntheticContent; deployer: the other three) count as false.",
+        "generatesSyntheticContent": {
+          "anyOf": [
+            "generatesSyntheticText",
+            "generatesSyntheticImage",
+            "generatesSyntheticAudio",
+            "generatesSyntheticVideo"
+          ]
+        },
+        "deployerOperatesErOrBcSystem": {
+          "anyOf": [
+            "deployerUsesEmotionRecognition",
+            "deployerUsesBiometricCategorisation"
+          ]
+        },
+        "art50DisclosureApplies": {
+          "anyOf": [
+            "interactsDirectlyWithNaturalPersons",
+            "generatesSyntheticContent",
+            "deployerOperatesErOrBcSystem",
+            "deployerGeneratesDeepFakes",
+            "deployerPublishesAiTextOnPublicInterest"
+          ]
+        }
+      },
+      "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use eight facts: generatesSyntheticContent, placedOnMarketDate, highRiskRoute, firstPlacedOnMarketOrPutIntoServiceDate, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent and gpaiModelPlacedOnMarketDate. The guided classification records each of them as true, false or unknown (dates as YYYY-MM-DD or unknown): highRiskRoute from the reviewed route and the Article 6(3) derogation, generatesSyntheticContent from the four modality facts. A predicate that reads an unknown fact yields needs_information.",
+      "exclusionType": {
+        "exclusions": "A triggered item is excluded when the ifAll list of any of its exclusions is true; if none is true and one is unknown, the item needs information. An exclusion takes effect only with fact values the independent classification review approved; exclusions with basis 'guidance' rest on non-binding guidelines and stay pending legal review.",
+        "exceptionsTestedPerItem": "Decision of 6 November 2026 (option a): a statutory exception claimed under Article 50(1), (3) or (4) never excludes the item. It is tested per output, channel or deployment in fieldwork (the model is criterion A50-P-04B-C01: label present or exception supported), so the item stays a candidate.",
+        "followsItems": "Article 50(5) governs only how the information owed under Article 50(1) to (4) is given, and the scope exclusions of Article 2(6) and 2(10) take the system out of the Regulation. An item with followsItems is evaluated only after its own trigger: it is a candidate when at least one listed item of a role the operator holds is a candidate; otherwise it needs information when one of them needs information; otherwise it is excluded when one of them is excluded (with that item's exclusion); otherwise it is not triggered."
+      },
+      "triggerType": {
+        "profile": "key_of_triggerProfiles",
+        "conditions": "array_of_fact_equals_predicates",
+        "evaluation": "Candidate selection only. Unknown in a required predicate yields needs_information. Legal-period approval and scope exclusions are separate human decisions."
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Model",
+        "Training log",
+        "Validation",
+        "Pipeline code",
+        "Governance",
+        "Instructions",
+        "Oversight",
+        "Security",
+        "Other"
+      ],
+      "order": [
+        "AIA-9-1",
+        "AIA-9-2A",
+        "AIA-9-2B",
+        "AIA-9-2C",
+        "AIA-9-2D",
+        "AIA-9-5",
+        "AIA-9-5ABC",
+        "AIA-9-TEST",
+        "AIA-9-9",
+        "AIA-10-2A",
+        "AIA-10-2B",
+        "AIA-10-2C",
+        "AIA-10-2D",
+        "AIA-10-2E",
+        "AIA-10-2F",
+        "AIA-10-2G",
+        "AIA-10-2H",
+        "AIA-10-3",
+        "AIA-10-4",
+        "AIA-10-6",
+        "AIA-11-1",
+        "AIA-11-2",
+        "AIA-12-1",
+        "AIA-12-2",
+        "AIA-12-3A",
+        "AIA-12-3B",
+        "AIA-12-3C",
+        "AIA-12-3D",
+        "AIA-13-12",
+        "AIA-13-3A",
+        "AIA-13-3B-I-III",
+        "AIA-13-3B-EXPL",
+        "AIA-13-3B-V",
+        "AIA-13-3B-VI",
+        "AIA-13-3C",
+        "AIA-13-3D",
+        "AIA-13-3E",
+        "AIA-13-3F",
+        "AIA-14-123",
+        "AIA-14-4A",
+        "AIA-14-4B",
+        "AIA-14-4C",
+        "AIA-14-4D",
+        "AIA-14-4E",
+        "AIA-14-5",
+        "AIA-15-1",
+        "AIA-15-3",
+        "AIA-15-4",
+        "AIA-15-4-FEEDBACK",
+        "AIA-15-5",
+        "AIA-AIV-1",
+        "AIA-AIV-2",
+        "AIA-AIV-3",
+        "AIA-AIV-4",
+        "AIA-AIV-5",
+        "AIA-AIV-6",
+        "AIA-AIV-7",
+        "AIA-AIV-8",
+        "AIA-AIV-9",
+        "AIA-23-1B",
+        "AIA-24-1",
+        "AIA-25-1",
+        "AIA-26-1",
+        "AIA-26-2",
+        "AIA-26-4",
+        "AIA-26-5",
+        "AIA-26-6",
+        "AIA-26-11",
+        "AIA-50-1",
+        "AIA-50-2",
+        "AIA-50-3",
+        "AIA-50-4-DF",
+        "AIA-50-4-TXT",
+        "AIA-50-5"
+      ]
+    }
+  }
+}

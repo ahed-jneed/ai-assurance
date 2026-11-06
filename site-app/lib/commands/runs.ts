@@ -14,6 +14,7 @@ import {
   pinDatasetCard,
   verifyFrozenInputs,
 } from "../evaluation-service";
+import { pinned, roleTemplate } from "../criteria/pin";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { diagnosticNarrative } from "../presentation";
@@ -216,8 +217,14 @@ export const runs = defineCommands({
         run.state = "succeeded";
         run.completedAt = now();
         for (const article of [...new Set(run.results.map((r) => r.article))]) {
+          const resolved = pinned(e);
           const p = templatePaper(
-            article === "10" ? "WP-A10-02" : "WP-A15-01",
+            resolved,
+            roleTemplate(
+              resolved.pack,
+              "diagnosticPaperByResultArticle",
+              article,
+            ),
             ctx.user.userId,
           );
           p.title = "Diagnostic run · " + run.id + " · Article " + article;

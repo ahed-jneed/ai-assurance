@@ -18,6 +18,7 @@ import {
   type Engagement,
   type Role,
 } from "@/lib/domain";
+import type { GateFeatures } from "@/lib/domain";
 import {
   assuranceLevelIds,
   assuranceLevels,
@@ -30,6 +31,7 @@ import {
   type ReportTerms,
 } from "@/lib/domain/report-model";
 import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
+import { gateTitle } from "@/lib/workflow/acceptance";
 /**
  * Report elements the approved brief and program supply. Independence is
  * not one of them: its gate has kind "acceptance" and opens that panel.
@@ -41,12 +43,17 @@ export const briefElements = [
   "report:work",
 ];
 export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;
+/** The practice members a gate may name (WorkspaceData.people). */
+export type GatePeople = readonly { user_id: string; display_name: string }[];
+const titleOf = (g: AuditGate, people: GatePeople) =>
+  gateTitle(g, (id) => people.find((m) => m.user_id === id)?.display_name);
 
 export function AuditGateList({
   gates,
   engagement: e,
   role,
   userId,
+  people = [],
   onGate,
   compact = false,
 }: {
@@ -54,6 +61,8 @@ export function AuditGateList({
   engagement: Engagement;
   role: Role;
   userId: string;
+  /** Names the team member of a declaration gate instead of their user id. */
+  people?: GatePeople;
   onGate?: GateAction;
   compact?: boolean;
 }) {
@@ -162,7 +171,7 @@ export function AuditGateList({
     const content = (
       <>
         <span className="audit-gate-description">
-          <b>{g.title}</b>
+          <b>{titleOf(g, people)}</b>
           {guidance && <small>{guidance}</small>}
         </span>
         {onGate && (
@@ -201,7 +210,7 @@ export function AuditGateList({
             <summary>
               <span className="gate-group-label">
                 {label}
-                <small>{items[0].title}</small>
+                <small>{titleOf(items[0], people)}</small>
               </span>
               <span className="count-label">{items.length}</span>
             </summary>
@@ -306,11 +315,14 @@ export function ReportReadiness({
   onGate,
   onAudience,
   busy = false,
+  features,
 }: {
   engagement: Engagement;
   role: Role;
   userId: string;
   terms: ReportTerms;
+  /** What the engagement's criteria pack switches on (the classification gate). */
+  features?: GateFeatures;
   onTerms: (terms: ReportTerms) => void;
   onGate: GateAction;
   /** Sets who a signed paper is written for; Lead Auditors only. */
@@ -321,7 +333,7 @@ export function ReportReadiness({
   const signed = e.papers.filter(
     (p) => paperCurrent(p) && p.status === "signed",
   );
-  const gates = finalReportGates(e, terms),
+  const gates = finalReportGates(e, terms, features),
     exceptions = e.findings.filter(
       (f) => f.status !== "closed" && ["High", "Critical"].includes(f.severity),
     ).length;

@@ -26,7 +26,9 @@ export const WORKER_FAILURE_GUIDANCE: Record<string, string> = {
   response_size_rejected:
     "The platform sent more bytes than the pinned size. Check that the pinned evidence is unchanged before queueing again.",
   dataset_input_pin_mismatch:
-    "The dataset bytes the worker received differ from the pinned size or SHA-256. Treat this as an integrity exception and investigate before re-running.",
+    "The dataset bytes the worker received differ from the pinned size or SHA-256. For a client-held dataset, the client's file changed after it was pinned. Treat this as an integrity exception and investigate before re-running.",
+  client_dataset_unavailable:
+    "The dataset stays with the client, but the worker has no client data directory or no file of the pinned size in it. Ask the client to place the pinned file, unchanged, in its worker's client data directory, then queue a new job.",
   model_input_pin_mismatch:
     "The model bytes the worker received differ from the pinned SHA-256. Treat this as an integrity exception and investigate before re-running.",
   model_input_size_mismatch:

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as domain from "./domain";
 import {
-  articleNames,
   canWrite,
   classify,
   risk,
@@ -14,7 +13,6 @@ describe("domain entry point", () => {
   it("exports the same runtime API", () => {
     // Type-only exports are checked by `tsc` through their importers.
     expect(Object.keys(domain).sort()).toEqual([
-      "articleNames",
       "canWrite",
       "classify",
       "completionGates",
@@ -51,15 +49,6 @@ describe("domain entry point", () => {
       "Evidence evaluation",
       "Reporting",
       "Sign-off",
-    ]);
-    expect(Object.keys(articleNames)).toEqual([
-      "9",
-      "10",
-      "11",
-      "12",
-      "13",
-      "14",
-      "15",
     ]);
   });
 
