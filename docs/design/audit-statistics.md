@@ -295,6 +295,8 @@ Explicit plans are taken as written. Whether they must also carry a baseline is 
 
 GC-38 and GC-49 pin descriptive entries and the derived plans of legacy hosted profiles. Every performance-kind golden case also carries its descriptive entries.
 
+**Supplementary descriptive entries (`traditional-ml-2.1.0`, #65).** Engine reports add, after the standard set, `prevalence` (binary: reference rows of the performance positive class over all rows) and `majority_baseline_accuracy` (the most frequent reference class over all rows), each with a Wilson interval and the descriptive shape above, and put a per-class table (`slice`, `support`, `predicted`, `tp`, `recall`, `precision`, `f1`) in the `slices` of the balanced-accuracy entry. They mirror the hosted runner's metrics, are never members and are outside the golden cases' core level. The majority-class baseline decides nothing here: the chance baseline replaces it (section 5.2).
+
 ## 5. Per-metric specification
 
 Notation: TP, FP, FN, TN are counts; positives P = TP + FN; negatives N = FP + TN; n = rows. `wilson(x, n, z)` is defined in section 5.1.
@@ -773,7 +775,7 @@ Every runner MUST derive the plan deterministically, so existing profiles keep t
 The derivation reads one fact from the data: for a multiclass task, k, the number of labels that occur in the target column of the evaluated rows, which sets the chance baseline 1/max(k, 2). Everything else comes from the configuration. Both runners already list the labels when they evaluate (the sorted union of target and prediction labels, `labels` in the engine and `names` in the hosted runner), and the worker's `translate_config` receives the rows. The recorded plan therefore carries the baseline as a number; for three classes it is 1/3 = 0.3333333333333333 in IEEE double.
 
 - **Today's hosted profile** (`schemaVersion` 1.0, with the configuration of hosted 1.1 runs, so `derivedFrom.contractVersion` is "1.1"; the worker uses the same rules for `engineConfig` 1.1; GC-38, GC-49). Each selected test becomes a confirmatory criterion with the test's id:
-  - `performance` (binary): accuracy ≥ `minimumAccuracy`, recall ≥ `minimumRecall` (default 0.7), and balanced accuracy ≥ 0.50.
+  - `performance` (binary): accuracy ≥ `minimumAccuracy`, recall ≥ `minimumRecall` (default 0.7), and balanced accuracy ≥ 0.50. Recall, precision and F1 refer to the profile's `performancePositiveLabel` (test definitions `traditional-ml-2.1.0`; empty means `positiveLabel`), which the engine configuration records as `performancePositiveLabel`; group criteria keep counting `positiveLabel` (#65).
   - `performance` (multiclass): accuracy ≥ `minimumAccuracy`, the chance baseline balanced accuracy (macro recall) ≥ 1/k, and macro F1 ≥ `minimumMacroF1` (default 0.7), in that order.
   - `regression`: RMSE ≤ `maximumRmse` (default 1), with `passBlockedBy` empty, because today's hosted rule decides on RMSE alone.
   - `demographic_parity`: selection-rate difference within ±`maximumParityGap`.
@@ -882,7 +884,7 @@ All three share one result shape: `{testId, label, article, outcome, metrics, li
 **Result ids.** One rule binds results to the plan on every path. It replaces every check that ties results to the five hosted test names (sites in H2, E4 and H4):
 - `results` holds exactly one result per criterion of the recorded plan, in plan order, and each `testId` is its criterion's `id`. An engine report may also hold results this specification does not govern (section 4.6), which keep today's ids.
 - The article and the allowed metric names follow the criterion's `kind`, and for group criteria its `metric`, never the test id:
-  - performance kinds: the standard metric set of the kind (section 4.8) and, for binary data, `false_positive_rate`, with `macro_recall` for multiclass balanced accuracy in the engine;
+  - performance kinds: the standard metric set of the kind (section 4.8) and, for binary data, `false_positive_rate`, with `macro_recall` for multiclass balanced accuracy in the engine, plus the supplementary descriptive entries `prevalence` (binary) and `majority_baseline_accuracy` (section 4.8);
   - group criteria: the headline name of section 11.3 for the criterion's metric, and member names `metric:subject|comparator` whose metric is the criterion's `selection_rate_difference` or `selection_rate_ratio`, or `tpr_difference` and `fpr_difference` for `equalized_odds`;
   - calibration: `maximum_calibration_gap`, `calibration_gap:bin<b>`, `brier_score` and `expected_calibration_error`.
 - A derived plan's criterion ids are today's test ids: the hosted suite names, or `PERF-*` and `FAIR-*` in the engine. So a derived run keeps today's ids, one result per suite test. An explicit plan chooses its own ids, up to 20 (GC-31, GC-37).
