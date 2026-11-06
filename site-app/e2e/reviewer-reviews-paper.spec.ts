@@ -89,9 +89,13 @@ test("the Reviewer reviews a paper and the Lead Auditor signs it off", async ({
   const auditor = await api("qa-auditor");
   const paperId = await submittedPaper(auditor, demo);
 
-  // An Auditor's role cannot review at all.
+  // An Auditor's role cannot review at all: the role check refuses it before
+  // the self-review check would.
   const review = await reviewAs(auditor, demo, paperId);
   expect(review.status()).toBe(403);
+  expect((await review.json()).error).toBe(
+    "Your role cannot perform this action",
+  );
 
   const page = await signIn("qa-reviewer");
   await page.goto(workspacePath(demo, "Working papers"));
