@@ -25,6 +25,7 @@ import {
 } from "@/lib/domain";
 import { getEngagement, loadEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
+import { sha256 } from "@/lib/ids";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
@@ -490,6 +491,58 @@ describe("POST /api/assurance", () => {
       "The dataset stays in the client's environment",
     );
   });
+
+  it.each([
+    ["client", "platform"],
+    ["platform", "client"],
+    ["client", undefined],
+  ] as const)(
+    "importJob refuses a result whose custody differs from the frozen %s request (#102)",
+    async (frozenCustody, stated) => {
+      const e = stored();
+      load(e);
+      const bytes = new TextEncoder().encode(
+        JSON.stringify({
+          schemaVersion: "1.0",
+          hostedResults: [
+            { testId: "performance", outcome: "pass", metrics: [] },
+          ],
+          provenance: {
+            execution: stated ? { datasetCustody: stated } : {},
+          },
+        }),
+      );
+      const job = {
+        id: "JOB-1",
+        state: "succeeded",
+        result_key: "results/JOB-1",
+        result_sha256: await sha256(bytes.buffer as ArrayBuffer),
+        request: JSON.stringify({
+          dataset: {
+            id: dataset.id,
+            ...(frozenCustody === "client" ? { custody: "client" } : {}),
+          },
+          engineConfig: {},
+        }),
+      };
+      env.DB = fakeD1((sql) =>
+        sql.includes("FROM execution_jobs") ? job : null,
+      ).db;
+      env.BUCKET = {
+        get: async () => ({ arrayBuffer: async () => bytes.buffer }),
+      } as unknown as R2Bucket;
+      try {
+        const response = await post(e, "importJob", { jobId: job.id });
+        expect(response.status).toBe(409);
+        expect(await response.json()).toEqual({
+          error: "The result's dataset custody differs from the frozen request",
+        });
+        expect(save).not.toHaveBeenCalled();
+      } finally {
+        delete env.BUCKET;
+      }
+    },
+  );
 });
 
 describe("GET /api/assurance", () => {
