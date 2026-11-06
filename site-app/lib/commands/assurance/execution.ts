@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
-import type { Result, Run } from "../../domain";
+import { aggregateOutcome } from "../../diagnostic-decisions";
+import type { Outcome, Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
 import { assertExternalProtocol } from "../../evaluation-service";
 import {
@@ -17,6 +18,19 @@ import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
+/**
+ * The overall outcome of an imported external run, by the rule hosted runs
+ * use (aggregateOutcome): any fail is a fail, and a missing or unknown outcome
+ * is inconclusive, never a pass. A packet without results has nothing to
+ * compile, so it is refused rather than recorded as a run.
+ */
+export function importedOutcome(
+  results: readonly Pick<Result, "outcome">[] | undefined,
+): Outcome {
+  if (!Array.isArray(results) || !results.length)
+    throw new ApiError(409, "The result holds no hosted results to compile");
+  return aggregateOutcome(results.map((r) => r?.outcome));
+}
 // Columns of a succeeded execution_jobs row as importJob reads them.
 type SucceededJobRow = {
   id: string;
@@ -358,6 +372,7 @@ export const execution: AssuranceModule = defineCommands({
       if ((await sha256(bytes)) !== job.result_sha256)
         throw new ApiError(409, "Result integrity check failed");
       const packet = JSON.parse(new TextDecoder().decode(bytes)),
+        outcome = importedOutcome(packet.hostedResults),
         frozen = JSON.parse(job.request),
         p = templatePaper("WP-A15-01", ctx.user.userId);
       p.required = false;
@@ -388,20 +403,11 @@ export const execution: AssuranceModule = defineCommands({
       p.evidenceIds = [job.id];
       p.runIds = [job.id];
       const binding = {
-          procedureId: frozen.procedure.id,
-          procedureRevision: frozen.procedure.revision,
-          briefRevision: frozen.procedure.briefRevision,
-          programRevision: frozen.procedure.programRevision,
-        },
-        outcome = packet.hostedResults.some((r: Result) => r.outcome === "fail")
-          ? "fail"
-          : packet.hostedResults.some(
-                (r: Result) => r.outcome === "inconclusive",
-              )
-            ? "inconclusive"
-            : packet.hostedResults.some((r: Result) => r.outcome === "pass")
-              ? "pass"
-              : "not_applicable";
+        procedureId: frozen.procedure.id,
+        procedureRevision: frozen.procedure.revision,
+        briefRevision: frozen.procedure.briefRevision,
+        programRevision: frozen.procedure.programRevision,
+      };
       const {
         sha256: declaredHash,
         size: declaredSize,
