@@ -5,7 +5,9 @@ import {
   primaryKey,
   foreignKey,
   index,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 export const tenants = sqliteTable("tenants", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -24,8 +26,43 @@ export const memberships = sqliteTable(
     clientId: text("client_id"),
     displayName: text("display_name").notNull(),
     status: text("status").notNull().default("active"),
+    // When the membership's current grant began: set on every grant,
+    // re-grant, role change and revocation. Client request grants issued
+    // before it no longer apply (activeGrant in lib/workflow-state.ts).
+    accessSince: text("access_since"),
   },
   (t) => [primaryKey({ columns: [t.tenantId, t.userId] })],
+);
+/**
+ * Practice invitations keyed by email, consumed at the invitee's next sign-in
+ * (lib/invitations.ts).
+ */
+export const invitations = sqliteTable(
+  "invitations",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    id: text("id").notNull(),
+    email: text("email").notNull(),
+    displayName: text("display_name"),
+    role: text("role").notNull(),
+    clientId: text("client_id"),
+    engagementIds: text("engagement_ids").notNull().default("[]"),
+    status: text("status").notNull().default("pending"),
+    invitedBy: text("invited_by").notNull(),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    acceptedBy: text("accepted_by"),
+    closedAt: text("closed_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.id] }),
+    index("idx_invitations_email").on(t.email, t.status),
+    uniqueIndex("idx_invitations_pending")
+      .on(t.tenantId, t.email)
+      .where(sql`status = 'pending'`),
+  ],
 );
 export const managementEvents = sqliteTable(
   "management_events",

@@ -27,6 +27,8 @@ const mf = new Miniflare({
   bindings: {
     IDENTITY_MODE: "trusted-headers",
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    // First sign-ins provision the fixture practices (lib/access-policy.ts).
+    SELF_SIGNUP: "open",
   },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
