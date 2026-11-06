@@ -46,6 +46,19 @@ def dossier_v1_1(key_id="KEY-fixture", rule_pack=None, methodology="2026.11.1"):
     return rehash(container)
 
 
+def dossier_v1_2(scope=None):
+    """The web app's manifest 1.2: the export scope is signed too (#83)."""
+    container = build_dossier({"report.json": b'{"reportId":"R-1","assurancePins":[{"id":"AS-1"},{"id":"AS-2"},{"id":"AS-3"}]}', "assurance/AS-1.json": b'{"procedureId":"P-1"}', "assurance/AS-2.json": b'{"procedureId":"P-1"}'}, report_id="R-1", report_path="report.json", created_at="2026-11-07T00:00:00Z")
+    container["manifest"].update(schemaVersion="1.2", signingKeyId="KEY-fixture", rulePack=None, methodologyVersion="2026.11.2", scope=scope)
+    return rehash(container)
+
+
+def scope_fixture(**changes):
+    scope = {"procedureIds": ["P-1"], "recordKinds": None, "period": {"from": "2026-10-01", "to": "2026-10-31"}, "evidence": "withheld", "pinnedRecords": 3, "includedRecords": 2}
+    scope.update(changes)
+    return scope
+
+
 def rehash(container):
     container["manifestSha256"] = hashlib.sha256(canonical_bytes(container["manifest"], integer_only=True)).hexdigest()
     return container
@@ -433,8 +446,15 @@ class DossierTests(unittest.TestCase):
         old_with_new["manifest"]["schemaVersion"] = "1.0"
         bad.append(rehash(old_with_new))
         future = dossier_v1_1()
-        future["manifest"]["schemaVersion"] = "1.2"
+        future["manifest"]["schemaVersion"] = "1.3"
         bad.append(rehash(future))
+        # A 1.1 manifest is not read as 1.2: 1.2 requires the scope key.
+        unscoped = dossier_v1_1()
+        unscoped["manifest"]["schemaVersion"] = "1.2"
+        bad.append(rehash(unscoped))
+        scoped_1_1 = dossier_v1_1()
+        scoped_1_1["manifest"]["scope"] = None
+        bad.append(rehash(scoped_1_1))
         review = dossier_v1_1()
         review["manifest"]["rulePack"]["legalReview"] = "assumed"
         bad.append(rehash(review))
@@ -470,6 +490,61 @@ class DossierTests(unittest.TestCase):
             downgraded = copy.deepcopy(signed)
             downgraded["manifest"]["rulePack"]["legalReview"] = "approved"
             self.assertFalse(verify_dossier(rehash(downgraded), trusted_keys=trust)["valid"])
+
+    def test_manifest_1_2_signs_the_scope_and_keeps_older_versions(self):
+        # Manifests 1.0 and 1.1 still verify; 1.2 full and scoped exports verify.
+        self.assertTrue(verify_dossier(dossier())["valid"])
+        self.assertTrue(verify_dossier(dossier_v1_1())["valid"])
+        full = dossier_v1_2()
+        self.assertTrue(verify_dossier(full)["valid"], verify_dossier(full))
+        scoped = dossier_v1_2(scope_fixture())
+        self.assertTrue(verify_dossier(scoped)["valid"], verify_dossier(scoped))
+        self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(procedureIds=None, period=None, recordKinds=["assertion", "sample"])))["valid"])
+        self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(procedureIds=None, period=None, evidence="withheld")))["valid"])
+        self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(period={"from": "2026-10-01", "to": "2026-10-01"})))["valid"])
+        bad = {
+            "missing scope key": (lambda c: c["manifest"].pop("scope")),
+            "extra scope key": (lambda c: c["manifest"]["scope"].update(note="x")),
+            "missing count": (lambda c: c["manifest"]["scope"].pop("pinnedRecords")),
+            "selects everything": (lambda c: c["manifest"].update(scope=scope_fixture(procedureIds=None, period=None, evidence="included"))),
+            "unsorted procedures": (lambda c: c["manifest"]["scope"].update(procedureIds=["P-2", "P-1"])),
+            "duplicate kinds": (lambda c: c["manifest"]["scope"].update(recordKinds=["sample", "sample"])),
+            "empty list": (lambda c: c["manifest"]["scope"].update(recordKinds=[])),
+            "blank procedure": (lambda c: c["manifest"]["scope"].update(procedureIds=[" "])),
+            "reversed period": (lambda c: c["manifest"]["scope"].update(period={"from": "2026-11-01", "to": "2026-10-01"})),
+            "impossible date": (lambda c: c["manifest"]["scope"].update(period={"from": "2026-02-30", "to": "2026-03-01"})),
+            "timestamp date": (lambda c: c["manifest"]["scope"].update(period={"from": "2026-10-01T00:00:00Z", "to": "2026-10-31"})),
+            "period keys": (lambda c: c["manifest"]["scope"].update(period={"from": "2026-10-01"})),
+            "evidence policy": (lambda c: c["manifest"]["scope"].update(evidence="partial")),
+            "understated count": (lambda c: c["manifest"]["scope"].update(includedRecords=1)),
+            "overstated pinned": (lambda c: c["manifest"]["scope"].update(includedRecords=4, pinnedRecords=3)),
+            "boolean count": (lambda c: c["manifest"]["scope"].update(pinnedRecords=True)),
+            "zero included": (lambda c: c["manifest"]["scope"].update(includedRecords=0)),
+        }
+        for name, change in bad.items():
+            container = dossier_v1_2(scope_fixture())
+            change(container)
+            self.assertFalse(verify_dossier(rehash(container))["valid"], name)
+        # Evidence files contradict a scope that withholds evidence.
+        with_evidence = build_dossier({"report.json": b'{"reportId":"R-1"}', "assurance/AS-1.json": b"{}", "evidence/E-1/a.csv": b"a\n"}, report_id="R-1", report_path="report.json", created_at="2026-11-07T00:00:00Z")
+        with_evidence["manifest"].update(schemaVersion="1.2", signingKeyId="KEY-fixture", rulePack=None, methodologyVersion=None, scope=scope_fixture(includedRecords=1))
+        self.assertFalse(verify_dossier(rehash(with_evidence))["valid"])
+        with_evidence["manifest"]["scope"]["evidence"] = "included"
+        self.assertTrue(verify_dossier(rehash(with_evidence))["valid"])
+
+    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    def test_manifest_1_2_signature_covers_the_scope(self):
+        with temporary_directory() as directory:
+            key_path = Path(directory) / "fixture.pem"
+            key_path.write_bytes(Ed25519PrivateKey.generate().private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            signed = sign_dossier(dossier_v1_2(scope_fixture()), private_key_path=key_path, key_id="KEY-fixture")
+            trust = {"KEY-fixture": signed["signature"]["publicKeySPKI"]}
+            proof = verify_dossier(signed, trusted_keys=trust, require_trusted_signature=True)
+            self.assertTrue(proof["valid"], proof)
+            # Presenting a scoped export as a different scope breaks the signature.
+            widened = copy.deepcopy(signed)
+            widened["manifest"]["scope"]["period"] = {"from": "2026-01-01", "to": "2026-12-31"}
+            self.assertFalse(verify_dossier(rehash(widened), trusted_keys=trust)["valid"])
 
     def test_read_json_rejects_duplicate_keys_and_nonfinite(self):
         with temporary_directory() as directory:
