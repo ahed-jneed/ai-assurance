@@ -1571,7 +1571,7 @@ try {
       .map((p) => ({ id: p.id, body: p.body, signatures: p.signatures })),
   );
   await command("adoptWorkflow", {});
-  assert.equal(e.workflow.procedures.length, 33);
+  assert.equal(e.workflow.procedures.length, 36);
   assert(
     e.workflow.procedures.every(
       (p) => p.applicability === "pending" && !p.selected,

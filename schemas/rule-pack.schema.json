@@ -61,7 +61,12 @@
       "properties": {
         "issue": { "$ref": "#/$defs/url" },
         "report": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.md$" },
-        "data": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.json$" }
+        "data": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.json$" },
+        "revisions": {
+          "description": "Later revisions of the pack built from further verified research, oldest first. Each names the research file, the research edits it applies (every edit that research addresses to the rule pack), the fields of base entries it amends, and the unverified claims the research resolved.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/researchRevision" }
+        }
       }
     },
     "approval": { "$ref": "#/$defs/packApproval" },
@@ -226,7 +231,7 @@
       "required": ["required", "itemIds"],
       "properties": {
         "required": { "type": "boolean" },
-        "itemIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^LR-[0-9]{2}$" } }
+        "itemIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^LR-(?:A50-)?[0-9]{2}$" } }
       },
       "if": { "properties": { "required": { "const": true } } },
       "then": { "properties": { "itemIds": { "minItems": 1 } } },
@@ -699,11 +704,51 @@
           }
         },
         "listedDate": { "$ref": "#/$defs/date" },
+        "reference": { "$ref": "#/$defs/text" },
+        "legalEffect": { "$ref": "#/$defs/text" },
+        "dates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["event", "date"],
+            "properties": { "event": { "$ref": "#/$defs/text" }, "date": { "$ref": "#/$defs/date" } }
+          }
+        },
+        "researchRef": { "description": "The guidance entry of a revision's research file that this entry reproduces.", "type": "string", "pattern": "^GUID-[A-Z0-9-]+$" },
         "url": { "$ref": "#/$defs/url" },
         "note": { "$ref": "#/$defs/text" },
         "platformUse": { "$ref": "#/$defs/text" },
         "sourceIds": { "$ref": "#/$defs/sourceIds" },
         "verification": { "$ref": "#/$defs/verification" }
+      }
+    },
+    "researchRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rulePackVersion", "issue", "report", "data", "edits", "amendments", "resolvesUnverified"],
+      "properties": {
+        "rulePackVersion": { "$ref": "#/$defs/methodologyVersion" },
+        "issue": { "$ref": "#/$defs/url" },
+        "report": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.md$" },
+        "data": { "type": "string", "pattern": "^docs/research/[a-z0-9-]+\\.json$" },
+        "edits": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[A-Z0-9]+-ED-[0-9]{2}$" } },
+        "amendments": {
+          "description": "Fields of entries taken from the base research that this revision extends: notes and questions are only appended to, source and legal-review lists only extended.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["edit", "target", "fields"],
+            "properties": {
+              "edit": { "type": "string", "pattern": "^[A-Z0-9]+-ED-[0-9]{2}$" },
+              "target": { "type": "string", "minLength": 1 },
+              "fields": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["notes", "sourceIds", "legalReview", "question"] } }
+            }
+          }
+        },
+        "resolvesUnverified": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^UV-[0-9]{2}$" } }
       }
     },
     "legalReviewItem": {
@@ -712,7 +757,7 @@
       "additionalProperties": false,
       "required": ["id", "topic", "question", "relatedIds", "status", "tracking"],
       "properties": {
-        "id": { "type": "string", "pattern": "^LR-[0-9]{2}$" },
+        "id": { "type": "string", "pattern": "^LR-(?:A50-)?[0-9]{2}$" },
         "topic": { "$ref": "#/$defs/text" },
         "question": { "$ref": "#/$defs/text" },
         "relatedIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
@@ -749,7 +794,7 @@
         "title": { "$ref": "#/$defs/text" },
         "publisher": { "$ref": "#/$defs/text" },
         "kind": {
-          "enum": ["official_journal", "publications_office_metadata", "consolidated_text", "commission", "standards_body", "secondary"]
+          "enum": ["official_journal", "publications_office_metadata", "consolidated_text", "commission", "ai_board", "web_archive", "standards_body", "secondary"]
         },
         "canonicalUrl": { "$ref": "#/$defs/url" },
         "accessUrl": { "$ref": "#/$defs/url" },

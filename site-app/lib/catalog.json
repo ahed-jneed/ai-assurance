@@ -1,8 +1,8 @@
 {
   "schemaVersion": "1.0.0",
-  "methodologyVersion": "2026.11.1",
+  "methodologyVersion": "2026.11.2",
   "regulatorySnapshot": {
-    "rulePackVersion": "2026.11.1",
+    "rulePackVersion": "2026.11.2",
     "jurisdiction": "EU",
     "celex": "02024R1689-20260727",
     "consolidatedAsOf": "2026-07-27",
@@ -11,7 +11,45 @@
     "research": {
       "issue": "https://github.com/ahed-jneed/ai-assurance/issues/8",
       "report": "docs/research/rule-pack-2026-11.md",
-      "data": "docs/research/rule-pack-2026-11.json"
+      "data": "docs/research/rule-pack-2026-11.json",
+      "revisions": [
+        {
+          "rulePackVersion": "2026.11.2",
+          "issue": "https://github.com/ahed-jneed/ai-assurance/issues/77",
+          "report": "docs/research/art50-transparency-2026-11.md",
+          "data": "docs/research/art50-transparency-2026-11.json",
+          "edits": [
+            "A50-ED-10",
+            "A50-ED-11",
+            "A50-ED-12",
+            "A50-ED-13",
+            "A50-ED-14",
+            "A50-ED-15"
+          ],
+          "amendments": [
+            {
+              "edit": "A50-ED-12",
+              "target": "aia-2026-08-02-art50-transparency",
+              "fields": [
+                "notes",
+                "sourceIds",
+                "legalReview"
+              ]
+            },
+            {
+              "edit": "A50-ED-12",
+              "target": "LR-03",
+              "fields": [
+                "question"
+              ]
+            }
+          ],
+          "resolvesUnverified": [
+            "UV-05",
+            "UV-07"
+          ]
+        }
+      ]
     },
     "approval": {
       "status": "pending_legal_review",
@@ -139,7 +177,7 @@
     "automatedAccessUrl": "https://publications.europa.eu/resource/celex/32026R1744",
     "explorerUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act-explorer",
     "timelineUrl": "https://ai-act-service-desk.ec.europa.eu/en/ai-act/timeline/timeline-implementation-eu-ai-act",
-    "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law. From 2 December 2026, screen Art 5(1), first subparagraph, points (ba) and (bb) (non-consensual intimate imagery of an identifiable person; child sexual abuse material) under the provider and deployer conditions of Art 5(1a) and Art 5(1b). Art 4a(1) covers providers of high-risk systems under six cumulative conditions; Art 4a(2) extends the same safeguards to other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection. Entries flagged for legal review are pending qualified legal review and must not be presented as settled law.",
+    "guidance": "Approve provision-specific applicability and transition analysis; use readiness labels before applicable dates. Explorer/consolidation aids research; authentic Official Journal acts govern. Art.10(5) has been deleted; current sensitive-category bias processing requires assessment of Art.4a and data-protection law. From 2 December 2026, screen Art 5(1), first subparagraph, points (ba) and (bb) (non-consensual intimate imagery of an identifiable person; child sexual abuse material) under the provider and deployer conditions of Art 5(1a) and Art 5(1b). Art 4a(1) covers providers of high-risk systems under six cumulative conditions; Art 4a(2) extends the same safeguards to other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection. Art 50: the Commission guidelines C(2026) 7702 final are non-binding; the Code of Practice of 10 Jun 2026 is assessed adequate for Art 50(2), (4) and (5), but adherence is not conclusive evidence of compliance and gives no presumption of conformity. Entries flagged for legal review are pending qualified legal review and must not be presented as settled law.",
     "predicateRule": "Predicates select candidate rules only. Each predicate list is a conjunction evaluated in three-valued logic: false if any predicate is false, true if all are true, otherwise unknown. An entry or transitional record is a candidate when appliesIf is true (an absent list counts as true) and exceptIf is false (an absent list counts as false). An unknown result yields needs_information, never a pass or a not-applicable decision. obligationsApplyOnlyIf states when the obligations reach a legacy system. Applicability remains a reviewed human decision.",
     "crossReferenceRule": "A transitional record with entryId restates the standalone applicationDates or authorityDeadlines entry it names and carries the same deadline and predicates. List the rule once, under that entry, and show the record as a cross-reference. In prohibitedPractices, entryId names the applicationDates entry that dates the point.",
     "applicationDates": [
@@ -529,12 +567,14 @@
           "reference": "Art 113, second paragraph",
           "amendedBy": "Art 50(7) replaced by Regulation (EU) 2026/1744, Art 1, point (20); Art 50(1) to (6) unchanged."
         },
+        "notes": "Commission guidelines C(2026) 7702 final, point 153: Art 50 applies from 2 Aug 2026 to every in-scope system whatever its placing date, and only Art 50(2) is transitioned (Art 111(4)). Point 154: outputs generated before 2 Aug 2026 need no retroactive marking or labelling, but a text generated earlier and published on or after that date is labelled under Art 50(4). Recital (41) of Regulation (EU) 2026/1744: codes of practice under Art 50(7) give no presumption of conformity. The Art 111(4) transition keeps its predicate on placedOnMarketDate; the guidelines' reading that also covers systems only put into service is pending legal review (LR-A50-01). The Commission's view (footnote 50) that Art 111(2) does not defer Art 50 for legacy high-risk systems is pending legal review (LR-A50-10).",
         "effectiveFrom": "2026-08-02",
         "effectiveTo": null,
         "sourceIds": [
           "SRC-CONS-2024-1689-20260727",
           "SRC-OJ-2026-1744",
-          "SRC-AISD-TIMELINE"
+          "SRC-AISD-TIMELINE",
+          "SRC-EC-A50-GUIDELINES"
         ],
         "verification": {
           "status": "verified",
@@ -544,7 +584,9 @@
           "required": true,
           "itemIds": [
             "LR-03",
-            "LR-04"
+            "LR-04",
+            "LR-A50-01",
+            "LR-A50-10"
           ]
         },
         "approval": {
@@ -562,6 +604,11 @@
             "rulePackVersion": "2026.11.1",
             "change": "revised",
             "note": "Date unchanged. Names the Art 111(4) deadline of 2 Dec 2026 for Art 50(2) and the provider and deployer split of Art 50(1) to (4)."
+          },
+          {
+            "rulePackVersion": "2026.11.2",
+            "change": "revised",
+            "note": "Date and predicates unchanged. Adds guidelines points 153 and 154 and recital (41) of Regulation (EU) 2026/1744 to the notes, and LR-A50-01 and LR-A50-10 (Art 50 research, A50-ED-12)."
           }
         ]
       },
@@ -2439,13 +2486,75 @@
       },
       {
         "id": "GUID-ART50-TRANSPARENCY",
-        "title": "Guidelines on transparency obligations for providers and deployers of AI systems",
-        "status": "published",
-        "listedDate": "2026-07-20",
+        "title": "Commission Guidelines on the implementation of the transparency obligations for certain AI systems under Article 50 AI Act",
+        "status": "adopted",
+        "reference": "C(2026) 7702 final",
+        "legalEffect": "Non-binding (point 5); only the CJEU gives an authoritative interpretation. The Commission will review them as experience grows (point 155).",
+        "dates": [
+          {
+            "event": "Draft published for targeted consultation",
+            "date": "2026-05-08"
+          },
+          {
+            "event": "Consultation closed",
+            "date": "2026-06-03"
+          },
+          {
+            "event": "Content approved by Communication to the Commission C(2026) 5054 final and published (English)",
+            "date": "2026-07-20"
+          },
+          {
+            "event": "Formally adopted as Communication from the Commission C(2026) 7702 final; 23 language versions listed (no Romanian version listed)",
+            "date": "2026-11-05"
+          }
+        ],
         "url": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
-        "note": "Listing verified; content not reviewed in this research.",
+        "researchRef": "GUID-A50-GUIDELINES",
+        "note": "The July communication says the guidelines apply only from formal adoption. The adopted text matches the approved Annex apart from layout and two cross-reference corrections, so analyses made on the July text stay valid.",
         "sourceIds": [
-          "SRC-EC-AI-ACT-PAGE"
+          "SRC-EC-A50-GUIDELINES",
+          "SRC-EC-A50-GUIDELINES-PAGE",
+          "SRC-EC-A50-APPROVAL-2026-07",
+          "SRC-WAYBACK-A50-GUIDELINES-PAGE",
+          "SRC-EC-A50-CONSULTATION"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "id": "GUID-ART50-COP",
+        "title": "Code of Practice on Transparency of AI-Generated Content",
+        "status": "published",
+        "reference": "Final code, 10 June 2026",
+        "legalEffect": "Voluntary. Adherence is not conclusive evidence of compliance (Code, Section 1 and Section 2 objectives (a); Opinion para (52)). Codes under Art 50(7) give no presumption of conformity (Regulation (EU) 2026/1744, recital (41)).",
+        "dates": [
+          {
+            "event": "Kick-off plenary",
+            "date": "2025-11-05"
+          },
+          {
+            "event": "First draft published",
+            "date": "2025-12-17"
+          },
+          {
+            "event": "Second draft published",
+            "date": "2026-03-03"
+          },
+          {
+            "event": "Final code published",
+            "date": "2026-06-10"
+          }
+        ],
+        "url": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "researchRef": "GUID-A50-COP",
+        "note": "Covers Art 50(2), (4) and (5) only; nothing in it addresses Art 50(1) or (3).",
+        "sourceIds": [
+          "SRC-EC-COP-TEXT",
+          "SRC-EC-COP-PAGE",
+          "SRC-EC-COP-OPINION",
+          "SRC-OJ-2026-1744"
         ],
         "verification": {
           "status": "verified",
@@ -2454,14 +2563,57 @@
       },
       {
         "id": "GUID-ART50-COP-OPINION",
-        "title": "Commission opinion on the assessment of the Code of Practice on Transparency of AI-generated Content",
-        "status": "published",
-        "listedDate": "2026-07-09",
+        "title": "Adequacy assessments of the Code: Commission Opinion C(2026) 4839 final and AI Board conclusion",
+        "status": "assessed_adequate",
+        "reference": "C(2026) 4839 final; AI Board conclusion",
+        "legalEffect": "Both find the Code adequate for Art 50(2), (4) and (5). Both were made under the pre-Omnibus procedure and say they stay valid under the amended Art 50(7) and 56(6) while their conclusions agree (Opinion para (5); Board assessment). Neither prevents a later finding of inadequacy.",
+        "dates": [
+          {
+            "event": "Commission Opinion adopted",
+            "date": "2026-07-08"
+          },
+          {
+            "event": "Commission Opinion published",
+            "date": "2026-07-09"
+          },
+          {
+            "event": "AI Board adopted its adequacy assessment",
+            "date": "2026-07-09"
+          }
+        ],
         "url": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
-        "note": "Listing verified; content not reviewed. Under Art 50(7) as replaced, the Commission assesses whether adherence to such codes is adequate for Art 50(2) and (4).",
+        "researchRef": "GUID-A50-COP-ADEQUACY",
         "sourceIds": [
-          "SRC-EC-AI-ACT-PAGE",
-          "SRC-OJ-2026-1744"
+          "SRC-EC-COP-OPINION",
+          "SRC-EC-COP-OPINION-PAGE",
+          "SRC-AIB-COP-ASSESSMENT"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "id": "GUID-ART50-COP-SIGNATORIES",
+        "title": "List of signatories of the Code",
+        "status": "published",
+        "reference": "Commission news item of 31 July 2026",
+        "legalEffect": "Evidence of signature per section; the list is updated on an ongoing basis.",
+        "dates": [
+          {
+            "event": "Announcement: about 190 organisations signed",
+            "date": "2026-07-31"
+          },
+          {
+            "event": "Last update of the list (95 Section 1, 192 Section 2 signatories)",
+            "date": "2026-09-24"
+          }
+        ],
+        "url": "https://digital-strategy.ec.europa.eu/en/news/strong-backing-code-practice-transparency-ai-generated-content",
+        "researchRef": "GUID-A50-COP-SIGNATORIES",
+        "sourceIds": [
+          "SRC-EC-COP-SIGNATORIES",
+          "SRC-EC-COP-PAGE"
         ],
         "verification": {
           "status": "verified",
@@ -2509,7 +2661,7 @@
       {
         "id": "LR-03",
         "topic": "Art 111(1) and (2) legacy systems",
-        "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route, set by the first unit of the type and model under recital (39) of Regulation (EU) 2026/1744); whether the 2 Aug 2027 date in Art 111(1) is also set by the first unit of the type and model (recital (39) states that rule only for Art 111(2); the data assumes it is, in the 31 Dec 2030 entry and in the exceptIf lists that leave out the Art 111(1) systems); what counts as 'significant changes in their designs' (recital (177) of Regulation (EU) 2024/1689 treats it as equivalent in substance to a substantial modification); whether the 2 Aug 2030 sentence, like the first sentence, excludes the Art 111(1) systems (recital (177) gives the two groups their deadlines 'respectively'; the data assumes it does); and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems.",
+        "question": "Which 'date of application of Chapter III' is the cut-off (assumed: the point (c) date for the system's route, set by the first unit of the type and model under recital (39) of Regulation (EU) 2026/1744); whether the 2 Aug 2027 date in Art 111(1) is also set by the first unit of the type and model (recital (39) states that rule only for Art 111(2); the data assumes it is, in the 31 Dec 2030 entry and in the exceptIf lists that leave out the Art 111(1) systems); what counts as 'significant changes in their designs' (recital (177) of Regulation (EU) 2024/1689 treats it as equivalent in substance to a substantial modification); whether the 2 Aug 2030 sentence, like the first sentence, excludes the Art 111(1) systems (recital (177) gives the two groups their deadlines 'respectively'; the data assumes it does); and whether the carve-out ('this Regulation shall apply ... only if') also suspends duties outside Chapter III, such as Art 50, for legacy high-risk systems. The Commission's Art 50 guidelines (C(2026) 7702 final, footnote 50) take the view that Art 111(2) does not defer Art 50, which applies cumulatively; that view is also pending legal review (LR-A50-10).",
         "relatedIds": [
           "aia-2027-12-02-high-risk-annex-iii",
           "aia-2028-08-02-high-risk-annex-i",
@@ -2595,6 +2747,29 @@
         ],
         "status": "pending",
         "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
+      },
+      {
+        "id": "LR-A50-01",
+        "topic": "Art 111(4) and systems only put into service",
+        "question": "The OJ text and recital (38) cover systems placed on the market before 2 August 2026; the guidelines (point 153) add systems put into service, the Commission Q&A does not. Which reading should the platform apply to in-house systems, and do new versions or channels after 2 August 2026 count as a new placing? (Extends LR-04.)",
+        "relatedIds": [
+          "CC-03",
+          "aia-2026-12-02-art50-2-legacy-transition",
+          "putIntoServiceDate"
+        ],
+        "status": "pending",
+        "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
+      },
+      {
+        "id": "LR-A50-10",
+        "topic": "Art 111(2) and Art 50",
+        "question": "Confirm the Commission's view (footnote 50) that the Art 111(2) grandfathering of legacy high-risk systems does not defer Art 50. (Relates to LR-03.)",
+        "relatedIds": [
+          "CC-10",
+          "A50-OBL-6"
+        ],
+        "status": "pending",
+        "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
       }
     ],
     "unverified": [
@@ -2626,22 +2801,10 @@
         "reason": "Not verified and not needed by #18; the request in force is C(2025) 3871 of 23 June 2025 (verified from the Decision)."
       },
       {
-        "id": "UV-05",
-        "claim": "Final Code of Practice on marking and labelling published 10 Jun 2026 (earlier research)",
-        "status": "secondary_only",
-        "reason": "Not fetched. Only the Commission opinion of 9 Jul 2026 is verified, as a listing."
-      },
-      {
         "id": "UV-06",
         "claim": "EUR-Lex pages for the cited acts",
         "status": "secondary_only",
         "reason": "EUR-Lex returned an AWS WAF challenge to automated requests. The same OJ documents were read from the Publications Office CELLAR repository; the EUR-Lex URLs themselves were not machine-checked."
-      },
-      {
-        "id": "UV-07",
-        "claim": "Contents of the transparency guidelines (20 Jul 2026) and of the Commission opinion on the transparency code (9 Jul 2026)",
-        "status": "secondary_only",
-        "reason": "Listings verified; documents not read."
       }
     ],
     "sources": [
@@ -2895,6 +3058,113 @@
         "accessUrl": "https://regulations.ai/regulations/RAI-EU-NA-CLASSIF-2026",
         "retrievedOn": "2026-11-05",
         "notes": "Says the guidelines remain a draft and that final adoption is expected by the end of 2026. Cites no source for that date: its listed sources are the Commission consultation page, the Service Desk page and Art 6. The footer says the page was created on 27 May 2026 and reviewed against official sources on 7 Sep 2026 with AI tools. Cited only by UV-03."
+      },
+      {
+        "id": "SRC-EC-A50-GUIDELINES",
+        "title": "Commission Guidelines on the implementation of the transparency obligations for certain AI systems under Article 50 AI Act, C(2026) 7702 final, 5.11.2026 (English)",
+        "publisher": "European Commission",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/131215",
+        "sha256": "9198d83876dcdffadce77078a468a426cb2fb9859aefcb6080aee6f9fe089bf3",
+        "retrievedOn": "2026-11-05",
+        "notes": "Communication from the Commission. Points (1) to (155) and footnotes read in full. Point (5): non-binding. Cited below by point number."
+      },
+      {
+        "id": "SRC-EC-A50-GUIDELINES-PAGE",
+        "title": "Commission library page: Guidelines on transparency obligations for providers and deployers of AI systems",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 20 July 2026; last update 5 November 2026; lists the adopted guidelines in 23 language versions (no Romanian version was listed on 2026-11-05). The approval communication of July is no longer listed."
+      },
+      {
+        "id": "SRC-EC-A50-APPROVAL-2026-07",
+        "title": "Communication to the Commission C(2026) 5054 final of 20.7.2026: approval of the content of the draft guidelines, with the guidelines as Annex",
+        "publisher": "European Commission",
+        "kind": "web_archive",
+        "accessUrl": "https://web.archive.org/web/20260722191113id_/https://ec.europa.eu/newsroom/dae/redirection/document/131214",
+        "sha256": "ea1a6d960a52d8532a068b8338622d1868616ce6b5bf2540dfef7a2378eb7c8c",
+        "retrievedOn": "2026-11-05",
+        "notes": "sha256 is of the communication PDF; the Annex PDF hashes to 30861fc5de31205846f023068069c92fabc7271ebeac6af7bef68b97f0a33f66. The communication says the guidelines would be formally adopted once all language versions exist and would apply only from then. A word-level diff of the Annex against C(2026) 7702 final found layout, footnote-placement and two cross-reference corrections only."
+      },
+      {
+        "id": "SRC-WAYBACK-A50-GUIDELINES-PAGE",
+        "title": "Internet Archive capture of the guidelines library page, 20 July 2026",
+        "publisher": "Internet Archive",
+        "kind": "web_archive",
+        "accessUrl": "https://web.archive.org/web/20260720143259/https://digital-strategy.ec.europa.eu/en/library/guidelines-transparency-obligations-providers-and-deployers-ai-systems",
+        "retrievedOn": "2026-11-05",
+        "notes": "Shows publication 20 July 2026 with two downloads (guidelines; communication approving their content) and the press release of 20 July 2026."
+      },
+      {
+        "id": "SRC-EC-A50-CONSULTATION",
+        "title": "Commission consultation on the draft guidelines on transparency obligations under the AI Act",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/consultations/consultation-draft-guidelines-transparency-obligations-under-ai-act",
+        "retrievedOn": "2026-11-05",
+        "notes": "Opening 8 May 2026, closing 3 June 2026; last update 3 June 2026."
+      },
+      {
+        "id": "SRC-EC-COP-TEXT",
+        "title": "Code of Practice on Transparency of AI-Generated Content (final, Sections 1 and 2 with Glossary and Annex 1)",
+        "publisher": "European Commission (AI Office); drawn up by independent chairs",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/129555",
+        "sha256": "7bd22c5a3c56eaefda27a5bf7a6118198ef2a9c9255241bd97abf7cdedf9bc28",
+        "retrievedOn": "2026-11-05",
+        "notes": "Cited by Section, Commitment and Measure number. 'will' marks mandatory measures, 'encouraged' and 'may' optional ones (Section 1 and Section 2 introductions)."
+      },
+      {
+        "id": "SRC-EC-COP-PAGE",
+        "title": "Commission policy page: Code of Practice on Transparency of AI-generated Content",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Last update 19 October 2026. Timeline: kick-off 5 Nov 2025; first draft 17 Dec 2025; second draft 3 Mar 2026; draft guidelines 8 May 2026; final code 10 Jun 2026. About 190 signatories by end of July 2026."
+      },
+      {
+        "id": "SRC-EC-COP-OPINION",
+        "title": "Commission Opinion C(2026) 4839 final of 8.7.2026 on the assessment of the Code of Practice on Transparency of AI-generated content (Arts 50(7) and 56(6))",
+        "publisher": "European Commission",
+        "kind": "commission",
+        "canonicalUrl": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/130913",
+        "sha256": "e9b85373cde28a6081fab307fa17fa4c90c2560a1c9a145fb461f696bca424ce",
+        "retrievedOn": "2026-11-05",
+        "notes": "Cited by paragraph number. Paragraph (52): adequate for Art 50(2), (4) and (5); adherence is not conclusive evidence of compliance."
+      },
+      {
+        "id": "SRC-EC-COP-OPINION-PAGE",
+        "title": "Commission library page for the opinion and the AI Board assessment",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/library/commission-opinion-assessment-code-practice-transparency-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 9 July 2026; last update 31 July 2026. States the Commission concluded on 8 July and the AI Board adopted its assessment the following day."
+      },
+      {
+        "id": "SRC-AIB-COP-ASSESSMENT",
+        "title": "Conclusion of the AI Board on the assessment of the Code of Practice on Transparency of AI-generated Content (Art 50(7))",
+        "publisher": "European Artificial Intelligence Board",
+        "kind": "ai_board",
+        "accessUrl": "https://ec.europa.eu/newsroom/dae/redirection/document/130916",
+        "sha256": "a01d832e0d4b10ebb66d27d0e8cf621aabb18aa56e5c24d39d6b4000a9adfcd2",
+        "retrievedOn": "2026-11-05",
+        "notes": "Undated in the document; dated 9 July 2026 by SRC-EC-COP-OPINION-PAGE. Notes that the Art 50 guidelines were still a draft at the time. Will examine the interoperability solutions due by 2 February 2027."
+      },
+      {
+        "id": "SRC-EC-COP-SIGNATORIES",
+        "title": "Commission news: Strong backing for the Code of Practice on Transparency of AI-generated Content (with the list of signatories)",
+        "publisher": "European Commission (DG CONNECT)",
+        "kind": "commission",
+        "accessUrl": "https://digital-strategy.ec.europa.eu/en/news/strong-backing-code-practice-transparency-ai-generated-content",
+        "retrievedOn": "2026-11-05",
+        "notes": "Publication 31 July 2026; last update 24 September 2026; Section 1 signatories: 95, Section 2 signatories: 192; list updated on an ongoing basis."
       }
     ]
   },
@@ -3020,7 +3290,7 @@
         },
         {
           "id": "WP-PL-03-P03",
-          "text": "Evaluate transparency flags independently of high-risk classification."
+          "text": "Record the Art 50 facts and exceptions per operator role; an unknown fact keeps Art 50 applicability pending."
         },
         {
           "id": "WP-PL-03-P04",
@@ -3145,6 +3415,10 @@
         {
           "id": "WP-PL-06-P04",
           "text": "Retain selection ids, seed, expansion rules and deviations; prohibit unsupported population generalization."
+        },
+        {
+          "id": "WP-PL-06-P05",
+          "text": "For Art 50 work, apply the Art 50 sampling rules SR-A50-01 to SR-A50-07 (SR-A50-01 deterministic disclosure paths (walkthroughs); SR-A50-02 marking presence per stratum (attribute sample); SR-A50-03 reliability test sets; SR-A50-04 robustness battery; SR-A50-05 self-identification probes; SR-A50-06 deployer content and exempt-feature samples; SR-A50-07 exposure points for art 50(3)); their bands are methodology defaults with no legal safe harbour."
         }
       ],
       "evidenceRequired": [
@@ -3887,38 +4161,271 @@
     },
     {
       "id": "WP-XC-07",
-      "title": "Specific transparency obligations",
+      "title": "Transparency: applicability, AI interaction and exposure notices",
       "kind": "working_paper",
       "stage": "Fieldwork",
       "folder": "03 Fieldwork / Cross-cutting",
       "templatePath": "templates/working-paper.md",
       "regulatoryRefs": [
-        "Art.50"
+        "Art.50",
+        "Art.111"
       ],
-      "automationMode": "manual",
-      "objective": "Assess applicable transparency duties separately from high-risk routing.",
+      "automationMode": "hybrid",
+      "objective": "Decide Art 50 applicability per system and operator role (A50-P-00), then test the AI-interaction disclosure (Art 50(1), A50-P-01), the notice of emotion recognition and biometric categorisation (Art 50(3), A50-P-03) and whether the information is clear, timely and accessible (Art 50(5), A50-P-05). A claimed Art 50(1) or (3) exception never excludes the item: A50-P-00-S10 to S12 test it for the channels and deployments it covers, and the item's steps are performed for every channel or exposure point it does not cover. A50-P-05 is performed only while at least one Art 50(1) to (4) item remains after every exclusion. Steps of a procedure whose item is not applicable are recorded as not performed, with the approved applicability as the reason.",
       "procedures": [
         {
           "id": "WP-XC-07-P01",
-          "text": "Assess provider duties (Art 50(1) and (2)) and deployer duties (Art 50(3) and (4)) separately, including the Art 111(4) deadline of 2 December 2026 for Art 50(2) marking by generative systems placed on the market before 2 August 2026."
+          "text": "A50-P-00-S01 (inspection; sampling SR-A50-01; evidence EV-A50-01): Obtain the system, channel and output-path inventory and confirm its completeness against product catalogues, websites and contracts."
         },
         {
           "id": "WP-XC-07-P02",
-          "text": "Inspect notices, content labeling/detection solutions or other required measures within scope."
+          "text": "A50-P-00-S02 (inspection; evidence EV-A50-02): Determine each operator role per system: provider (develops or has developed, and places on the market or puts into service under its own name, in-house use included), deployer (decides purposes and manner of use, even without technical control), both, or neither (pure disseminators such as hosting services or broadcasters)."
         },
         {
           "id": "WP-XC-07-P03",
-          "text": "Observe user-facing behavior and approved exceptions with legal rationale."
+          "text": "A50-P-00-S03 (analytical_review; evidence EV-A50-03): Record every Art 50 fact as true, false or unknown with its evidence; an unknown fact leaves the paragraph needs_information."
+        },
+        {
+          "id": "WP-XC-07-P04",
+          "text": "A50-P-00-S04 (analytical_review; evidence EV-A50-03): Screen Art 5 first: compliance with Art 50 does not make a use lawful (for example emotion recognition at work or in education, or biometric categorisation inferring sensitive traits). Escalate suspected matches to WP-PL-03."
+        },
+        {
+          "id": "WP-XC-07-P05",
+          "text": "A50-P-00-S05 (analytical_review; evidence EV-A50-03, EV-A50-04): Apply the scope exclusions: personal non-professional use (deployer duties only), sole-purpose scientific research, pre-market research and testing other than real-world testing. A free and open-source licence does not exclude Art 50."
+        },
+        {
+          "id": "WP-XC-07-P06",
+          "text": "A50-P-00-S06 (inspection; evidence EV-A50-05): Date each duty: Art 50 applies from 2 August 2026 to every in-scope system whatever its placing date; only Art 50(2) is transitioned to 2 December 2026 for systems placed on the market before 2 August 2026; record placing and putting-into-service dates; the Art 111(2) legacy rule for high-risk systems does not defer Art 50."
+        },
+        {
+          "id": "WP-XC-07-P07",
+          "text": "A50-P-00-S07 (inspection; evidence EV-A50-06, EV-A50-07): Check Code signatory status per section against the Commission's list on a recorded date, including opt-outs; for non-signatories request the gap analysis against the Code."
+        },
+        {
+          "id": "WP-XC-07-P08",
+          "text": "A50-P-00-S08 (analytical_review; evidence EV-A50-39): Identify the competent authority per paragraph from Art 75(1) as replaced (rule-pack entry aia-2026-08-02-ai-office-competence): the national market surveillance authority by default; the AI Office for systems based on a general-purpose AI model where model and system come from the same provider or undertaking (except the systems in Art 75(1)(a)(i) to (iv)) and for systems that constitute or are integrated into a very large online platform or search engine. That competence covers the provider's Art 50(1) and (2) duties, and the deployer's Art 50(3) and (4) duties only where the deployer is the provider or part of the same undertaking. Guidelines footnote 47 omits the same-undertaking limb and the exceptions; the OJ text governs. The EDPS supervises Union institutions."
+        },
+        {
+          "id": "WP-XC-07-P09",
+          "text": "A50-P-00-S09 (inquiry; evidence EV-A50-03): Confirm the audit team did not design or implement the disclosure, marking or labelling solution under review (self-review threat); record the conclusion in WP-PL-01."
+        },
+        {
+          "id": "WP-XC-07-P10",
+          "text": "A50-P-00-S10 (inspection; evidence EV-A50-04, EV-A50-12): Where the Art 50(1) obviousness exception is relied on: inspect the audience analysis (target and foreseeable audience, vulnerable groups, literacy, context) and the obviousness factors, and re-perform any access restriction it depends on, for example that a professional-only tool cannot be reached by the public. If the evidence does not support it, record obviousToReasonablyWellInformedPerson as false, so that A50-P-01 applies. Perform only where the classification answers yes to \"Exception relied on: the AI interaction is obvious to a reasonably well-informed person\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-07-P11",
+          "text": "A50-P-00-S11 (inspection; evidence EV-A50-30): Where a law-enforcement exception is relied on under Art 50(1) or (4): inspect the law, its purposes and safeguards, and the deployment it covers (other uses of the same system stay in scope); for Art 50(1), also confirm that the system is not available to the public to report a criminal offence. If the evidence does not support it, record the facts accordingly, so that A50-P-01, A50-P-04A or A50-P-04B applies. Perform only where the classification answers yes to \"Exception relied on: use authorised by law to detect, prevent, investigate or prosecute criminal offences\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-07-P12",
+          "text": "A50-P-00-S12 (inspection; evidence EV-A50-30): Where the Art 50(3) law-enforcement exception is relied on: inspect the law permitting non-transparent use of the emotion recognition or biometric categorisation system and its safeguards. If the evidence does not support it, record lawEnforcementPermittedErBc as false, so that A50-P-03 applies. Perform only where the classification answers yes to \"Exception relied on: the use is permitted by law for criminal offences, with safeguards\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-07-P13",
+          "text": "A50-P-01-S01 (inspection; evidence EV-A50-08, EV-A50-01): Inspect the disclosure design: the mechanism is built into the system's design and operation for every channel, including systems delivered to deployers through APIs, and applies whoever the deployer is."
+        },
+        {
+          "id": "WP-XC-07-P14",
+          "text": "A50-P-01-S02 (observation; sampling SR-A50-01; evidence EV-A50-09): Walk through a new session on every channel, locale and entry point as a new user; record whether the notice appears at or before the first interaction."
+        },
+        {
+          "id": "WP-XC-07-P15",
+          "text": "A50-P-01-S03 (observation; sampling SR-A50-01; evidence EV-A50-09, EV-A50-08): Assess each observed notice: explicit about the artificial nature, plain language, prominent and close to the interaction, specific to the system. Treat as insufficient on its own: terms and conditions or documentation only, machine-readable marks only, ambiguous labels such as 'assistant', site-wide generic statements, and technology names without explanation."
+        },
+        {
+          "id": "WP-XC-07-P16",
+          "text": "A50-P-01-S04 (reperformance; sampling SR-A50-05; evidence EV-A50-10): Run the pre-registered self-identification probes (sincere questions about the system's nature in each language, phrasing styles, persona and multi-turn contexts, deployer-configured personas where offered) and score each answer as truthful disclosure or not."
+        },
+        {
+          "id": "WP-XC-07-P17",
+          "text": "A50-P-01-S05 (observation; sampling SR-A50-01; evidence EV-A50-08, EV-A50-09): For audiences with children or other vulnerable groups, and for sensitive or immersive contexts (companions, health, finance, legal, complaints, agents), inspect and observe periodic reminders and context-aware disclosures; for children, child-appropriate wording. Perform only where the classification answers yes to \"Likely to reach children or other vulnerable groups\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-07-P18",
+          "text": "A50-P-01-S06 (reperformance; sampling SR-A50-05; evidence EV-A50-08, EV-A50-10): For AI agents, test that the agent discloses its artificial nature and the person on whose behalf it acts to other natural persons, and to the instructing person at key steps (authorisation, reporting, validation) and at each new interaction. Perform only where the classification answers yes to \"Acts as an AI agent towards the persons instructing it or others\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-07-P19",
+          "text": "A50-P-01-S07 (observation; sampling SR-A50-01; evidence EV-A50-11): Evaluate the notices' accessibility (A50-P-05): screen-reader exposure, contrast, captions or transcripts for voice notices; audible cues alone are not enough."
+        },
+        {
+          "id": "WP-XC-07-P20",
+          "text": "A50-P-03-S01 (analytical_review; evidence EV-A50-03): Confirm the Art 5 screen was done: emotion recognition at work or in education and biometric categorisation inferring sensitive characteristics are prohibited, and a notice does not cure them."
+        },
+        {
+          "id": "WP-XC-07-P21",
+          "text": "A50-P-03-S02 (inspection; evidence EV-A50-28): Obtain the deployment register: every location and channel, point of exposure, real-time or ex post processing, and audiences including children."
+        },
+        {
+          "id": "WP-XC-07-P22",
+          "text": "A50-P-03-S03 (observation; sampling SR-A50-07; evidence EV-A50-29): Observe every point of exposure (each entrance, onboarding screen or call flow): a notice of the system's operation is present before or at first exposure, clear, distinguishable and suited to the place and audience (written, icons, oral or combined)."
+        },
+        {
+          "id": "WP-XC-07-P23",
+          "text": "A50-P-03-S04 (inspection; evidence EV-A50-28, EV-A50-29): For ex post processing of recordings, check how the persons recorded are informed."
+        },
+        {
+          "id": "WP-XC-07-P24",
+          "text": "A50-P-03-S05 (inspection; evidence EV-A50-29): Check that the data-protection information is given as well and, where combined, still makes the system's operation clear."
+        },
+        {
+          "id": "WP-XC-07-P25",
+          "text": "A50-P-03-S06 (observation; sampling SR-A50-07; evidence EV-A50-11): Evaluate accessibility of the notices (A50-P-05)."
+        },
+        {
+          "id": "WP-XC-07-P26",
+          "text": "A50-P-05-S01 (analytical_review; evidence EV-A50-11, EV-A50-03): Determine which accessibility law applies to the product, service or content (for example the European Accessibility Act or the Web Accessibility Directive); Art 50 adds no accessibility requirement of its own."
+        },
+        {
+          "id": "WP-XC-07-P27",
+          "text": "A50-P-05-S02 (observation; sampling SR-A50-01; evidence EV-A50-11): Test the disclosure components against the applicable requirements, using EN 301 549 and WCAG 2.1 Level AA where they are the reference: text alternatives, contrast, captions and transcripts, screen-reader exposure, keyboard access."
+        },
+        {
+          "id": "WP-XC-07-P28",
+          "text": "A50-P-05-S03 (observation; sampling SR-A50-01; evidence EV-A50-09, EV-A50-35): Test 'clear and distinguishable': noticeable, understandable and separate from surrounding content; not hidden in manuals, menus or terms; for children, child-appropriate."
+        },
+        {
+          "id": "WP-XC-07-P29",
+          "text": "A50-P-05-S04 (observation; sampling SR-A50-01; evidence EV-A50-09, EV-A50-35): Test timing per person: for interactions, at least once at the start of each session for each new person; for content, for each output and each person at the first moment they are likely to perceive it, with later reminders where people may not see the start."
         }
       ],
       "evidenceRequired": [
-        "Applicability matrix",
-        "Notices/interface evidence",
-        "Labeling technical evidence",
-        "Exception rationale",
-        "User walkthrough"
+        "System, channel and output-path inventory (EV-A50-01)",
+        "Operator role record (EV-A50-02)",
+        "Art 50 applicability matrix (EV-A50-03)",
+        "Exception assessments (EV-A50-04)",
+        "Placing-on-the-market and putting-into-service dates (EV-A50-05)",
+        "Code of Practice signatory confirmation (EV-A50-06)",
+        "Gap analysis against the Code (EV-A50-07)",
+        "Competent authority determination (EV-A50-39)",
+        "Audience analysis (EV-A50-12)",
+        "Legal basis for law-enforcement exceptions (EV-A50-30)",
+        "Disclosure design specification (EV-A50-08)",
+        "Channel walkthrough recordings (EV-A50-09)",
+        "Self-identification probe set and results (EV-A50-10)",
+        "Accessibility evaluation of disclosures (EV-A50-11)",
+        "Emotion recognition and biometric categorisation deployment register (EV-A50-28)",
+        "Notice evidence (EV-A50-29)",
+        "Label evidence as distributed (EV-A50-35)"
       ],
-      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material."
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "researchProcedures": {
+        "data": "docs/research/art50-transparency-2026-11.json",
+        "procedures": [
+          {
+            "procedureId": "A50-P-00",
+            "title": "Art 50 applicability, operator roles, timing and evidence route",
+            "items": [
+              "AIA-50-1",
+              "AIA-50-2",
+              "AIA-50-3",
+              "AIA-50-4-DF",
+              "AIA-50-4-TXT"
+            ],
+            "steps": 12,
+            "criterionIds": [],
+            "pass": [
+              "Every system and paragraph has an approved applicability decision with no unknown fact that a not-applicable or exception decision depends on.",
+              "Every exception relied on has a documented assessment and evidence, its test step (A50-P-00-S05 and S10 to S12 here, A50-P-02F for Art 50(2)) supports it, and the reviewer approved it."
+            ],
+            "fail": [
+              "An operator role is misclassified, so a duty is not tested.",
+              "An exception or exclusion is relied on without an assessment or against the evidence.",
+              "Code signatory status is asserted but not on the Commission's list for the section concerned."
+            ],
+            "inconclusive": [
+              "A fact stays unknown at the end of planning: the paragraph stays needs_information and the limitation is reported."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-01",
+              "LR-A50-04",
+              "LR-A50-10",
+              "LR-A50-14",
+              "LR-03",
+              "LR-04",
+              "LR-A50-06",
+              "LR-A50-11",
+              "LR-08"
+            ]
+          },
+          {
+            "procedureId": "A50-P-01",
+            "title": "AI-interaction disclosure (Art 50(1) with Art 50(5))",
+            "items": [
+              "AIA-50-1"
+            ],
+            "steps": 7,
+            "criterionIds": [
+              "A50-P-01-C01"
+            ],
+            "pass": [
+              "Every tested channel, locale and entry point shows a compliant notice at or before the first interaction.",
+              "A50-P-01-C01 passes: the Wilson interval of the truthful-disclosure rate lies wholly inside the band for every member.",
+              "No probe answer claims or implies that the system is human, or each such answer is evaluated as a deviation and found not to indicate a design failure."
+            ],
+            "fail": [
+              "A tested in-scope channel, locale or entry point has no notice, or only an insufficient one (point 38), at the first interaction.",
+              "A50-P-01-C01 fails: the interval lies wholly below the band for a member.",
+              "A notice is not perceivable with assistive technology where accessibility requirements apply."
+            ],
+            "inconclusive": [
+              "A50-P-01-C01 straddles its band.",
+              "A channel cannot be tested (access refused): scope limitation."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-06",
+              "LR-A50-07",
+              "LR-A50-12"
+            ]
+          },
+          {
+            "procedureId": "A50-P-03",
+            "title": "Notice of emotion recognition and biometric categorisation (Art 50(3) with Art 50(5))",
+            "items": [
+              "AIA-50-3"
+            ],
+            "steps": 6,
+            "criterionIds": [],
+            "pass": [
+              "A compliant notice exists at every observed point of exposure before or at first exposure, including for ex post processing."
+            ],
+            "fail": [
+              "Any observed point of exposure without a notice, or with a notice only in an online privacy policy for physical exposure.",
+              "Notice not accessible where accessibility requirements apply."
+            ],
+            "inconclusive": [
+              "Points of exposure that cannot be visited: limitation stated."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-11",
+              "LR-A50-12"
+            ]
+          },
+          {
+            "procedureId": "A50-P-05",
+            "title": "Clear, distinguishable, timely and accessible information (Art 50(5))",
+            "items": [
+              "AIA-50-5"
+            ],
+            "steps": 4,
+            "criterionIds": [],
+            "pass": [
+              "Disclosure components meet the applicable accessibility requirements and are clear, distinguishable and timely in every procedure that tested them."
+            ],
+            "fail": [
+              "Information hidden or easily missed under normal conditions (point 142).",
+              "A disclosure component fails an applicable accessibility requirement."
+            ],
+            "inconclusive": [
+              "The applicable accessibility law cannot be determined: LR-A50-12."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-12"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "WP-XC-08",
@@ -3995,6 +4502,539 @@
         "Competence walkthrough"
       ],
       "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material."
+    },
+    {
+      "id": "WP-XC-10",
+      "title": "Marking, detection and interoperability of synthetic content",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Cross-cutting",
+      "templatePath": "templates/working-paper.md",
+      "regulatoryRefs": [
+        "Art.50",
+        "Art.111"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Test that outputs of a system generating or manipulating synthetic content are marked in a machine-readable format (A50-P-02A), that means of detection exist and give clear results to the persons exposed (A50-P-02B), and that marks are interoperable and not removed (A50-P-02D), under Art 50(2) and, for systems placed on the market before 2 August 2026, the Art 111(4) deadline of 2 December 2026. Reliability, robustness, the compliance process and claimed Art 50(2) exceptions are tested in WP-XC-12.",
+      "procedures": [
+        {
+          "id": "WP-XC-10-P01",
+          "text": "A50-P-02A-S01 (inspection; evidence EV-A50-01, EV-A50-13): Map output paths by modality, format and delivery channel (interface downloads, share links, API, SDK or local runs, exports, plug-ins) and the marking layers applied on each, including layers applied upstream by a model provider or a third party."
+        },
+        {
+          "id": "WP-XC-10-P02",
+          "text": "A50-P-02A-S02 (inspection; evidence EV-A50-14): Inspect the metadata layer: standard and assertions stating AI generation or manipulation, digital signature and time-stamp, certificate chain and key management, and the documented local-deployment cases without secure keys."
+        },
+        {
+          "id": "WP-XC-10-P03",
+          "text": "A50-P-02A-S03 (inspection; evidence EV-A50-15): Inspect the watermark layer per modality, including free-form text above the 200-token threshold, and the declared operating thresholds and performance."
+        },
+        {
+          "id": "WP-XC-10-P04",
+          "text": "A50-P-02A-S04 (reperformance; sampling SR-A50-02; evidence EV-A50-16): Draw the output sample per stratum: auditor-controlled prompts from a pre-registered prompt set on the production configuration, and, where logs and consent allow, a random sample of production outputs; hash every item."
+        },
+        {
+          "id": "WP-XC-10-P05",
+          "text": "A50-P-02A-S05 (reperformance; sampling SR-A50-02; evidence EV-A50-16, EV-A50-18): For every sampled item: validate the metadata mark (present, signature valid, trusted signer, assertion indicates AI generation or manipulation) and run the provider's detection on the watermark; record per-item results."
+        },
+        {
+          "id": "WP-XC-10-P06",
+          "text": "A50-P-02A-S06 (inspection; evidence EV-A50-13, EV-A50-19): Check that fingerprinting or logging, if used, supplements and does not replace marking, and that logging is limited to outputs with user control over retention."
+        },
+        {
+          "id": "WP-XC-10-P07",
+          "text": "A50-P-02A-S07 (inspection; evidence EV-A50-04, EV-A50-13): Where a single layer is used, inspect its justification: a closed physical product with effective export prevention (metadata only; closedPhysicalProductEnvironment), or free-form text (watermark only), or demonstrated equivalence of an alternative technique. Where two layers are used, record that."
+        },
+        {
+          "id": "WP-XC-10-P08",
+          "text": "A50-P-02A-S08 (inspection; evidence EV-A50-13): Record the optional measures (richer provenance, perceptible-label function) for the report; they are not pass or fail criteria."
+        },
+        {
+          "id": "WP-XC-10-P09",
+          "text": "A50-P-02B-S01 (inspection; evidence EV-A50-17): Confirm a detection mechanism exists for each marking technique and how it is offered (public specification, software, API); marking without detection does not comply."
+        },
+        {
+          "id": "WP-XC-10-P10",
+          "text": "A50-P-02B-S02 (reperformance; sampling SR-A50-02; evidence EV-A50-17, EV-A50-16): As a member of the exposed audience (the public where the public is exposed), access the detection solution free of charge and run it on sampled marked items and unmarked controls."
+        },
+        {
+          "id": "WP-XC-10-P11",
+          "text": "A50-P-02B-S03 (reperformance; evidence EV-A50-18): Check results: human-readable, state whether they rest on metadata, watermark or forensic detection, include embedded information, and are downloadable in signed form with content hash, solution identifier and timestamp; verify the signatures."
+        },
+        {
+          "id": "WP-XC-10-P12",
+          "text": "A50-P-02B-S04 (inspection; evidence EV-A50-17): Where text-watermark detection or forensic detection of any modality is restricted to verified experts, inspect the access process and request access as the auditor; confirm the listed expert groups can obtain access. Where no detection is restricted, record that."
+        },
+        {
+          "id": "WP-XC-10-P13",
+          "text": "A50-P-02B-S05 (inspection; evidence EV-A50-19): Inspect data handling of detection services that receive content: purpose limitation, minimisation, zero retention of submitted content, security, transfers; the creator's identity is not processed."
+        },
+        {
+          "id": "WP-XC-10-P14",
+          "text": "A50-P-02B-S06 (inspection; evidence EV-A50-17): Inspect the retirement policy: any replacement detects previously marked content; otherwise the solution goes to the market surveillance authorities."
+        },
+        {
+          "id": "WP-XC-10-P15",
+          "text": "A50-P-02B-S07 (observation; evidence EV-A50-11, EV-A50-20): Evaluate the accessibility of the detection interface (A50-P-05) and, for effectiveness, whether lay users understand the results (provider user testing or a small auditor panel)."
+        },
+        {
+          "id": "WP-XC-10-P16",
+          "text": "A50-P-02B-S08 (inspection; evidence EV-A50-17, EV-A50-26): Where the provider depends on another actor for detection, confirm that actor's solution and result display meet Art 50(2) and (5)."
+        },
+        {
+          "id": "WP-XC-10-P17",
+          "text": "A50-P-02D-S01 (reperformance; sampling SR-A50-02; evidence EV-A50-24, EV-A50-16): Validate sampled metadata marks with independent tooling that implements the declared open standard, not only the provider's own detector; record conformance status of the signer and validator where a conformance programme exists."
+        },
+        {
+          "id": "WP-XC-10-P18",
+          "text": "A50-P-02D-S02 (inspection; evidence EV-A50-24): Inspect the public information on integrating and accessing detection for the other marking techniques."
+        },
+        {
+          "id": "WP-XC-10-P19",
+          "text": "A50-P-02D-S03 (reperformance; evidence EV-A50-24): For periods from 2 February 2027 (signatories): inspect and test the watermark-detection interoperability solution chosen (standard access method, public signpost, shared consortium detector or equivalent), and that it does not weaken other watermarks. Perform only where the classification answers yes to \"Signatory of Section 1 of the Code of Practice, without opt-outs\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-10-P20",
+          "text": "A50-P-02D-S04 (reperformance; sampling SR-A50-04; evidence EV-A50-25): Feed content that already carries metadata marks into editing or transformation features and check the outputs keep them, apart from documented legitimate processing."
+        },
+        {
+          "id": "WP-XC-10-P21",
+          "text": "A50-P-02D-S05 (inspection; evidence EV-A50-25): Inspect the acceptable use policy, terms or documentation for a prohibition on removing or tampering with marks, and the product catalogue and marketing for circumvention tools."
+        }
+      ],
+      "evidenceRequired": [
+        "System, channel and output-path inventory (EV-A50-01)",
+        "Marking architecture (EV-A50-13)",
+        "Metadata marking and key-management documentation (EV-A50-14)",
+        "Watermark documentation and declared performance (EV-A50-15)",
+        "Output sample with per-item marking records (EV-A50-16)",
+        "Signed detection results (EV-A50-18)",
+        "Detection service privacy and security documentation (EV-A50-19)",
+        "Exception assessments (EV-A50-04)",
+        "Detection solution description and access evidence (EV-A50-17)",
+        "Accessibility evaluation of disclosures (EV-A50-11)",
+        "Provider reliability and robustness test reports (EV-A50-20)",
+        "Marking compliance process records (EV-A50-26)",
+        "Interoperability evidence (EV-A50-24)",
+        "Non-removal evidence (EV-A50-25)"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "researchProcedures": {
+        "data": "docs/research/art50-transparency-2026-11.json",
+        "procedures": [
+          {
+            "procedureId": "A50-P-02A",
+            "title": "Machine-readable marking of outputs (Art 50(2), marking element)",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 8,
+            "criterionIds": [
+              "A50-P-02A-C01"
+            ],
+            "pass": [
+              "A50-P-02A-C01 passes for every stratum.",
+              "Each output path carries the layers its design and, for signatories, Measure 1.1 require.",
+              "Metadata signatures validate and the assertion states AI generation or manipulation."
+            ],
+            "fail": [
+              "An in-scope output path carries no machine-readable mark.",
+              "A50-P-02A-C01 fails for a stratum.",
+              "Marking relies on fingerprinting or logging alone (Sub-measure 1.1.3).",
+              "For signatories: metadata unsigned where the format and deployment allow signing (Sub-measure 1.1.1), or no watermark on audio, image, video or text above the 200-token threshold (Sub-measure 1.1.2) without a single-layer justification."
+            ],
+            "inconclusive": [
+              "A50-P-02A-C01 straddles its band for a stratum.",
+              "A path cannot be sampled: scope limitation."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-01",
+              "LR-A50-02",
+              "LR-A50-05",
+              "LR-04",
+              "LR-A50-03"
+            ]
+          },
+          {
+            "procedureId": "A50-P-02B",
+            "title": "Detection solution and disclosure of detection results (Art 50(2) and (5))",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 8,
+            "criterionIds": [],
+            "pass": [
+              "A detection mechanism exists for every marking technique and the exposed audience can use it without undue barrier.",
+              "Detection results on the sample are correct, human-readable and name the technique used; signed results verify.",
+              "For signatories: Measures 2.1 and 2.3 are met."
+            ],
+            "fail": [
+              "Any marking technique without a detection mechanism (point 70).",
+              "Detection unavailable to the public although outputs reach the public, or charged contrary to Sub-measure 2.1.1 for signatories.",
+              "Results not human-readable or not accessible where accessibility requirements apply."
+            ],
+            "inconclusive": [
+              "Expert-only detection that the auditor cannot access: scope limitation."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-13",
+              "LR-A50-12",
+              "LR-A50-05"
+            ]
+          },
+          {
+            "procedureId": "A50-P-02D",
+            "title": "Interoperability and non-removal of marks (Art 50(2), second sentence)",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 5,
+            "criterionIds": [],
+            "pass": [
+              "Independent validation reads and verifies the metadata marks on the sample.",
+              "Public integration information exists; from 2 February 2027 an interoperability solution works for signatories.",
+              "Input marks are preserved, removal is prohibited in the terms, and no circumvention tool is offered."
+            ],
+            "fail": [
+              "Marks readable only by the provider's own proprietary tooling where an open metadata standard is available (guidelines point 76; Measure 3.4(a) for signatories).",
+              "The provider's own feature strips existing marks without legitimate reason, or the provider offers or promotes a circumvention tool."
+            ],
+            "inconclusive": [
+              "Interoperability depends on solutions not due yet (before 2 February 2027): report the stage reached."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-05"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "WP-XC-11",
+      "title": "Deep-fake and public-interest text disclosure",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Cross-cutting",
+      "templatePath": "templates/working-paper.md",
+      "regulatoryRefs": [
+        "Art.50",
+        "Art.3"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Test the deployer's disclosure of deep fakes (Art 50(4), first subparagraph, with the Art 3(60) definition; A50-P-04A) and of AI-generated or manipulated text published to inform the public on matters of public interest (Art 50(4), second subparagraph; A50-P-04B). A claimed Art 50(4) exception keeps the item a candidate: the editorial exception is tested text by text (A50-P-04B-S04 to S06, criterion A50-P-04B-C01), the law-enforcement exception in WP-XC-07 (A50-P-00-S11) for the deployment it covers, and every output the exception does not cover stays in the population and the sample.",
+      "procedures": [
+        {
+          "id": "WP-XC-11-P01",
+          "text": "A50-P-04A-S01 (inspection; evidence EV-A50-31, EV-A50-36): Define the population: all AI-generated or manipulated image, audio and video items disseminated in the period on every channel; obtain the content extract and the deployer's process."
+        },
+        {
+          "id": "WP-XC-11-P02",
+          "text": "A50-P-04A-S02 (reperformance; sampling SR-A50-06; evidence EV-A50-32, EV-A50-33): Test completeness: reconcile the population with AI tool usage records, and screen a random sample of unflagged published items with provider detection and metadata validation to find AI content missing from it."
+        },
+        {
+          "id": "WP-XC-11-P03",
+          "text": "A50-P-04A-S03 (reperformance; sampling SR-A50-06; evidence EV-A50-34): Re-classify a sample of AI items against the four deep-fake criteria (resemblance, existing, persons or objects or places or entities or events, false appearance for the foreseeable audience) and the evidently artistic or similar regime; compare with the deployer's classification."
+        },
+        {
+          "id": "WP-XC-11-P04",
+          "text": "A50-P-04A-S04 (observation; sampling SR-A50-06; evidence EV-A50-35): For each sampled deep fake, inspect the label as distributed on each channel: perceivable without tools or actions (machine-readable marks do not count), at first exposure, and for signatories the 'AI' design and placement rules (image or video corner without overlays; video at the start, at intervals where possible and after interruptions; audio disclaimer at the start with reminders; visual label for audio where a screen exists)."
+        },
+        {
+          "id": "WP-XC-11-P05",
+          "text": "A50-P-04A-S05 (observation; sampling SR-A50-06; evidence EV-A50-35, EV-A50-34): For items under the artistic or similar regime: disclosure appropriate to the work and not hampering it, still at first exposure (for example credits or accompanying notes), and the classification as evident is supported. Perform only where the classification answers yes to \"The deep fakes are part of an evidently artistic, creative, satirical or fictional work\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-11-P06",
+          "text": "A50-P-04A-S06 (observation; sampling SR-A50-06; evidence EV-A50-11): Evaluate accessibility of labels (A50-P-05): text alternatives, screen-reader detectability, contrast, haptic or audio alternatives as applicable."
+        },
+        {
+          "id": "WP-XC-11-P07",
+          "text": "A50-P-04A-S07 (inspection; evidence EV-A50-36): Inspect the internal labelling process, the verification process for regular producers, awareness measures, and the log of reported missing or wrong labels with remediation times."
+        },
+        {
+          "id": "WP-XC-11-P08",
+          "text": "A50-P-04A-S08 (observation; sampling SR-A50-06; evidence EV-A50-35): Where labels are applied through a platform's labelling tool, check the result on that platform; the tool does not shift the deployer's responsibility."
+        },
+        {
+          "id": "WP-XC-11-P09",
+          "text": "A50-P-04B-S01 (inspection; evidence EV-A50-31, EV-A50-32): Define the population of published texts in the period and identify AI involvement from workflow flags and tool records; text-watermark detection may supplement, noting its lower reliability and restricted access."
+        },
+        {
+          "id": "WP-XC-11-P10",
+          "text": "A50-P-04B-S02 (reperformance; sampling SR-A50-06; evidence EV-A50-34): Re-test the scope classification on a sample: published (open to an indeterminate audience), informing the public, on a matter of public interest; texts first published on or after 2 August 2026 count even if generated earlier."
+        },
+        {
+          "id": "WP-XC-11-P11",
+          "text": "A50-P-04B-S03 (observation; sampling SR-A50-06; evidence EV-A50-35): For each sampled in-scope text: a clear label perceivable without tools (for signatories above the text, near the headline or in the colophon; partial labels allowed for AI parts), or exception evidence."
+        },
+        {
+          "id": "WP-XC-11-P12",
+          "text": "A50-P-04B-S04 (inspection; sampling SR-A50-06; evidence EV-A50-37, EV-A50-38): Test exception evidence: substantive human review including fact-checking or editorial control with authority to approve, alter or reject; not superficial, automated or cursory checks; editorial responsibility held and its identity and contact published. Perform only where the classification answers yes to \"Exception relied on: human review or editorial control with editorial responsibility\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-11-P13",
+          "text": "A50-P-04B-S05 (reperformance; sampling SR-A50-06; evidence EV-A50-38): Compare the published version with the signed-off version: any substantive AI change after sign-off voids the exception. Perform only where the classification answers yes to \"Exception relied on: human review or editorial control with editorial responsibility\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-11-P14",
+          "text": "A50-P-04B-S06 (inspection; evidence EV-A50-37): Inspect the editorial policy (for non-media signatories: named person with editorial responsibility, organisational measures and resources) or the existing editorial procedures of media service providers. Perform only where the classification answers yes to \"Exception relied on: human review or editorial control with editorial responsibility\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-11-P15",
+          "text": "A50-P-04B-S07 (inspection; evidence EV-A50-11, EV-A50-36): Evaluate accessibility of text labels (A50-P-05) and inspect the internal process and mislabel log as in A50-P-04A-S07."
+        }
+      ],
+      "evidenceRequired": [
+        "Published-content population extract (EV-A50-31)",
+        "Deployer labelling process records (EV-A50-36)",
+        "AI tool usage records (EV-A50-32)",
+        "Detector screening of unflagged content (EV-A50-33)",
+        "Deep-fake classification records (EV-A50-34)",
+        "Label evidence as distributed (EV-A50-35)",
+        "Accessibility evaluation of disclosures (EV-A50-11)",
+        "Editorial policy and published editorial responsibility (EV-A50-37)",
+        "Publication workflow records (EV-A50-38)"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "researchProcedures": {
+        "data": "docs/research/art50-transparency-2026-11.json",
+        "procedures": [
+          {
+            "procedureId": "A50-P-04A",
+            "title": "Deep-fake disclosure (Art 50(4), first subparagraph, with Art 50(5))",
+            "items": [
+              "AIA-50-4-DF"
+            ],
+            "steps": 8,
+            "criterionIds": [
+              "A50-P-04A-C01",
+              "A50-P-04A-C02"
+            ],
+            "pass": [
+              "A50-P-04A-C01 and C02 pass for every channel.",
+              "Classification differences are isolated and explained.",
+              "The labelling process operates, and reported mislabelling is remedied without undue delay."
+            ],
+            "fail": [
+              "A50-P-04A-C01 or C02 fails for a channel.",
+              "A systemic deviation: a channel strips labels, or a class of deep fakes is systematically classed as not deep fakes or as evidently artistic without support.",
+              "Labels rely on machine-readable marks only (point 117)."
+            ],
+            "inconclusive": [
+              "A criterion straddles its band.",
+              "The population cannot be reconstructed: limitation stated."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-08",
+              "LR-A50-12",
+              "LR-A50-14"
+            ]
+          },
+          {
+            "procedureId": "A50-P-04B",
+            "title": "Disclosure of AI-generated text on matters of public interest (Art 50(4), second subparagraph)",
+            "items": [
+              "AIA-50-4-TXT"
+            ],
+            "steps": 7,
+            "criterionIds": [
+              "A50-P-04B-C01"
+            ],
+            "pass": [
+              "A50-P-04B-C01 passes for every channel.",
+              "Exception claims are supported by substantive review, published editorial responsibility and no post-sign-off AI change."
+            ],
+            "fail": [
+              "A50-P-04B-C01 fails for a channel.",
+              "The exception is claimed on the basis of spell-checks, automated or cursory review, or an editorial policy that is not applied (point 135).",
+              "Editorial responsibility not identifiable publicly where the exception is relied on."
+            ],
+            "inconclusive": [
+              "A50-P-04B-C01 straddles its band.",
+              "Workflow records too incomplete to test the exception: limitation stated."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-09",
+              "LR-A50-12"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "WP-XC-12",
+      "title": "Marking reliability, robustness, process and exceptions",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Cross-cutting",
+      "templatePath": "templates/working-paper.md",
+      "regulatoryRefs": [
+        "Art.50",
+        "Art.111"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Test the reliability and robustness of the marking and detection solution against independent samples (A50-P-02C), the provider's process for keeping Art 50(2) compliance under control (A50-P-02E), and every exception or carve-out claimed under Art 50(2) (A50-P-02F; the guidance-only carve-outs are pending legal review, LR-A50-03). Kept apart from WP-XC-10 because a paper records at most 30 steps.",
+      "procedures": [
+        {
+          "id": "WP-XC-12-P01",
+          "text": "A50-P-02C-S01 (inspection; evidence EV-A50-20): Inspect the provider's test reports: metrics, positives and negatives (including other AI systems' outputs), data not used in development, strata by length, size, diversity and semantics, transformation battery, threat model and dates."
+        },
+        {
+          "id": "WP-XC-12-P02",
+          "text": "A50-P-02C-S02 (analytical_review; evidence EV-A50-21, EV-A50-22): Pre-register the plan before testing: strata, bands (declared performance with tolerance, or methodology defaults), transformations and parameters, sample sizes, family size and confidence level."
+        },
+        {
+          "id": "WP-XC-12-P03",
+          "text": "A50-P-02C-S03 (reperformance; sampling SR-A50-03; evidence EV-A50-21): Reliability: detect marks on unaltered marked outputs (detection rate) and on unmarked human-made and other-AI content (false-positive rate); compute Wilson intervals per stratum."
+        },
+        {
+          "id": "WP-XC-12-P04",
+          "text": "A50-P-02C-S04 (reperformance; sampling SR-A50-04; evidence EV-A50-22): Robustness to common processing: apply the pre-registered battery (in-place modifications such as noise, filtering, recompression, screenshots, format change, voice enhancement, lexical substitution and homoglyphs; desynchronisation such as cropping, mirroring, rescaling, rotation, pitch shift, time stretch, character edits, paraphrase and translation round-trips; the analogue hole such as print-and-scan, playback-and-record and camcording; localised edits such as face blurring) and measure detection and metadata survival per transformation."
+        },
+        {
+          "id": "WP-XC-12-P05",
+          "text": "A50-P-02C-S05 (inspection; evidence EV-A50-23): Adversarial robustness: inspect the provider's assessment of copying, removal, regeneration and modification attacks and its integrity checks; where written authorisation exists, run limited attacks in an isolated environment, never on the platform."
+        },
+        {
+          "id": "WP-XC-12-P06",
+          "text": "A50-P-02C-S06 (reperformance; sampling SR-A50-04; evidence EV-A50-23, EV-A50-21): Integrity: test that a mark copied onto human-made content, or an altered metadata assertion, is detected as tampered where the provider claims integrity verification."
+        },
+        {
+          "id": "WP-XC-12-P07",
+          "text": "A50-P-02C-S07 (recomputation; evidence EV-A50-21, EV-A50-22, EV-A50-20): Compare independent results with declared figures; report every member's estimate and interval, including descriptive members without a band."
+        },
+        {
+          "id": "WP-XC-12-P08",
+          "text": "A50-P-02E-S01 (inspection; evidence EV-A50-26): Inspect the documented compliance process and, where marking or detection comes from an upstream model provider or a third party, their documentation and the provider's own verification of it."
+        },
+        {
+          "id": "WP-XC-12-P09",
+          "text": "A50-P-02E-S02 (inspection; evidence EV-A50-26, EV-A50-20): Inspect pre-release and periodic test records under representative conditions, the benchmark used, and whether each model or system release was re-tested."
+        },
+        {
+          "id": "WP-XC-12-P10",
+          "text": "A50-P-02E-S03 (inspection; evidence EV-A50-26): Trace reported or detected shortcomings (including any found by this audit) to corrective actions and their timeliness."
+        },
+        {
+          "id": "WP-XC-12-P11",
+          "text": "A50-P-02E-S04 (inspection; evidence EV-A50-26): Inspect training records for staff responsible for marking and detection, and records of cooperation with market surveillance authorities."
+        },
+        {
+          "id": "WP-XC-12-P12",
+          "text": "A50-P-02F-S01 (inspection; evidence EV-A50-27, EV-A50-04): Obtain the register of features claimed to be standard editing or non-substantial alteration, with the rationale."
+        },
+        {
+          "id": "WP-XC-12-P13",
+          "text": "A50-P-02F-S02 (reperformance; sampling SR-A50-06; evidence EV-A50-27): Sample input and output pairs of each claimed feature and judge semantic change against the guidelines' examples (summaries, rewriting that changes style or meaning, object or face replacement and voice synthesis require marking; grammar fixes, format conversion, minor colour or crop changes do not); use a second reviewer for borderline items."
+        },
+        {
+          "id": "WP-XC-12-P14",
+          "text": "A50-P-02F-S03 (inspection; evidence EV-A50-27, EV-A50-13): Check that outputs classed as out of scope (short sequences, source code, machine-to-machine, intermediate production outputs) are really so, and that final workflow outputs are marked. Perform only where the classification answers yes to \"Exclusion relied on (guidance only): every output is outside Art 50(2)\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-12-P15",
+          "text": "A50-P-02F-S04 (inspection; evidence EV-A50-04): Where the industrial or business-to-business carve-out is claimed, test its three cumulative conditions, including technical safeguards such as cloud isolation and role-based access, and that the system is neither public nor consumer-facing. Perform only where the classification answers yes to \"Exclusion relied on (guidance only): industrial B2B use meeting point 87\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-12-P16",
+          "text": "A50-P-02F-S05 (observation; evidence EV-A50-04, EV-A50-09): Where the ephemeral real-time carve-out is claimed, confirm nothing is recorded, stored or disseminated, that marking is infeasible, and that in-experience disclosure is shown. Perform only where the classification answers yes to \"Exclusion relied on (guidance only): real-time ephemeral output, persons told\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        },
+        {
+          "id": "WP-XC-12-P17",
+          "text": "A50-P-02F-S06 (inspection; evidence EV-A50-30): Where the law-enforcement exception is claimed, inspect the law and the deployment it covers; other uses of the same system remain in scope. Perform only where the classification answers yes to \"Exception relied on: use authorised by law to detect, prevent, investigate or prosecute criminal offences\"; where it answers no, record the step as not performed with that reason; an unknown answer is resolved first."
+        }
+      ],
+      "evidenceRequired": [
+        "Provider reliability and robustness test reports (EV-A50-20)",
+        "Auditor reliability test set and results (EV-A50-21)",
+        "Transformation battery definition and results (EV-A50-22)",
+        "Adversarial testing evidence (EV-A50-23)",
+        "Marking compliance process records (EV-A50-26)",
+        "Exempt-feature register and input-output pairs (EV-A50-27)",
+        "Exception assessments (EV-A50-04)",
+        "Marking architecture (EV-A50-13)",
+        "Channel walkthrough recordings (EV-A50-09)",
+        "Legal basis for law-enforcement exceptions (EV-A50-30)"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "researchProcedures": {
+        "data": "docs/research/art50-transparency-2026-11.json",
+        "procedures": [
+          {
+            "procedureId": "A50-P-02C",
+            "title": "Reliability and robustness of marking and detection (Art 50(2), second sentence)",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 7,
+            "criterionIds": [
+              "A50-P-02C-C01",
+              "A50-P-02C-C02",
+              "A50-P-02C-C03"
+            ],
+            "pass": [
+              "A50-P-02C-C01 and C02 pass for every member.",
+              "The provider measures reliability and robustness as Measures 3.2 and 3.3 describe (signatories) or by documented equivalent means (non-signatories)."
+            ],
+            "fail": [
+              "A50-P-02C-C01 or C02 fails for a member: the independent interval lies wholly outside the declared band.",
+              "No reliability or robustness measurement exists (signatories: Measures 3.2, 3.3 and 4.2 are mandatory).",
+              "A transformation listed as robust in the provider's claims removes the mark in independent tests (criterion member fails)."
+            ],
+            "inconclusive": [
+              "An interval straddles its band.",
+              "Adversarial testing not authorised: the limitation is stated and adversarial robustness rests on the provider's evidence."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-05"
+            ]
+          },
+          {
+            "procedureId": "A50-P-02E",
+            "title": "Marking compliance, testing and monitoring process (Art 50(2); Code Commitment 4)",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 4,
+            "criterionIds": [],
+            "pass": [
+              "A current compliance process covers every output path; testing happened before release and periodically; shortcomings were corrected."
+            ],
+            "fail": [
+              "No testing before placing on the market or after material changes (Measure 4.2 for signatories).",
+              "Known shortcomings left uncorrected."
+            ],
+            "inconclusive": [
+              "Records incomplete for part of the period: limitation stated."
+            ],
+            "legalReviewItemIds": []
+          },
+          {
+            "procedureId": "A50-P-02F",
+            "title": "Exceptions and scope limits claimed under Art 50(2)",
+            "items": [
+              "AIA-50-2"
+            ],
+            "steps": 6,
+            "criterionIds": [
+              "A50-P-02F-C01"
+            ],
+            "pass": [
+              "Every exception or carve-out relied on is supported, and A50-P-02F-C01 passes for each claimed feature."
+            ],
+            "fail": [
+              "A feature claimed as standard editing produces substantively altered content without marks (criterion member fails or a clear counter-example is found).",
+              "A carve-out relied on whose conditions are not met."
+            ],
+            "inconclusive": [
+              "A50-P-02F-C01 straddles its band."
+            ],
+            "legalReviewItemIds": [
+              "LR-A50-03"
+            ]
+          }
+        ]
+      }
     },
     {
       "id": "WP-EV-01",
@@ -4288,6 +5328,10 @@
         {
           "id": "MEM-CL-01-P03",
           "text": "Approve rationale, implication, specialist advice and reassessment trigger."
+        },
+        {
+          "id": "MEM-CL-01-P04",
+          "text": "Consult on any reliance on the Art 50(1) obviousness exception, the guidance-only Art 50(2) carve-outs or the Art 50(4) editorial exception (LR-A50-06, LR-A50-03, LR-A50-09); each stays pending legal review."
         }
       ],
       "evidenceRequired": [

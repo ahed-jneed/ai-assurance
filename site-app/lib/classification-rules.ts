@@ -5,34 +5,12 @@
 // views pass the catalog the workspace API sends; the server passes its own.
 import type {
   ClassificationRules,
+  GuidanceCitation,
   ObligationRule,
   TriggerProfile,
 } from "./domain/classification";
 import obligations from "./obligation-subitems.json";
 import { openReviewItems, type RegulatorySnapshot } from "./rule-pack";
-
-/**
- * Guidance versions the Art 50 facts were researched against
- * (docs/research/art50-transparency-2026-11.json, GUID-A50-GUIDELINES and
- * GUID-A50-COP; A50-ED-05). The rule pack lists the guidelines as published
- * on 20 July 2026; the research records their formal adoption.
- */
-const art50Guidance = [
-  {
-    id: "GUID-ART50-TRANSPARENCY",
-    title: "Commission guidelines on the Art 50 transparency obligations",
-    status: "adopted (non-binding)",
-    reference: "C(2026) 7702 final",
-    date: "2026-11-05",
-  },
-  {
-    id: "GUID-ART50-COP",
-    title: "Code of Practice on Transparency of AI-Generated Content",
-    status: "published (voluntary; no presumption of conformity)",
-    reference: "Final code of 10 June 2026",
-    date: "2026-06-10",
-  },
-];
 
 /** The Art 50 items of the obligation catalogue. */
 export const art50Items: ObligationRule[] = (
@@ -42,6 +20,41 @@ export const triggerProfiles = obligations.triggerProfiles as Record<
   string,
   TriggerProfile
 >;
+
+/**
+ * The guidance a classification cites, from the pack's guidance register.
+ * Entries revised from later research (the Art 50 guidelines and Code since
+ * rule pack 2026.11.2, A50-ED-05, A50-ED-10) carry their own reference and
+ * dated history; older entries a draft or listing date.
+ */
+function guidanceCitation(
+  pack: Pick<RegulatorySnapshot, "guidanceDocuments">,
+  id: string,
+): GuidanceCitation[] {
+  const g = pack.guidanceDocuments.find((x) => x.id === id);
+  if (!g) return [];
+  const date = g.dates?.at(-1)?.date ?? g.draftPublished ?? g.listedDate;
+  return [
+    {
+      id: g.id,
+      title: g.title,
+      status: g.status,
+      reference:
+        g.reference ??
+        (g.draftPublished ? "Draft for consultation" : "Commission guidance"),
+      ...(date ? { date } : {}),
+      ...(g.legalEffect ? { legalEffect: g.legalEffect } : {}),
+    },
+  ];
+}
+
+/** The guidance register entries a classification cites, in order. */
+export const citedGuidanceIds = [
+  "GUID-ART6-HIGH-RISK-CLASSIFICATION",
+  "GUID-PROHIBITED-PRACTICES",
+  "GUID-ART50-TRANSPARENCY",
+  "GUID-ART50-COP",
+] as const;
 
 /**
  * The rules of a rule pack. Criteria without an EU AI Act rule pack have no
@@ -68,29 +81,6 @@ export function classificationRules(
       guidance: [],
     };
   const entries = new Map(pack.applicationDates.map((e) => [e.id, e]));
-  const guidance = (id: string) => {
-    const g = pack.guidanceDocuments.find((x) => x.id === id) as
-      | (RegulatorySnapshot["guidanceDocuments"][number] & {
-          draftPublished?: string;
-          listedDate?: string;
-        })
-      | undefined;
-    return g
-      ? [
-          {
-            id: g.id,
-            title: g.title,
-            status: g.status,
-            reference: g.draftPublished
-              ? "Draft for consultation"
-              : "Commission guidance",
-            ...(g.draftPublished || g.listedDate
-              ? { date: g.draftPublished ?? g.listedDate }
-              : {}),
-          },
-        ]
-      : [];
-  };
   return {
     rulePackVersion: pack.rulePackVersion,
     legalVersion: pack.celex,
@@ -105,10 +95,6 @@ export function classificationRules(
     }),
     art50Items,
     profiles: triggerProfiles,
-    guidance: [
-      ...guidance("GUID-ART6-HIGH-RISK-CLASSIFICATION"),
-      ...guidance("GUID-PROHIBITED-PRACTICES"),
-      ...art50Guidance,
-    ],
+    guidance: citedGuidanceIds.flatMap((id) => guidanceCitation(pack, id)),
   };
 }

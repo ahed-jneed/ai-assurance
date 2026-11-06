@@ -77,6 +77,8 @@ export type GuidanceCitation = {
   status: string;
   reference: string;
   date?: string;
+  /** The register's legal effect, for example that guidelines are non-binding. */
+  legalEffect?: string;
 };
 export type Art50Status =
   | "candidate"
