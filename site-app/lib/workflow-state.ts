@@ -1,5 +1,7 @@
-// Only type imports: scripts/paper-presentation-check.mjs and
-// scripts/work-inbox-check.mjs load this module without resolving imports.
+// Keep runtime imports to small leaf modules (./domain/release-time): the
+// harnesses scripts/paper-presentation-check.mjs and
+// scripts/work-inbox-check.mjs load this module through sourceURL
+// (scripts/ts-modules.mjs), which compiles it and its relative imports.
 import type { Engagement, Report, Role, Run } from "./domain";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
