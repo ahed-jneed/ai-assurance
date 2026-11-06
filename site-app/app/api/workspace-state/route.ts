@@ -4,7 +4,7 @@ import {
   checkOrigin,
   context,
   db,
-  getEngagement,
+  loadEngagement,
   now,
   readBounded,
   requireRole,
@@ -32,7 +32,8 @@ async function target(
   writing = false,
 ) {
   requireRole(ctx, ["Auditor", "Lead Auditor", "Reviewer"]);
-  const e = await getEngagement(ctx, engagementId);
+  // Drafts check revisions and locks only, never the record's R2 parts.
+  const e = await loadEngagement(ctx, engagementId);
   if (writing) requireRole(ctx, ["Auditor", "Lead Auditor"]);
   if (kind === "paper") {
     const p = e.papers.find((p) => p.id === recordId);
