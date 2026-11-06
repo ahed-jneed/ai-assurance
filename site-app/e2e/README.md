@@ -18,8 +18,10 @@ npx playwright show-report           # the HTML report of the last run
 `E2E_PORT` for another port). The server deletes `.wrangler/e2e-state`, applies
 every migration with `npm run db:migrate:local -- --persist-to
 .wrangler/e2e-state`, and starts the built Worker with
-`IDENTITY_MODE=trusted-headers` and `IDENTITY_TRUSTED_HEADERS=loopback-tests`
-(`docs/security/identity.md`). It never touches `.wrangler/state`, which
+`IDENTITY_MODE=trusted-headers`, `IDENTITY_TRUSTED_HEADERS=loopback-tests` and
+`SELF_SIGNUP=@personas.test` (`docs/security/identity.md`): self-signup is off
+outside the development server, so only the persona domain may provision the
+practices the specs expect. It never touches `.wrangler/state`, which
 `npm run dev` and `npm start` use. Each persona's browser context and API client
 send that persona's `oai-authenticated-user-*` headers; the Worker trusts them
 only for loopback requests in this mode.

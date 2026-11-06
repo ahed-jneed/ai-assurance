@@ -4,6 +4,10 @@
 // .wrangler/state that `npm run dev` and `npm start` use. The Worker trusts the
 // oai-authenticated-user-* headers each persona's browser context sends
 // (IDENTITY_MODE=trusted-headers, loopback only; docs/security/identity.md).
+// Self-signup is off outside the development server, so the Worker allows it
+// for the persona domain only (SELF_SIGNUP=@personas.test): qa-lead, qa-lead2
+// and qa-outsider provision the practices the specs expect, and any other
+// identity is still refused.
 //
 //   npm run build && node e2e/server.mjs [port]
 import { spawn, spawnSync } from "node:child_process";
@@ -50,6 +54,8 @@ const worker = spawn(
     "IDENTITY_MODE:trusted-headers",
     "--var",
     "IDENTITY_TRUSTED_HEADERS:loopback-tests",
+    "--var",
+    "SELF_SIGNUP:@personas.test",
   ],
   { cwd: projectRoot, stdio: "inherit" },
 );
