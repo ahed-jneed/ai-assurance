@@ -16,6 +16,7 @@ import {
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { diagnosticNarrative } from "../presentation";
+import { runAuditDetails } from "../special-category";
 import { defineCommands } from "./command";
 import { short } from "./fields";
 /**
@@ -100,7 +101,7 @@ export const runs = defineCommands({
         run.provenance.inputHashes.auditBinding = await sha256(
           JSON.stringify(run.procedureBinding),
         );
-      return { details: { runId: run.id } };
+      return { details: { runId: run.id, ...runAuditDetails(run) } };
     },
   },
   retryRun: {
@@ -146,7 +147,9 @@ export const runs = defineCommands({
           JSON.stringify(run.procedureBinding),
         );
       }
-      return { details: { runId: run.id, retryOf: source.id } };
+      return {
+        details: { runId: run.id, retryOf: source.id, ...runAuditDetails(run) },
+      };
     },
   },
   executeRun: {

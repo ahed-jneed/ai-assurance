@@ -11,6 +11,7 @@ import {
   verifyFrozenInputs,
 } from "./evaluation-service";
 import { ApiError } from "./http";
+import { externalGate, type SpecialCategoryBasis } from "./special-category";
 
 // Evidence bytes by R2 key, served as the BUCKET binding of the shared
 // cloudflare:workers stub.
@@ -137,6 +138,8 @@ const fairnessOnly = (version: string) =>
       performancePositiveLabel: "fraud",
     },
     datasetContext: { ...context, sensitiveDataBasis: "Synthetic data" },
+    // Synthetic groups: not special-category data.
+    specialCategory: { specialCategory: false },
   });
 
 describe("registerProfile", () => {
@@ -314,5 +317,162 @@ describe("retries", () => {
     await expect(verifyFrozenInputs(e, run)).rejects.toThrow(
       "Frozen evaluation configuration integrity check failed",
     );
+  });
+});
+
+describe("special-category fairness data (#60)", () => {
+  // The client's GDPR Art 9(2) basis for the group column, as recorded.
+  const basis: SpecialCategoryBasis = {
+    id: "BASIS-1",
+    kind: "gdpr_art9",
+    point: "g",
+    statement: "Substantial public interest under national equality law",
+    columns: ["group"],
+    confirmedBy: "Client DPO",
+    confirmedOn: "2026-11-01",
+    recordedBy: "auditor",
+    recordedAt: "2026-11-02T09:00:00.000Z",
+  };
+  const special = (
+    version: string,
+    specialCategory: Record<string, unknown> = {},
+  ) =>
+    binaryProtocol({
+      version,
+      suite: ["demographic_parity"],
+      config: { ...criteria, groupColumn: "group" },
+      datasetContext: { ...context, sensitiveDataBasis: "Client DPIA" },
+      specialCategory,
+    });
+  const queue = (profileId: string, acknowledge = false) =>
+    queueEvaluation(
+      e,
+      {
+        modelId: "MODEL-1",
+        datasetId: "EV-1",
+        profileId,
+        ...(acknowledge ? { acknowledgeSpecialCategory: true } : {}),
+      },
+      "auditor",
+    );
+
+  it("declares the group column special-category and client-side by default", () => {
+    const p = registerProfile(e, special("1.0"), "auditor");
+    expect(p.specialCategory).toMatchObject({
+      column: "group",
+      specialCategory: true,
+      route: "client_side",
+      basis: null,
+      declaredBy: "auditor",
+    });
+  });
+
+  it("refuses a hosted run with special-category columns and no basis", async () => {
+    const clientSide = registerProfile(e, special("1.0"), "auditor");
+    const refused = await rejection(queue(clientSide.id, true));
+    expect(refused.status).toBe(409);
+    expect(refused.message).toContain("run client-side by default");
+    // The hosted route itself needs a recorded basis.
+    expect(() =>
+      registerProfile(e, special("2.0", { route: "hosted" }), "auditor"),
+    ).toThrow(/needs the client's recorded Art 4a or GDPR Art 9\(2\) basis/);
+    expect(e.runs).toEqual([]);
+  });
+
+  it("refuses a basis that does not cover the group column", () => {
+    e.specialCategoryBases = [{ ...basis, columns: ["ethnicity"] }];
+    expect(() =>
+      registerProfile(
+        e,
+        special("1.0", { route: "hosted", basisId: "BASIS-1" }),
+        "auditor",
+      ),
+    ).toThrow(/covers the group column group/);
+  });
+
+  it("runs with a basis and an acknowledgement, freezing the basis with the run", async () => {
+    e.specialCategoryBases = [basis];
+    const p = registerProfile(
+      e,
+      special("1.0", { route: "hosted", basisId: "BASIS-1" }),
+      "auditor",
+    );
+    // The basis is stored with the protocol as recorded.
+    expect(p.specialCategory?.basis).toEqual(basis);
+    const unacknowledged = await rejection(queue(p.id));
+    expect(unacknowledged.message).toContain("Acknowledge");
+    const run = await queue(p.id, true);
+    expect(run.state).toBe("queued");
+    expect(run.manifest?.profile?.specialCategory?.basis).toEqual(basis);
+    expect(run.manifest?.specialCategoryAcknowledgement).toMatchObject({
+      column: "group",
+      acknowledgedBy: "auditor",
+    });
+    expect(run.manifest?.limitations.at(-1)).toBe(
+      "Special-category column group was processed on the platform under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
+    );
+    // A later change to the engagement's register does not reach the run.
+    e.specialCategoryBases[0].confirmedBy = "Someone else";
+    expect(run.manifest?.profile?.specialCategory?.basis?.confirmedBy).toBe(
+      "Client DPO",
+    );
+    await expect(executionCSV(e, run)).resolves.toMatchObject({
+      csv: predictions,
+    });
+    // A retry repeats the frozen request and carries the acknowledgement
+    // over as given, naming the source run: the person who retries gave none.
+    run.state = "cancelled";
+    const retry = await queueRetry(e, run, "lead");
+    expect(retry.manifest?.specialCategoryAcknowledgement).toEqual({
+      ...run.manifest!.specialCategoryAcknowledgement,
+      acknowledgedBy: "auditor",
+      inheritedFrom: run.id,
+    });
+  });
+
+  it("refuses to retry a legacy explicit fairness run on the platform", async () => {
+    e.specialCategoryBases = [basis];
+    const p = registerProfile(
+      e,
+      special("1.0", { route: "hosted", basisId: "BASIS-1" }),
+      "auditor",
+    );
+    const frozen = await queue(p.id, true);
+    // Explicit-configuration runs predate protocols and declarations.
+    const legacy = {
+      ...frozen,
+      id: "RUN-LEGACY",
+      state: "cancelled" as const,
+      profileId: undefined,
+      manifest: { ...frozen.manifest!, profile: null },
+    };
+    delete legacy.manifest.specialCategoryAcknowledgement;
+    const refused = await rejection(queueRetry(e, legacy, "lead"));
+    expect(refused.status).toBe(409);
+    expect(refused.message).toContain(
+      "This explicit fairness run predates special-category declarations",
+    );
+  });
+
+  it("refuses hosted runs of fairness protocols saved before declarations", async () => {
+    const p = registerProfile(e, special("1.0"), "auditor");
+    delete p.specialCategory;
+    const refused = await rejection(queue(p.id, true));
+    expect(refused.message).toContain("predates special-category declarations");
+  });
+
+  it("lets the client's own worker run without a basis, and no other worker", () => {
+    const p = registerProfile(e, special("1.0"), "auditor");
+    expect(() => externalGate(p, "client_local")).not.toThrow();
+    const refused = thrown(() => externalGate(p, "provided_predictions"));
+    expect(refused.status).toBe(409);
+    expect(refused.message).toContain("client-local mode");
+    e.specialCategoryBases = [basis];
+    const recorded = registerProfile(
+      e,
+      special("2.0", { basisId: "BASIS-1" }),
+      "auditor",
+    );
+    expect(() => externalGate(recorded, "auditor_model")).not.toThrow();
   });
 });
