@@ -173,9 +173,8 @@ jobs:
           server=$!
           for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:8791/ && break; sleep 2; done
           node scripts/seed-demo.mjs --trusted-headers http://127.0.0.1:8791 > /dev/null
-          node e2e/probe-119.mjs http://127.0.0.1:8791 40 0 1 || true
-          node e2e/probe-119.mjs http://127.0.0.1:8791 40 1 0 || true
-          node e2e/probe-119.mjs http://127.0.0.1:8791 40 1 1 || true
+          node e2e/probe-119-idle.mjs http://127.0.0.1:8791 100 1 || true
+          node e2e/probe-119-idle.mjs http://127.0.0.1:8791 30 0 || true
           echo "Network connection lost lines: $(grep -c 'Network connection lost' /tmp/probe-server.log || true)"
           grep -v '^\[wrangler:info\] \(GET\|POST\)' /tmp/probe-server.log | tail -80 || true
           kill $server || true

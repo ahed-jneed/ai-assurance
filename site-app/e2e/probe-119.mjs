@@ -26,7 +26,8 @@ async function get(engagementId, ms = 15000) {
     headers,
     signal: AbortSignal.timeout(ms),
   });
-  if (r.status !== 200) throw new Error("GET " + r.status + " " + (await r.text()));
+  if (r.status !== 200)
+    throw new Error("GET " + r.status + " " + (await r.text()));
   return r.json();
 }
 const list = await get();
@@ -62,7 +63,12 @@ const body = (n) => ({
   conclusionStatus: "not_evaluated",
 });
 const edit = (paperId, n) =>
-  command("editPaper", { paperId, body: body(n), evidenceIds: [], required: true });
+  command("editPaper", {
+    paperId,
+    body: body(n),
+    evidenceIds: [],
+    required: true,
+  });
 // Papers with an archived revision: their histories live in R2, and every
 // save of the engagement writes each history again under the same key.
 const papers = [];
@@ -83,11 +89,16 @@ for (let i = 0; i < rounds; i++) {
     new Promise((res) => setTimeout(res, d)).then(() =>
       get(engagementId).then(
         () => ok++,
-        (e) => (e.name === "TimeoutError" ? hung++ : (errors++, console.error(e.message))),
+        (e) =>
+          e.name === "TimeoutError"
+            ? hung++
+            : (errors++, console.error(e.message)),
       ),
     ),
   );
   await Promise.all([post, ...reads]);
   console.log(`round ${i + 1}: ok=${ok} hung=${hung} errors=${errors}`);
 }
-console.log(`TOTAL overlap=${overlap} hist=${histArg !== "0"}: ok=${ok} hung=${hung} errors=${errors}`);
+console.log(
+  `TOTAL overlap=${overlap} hist=${histArg !== "0"}: ok=${ok} hung=${hung} errors=${errors}`,
+);
