@@ -155,7 +155,13 @@ export function ManagementViews({
                 </TableCell>
               )}
               <TableCell data-label="Stage">
-                <span className="badge neutral">{g.stage}</span>
+                {g.integrity_error ? (
+                  <span className="badge red" title={g.integrity_error}>
+                    Integrity error
+                  </span>
+                ) : (
+                  <span className="badge neutral">{g.stage}</span>
+                )}
               </TableCell>
               <TableCell data-label="Due date">{g.due_date || "—"}</TableCell>
             </TableRow>

@@ -7,7 +7,7 @@ import {
   managementOps,
 } from "@/lib/commands/management";
 import { roles, type Role } from "@/lib/domain";
-import { getEngagement } from "@/lib/engagement-repo";
+import { loadEngagement } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import { context, type Context } from "@/lib/tenancy";
 import {
@@ -25,7 +25,7 @@ vi.mock("@/lib/tenancy", async (importOriginal) => ({
 }));
 vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/engagement-repo")>()),
-  getEngagement: vi.fn(),
+  loadEngagement: vi.fn(),
 }));
 
 // Every op, in module order (the envelope enum's order).
@@ -291,10 +291,10 @@ describe("POST /api/management", () => {
     const d1 = practice();
     const ctx = caller();
     signIn(ctx);
-    vi.mocked(getEngagement).mockResolvedValue(stored());
+    vi.mocked(loadEngagement).mockResolvedValue(stored());
     const response = await post("grantMember", grant);
     expect(response.status).toBe(200);
-    expect(getEngagement).toHaveBeenCalledWith(ctx, "ENG-1");
+    expect(loadEngagement).toHaveBeenCalledWith(ctx, "ENG-1");
     expect(tables(own(d1))).toEqual(["memberships", "engagement_access"]);
   });
 });
@@ -353,7 +353,7 @@ describe("access lifecycle (F-24)", () => {
     });
     expect(d1.batches).toEqual([]);
     d1 = practice(1, { grants: ["ENG-OLD"], workers: ["W-OLD"] });
-    vi.mocked(getEngagement).mockResolvedValue(stored());
+    vi.mocked(loadEngagement).mockResolvedValue(stored());
     const response = await post("grantMember", {
       ...restore,
       engagementIds: ["ENG-1"],
@@ -410,7 +410,7 @@ describe("access lifecycle (F-24)", () => {
   it("grants and changes to the Engagement Quality Reviewer role like any internal role (#24)", async () => {
     const d1 = practice();
     signIn(caller());
-    vi.mocked(getEngagement).mockResolvedValue(stored());
+    vi.mocked(loadEngagement).mockResolvedValue(stored());
     const response = await post("updateMember", {
       userId: "user-2",
       displayName: "Ada",

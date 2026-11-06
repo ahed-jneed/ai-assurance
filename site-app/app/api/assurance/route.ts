@@ -2,9 +2,11 @@ import { z } from "zod";
 import { assuranceTarget, dispatchAssurance } from "@/lib/commands/assurance";
 import { short } from "@/lib/commands/fields";
 import { getEngagement } from "@/lib/engagement-repo";
-import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
+import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import {
   assuranceRecordPage,
+  assuranceReviewQueue,
+  assuranceSearch,
   assuranceView,
 } from "@/lib/read-models/assurance-view";
 import { context, refuseReadOnly } from "@/lib/tenancy";
@@ -13,18 +15,40 @@ export const dynamic = "force-dynamic";
 /**
  * The workbench view with the first page of records or, given a `cursor` from
  * a previous page or a record `kind`, just that page of records.
+ * `view=search` (`kinds`, `q`, `review`, `cursor`, `limit`) answers one page
+ * of a search over every record; `view=queue` the caller's review queue, or
+ * with `state` one page of it.
  */
 export async function GET(request: Request) {
   try {
     const u = new URL(request.url),
-      ctx = await context(u.searchParams.get("tenantId") ?? ""),
-      engagementId = u.searchParams.get("engagementId") ?? "",
-      kind = u.searchParams.get("kind") ?? "",
-      cursor = u.searchParams.get("cursor") ?? "";
+      param = (name: string) => u.searchParams.get(name) ?? "",
+      ctx = await context(param("tenantId")),
+      engagementId = param("engagementId"),
+      view = param("view"),
+      kind = param("kind"),
+      cursor = param("cursor"),
+      limit = param("limit") ? Number(param("limit")) : undefined;
+    if (view && !["search", "queue"].includes(view))
+      throw new ApiError(400, "Unknown assurance view");
     return Response.json(
-      kind || cursor
-        ? await assuranceRecordPage(ctx, engagementId, { kind, cursor })
-        : await assuranceView(ctx, engagementId),
+      view === "search"
+        ? await assuranceSearch(ctx, engagementId, {
+            kinds: param("kinds") ? param("kinds").split(",") : [],
+            term: param("q"),
+            review: param("review"),
+            cursor,
+            limit,
+          })
+        : view === "queue"
+          ? await assuranceReviewQueue(ctx, engagementId, {
+              state: param("state"),
+              cursor,
+              limit,
+            })
+          : kind || cursor
+            ? await assuranceRecordPage(ctx, engagementId, { kind, cursor })
+            : await assuranceView(ctx, engagementId),
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (e) {
@@ -46,11 +70,7 @@ const command = z
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const a = command.parse(
-        JSON.parse(
-          new TextDecoder().decode(await readBounded(request, 1024 * 1024)),
-        ),
-      ),
+    const a = command.parse(await readJson(request, 1024 * 1024)),
       ctx = await context(a.tenantId);
     refuseReadOnly(ctx);
     if (isClientRole(ctx.role))

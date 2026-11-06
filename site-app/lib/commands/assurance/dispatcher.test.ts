@@ -23,7 +23,7 @@ import {
   type Model,
   type Role,
 } from "@/lib/domain";
-import { getEngagement, save } from "@/lib/engagement-repo";
+import { getEngagement, loadEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
@@ -37,6 +37,7 @@ vi.mock("@/lib/tenancy", async (importOriginal) => ({
 vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/engagement-repo")>()),
   getEngagement: vi.fn(),
+  loadEngagement: vi.fn(),
   save: vi.fn(),
 }));
 vi.mock("@/lib/assurance-store", async (importOriginal) => ({
@@ -88,6 +89,7 @@ function written(
 function load(e: Engagement, ctx: Context = caller()) {
   vi.mocked(context).mockResolvedValue(ctx);
   vi.mocked(getEngagement).mockResolvedValue(e);
+  vi.mocked(loadEngagement).mockResolvedValue(e);
   vi.mocked(recordPage).mockResolvedValue({ records: [], nextCursor: null });
   vi.mocked(recordCount).mockResolvedValue(0);
   vi.mocked(recordsById).mockResolvedValue([]);
@@ -526,6 +528,11 @@ describe("GET /api/assurance", () => {
         telemetry: { queued: 1, stalled: 1 },
       });
       expect(recordPage).toHaveBeenCalledWith(ctx, e.id);
+      // One execution_jobs query serves the list and the telemetry (#16), and
+      // the workbench never loads the engagement's R2 parts.
+      expect(jobs).toHaveBeenCalledTimes(1);
+      expect(getEngagement).not.toHaveBeenCalled();
+      expect(loadEngagement).toHaveBeenCalledWith(ctx, e.id);
       expect(view.jobs).toHaveLength(3);
       expect(view.eligibleMembers).toHaveLength(eligible);
       expect(Object.keys(view.capabilities).sort()).toEqual([
