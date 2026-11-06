@@ -29,10 +29,12 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
+import { datasetCardFor } from "@/lib/dataset-card";
 import {
   tasks,
   tests,
   fairnessSelected,
+  performancePositiveLabel,
   protocolConfigKeys,
 } from "@/lib/evaluation";
 import type {
@@ -47,10 +49,16 @@ import type {
 } from "@/lib/domain";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
+import {
+  resolveLabIntent,
+  type PendingLabIntent,
+} from "./workspace/lab-intent";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 type Props = {
-  initialProcedure?: string;
-  datasetCardRecordId?: string;
+  /** Work handed to the lab; it opens with it once. */
+  intent: PendingLabIntent | null;
+  /** The lab has applied `intent` and must not reopen with it. */
+  onIntentUsed: (intent: PendingLabIntent) => void;
   onRefresh: () => Promise<unknown>;
   engagement: Engagement;
   tenantId: string;
@@ -58,7 +66,10 @@ type Props = {
   busy: boolean;
   view: string;
   onView: (view: string) => void;
+  /** The lab's own model and evaluation setup dialogs report here. */
   onEditorOpen: (open: boolean) => void;
+  /** The dataset registry's card form reports here, separately. */
+  onDatasetEditing: (open: boolean) => void;
   onEvidence: () => void;
   onPaper: (p: Paper) => void;
   resolve: (id: string) => string;
@@ -91,6 +102,7 @@ const initialConfig: EvaluationConfig = {
   predictionColumn: "",
   groupColumn: "",
   positiveLabel: "1",
+  performancePositiveLabel: "",
   minimumSampleSize: 20,
   minimumClassCount: 5,
   minimumGroupSize: 20,
@@ -227,9 +239,11 @@ function modelCapability(m: Model) {
       ? "Define a classification task to evaluate predictions"
       : "External adapter required";
 }
+/** An evaluation set up for an approved procedure, with its dataset card. */
+type ProcedureBinding = { procedureId: string; datasetCardRecordId: string };
 export function TestingLab({
-  initialProcedure,
-  datasetCardRecordId,
+  intent,
+  onIntentUsed,
   onRefresh,
   engagement: e,
   tenantId,
@@ -238,6 +252,7 @@ export function TestingLab({
   view,
   onView,
   onEditorOpen,
+  onDatasetEditing,
   onEvidence,
   onPaper,
   resolve,
@@ -262,7 +277,8 @@ export function TestingLab({
     [discard, setDiscard] = useState<null | "registration" | "wizard">(null),
     [touched, setTouched] = useState(false);
   const [cards, setCards] = useState<AssuranceRecord[]>([]),
-    [boundProcedure, setBoundProcedure] = useState("");
+    // Belongs to the open setup only: every other evaluation starts unbound.
+    [binding, setBinding] = useState<ProcedureBinding | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     void fetch(
@@ -291,8 +307,13 @@ export function TestingLab({
     else if (kind === "registration") setRegister(null);
     else setWizard(false);
   }
-  function startWizard(m?: Model, p?: EvaluationProfile, only = false) {
-    setBoundProcedure("");
+  function startWizard(
+    m?: Model,
+    p?: EvaluationProfile,
+    only = false,
+    bound: ProcedureBinding | null = null,
+  ) {
+    setBinding(bound);
     setTouched(false);
     const chosen =
       m ??
@@ -307,16 +328,21 @@ export function TestingLab({
     setWizard(true);
   }
   useEffect(() => {
-    const p = e.workflow?.procedures.find((p) => p.id === initialProcedure),
-      m = e.models.find((m) => m.id === p?.modelId),
-      profile = profiles.find((x) => x.id === p?.profileId);
-    if (p && m && profile) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the wizard for an incoming procedure deep link
-      startWizard(m, profile);
-      setBoundProcedure(p.id);
+    if (!intent) return;
+    const action = resolveLabIntent(intent, e);
+    if (action.kind === "evaluate")
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the setup a hand-off asks for, once
+      startWizard(action.model, action.profile, false, {
+        procedureId: action.procedureId,
+        datasetCardRecordId: action.datasetCardRecordId,
+      });
+    else if (action.kind === "showRun") {
+      onView("runs");
+      setSelectedRun(action.run);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs only when a procedure deep link arrives, not when models or profiles refresh
-  }, [initialProcedure]);
+    onIntentUsed(intent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- applies each hand-off once, when it arrives, not when the engagement refreshes
+  }, [intent]);
   function startRegistration(m?: Model) {
     setTouched(false);
     setError("");
@@ -517,25 +543,26 @@ export function TestingLab({
         onView("protocols");
         return;
       }
+      // The card must describe the exact accepted bytes this run evaluates.
+      const card = datasetCardFor(
+        cards,
+        source.artifacts.find(
+          (a) => a.id === model!.artifactId && a.status === "accepted",
+        ),
+        binding?.datasetCardRecordId,
+      );
       const queued = await act(
         "queueRun",
         {
           modelId: model!.id,
           datasetId: model!.artifactId,
           profileId: currentProfile,
-          ...(boundProcedure ? { procedureId: boundProcedure } : {}),
-          ...(datasetCardRecordId
-            ? { datasetCardRecordId }
-            : cards.find((c) => c.body.artifactId === model!.artifactId)
-              ? {
-                  datasetCardRecordId: cards.find(
-                    (c) => c.body.artifactId === model!.artifactId,
-                  )!.id,
-                }
-              : {}),
+          ...(binding ? { procedureId: binding.procedureId } : {}),
+          ...(card ? { datasetCardRecordId: card.id } : {}),
         },
         source,
       );
+      setBinding(null);
       setWizard(false);
       onView("runs");
       await act(
@@ -584,6 +611,10 @@ export function TestingLab({
   const runnable = e.models.filter(
     (m) => modelCapability(m) === "Saved predictions ready",
   );
+  // The selected run as the engagement now holds it, so starting, cancelling
+  // or completing it updates the open dialog.
+  const shownRun =
+    selectedRun && (e.runs.find((r) => r.id === selectedRun.id) ?? selectedRun);
   return (
     <div className="ml-lab">
       <Tabs value={view} onValueChange={onView}>
@@ -640,7 +671,7 @@ export function TestingLab({
             engagement={e}
             tenantId={tenantId}
             role={role}
-            onEditing={onEditorOpen}
+            onEditing={onDatasetEditing}
             onRefresh={onRefresh}
             onCards={setCards}
           />
@@ -1275,9 +1306,20 @@ export function TestingLab({
               <fieldset disabled={busy || inspecting}>
                 {step === 0 && (
                   <>
+                    {binding && (
+                      <p className="ml-notice">
+                        Planned procedure{" "}
+                        {e.workflow?.procedures.find(
+                          (p) => p.id === binding.procedureId,
+                        )?.title ?? binding.procedureId}
+                        : the approved audit program fixes this model version
+                        and protocol.
+                      </p>
+                    )}
                     <SelectField
                       label="Registered model version"
                       value={modelId}
+                      disabled={!!binding}
                       onChange={(v) => {
                         const m = e.models.find((x) => x.id === v);
                         setModelId(v);
@@ -1293,6 +1335,7 @@ export function TestingLab({
                     <SelectField
                       label="Evaluation protocol"
                       value={profileId || "new"}
+                      disabled={!!binding}
                       onChange={(v) => {
                         const p = profiles.find((x) => x.id === v);
                         setProfileId(p?.id ?? "");
@@ -1346,7 +1389,10 @@ export function TestingLab({
                           />
                         </div>
                         {model?.task === "Binary classification" && (
-                          <Field label="Favourable class label">
+                          <Field
+                            label="Favourable class label"
+                            help="The outcome fairness tests count as selection."
+                          >
                             <Input
                               disabled={locked}
                               required
@@ -1528,12 +1574,32 @@ export function TestingLab({
                             0,
                             1,
                           )}
+                          {model?.task === "Binary classification" && (
+                            <Field
+                              label="Performance positive class"
+                              help="Recall is measured on this class and specificity on the other. Leave empty to use the favourable label."
+                            >
+                              <Input
+                                disabled={locked}
+                                placeholder={draft.config.positiveLabel}
+                                value={
+                                  draft.config.performancePositiveLabel ?? ""
+                                }
+                                onChange={(ev) =>
+                                  config(
+                                    "performancePositiveLabel",
+                                    ev.target.value,
+                                  )
+                                }
+                              />
+                            </Field>
+                          )}
                           {numeric(
                             model?.task === "Binary classification"
                               ? "minimumRecall"
                               : "minimumMacroF1",
                             model?.task === "Binary classification"
-                              ? "Minimum favourable-class recall"
+                              ? "Minimum recall of the positive class"
                               : "Minimum macro F1",
                             0,
                             1,
@@ -2027,15 +2093,15 @@ export function TestingLab({
                   : ""}
               </DialogDescription>
             </DialogHeader>
-            {selectedRun &&
+            {shownRun &&
               writer &&
-              ["failed", "cancelled"].includes(selectedRun.state) && (
+              ["failed", "cancelled"].includes(shownRun.state) && (
                 <div className="row-actions">
                   <Button
                     variant="outline"
                     disabled={busy}
                     onClick={() =>
-                      void act("retryRun", { runId: selectedRun.id })
+                      void act("retryRun", { runId: shownRun.id })
                         .then(() => {
                           setSelectedRun(null);
                           onView("runs");
@@ -2050,12 +2116,43 @@ export function TestingLab({
                   </span>
                 </div>
               )}
-            {selectedRun?.retryOf && (
-              <p className="subtle">Retry of {selectedRun.retryOf}</p>
+            {shownRun && writer && shownRun.state === "queued" && (
+              <div className="row-actions">
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void act("executeRun", { runId: shownRun.id }).catch(
+                      () => {},
+                    )
+                  }
+                >
+                  <Play size={14} />
+                  Start evaluation
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() =>
+                    void act("cancelRun", { runId: shownRun.id }).catch(
+                      () => {},
+                    )
+                  }
+                >
+                  Cancel run
+                </Button>
+                <span className="subtle">
+                  Queued with frozen inputs.
+                  {shownRun.procedureBinding &&
+                    " Start or cancel it before queueing another evaluation of the same procedure."}
+                </span>
+              </div>
             )}
-            {selectedRun && (
+            {shownRun?.retryOf && (
+              <p className="subtle">Retry of {shownRun.retryOf}</p>
+            )}
+            {shownRun && (
               <RunDetails
-                run={e.runs.find((r) => r.id === selectedRun.id) ?? selectedRun}
+                run={shownRun}
                 engagement={e}
                 resolve={resolve}
                 onPaper={(p) => {
@@ -2156,8 +2253,9 @@ function criterionSummary(p: Draft) {
       ? [
           `accuracy ≥ ${c.minimumAccuracy}`,
           p.task === "Binary classification"
-            ? `recall ≥ ${c.minimumRecall}`
+            ? `recall of '${performancePositiveLabel(c)}' ≥ ${c.minimumRecall}`
             : `macro F1 ≥ ${c.minimumMacroF1}`,
+          "better than always predicting the majority class",
         ]
       : []),
     ...(p.suite.includes("regression")

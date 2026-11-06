@@ -26,6 +26,19 @@ export type Brief = BriefFields & {
   updatedBy: string;
   updatedAt: string;
   approval?: Approval;
+  // The reviewer's open request for changes, kept apart from the preparer's
+  // fields: set when a submitted brief is returned, cleared when it is
+  // submitted again. The history keeps the returned revision with it.
+  returnReason?: string;
+  returnedBy?: string;
+  returnedAt?: string;
+  /**
+   * Submitted revisions: each returned revision, with its return reason, and
+   * each approved revision once a Lead revises it. A draft that was never
+   * submitted is superseded without an entry. Older histories also hold one
+   * entry per earlier draft save, and returned revisions without a return
+   * reason; those count towards no return limit.
+   */
   history: Omit<Brief, "history">[];
 };
 export type ProcedurePlan = {
@@ -45,12 +58,26 @@ export type ProcedurePlan = {
   datasetId: string;
   profileId: string;
 };
+/**
+ * What replaced a procedure's state: a plan change, a new execution, an
+ * evaluation, an independent impact review or a reviewer's return.
+ */
+export type ProcedureChange =
+  "plan" | "execute" | "evaluate" | "reaffirm" | "return";
 export type Execution = {
   id: string;
   revision: number;
   briefRevision: number;
+  /** The program revision in force when the work was recorded. */
   programRevision: number;
+  /** The procedure's plan revision the work was performed against. */
   procedureRevision: number;
+  /**
+   * The `Procedure.planHash` the work was performed against: with the brief
+   * revision, what keeps the execution current. Executions recorded before
+   * plan hashes bind `procedureRevision` instead.
+   */
+  planHash?: string;
   performed: string;
   steps: {
     id: string;
@@ -94,7 +121,25 @@ export type Procedure = ProcedurePlan & {
   }[];
   expectedEvidence: string[];
   candidateRefs: string[];
+  /**
+   * The substantive plan revision: it changes with what the procedure tests
+   * and how, never with its preparer, reviewer or due date.
+   */
   revision: number;
+  /**
+   * SHA-256 of the substantive plan (`substantivePlan` in
+   * lib/workflow/command.ts). Absent until a command first needs it on a
+   * procedure planned before plan hashes.
+   */
+  planHash?: string;
+  /** Counts changes to the preparer, reviewer and due date; absent is 1. */
+  assignmentRevision?: number;
+  /**
+   * Set once the plan changes after it was last submitted for program
+   * approval: the submitted plan is then in the history, and further changes
+   * before the next submission amend this one without new history entries.
+   */
+  planAmended?: boolean;
   contributors: string[];
   updatedBy: string;
   updatedAt: string;
@@ -104,6 +149,12 @@ export type Procedure = ProcedurePlan & {
   execution?: Execution;
   review?: Approval;
   history: {
+    /**
+     * The change this entry kept the state before. The commands set it on
+     * every entry they write; an entry without it was written before actions
+     * were recorded and counts towards no limit, whatever its date.
+     */
+    action?: ProcedureChange;
     plan: ProcedurePlan;
     revision: number;
     execution?: Execution;
@@ -115,6 +166,10 @@ export type Procedure = ProcedurePlan & {
   }[];
 };
 export type Program = {
+  /**
+   * Drafting amends the current revision; changing a submitted or approved
+   * program starts the next one.
+   */
   revision: number;
   briefRevision: number;
   status: "draft" | "submitted" | "approved";
@@ -122,14 +177,23 @@ export type Program = {
   updatedBy: string;
   updatedAt: string;
   approval?: Approval;
+  /**
+   * Each submission ("submitted") and its outcome, with the procedure plans
+   * it bound: "approved", "returned" with the reviewer's reason, or
+   * "withdrawn" when a Lead's plan or scope change took it back to draft.
+   * Older histories also hold one entry per earlier plan save, with the
+   * status the program had before that save; none of them is a return.
+   */
   history: {
     revision: number;
     briefRevision: number;
     status: string;
     approval?: Approval;
+    reason?: string;
     procedureRevisions: {
       id: string;
       revision: number;
+      planHash?: string;
     }[];
     at: string;
     actor: string;

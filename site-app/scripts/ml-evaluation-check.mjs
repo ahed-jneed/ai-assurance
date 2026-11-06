@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import ts from "typescript";
 const dir = ".sites-runtime/ml-unit";
 await fs.mkdir(dir, { recursive: true });
-for (const name of ["evaluation", "diagnostics"]) {
+// diagnostics.ts imports the other two; type-only imports disappear.
+for (const name of ["evaluation", "diagnostic-decisions", "diagnostics"]) {
   const js = ts
     .transpileModule(await fs.readFile("lib/" + name + ".ts", "utf8"), {
       compilerOptions: {
@@ -12,8 +13,8 @@ for (const name of ["evaluation", "diagnostics"]) {
       },
     })
     .outputText.replace(
-      /from (['"])\.\/evaluation\1/,
-      "from './evaluation.js'",
+      /from (['"])\.\/(evaluation|diagnostic-decisions)\1/g,
+      "from './$2.js'",
     );
   await fs.writeFile(dir + "/" + name + ".js", js);
 }
@@ -75,6 +76,15 @@ assert.equal(
   evaluate(run(), "actual,predicted\n0,0\n0,1")[0].outcome,
   "inconclusive",
   "No actual positives cannot pass accuracy",
+);
+assert.equal(
+  evaluate(run(), "actual,predicted\n1,1\n1,1\n1,1\n0,1")[0].outcome,
+  "fail",
+  "A constant majority-class prediction fails despite 75% accuracy and full recall",
+);
+assert.throws(
+  () => evaluate(run(), "actual,predicted\n1,1\n\n0,0"),
+  /Blank data row/,
 );
 assert.throws(() => evaluate(run(), "actual,predicted\n1,\n0,0"), /missing/);
 const multi = evaluate(

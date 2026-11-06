@@ -8,6 +8,7 @@ import {
   tasks,
   assertSuite,
   fairnessSelected,
+  performancePositiveLabel,
   runnerVersion,
   testDefinitionVersion,
 } from "./evaluation";
@@ -120,6 +121,13 @@ export function registerProfile(
       400,
       "Binary classification needs a favourable class label",
     );
+  // The protocol freezes the class binary recall is measured on. Only binary
+  // performance has one: a value left from a deselected performance test
+  // would otherwise constrain the labels of a fairness-only protocol.
+  a.config.performancePositiveLabel =
+    a.task === "Binary classification" && a.suite.includes("performance")
+      ? a.config.performancePositiveLabel || a.config.positiveLabel
+      : "";
   if (
     fairnessSelected(a.suite) &&
     new Set([
@@ -160,6 +168,28 @@ export function registerProfile(
   (e.evaluationProfiles ??= []).push(p);
   return p;
 }
+/**
+ * Refuses a protocol the external worker cannot run as frozen. The worker
+ * measures binary recall on the favourable label only (`translate_config`
+ * in engine/worker_contract.py), so a separate performance positive class
+ * would be reported as measured when it was not. Lift this once the worker
+ * honours `performancePositiveLabel` (#65).
+ */
+export function assertExternalProtocol(
+  profile: Pick<EvaluationProfile, "task" | "suite" | "config">,
+) {
+  const favourable = profile.config.positiveLabel,
+    positive = performancePositiveLabel(profile.config);
+  if (
+    profile.task === "Binary classification" &&
+    profile.suite.includes("performance") &&
+    positive !== favourable
+  )
+    throw new ApiError(
+      400,
+      `External execution measures binary recall on the favourable label '${favourable}' only, so it cannot apply this protocol's performance positive class '${positive}'. Use a protocol version whose performance positive class is the favourable label, or evaluate saved predictions in the Testing lab.`,
+    );
+}
 export async function datasetCSV(e: Engagement, artifactId: string) {
   const a = e.artifacts.find((x) => x.id === artifactId);
   if (
@@ -189,48 +219,105 @@ export async function datasetCSV(e: Engagement, artifactId: string) {
   }
   return { a, csv };
 }
+/**
+ * Freezes a new evaluation of a registered model against a saved protocol.
+ * A protocol is required: registerProfile checks what an explicit suite and
+ * configuration would skip, such as the fairness data-handling basis.
+ */
 export async function queueEvaluation(
   e: Engagement,
   data: Record<string, unknown>,
   actor: string,
 ) {
   const a = z
-      .object({
-        modelId: short,
-        datasetId: short,
-        profileId: short.optional(),
-        suite: suiteSchema.optional(),
-        config: configSchema.optional(),
-      })
-      .strict()
-      .parse(data),
-    m = e.models.find((x) => x.id === a.modelId),
-    profile = a.profileId
-      ? (e.evaluationProfiles ?? []).find((p) => p.id === a.profileId)
-      : null;
-  if (a.profileId && !profile)
-    throw new ApiError(404, "Evaluation protocol not found");
-  if (profile && (a.suite || a.config))
+    .object({
+      modelId: short,
+      datasetId: short,
+      profileId: short.optional(),
+      suite: suiteSchema.optional(),
+      config: configSchema.optional(),
+    })
+    .strict()
+    .parse(data);
+  if (!a.profileId)
+    throw new ApiError(
+      400,
+      "Choose a saved evaluation protocol. Explicit configurations are accepted only to retry a frozen run.",
+    );
+  const profile = (e.evaluationProfiles ?? []).find(
+    (p) => p.id === a.profileId,
+  );
+  if (!profile) throw new ApiError(404, "Evaluation protocol not found");
+  if (a.suite || a.config)
     throw new ApiError(
       400,
       "A saved protocol cannot be overridden within a run; create a revised protocol",
     );
+  return freezeRun(
+    e,
+    {
+      modelId: a.modelId,
+      datasetId: a.datasetId,
+      profile,
+      suite: profile.suite,
+      config: profile.config,
+    },
+    actor,
+  );
+}
+/**
+ * Queues a new run with the frozen request of a failed or cancelled run: its
+ * protocol, or the suite and configuration of a legacy explicit run.
+ */
+export async function queueRetry(e: Engagement, source: Run, actor: string) {
+  const profile = source.profileId
+    ? (e.evaluationProfiles ?? []).find((p) => p.id === source.profileId)
+    : null;
+  if (profile === undefined)
+    throw new ApiError(404, "Evaluation protocol not found");
+  return freezeRun(
+    e,
+    {
+      modelId: source.modelId,
+      datasetId: source.datasetId,
+      profile,
+      suite: profile?.suite ?? source.suite,
+      config: profile?.config ?? source.config,
+    },
+    actor,
+  );
+}
+async function freezeRun(
+  e: Engagement,
+  {
+    modelId,
+    datasetId,
+    profile,
+    suite,
+    config,
+  }: {
+    modelId: string;
+    datasetId: string;
+    /** The saved protocol; null only to retry a legacy explicit run. */
+    profile: EvaluationProfile | null;
+    suite: string[];
+    config: Run["config"];
+  },
+  actor: string,
+) {
+  const m = e.models.find((x) => x.id === modelId);
   if (!m || m.format !== "Prediction file" || m.status !== "registered")
     throw new ApiError(
       400,
       "This version has no interactive saved-prediction capability",
     );
-  if (m.artifactId !== a.datasetId)
+  if (m.artifactId !== datasetId)
     throw new ApiError(
       400,
       "Use the exact prediction artifact registered for this model version. Register a new version to test a different prediction file.",
     );
   if (profile && profile.task !== m.task)
     throw new ApiError(400, "Model task and protocol task must match");
-  const suite = profile?.suite ?? a.suite,
-    config = profile?.config ?? a.config;
-  if (!suite || !config)
-    throw new ApiError(400, "Choose an evaluation protocol");
   try {
     assertSuite(m.task, suite);
   } catch (error) {
@@ -238,7 +325,7 @@ export async function queueEvaluation(
   }
   if (e.runs.filter((r) => ["queued", "running"].includes(r.state)).length >= 3)
     throw new ApiError(429, "Complete or cancel outstanding runs first");
-  const { a: dataset, csv } = await datasetCSV(e, a.datasetId);
+  const { a: dataset, csv } = await datasetCSV(e, datasetId);
   if (m.sourceSha256 && m.sourceSha256 !== dataset.sha256)
     throw new ApiError(400, "Registered prediction artifact hash changed");
   const run: Run = {
@@ -324,7 +411,17 @@ export async function queueEvaluation(
   e.runs.push(run);
   return run;
 }
-export async function executionCSV(e: Engagement, run: Run) {
+/**
+ * Verifies a frozen run's procedure binding, manifest, protocol and
+ * configuration pins and its dataset bytes, and returns those bytes. A
+ * retry needs only these; executing a queued run also needs the runner and
+ * test definitions it was queued under (`currentDefinition`).
+ */
+export async function verifyFrozenInputs(
+  e: Engagement,
+  run: Run,
+  { currentDefinition = false } = {},
+) {
   if (
     run.procedureBinding &&
     (await sha256(JSON.stringify(run.procedureBinding))) !==
@@ -335,44 +432,47 @@ export async function executionCSV(e: Engagement, run: Run) {
     throw Error(
       "This legacy queued run has no frozen evaluation manifest. Create a new evaluation using a current protocol; completed legacy results remain readable.",
     );
-  if (run.manifest) {
-    if (
-      (await sha256(JSON.stringify(run.manifest))) !==
-        run.provenance.inputHashes.manifest ||
-      (await sha256(JSON.stringify(run.manifest.model))) !==
-        run.provenance.inputHashes.modelMetadata
-    )
-      throw Error("Frozen input manifest integrity check failed");
-    if (
-      run.manifest.profile &&
-      (await sha256(JSON.stringify(run.manifest.profile))) !==
-        run.provenance.inputHashes.protocol
-    )
-      throw Error("Frozen protocol integrity check failed");
-    if (
-      (await sha256(
-        JSON.stringify({
-          modelId: run.modelId,
-          datasetId: run.datasetId,
-          task: run.task,
-          suite: run.suite,
-          config: run.config,
-          seed: run.seed,
-        }),
-      )) !== run.provenance.inputHashes.configuration
-    )
-      throw Error("Frozen evaluation configuration integrity check failed");
-    if (
-      run.provenance.runnerVersion !== runnerVersion ||
-      run.manifest.testDefinitionVersion !== testDefinitionVersion
-    )
-      throw Error(
-        "Queued runner definition is no longer available; create a new run",
-      );
-  }
+  if (
+    (await sha256(JSON.stringify(run.manifest))) !==
+      run.provenance.inputHashes.manifest ||
+    (await sha256(JSON.stringify(run.manifest.model))) !==
+      run.provenance.inputHashes.modelMetadata
+  )
+    throw Error("Frozen input manifest integrity check failed");
+  if (
+    run.manifest.profile &&
+    (await sha256(JSON.stringify(run.manifest.profile))) !==
+      run.provenance.inputHashes.protocol
+  )
+    throw Error("Frozen protocol integrity check failed");
+  if (
+    (await sha256(
+      JSON.stringify({
+        modelId: run.modelId,
+        datasetId: run.datasetId,
+        task: run.task,
+        suite: run.suite,
+        config: run.config,
+        seed: run.seed,
+      }),
+    )) !== run.provenance.inputHashes.configuration
+  )
+    throw Error("Frozen evaluation configuration integrity check failed");
+  if (
+    currentDefinition &&
+    (run.provenance.runnerVersion !== runnerVersion ||
+      run.manifest.testDefinitionVersion !== testDefinitionVersion)
+  )
+    throw Error(
+      "Queued runner definition is no longer available; create a new run",
+    );
   const { a, csv } = await datasetCSV(e, run.datasetId);
   if (a.sha256 !== run.provenance.inputHashes.dataset)
     throw Error("Dataset integrity check failed");
   return { a, csv };
+}
+/** The verified dataset bytes to execute a queued run with. */
+export function executionCSV(e: Engagement, run: Run) {
+  return verifyFrozenInputs(e, run, { currentDefinition: true });
 }
 export { inspectCSV };

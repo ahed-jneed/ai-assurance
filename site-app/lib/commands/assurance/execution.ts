@@ -3,6 +3,7 @@ import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
+import { assertExternalProtocol } from "../../evaluation-service";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
@@ -75,6 +76,7 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
+      assertExternalProtocol(profile);
       const card = v.datasetCardRecordId
         ? find(v.datasetCardRecordId, "dataset")
         : undefined;

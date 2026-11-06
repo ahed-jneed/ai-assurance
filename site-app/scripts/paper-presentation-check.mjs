@@ -464,15 +464,16 @@ for (const [label, modify] of [
     },
   ],
   [
-    "changed scope revision",
-    (e) => {
-      e.workflow.brief.revision++;
+    "changed plan hash",
+    (_e, p) => {
+      p.planHash = "a".repeat(64);
+      p.execution.planHash = "b".repeat(64);
     },
   ],
   [
-    "changed program revision",
+    "changed scope revision",
     (e) => {
-      e.workflow.program.revision++;
+      e.workflow.brief.revision++;
     },
   ],
   [
@@ -515,6 +516,16 @@ assert.equal(
   true,
   "A current documented execution impact review can reaffirm an older execution",
 );
+assert.equal(
+  row(
+    sourcePaper,
+    changed((e) => {
+      e.workflow.program.revision++;
+    }),
+  ).reviewable,
+  true,
+  "A program revision for another procedure's change keeps this execution reviewable",
+);
 const stale = changed((e) => {
   e.workflow.program.status = "draft";
 });
@@ -553,7 +564,8 @@ for (const modify of [
     p.execution.briefRevision--;
   },
   (_e, p) => {
-    p.execution.programRevision--;
+    p.planHash = "a".repeat(64);
+    p.execution.planHash = "b".repeat(64);
   },
   (_e, p) => {
     p.execution.procedureRevision--;

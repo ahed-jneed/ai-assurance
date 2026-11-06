@@ -1,9 +1,18 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import {
+  authRoute,
+  authenticate,
+  identityConfig,
+  runWithIdentity,
+} from "../lib/identity";
+
+/** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
+declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
 
 export default {
-  fetch(
+  async fetch(
     request: Request,
     env: Cloudflare.Env,
     ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>,
@@ -31,8 +40,24 @@ export default {
         },
       };
     }
-    return runWithConnectorBinding(binding, () =>
-      handler.fetch(request, env, ctx),
+    // The identity is settled before the app sees the request: IDENTITY_MODE
+    // picks the one trusted credential (while it is unset, the Sites build
+    // uses `sites`), and the oai-* headers are removed unless Sites dispatch
+    // set them (docs/security/identity.md). The `dev` mode exists only on the
+    // development server. The sign-in routes are answered after
+    // authentication: behind Cloudflare Access, sign-in returns only a
+    // verified caller to the page.
+    const config = identityConfig(env, {
+      devServer: import.meta.env.DEV,
+      defaultMode: __SITES_IDENTITY_DEFAULT__,
+    });
+    const caller = await authenticate(request, config);
+    const route = authRoute(request, config, caller.identity);
+    if (route) return route;
+    return runWithIdentity(caller.identity, () =>
+      runWithConnectorBinding(binding, () =>
+        handler.fetch(caller.request, env, ctx),
+      ),
     );
   },
 };

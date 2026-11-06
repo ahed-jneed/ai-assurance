@@ -16,7 +16,7 @@ import type {
 } from "../domain";
 import { seedWorkflow } from "../workflow-seed";
 import { WorkflowError, workflowCommand } from "../workflow-service";
-import type { Procedure, Workflow } from "../workflow-types";
+import type { Procedure, ProcedureChange, Workflow } from "../workflow-types";
 
 export type WorkflowContext = Parameters<typeof workflowCommand>[3];
 type Member = NonNullable<Awaited<ReturnType<WorkflowContext["member"]>>>;
@@ -354,6 +354,26 @@ export function procedureOf(e: Engagement, id: string): Procedure {
   return p;
 }
 
+/**
+ * Procedure history entries kept before this kind of change, to fill a
+ * history; without one, in the shape written before entries recorded their
+ * change. They are dated `recordedAt`, by default the fixture date.
+ */
+export function procedureEntries(
+  p: Procedure,
+  length: number,
+  action?: ProcedureChange,
+  recordedAt = at,
+): Procedure["history"] {
+  return Array.from({ length }, () => ({
+    ...(action && { action }),
+    plan: { ...p },
+    revision: p.revision,
+    at: recordedAt,
+    actor: "auditor",
+  }));
+}
+
 /** A workflow whose brief (revision 1) and program (bound to it) are approved. */
 export function approvedWorkflow(procedures: Procedure[] = []): Workflow {
   const w = seedWorkflow("lead", at);
@@ -428,6 +448,22 @@ export function planInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * A saveProcedurePlan payload read at the procedure's current assignment
+ * revision, as the audit program's plan form sends it.
+ */
+export function planSave(
+  e: Engagement,
+  overrides: Record<string, unknown> = {},
+  id = procedureId,
+) {
+  return {
+    procedureId: id,
+    assignmentRevision: procedureOf(e, id).assignmentRevision ?? 1,
+    plan: planInput(overrides),
+  };
+}
+
 /** Saves, submits and independently approves the engagement brief. */
 export async function approveScope(e: Engagement) {
   await command(e, "saveBrief", briefInput, "auditor");
@@ -454,12 +490,7 @@ export async function planProgram(e: Engagement) {
     },
     "auditor",
   );
-  await command(
-    e,
-    "saveProcedurePlan",
-    { procedureId, plan: planInput() },
-    "auditor",
-  );
+  await command(e, "saveProcedurePlan", planSave(e), "auditor");
 }
 
 /** Approved brief and program: what procedure execution requires. */

@@ -10,10 +10,12 @@ import {
   requireRole,
   responseError,
 } from "@/lib/store";
+import { procedureDraftRevision } from "@/lib/workflow-state";
 import {
   defaultPreferences,
   draftKinds,
   preferencesSchema,
+  type DraftKind,
 } from "@/lib/workspace-state";
 import {
   navigationRoutes,
@@ -25,7 +27,7 @@ const short = z.string().min(1).max(300);
 async function target(
   ctx: Awaited<ReturnType<typeof context>>,
   engagementId: string,
-  kind: string,
+  kind: DraftKind,
   recordId: string,
   writing = false,
 ) {
@@ -63,15 +65,7 @@ async function target(
       403,
       "Only the assigned preparer or Lead may draft this execution",
     );
-  return {
-    revision: [
-      p.revision,
-      p.execution?.revision ?? 0,
-      e.workflow.program.revision,
-      e.workflow.brief?.revision ?? 0,
-    ].join(":"),
-    e,
-  };
+  return { revision: procedureDraftRevision(e.workflow, p, kind), e };
 }
 export async function GET(request: Request) {
   try {

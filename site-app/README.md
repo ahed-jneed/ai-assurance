@@ -28,9 +28,11 @@ On portable, `npm run dev` uses `vinext dev` with HMR, starting at port 5173. Vi
 
 For browser QA on managed Linux, use `sites-preview start`. The project's dev script runs Vite and accepts the supervisor's `--host 0.0.0.0 --port 4173 --strictPort` arguments. The internal browser uses `http://terminal.local:4173/`; it is not a user-facing URL. The supervisor owns the preview lifecycle. The ignored local profile survives the supervisor's cleared process environment.
 
-The portable profile simulates ChatGPT sign-in only for loopback development requests. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`) and `/signout-with-chatgpt?return_to=/` to sign out. The development cookie preserves that identity across server restarts. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
+The portable profile simulates ChatGPT sign-in only for loopback development requests, and the Worker trusts it only in `IDENTITY_MODE=dev`, which exists only on the development server. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`), `/signin-with-chatgpt?as=<persona>&return_to=/` to sign in as one of the test personas in `fixtures/dev-personas.json` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`), and `/signout-with-chatgpt?return_to=/` to sign out. The account menu in the sidebar footer offers Sign out and, on the development server, the persona switch; the signed-out screen lists the personas. The sign-in cookie is named for the dev server's port (`__sites_local_auth_<port>`), so dev servers on different ports keep separate sign-ins and never sign each other out; it preserves the identity across restarts on the same port. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
 
-The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port.
+With the dev server running, `npm run seed:demo` provisions a demo practice through the app's own API: qa-lead's practice with the client "Acme", a structured engagement, each persona's membership and engagement grant, and an evidence request that `qa-contrib` can answer in the client portal; `qa-lead2` also leads a practice of their own (practice switching) and `qa-outsider` stays outside. Run it before signing in as a persona, since a first sign-in without a membership provisions a separate practice. It prints a sign-in link per persona and is safe to run again. Pass the URL for another port (`npm run seed:demo -- http://127.0.0.1:5184`), or `--trusted-headers` for a built Worker in `trusted-headers` mode.
+
+The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port. Outside a Sites checkout the build trusts no identity and the API answers 401; for local end-to-end tests pass `npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests` and send the `oai-authenticated-user-*` headers from the test client.
 
 Local previews use Miniflare's placeholder `Request.cf` metadata without a network lookup. Set `CLOUDFLARE_CF_FETCH_ENABLED=true` to opt into fetching preview metadata; this setting does not change hosted request metadata.
 
@@ -39,7 +41,8 @@ Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=tru
 ## Included Shape
 
 - edit site code under `app/`
-- `app/chatgpt-auth.ts` provides optional dispatch-owned ChatGPT sign-in helpers
+- `lib/identity.ts` resolves the caller at the Worker entry according to `IDENTITY_MODE` (`sites`, `cloudflare-access`, `trusted-headers` or `dev`); with no mode the API answers 401. See [`docs/security/identity.md`](../docs/security/identity.md)
+- `app/chatgpt-auth.ts` provides `requireChatGPTUser()` for server-rendered pages; `lib/auth-paths.ts` builds sign-in and sign-out links
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings; it is checkout-local (ignored by Git), and builds without it use the `DB`/`BUCKET` bindings
 - `vite.config.ts` simulates declared bindings for local development
 - `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
@@ -50,49 +53,30 @@ Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=tru
 
 ## Workspace Auth Headers
 
+On Sites, dispatch sends signed-in visitors' identity in headers. In this workspace only the identity adapter (`lib/identity.ts`) reads them, and only in `sites` mode or in the loopback `trusted-headers` and `dev` modes; in every other mode the Worker entry removes inbound `oai-*` headers before the app runs. App code reads the caller with `currentUser()` from `lib/identity.ts` and never reads these headers itself.
+
 Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
 
 The user ID is stable for the same user on the same Site and different across Sites. Use it as the durable user key; use email and name for display or contact purposes.
 
 SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
 
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
+The adapter treats the full name as optional: `currentUser()` returns `{ userId, email, displayName, fullName }`, where `displayName` falls back to the email when no full name is present.
 
 ## Optional Dispatch-Owned ChatGPT Sign-In
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs optional or required ChatGPT sign-in:
+Use these helpers when the site needs optional or required sign-in:
 
-- Use `getChatGPTUser()` for optional signed-in UI.
+- Use `currentUser()` from `lib/identity.ts` for optional signed-in UI in server code; it returns `null` for anonymous requests.
 - Use the returned `userId` as the stable user key for user-owned records; do not use email as a durable identifier.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send anonymous visitors through Sign in with ChatGPT.
-- In a Server Component, start sign-in with `<a href={chatGPTSignInPath(returnTo)} target="_top">`. The auth helper module is server-only; do not import it into a Client Component.
+- Use `requireChatGPTUser(returnTo)` from `app/chatgpt-auth.ts` for server-rendered pages that should send anonymous visitors to sign-in. That module is server-only; do not import it into a Client Component.
+- Build links with `signInPath(returnTo)` and `signOutPath(returnTo)` from `lib/auth-paths.ts` (usable in Client Components too), for example `<a href={signInPath(returnTo)} target="_top">`.
 - Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
 - Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
-- Use `chatGPTSignOutPath(returnTo)` for browser sign-out links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity headers.
+- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out, normally the current location so that deep links survive. The helpers validate and safely encode it.
+- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Routes that do not import and call the helper remain anonymous-compatible.
+Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Outside Sites, the development server answers them in `dev` mode and the Worker entry answers them in the other modes: in `cloudflare-access` mode sign-in returns to the return path once Access has authenticated the request (401 otherwise) and sign-out redirects to `/cdn-cgi/access/logout`; without an interactive sign-in they answer 401. The workspace's sign-in button says "Sign in with ChatGPT" only in the Sites build and on the development server, and "Sign in" in every other build (`signInLabel()` in `lib/auth-paths.ts`). Routes that do not call the helpers remain anonymous-compatible.
 
 SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
 
@@ -115,6 +99,7 @@ Replace the filename with the pending migration and `DB` with your D1 binding na
 - `npm run build`: build the deployable Sites artifact
 - `npm run start`: preview the built Worker locally with D1/R2 support
 - `npm run db:generate`: generate Drizzle migrations after schema changes
+- `npm run seed:demo`: seed the persona demo practice into a running dev server
 - `npm run check`: run everything CI runs for this workspace (`format:check`, `typecheck`, `lint`, `test`, `build`, `check:harnesses`); each step is also its own script
 
 When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.
