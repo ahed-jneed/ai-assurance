@@ -10,6 +10,7 @@ import {
 } from "@/lib/store";
 import { activeJobGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
+import { claimResponse } from "@/lib/external-worker-contract";
 import type { Artifact } from "@/lib/domain";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
@@ -211,17 +212,19 @@ export async function POST(request: Request) {
           .bind(now(), w.id),
       ]);
       if (!changed[0].meta.changes) return Response.json({ idle: true });
+      // queueExternal sized this body with claimResponseBytes.
       return Response.json(
-        {
-          jobId: j.id,
-          attemptId,
-          fence,
-          nonce,
-          leaseUntil,
-          requestSha256: j.request_sha256,
-          requestJSON: j.request,
-          request: JSON.parse(j.request),
-        },
+        claimResponse(
+          {
+            jobId: j.id,
+            attemptId,
+            fence,
+            nonce,
+            leaseUntil,
+            requestSha256: j.request_sha256,
+          },
+          j.request,
+        ),
         { headers: { "Cache-Control": "no-store" } },
       );
     }
