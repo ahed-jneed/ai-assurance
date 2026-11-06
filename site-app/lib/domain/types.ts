@@ -2,6 +2,7 @@
 // roles people act in.
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
+import type { EngagementCriteria } from "../criteria/types";
 import type { Decision, Plan } from "../statistics";
 import type { QualityReview } from "./quality-review";
 import type {
@@ -432,6 +433,12 @@ export type Engagement = {
   classification: Classification;
   /** Written once at creation; absent on engagements created before stamps. */
   rulePack?: RulePackStamp;
+  /**
+   * The criteria pack the engagement is pinned to (docs/design/criteria-model.md
+   * section 10). Written at creation; absent on engagements created before
+   * pins, which resolve to the read-time legacy pin (lib/criteria/registry.ts).
+   */
+  criteria?: EngagementCriteria;
   papers: Paper[];
   artifacts: Artifact[];
   evidenceRequests?: EvidenceRequest[];

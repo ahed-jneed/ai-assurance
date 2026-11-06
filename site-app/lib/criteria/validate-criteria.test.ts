@@ -80,231 +80,357 @@ describe("criteria schema", () => {
   const cw = () => structuredClone(newPack.documents[4]) as Json;
   const idx = () => structuredClone(aiActSample.index) as Json;
   const documentMutations: [string, () => Json][] = [
-    ["a migrated superset_of link", () => {
-      const p = pack();
-      p.controlObjectives[0].addresses[0].relationship = "superset_of";
-      return p;
-    }],
-    ["text under paraphrased_titles", () => {
-      const f = fw();
-      f.requirements[1].text = "Clause text";
-      return f;
-    }],
-    ["an 81-character title under paraphrased_titles", () => {
-      const f = fw();
-      f.requirements[1].title = "x".repeat(81);
-      return f;
-    }],
-    ["a title under identifiers_only", () => {
-      const f = fw();
-      f.licence.textPolicy = "identifiers_only";
-      return f;
-    }],
-    ["an audit programme without reporting", () => {
-      const p = pack();
-      delete p.reporting;
-      return p;
-    }],
-    ["an audit programme without a primary set", () => {
-      const p = pack();
-      p.criteria[0].role = "supporting";
-      return p;
-    }],
-    ["an unknown feature", () => {
-      const p = pack();
-      p.features.soc2 = true;
-      return p;
-    }],
-    ["a feature that is not a boolean", () => {
-      const p = pack();
-      p.features.annexIvIndex = "yes";
-      return p;
-    }],
-    ["compat.obligations without order", () => {
-      const f = structuredClone(aiActSample.documents[0]) as Json;
-      delete f.compat.obligations.order;
-      return f;
-    }],
-    ["the first draft's methodologyVersions map", () => {
-      const p = pack();
-      p.methodologyVersions = { "2026.10.1": "2026.10.1" };
-      return p;
-    }],
-    ["a working paper without objectives", () => {
-      const p = pack();
-      p.items[0].objectiveIds = [];
-      return p;
-    }],
-    ["a working paper with 31 steps", () => {
-      const p = pack();
-      p.items[0].procedures = Array.from({ length: 31 }, (_, i) => ({
-        id: `WP-A09-01-P${i + 10}`,
-        text: "Step",
-      }));
-      return p;
-    }],
-    ["an item without evidence", () => {
-      const p = pack();
-      p.items[0].evidenceRequired = [];
-      return p;
-    }],
-    ["an http source", () => {
-      const f = fw();
-      f.sources[0].url = "http://www.iso.org/standard/42001";
-      return f;
-    }],
-    ["a verified fact without a check date", () => {
-      const f = fw();
-      delete f.defaultProvenance.checkedAt;
-      return f;
-    }],
-    ["exhaustive on a requirement", () => {
-      const f = fw();
-      f.requirements[1].exhaustive = true;
-      return f;
-    }],
-    ["replacedBy without deprecated", () => {
-      const f = fw();
-      f.requirements[1].replacedBy = ["8.2"];
-      return f;
-    }],
-    ["a bad requirement id", () => {
-      const f = fw();
-      f.requirements[1].id = "6 1 2";
-      return f;
-    }],
-    ["a bad requirement reference", () => {
-      const p = pack();
-      p.controlObjectives[0].addresses[0].requirement = "AIA-ART-9";
-      return p;
-    }],
-    ["an unknown relationship", () => {
-      const c = cw();
-      c.entries[0].relationship = "equivalent_to";
-      return c;
-    }],
-    ["an unknown rationale", () => {
-      const c = cw();
-      c.entries[0].rationale = "intuitive";
-      return c;
-    }],
-    ["a crosswalk without a use case", () => {
-      const c = cw();
-      delete c.useCase;
-      return c;
-    }],
-    ["a crosswalk-only pack with items", () => {
-      const p = pack();
-      p.kind = "crosswalk_only";
-      p.crosswalks = [{ id: "x-to-y", version: "2027.1.0" }];
-      return p;
-    }],
-    ["a bad data version", () => {
-      const p = pack();
-      p.version = "2026.13.1";
-      return p;
-    }],
+    [
+      "a migrated superset_of link",
+      () => {
+        const p = pack();
+        p.controlObjectives[0].addresses[0].relationship = "superset_of";
+        return p;
+      },
+    ],
+    [
+      "text under paraphrased_titles",
+      () => {
+        const f = fw();
+        f.requirements[1].text = "Clause text";
+        return f;
+      },
+    ],
+    [
+      "an 81-character title under paraphrased_titles",
+      () => {
+        const f = fw();
+        f.requirements[1].title = "x".repeat(81);
+        return f;
+      },
+    ],
+    [
+      "a title under identifiers_only",
+      () => {
+        const f = fw();
+        f.licence.textPolicy = "identifiers_only";
+        return f;
+      },
+    ],
+    [
+      "an audit programme without reporting",
+      () => {
+        const p = pack();
+        delete p.reporting;
+        return p;
+      },
+    ],
+    [
+      "an audit programme without a primary set",
+      () => {
+        const p = pack();
+        p.criteria[0].role = "supporting";
+        return p;
+      },
+    ],
+    [
+      "an unknown feature",
+      () => {
+        const p = pack();
+        p.features.soc2 = true;
+        return p;
+      },
+    ],
+    [
+      "a feature that is not a boolean",
+      () => {
+        const p = pack();
+        p.features.annexIvIndex = "yes";
+        return p;
+      },
+    ],
+    [
+      "compat.obligations without order",
+      () => {
+        const f = structuredClone(aiActSample.documents[0]) as Json;
+        delete f.compat.obligations.order;
+        return f;
+      },
+    ],
+    [
+      "the first draft's methodologyVersions map",
+      () => {
+        const p = pack();
+        p.methodologyVersions = { "2026.10.1": "2026.10.1" };
+        return p;
+      },
+    ],
+    [
+      "a working paper without objectives",
+      () => {
+        const p = pack();
+        p.items[0].objectiveIds = [];
+        return p;
+      },
+    ],
+    [
+      "a working paper with 31 steps",
+      () => {
+        const p = pack();
+        p.items[0].procedures = Array.from({ length: 31 }, (_, i) => ({
+          id: `WP-A09-01-P${i + 10}`,
+          text: "Step",
+        }));
+        return p;
+      },
+    ],
+    [
+      "an item without evidence",
+      () => {
+        const p = pack();
+        p.items[0].evidenceRequired = [];
+        return p;
+      },
+    ],
+    [
+      "an http source",
+      () => {
+        const f = fw();
+        f.sources[0].url = "http://www.iso.org/standard/42001";
+        return f;
+      },
+    ],
+    [
+      "a verified fact without a check date",
+      () => {
+        const f = fw();
+        delete f.defaultProvenance.checkedAt;
+        return f;
+      },
+    ],
+    [
+      "exhaustive on a requirement",
+      () => {
+        const f = fw();
+        f.requirements[1].exhaustive = true;
+        return f;
+      },
+    ],
+    [
+      "replacedBy without deprecated",
+      () => {
+        const f = fw();
+        f.requirements[1].replacedBy = ["8.2"];
+        return f;
+      },
+    ],
+    [
+      "a bad requirement id",
+      () => {
+        const f = fw();
+        f.requirements[1].id = "6 1 2";
+        return f;
+      },
+    ],
+    [
+      "a bad requirement reference",
+      () => {
+        const p = pack();
+        p.controlObjectives[0].addresses[0].requirement = "AIA-ART-9";
+        return p;
+      },
+    ],
+    [
+      "an unknown relationship",
+      () => {
+        const c = cw();
+        c.entries[0].relationship = "equivalent_to";
+        return c;
+      },
+    ],
+    [
+      "an unknown rationale",
+      () => {
+        const c = cw();
+        c.entries[0].rationale = "intuitive";
+        return c;
+      },
+    ],
+    [
+      "a crosswalk without a use case",
+      () => {
+        const c = cw();
+        delete c.useCase;
+        return c;
+      },
+    ],
+    [
+      "a crosswalk-only pack with items",
+      () => {
+        const p = pack();
+        p.kind = "crosswalk_only";
+        p.crosswalks = [{ id: "x-to-y", version: "2027.1.0" }];
+        return p;
+      },
+    ],
+    [
+      "a bad data version",
+      () => {
+        const p = pack();
+        p.version = "2026.13.1";
+        return p;
+      },
+    ],
   ];
   const indexMutations: [string, () => Json][] = [
-    ["a released entry without approvals", () => {
-      const i = idx();
-      delete i.documents[1].approvals;
-      return i;
-    }],
-    ["a released entry without a digest", () => {
-      const i = idx();
-      delete i.documents[1].sha256;
-      return i;
-    }],
-    ["a released entry without releasedAt", () => {
-      const i = idx();
-      delete i.documents[1].releasedAt;
-      return i;
-    }],
-    ["two approvals in one role", () => {
-      const i = idx();
-      i.documents[1].approvals.push({
-        role: "methodology_owner",
-        by: "Other",
-        at: "2026-12-01",
-      });
-      return i;
-    }],
-    ["an unknown role", () => {
-      const i = idx();
-      i.documents[1].approvals[0].role = "auditor";
-      return i;
-    }],
-    ["the first draft's approvedBy field", () => {
-      const i = idx();
-      i.documents[1].approvedBy = "Owner";
-      return i;
-    }],
-    ["legalReview completed without a legal reviewer", () => {
-      const i = idx();
-      i.documents[0].legalReview = "completed";
-      return i;
-    }],
-    ["legalReview pending with a legal reviewer", () => {
-      const i = idx();
-      i.documents[0].approvals.push({
-        role: "legal_reviewer",
-        by: "Counsel",
-        at: "2026-12-02",
-      });
-      return i;
-    }],
-    ["legalReview on a pack entry", () => {
-      const i = idx();
-      i.documents[1].legalReview = "pending";
-      return i;
-    }],
-    ["an unknown legalReview value", () => {
-      const i = idx();
-      i.documents[0].legalReview = "waived";
-      return i;
-    }],
-    ["edition on a pack entry", () => {
-      const i = idx();
-      i.documents[1].edition = "2026";
-      return i;
-    }],
-    ["a framework entry without an edition", () => {
-      const i = idx();
-      delete i.documents[0].edition;
-      return i;
-    }],
-    ["selectable on a framework entry", () => {
-      const i = idx();
-      i.documents[0].selectable = true;
-      return i;
-    }],
-    ["a withdrawn entry without a reason", () => {
-      const i = idx();
-      i.documents[1].status = "withdrawn";
-      i.documents[1].withdrawnAt = "2026-12-05";
-      return i;
-    }],
-    ["an unknown status", () => {
-      const i = idx();
-      i.documents[1].status = "retired";
-      return i;
-    }],
-    ["a legacy stamp key with a space", () => {
-      const i = idx();
-      i.legacy.stamps["rule pack"] = "2026.10.1";
-      return i;
-    }],
-    ["a legacy stamp value that is not a version", () => {
-      const i = idx();
-      i.legacy.stamps["2026.11.1"] = "latest";
-      return i;
-    }],
-    ["an index without legacy", () => {
-      const i = idx();
-      delete i.legacy;
-      return i;
-    }],
+    [
+      "a released entry without approvals",
+      () => {
+        const i = idx();
+        delete i.documents[1].approvals;
+        return i;
+      },
+    ],
+    [
+      "a released entry without a digest",
+      () => {
+        const i = idx();
+        delete i.documents[1].sha256;
+        return i;
+      },
+    ],
+    [
+      "a released entry without releasedAt",
+      () => {
+        const i = idx();
+        delete i.documents[1].releasedAt;
+        return i;
+      },
+    ],
+    [
+      "two approvals in one role",
+      () => {
+        const i = idx();
+        i.documents[1].approvals.push({
+          role: "methodology_owner",
+          by: "Other",
+          at: "2026-12-01",
+        });
+        return i;
+      },
+    ],
+    [
+      "an unknown role",
+      () => {
+        const i = idx();
+        i.documents[1].approvals[0].role = "auditor";
+        return i;
+      },
+    ],
+    [
+      "the first draft's approvedBy field",
+      () => {
+        const i = idx();
+        i.documents[1].approvedBy = "Owner";
+        return i;
+      },
+    ],
+    [
+      "legalReview completed without a legal reviewer",
+      () => {
+        const i = idx();
+        i.documents[0].legalReview = "completed";
+        return i;
+      },
+    ],
+    [
+      "legalReview pending with a legal reviewer",
+      () => {
+        const i = idx();
+        i.documents[0].approvals.push({
+          role: "legal_reviewer",
+          by: "Counsel",
+          at: "2026-12-02",
+        });
+        return i;
+      },
+    ],
+    [
+      "legalReview on a pack entry",
+      () => {
+        const i = idx();
+        i.documents[1].legalReview = "pending";
+        return i;
+      },
+    ],
+    [
+      "an unknown legalReview value",
+      () => {
+        const i = idx();
+        i.documents[0].legalReview = "waived";
+        return i;
+      },
+    ],
+    [
+      "edition on a pack entry",
+      () => {
+        const i = idx();
+        i.documents[1].edition = "2026";
+        return i;
+      },
+    ],
+    [
+      "a framework entry without an edition",
+      () => {
+        const i = idx();
+        delete i.documents[0].edition;
+        return i;
+      },
+    ],
+    [
+      "selectable on a framework entry",
+      () => {
+        const i = idx();
+        i.documents[0].selectable = true;
+        return i;
+      },
+    ],
+    [
+      "a withdrawn entry without a reason",
+      () => {
+        const i = idx();
+        i.documents[1].status = "withdrawn";
+        i.documents[1].withdrawnAt = "2026-12-05";
+        return i;
+      },
+    ],
+    [
+      "an unknown status",
+      () => {
+        const i = idx();
+        i.documents[1].status = "retired";
+        return i;
+      },
+    ],
+    [
+      "a legacy stamp key with a space",
+      () => {
+        const i = idx();
+        i.legacy.stamps["rule pack"] = "2026.10.1";
+        return i;
+      },
+    ],
+    [
+      "a legacy stamp value that is not a version",
+      () => {
+        const i = idx();
+        i.legacy.stamps["2026.11.1"] = "latest";
+        return i;
+      },
+    ],
+    [
+      "an index without legacy",
+      () => {
+        const i = idx();
+        delete i.legacy;
+        return i;
+      },
+    ],
   ];
   it.each([...documentMutations, ...indexMutations])("rejects %s", (_, make) =>
     expect(validate(make())).toBe(false),
@@ -320,182 +446,356 @@ describe("criteria integrity rules", () => {
     });
   });
 
-  const cases: [string, string, (c: ReturnType<typeof criteria>) => void][] =
+  const cases: [string, string, (c: ReturnType<typeof criteria>) => void][] = [
     [
-      ["rule 1", "duplicate requirement id", (c) => {
+      "rule 1",
+      "duplicate requirement id",
+      (c) => {
         doc(c, ISO).requirements[2].id = "6.1.2";
-      }],
-      ["rule 1", "duplicate alias", (c) => {
+      },
+    ],
+    [
+      "rule 1",
+      "duplicate alias",
+      (c) => {
         doc(c, ISO).requirements[1].aliases = ["A"];
         doc(c, ISO).requirements[2].aliases = ["A"];
-      }],
-      ["rule 2", "not a group of this document", (c) => {
+      },
+    ],
+    [
+      "rule 2",
+      "not a group of this document",
+      (c) => {
         doc(c, ISO).requirements[1].parent = "8.2";
-      }],
-      ["rule 2", "form a cycle", (c) => {
+      },
+    ],
+    [
+      "rule 2",
+      "form a cycle",
+      (c) => {
         const r = doc(c, ISO).requirements;
         r[0].parent = "8";
         r[3].parent = "6";
-      }],
-      ["rule 2", "has no children", (c) => {
+      },
+    ],
+    [
+      "rule 2",
+      "has no children",
+      (c) => {
         doc(c, ISO).requirements[4].parent = "6";
-      }],
-      ["rule 3", "replaced by", (c) => {
+      },
+    ],
+    [
+      "rule 3",
+      "replaced by",
+      (c) => {
         Object.assign(doc(c, ISO).requirements[2], {
           deprecated: true,
           replacedBy: ["9.9"],
         });
-      }],
-      ["rule 4", "two criteria sets for framework", (c) => {
+      },
+    ],
+    [
+      "rule 4",
+      "two criteria sets for framework",
+      (c) => {
         doc(c, NP).criteria.push({
           framework: "en-18286",
           edition: "2026",
           version: "2027.1.0",
           role: "supporting",
         });
-      }],
-      ["rule 4", "is not an indexed framework", (c) => {
+      },
+    ],
+    [
+      "rule 4",
+      "is not an indexed framework",
+      (c) => {
         doc(c, NP).criteria[0].version = "2027.2.0";
-      }],
-      ["rule 4", "include", (c) => {
+      },
+    ],
+    [
+      "rule 4",
+      "include",
+      (c) => {
         doc(c, NP).criteria[1].include = ["7"];
-      }],
-      ["rule 5", "not in the pack's criteria sets", (c) => {
+      },
+    ],
+    [
+      "rule 5",
+      "not in the pack's criteria sets",
+      (c) => {
         doc(c, NP).controlObjectives[0].addresses[0].requirement =
           "iso-iec-42001:9.9";
-      }],
-      ["rule 5", "informative node", (c) => {
+      },
+    ],
+    [
+      "rule 5",
+      "informative node",
+      (c) => {
         doc(c, ISO).requirements[1].type = "informative";
-      }],
-      ["rule 5", "twice with rationale", (c) => {
+      },
+    ],
+    [
+      "rule 5",
+      "twice with rationale",
+      (c) => {
         const a = doc(c, NP).controlObjectives[0].addresses;
         a.push({ ...a[0], relationship: "intersects_with" });
-      }],
-      ["rule 6", "duplicate item id", (c) => {
+      },
+    ],
+    [
+      "rule 6",
+      "duplicate item id",
+      (c) => {
         doc(c, NP).items[1].id = "AIMS-S2-01";
-      }],
-      ["rule 6", "duplicate step id", (c) => {
+      },
+    ],
+    [
+      "rule 6",
+      "duplicate step id",
+      (c) => {
         doc(c, NP).items[0].procedures[1].id = "AIMS-S2-01-P01";
-      }],
-      ["rule 6", "unknown objective", (c) => {
+      },
+    ],
+    [
+      "rule 6",
+      "unknown objective",
+      (c) => {
         doc(c, NP).items[0].objectiveIds = ["CO-NONE"];
-      }],
-      ["rule 6", "is used by no item", (c) => {
+      },
+    ],
+    [
+      "rule 6",
+      "is used by no item",
+      (c) => {
         doc(c, NP).controlObjectives.push({
           ...doc(c, NP).controlObjectives[0],
           id: "CO-UNUSED",
         });
-      }],
-      ["rule 6", "unknown phase", (c) => {
+      },
+    ],
+    [
+      "rule 6",
+      "unknown phase",
+      (c) => {
         doc(c, NP).items[0].phase = "stage-3";
-      }],
-      ["rule 7", "no primary framework lists as an alias", (c) => {
+      },
+    ],
+    [
+      "rule 7",
+      "no primary framework lists as an alias",
+      (c) => {
         doc(c, NP).items[0].regulatoryRefs = ["Art.9"];
-      }],
-      ["rule 8", "role limitationMemo", (c) => {
+      },
+    ],
+    [
+      "rule 8",
+      "role limitationMemo",
+      (c) => {
         doc(c, NP).roles.limitationMemo = "MEM-XX-01";
-      }],
-      ["rule 8", "annexIvIndex needs", (c) => {
+      },
+    ],
+    [
+      "rule 8",
+      "annexIvIndex needs",
+      (c) => {
         doc(c, NP).features = { annexIvIndex: true };
-      }],
-      ["rule 8", "AI Act features need an eu-ai-act criteria set", (c) => {
+      },
+    ],
+    [
+      "rule 8",
+      "AI Act features need an eu-ai-act criteria set",
+      (c) => {
         doc(c, NP).features = { aiActClassification: true };
-      }],
-      ["rule 8", "needs compat.obligations", (c) => {
+      },
+    ],
+    [
+      "rule 8",
+      "needs compat.obligations",
+      (c) => {
         delete doc(c, F1).compat;
-      }],
-      ["rule 9", "is not in iso-iec-42001", (c) => {
+      },
+    ],
+    [
+      "rule 9",
+      "is not in iso-iec-42001",
+      (c) => {
         doc(c, XISO).entries[0].sources = ["6.1.3"];
-      }],
-      ["rule 9", "target AIA-99-9", (c) => {
+      },
+    ],
+    [
+      "rule 9",
+      "target AIA-99-9",
+      (c) => {
         doc(c, XISO).entries[0].target = "AIA-99-9";
-      }],
-      ["rule 9", "duplicate entry id", (c) => {
+      },
+    ],
+    [
+      "rule 9",
+      "duplicate entry id",
+      (c) => {
         doc(c, XISO).entries[1].id = "X1";
-      }],
-      ["rule 10", "legal review is not completed", (c) => {
+      },
+    ],
+    [
+      "rule 10",
+      "legal review is not completed",
+      (c) => {
         doc(c, EN).licence.status = "confirmed";
         release(c, EN);
         release(c, XEN);
-      }],
-      ["rule 10", "only with the methodology owner's and a legal reviewer's", (c) => {
+      },
+    ],
+    [
+      "rule 10",
+      "only with the methodology owner's and a legal reviewer's",
+      (c) => {
         doc(c, EN).licence.status = "confirmed";
         release(c, EN);
         doc(c, XEN).entries[0].legalEffect.provenance.legalReview = "completed";
         release(c, XEN);
-      }],
-      ["rule 12a", "is listed but missing", (c) => {
+      },
+    ],
+    [
+      "rule 12a",
+      "is listed but missing",
+      (c) => {
         c.documents.delete(XISO);
-      }],
-      ["rule 12a", "is not listed in index.json", (c) => {
+      },
+    ],
+    [
+      "rule 12a",
+      "is not listed in index.json",
+      (c) => {
         c.index.documents = c.index.documents.filter(
           (e: Json) => e.path !== XISO,
         );
-      }],
-      ["rule 12a", "does not match the document", (c) => {
+      },
+    ],
+    [
+      "rule 12a",
+      "does not match the document",
+      (c) => {
         doc(c, ISO).version = "2027.1.1";
-      }],
-      ["rule 12a", "versions must increase", (c) => {
+      },
+    ],
+    [
+      "rule 12a",
+      "versions must increase",
+      (c) => {
         c.index.documents.push({ ...entry(c, ISO) });
-      }],
-      ["rule 12a", "only audit programmes are selectable", (c) => {
+      },
+    ],
+    [
+      "rule 12a",
+      "only audit programmes are selectable",
+      (c) => {
         doc(c, NP).kind = "crosswalk_only";
         doc(c, NP).items = [];
         doc(c, NP).controlObjectives = [];
         doc(c, NP).crosswalks = [
           { id: "iso-iec-42001-to-eu-ai-act", version: "2027.1.0" },
         ];
-      }],
-      ["rule 12b", "is not the JCS digest", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "is not the JCS digest",
+      (c) => {
         doc(c, P1).title = "Changed";
-      }],
-      ["rule 12b", "unconfirmed licence cannot be released", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "unconfirmed licence cannot be released",
+      (c) => {
         release(c, ISO);
-      }],
-      ["rule 12b", "references a draft", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "references a draft",
+      (c) => {
         doc(c, ISO).licence.status = "confirmed";
         release(c, ISO);
         release(c, NP);
-      }],
-      ["rule 12b", "defaults.pack", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "defaults.pack",
+      (c) => {
         c.index.defaults.pack = { id: "en18286-iso42001", version: "2027.1.0" };
-      }],
-      ["rule 12b", "legacy: eu-ai-act-amended 2027.1.0", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "legacy: eu-ai-act-amended 2027.1.0",
+      (c) => {
         c.index.legacy.stamps["2027.1.0"] = "2027.1.0";
-      }],
-      ["rule 12b", "legacy: en18286-iso42001", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "legacy: en18286-iso42001",
+      (c) => {
         c.index.legacy.packId = "en18286-iso42001";
-      }],
-      ["rule 12b", "records legalReview", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "records legalReview",
+      (c) => {
         delete entry(c, F1).legalReview;
-      }],
-      ["rule 12b", "needs the methodology owner's approval", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "needs the methodology owner's approval",
+      (c) => {
         entry(c, F1).approvals = [
           { role: "legal_reviewer", by: "Counsel", at: "2026-11-06" },
         ];
         entry(c, F1).legalReview = "completed";
-      }],
-      ["rule 12b", "two different people", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "two different people",
+      (c) => {
         entry(c, F1).approvals.push({
           role: "legal_reviewer",
           by: " AHED-JNEED (methodology owner, by merging #27) ",
           at: "2026-11-07",
         });
         entry(c, F1).legalReview = "completed";
-      }],
-      ["rule 12b", "only legislation frameworks record legalReview", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "only legislation frameworks record legalReview",
+      (c) => {
         doc(c, ISO).licence.status = "confirmed";
         release(c, ISO);
         entry(c, ISO).legalReview = "pending";
-      }],
-      ["rule 12b", "legal reviewer's approval belongs only", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "legal reviewer's approval belongs only",
+      (c) => {
         entry(c, P1).approvals.push({
           role: "legal_reviewer",
           by: "Counsel",
           at: "2026-11-07",
         });
-      }],
-      ["rule 12b", "same person, crosswalk with a legal effect", (c) => {
+      },
+    ],
+    [
+      "rule 12b",
+      "same person, crosswalk with a legal effect",
+      (c) => {
         doc(c, EN).licence.status = "confirmed";
         release(c, EN);
         doc(c, XEN).entries[0].legalEffect.provenance.legalReview = "completed";
@@ -505,8 +805,9 @@ describe("criteria integrity rules", () => {
           by: "owner",
           at: "2027-01-15",
         });
-      }],
-    ];
+      },
+    ],
+  ];
   it.each(cases)("%s rejects: %s", (rule, message, mutate) => {
     const c = criteria();
     mutate(c);
@@ -597,43 +898,64 @@ describe("rule 13: index history", () => {
   const rejected: [string, (i: Json) => void, Json?][] = [
     ["a released entry removed", (i) => i.documents.splice(1, 1)],
     ["a changed digest", (i) => (packEntry(i).sha256 = "0".repeat(64))],
-    ["a changed approval", (i) => (packEntry(i).approvals[0].at = "2026-11-07")],
+    [
+      "a changed approval",
+      (i) => (packEntry(i).approvals[0].at = "2026-11-07"),
+    ],
     ["a changed release date", (i) => (packEntry(i).releasedAt = "2026-11-07")],
-    ["a legal reviewer's approval appended to a pack", (i) =>
-      packEntry(i).approvals.push({
-        role: "legal_reviewer",
-        by: "Counsel",
-        at: "2026-12-01",
-      })],
-    ["a legal reviewer's approval inserted before the existing one", (i) => {
-      fwEntry(i).approvals.unshift({
-        role: "legal_reviewer",
-        by: "Counsel",
-        at: "2026-12-01",
-      });
-      fwEntry(i).legalReview = "completed";
-    }],
-    ["a legal reviewer's approval dated before the release", (i) => {
-      fwEntry(i).approvals.push({
-        role: "legal_reviewer",
-        by: "Counsel",
-        at: "2026-11-01",
-      });
-      fwEntry(i).legalReview = "completed";
-    }],
-    ["an approval appended without legalReview completed", (i) =>
-      fwEntry(i).approvals.push({
-        role: "legal_reviewer",
-        by: "Counsel",
-        at: "2026-12-01",
-      })],
-    ["legalReview completed without an approval", (i) =>
-      (fwEntry(i).legalReview = "completed")],
+    [
+      "a legal reviewer's approval appended to a pack",
+      (i) =>
+        packEntry(i).approvals.push({
+          role: "legal_reviewer",
+          by: "Counsel",
+          at: "2026-12-01",
+        }),
+    ],
+    [
+      "a legal reviewer's approval inserted before the existing one",
+      (i) => {
+        fwEntry(i).approvals.unshift({
+          role: "legal_reviewer",
+          by: "Counsel",
+          at: "2026-12-01",
+        });
+        fwEntry(i).legalReview = "completed";
+      },
+    ],
+    [
+      "a legal reviewer's approval dated before the release",
+      (i) => {
+        fwEntry(i).approvals.push({
+          role: "legal_reviewer",
+          by: "Counsel",
+          at: "2026-11-01",
+        });
+        fwEntry(i).legalReview = "completed";
+      },
+    ],
+    [
+      "an approval appended without legalReview completed",
+      (i) =>
+        fwEntry(i).approvals.push({
+          role: "legal_reviewer",
+          by: "Counsel",
+          at: "2026-12-01",
+        }),
+    ],
+    [
+      "legalReview completed without an approval",
+      (i) => (fwEntry(i).legalReview = "completed"),
+    ],
     ["a released entry back in draft", (i) => (packEntry(i).status = "draft")],
-    ["a changed fallbackVersion", (i) =>
-      (i.legacy.fallbackVersion = "2026.11.3")],
-    ["a changed stamps entry", (i) =>
-      (i.legacy.stamps["2026.11.1"] = "2026.11.3")],
+    [
+      "a changed fallbackVersion",
+      (i) => (i.legacy.fallbackVersion = "2026.11.3"),
+    ],
+    [
+      "a changed stamps entry",
+      (i) => (i.legacy.stamps["2026.11.1"] = "2026.11.3"),
+    ],
     ["a removed stamps entry", (i) => delete i.legacy.stamps["2026.11.1"]],
   ];
   it.each(rejected)("rejects %s", (_, mutate) => {
