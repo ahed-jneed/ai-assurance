@@ -320,6 +320,12 @@ export type Report = {
   clientSnapshot?: Record<string, unknown>;
   clientSha256?: string;
   release?: Release;
+  /**
+   * The earlier released reports this released report replaced, by id. Set
+   * on the client projection, which shows no release records, so a client
+   * sees why an earlier report is no longer listed.
+   */
+  replaces?: string[];
 };
 export type Engagement = {
   workflow?: Workflow;

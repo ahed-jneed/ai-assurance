@@ -340,6 +340,13 @@ export function FrozenReportDetails({ value }: { value: Row }) {
           Fixed snapshot
         </span>
       </div>
+      {Array.isArray(value.replaces) && value.replaces.length > 0 && (
+        <p className="subtle report-replaces">
+          Replaces {value.replaces.map((id) => text(id)).join(", ")}. A released
+          report is replaced when a newer one is released, so the earlier report
+          is no longer listed.
+        </p>
+      )}
       <Tabs
         value={section}
         onValueChange={setSection}
