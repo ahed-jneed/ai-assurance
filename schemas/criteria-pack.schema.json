@@ -1014,7 +1014,7 @@
         },
         "status": { "enum": ["draft", "released", "withdrawn"] },
         "approvals": {
-          "description": "Release approvals, at most one per role (design section 18, Q4). Validator rule 12b: a framework of kind legislation, implementing_act or local_law needs a legal_reviewer approval; every other document a methodology_owner approval; a crosswalk with a legalEffect entry both, given by two different people.",
+          "description": "Release approvals, at most one per role (design section 18, Q4). Validator rule 12b: every released document needs a methodology_owner approval; a framework of kind legislation, implementing_act or local_law also carries legalReview, and its legal_reviewer approval is present exactly when legalReview is completed; a crosswalk with a legalEffect entry needs both approvals at release. Two approvals of one entry come from two different people. Rule 13 freezes approvals once released, except that the legal_reviewer approval of a pending legal review may be appended later.",
           "type": "array",
           "minItems": 1,
           "maxItems": 2,
@@ -1035,6 +1035,10 @@
               "maxContains": 1
             }
           ]
+        },
+        "legalReview": {
+          "description": "Frameworks of kind legislation, implementing_act or local_law only (validator rule 12b): the status of their qualified legal review (Q4, option b). pending: released by the methodology owner, shown everywhere as pending legal review. completed: the legal_reviewer approval is recorded. Rule 13 allows only the move from pending to completed, by appending that approval; the document itself never changes.",
+          "enum": ["pending", "completed"]
         },
         "releasedAt": { "$ref": "#/$defs/date" },
         "withdrawnAt": { "$ref": "#/$defs/date" },
@@ -1067,7 +1071,40 @@
             "required": ["documentType"]
           },
           "then": { "required": ["edition"] },
-          "else": { "not": { "required": ["edition"] } }
+          "else": { "not": { "anyOf": [{ "required": ["edition"] }, { "required": ["legalReview"] }] } }
+        },
+        {
+          "if": {
+            "properties": { "legalReview": { "const": "completed" } },
+            "required": ["legalReview"]
+          },
+          "then": {
+            "required": ["approvals"],
+            "properties": {
+              "approvals": {
+                "contains": {
+                  "properties": { "role": { "const": "legal_reviewer" } }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "legalReview": { "const": "pending" } },
+            "required": ["legalReview"]
+          },
+          "then": {
+            "properties": {
+              "approvals": {
+                "not": {
+                  "contains": {
+                    "properties": { "role": { "const": "legal_reviewer" } }
+                  }
+                }
+              }
+            }
+          }
         },
         {
           "if": {

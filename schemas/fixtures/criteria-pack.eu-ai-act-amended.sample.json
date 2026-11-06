@@ -3,7 +3,59 @@
   "schemaVersion": "1.0.0",
   "purpose": "fixture",
   "title": "EU AI Act (amended) pack 2026.10.1 - three sample requirements",
-  "notes": "Draft fixture for design issue #26. Source: templates/catalog.json and docs/obligation-subitems.json at commit 74c6463. Items WP-A09-01, WP-XC-01 and WP-XC-07 are copied verbatim; requirements Art. 9 (with 9(1)), Art. 17 and Art. 50, plus Art. 16 because WP-XC-01 cites it. Not a release: no index entry and no approval.",
+  "notes": "Draft fixture for design issue #26. Source: templates/catalog.json and docs/obligation-subitems.json at commit 74c6463. Items WP-A09-01, WP-XC-01 and WP-XC-07 are copied verbatim; requirements Art. 9 (with 9(1)), Art. 17 and Art. 50, plus Art. 16 because WP-XC-01 cites it. Not a release. The index shows how the two documents are listed once released under Q4 option (b): the methodology owner releases the framework while its qualified legal review is pending, and the legal reviewer's approval is appended later. The digests are the real JCS digests of the two documents; names and dates are example values.",
+  "index": {
+    "documentType": "index",
+    "schemaVersion": "1.0.0",
+    "documents": [
+      {
+        "documentType": "framework",
+        "id": "eu-ai-act",
+        "edition": "02024R1689-20260727",
+        "version": "2026.10.1",
+        "path": "frameworks/eu-ai-act/02024R1689-20260727/2026.10.1.json",
+        "sha256": "2decbb4a6c55cb4a0e830e77670c01f63728adab8b88e15f239dcd985e996f46",
+        "status": "released",
+        "approvals": [
+          {
+            "role": "methodology_owner",
+            "by": "Methodology owner (example)",
+            "at": "2026-12-01"
+          }
+        ],
+        "legalReview": "pending",
+        "releasedAt": "2026-12-01"
+      },
+      {
+        "documentType": "pack",
+        "id": "eu-ai-act-amended",
+        "version": "2026.10.1",
+        "path": "packs/eu-ai-act-amended/2026.10.1.json",
+        "sha256": "fd88e15ff804f756949ebcd4f48b93c720f7d5b3abf09aa9035d03e2ed10a8dc",
+        "status": "released",
+        "approvals": [
+          {
+            "role": "methodology_owner",
+            "by": "Methodology owner (example)",
+            "at": "2026-12-01"
+          }
+        ],
+        "releasedAt": "2026-12-01",
+        "selectable": true
+      }
+    ],
+    "defaults": {
+      "pack": {
+        "id": "eu-ai-act-amended",
+        "version": "2026.10.1"
+      }
+    },
+    "legacy": {
+      "packId": "eu-ai-act-amended",
+      "fallbackVersion": "2026.10.1",
+      "stamps": {}
+    }
+  },
   "documents": [
     {
       "documentType": "framework",
