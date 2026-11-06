@@ -3,9 +3,11 @@
 // spreadsheets (.xlsx, .xlsm) from the first non-empty row of each
 // worksheet. Both are parsed here byte by byte, without executing anything
 // the file holds (no macros, formulas or external links are evaluated),
-// within fixed limits on the bytes read and decompressed, and in time linear
-// in those bytes: the XML is read by a scanner that never backtracks, so
-// malformed markup (unclosed tags or quotes) cannot make the scan quadratic.
+// within fixed limits on the bytes read and decompressed (one budget for the
+// whole package, so a part named many times, or many parts, cannot multiply
+// it), and in time linear in those bytes: the XML is read by a scanner that
+// never backtracks, so malformed markup (unclosed tags or quotes) cannot make
+// the scan quadratic.
 
 /** Column names, or why a recognised format could not be read. */
 export type BinaryHeader = { columns: string[] } | { unreadable: string };
@@ -229,10 +231,20 @@ const maxZipEntries = 20_000,
   maxWorksheets = 64,
   /** Decompressed bytes read from one worksheet to find its first row. */
   worksheetLimit = 4 * 1024 * 1024,
-  /** Decompressed bytes read from the shared strings table. */
-  sharedStringsLimit = 16 * 1024 * 1024,
   /** Decompressed bytes read from [Content_Types].xml. */
-  contentTypesLimit = 1024 * 1024;
+  contentTypesLimit = 1024 * 1024,
+  /**
+   * Decompressed bytes read from the whole package: content types, every
+   * worksheet and the shared strings share it, so the per-part limits do not
+   * add up (#125 review: 64 worksheets of 4 MiB and 16 MiB of shared strings
+   * took 31 s of CPU).
+   */
+  packageBudget = 16 * 1024 * 1024;
+
+/** The decompressed bytes a package may still produce. */
+type Budget = { left: number };
+/** The package budget was spent before the header rows were read. */
+class BudgetSpent extends Error {}
 
 type ZipEntry = {
   name: string;
@@ -282,14 +294,21 @@ function zipEntries(b: Uint8Array): ZipEntry[] {
 /**
  * The text of one ZIP entry, decompressed as a stream and stopped once
  * `done` says enough was read or `limit` bytes were produced. Null when the
- * limit was reached first.
+ * limit was reached first. Every byte produced is taken from `budget`, and
+ * BudgetSpent is thrown once the budget runs out before the limit does.
  */
 async function entryText(
   b: Uint8Array,
   entry: ZipEntry,
   limit: number,
+  budget: Budget,
   done: (text: string) => boolean = () => false,
 ): Promise<string | null> {
+  const cap = Math.min(limit, budget.left),
+    over = () => {
+      if (cap < limit) throw new BudgetSpent();
+      return null;
+    };
   const view = new DataView(b.buffer, b.byteOffset, b.byteLength),
     at = entry.localOffset;
   if (at + 30 > b.length || view.getUint32(at, true) !== 0x04034b50)
@@ -301,8 +320,10 @@ async function entryText(
   if (start + entry.compressedSize > b.length)
     throw new Malformed("truncated entry");
   if (entry.method === 0) {
-    const text = utf8.decode(data.subarray(0, limit));
-    return data.length > limit && !done(text) ? null : text;
+    const read = data.subarray(0, cap),
+      text = utf8.decode(read);
+    budget.left -= read.length;
+    return data.length > cap && !done(text) ? over() : text;
   }
   if (entry.method !== 8) throw new Malformed("unsupported compression");
   const reader = new Blob([data.slice()])
@@ -311,17 +332,27 @@ async function entryText(
       .getReader(),
     decoder = new TextDecoder("utf-8");
   let text = "",
-    produced = 0;
+    produced = 0,
+    // `done` reads the text, which joins the chunks appended since it last
+    // looked into one string: a copy of the whole text. Looking only once
+    // the text has grown by half keeps those copies linear in the text
+    // (looking after every 16 KiB chunk made 12 MiB take a second).
+    check = 0;
   try {
     for (;;) {
       const { value, done: ended } = await reader.read();
       if (ended) return text + decoder.decode();
       produced += value.byteLength;
+      budget.left = Math.max(0, budget.left - value.byteLength);
       text += decoder.decode(value, { stream: true });
-      if (done(text)) return text;
-      if (produced > limit) return null;
+      if (produced > cap) return done(text) ? text : over();
+      if (text.length >= check) {
+        if (done(text)) return text;
+        check = text.length + Math.max(64 * 1024, text.length >> 1);
+      }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof BudgetSpent) throw error;
     throw new Malformed("corrupt deflate data");
   } finally {
     void reader.cancel().catch(() => {});
@@ -337,6 +368,7 @@ const entities: Record<string, string> = {
 };
 /** XML character data with entities and OOXML's _xHHHH_ escapes decoded. */
 export function xmlText(s: string) {
+  if (!s.includes("&") && !s.includes("_")) return s;
   return s
     .replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, e: string) => {
       if (e[0] !== "#") return entities[e] ?? m;
@@ -718,7 +750,8 @@ export async function spreadsheetColumns(
       part = partIndex(entries),
       types = part("[Content_Types].xml");
     if (!types) return null;
-    const typesXml = await entryText(b, types, contentTypesLimit);
+    const budget: Budget = { left: packageBudget },
+      typesXml = await entryText(b, types, contentTypesLimit, budget);
     if (typesXml === null) throw new Malformed("content types too large");
     if (!/spreadsheetml|ms-excel/i.test(typesXml)) return null;
     const { overrides, defaults } = contentTypes(typesXml),
@@ -748,11 +781,11 @@ export async function spreadsheetColumns(
         unreadable:
           "the workbook has binary worksheets (.xlsb), which are not read",
       };
-    if (declared.length > maxWorksheets)
-      return { unreadable: "the workbook has more than 64 worksheets" };
     if (!declared.length)
       return { unreadable: "the workbook declares no worksheet" };
-    const sheets: ZipEntry[] = [];
+    // Each ZIP entry is read once, however many declarations name it or
+    // however many central-directory entries point at its local header.
+    const sheets = new Map<number, ZipEntry>();
     for (const s of declared) {
       const entry = part(s.name);
       if (!entry)
@@ -760,16 +793,19 @@ export async function spreadsheetColumns(
           unreadable:
             "worksheet " + s.name + " is declared but not in the workbook",
         };
-      sheets.push(entry);
+      if (!sheets.has(entry.localOffset)) sheets.set(entry.localOffset, entry);
+      if (sheets.size > maxWorksheets)
+        return { unreadable: "the workbook has more than 64 worksheets" };
     }
     const shared = overrides.find((o) => /\.sharedStrings\+xml$/i.test(o.type));
     const rows: Cell[][] = [];
-    for (const sheet of sheets) {
+    for (const sheet of sheets.values()) {
       const scan = firstRowScanner(),
         markup = await entryText(
           b,
           sheet,
           worksheetLimit,
+          budget,
           (t) => scan(t) !== undefined,
         ),
         cells = markup === null ? undefined : scan(markup, true);
@@ -792,13 +828,9 @@ export async function spreadsheetColumns(
       const entry = shared && part(shared.name);
       if (!entry) return { unreadable: "the shared strings table is missing" };
       const table = sharedStringsScanner(needed),
-        markup = await entryText(b, entry, sharedStringsLimit, table.feed);
-      if (markup === null)
-        return {
-          unreadable:
-            "the shared strings of the header rows are not within the first 16 MiB",
-        };
-      table.feed(markup);
+        // The package budget is the only limit on the shared strings.
+        markup = await entryText(b, entry, packageBudget, budget, table.feed);
+      if (markup !== null) table.feed(markup);
       strings = table.strings;
       if (strings.length <= needed)
         return { unreadable: "the shared strings table is incomplete" };
@@ -810,6 +842,11 @@ export async function spreadsheetColumns(
     }
     return { columns: [...columns] };
   } catch (error) {
+    if (error instanceof BudgetSpent)
+      return {
+        unreadable:
+          "the workbook decompresses to more than 16 MiB before its header rows are read",
+      };
     if (error instanceof Malformed)
       return {
         unreadable: "the spreadsheet could not be read: " + error.message,

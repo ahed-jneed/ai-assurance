@@ -346,6 +346,92 @@ describe("spreadsheetColumns", () => {
     expect(performance.now() - started).toBeLessThan(3000);
   });
 
+  it("reads each worksheet once, within one budget for the whole package", async () => {
+    // The #125 review probe: one worksheet named by 64 Overrides, about
+    // 4 MiB of filler before a header cell that points near the end of
+    // 16 MiB of shared strings. Without deduplication and one budget it
+    // decompressed about 272 MiB and took 31 s of CPU.
+    const mib = 1024 * 1024,
+      overrides = Array.from(
+        { length: 64 },
+        () =>
+          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+      ).join(""),
+      count = Math.floor((16 * mib) / "<si><t>x</t></si>".length),
+      probe = await zipArchive([
+        {
+          name: "[Content_Types].xml",
+          text:
+            '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+            overrides +
+            '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+        },
+        { name: "xl/workbook.xml", text: "<workbook/>" },
+        {
+          name: "xl/worksheets/sheet1.xml",
+          text:
+            "<worksheet><sheetData>" +
+            "<x>".repeat(Math.floor((4 * mib - 512) / 3)) +
+            '<row><c t="s"><v>' +
+            (count - 2) +
+            "</v></c></row></sheetData></worksheet>",
+        },
+        {
+          name: "xl/sharedStrings.xml",
+          text: "<sst>" + "<si><t>x</t></si>".repeat(count) + "</sst>",
+        },
+      ]);
+    expect(probe.length).toBeLessThan(200_000);
+    let started = performance.now();
+    expect(await spreadsheetColumns(probe)).toEqual({
+      unreadable:
+        "the workbook decompresses to more than 16 MiB before its header rows are read",
+    });
+    expect(performance.now() - started).toBeLessThan(3000);
+
+    // Many distinct worksheets share the budget too.
+    const sheets = Array.from(
+      { length: 20 },
+      () =>
+        "<x>".repeat(Math.floor(mib / 3)) +
+        '<row><c t="inlineStr"><is><t>a</t></is></c></row>',
+    );
+    started = performance.now();
+    expect(await spreadsheetColumns(await workbook(sheets))).toEqual({
+      unreadable:
+        "the workbook decompresses to more than 16 MiB before its header rows are read",
+    });
+    expect(performance.now() - started).toBeLessThan(3000);
+    expect(
+      await spreadsheetColumns(await workbook(sheets.slice(0, 12))),
+    ).toEqual({ columns: ["a"] });
+
+    // Central-directory entries that share one local header read it once:
+    // 64 of them are no more than one worksheet.
+    const shared = await workbook(
+        Array.from(
+          { length: 65 },
+          (_, i) =>
+            '<row><c t="inlineStr"><is><t>c' + i + "</t></is></c></row>",
+        ),
+      ),
+      view = new DataView(shared.buffer, shared.byteOffset, shared.byteLength),
+      eocd = shared.length - 22,
+      decoder = new TextDecoder();
+    let p = view.getUint32(eocd + 16, true),
+      first = -1;
+    for (let k = 0; k < view.getUint16(eocd + 10, true); k++) {
+      const nameLength = view.getUint16(p + 28, true),
+        name = decoder.decode(shared.subarray(p + 46, p + 46 + nameLength));
+      if (name.startsWith("xl/worksheets/")) {
+        if (first < 0) first = view.getUint32(p + 42, true);
+        else view.setUint32(p + 42, first, true);
+      }
+      p += 46 + nameLength;
+    }
+    expect(await spreadsheetColumns(shared)).toEqual({ columns: ["c0"] });
+  });
+
   it("scans each complete row once as the sheet grows", () => {
     const scan = firstRowScanner();
     expect(scan('<row r="1"/><row r="2"><c><v>a')).toBeUndefined();
