@@ -353,6 +353,52 @@ await withWorker(
       "PASS revoke and role change withdraw engagement grants and sponsored runner tokens in the same batch; re-grant lists engagements explicitly and restores nothing",
     );
 
+    // An invitation issued before a revocation never restores access: it is
+    // closed as superseded at the revoked member's next request.
+    const stale = await manage("inviteMember", {
+      email: "auditor@fixture.invalid",
+      role: "Lead Auditor",
+      engagementIds: [engagementId],
+    });
+    await manage("revokeMember", { userId: "user-auditor" });
+    for (const url of ["/api/workspace?tenantId=" + tenantId, "/api/workspace"])
+      assert.equal((await call(url, auditor)).status, 403, url);
+    assert.deepEqual(
+      await rows(
+        "SELECT status,accepted_by FROM invitations WHERE tenant_id=? AND id=?",
+        tenantId,
+        stale.invitationId,
+      ),
+      [{ status: "superseded", accepted_by: "user-auditor" }],
+    );
+    assert.deepEqual(
+      await rows(
+        "SELECT m.status,m.role,(SELECT COUNT(*) FROM engagement_access a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS grants FROM memberships m WHERE m.tenant_id=? AND m.user_id='user-auditor'",
+        tenantId,
+      ),
+      [{ status: "revoked", role: "Reviewer", grants: 0 }],
+    );
+    await load();
+    assert.equal(view.managementEvents[0].action, "supersedeInvitation");
+    assert.deepEqual(
+      view.invitations.map((i) => i.email),
+      ["viewer@fixture.invalid"],
+      "the superseded invitation is no longer pending",
+    );
+    // An invitation issued after the revocation admits the member again.
+    await manage("inviteMember", {
+      email: "auditor@fixture.invalid",
+      role: "Reviewer",
+    });
+    const readmitted = (
+      await call("/api/workspace?tenantId=" + tenantId, auditor)
+    ).body;
+    assert.equal(readmitted.identity.role, "Reviewer");
+    assert.deepEqual(readmitted.engagements, []);
+    console.log(
+      "PASS an invitation issued before a revocation is superseded and restores nothing; one issued after it admits the member with the invited role",
+    );
+
     // F-43: practice administration keeps one active administrator.
     assert.equal(
       (await manage("revokeAdmin", { userId: "user-lead" }, 409)).error,

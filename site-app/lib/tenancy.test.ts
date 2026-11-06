@@ -216,6 +216,7 @@ describe("context", () => {
               client_id: null,
               engagement_ids: '["ENG-1"]',
               invited_by: "user-admin",
+              created_at: "2026-11-01T00:00:00.000Z",
             },
           ])
         : [];
@@ -257,11 +258,63 @@ describe("context", () => {
       ]);
       // A revoked membership comes back with the invited role only.
       expect(d1.state.writes[1].sql).toContain(
-        "WHERE memberships.status<>'active'",
+        "WHERE memberships.status<>'active' AND (memberships.access_since IS NULL OR memberships.access_since<?)",
       );
+      // Acceptance itself refuses an invitation the current grant overtook.
+      expect(d1.state.writes[0].sql).toContain(
+        "AND NOT EXISTS(SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND access_since IS NOT NULL AND access_since>=?)",
+      );
+      expect(d1.state.writes[0].args.slice(-3)).toEqual([
+        "tenant-firm",
+        "user-lea",
+        "2026-11-01T00:00:00.000Z",
+      ]);
       expect(d1.state.writes[4].args[3]).toBe("acceptInvitation");
     } finally {
       d1.db.batch = batch;
     }
+  });
+
+  it("closes an invitation issued before a revocation as superseded and never restores the membership", async () => {
+    d1.state.list = (sql) =>
+      /FROM invitations WHERE email=\?/.test(sql)
+        ? [
+            {
+              tenant_id: "tenant-firm",
+              id: "INV-1",
+              display_name: null,
+              role: "Lead Auditor",
+              client_id: null,
+              engagement_ids: '["ENG-1"]',
+              invited_by: "user-admin",
+              created_at: "2026-11-01T00:00:00.000Z",
+            },
+          ]
+        : [];
+    rows([
+      // memberships.access_since (the revocation) is after created_at.
+      [
+        /SELECT 1 AS superseded WHERE EXISTS\(SELECT 1 FROM memberships/,
+        {
+          superseded: 1,
+        },
+      ],
+    ]);
+    await expect(as(lea, () => context("tenant-firm"))).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    const writes = d1.state.writes.map(
+      ({ sql }) => /^(?:UPDATE|INSERT INTO) (\w+)/.exec(sql)?.[1],
+    );
+    expect(writes).toEqual(["invitations", "tenants", "management_events"]);
+    expect(d1.state.writes[0].sql).toMatch(
+      /^UPDATE invitations SET status='superseded'/,
+    );
+    expect(d1.state.writes[2].args[3]).toBe("supersedeInvitation");
+    expect(
+      d1.state.writes.some(({ sql }) =>
+        /memberships|engagement_access/.test(sql.split(" WHERE ")[0]),
+      ),
+    ).toBe(false);
   });
 });
