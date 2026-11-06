@@ -11,7 +11,8 @@ import {
   responseError,
   sha256,
 } from "@/lib/store";
-import { buildDossier, signDossier, signingKey } from "@/lib/dossier";
+import { buildDossier, signDossier } from "@/lib/dossier";
+import { activeSigningKey } from "@/lib/signing-keys";
 import { addRecord, dossierSeal } from "@/lib/assurance-store";
 import { isClientRole, isReleased } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,16 @@ export async function POST(request: Request) {
           engagementId: z.string(),
           reportId: z.string().optional(),
           audience: z.enum(["internal", "client"]).default("internal"),
-          op: z.enum(["seal", "rotate_key"]).default("seal"),
+          // Signing keys are practice-wide: rotation is the management op
+          // rotateSigningKey, for practice administrators only (#25).
+          op: z
+            .literal("seal", {
+              errorMap: () => ({
+                message:
+                  "This endpoint only seals dossiers. A practice administrator rotates the signing key (management op rotateSigningKey).",
+              }),
+            })
+            .optional(),
           withheld: z
             .array(
               z.object({
@@ -44,14 +54,6 @@ export async function POST(request: Request) {
       ctx = await context(v.tenantId),
       e = await getEngagement(ctx, v.engagementId);
     requireRole(ctx, ["Lead Auditor"]);
-    if (v.op === "rotate_key") {
-      const key = await signingKey(ctx, true);
-      await addRecord(ctx, e.id, "key_rotation", {
-        keyId: key.id,
-        publicKeySPKI: key.public_key,
-      });
-      return Response.json({ keyId: key.id, publicKeySPKI: key.public_key });
-    }
     const r = e.reports.find((r) => r.id === v.reportId);
     if (!r || (v.audience === "client" && !isReleased(r)))
       throw new ApiError(
@@ -72,9 +74,17 @@ export async function POST(request: Request) {
       )
     )
       throw new ApiError(400, "Exclusions must refer to captured evidence");
-    const dossier = await signDossier(
-        ctx,
-        await buildDossier(ctx, e, r, v.audience === "client", v.withheld),
+    const signingKey = await activeSigningKey(ctx),
+      dossier = await signDossier(
+        signingKey,
+        await buildDossier(
+          ctx,
+          e,
+          r,
+          v.audience === "client",
+          signingKey.id,
+          v.withheld,
+        ),
       ),
       body = JSON.stringify(dossier),
       hash = await sha256(body),
@@ -104,13 +114,18 @@ export async function POST(request: Request) {
       withheld: dossier.manifest.withheld,
       createdAt: now(),
       signing:
-        "Application server-held Ed25519 key; no external timestamp or KMS attestation",
+        "Application Ed25519 practice key, wrapped at rest under the DOSSIER_KEK Worker secret; no external timestamp or KMS attestation",
     });
     return Response.json(
       { record },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
+    if (e instanceof z.ZodError)
+      return Response.json(
+        { error: e.issues.map((i) => i.message).join("; ") },
+        { status: 400 },
+      );
     return responseError(e);
   }
 }

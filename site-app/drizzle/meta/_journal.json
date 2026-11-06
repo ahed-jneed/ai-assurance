@@ -57,6 +57,13 @@
       "when": 1793957016121,
       "tag": "0007_access_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793971648186,
+      "tag": "0008_dossier_signing_keys",
+      "breakpoints": true
     }
   ]
 }

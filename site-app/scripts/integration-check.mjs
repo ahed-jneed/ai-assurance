@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
@@ -28,6 +29,8 @@ const mf = new Miniflare({
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
     // First sign-ins provision the fixture practices (lib/access-policy.ts).
     SELF_SIGNUP: "open",
+    // A key-encryption key generated for this run (docs/security/signing-keys.md).
+    DOSSIER_KEK: randomBytes(32).toString("base64"),
   },
   d1Databases: { DB: "audit-integration" },
   r2Buckets: { BUCKET: "audit-integration-evidence" },

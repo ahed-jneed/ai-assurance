@@ -15,5 +15,10 @@ declare namespace Cloudflare {
     SELF_SIGNUP?: string;
     TENANT_MAX_ENGAGEMENTS?: string;
     TENANT_MAX_SAVES_PER_HOUR?: string;
+    // Signing keys (lib/signing-keys.ts, docs/security/signing-keys.md): a
+    // Worker secret of 32 random bytes in base64 that wraps the practices'
+    // Ed25519 private keys; unset, signing works only on the development
+    // server, with a public development key.
+    DOSSIER_KEK?: string;
   }
 }
