@@ -8,7 +8,6 @@ coverage/
 package-lock.json
 
 # Copies and vendored sources kept byte-identical with their upstream
-reference/
 vendor/
 public/
 drizzle/meta/
@@ -16,7 +15,7 @@ drizzle/meta/
 components/ui/
 hooks/use-mobile.ts
 
-# Data mirrored byte-for-byte from ../templates and imported as-is by the app
+# Byte-for-byte copies of ../templates and ../docs data (scripts/sync-generated.mjs)
 lib/*.json
 
 # Markdown is outside the formatting baseline
