@@ -126,7 +126,9 @@ export function useRecordSearch(
     };
   }, [key]);
   const more = () => {
-    if (!state.nextCursor || state.loading) return;
+    // Only the rows of the current query continue; a first page that is
+    // still loading is never aborted for them.
+    if (!state.nextCursor || state.loading || state.key !== key) return;
     const abort = new AbortController();
     controller.current?.abort();
     controller.current = abort;
@@ -252,7 +254,7 @@ export function RecordRegister({
       <PageFooter
         shown={result.records.length}
         total={result.total}
-        loading={result.loading}
+        loading={result.loading || !result.current}
         hasMore={!!result.nextCursor}
         onMore={result.more}
         noun={filtered ? "matching records" : "records"}
@@ -337,7 +339,10 @@ export function RecordPicker({
           {result.error}
         </p>
       )}
-      <div className="record-picker-results" aria-busy={result.loading}>
+      <div
+        className="record-picker-results"
+        aria-busy={result.loading || !result.current}
+      >
         {!result.key && result.loading ? (
           <p className="subtle" role="status">
             Loading records…
@@ -371,7 +376,7 @@ export function RecordPicker({
       <PageFooter
         shown={result.records.length}
         total={result.total}
-        loading={result.loading}
+        loading={result.loading || !result.current}
         hasMore={!!result.nextCursor}
         onMore={result.more}
         noun={term.trim() ? "matching records" : "records"}
