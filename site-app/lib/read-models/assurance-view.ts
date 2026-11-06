@@ -7,13 +7,14 @@ import {
 } from "../assurance-search";
 import { jobs, recordCount, recordPage } from "../assurance-store";
 import { db } from "../bindings";
-import { getEngagement } from "../engagement-repo";
+import { loadEngagement } from "../engagement-repo";
 import { ApiError } from "../http";
 import type { Context } from "../tenancy";
 import { isClientRole } from "../workflow-state";
-// Client roles never read the assurance workbench.
+// Client roles never read the assurance workbench. The workbench needs the
+// engagement's access and id only, so its R2 parts are never loaded here.
 async function internalEngagement(ctx: Context, engagementId: string) {
-  const e = await getEngagement(ctx, engagementId);
+  const e = await loadEngagement(ctx, engagementId);
   if (isClientRole(ctx.role))
     throw new ApiError(403, "The assurance workbench is internal");
   return e;

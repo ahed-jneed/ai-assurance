@@ -2,7 +2,7 @@ import { z } from "zod";
 import { assuranceTarget, dispatchAssurance } from "@/lib/commands/assurance";
 import { short } from "@/lib/commands/fields";
 import { getEngagement } from "@/lib/engagement-repo";
-import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
+import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import {
   assuranceRecordPage,
   assuranceReviewQueue,
@@ -70,11 +70,7 @@ const command = z
 export async function POST(request: Request) {
   try {
     checkOrigin(request);
-    const a = command.parse(
-        JSON.parse(
-          new TextDecoder().decode(await readBounded(request, 1024 * 1024)),
-        ),
-      ),
+    const a = command.parse(await readJson(request, 1024 * 1024)),
       ctx = await context(a.tenantId);
     refuseReadOnly(ctx);
     if (isClientRole(ctx.role))
