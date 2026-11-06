@@ -2881,6 +2881,9 @@
         },
         "createdBy": {
           "$ref": "#/$defs/actorId"
+        },
+        "specialCategory": {
+          "$ref": "#/$defs/specialCategoryDeclaration"
         }
       },
       "required": [
@@ -3006,6 +3009,101 @@
         }
       ]
     },
+    "specialCategoryBasis": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "columns",
+        "confirmedBy",
+        "confirmedOn",
+        "recordedBy",
+        "recordedAt"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "art4a",
+            "gdpr_art9"
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true
+        },
+        "confirmedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "confirmedOn": {
+          "type": "string",
+          "format": "date"
+        },
+        "recordedBy": {
+          "$ref": "#/$defs/actorId"
+        },
+        "recordedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "specialCategoryDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "specialCategory": {
+          "type": "boolean"
+        },
+        "route": {
+          "enum": [
+            "client_side",
+            "hosted"
+          ]
+        },
+        "basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/specialCategoryBasis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "declaredBy": {
+          "$ref": "#/$defs/actorId"
+        },
+        "declaredAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "column",
+        "specialCategory",
+        "route",
+        "basis",
+        "declaredBy",
+        "declaredAt"
+      ]
+    },
     "runManifest": {
       "type": "object",
       "additionalProperties": false,
@@ -3064,6 +3162,32 @@
         },
         "limitations": {
           "$ref": "#/$defs/stringNotes"
+        },
+        "specialCategoryAcknowledgement": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "acknowledgedBy": {
+              "$ref": "#/$defs/actorId"
+            },
+            "acknowledgedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "column",
+            "acknowledgedBy",
+            "acknowledgedAt"
+          ]
         }
       },
       "required": [
@@ -7607,6 +7731,32 @@
         },
         "limitations": {
           "$ref": "#/$defs/stringNotes"
+        },
+        "specialCategoryAcknowledgement": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "acknowledgedBy": {
+              "$ref": "#/$defs/actorId"
+            },
+            "acknowledgedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "column",
+            "acknowledgedBy",
+            "acknowledgedAt"
+          ]
         }
       },
       "required": [
@@ -8726,6 +8876,9 @@
         "createdBy": {
           "$ref": "#/$defs/actorId"
         },
+        "specialCategory": {
+          "$ref": "#/$defs/specialCategoryDeclaration"
+        },
         "statistics": {
           "$ref": "#/$defs/statisticsPlan"
         }
@@ -8848,6 +9001,32 @@
         },
         "limitations": {
           "$ref": "#/$defs/stringNotes"
+        },
+        "specialCategoryAcknowledgement": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "acknowledgedBy": {
+              "$ref": "#/$defs/actorId"
+            },
+            "acknowledgedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "column",
+            "acknowledgedBy",
+            "acknowledgedAt"
+          ]
         },
         "statistics": {
           "$ref": "#/$defs/statisticsPlan"
@@ -9832,6 +10011,32 @@
         },
         "limitations": {
           "$ref": "#/$defs/stringNotes"
+        },
+        "specialCategoryAcknowledgement": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "acknowledgedBy": {
+              "$ref": "#/$defs/actorId"
+            },
+            "acknowledgedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "inheritedFrom": {
+              "$ref": "#/$defs/id"
+            }
+          },
+          "required": [
+            "column",
+            "acknowledgedBy",
+            "acknowledgedAt"
+          ]
         },
         "statistics": {
           "$ref": "#/$defs/statisticsPlan"

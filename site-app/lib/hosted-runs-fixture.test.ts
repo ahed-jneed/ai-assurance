@@ -199,6 +199,8 @@ async function fixtureRuns() {
         ],
       },
       datasetContext: context,
+      // Synthetic groups: not special-category data (#60).
+      specialCategory: { specialCategory: false },
       rationale: "Pre-registered acceptance rules for the fixture",
     },
     "fixture-auditor",
@@ -221,6 +223,7 @@ async function fixtureRuns() {
         minimumAccuracy: 0.8,
       },
       datasetContext: context,
+      specialCategory: { specialCategory: false },
       rationale: "Legacy thresholds; the plan is derived per run",
     },
     "fixture-auditor",

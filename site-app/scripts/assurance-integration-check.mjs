@@ -272,6 +272,8 @@ try {
       sensitiveDataBasis: "Synthetic data",
     },
     rationale: "Numerical integration fixture only",
+    // Synthetic groups hold no special-category data (#60).
+    specialCategory: { specialCategory: false },
   });
   const profileId = e.evaluationProfiles.at(-1).id;
   // Recall of "0" rather than of the favourable "1": the external worker
@@ -1053,6 +1055,7 @@ try {
       },
       statistics: explicitPlan,
       datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+      specialCategory: { specialCategory: false },
       rationale: "Pre-registered external plan fixture",
     });
     const created = e.evaluationProfiles.at(-1);

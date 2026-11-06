@@ -15,6 +15,7 @@ import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { diagnosticNarrative } from "../../presentation";
 import { recordVersions } from "../../rule-pack-current";
+import { externalGate } from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
@@ -88,6 +89,7 @@ export const execution: AssuranceModule = defineCommands({
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
       assertExternalProtocol(profile);
+      externalGate(profile, v.mode);
       const plan = profile.statistics,
         outputLabels: string[] = system.body.outputs.classOrder,
         labels = frozenLabelPair({

@@ -61,6 +61,15 @@ import { PowerCheck, powerShortfalls } from "./power-check";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
 import {
+  declarationFor,
+  ProtocolDeclaration,
+  SpecialCategoryRegister,
+} from "./special-category";
+import {
+  basisFor,
+  type SpecialCategoryDeclarationInput,
+} from "@/lib/special-category";
+import {
   resolveLabIntent,
   type PendingLabIntent,
 } from "./workspace/lab-intent";
@@ -349,7 +358,13 @@ export function TestingLab({
     [error, setError] = useState(""),
     [saveOnly, setSaveOnly] = useState(false),
     [discard, setDiscard] = useState<null | "registration" | "wizard">(null),
-    [touched, setTouched] = useState(false);
+    [touched, setTouched] = useState(false),
+    // A new fairness protocol's special-category declaration (#60), and the
+    // acknowledgement a hosted run on special-category data needs.
+    [declaration, setDeclaration] = useState<SpecialCategoryDeclarationInput>(
+      {},
+    ),
+    [acknowledged, setAcknowledged] = useState(false);
   const [cards, setCards] = useState<AssuranceRecord[]>([]),
     // Belongs to the open setup only: every other evaluation starts unbound.
     [binding, setBinding] = useState<ProcedureBinding | null>(null);
@@ -392,6 +407,8 @@ export function TestingLab({
     setModelId(chosen?.id ?? "");
     setProfileId(p?.id ?? "");
     setDraft(p ? profileDraft(p) : emptyDraft(chosen?.task));
+    setDeclaration({});
+    setAcknowledged(false);
     setStep(0);
     setSaveOnly(only);
     setWizard(true);
@@ -524,6 +541,20 @@ export function TestingLab({
   }
   const selectedTests = tests.filter((t) => draft.suite.includes(t.id)),
     fair = fairnessSelected(draft.suite),
+    savedDeclaration = profiles.find(
+      (p) => p.id === profileId,
+    )?.specialCategory,
+    // Special-category fairness tests run client-side unless the protocol
+    // takes the hosted route with a recorded basis.
+    special =
+      fair &&
+      (locked
+        ? (savedDeclaration?.specialCategory ?? true)
+        : (declaration.specialCategory ?? true)),
+    hostedRoute = locked
+      ? savedDeclaration?.route === "hosted" && !!savedDeclaration.basis
+      : declaration.route === "hosted" &&
+        !!basisFor(e, draft.config.groupColumn),
     cols =
       inspect?.columns.map((c) => ({
         value: c.name,
@@ -621,6 +652,8 @@ export function TestingLab({
         !draft.plan.coverageRationale.trim()
       )
         return "Record why a coverage below 100% is acceptable.";
+      if (special && !saveOnly && !hostedRoute)
+        return "Special-category fairness tests run client-side by default: save the protocol only and queue it for the external worker or the runtime package, or choose the hosted route with the client's recorded basis.";
     }
     if (
       step === 3 &&
@@ -630,6 +663,8 @@ export function TestingLab({
       !draft.plan.acknowledgement.trim()
     )
       return "Acknowledge the power shortfall before saving the protocol.";
+    if (step === 3 && special && !saveOnly && !acknowledged)
+      return "Acknowledge that this run processes special-category data on the platform.";
     return "";
   }
   async function runEvaluation() {
@@ -638,10 +673,18 @@ export function TestingLab({
       let source = e,
         currentProfile = profileId;
       if (!currentProfile) {
-        const created = await act(
-          "createEvaluationProfile",
-          profileRequest(draft, classCount),
-        );
+        const created = await act("createEvaluationProfile", {
+          ...profileRequest(draft, classCount),
+          ...(fair && draft.config.groupColumn
+            ? {
+                specialCategory: declarationFor(
+                  e,
+                  draft.config.groupColumn,
+                  declaration,
+                ),
+              }
+            : {}),
+        });
         source = created.engagement;
         currentProfile = created.details!.profileId;
         setProfileId(currentProfile);
@@ -667,6 +710,7 @@ export function TestingLab({
           profileId: currentProfile,
           ...(binding ? { procedureId: binding.procedureId } : {}),
           ...(card ? { datasetCardRecordId: card.id } : {}),
+          ...(special ? { acknowledgeSpecialCategory: true } : {}),
         },
         source,
       );
@@ -775,6 +819,12 @@ export function TestingLab({
           </div>
         </div>
         <TabsContent value="datasets">
+          <SpecialCategoryRegister
+            engagement={e}
+            writer={writer}
+            busy={busy}
+            act={act}
+          />
           <DatasetRegistry
             engagement={e}
             tenantId={tenantId}
@@ -1765,6 +1815,15 @@ export function TestingLab({
                           onChange={(v) => config("groupColumn", v)}
                           options={cols}
                         />
+                        <ProtocolDeclaration
+                          engagement={e}
+                          column={draft.config.groupColumn}
+                          value={declaration}
+                          onChange={setDeclaration}
+                          saved={
+                            locked ? (savedDeclaration ?? null) : undefined
+                          }
+                        />
                         <Field label="Reviewed basis for protected-data handling">
                           <Textarea
                             disabled={locked}
@@ -1964,6 +2023,19 @@ export function TestingLab({
                         Training data measures fit; this run cannot establish
                         independent generalization.
                       </p>
+                    )}
+                    {special && !saveOnly && (
+                      <label className="check-row">
+                        <input
+                          type="checkbox"
+                          checked={acknowledged}
+                          onChange={(ev) => setAcknowledged(ev.target.checked)}
+                        />{" "}
+                        I acknowledge that this run processes the
+                        special-category column {draft.config.groupColumn} on
+                        this platform under the client&apos;s recorded basis,
+                        which the run and the report will state.
+                      </label>
                     )}
                   </>
                 )}

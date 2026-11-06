@@ -103,7 +103,18 @@ defs['predictionDataset'] = obj({'id': ref('id'), 'name': st(1, 5000), 'sha256':
 defs['datasetContext'] = obj({'split': en('test', 'validation', 'training', 'unknown'), 'population': st(1, 5000), 'predictionProvenance': st(1, 5000), 'independence': st(1, 5000), 'sensitiveDataBasis': st(0, 5000)})
 defs['evaluationProfile'] = obj({'id': ref('id'), 'schemaVersion': {'const': '1.0'}, 'name': st(1, 300), 'version': st(1, 300), 'task': hostedTasks, 'suite': hostedSuite, 'config': ref('hostedConfig'), 'datasetContext': ref('datasetContext'), 'rationale': st(1, 5000), 'createdAt': date, 'createdBy': ref('actorId')})
 defs['evaluationProfile']['allOf'] = taskSuiteRules()
+# Fairness protocols declare whether the group column holds special-category
+# data, the route its tests take and a copy of the client's recorded Art 4a or
+# GDPR Art 9(2) basis (#60). Protocols saved before declarations have none.
+# Application validation enforces the condition-by-condition statements.
+defs['specialCategoryBasis'] = {'type': 'object', 'required': ['id', 'kind', 'columns', 'confirmedBy', 'confirmedOn', 'recordedBy', 'recordedAt'], 'properties': {'id': ref('id'), 'kind': en('art4a', 'gdpr_art9'), 'columns': arr(st(1, 300), 1, 20, True), 'confirmedBy': st(1, 300), 'confirmedOn': {'type': 'string', 'format': 'date'}, 'recordedBy': ref('actorId'), 'recordedAt': date}}
+defs['specialCategoryDeclaration'] = obj({'column': st(1, 300), 'specialCategory': {'type': 'boolean'}, 'route': en('client_side', 'hosted'), 'basis': nullable(ref('specialCategoryBasis')), 'declaredBy': ref('actorId'), 'declaredAt': date})
+defs['evaluationProfile']['properties']['specialCategory'] = ref('specialCategoryDeclaration')
 defs['runManifest'] = obj({'schemaVersion': {'const': '1.0'}, 'model': ref('registeredModel'), 'dataset': ref('predictionDataset'), 'profile': nullable(ref('evaluationProfile')), 'executionMode': {'const': 'saved_predictions'}, 'lineage': {'const': 'registered_prediction_artifact'}, 'testDefinitionVersion': {**st(1, 100), 'pattern': r'^traditional-ml-\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$'}, 'limitations': ref('stringNotes')})
+# A hosted run on special-category data records who acknowledged it (#60). A
+# retry carries the source run's acknowledgement over unchanged and names that
+# run in inheritedFrom.
+defs['runManifest']['properties']['specialCategoryAcknowledgement'] = obj({'column': st(1, 300), 'acknowledgedBy': ref('actorId'), 'acknowledgedAt': date, 'inheritedFrom': ref('id')}, ['column', 'acknowledgedBy', 'acknowledgedAt'])
 defs['runManifest']['properties']['model'] = {'allOf': [ref('registeredModel'), {'properties': {'format': {'const': 'Prediction file'}, 'status': {'const': 'registered'}, 'task': hostedTasks}}]}
 defs['hostedThresholds'] = obj({'source': {'const': 'internal_policy'}, 'policyId': st(1, 300), 'policyVersion': st(1, 300), 'frozenAt': date, 'frozenBy': ref('actorId'), **copy.deepcopy(configProps)})
 defs['hostedThresholds']['properties']['performancePositiveLabel'] = st(0, 300)

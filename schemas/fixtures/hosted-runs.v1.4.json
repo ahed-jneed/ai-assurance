@@ -605,9 +605,9 @@
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
         "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
         "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
-        "protocol": "99b329bc0baa15bb4887d300b74e35cbf0067f8daf5c19b8d759fc68f948fb58",
+        "protocol": "1952d71a06fd6cc18eee1b62d9b3c1ddfaf840c15c1273f21f971cba30926d69",
         "statisticsPlan": "ca27c6dc00fe331f320bc30b5c6c607a687b4b123f6fc087fefc478a1e89f49e",
-        "manifest": "44615258c0b79a6d2a0c8195d13927302ab82d5263f2de6dd7e21d7fa18988e6",
+        "manifest": "9bdfeb0d0c3a31941e25cb85ad844c1b0cb6dd7e089dec0af739d670915d5fbb",
         "configuration": "b7a5d3e4c59190618911578abf6121f059ccc96f6a89e899e8e3bde962282eb3"
       },
       "runnerVersion": "interactive-predictions-3.0.0",
@@ -775,6 +775,14 @@
         },
         "rationale": "Pre-registered acceptance rules for the fixture",
         "id": "PROTOCOL-FX0001",
+        "specialCategory": {
+          "column": "group",
+          "specialCategory": false,
+          "route": "client_side",
+          "basis": null,
+          "declaredBy": "fixture-auditor",
+          "declaredAt": "2026-11-06T09:00:00.000Z"
+        },
         "schemaVersion": "1.1",
         "createdAt": "2026-11-06T09:00:00.000Z",
         "createdBy": "fixture-auditor"
@@ -1429,9 +1437,9 @@
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
         "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
         "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
-        "protocol": "9c3aa18cef563fd5d35a15c7fa6d039906b331381b0bb44dcf0c17109c226f07",
+        "protocol": "f6c2264ab0faec5fc03955827c3602a7faf82e22d9c532fd7d3aed90619e06b1",
         "statisticsPlan": "d5a2879c350d2ab94c88bdc56c22a8ccea6066f1c6b49f81808bbbd6dd6fd159",
-        "manifest": "9c7368f9907dd7153dff1f7662031cc2e4af54a450aa0bb8857d4fa9ce12bc0d",
+        "manifest": "60326e332eb0d7789f17ec81e9059626f78b79507234fea3607176df30adee4b",
         "configuration": "b630a1cc50590cd5d82d8365fb29a9a81fb9cfedd125bd6b2d24dfba7f7249d1"
       },
       "runnerVersion": "interactive-predictions-3.0.0",
@@ -1495,6 +1503,14 @@
           "sensitiveDataBasis": "Synthetic groups; no personal data"
         },
         "rationale": "Legacy thresholds; the plan is derived per run",
+        "specialCategory": {
+          "column": "group",
+          "specialCategory": false,
+          "route": "client_side",
+          "basis": null,
+          "declaredBy": "fixture-auditor",
+          "declaredAt": "2026-11-06T09:00:00.000Z"
+        },
         "id": "PROTOCOL-FX0002",
         "schemaVersion": "1.0",
         "createdAt": "2026-11-06T09:00:00.000Z",
@@ -2445,9 +2461,9 @@
         "dataset": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
         "modelMetadata": "2d4cd8aa5e15e6852e51a286afdd179c58c375d51190723f9c3f5ccd746325bc",
         "modelArtifact": "e9184ddf4bb89dbf89ec3ab536b94f3499e4237f22dc7663beac7548e9ed5adf",
-        "protocol": "99b329bc0baa15bb4887d300b74e35cbf0067f8daf5c19b8d759fc68f948fb58",
+        "protocol": "1952d71a06fd6cc18eee1b62d9b3c1ddfaf840c15c1273f21f971cba30926d69",
         "statisticsPlan": "ca27c6dc00fe331f320bc30b5c6c607a687b4b123f6fc087fefc478a1e89f49e",
-        "manifest": "44615258c0b79a6d2a0c8195d13927302ab82d5263f2de6dd7e21d7fa18988e6",
+        "manifest": "9bdfeb0d0c3a31941e25cb85ad844c1b0cb6dd7e089dec0af739d670915d5fbb",
         "configuration": "b7a5d3e4c59190618911578abf6121f059ccc96f6a89e899e8e3bde962282eb3"
       },
       "runnerVersion": "interactive-predictions-3.0.0",
@@ -2615,6 +2631,14 @@
         },
         "rationale": "Pre-registered acceptance rules for the fixture",
         "id": "PROTOCOL-FX0001",
+        "specialCategory": {
+          "column": "group",
+          "specialCategory": false,
+          "route": "client_side",
+          "basis": null,
+          "declaredBy": "fixture-auditor",
+          "declaredAt": "2026-11-06T09:00:00.000Z"
+        },
         "schemaVersion": "1.1",
         "createdAt": "2026-11-06T09:00:00.000Z",
         "createdBy": "fixture-auditor"

@@ -1,6 +1,14 @@
 "use client";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import {
+  headerScanBytes,
+  specialColumns,
+  uploadHeader,
+  type SpecialColumn,
+} from "@/lib/special-category";
+import { PendingLegalReview } from "../../special-category";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
 import { Choice } from "../workspace-ui";
@@ -12,12 +20,41 @@ export const uploadDefaults = () => ({
   visibility: "internal",
   handlingBasis: "synthetic",
 });
-function UploadFields({ choices, choice, engagement: e }: ModalFieldsProps) {
+function UploadFields({
+  choices,
+  choice,
+  checks,
+  check,
+  engagement: e,
+}: ModalFieldsProps) {
+  // The chosen CSV's special-category columns, read from its header here so
+  // the uploader sees what the server will gate (#60, D-11).
+  const [found, setFound] = useState<SpecialColumn[]>([]);
+  async function inspect(file: File | undefined) {
+    setFound([]);
+    check("specialCategoryNotPersonal", false);
+    if (!file || !e) return;
+    try {
+      const headers = uploadHeader(
+        file.name,
+        await file.slice(0, headerScanBytes).arrayBuffer(),
+      );
+      setFound(headers ? specialColumns(headers, e) : []);
+    } catch {
+      setFound([]);
+    }
+  }
+  const uncovered = found.filter((c) => !c.basisId);
   return (
     <>
       <label>
         Evidence file
-        <Input name="file" type="file" required />
+        <Input
+          name="file"
+          type="file"
+          required
+          onChange={(ev) => void inspect(ev.target.files?.[0])}
+        />
       </label>
       <div className="field-grid">
         <label>
@@ -26,7 +63,10 @@ function UploadFields({ choices, choice, engagement: e }: ModalFieldsProps) {
             label="Category"
             value={choices.category}
             values={evidenceCategories}
-            onChange={(v) => choice("category", v)}
+            onChange={(v) => {
+              choice("category", v);
+              check("specialCategoryNotPersonal", false);
+            }}
           />
         </label>
         <label>
@@ -64,7 +104,11 @@ function UploadFields({ choices, choice, engagement: e }: ModalFieldsProps) {
               label: "Independently reviewed processing route",
             },
           ]}
-          onChange={(v) => choice("handlingBasis", v)}
+          onChange={(v) => {
+            choice("handlingBasis", v);
+            // The declaration holds only for the basis it was ticked under.
+            check("specialCategoryNotPersonal", false);
+          }}
         />
       </label>
       {choices.handlingBasis === "reviewed" && (
@@ -84,6 +128,42 @@ function UploadFields({ choices, choice, engagement: e }: ModalFieldsProps) {
           />
         </label>
       )}
+      {choices.category === "Dataset" && found.length > 0 && (
+        <div className="note" role="status">
+          <p>
+            Special-category columns:{" "}
+            {found
+              .map(
+                (c) =>
+                  c.column + (c.basisId ? " (basis " + c.basisId + ")" : ""),
+              )
+              .join(", ")}
+            .{" "}
+            {uncovered.length
+              ? "Record the client's Art 4a or GDPR Art 9(2) basis for " +
+                uncovered.map((c) => c.column).join(", ") +
+                " under Testing lab › Datasets before uploading, or upload only approved aggregates."
+              : "The recorded basis is logged with this upload."}{" "}
+            Only Dataset evidence is gated; runs read only Dataset evidence.{" "}
+            <PendingLegalReview />
+          </p>
+          {uncovered.length > 0 &&
+            ["synthetic", "anonymized"].includes(choices.handlingBasis) && (
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={!!checks.specialCategoryNotPersonal}
+                  onChange={(ev) =>
+                    check("specialCategoryNotPersonal", ev.target.checked)
+                  }
+                />{" "}
+                These columns hold no special-category personal data (synthetic,
+                anonymised or aggregate evidence). This declaration is recorded
+                in the audit trail.
+              </label>
+            )}
+        </div>
+      )}
       <div className="note">
         Limit 50 MB. Where Article 4a restricts access by other parties, process
         sensitive-category records in the client&apos;s controlled environment
@@ -99,7 +179,15 @@ export const uploadModal: ModalDefinition = {
   submitLabel: "Upload for acceptance",
   Fields: UploadFields,
   reportsToWorkspace: true,
-  submit: async ({ form, data, engagement: e, choices, setBusy, load }) => {
+  submit: async ({
+    form,
+    data,
+    engagement: e,
+    choices,
+    checks,
+    setBusy,
+    load,
+  }) => {
     setBusy(true);
     const fd = new FormData(form);
     fd.set("tenantId", data!.tenantId);
@@ -109,6 +197,10 @@ export const uploadModal: ModalDefinition = {
     fd.set("visibility", choices.visibility || "internal");
     fd.set("handlingBasis", choices.handlingBasis || "");
     fd.set("governanceArtifactId", choices.governanceArtifactId || "");
+    fd.set(
+      "specialCategoryDeclaration",
+      checks.specialCategoryNotPersonal ? "not_personal" : "",
+    );
     const response = await fetch("/api/evidence", {
         method: "POST",
         body: fd,
