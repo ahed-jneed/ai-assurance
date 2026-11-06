@@ -20,6 +20,7 @@ import {
 import { requestLabel } from "@/lib/evidence-requests";
 import type { EvidenceRequest } from "@/lib/domain";
 import { humanLabel, readableResults } from "@/lib/presentation";
+import { legalDate } from "@/lib/rule-pack";
 type Row = Record<string, unknown>;
 const record = (v: unknown): v is Row =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -445,6 +446,24 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                 <div>
                   <dt>Annex map</dt>
                   <dd>{text(snapshot.annexMapVersion)}</dd>
+                </div>
+              )}
+              {record(snapshot.rulePack) && (
+                <div>
+                  <dt>Rule pack</dt>
+                  <dd>
+                    {text(snapshot.rulePack.version)}, researched{" "}
+                    {legalDate(text(snapshot.rulePack.researchedAsOf))}
+                    {snapshot.rulePack.legalReview === "approved"
+                      ? ""
+                      : " · pending legal review"}
+                  </dd>
+                </div>
+              )}
+              {snapshot.methodologyVersion != null && (
+                <div>
+                  <dt>Methodology</dt>
+                  <dd>{text(snapshot.methodologyVersion)}</dd>
                 </div>
               )}
             </dl>

@@ -135,6 +135,12 @@ for task, tests in [('Binary classification', ['performance', 'demographic_parit
 defs['procedureBinding'] = obj({'procedureId': ref('id'), 'procedureRevision': it(1, 2147483647), 'briefRevision': it(1, 2147483647), 'programRevision': it(1, 2147483647)})
 run['properties']['procedureBinding'] = ref('procedureBinding')
 run['properties']['retryOf'] = ref('id')
+# Rule-pack stamp (#18): the rule pack and methodology the run was made under.
+# Optional, because runs made before rule pack 2026.11.1 do not carry it.
+methodologyVersion = {'type': 'string', 'pattern': r'^\d{4}\.(?:[1-9]|1[0-2])\.[1-9]\d*$'}
+defs['rulePackStamp'] = obj({'version': methodologyVersion, 'legalVersion': {'type': 'string', 'pattern': r'^0\d{4}R\d{4}-\d{8}$'}, 'researchedAsOf': {'type': 'string', 'format': 'date'}, 'legalReview': en('pending', 'approved')})
+run['properties']['rulePack'] = ref('rulePackStamp')
+run['properties']['methodologyVersion'] = methodologyVersion
 run['allOf'].append({'if': {'required': ['procedureBinding']}, 'then': {'properties': {'provenance': {'properties': {'inputHashes': {'required': ['auditBinding']}}}}}, 'else': {'properties': {'provenance': {'properties': {'inputHashes': {'not': {'required': ['auditBinding']}}}}}}})
 defs['hostedRun'] = run
 output = {'$schema': 'https://json-schema.org/draft/2020-12/schema', '$id': 'urn:ai-assurance:test-run:1.1', 'title': 'AI Assurance common diagnostic run contract', 'description': 'Version-discriminated contract: v1.0 Python/legacy interactive runs and v1.1 hosted saved-prediction runs. Frozen internal policies and diagnostic outcomes provide audit evidence; they do not certify EU AI Act conformity. Application validation must verify hashes, cross-field bindings, timestamp order and evidence custody.', 'oneOf': [ref('legacyRun'), ref('hostedRun')], '$defs': defs}

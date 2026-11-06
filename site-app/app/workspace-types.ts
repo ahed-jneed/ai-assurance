@@ -61,7 +61,9 @@ export type WorkspaceData = {
     details: string;
   }[];
   catalog: {
+    methodologyVersion?: string;
     items: CatalogItem[];
+    /** The rule pack (lib/rule-pack.ts asRulePack); empty without one. */
     regulatorySnapshot: Record<string, unknown>;
   } | null;
 };

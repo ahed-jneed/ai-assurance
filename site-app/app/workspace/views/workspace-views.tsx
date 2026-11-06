@@ -317,6 +317,7 @@ export function WorkspaceViews({
       {view === "Regulatory mapping" && (
         <RegulatoryMapping
           engagement={e}
+          catalog={data.catalog}
           reviewer={reviewer}
           busy={busy}
           onApprove={() => safeAct("approveClassification", {})}
