@@ -1,4 +1,5 @@
 import catalog from "./catalog.json";
+import { templateCriterion } from "./catalog-criteria";
 import type { Workflow } from "./workflow-types";
 export function seedWorkflow(userId: string, at: string): Workflow {
   return {
@@ -28,7 +29,7 @@ export function seedWorkflow(userId: string, at: string): Workflow {
         selected: false,
         applicability: "pending",
         rationale: "",
-        criterion: t.regulatoryRefs.join("; "),
+        criterion: templateCriterion(t),
         sourceVersion: t.regulatoryRefs.length
           ? catalog.regulatorySnapshot.celex
           : catalog.methodologyVersion,
