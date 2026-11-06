@@ -938,6 +938,11 @@ describe("answers, history and migration", () => {
       reference: "C(2026) 7702 final",
       date: "2026-11-05",
     });
+    // The record keeps the register's legal effect: the guidelines are
+    // non-binding, and a citation without one in the register has none.
+    expect(c.guidance?.[2]?.legalEffect).toMatch(/^Non-binding/);
+    expect(c.guidance?.[3]?.legalEffect).toMatch(/^Voluntary/);
+    expect(c.guidance?.[0]).not.toHaveProperty("legalEffect");
     expect(c.guidance?.[3]).toMatchObject({
       reference: "Final code, 10 June 2026",
       date: "2026-06-10",

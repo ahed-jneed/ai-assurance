@@ -43,6 +43,7 @@ function guidanceCitation(
         g.reference ??
         (g.draftPublished ? "Draft for consultation" : "Commission guidance"),
       ...(date ? { date } : {}),
+      ...(g.legalEffect ? { legalEffect: g.legalEffect } : {}),
     },
   ];
 }
