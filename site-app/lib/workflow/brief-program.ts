@@ -26,6 +26,7 @@ import type {
   ProcedurePlan,
   Program,
 } from "../workflow-types";
+import { assignable } from "./acceptance-commands";
 import {
   assignmentKeys,
   calendarDate,
@@ -50,7 +51,9 @@ const briefFields = z
     deliverables: text,
     basis: text,
     constraints: text,
-    independence: text,
+    // Replaced by per-person declarations (./acceptance-commands.ts); kept
+    // for briefs that recorded it as free text.
+    independence: optional,
     changeImpact: optional,
   })
   .strict();
@@ -316,10 +319,14 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
           p.title +
           " changed after this plan was opened. Reload and apply your changes again.",
       );
-    if (a.plan.ownerId)
+    if (a.plan.ownerId) {
       await authorized(a.plan.ownerId, ["Auditor", "Lead Auditor"]);
+      if (a.plan.ownerId !== p.ownerId) assignable(w(), a.plan.ownerId);
+    }
     if (a.plan.reviewerId) {
       await authorized(a.plan.reviewerId, ["Reviewer", "Lead Auditor"]);
+      if (a.plan.reviewerId !== p.reviewerId)
+        assignable(w(), a.plan.reviewerId);
       // Saving makes the editor a contributor, who cannot review it either.
       if (
         [a.plan.ownerId, c.userId, ...p.contributors].includes(
@@ -373,9 +380,13 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
     for (const p of targets) {
       const owner = a.patch.ownerId ?? p.ownerId,
         review = a.patch.reviewerId ?? p.reviewerId;
-      if (owner) await authorized(owner, ["Auditor", "Lead Auditor"]);
+      if (owner) {
+        await authorized(owner, ["Auditor", "Lead Auditor"]);
+        if (owner !== p.ownerId) assignable(w(), owner);
+      }
       if (review) {
         await authorized(review, ["Reviewer", "Lead Auditor"]);
+        if (review !== p.reviewerId) assignable(w(), review);
         if (
           review === owner ||
           p.contributors.includes(review) ||

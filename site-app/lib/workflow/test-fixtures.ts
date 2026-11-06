@@ -440,7 +440,120 @@ export function approvedWorkflow(procedures: Procedure[] = []): Workflow {
     },
   };
   w.procedures = procedures;
+  w.acceptance = acceptedRecord();
+  w.declarations = internalPeople.map((userId) => declaration(userId));
   return w;
+}
+
+/**
+ * Records what leaving Planning requires (#23): an approved acceptance record
+ * and a conflict-free declaration from every internal fixture member. For a
+ * test that moves an engagement past Planning by setting its stage.
+ */
+export function recordAcceptance(e: Engagement) {
+  const w = workflowOf(e);
+  w.acceptance = acceptedRecord();
+  w.declarations = internalPeople.map((userId) => declaration(userId));
+}
+
+// Every active internal fixture member, so that a test may assign any of
+// them without making the fixture declarations outdated.
+export const internalPeople = [
+  "auditor",
+  "lead",
+  "reviewer",
+  "second-auditor",
+  "second-lead",
+  "second-reviewer",
+];
+
+export const acceptanceInput = {
+  decision: "acceptance",
+  preconditions: {
+    subjectMatter: { met: true, basis: "The credit scorer is identifiable" },
+    criteria: { met: true, basis: "Art. 9-15 as mapped in the rule pack" },
+    evidence: { met: true, basis: "Grey-box access agreed in the letter" },
+    purpose: { met: true, basis: "Board readiness decision" },
+  },
+  scope: "Readiness of the credit scorer against the high-risk requirements",
+  // The period of `briefInput`.
+  periodStart: "2026-01-01",
+  periodEnd: "2026-09-30",
+  systemBoundary: "Scoring service and its decision-support interface",
+  accessLevel: "grey",
+  engagementLetter: "EL-2026-014 of 1 Oct 2026",
+  team: ["lead"],
+  competenceConclusion: "The team covers assurance, statistics and regulation",
+  changeReason: "",
+};
+
+/** An acceptance record a Lead approved during Planning. */
+export function acceptedRecord(): NonNullable<Workflow["acceptance"]> {
+  return {
+    ...(acceptanceInput as Omit<
+      NonNullable<Workflow["acceptance"]>,
+      "revision" | "status" | "contributors" | "updatedBy" | "updatedAt"
+    >),
+    revision: 1,
+    status: "approved",
+    contributors: ["lead"],
+    updatedBy: "lead",
+    updatedAt: at,
+    approval: {
+      userId: "lead",
+      at,
+      revision: 1,
+      hash: "d".repeat(64),
+      reason: "Preconditions met",
+      stage: "Planning",
+    },
+    history: [],
+  };
+}
+
+export const competenceInput = {
+  assurance: "proficient",
+  ai_systems: "foundation",
+  statistics: "foundation",
+  regulation: "proficient",
+  management_systems: "none",
+  data_protection: "foundation",
+  security: "none",
+  domain: "foundation",
+} as const;
+
+export function declarationInput(overrides: Record<string, unknown> = {}) {
+  return {
+    priorWork: "",
+    threats: [],
+    exclusions: [],
+    competence: competenceInput,
+    expertField: "",
+    confirmed: true,
+    ...overrides,
+  };
+}
+
+/** A conflict-free declaration for the fixture period and every member. */
+export function declaration(
+  userId: string,
+  overrides: Partial<NonNullable<Workflow["declarations"]>[number]> = {},
+): NonNullable<Workflow["declarations"]>[number] {
+  return {
+    id: "DEC-" + userId,
+    userId,
+    role: people[userId].role,
+    declaredAt: at,
+    periodStart: acceptanceInput.periodStart,
+    periodEnd: acceptanceInput.periodEnd,
+    team: [...internalPeople],
+    priorWork: "",
+    threats: [],
+    exclusions: [],
+    competence: { ...competenceInput },
+    expertField: "",
+    ...overrides,
+  };
 }
 
 // The procedure the command tests plan, execute and review.

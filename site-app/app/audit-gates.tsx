@@ -30,12 +30,14 @@ import {
   type ReportTerms,
 } from "@/lib/domain/report-model";
 import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
-/** Report elements the approved brief and program supply. */
+/**
+ * Report elements the approved brief and program supply. Independence is
+ * not one of them: its gate has kind "acceptance" and opens that panel.
+ */
 export const briefElements = [
   "report:subject",
   "report:criteria",
   "report:responsibilities",
-  "report:independence",
   "report:work",
 ];
 export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;
@@ -56,6 +58,7 @@ export function AuditGateList({
   compact?: boolean;
 }) {
   const groups = [
+    "Acceptance & independence",
     "Scope & program",
     "Classification",
     "Evidence collection",
@@ -78,6 +81,7 @@ export function AuditGateList({
           signed: "Paper signatures",
         }[e.papers.find((p) => p.id === g.recordId)?.status ?? "draft"]
       : {
+          acceptance: "Acceptance & independence",
           workflow: "Scope & program",
           classification: "Classification",
           run: "Evaluations",
@@ -142,6 +146,7 @@ export function AuditGateList({
               : "Open paper"
       : {
           paper: "Open paper",
+          acceptance: g.recordId ? "Open declarations" : "Open acceptance",
           workflow: g.recordId ? "Open procedure" : "Open scope & program",
           classification: "Open assessment",
           request: "Assess receipt",

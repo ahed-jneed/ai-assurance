@@ -243,6 +243,10 @@ export function useWorkspaceNavigation({
     } else if (gate.kind === "workflow") {
       url.setProcedureContext(gate.recordId);
       navigate("Audit program");
+    } else if (gate.kind === "acceptance") {
+      url.setProcedureContext(undefined);
+      url.setProcedureSection("acceptance");
+      navigate("Audit program");
     } else if (gate.kind === "classification")
       navigate("Regulatory mapping", {
         search: "",

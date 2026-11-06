@@ -277,7 +277,7 @@ try {
   });
   const profileId = e.evaluationProfiles.at(-1).id;
   // Recall of "0" rather than of the favourable "1": the external worker
-  // measures recall on the favourable label only.
+  // measures binary performance on the frozen performance positive class.
   await cmd("createEvaluationProfile", {
     name: "External acceptance",
     version: "2",
@@ -709,7 +709,8 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
-  // A second procedure, planned with the protocol the worker cannot run.
+  // A second procedure, planned with the protocol whose performance
+  // positive class differs from the favourable label.
   const classProcedure = e.workflow.procedures.find(
     (p) => p.templateId === "WP-A15-02",
   );
@@ -787,15 +788,65 @@ try {
     securityReview:
       "Synthetic fixture process, not native model sandbox validation",
   });
-  const refused = await assurance(
-    "queueExternal",
-    { ...plan, profileId: classProfileId, procedureId: classProcedure.id },
-    owner,
-    400,
+  const runWorker = async () => {
+    const runtime = await processRun(
+      [
+        "-c",
+        "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'4'*64,heartbeat=1); print(json.dumps(w.once()))",
+      ],
+      {
+        ASSURANCE_WORKER_TOKEN: worker.token,
+        ASSURANCE_TEST_ORIGIN: origin,
+        ASSURANCE_TEST_WORKER: worker.workerId,
+      },
+    );
+    assert.equal(runtime.code, 0, runtime.out + runtime.error);
+    return JSON.parse(runtime.out.trim());
+  };
+  // The worker measures binary performance on the protocol's performance
+  // positive class "0" (#65), and fairness would count the favourable "1".
+  const classJob = await assurance("queueExternal", {
+    ...plan,
+    profileId: classProfileId,
+    procedureId: classProcedure.id,
+  });
+  assert.equal((await runWorker()).state, "completed");
+  const classRow = await testDb
+    .prepare("SELECT * FROM execution_jobs WHERE id=?")
+    .bind(classJob.jobId)
+    .first();
+  assert.equal(classRow.state, "succeeded");
+  const classEnvelope = JSON.parse(
+    await (await testBucket.get(classRow.result_key)).text(),
   );
-  assert.match(
-    refused.error,
-    /recall on the favourable label '1' only, so it cannot apply this protocol's performance positive class '0'/,
+  const native = classEnvelope.externalReport.configuration;
+  assert.deepEqual(
+    [
+      native.positiveLabel,
+      native.negativeLabel,
+      native.performancePositiveLabel,
+    ],
+    ["1", "0", "0"],
+  );
+  const classMetrics = classEnvelope.hostedResults[0].metrics,
+    classMetric = (name) => classMetrics.find((m) => m.name === name);
+  // Recall of "0": 34 of its 40 reference rows predicted "0". The fixture is
+  // symmetric (34/40 correct in each class, prevalence 0.5), so these values
+  // would hold for either class; the native configuration above, the slice
+  // order and the limitation note below are what identify class "0".
+  assert.deepEqual(
+    [classMetric("recall").numerator, classMetric("recall").denominator],
+    [34, 40],
+  );
+  assert.equal(classMetric("prevalence").value, 0.5);
+  assert.deepEqual(
+    classMetric("balanced_accuracy").slices.map((row) => row.slice),
+    ["0", "1"],
+  );
+  assert(
+    classEnvelope.hostedResults[0].limitations.some((note) =>
+      note.includes("refer to the performance positive class '0'"),
+    ),
   );
   // Jobs the worker would refuse are refused at queue time (#58).
   const jobCount = async () =>
@@ -888,21 +939,6 @@ try {
   console.log(
     "PASS queue refuses a wrong other label, a non-binary system, more than 100 features and an oversized claim",
   );
-  const runWorker = async () => {
-    const runtime = await processRun(
-      [
-        "-c",
-        "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'4'*64,heartbeat=1); print(json.dumps(w.once()))",
-      ],
-      {
-        ASSURANCE_WORKER_TOKEN: worker.token,
-        ASSURANCE_TEST_ORIGIN: origin,
-        ASSURANCE_TEST_WORKER: worker.workerId,
-      },
-    );
-    assert.equal(runtime.code, 0, runtime.out + runtime.error);
-    return JSON.parse(runtime.out.trim());
-  };
   const job = await assurance("queueExternal", plan);
   assert.equal((await runWorker()).state, "completed");
   const jobRow = await testDb

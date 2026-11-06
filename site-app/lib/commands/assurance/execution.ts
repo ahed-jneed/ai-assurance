@@ -3,7 +3,6 @@ import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
-import { assertExternalProtocol } from "../../evaluation-service";
 import {
   assertClaimFits,
   assertDeclaredLabel,
@@ -88,7 +87,6 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
-      assertExternalProtocol(profile);
       externalGate(profile, v.mode);
       const plan = profile.statistics,
         outputLabels: string[] = system.body.outputs.classOrder,
