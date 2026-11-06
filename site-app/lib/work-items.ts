@@ -15,6 +15,7 @@ import {
   reReviewTriggers,
   type ClassificationRules,
 } from "./domain/classification";
+import { acceptanceTasks } from "./workflow/acceptance";
 
 export type WorkItem = {
   id: string;
@@ -22,6 +23,7 @@ export type WorkItem = {
   engagement: string;
   client: string;
   kind:
+    | "acceptance"
     | "scope"
     | "classification"
     | "program"
@@ -138,10 +140,18 @@ export function procedureWork(
             !["reviewed", "signed"].includes(paper?.status ?? "")))),
   };
 }
+export interface EngagementWorkOptions {
+  /** A team member's display name, for titles that name them. */
+  nameOf?: (userId: string) => string | undefined;
+  /** The classification rules of the rule pack served. */
+  rules?: ClassificationRules;
+}
 /**
- * The open work of an engagement for a team member. With the rules of the
- * rule pack served (`rules`), due classification re-review triggers are work
- * too; without them (a caller that has no catalog) they are left out.
+ * The work an internal member sees for the engagement. `options.nameOf`
+ * gives a person's display name for the titles that name a team member; the
+ * user id stands in without it. With the rules of the rule pack served
+ * (`options.rules`), due classification re-review triggers are work too;
+ * without them (a caller that has no catalog) they are left out.
  */
 export function engagementWork(
   e: Engagement,
@@ -149,9 +159,11 @@ export function engagementWork(
   userId: string,
   client = "",
   today = localWorkDay(),
-  rules?: ClassificationRules,
+  options: EngagementWorkOptions = {},
 ): WorkItem[] {
   if (["Client Viewer", "Client Contributor"].includes(role)) return [];
+  const { rules } = options,
+    nameOf = options.nameOf ?? (() => undefined);
   const result: WorkItem[] = [],
     lead = role === "Lead Auditor",
     reviewer = ["Reviewer", "Lead Auditor"].includes(role),
@@ -230,6 +242,46 @@ export function engagementWork(
         1,
         undefined,
         writer,
+      );
+  }
+  // Declarations are owed by the declarant; a declared threat is evaluated
+  // by a Reviewer or Lead Auditor other than the declarant.
+  for (const t of acceptanceTasks(w)) {
+    const name = nameOf(t.userId) || t.userId;
+    if (t.kind === "declaration")
+      add(
+        "acceptance",
+        "declaration:" + t.userId,
+        "Independence and competence declaration · " + name,
+        t.status === "missing" ? "Declare independence" : "Renew declaration",
+        t.status === "missing"
+          ? "Declare independence and competence for the accepted engagement period."
+          : "The engagement team changed after this declaration; declare again.",
+        "Audit program",
+        t.userId,
+        e.dueDate,
+        "ready",
+        1,
+        "acceptance",
+        t.userId === userId,
+      );
+    else
+      add(
+        "acceptance",
+        "threat:" + t.declarationId,
+        "Declared independence threat · " + name,
+        "Evaluate declared threat",
+        t.threats === 1
+          ? "A declared threat awaits evaluation by someone other than the declarant."
+          : t.threats +
+              " declared threats await evaluation by someone other than the declarant.",
+        "Audit program",
+        "",
+        e.dueDate,
+        "review",
+        1,
+        "acceptance",
+        reviewer && t.userId !== userId,
       );
   }
   if (w) {

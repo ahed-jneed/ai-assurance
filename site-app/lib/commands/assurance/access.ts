@@ -4,6 +4,7 @@ import { db } from "../../bindings";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { now } from "../../ids";
+import { accessConflict } from "../../workflow/acceptance";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -30,6 +31,10 @@ export const access: AssuranceModule = defineCommands({
           .first())
       )
         throw new ApiError(400, "Select an active internal member");
+      // A grant applies the conflict that refuses assigning the person to
+      // the team (lib/workflow/acceptance.ts); a revocation never waits.
+      const conflict = v.active && accessConflict(e, v.userId);
+      if (conflict) throw new ApiError(409, conflict);
       const log = await recordStatement(ctx, e.id, "access_event", v);
       await save(
         ctx,

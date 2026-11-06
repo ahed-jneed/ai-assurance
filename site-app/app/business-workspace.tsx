@@ -340,7 +340,13 @@ export function EngagementTaskQueue({
         data.identity.id,
         data.clients.find((c) => c.id === e.clientId)?.name,
         undefined,
-        classificationRules(asRulePack(data.catalog?.regulatorySnapshot)),
+        {
+          nameOf: (id) =>
+            data.people.find((m) => m.user_id === id)?.display_name,
+          rules: classificationRules(
+            asRulePack(data.catalog?.regulatorySnapshot),
+          ),
+        },
       ),
     ).filter((i) => i.personal),
     [all, setAll] = useState(false);

@@ -281,6 +281,7 @@ export function EngagementOverview({
                   engagement={e}
                   role={role}
                   userId={userId}
+                  people={data.people}
                   onGate={onGate}
                 />
               ) : (

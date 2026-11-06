@@ -82,7 +82,7 @@ describe("classification work (#104)", () => {
     on = today,
     r: typeof rules | null = rules,
   ) =>
-    engagementWork(e, role, userId, "", on, r ?? undefined).filter(
+    engagementWork(e, role, userId, "", on, { rules: r ?? undefined }).filter(
       (i) => i.kind === "classification" || i.kind === "report",
     );
   const migrated = () =>
