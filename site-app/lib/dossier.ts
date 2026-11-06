@@ -1,6 +1,7 @@
 import { ApiError, bucket, db, id, now, sha256, type Context } from "./store";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report, RulePackStamp } from "./domain";
 import { canonical } from "./assurance-core";
+import { legalDate } from "./rule-pack";
 export function base64(bytes: ArrayBuffer | Uint8Array) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let s = "";
@@ -19,6 +20,23 @@ const escaped = (s: unknown) =>
         c
       ]!,
   );
+/** The captured rule-pack and methodology versions, for the readable rendition. */
+function rulePackLine(snapshot: Record<string, unknown>) {
+  const pack = snapshot.rulePack as Partial<RulePackStamp> | undefined;
+  if (!pack?.version) return "";
+  return (
+    "<small>Rule pack " +
+    escaped(pack.version) +
+    " (legal text " +
+    escaped(pack.legalVersion) +
+    ", researched " +
+    escaped(legalDate(String(pack.researchedAsOf))) +
+    (pack.legalReview === "approved" ? "" : ", pending legal review") +
+    ") · methodology " +
+    escaped(snapshot.methodologyVersion) +
+    "</small>"
+  );
+}
 export async function buildDossier(
   ctx: Context,
   e: Engagement,
@@ -95,7 +113,9 @@ export async function buildDossier(
     escaped(e.title) +
     "</h1><h2>" +
     escaped(snapshot.opinion) +
-    "</h2><pre>" +
+    "</h2>" +
+    rulePackLine(snapshot) +
+    "<pre>" +
     escaped(snapshot.summary) +
     "</pre>" +
     papers

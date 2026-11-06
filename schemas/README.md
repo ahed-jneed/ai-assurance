@@ -59,3 +59,15 @@ node schemas/validate-working-paper-schema.mjs
 ```
 
 The validator checks the engine example drafts, the blank template and the status gates. The extracted runtime package has no `templates/` folder, so there it checks the engine drafts only.
+
+## Rule pack
+
+`rule-pack.schema.json` (Draft 2020-12) defines the EU AI Act rule pack, the `regulatorySnapshot` of `templates/catalog.json`: per-provision application dates with sources, verification date, legal-review flags, approval metadata and change history; authority deadlines; the dated Article 5 practices; the Article 4a conditions for special-category data in bias detection and the provisions Regulation (EU) 2026/1744 changed; the standards and guidance registers; the legal-review items, unverified claims and the source register. From the workspace root:
+
+```powershell
+node schemas/validate-rule-pack.mjs
+```
+
+Beyond the schema, the validator checks unique ids; that every source, legal-review item and cross-reference resolves and every source is cited; real calendar dates; typed predicates over the facts declared in `docs/obligation-subitems.json`; the approval rules (an entry or the pack is approved only with a reviewer and an approval time, never while a legal-review item it depends on is pending); that secondary sources back only content marked `secondary_only`; the version and research date the catalog, the obligation file and the Annex IV map share; that a clause scope never both covers and excludes a clause; and agreement with the verified research file the pack names, including each entry's summary, scope, conditions and notes (a summary may differ only where `summaryPointers` replaces a pointer to a research data key with one to content the Site shows), the Article 4a conditions, the provision references and each legal-review item's related ids. It then proves that a set of single mutations is each rejected. CI runs it in the `engine` job, and the Site unit tests run the same checks on the copies in `site-app/lib/`.
+
+Hosted 1.1 and external 1.2 runs may also carry `rulePack` and `methodologyVersion`: the rule pack and methodology version the run was made under. Both are optional because earlier runs lack them.

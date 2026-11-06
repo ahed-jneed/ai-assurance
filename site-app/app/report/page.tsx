@@ -1,6 +1,13 @@
 import type { BriefFields, Workflow } from "@/lib/workflow-types";
-import type { Model, Report, Run, EvidenceRequest } from "@/lib/domain";
+import type {
+  Model,
+  Report,
+  Run,
+  EvidenceRequest,
+  RulePackStamp,
+} from "@/lib/domain";
 import { requestLabel } from "@/lib/evidence-requests";
+import { legalDate } from "@/lib/rule-pack";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ApiError, context, getEngagement, sanitize } from "@/lib/store";
 export const dynamic = "force-dynamic";
@@ -65,6 +72,9 @@ type ReportSnapshot = {
   summary: string;
   opinion: string;
   limitations: string;
+  /** Recorded at capture from rule pack 2026.11.1 on; absent on older snapshots. */
+  rulePack?: RulePackStamp;
+  methodologyVersion?: string;
   papers: {
     id: string;
     title: string;
@@ -195,6 +205,16 @@ function reportMarkup(report: Report, s: ReportSnapshot) {
           Operator: {s.engagement.classification.operatorRole} · Regulatory
           version: {s.engagement.classification.version}
         </p>
+        {s.rulePack && (
+          <p>
+            Rule pack {s.rulePack.version} (legal text {s.rulePack.legalVersion}
+            , researched {legalDate(s.rulePack.researchedAsOf)}) · methodology{" "}
+            {s.methodologyVersion}
+            {s.rulePack.legalReview === "approved"
+              ? ""
+              : " · rule pack pending qualified legal review"}
+          </p>
+        )}
         <p>{s.engagement.classification.rationale}</p>
       </section>
       <section>

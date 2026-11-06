@@ -17,6 +17,7 @@ export type {
   Report,
   Result,
   Role,
+  RulePackStamp,
   Run,
 } from "./domain/types";
 export { canWrite, roles } from "./domain/types";
