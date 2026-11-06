@@ -164,6 +164,12 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"{field} must be a nonempty string")
         if frozen["positiveLabel"] == frozen["negativeLabel"]:
             raise ValueError("Positive and negative labels must differ")
+        # The class binary performance (recall, precision, F1) is measured on; absent means the favourable
+        # positiveLabel. Group comparisons and calibration always count positiveLabel.
+        if "performancePositiveLabel" in frozen and frozen["performancePositiveLabel"] not in {frozen["positiveLabel"], frozen["negativeLabel"]}:
+            raise ValueError("performancePositiveLabel must be positiveLabel or negativeLabel")
+    elif "performancePositiveLabel" in frozen:
+        raise ValueError("performancePositiveLabel applies to binary classification only")
     for field, default in (("minGroupSize", 30), ("minClassCount", 10), ("minSampleSize", 30), ("psiBins", 10), ("calibrationBins", 10)):
         value = frozen.get(field, default)
         if not isinstance(value, int) or isinstance(value, bool) or value < 2 or value > (100 if field.endswith("Bins") else MAX_ROWS):
