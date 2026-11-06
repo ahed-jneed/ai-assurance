@@ -46,6 +46,7 @@ const manageMessages: Record<string, string> = {
   inviteMember: "Invitation saved",
   cancelInvitation: "Invitation cancelled",
   renamePractice: "Practice renamed",
+  setQualityReviewPolicy: "Quality review policy saved",
   rotateSigningKey: "Signing key rotated",
 };
 const actMessages: Record<string, string> = {

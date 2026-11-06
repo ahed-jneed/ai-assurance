@@ -3,6 +3,7 @@ import { sanitize } from "../client-projection";
 import type { Engagement } from "../domain";
 import { db, getEngagement, storedSize } from "../engagement-repo";
 import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
+import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import { isClientRole, isInternalRole } from "../workflow-state";
 
@@ -205,12 +206,24 @@ export async function workspaceView(
           .all()
       ).results
     : [];
-  const managementVersion = (await db()
-    .prepare("SELECT version FROM tenants WHERE id=?")
+  const tenant = (await db()
+    .prepare(
+      "SELECT version,eqr_cooling_off_days AS cooling_off_days FROM tenants WHERE id=?",
+    )
     .bind(ctx.tenantId)
     .first<{
       version: number;
-    }>())!.version;
+      cooling_off_days: number | null;
+    }>())!;
+  const managementVersion = tenant.version;
+  // The practice's quality review policy, for its internal members: the
+  // quality review panel and practice settings show it.
+  const qualityReviewPolicy = isInternalRole(ctx.role)
+    ? {
+        coolingOffDays: effectiveCoolingOffDays(tenant.cooling_off_days),
+        practiceSet: typeof tenant.cooling_off_days === "number",
+      }
+    : null;
   const managementEvents = ctx.practiceAdmin
     ? (
         await db()
@@ -240,6 +253,7 @@ export async function workspaceView(
     invitations,
     people,
     managementVersion,
+    qualityReviewPolicy,
     managementEvents,
     events: trail?.events ?? [],
     catalog: isClientRole(ctx.role) ? null : catalog,

@@ -42,6 +42,7 @@ const ops = [
   "inviteMember",
   "cancelInvitation",
   "renamePractice",
+  "setQualityReviewPolicy",
   "rotateSigningKey",
 ];
 // Valid data for each op, against the practice below.
@@ -58,6 +59,7 @@ const valid: Record<string, Record<string, unknown>> = {
   inviteMember: { email: "Nia@Example.test", role: "Auditor" },
   cancelInvitation: { invitationId: "INV-1" },
   renamePractice: { name: "Lea & Partners" },
+  setQualityReviewPolicy: { coolingOffDays: 365, reason: "Firm policy review" },
   rotateSigningKey: { reason: "Scheduled annual rotation" },
 };
 // The members of the fixture practice besides the caller (user-lead).
@@ -255,6 +257,7 @@ describe("POST /api/management", () => {
           inviteMember: ["invitations"],
           cancelInvitation: ["invitations"],
           renamePractice: ["tenants"],
+          setQualityReviewPolicy: ["tenants"],
           rotateSigningKey: ["dossier_keys", "dossier_keys"],
         }[op],
       );
@@ -622,6 +625,49 @@ describe("invitations and practice settings (F-44)", () => {
     ).toEqual({ status: 400, error: "Use at most 80 characters" });
     await post("renamePractice", { name: "  Lea & Partners " });
     expect(own(d1)[0].args.slice(0, 2)).toEqual(["Lea & Partners", "tenant-1"]);
+  });
+
+  it("sets the quality review policy with a reason, for a Lead Auditor only", async () => {
+    for (const data of [
+      { coolingOffDays: -1, reason: "Policy" },
+      { coolingOffDays: 3651, reason: "Policy" },
+      { coolingOffDays: 1.5, reason: "Policy" },
+      { coolingOffDays: 365 },
+    ]) {
+      const d1 = practice();
+      signIn(caller());
+      const response = await post("setQualityReviewPolicy", data);
+      expect(response.status, JSON.stringify(data)).toBe(400);
+      expect(d1.batches).toEqual([]);
+    }
+    for (const role of ["Auditor", "Reviewer", "Engagement Quality Reviewer"]) {
+      const d1 = practice();
+      signIn(caller(role as Role));
+      expect(
+        await refusal(
+          await post("setQualityReviewPolicy", valid.setQualityReviewPolicy),
+        ),
+        role,
+      ).toEqual({
+        status: 403,
+        error: "Only a Lead Auditor may set the quality review policy",
+      });
+      expect(d1.batches).toEqual([]);
+    }
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("setQualityReviewPolicy", {
+      coolingOffDays: 0,
+      reason: " Only the engagement's own team ",
+    });
+    // The event records the old (default) and the new period and the reason.
+    expect((await reply(response)).details).toEqual({
+      coolingOffDays: 0,
+      previousCoolingOffDays: 730,
+      reason: "Only the engagement's own team",
+    });
+    expect(own(d1)[0].sql).toMatch(/^UPDATE tenants SET eqr_cooling_off_days/);
+    expect(own(d1)[0].args.slice(0, 2)).toEqual([0, "tenant-1"]);
   });
 
   it("rotates the signing key with a reason, retiring the active key", async () => {

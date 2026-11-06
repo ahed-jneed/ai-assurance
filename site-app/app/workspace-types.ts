@@ -67,6 +67,12 @@ export type WorkspaceData = {
     client_id: string | null;
   }[];
   managementVersion: number;
+  /**
+   * The practice's engagement quality review policy, for internal members:
+   * the cooling-off period appointments are checked against, and whether
+   * the practice set it (otherwise the default applies).
+   */
+  qualityReviewPolicy?: { coolingOffDays: number; practiceSet: boolean } | null;
   managementEvents: {
     id: string;
     action: string;
