@@ -3,6 +3,7 @@ import { assist, canonical } from "../../assurance-core";
 import { addRecord, recordStatement } from "../../assurance-store";
 import { bucket } from "../../bindings";
 import { base64, signingKey, unbase64 } from "../../dossier";
+import { isReleaseTimeRecord, paperCurrent } from "../../domain";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { now, sha256 } from "../../ids";
@@ -383,6 +384,8 @@ export const assistant: AssuranceModule = defineCommands({
       if (
         !p ||
         p.status !== "draft" ||
+        !paperCurrent(p) ||
+        isReleaseTimeRecord(p.templateId) ||
         e.workflow?.procedures.some((x) => x.paperId === p.id)
       )
         throw new ApiError(

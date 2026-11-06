@@ -99,6 +99,17 @@ export const reports = defineCommands({
             supersededBy: p.supersededBy,
             signatures: p.signatures,
           })),
+        // Limitation memos retired by reopening their evidence request stay
+        // referenced, so evidenceRequests[].limitationPaperId resolves.
+        retiredPapers: e.papers
+          .filter((p) => p.retired && !p.supersededBy)
+          .map((p) => ({
+            id: p.id,
+            templateId: p.templateId,
+            revision: p.revision,
+            retired: p.retired,
+            signatures: p.signatures,
+          })),
         evidence: e.artifacts.map(({ key, ...a }) => a),
         findings: e.findings,
         models: e.models,
