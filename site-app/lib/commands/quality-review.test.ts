@@ -9,7 +9,8 @@ import {
 import { ApiError } from "../http";
 import type { Context } from "../tenancy";
 import { sqliteD1 } from "../test-d1";
-import { engagement, paper } from "../workflow/test-fixtures";
+import { assertReviewerIndependent } from "../quality-review-records";
+import { artifact, engagement, paper } from "../workflow/test-fixtures";
 import { dispatch } from ".";
 
 const settings = env as { DB?: D1Database; EQR_COOLING_OFF_DAYS?: string };
@@ -71,6 +72,33 @@ afterEach(() => {
   delete settings.DB;
   delete settings.EQR_COOLING_OFF_DAYS;
 });
+
+/** An audit event for a command `actor` issued on `engagementId`. */
+function auditEvent(
+  engagementId: string,
+  actor: string,
+  action: string,
+  createdAt = new Date().toISOString(),
+) {
+  sqlite
+    .prepare(
+      "INSERT INTO audit_events(tenant_id,engagement_id,id,actor,action,previous_hash,hash,created_at,details) VALUES('tenant-1',?,?,?,?,'p','h',?,'{}')",
+    )
+    .run(engagementId, crypto.randomUUID(), actor, action, createdAt);
+}
+/** An assurance record `actor` wrote on `engagementId`. */
+function assuranceRecord(engagementId: string, actor: string) {
+  sqlite
+    .prepare(
+      "INSERT INTO assurance_records(tenant_id,engagement_id,id,kind,body,sha256,created_at,actor) VALUES('tenant-1',?,?,'observation','{}','s',?,?)",
+    )
+    .run(engagementId, crypto.randomUUID(), new Date().toISOString(), actor);
+}
+const teamRefusal = {
+  status: 409,
+  message:
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+};
 
 const appoint = (e: Engagement, userId = "eqr", ctx = lead) =>
   dispatch(e, "appointQualityReviewer", { userId, reason: "Independent" }, ctx);
@@ -138,6 +166,93 @@ describe("appointing the engagement quality reviewer", () => {
         "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
     });
     expect(e.qualityReview).toBeUndefined();
+  });
+
+  it("rejects a reviewer who only commented on a paper or only uploaded evidence", async () => {
+    const commented = engagement({
+      papers: [
+        paper({
+          comments: [
+            {
+              id: "C1",
+              authorId: "eqr",
+              text: "Check the sample",
+              resolved: false,
+              createdAt: "2026-11-01T09:00:00Z",
+            },
+          ],
+        }),
+      ],
+    });
+    expect(await refusal(appoint(commented))).toEqual(teamRefusal);
+    const responded = engagement({
+      papers: [
+        paper({
+          comments: [
+            {
+              id: "C1",
+              authorId: "auditor",
+              text: "Check the sample",
+              resolved: true,
+              createdAt: "2026-11-01T09:00:00Z",
+              responses: [
+                { actor: "eqr", at: "2026-11-02T09:00:00Z", text: "Done" },
+              ],
+            },
+          ],
+        }),
+      ],
+    });
+    expect(await refusal(appoint(responded))).toEqual(teamRefusal);
+    const uploaded = engagement({
+      artifacts: [artifact({ uploadedBy: "eqr" })],
+    });
+    expect(await refusal(appoint(uploaded))).toEqual(teamRefusal);
+  });
+
+  it("rejects a reviewer whose work is recorded only in audit events or assurance records", async () => {
+    // Work the engagement record does not show (a run, a removed comment).
+    member("eqr-ran", "Engagement Quality Reviewer");
+    member("eqr-observed", "Engagement Quality Reviewer");
+    auditEvent("ENG-1", "eqr-ran", "startRun");
+    assuranceRecord("ENG-1", "eqr-observed");
+    expect(await refusal(appoint(engagement(), "eqr-ran"))).toEqual(
+      teamRefusal,
+    );
+    expect(await refusal(appoint(engagement(), "eqr-observed"))).toEqual(
+      teamRefusal,
+    );
+    // The reviewer's own checklist saves and sign-offs are not team work.
+    auditEvent("ENG-1", "eqr", "saveQualityReview");
+    auditEvent("ENG-1", "eqr", "signOffQualityReview");
+    await appoint(engagement());
+  });
+
+  it("applies the cooling-off period to recorded work on the client's other engagements", async () => {
+    storedEngagement("ENG-0", "client", engagement({ id: "ENG-0" }));
+    storedEngagement("ENG-9", "other-client", engagement({ id: "ENG-9" }));
+    auditEvent("ENG-9", "eqr", "comment");
+    auditEvent(
+      "ENG-0",
+      "eqr",
+      "comment",
+      new Date(Date.now() - 900 * 86_400_000).toISOString(),
+    );
+    const e = engagement();
+    // Only old work for this client and work for another client: eligible.
+    await appoint(e);
+    delete e.qualityReview;
+    auditEvent(
+      "ENG-0",
+      "eqr",
+      "editPaper",
+      new Date(Date.now() - 30 * 86_400_000).toISOString(),
+    );
+    expect(await refusal(appoint(e))).toEqual({
+      status: 409,
+      message:
+        "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
+    });
   });
 
   it("rejects members without the role or without engagement access", async () => {
@@ -278,6 +393,35 @@ describe("the reviewer's checklist and sign-off", () => {
         dispatch(e, "saveQualityReview", { items: allSatisfied }, eqr),
       ),
     ).toMatchObject({ status: 409 });
+  });
+});
+
+describe("recorded team work after the appointment", () => {
+  it("refuses the reviewer's checklist, capture and release", async () => {
+    const e = engagement({ reports: [finalPackage()] });
+    await appoint(e);
+    await dispatch(e, "saveQualityReview", { items: allSatisfied }, eqr);
+    // The reviewer later did team work, say under another role.
+    auditEvent("ENG-1", "eqr", "comment");
+    expect(
+      await refusal(
+        dispatch(e, "saveQualityReview", { items: allSatisfied }, eqr),
+      ),
+    ).toMatchObject({ status: 409 });
+    expect(await refusal(assertReviewerIndependent(lead, e))).toEqual({
+      status: 409,
+      message:
+        "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer",
+    });
+  });
+
+  it("lets capture and release proceed while the reviewer did no team work", async () => {
+    const e = engagement({ reports: [finalPackage()] });
+    await appoint(e);
+    await dispatch(e, "saveQualityReview", { items: allSatisfied }, eqr);
+    auditEvent("ENG-1", "eqr", "saveQualityReview");
+    auditEvent("ENG-1", "lead", "appointQualityReviewer");
+    await assertReviewerIndependent(lead, e);
   });
 });
 

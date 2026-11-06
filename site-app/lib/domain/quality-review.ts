@@ -113,10 +113,17 @@ export type QualityReview = {
 };
 
 /**
- * The engagement team: everyone who prepared, reviewed, approved or led any
+ * The engagement team as the engagement record shows it: everyone who
+ * prepared, reviewed, commented on, uploaded evidence to, approved or led any
  * of the engagement's work, with the time of their latest involvement. The
- * quality review records themselves are not team work. Records written by
- * client users (evidence uploads, submissions) are not read.
+ * quality review records themselves are not team work. Client users' records
+ * (evidence uploads, comments) count too: a client's own staff are never
+ * independent of the engagement.
+ *
+ * Work recorded only outside the engagement record (its audit events and
+ * assurance records) is read on the server by lib/quality-review-records.ts,
+ * which every appointment, checklist save, sign-off, capture and release
+ * also consults.
  */
 export function engagementTeam(e: Engagement): Map<string, string> {
   const team = new Map<string, string>();
@@ -172,6 +179,10 @@ export function engagementTeam(e: Engagement): Map<string, string> {
   for (const p of e.papers) {
     add(p.authorId, p.updatedAt);
     addAll(p.contributors, p.updatedAt);
+    for (const c of p.comments ?? []) {
+      add(c.authorId, c.createdAt);
+      for (const r of c.responses ?? []) add(r.actor, r.at);
+    }
     for (const r of p.reviews) add(r.userId, r.at);
     for (const s of p.signatures) add(s.userId, s.at);
     for (const h of p.history) {
@@ -191,6 +202,7 @@ export function engagementTeam(e: Engagement): Map<string, string> {
     add(f.support?.actor, f.support?.at);
     add(f.retest?.actor, f.retest?.at);
   }
+  for (const a of e.artifacts ?? []) add(a.uploadedBy, a.createdAt);
   for (const m of e.models) add(m.registeredBy, m.registeredAt);
   for (const p of e.evaluationProfiles ?? []) add(p.createdBy, p.createdAt);
   const c = e.classification;
@@ -305,6 +317,20 @@ export function qualityReviewGates(
 }
 
 /**
+ * Whether the appointed reviewer has signed off this exact package: both
+ * hashes and the current checklist revision.
+ */
+export const qualityReviewSignedOff = (q: QualityReview, r: Report) =>
+  q.signOffs.some(
+    (s) =>
+      s.reportId === r.id &&
+      s.userId === q.reviewerId &&
+      s.internalHash === r.sha256 &&
+      s.clientHash === r.clientSha256 &&
+      s.checklistRevision === q.revision,
+  );
+
+/**
  * Why this final package may not be released yet for want of the quality
  * review; empty when the review does not apply or covers the exact package.
  */
@@ -316,15 +342,7 @@ export function qualityReviewReleaseProblem(e: Engagement, r: Report) {
     return "Appoint an engagement quality reviewer and obtain their sign-off before release";
   if (onEngagementTeam(e, q.reviewerId))
     return "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer";
-  const signed = q.signOffs.some(
-    (s) =>
-      s.reportId === r.id &&
-      s.userId === q.reviewerId &&
-      s.internalHash === r.sha256 &&
-      s.clientHash === r.clientSha256 &&
-      s.checklistRevision === q.revision,
-  );
-  return signed
+  return qualityReviewSignedOff(q, r)
     ? ""
     : "The engagement quality reviewer must sign off both exact packages before release";
 }

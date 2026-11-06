@@ -23,6 +23,12 @@ vi.mock("../assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
+// The reviewer's recorded team work is read from D1 too; none exists here.
+vi.mock("../quality-review-records", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../quality-review-records")>()),
+  assertReviewerIndependent: vi.fn(async () => {}),
+}));
+
 const particulars = {
   addressee: "The board of Fixture Bank AG",
   location: "Vienna, Austria",

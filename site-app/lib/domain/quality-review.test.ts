@@ -5,6 +5,7 @@ import { finalReportGates, type Engagement, type Report } from "../domain";
 import { engagementWork } from "../work-items";
 import {
   approvedWorkflow,
+  artifact,
   at,
   command,
   completedQualityReview,
@@ -94,6 +95,39 @@ describe("engagement team", () => {
     // The quality review itself is not team work.
     e.qualityReview = completedQualityReview();
     expect(engagementTeam(e).has("quality-reviewer")).toBe(false);
+  });
+
+  it("counts paper comments, comment responses and evidence uploads as team work", () => {
+    const e = engagement({
+      papers: [
+        paper({
+          authorId: "auditor",
+          comments: [
+            {
+              id: "C1",
+              authorId: "commenter",
+              text: "Check the sample",
+              resolved: false,
+              createdAt: "2026-10-01T09:00:00Z",
+              responses: [
+                {
+                  actor: "responder",
+                  at: "2026-10-02T09:00:00Z",
+                  text: "Done",
+                },
+              ],
+            },
+          ],
+        }),
+      ],
+      artifacts: [
+        artifact({ uploadedBy: "uploader", createdAt: "2026-10-03T09:00:00Z" }),
+      ],
+    });
+    const team = engagementTeam(e);
+    expect(team.get("commenter")).toBe("2026-10-01T09:00:00Z");
+    expect(team.get("responder")).toBe("2026-10-02T09:00:00Z");
+    expect(team.get("uploader")).toBe("2026-10-03T09:00:00Z");
   });
 
   it("finds team service on the client's other engagements within the cooling-off period", () => {

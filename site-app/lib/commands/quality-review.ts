@@ -4,20 +4,22 @@ import type { Engagement } from "../domain";
 import {
   checklistItemIds,
   checklistProblem,
-  coolingOffConflicts,
-  onEngagementTeam,
   qualityReviewerRole,
   type QualityReview,
 } from "../domain/quality-review";
 import { db, now } from "../engagement-repo";
 import { ApiError } from "../http";
+import {
+  onRecordedTeam,
+  recordedCoolingOffConflicts,
+} from "../quality-review-records";
 import type { Context } from "../tenancy";
 import { releaseState } from "../workflow-state";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
 
 /** The appointed reviewer's quality review, for the reviewer's own commands. */
-function ownReview(e: Engagement, ctx: Context) {
+async function ownReview(e: Engagement, ctx: Context) {
   const q = e.qualityReview;
   if (!q)
     throw new ApiError(409, "No engagement quality reviewer is appointed");
@@ -26,7 +28,7 @@ function ownReview(e: Engagement, ctx: Context) {
       403,
       "Only the appointed engagement quality reviewer can record this review",
     );
-  if (onEngagementTeam(e, q.reviewerId))
+  if (await onRecordedTeam(ctx, e, q.reviewerId))
     throw new ApiError(
       409,
       "You are on the engagement team and cannot act as its quality reviewer",
@@ -94,7 +96,7 @@ export const qualityReview = defineCommands({
           400,
           "Grant the reviewer access to this engagement in Users & access first",
         );
-      if (onEngagementTeam(e, a.userId))
+      if (await onRecordedTeam(ctx, e, a.userId))
         throw new ApiError(
           409,
           "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
@@ -102,7 +104,9 @@ export const qualityReview = defineCommands({
       const days = coolingOffDays(),
         at = now();
       const conflicts = days
-        ? coolingOffConflicts(
+        ? await recordedCoolingOffConflicts(
+            ctx,
+            e,
             await clientEngagements(ctx, e),
             a.userId,
             days,
@@ -153,8 +157,8 @@ export const qualityReview = defineCommands({
   },
   saveQualityReview: {
     roles: [qualityReviewerRole],
-    handle(e, d, ctx) {
-      const q = ownReview(e, ctx);
+    async handle(e, d, ctx) {
+      const q = await ownReview(e, ctx);
       const a = z
         .object({
           items: z
@@ -197,8 +201,8 @@ export const qualityReview = defineCommands({
   },
   signOffQualityReview: {
     roles: [qualityReviewerRole],
-    handle(e, d, ctx) {
-      const q = ownReview(e, ctx);
+    async handle(e, d, ctx) {
+      const q = await ownReview(e, ctx);
       const a = z
         .object({
           reportId: short,
