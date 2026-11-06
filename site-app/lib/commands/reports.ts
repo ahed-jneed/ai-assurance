@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { annexIVIndex, annexMapVersion } from "../annex-iv";
 import { assurancePins, jobs, assuranceGates } from "../assurance-store";
-import { clientReportSnapshot, paperAudience } from "../client-projection";
+import {
+  clientReportSnapshot,
+  currentClientSnapshot,
+  legacyPackageMessage,
+  paperAudience,
+} from "../client-projection";
 import {
   finalReportGates,
   paperCurrent,
@@ -34,15 +39,10 @@ import { short, text } from "./fields";
 /**
  * The papers a report captures: every current paper for a draft, the current
  * signed papers for a final report. Superseded papers and retired limitation
- * memos are history, not current work. Report model v2 snapshots also record
- * each paper's audience, which decides what the client snapshot publishes;
- * older snapshots are compared without it.
+ * memos are history, not current work. Each paper's audience decides what the
+ * client snapshot publishes.
  */
-function capturedPapers(
-  e: Engagement,
-  kind: "draft" | "final",
-  withAudience = true,
-) {
+function capturedPapers(e: Engagement, kind: "draft" | "final") {
   return e.papers
     .filter(
       (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
@@ -53,7 +53,7 @@ function capturedPapers(
       title: p.title,
       revision: p.revision,
       status: p.status,
-      ...(withAudience && { audience: paperAudience(p) }),
+      audience: paperAudience(p),
       body: p.body,
       evidenceIds: p.evidenceIds,
       runIds: p.runIds,
@@ -203,7 +203,14 @@ export const reports = defineCommands({
           snapshot,
           release: { state: "internal" as const, history: [] },
         };
-      const clientSnapshot = clientReportSnapshot(e, { ...snapshot, report });
+      // The client report counts only the findings it lists (F-57).
+      const clientSnapshot = clientReportSnapshot(e, {
+        ...snapshot,
+        report: {
+          ...report,
+          criteria: criterionRollup(e, (f) => f.visibility === "client"),
+        },
+      });
       Object.assign(r, {
         clientSnapshot,
         clientSha256: await sha256(JSON.stringify(clientSnapshot)),
@@ -246,6 +253,11 @@ export async function assertReleasable(
 ) {
   const r = e.reports.find((r) => r.id === d.reportId);
   if (!r) throw new ApiError(404, "Report not found");
+  // A package captured before report model v2 carries the old client
+  // snapshot (internal memos, approver and uploader ids): never publish it.
+  const terms = snapshotTerms(r.snapshot);
+  if (!terms || !currentClientSnapshot(r))
+    throw new ApiError(409, legacyPackageMessage);
   if (
     r.snapshot.assurancePins &&
     JSON.stringify(r.snapshot.assurancePins) !==
@@ -255,12 +267,11 @@ export async function assertReleasable(
       409,
       "Assurance sources changed after capture; prepare and approve a new report",
     );
-  // A legacy report (captured before report model v2) is rechecked with its
-  // opinion string; a v2 report with its terms and report elements.
-  const terms = snapshotTerms(r.snapshot),
-    report: FinalReport | string = terms
-      ? { ...terms, particulars: snapshotParticulars(r.snapshot) }
-      : snapshotConclusion(r.snapshot);
+  // The release gates are rechecked with the captured terms and elements.
+  const report: FinalReport = {
+    ...terms,
+    particulars: snapshotParticulars(r.snapshot),
+  };
   const assuranceBlockers = await assuranceGates(
     ctx,
     e.id,
@@ -292,7 +303,7 @@ export async function assertReleasable(
     JSON.stringify(frozen.procedures) !==
       JSON.stringify(e.workflow?.procedures) ||
     JSON.stringify(r.snapshot.papers) !==
-      JSON.stringify(capturedPapers(e, "final", !!terms)) ||
+      JSON.stringify(capturedPapers(e, "final")) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
     JSON.stringify(
       (

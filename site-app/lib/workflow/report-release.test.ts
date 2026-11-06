@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { legacyPackageMessage } from "../client-projection";
 import type { Report } from "../domain";
 import { seedWorkflow } from "../workflow-seed";
 import {
@@ -18,7 +19,7 @@ function approvedReport(id: string): Report {
     actor: "auditor",
     sha256: id + "-internal",
     snapshot: { opinion: "Adverse conclusion" },
-    clientSnapshot: { opinion: "Adverse conclusion" },
+    clientSnapshot: { contractVersion: "2.0", opinion: "Adverse conclusion" },
     clientSha256: id + "-client",
     release: {
       state: "approved",
@@ -144,6 +145,34 @@ describe("report release", () => {
     await expectFailure(release("R2", "R2"), 400);
     await expectFailure(release("R2", "unknown"), 400);
     expect(reportOf("R1").release!.state).toBe("released");
+  });
+
+  it("refuses to approve a package captured before report model v2", async () => {
+    setup("R1");
+    const r = reportOf("R1");
+    r.release = { state: "internal", history: [] };
+    // The old client snapshot: no contract version.
+    r.clientSnapshot = { opinion: "Adverse conclusion" };
+    r.snapshot = {
+      opinion: "Adverse conclusion",
+      workflow: approvedWorkflow(),
+    };
+    await expectFailure(
+      command(
+        engagementWith,
+        "approveReportPackage",
+        {
+          reportId: "R1",
+          internalHash: "R1-internal",
+          clientHash: "R1-client",
+          reason: "Both packages reviewed",
+        },
+        "reviewer",
+      ),
+      409,
+      legacyPackageMessage,
+    );
+    expect(r.release.state).toBe("internal");
   });
 
   it("ignores the release-time procedures but not other unfinished work", async () => {

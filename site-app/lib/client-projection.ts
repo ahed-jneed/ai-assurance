@@ -119,6 +119,18 @@ export function clientScope(b: Brief | undefined) {
     : null;
 }
 
+/** The client snapshot contract that report model v2 captures. */
+export const clientSnapshotVersion = "2.0";
+/**
+ * Whether a package's client snapshot follows the current contract. Packages
+ * captured before report model v2 carry a client snapshot that includes
+ * internal memos and internal user ids; they must not be approved or released.
+ */
+export const currentClientSnapshot = (r: {
+  clientSnapshot?: Record<string, unknown>;
+}) => r.clientSnapshot?.contractVersion === clientSnapshotVersion;
+export const legacyPackageMessage =
+  "This package was captured before report model v2 and its client snapshot is not current. Prepare a new report package";
 /**
  * The client snapshot of a final report, built when the report is captured
  * and published when it is released. `report` is the part of the internal
@@ -139,7 +151,7 @@ export function clientReportSnapshot(
   },
 ) {
   return {
-    contractVersion: "2.0",
+    contractVersion: clientSnapshotVersion,
     scope: clientScope(e.workflow?.brief),
     engagement: {
       id: e.id,
@@ -163,6 +175,9 @@ export function clientReportSnapshot(
     methodologyVersion: captured.methodologyVersion,
   };
 }
+
+/** How a client sees a successor that was withdrawn after its release. */
+export const withdrawnSuccessor = "a later report, since withdrawn";
 
 /**
  * The live engagement as the caller may see it: internal roles get the full
@@ -227,8 +242,14 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       replaces: e.reports
         .filter((q) => q.release?.supersededBy === r.id)
         .map((q) => q.id),
+      // A successor the client cannot read (withdrawn after release) is not
+      // named.
       ...(r.release?.supersededBy && {
-        supersededBy: r.release.supersededBy,
+        supersededBy: e.reports.some(
+          (q) => q.id === r.release!.supersededBy && isClientVisible(q),
+        )
+          ? r.release.supersededBy
+          : withdrawnSuccessor,
       }),
     })),
     ...(contributor

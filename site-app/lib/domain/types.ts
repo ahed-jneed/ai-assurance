@@ -355,7 +355,8 @@ export type Report = {
   /**
    * The released report that superseded this one. Set on the client
    * projection: a superseded report stays readable to the client, which was
-   * issued that opinion, labelled with its successor.
+   * issued that opinion, labelled with its successor (or, when the successor
+   * was withdrawn and the client cannot read it, without naming it).
    */
   supersededBy?: string;
 };

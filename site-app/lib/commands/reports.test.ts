@@ -279,10 +279,11 @@ describe("report model v2 snapshots", () => {
     ).toThrow("Your role cannot perform this action");
   });
 
-  it("rechecks a legacy report with its opinion string on release", async () => {
+  it("refuses to release a package captured before report model v2", async () => {
     const e = await issuable();
     const r = await capture(e, qualified);
-    // A report captured before v2: an opinion string and no paper audience.
+    // A report captured before v2: an opinion string, no paper audience and
+    // the old client snapshot with internal memos and user ids.
     const legacy = structuredClone(r);
     legacy.id = "REPORT-LEGACY";
     const s = legacy.snapshot as Record<string, unknown>;
@@ -295,15 +296,65 @@ describe("report model v2 snapshots", () => {
       "reportTitle",
     ])
       delete s[key];
-    s.opinion = "Unable to conclude";
+    s.opinion = "Qualified conclusion";
     s.contractVersion = "1.1";
     for (const p of s.papers as Record<string, unknown>[]) delete p.audience;
+    legacy.clientSnapshot = {
+      opinion: "Qualified conclusion",
+      engagement: { classification: { approvedBy: "user-approver-7" } },
+      papers: s.papers,
+    };
     e.reports.push(legacy);
-    await assertReleasable(e, { reportId: legacy.id }, caller());
-    s.opinion = "Readiness assessment";
-    e.findings.push(finding({ id: "F-9", severity: "High" }));
     await expect(
       assertReleasable(e, { reportId: legacy.id }, caller()),
-    ).rejects.toThrow("F-9: unresolved high finding");
+    ).rejects.toThrow("Prepare a new report package");
+    // A v2 internal snapshot paired with an old client snapshot is refused too.
+    const mixed = structuredClone(r);
+    mixed.id = "REPORT-MIXED";
+    delete mixed.clientSnapshot!.contractVersion;
+    e.reports.push(mixed);
+    await expect(
+      assertReleasable(e, { reportId: mixed.id }, caller()),
+    ).rejects.toThrow("Prepare a new report package");
+    await assertReleasable(e, { reportId: r.id }, caller());
+  });
+
+  it("counts only client-visible findings in the client's results by criterion", async () => {
+    const e = await issuable();
+    const support = (findingId: string) => ({
+      findingId,
+      procedureId,
+      paperIds: [],
+      evidenceIds: [],
+      runIds: [],
+      actor: "auditor",
+      at: "2026-11-05T10:00:00.000Z",
+    });
+    e.findings.push(
+      finding({
+        id: "F-INT",
+        severity: "Medium",
+        visibility: "internal",
+        support: support("F-INT"),
+      }),
+      finding({
+        id: "F-CLI",
+        severity: "Medium",
+        visibility: "client",
+        support: support("F-CLI"),
+      }),
+    );
+    const r = await capture(e, { ...qualified, kind: "draft" });
+    const counts = (s: Record<string, unknown>) =>
+      (s.criteria as { openFindings: number }[]).map((c) => c.openFindings);
+    expect(counts(r.snapshot)).toEqual([2]);
+    expect(counts(r.clientSnapshot!)).toEqual([1]);
+  });
+
+  it("states the firm's independence statement, not the internal planning note", async () => {
+    const e = await issuable();
+    e.workflow!.brief!.independence = "Internal: partner X declared a conflict";
+    const r = await capture(e, qualified);
+    expect(JSON.stringify(r.clientSnapshot)).not.toContain("partner X");
   });
 });

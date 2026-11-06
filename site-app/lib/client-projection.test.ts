@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { paperAudience, sanitize } from "./client-projection";
+import {
+  paperAudience,
+  sanitize,
+  withdrawnSuccessor,
+} from "./client-projection";
 import { caller, stored } from "./commands/test-fixtures";
 import type { Report } from "./domain";
 import { packageStatusLabel } from "./report-presentation";
@@ -80,6 +84,32 @@ describe("client projection of released reports", () => {
     );
     expect(packageStatusLabel(client.reports[2], true)).toBe(
       "Released to client",
+    );
+  });
+
+  it("does not name a successor the client cannot read", () => {
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "superseded",
+        releasedAt: at,
+        supersededBy: "REPORT-2",
+        history: [],
+      }),
+      report("REPORT-2", {
+        state: "withdrawn",
+        releasedAt: at,
+        supersedes: "REPORT-1",
+        history: [],
+      }),
+    ];
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(client.reports.map((r) => [r.id, r.supersededBy])).toEqual([
+      ["REPORT-1", withdrawnSuccessor],
+    ]);
+    expect(JSON.stringify(client.reports)).not.toContain("REPORT-2");
+    expect(packageStatusLabel(client.reports[0], true)).toBe(
+      "Superseded by a later report, since withdrawn",
     );
   });
 
