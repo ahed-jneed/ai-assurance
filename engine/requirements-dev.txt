@@ -4,7 +4,12 @@
 # site-app/scripts/assurance-integration-check.mjs. numpy is needed by the
 # native-adapter tests in engine/tests/test_connectors_adapters.py; its pin
 # matches requirements-optional.txt. jsonschema validates engine reports
-# against schemas/test-run.schema.json (those tests skip without it).
+# against schemas/test-run.schema.json and GenAI envelopes against
+# schemas/genai-*.schema.json (those tests skip without it). zstandard reads
+# the zstd entries of Inspect .eval logs below Python 3.14 (engine/GENAI.md);
+# its pin matches requirements-optional.txt, and CI sets GENAI_REQUIRE_ZSTD=1
+# so the .eval tests cannot skip there.
 cryptography==50.0.2
 jsonschema==4.26.0
 numpy==2.3.5
+zstandard==0.25.0

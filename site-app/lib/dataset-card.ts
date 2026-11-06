@@ -44,6 +44,20 @@ type CardRecord = {
   body: { artifactId?: unknown; artifactSha256?: unknown };
 };
 /**
+ * Whether a registered card record describes these exact bytes: a dataset
+ * card for the artifact id and its SHA-256.
+ */
+export function cardDescribes(
+  card: CardRecord,
+  artifact: { id: string; sha256: string },
+) {
+  return (
+    card.kind === "dataset" &&
+    card.body.artifactId === artifact.id &&
+    card.body.artifactSha256 === artifact.sha256
+  );
+}
+/**
  * The dataset card to pin to an evaluation of `artifact`: the `preferred`
  * card when it describes these exact bytes, otherwise the latest card that
  * does. Records are in registration order. A card for other bytes is never
@@ -55,11 +69,6 @@ export function datasetCardFor<T extends CardRecord>(
   preferred?: string,
 ): T | undefined {
   if (!artifact) return undefined;
-  const matching = cards.filter(
-    (c) =>
-      c.kind === "dataset" &&
-      c.body.artifactId === artifact.id &&
-      c.body.artifactSha256 === artifact.sha256,
-  );
+  const matching = cards.filter((c) => cardDescribes(c, artifact));
   return matching.find((c) => c.id === preferred) ?? matching.at(-1);
 }

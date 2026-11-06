@@ -1,6 +1,7 @@
 // New records built from the methodology catalog: working papers from a
 // template and engagements in their initial state.
 import catalog from "./catalog.json";
+import { templateCriterion } from "./catalog-criteria";
 import type { Engagement, Paper } from "./domain";
 import { id, now } from "./ids";
 import { ApiError } from "./http";
@@ -27,7 +28,7 @@ export function templatePaper(templateId: string, userId: string): Paper {
     body: {
       objective: t.objective,
       scope: "",
-      criteria: t.regulatoryRefs.join("; "),
+      criteria: templateCriterion(t),
       procedures: "",
       sampling: "",
       results: "",

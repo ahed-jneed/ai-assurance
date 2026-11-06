@@ -18,7 +18,7 @@
 | Tenancy, authorization and persistence core | `lib/store.ts`, `lib/engagement-storage.ts` | `context()` maps identity to tenant, role, client and practice-admin flag, and auto-provisions new users. `getEngagement()` authorizes and hydrates. `save()` runs the compare-and-swap batch. `sanitize()` builds the client projection. Also `readBounded`, `checkOrigin`, `responseError` |
 | Audit domain | `lib/domain.ts`, `lib/workflow-{types,state,service,seed}.ts`, `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts` | The engagement aggregate, lifecycle gates, brief/program/procedure workflow, independence rules, report approval and release, monitoring |
 | Evaluation | `lib/diagnostics.ts`, `lib/evaluation.ts`, `lib/evaluation-service.ts`, `lib/dataset-card.ts`, `lib/testing-readiness.ts` | CSV diagnostics computed inside the Worker (binary, multiclass, regression, plus demographic parity, disparate impact and equalized odds); frozen run manifests |
-| Assurance and signing | `lib/assurance-{core,packet,store}.ts`, `lib/dossier.ts` | Append-only assurance records, an external job queue with fenced leases, and Ed25519-signed dossiers and briefing packets |
+| Assurance and signing | `lib/assurance-{core,packet,store}.ts`, `lib/dossier.ts`, `lib/signing-keys.ts` | Append-only assurance records, an external job queue with fenced leases, and Ed25519-signed dossiers and briefing packets with wrapped practice keys (`docs/security/signing-keys.md`) |
 | Worker entry and build | `build/sites-worker.ts`, `build/sites-vite-plugin.ts`, `vite.config.ts`, `scripts/run-framework.mjs` | Worker fetch wrapper; dev-only mock sign-in; copies `hosting.json` and `drizzle/` into `dist/.openai` |
 | Python engine | `engine/` | Stdlib-only diagnostics CLI, a pull worker for `/api/runner` (child process or Docker executor), assurance CLIs (sampling, bootstrap, dossier verify/sign), registry import, cited assistant, runtime packager. 120 unittest cases |
 | Contracts | `schemas/` | Draft 2020-12 run contract (1.0 legacy, 1.1 hosted, 1.2 external), procedure-execution and working-paper schemas, and Ajv validators |
@@ -82,7 +82,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
    - `createReport` freezes an internal snapshot and a client snapshot, both hashed and offloaded to R2.
    - `approveReportPackage` approves both hashes; `releaseReport` releases the client projection.
    - `/api/report-package` re-verifies the digests.
-   - `/api/dossier` seals an Ed25519-signed dossier per audience, which can be verified offline with `engine/assurance.py verify`.
+   - `/api/dossier` seals an Ed25519-signed dossier per audience, which can be verified offline with `engine/assurance.py verify`; `/api/dossier/keys` lists the practice's active and retired verification keys, and a practice administrator rotates the key with the management op `rotateSigningKey`.
 
 ### 1.4 Storage
 
@@ -92,7 +92,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 |---|---|
 | Tenancy and access | `tenants` (version, last_command_id), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_policies` |
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
-| Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (plaintext PKCS#8 private keys) |
+| Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |
 
 **Invariants.** Append-only triggers protect `audit_events`, `engagement_snapshots`, `management_events`, `assurance_records`, and completed jobs and attempts. Unique indexes on `json_extract` expressions stop revision forks. All of these exist only in hand-written SQL (`0001`, `0003`).
@@ -114,7 +114,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 4. It runs a legacy access-adoption write batch on every request.
 5. It sets the `practiceAdmin` flag.
 
-**Roles.** There are five: Auditor, Lead Auditor, Reviewer, Client Viewer, Client Contributor, plus the practice-admin flag.
+**Roles.** There are six: Auditor, Lead Auditor, Reviewer, Engagement Quality Reviewer (reads its engagements and records only the quality review, #24), Client Viewer, Client Contributor, plus the practice-admin flag.
 - Internal roles need a per-engagement `engagement_access` row.
 - Client roles are scoped by their membership's `client_id`. Contributors also need an unexpired grant inside the engagement JSON.
 
@@ -188,6 +188,7 @@ A second identity is impossible in this mode: the mock strips inbound `oai-*` he
 | `qa-auditor` | Auditor | Brief and program preparation, procedures, classification, evidence, findings |
 | `qa-reviewer` | Reviewer | Independent approvals: brief, program, procedure review, classification, retest and closure, report package |
 | `qa-lead2` | Lead Auditor (optional) | A second signer or releaser when qa-lead prepared the content |
+| `qa-eqr` | Engagement Quality Reviewer | Quality review checklist and package sign-off; never edits audit work |
 | `qa-contrib` | Client Contributor (Acme) | Client portal submissions |
 | `qa-viewer` | Client Viewer (Acme) | Released reports; isolation checks |
 | `qa-outsider` | Never granted | Cross-tenant isolation checks |

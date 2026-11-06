@@ -90,6 +90,8 @@ type Props = {
   onEditorOpen: (open: boolean) => void;
   /** The dataset registry's card form reports here, separately. */
   onDatasetEditing: (open: boolean) => void;
+  /** The special-category basis form reports here, separately. */
+  onBasisEditing: (open: boolean) => void;
   onEvidence: () => void;
   onPaper: (p: Paper) => void;
   resolve: (id: string) => string;
@@ -336,6 +338,7 @@ export function TestingLab({
   onView,
   onEditorOpen,
   onDatasetEditing,
+  onBasisEditing,
   onEvidence,
   onPaper,
   resolve,
@@ -824,6 +827,7 @@ export function TestingLab({
             writer={writer}
             busy={busy}
             act={act}
+            onEditing={onBasisEditing}
           />
           <DatasetRegistry
             engagement={e}

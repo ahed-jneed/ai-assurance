@@ -18,6 +18,8 @@ export const editingSources = [
   "testing-lab",
   // The Testing lab's dataset card form, apart from the lab's own dialogs.
   "dataset-registry",
+  // The Testing lab's form recording a client's special-category basis.
+  "special-category-basis",
   "member-onboarding",
   "finding-assurance",
   "report-release",

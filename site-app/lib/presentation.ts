@@ -17,6 +17,11 @@ export function humanLabel(value: string) {
     maximumParityGap: "Maximum parity gap",
     minimumImpactRatio: "Minimum impact ratio",
     minimumAccuracy: "Minimum accuracy",
+    maximumRmse: "Maximum RMSE",
+    mae: "MAE",
+    rmse: "RMSE",
+    r2: "R²",
+    baseline_rmse: "Baseline RMSE (predicting the mean)",
   };
   return (
     names[value] ??

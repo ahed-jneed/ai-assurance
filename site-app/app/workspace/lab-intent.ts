@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer } from "react";
 import type { Engagement, EvaluationProfile, Model, Run } from "@/lib/domain";
+import { activeProcedureRun } from "@/lib/workflow-state";
 
 /**
  * Work another module hands to the Testing lab. The lab opens with it once:
@@ -61,12 +62,8 @@ export function resolveLabIntent(
   }
   // A planned evaluation already waiting for this procedure is shown rather
   // than queueing a duplicate that would block final issuance.
-  const pending = e.runs.filter(
-    (r) =>
-      ["queued", "running"].includes(r.state) &&
-      r.procedureBinding?.procedureId === intent.procedureId,
-  );
-  if (pending.length) return { kind: "showRun", run: pending.at(-1)! };
+  const pending = activeProcedureRun(e, intent.procedureId);
+  if (pending) return { kind: "showRun", run: pending };
   const p = e.workflow?.procedures.find((p) => p.id === intent.procedureId),
     model = e.models.find((m) => m.id === p?.modelId),
     profile = e.evaluationProfiles?.find((x) => x.id === p?.profileId);

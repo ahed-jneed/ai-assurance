@@ -30,6 +30,7 @@ import {
   type ReportTerms,
 } from "@/lib/domain/report-model";
 import { paperNextAction, type PaperTarget } from "@/lib/paper-workflow";
+import { gateTitle } from "@/lib/workflow/acceptance";
 /**
  * Report elements the approved brief and program supply. Independence is
  * not one of them: its gate has kind "acceptance" and opens that panel.
@@ -41,12 +42,17 @@ export const briefElements = [
   "report:work",
 ];
 export type GateAction = (gate: AuditGate, target?: PaperTarget) => void;
+/** The practice members a gate may name (WorkspaceData.people). */
+export type GatePeople = readonly { user_id: string; display_name: string }[];
+const titleOf = (g: AuditGate, people: GatePeople) =>
+  gateTitle(g, (id) => people.find((m) => m.user_id === id)?.display_name);
 
 export function AuditGateList({
   gates,
   engagement: e,
   role,
   userId,
+  people = [],
   onGate,
   compact = false,
 }: {
@@ -54,6 +60,8 @@ export function AuditGateList({
   engagement: Engagement;
   role: Role;
   userId: string;
+  /** Names the team member of a declaration gate instead of their user id. */
+  people?: GatePeople;
   onGate?: GateAction;
   compact?: boolean;
 }) {
@@ -69,6 +77,7 @@ export function AuditGateList({
     "Evaluations",
     "Findings",
     "Report elements",
+    "Quality review",
     "Engagement stage",
   ];
   const group = (g: AuditGate) =>
@@ -89,6 +98,7 @@ export function AuditGateList({
           request: "Evidence collection",
           conclusion: "Conclusion exceptions",
           report: "Report elements",
+          quality_review: "Quality review",
         }[g.kind];
   function row(g: AuditGate) {
     const p = ["paper", "conclusion"].includes(g.kind)
@@ -155,11 +165,12 @@ export function AuditGateList({
           report: briefElements.includes(g.id)
             ? "Open scope & program"
             : "Edit report terms",
+          quality_review: "Open quality review",
         }[g.kind];
     const content = (
       <>
         <span className="audit-gate-description">
-          <b>{g.title}</b>
+          <b>{titleOf(g, people)}</b>
           {guidance && <small>{guidance}</small>}
         </span>
         {onGate && (
@@ -198,7 +209,7 @@ export function AuditGateList({
             <summary>
               <span className="gate-group-label">
                 {label}
-                <small>{items[0].title}</small>
+                <small>{titleOf(items[0], people)}</small>
               </span>
               <span className="count-label">{items.length}</span>
             </summary>

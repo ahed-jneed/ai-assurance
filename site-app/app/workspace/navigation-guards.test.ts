@@ -28,6 +28,30 @@ describe("reportEditing", () => {
     expect(open).toEqual(["testing-lab"]);
   });
 
+  it("keeps an open special-category basis form apart from the lab's other editors", () => {
+    // The basis form and the dataset card form share the Datasets tab; the
+    // card form closing must not release the unsaved basis (#103).
+    let open = reportEditing([], "special-category-basis", true);
+    open = reportEditing(open, "dataset-registry", true);
+    open = reportEditing(open, "dataset-registry", false);
+    expect(open).toEqual(["special-category-basis"]);
+    expect(
+      navigationGuard({
+        busy: false,
+        loading: false,
+        bootstrapping: false,
+        modal: "",
+        isModalSubmitting: () => false,
+        editorOpen: open.length > 0,
+        view: "Testing lab",
+        isDirty: () => false,
+        confirmDiscard: () => {},
+      })(() => {
+        throw Error("must not navigate");
+      }),
+    ).toBe("editor_open");
+  });
+
   it("keeps the same list when nothing changes", () => {
     const open = reportEditing([], "testing-lab", true);
     expect(reportEditing(open, "testing-lab", true)).toBe(open);

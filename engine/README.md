@@ -4,6 +4,8 @@ This is an executable evidence engine for the assurance platform. Its default de
 
 The independent `/api/runner` pull client is implemented in `worker.py`; see [WORKER.md](WORKER.md) for enrollment, exact-byte completion signatures, hosted/external contract translation, isolated native execution and current limitations. Its local loopback end-to-end tests do not establish a deployed worker service or native-runtime validation.
 
+GenAI evaluation evidence (Inspect, lm-evaluation-harness, promptfoo, garak, PyRIT, DeepEval, Ragas, human-versus-judge labels and Art. 50 marking checks) is ingested and recomputed by `python -m engine.genai`; see [GENAI.md](GENAI.md). It never executes, imports or deserializes code that an ingested log names. Reading Inspect `.eval` logs needs a zstd back-end: the standard library from Python 3.14, otherwise the optional `zstandard` package pinned in `requirements-optional.txt` and `requirements-dev.txt` (#62 settles the packaging).
+
 Read-only MLflow and Hugging Face registration snapshots are implemented in `registry_import.py`; see [REGISTRY_IMPORT.md](REGISTRY_IMPORT.md) for exact version/commit acquisition, declaration-only feature contracts, approved digest-bound artifact copies and unknown fields. Importing a snapshot does not approve a model or enable a runtime.
 
 From the repository root:
@@ -42,7 +44,7 @@ SHAP, LIME, cross-validation, adversarial robustness and Article 12 record-keepi
 
 ## Common run contract
 
-The shared Draft 2020-12 schema in `schemas/test-run.schema.json` distinguishes these records. Engine evidence is contract **1.3** (runner **1.3.0**, statistics 1.0.0); frozen 1.0 engine reports stay readable under their own rules. The frozen hosted input/configuration and hosted saved-prediction record use **1.1**; the platform's authenticated external-result compilation uses **1.2**, and **1.5** under statistics 1.0.0. The worker transport request and exact result envelope each use `schemaVersion: "1.0"`. These independent version fields describe different boundaries; importing evidence does not rewrite the original report or upgrade its provenance.
+The shared Draft 2020-12 schema in `schemas/test-run.schema.json` distinguishes these records. Engine evidence is contract **1.3** (runner **1.4.0**, statistics 1.0.0); frozen 1.0 engine reports stay readable under their own rules. The frozen hosted input/configuration and hosted saved-prediction record use **1.1**; the platform's authenticated external-result compilation uses **1.2**, and **1.5** under statistics 1.0.0. The worker transport request and exact result envelope each use `schemaVersion: "1.0"`. These independent version fields describe different boundaries; importing evidence does not rewrite the original report or upgrade its provenance.
 
 An external projection retains the complete worker metric objects, request/result SHA-256 pins, system/model/dataset/protocol declarations and approved procedure revisions. It creates one supplementary compilation paper requiring human assessment. Its manifest `rowCount` is derived from the largest reported metric sample size; it is not an independently verified population census. A registered native model associated with `provided_predictions` or `client_local` still represents supplied-prediction evaluation. Independent scoring requires the worker's actual `auditor_model` execution path and reviewed adapter/runtime evidence.
 

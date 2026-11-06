@@ -69,6 +69,10 @@ const UNDECIDABLE: Record<string, string> = {
   regression_performance: "r2",
   calibration: "expected_calibration_error",
 };
+// Section 5.9: a regression pass also needs the model to beat the
+// mean-prediction baseline; an MSE reduction of at most this share of the
+// baseline MSE is floating-point rounding and never counts as beating it.
+const BASELINE_TOLERANCE = 1e-9;
 const RATE_KEYS: Record<string, "selection" | "tpr" | "fpr"> = {
   selection_rate_difference: "selection",
   selection_rate_ratio: "selection",
@@ -2180,6 +2184,60 @@ function regressionStat(
   );
 }
 
+/**
+ * Section 5.9: the mean-prediction baseline (the descriptive `baseline_rmse`)
+ * and its gate p. The baseline predicts the mean of the evaluated targets on
+ * every row; no constant prediction has a lower RMSE. The gate tests that the
+ * model's MSE lies below the baseline's: d_i = e_i² − (mean − y_i)², one-sided
+ * normal approximation on the decision scale. A reduction of at most
+ * BASELINE_TOLERANCE of the baseline MSE is rounding, so the gate does not
+ * reject.
+ */
+function meanBaseline(data: RegressionData, mins: Minimums): [Stat, number] {
+  const errors = data.errors;
+  const n = errors.length;
+  const targets = data.targets;
+  const undefinedStat = (): [Stat, number] => [
+    stat(null, null, null, null, { n }, [
+      "undefined",
+      ["undefined_zero_denominator"],
+    ]),
+    1.0,
+  ];
+  if (n < 2 || targets === undefined) return undefinedStat();
+  const meanT = fsum(targets) / n;
+  const residuals = targets.map((t) => meanT - t);
+  const sst = fsum(residuals.map((r) => r * r));
+  if (sst === 0.0) return undefinedStat();
+  const baselineMse = sst / n;
+  const [meanD, sdD] = meanSd(
+    errors.map((e, i) => e * e - residuals[i] * residuals[i]),
+  );
+  const se = sdD / Math.sqrt(n);
+  const reduction = 0.0 - meanD; // never -0
+  const p =
+    reduction <= BASELINE_TOLERANCE * baselineMse
+      ? 1.0
+      : pFromZ(se === 0.0 ? Z_MAX : reduction / se);
+  return [
+    stat(
+      Math.sqrt(baselineMse),
+      null,
+      null,
+      null,
+      {
+        n,
+        meanSquaredError: baselineMse,
+        meanSquaredErrorReduction: reduction,
+        sdSquaredErrorDifference: sdD,
+        gatePValue: p,
+      },
+      support(n, mins.sampleSize, "below_minimum_sample_size"),
+    ),
+    p,
+  ];
+}
+
 export type GroupData =
   | ({ group: string } & Confusion)
   | { group: string; selected: number; n: number };
@@ -2339,6 +2397,8 @@ type Context = {
   headlineMetric?: string;
   groups?: GroupView[];
   descriptive?: Member[];
+  /** Regression only: the mean baseline gate p of section 5.9. */
+  baselineP?: number;
 };
 
 export type CriterionData = {
@@ -2709,7 +2769,14 @@ export function evaluateCriterion(
     descriptive = REGRESSION_DESCRIPTIVE.filter(
       (m) => !planned.includes(m),
     ).map((m) => statEntry(m, null, regressionStat(m, d, mins), level, true));
-    context = { sampleSize: d.errors.length, passBlocked: false, reasons: [] };
+    const [baseline, baselineP] = meanBaseline(d, mins);
+    descriptive.push(statEntry("baseline_rmse", null, baseline, level, true));
+    context = {
+      sampleSize: d.errors.length,
+      passBlocked: false,
+      reasons: [],
+      baselineP,
+    };
   } else if (kind === "group_comparison") {
     [members, context] = groupMembers(spec, data, mins, level);
     groups = context.groups!;
@@ -2779,7 +2846,11 @@ export function evaluateCriterion(
             : "interval_straddles_band",
         );
       }
+      // The mean baseline gate (section 5.9) gates passes only.
+      p = Math.max(p, context.baselineP ?? 0.0);
     } else p = 1.0;
+    if ((context.baselineP ?? 0.0) > alpha + EPS)
+      reasons.push("mean_baseline_not_beaten");
   }
   for (const m of pool)
     for (const r of m.reasons) if (!reasons.includes(r)) reasons.push(r);

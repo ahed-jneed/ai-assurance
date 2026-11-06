@@ -6,6 +6,7 @@ import {
   FileText,
   Search,
   ShieldCheck,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -37,12 +38,15 @@ import {
 import { DatabaseToolbar } from "./database-toolbar";
 import { RegisterControls } from "./register-controls";
 import { ReportReadiness, type GateAction } from "./audit-gates";
+import { QualityReviewPanel } from "./quality-review-panel";
+import type { WorkspaceData } from "./workspace-types";
 
 type Props = {
   engagement: Engagement;
   tenantId: string;
   role: Role;
   userId: string;
+  people: WorkspaceData["people"];
   busy: boolean;
   terms: ReportTerms;
   onTerms: (value: ReportTerms) => void;
@@ -50,6 +54,8 @@ type Props = {
   onGate: GateAction;
   onCreate: (kind: "draft" | "final") => void;
   onOpen: (report: Report) => void;
+  /** Runs an engagement command (the quality review's). */
+  onAct: (op: string, data: Record<string, unknown>) => void;
   section: string;
   onSection: (value: string) => void;
   query: RegisterQuery;
@@ -62,6 +68,7 @@ export function ReportWorkspace({
   tenantId,
   role,
   userId,
+  people,
   busy,
   terms,
   onTerms,
@@ -69,6 +76,7 @@ export function ReportWorkspace({
   onGate,
   onCreate,
   onOpen,
+  onAct,
   section,
   onSection,
   query,
@@ -76,7 +84,8 @@ export function ReportWorkspace({
   onReset,
 }: Props) {
   const clientView = ["Client Viewer", "Client Contributor"].includes(role),
-    lead = role === "Lead Auditor";
+    lead = role === "Lead Auditor",
+    qualityReviewer = role === "Engagement Quality Reviewer";
   const gates = clientView ? [] : finalReportGates(e, terms);
   const next =
     gates.find((g) => g.kind === "workflow") ??
@@ -436,6 +445,10 @@ export function ReportWorkspace({
               <Button disabled={busy} onClick={() => onCreate("final")}>
                 Prepare final snapshot
               </Button>
+            ) : qualityReviewer ? (
+              <span className="subtle">
+                A Lead Auditor captures the final package for your sign-off.
+              </span>
             ) : (
               <span className="subtle">
                 A Lead Auditor captures the final package.
@@ -445,7 +458,9 @@ export function ReportWorkspace({
         </div>
       </section>
       <Tabs
-        value={section === "completion" ? "completion" : "packages"}
+        value={
+          ["completion", "quality"].includes(section) ? section : "packages"
+        }
         onValueChange={onSection}
         className="report-workspace-tabs"
       >
@@ -460,6 +475,10 @@ export function ReportWorkspace({
             Completion checklist
             <span className="tab-record-count">{gates.length}</span>
           </TabsTrigger>
+          <TabsTrigger value="quality">
+            <UserCheck size={15} aria-hidden="true" />
+            Quality review
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="packages">{library}</TabsContent>
         <TabsContent value="completion">
@@ -472,6 +491,17 @@ export function ReportWorkspace({
             onGate={onGate}
             onAudience={lead ? onAudience : undefined}
             busy={busy}
+          />
+        </TabsContent>
+        <TabsContent value="quality">
+          <QualityReviewPanel
+            engagement={e}
+            role={role}
+            userId={userId}
+            people={people}
+            terms={terms}
+            busy={busy}
+            onAct={onAct}
           />
         </TabsContent>
       </Tabs>

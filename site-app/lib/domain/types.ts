@@ -3,6 +3,7 @@
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
 import type { Decision, Plan } from "../statistics";
+import type { QualityReview } from "./quality-review";
 import type {
   SpecialCategoryAcknowledgement,
   SpecialCategoryBasis,
@@ -13,13 +14,15 @@ export type Role =
   | "Lead Auditor"
   | "Client Viewer"
   | "Client Contributor"
-  | "Reviewer";
+  | "Reviewer"
+  | "Engagement Quality Reviewer";
 export const roles: Role[] = [
   "Auditor",
   "Lead Auditor",
   "Client Viewer",
   "Client Contributor",
   "Reviewer",
+  "Engagement Quality Reviewer",
 ];
 export function canWrite(role: Role) {
   return role === "Auditor" || role === "Lead Auditor";
@@ -439,6 +442,11 @@ export type Engagement = {
   findings: Finding[];
   runs: Run[];
   reports: Report[];
+  /**
+   * The engagement quality review (ISQM 2): the appointed reviewer, their
+   * stand-back checklist and package sign-offs. Internal only.
+   */
+  qualityReview?: QualityReview;
   eventHead: string;
   createdAt: string;
 };

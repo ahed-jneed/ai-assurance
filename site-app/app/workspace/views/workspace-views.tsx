@@ -300,6 +300,7 @@ export function WorkspaceViews({
             onView={url.setLabView}
             onEditorOpen={reporters["testing-lab"]}
             onDatasetEditing={reporters["dataset-registry"]}
+            onBasisEditing={reporters["special-category-basis"]}
             act={act}
             onPaper={nav.openPaper}
             resolve={resolve}
@@ -337,6 +338,7 @@ export function WorkspaceViews({
             tenantId={data.tenantId}
             role={role}
             userId={data.identity.id}
+            people={data.people}
             busy={busy}
             terms={url.reportTerms}
             onTerms={url.setReportTerms}
@@ -354,6 +356,7 @@ export function WorkspaceViews({
               })
             }
             onOpen={(r) => onDetail(reportTitle(r), r)}
+            onAct={safeAct}
             section={url.reportSection}
             onSection={url.setReportSection}
             query={url.registerQuery}

@@ -166,14 +166,88 @@ export function acceptanceGates(e: Engagement): AuditGate[] {
     const status = declarationStatus(w, userId, team);
     if (status !== "current")
       gates.push({
-        id: "declaration:" + userId,
+        id: declarationGate + userId,
         kind: "acceptance",
         recordId: userId,
-        title: "Independence and competence declaration · " + userId,
+        title: declarationTitle + " · " + userId,
         message: declarationMessages[status],
       });
   }
   return gates;
+}
+
+const declarationGate = "declaration:";
+const declarationTitle = "Independence and competence declaration";
+
+/**
+ * A gate's title for display: a declaration gate names the team member by
+ * `nameOf` (their display name) instead of their user id, which stays the
+ * fallback for someone no longer in the practice.
+ */
+export function gateTitle(
+  g: AuditGate,
+  nameOf: (userId: string) => string | undefined = () => undefined,
+) {
+  return g.kind === "acceptance" &&
+    g.recordId &&
+    g.id === declarationGate + g.recordId
+    ? declarationTitle + " · " + (nameOf(g.recordId) || g.recordId)
+    : g.title;
+}
+
+/**
+ * Why this person may not be given access to the engagement, if any: the
+ * conflict that refuses assigning them (assignmentConflict). Every grant of
+ * engagement access applies it (grantMember and updateMember, setAccess,
+ * and an accepted invitation, which withholds that engagement), so access
+ * never reaches a person the Planning-exit gate would refuse.
+ */
+export const accessConflict = (
+  e: Pick<Engagement, "workflow">,
+  userId: string,
+) => (e.workflow ? assignmentConflict(e.workflow, userId) : undefined);
+
+/** Declaration work for the inbox (lib/work-items.ts). */
+export type AcceptanceTask =
+  | {
+      kind: "declaration";
+      userId: string;
+      status: "missing" | "outdated";
+    }
+  | {
+      kind: "threat";
+      userId: string;
+      declarationId: string;
+      threats: number;
+    };
+
+/**
+ * What team members still owe the acceptance record: a declaration for the
+ * current period that is missing or predates a team change (the declarant
+ * makes it), and declared threats nobody has resolved (someone other than
+ * the declarant evaluates them). Nothing is due before the acceptance record
+ * states the period a declaration is made for.
+ */
+export function acceptanceTasks(w: Workflow | undefined): AcceptanceTask[] {
+  if (!acceptanceApplies(w) || !w.acceptance) return [];
+  const team = engagementTeam(w),
+    tasks: AcceptanceTask[] = [];
+  for (const userId of team) {
+    const d = currentDeclaration(w, userId),
+      open = d ? unresolvedThreats(d).length : 0;
+    if (d && open)
+      tasks.push({
+        kind: "threat",
+        userId,
+        declarationId: d.id,
+        threats: open,
+      });
+    // A standing relationship ("excluded") is no declaration to make.
+    const status = declarationStatus(w, userId, team);
+    if (status === "missing" || status === "outdated")
+      tasks.push({ kind: "declaration", userId, status });
+  }
+  return tasks;
 }
 
 /**

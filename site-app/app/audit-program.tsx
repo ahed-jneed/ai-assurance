@@ -40,6 +40,7 @@ import {
   executionPlanCurrent,
   procedureDraftRevision,
   procedureLabel,
+  activeProcedureRun,
   releaseState,
   revisionWarnings,
   runBindsProcedure,
@@ -54,6 +55,9 @@ import {
   type DraftScope,
 } from "./recoverable-draft";
 import { procedureWork } from "@/lib/work-items";
+import { assuranceRecords } from "@/lib/assurance-store-client";
+import type { AssuranceRecord } from "@/lib/assurance-core";
+import { datasetCardFor } from "@/lib/dataset-card";
 import { acceptanceGates } from "@/lib/workflow/acceptance";
 import { AcceptancePanel } from "./audit-program/acceptance-panel";
 type Option = {
@@ -1950,34 +1954,17 @@ export function AuditProgram({
                         </Button>
                       )}
                       {writer && p.method !== "manual" && (
-                        <Button
-                          variant="outline"
-                          disabled={
-                            busy ||
-                            w.program.status !== "approved" ||
-                            !p.modelId ||
-                            !p.datasetId ||
-                            !p.profileId
-                          }
-                          onClick={() =>
-                            void act("queueRun", {
-                              procedureId: p.id,
-                              modelId: p.modelId,
-                              datasetId: p.datasetId,
-                              profileId: p.profileId,
-                            })
-                              .then((r) => {
-                                setSelected(undefined);
-                                // Shows the queued run; opening the setup
-                                // again would queue a duplicate.
-                                if (r.details?.runId)
-                                  onQueuedRun(p.id, r.details.runId);
-                              })
-                              .catch(() => {})
-                          }
-                        >
-                          Queue planned evaluation
-                        </Button>
+                        <PlannedEvaluation
+                          e={e}
+                          p={p}
+                          tenantId={data.tenantId}
+                          busy={busy}
+                          act={act}
+                          onQueuedRun={(runId) => {
+                            setSelected(undefined);
+                            onQueuedRun(p.id, runId);
+                          }}
+                        />
                       )}
                       {reviewer &&
                         p.execution &&
@@ -2569,5 +2556,115 @@ export function FindingAssurance({
         onEditing={onEditing}
       />
     </section>
+  );
+}
+/**
+ * "Queue planned evaluation" for an automated procedure. The run pins the
+ * dataset card that describes the procedure's accepted dataset bytes, as the
+ * Testing lab does, and the note says when no card does. While a run of the
+ * procedure is queued or running the button is disabled and "Open queued
+ * evaluation" shows that run: the server refuses a duplicate, which would
+ * block final issuance.
+ */
+function PlannedEvaluation({
+  e,
+  p,
+  tenantId,
+  busy,
+  act,
+  onQueuedRun,
+}: {
+  e: Engagement;
+  p: Procedure;
+  tenantId: string;
+  busy: boolean;
+  act: WorkflowAct;
+  onQueuedRun: (runId: string) => void;
+}) {
+  const [cards, setCards] = useState<AssuranceRecord[] | null>(null),
+    [unavailable, setUnavailable] = useState(false),
+    [refresh, setRefresh] = useState(0);
+  // A card registered in another tab or view need not bump the engagement
+  // version, so the cards are read again when the window regains focus.
+  useEffect(() => {
+    const onFocus = () => setRefresh((n) => n + 1);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    void assuranceRecords(
+      { tenantId, engagementId: e.id, kind: "dataset" },
+      { signal: controller.signal },
+    )
+      .then((records) => {
+        setCards(records);
+        setUnavailable(false);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setUnavailable(true);
+      });
+    return () => controller.abort();
+  }, [tenantId, e.id, e.version, refresh]);
+  const active = activeProcedureRun(e, p.id),
+    dataset = e.artifacts.find(
+      (a) => a.id === p.datasetId && a.status === "accepted",
+    ),
+    card = cards ? datasetCardFor(cards, dataset) : undefined,
+    planned = !!p.modelId && !!p.datasetId && !!p.profileId;
+  return (
+    <>
+      <Button
+        variant="outline"
+        disabled={
+          busy ||
+          !!active ||
+          cards === null ||
+          unavailable ||
+          e.workflow?.program.status !== "approved" ||
+          !planned
+        }
+        title={
+          active
+            ? `Evaluation ${active.id} of this procedure is ${active.state}`
+            : undefined
+        }
+        onClick={() =>
+          void act("queueRun", {
+            procedureId: p.id,
+            modelId: p.modelId!,
+            datasetId: p.datasetId!,
+            profileId: p.profileId!,
+            ...(card ? { datasetCardRecordId: card.id } : {}),
+          })
+            .then((r) => {
+              // Shows the queued run; opening the setup again would queue a
+              // duplicate.
+              if (r.details?.runId) onQueuedRun(r.details.runId);
+            })
+            .catch(() => {})
+        }
+      >
+        Queue planned evaluation
+      </Button>
+      {active && (
+        <Button variant="outline" onClick={() => onQueuedRun(active.id)}>
+          Open {active.state} evaluation
+        </Button>
+      )}
+      {planned && !active && unavailable && (
+        <p className="subtle workflow-note" role="alert">
+          Dataset cards could not be loaded, so the card to pin is unknown.
+          Reload to queue the planned evaluation.
+        </p>
+      )}
+      {planned && !active && cards !== null && !unavailable && (
+        <p className="subtle workflow-note" data-testid="planned-card-pin">
+          {card
+            ? `Pins dataset card ${String(card.body.name ?? card.id)} v${String(card.body.version ?? "")} (${card.id}).`
+            : "No dataset card describes the accepted dataset bytes; the run pins no card."}
+        </p>
+      )}
+    </>
   );
 }

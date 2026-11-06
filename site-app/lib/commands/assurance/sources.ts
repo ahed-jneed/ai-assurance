@@ -92,10 +92,23 @@ export const sources: AssuranceModule = defineCommands({
           "The sample must use the planned procedure dataset",
         );
       const { a: data, csv } = await datasetCSV(e, v.datasetId);
+      // A sampling frame must not lose records silently: blank rows are
+      // refused, and a malformed population or an unusable column choice is
+      // the auditor's input to correct (400), not a server failure.
+      let drawn: Awaited<ReturnType<typeof sampleRecords>>;
+      try {
+        drawn = await sampleRecords(
+          parseCSV(csv, { blankRows: "reject" }),
+          v,
+          sha256,
+        );
+      } catch (error) {
+        throw new ApiError(400, (error as Error).message);
+      }
       return {
         record: await addRecord(ctx, e.id, "sample", {
           ...v,
-          ...(await sampleRecords(parseCSV(csv), v, sha256)),
+          ...drawn,
           datasetSha256: data.sha256,
           ...(p
             ? {

@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { Miniflare } from "miniflare";
 const python =
   process.env.ASSURANCE_TEST_PYTHON ??
@@ -29,6 +29,8 @@ const mf = new Miniflare({
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
     // First sign-ins provision the fixture practices (lib/access-policy.ts).
     SELF_SIGNUP: "open",
+    // A key-encryption key generated for this run (docs/security/signing-keys.md).
+    DOSSIER_KEK: randomBytes(32).toString("base64"),
   },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
@@ -612,6 +614,42 @@ try {
   assert(sample1.body.selected.every((s) => s.inclusionProbability === 0.5));
   console.log(
     "PASS exact population pin and reproducible stratified sample manifest",
+  );
+  // A sampling frame never loses records silently (F-63): a blank row is
+  // refused with its row number, and a malformed population or column choice
+  // is a 400 rather than a server failure. Line breaks that end the file are
+  // not rows.
+  const sampleOf = async (name, content, status, extra = {}) => {
+    const datasetId = await upload(name, content);
+    return assurance(
+      "sample",
+      { ...sampleInput, datasetId, ...extra },
+      owner,
+      status,
+    );
+  };
+  assert.equal(
+    (await sampleOf("blank-row.csv", "id,stratum\nr1,A\n\nr2,B\n", 400)).error,
+    "Blank data row 2: remove empty rows; missing values are not silently dropped",
+  );
+  assert.equal(
+    (await sampleOf("malformed.csv", 'id,stratum\nr1,"A\nr2,B\n', 400)).error,
+    "Unclosed CSV field",
+  );
+  assert.equal(
+    (
+      await sampleOf("bad-column.csv", "id,stratum\nr1,A\nr2,B\n", 400, {
+        idColumn: "missing",
+      })
+    ).error,
+    "Choose an existing unique record-ID column",
+  );
+  const trailing = (
+    await sampleOf("trailing.csv", "id,stratum\r\nr1,A\r\nr2,B\r\n\r\n", 200)
+  ).record;
+  assert.equal(trailing.body.selected.length, 2);
+  console.log(
+    "PASS sampling rejects blank rows and malformed populations with 400 and accepts trailing line breaks",
   );
   // A binary model labelled "no"/"yes": queueExternal derives the other
   // class from the system's output classes instead of freezing "0" (D-12).
@@ -1295,6 +1333,53 @@ try {
     planRun.provenance.inputHashes.statisticsPlan,
     planEnvelope.externalReport.provenance.statisticsPlanSha256,
   );
+  // The paper an external run compiles states the special-category
+  // limitation, as a hosted run's paper does (#103). The completed job
+  // replays the plan job's result under a frozen request whose protocol
+  // declares its group column special-category on the client's own worker.
+  const planPaper = e.papers.find((p) => p.runIds?.includes(planJob.jobId));
+  assert.doesNotMatch(planPaper.body.limitations, /special-category/);
+  const specialRequest = structuredClone(planFrozen);
+  specialRequest.executionMode = "client_local";
+  specialRequest.profile.specialCategory = {
+    column: "group",
+    specialCategory: true,
+    route: "client_side",
+    basis: null,
+    declaredBy: owner,
+    declaredAt: planDone.created_at,
+  };
+  const specialJobId = planJob.jobId + "-special",
+    specialText = JSON.stringify(specialRequest);
+  await testDb
+    .prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at,attempt_id,fence,result_key,result_sha256,completed_at) VALUES (?,?,?,'succeeded',?,?,?,?,?,?,?,?,?)",
+    )
+    .bind(
+      specialJobId,
+      planDone.tenant_id,
+      planDone.engagement_id,
+      specialText,
+      digest(specialText),
+      planDone.created_by,
+      planDone.created_at,
+      planDone.attempt_id,
+      planDone.fence,
+      planDone.result_key,
+      planDone.result_sha256,
+      planDone.completed_at,
+    )
+    .run();
+  await assurance("importJob", { jobId: specialJobId });
+  const specialPaper = e.papers.find((p) => p.runIds?.includes(specialJobId));
+  assert.ok(
+    specialPaper.body.limitations.endsWith(
+      "\nRun " +
+        specialJobId +
+        " evaluated special-category column group on the client's own worker with no basis recorded on its protocol.",
+    ),
+    specialPaper.body.limitations,
+  );
   // The runner route checks a delivery against the plan's criterion ids and
   // kinds: results out of plan order are refused before they are stored.
   const orderJob = await assurance("queueExternal", {
@@ -1531,6 +1616,40 @@ try {
     "--require-trusted-signature",
   ]);
   assert.equal(verified.code, 0, verified.out + verified.error);
+  // Manifest 1.1 signs the key ID and the captured versions (#25).
+  assert.equal(dossier.manifest.schemaVersion, "1.1");
+  assert.equal(dossier.manifest.signingKeyId, dossier.signature.keyId);
+  assert.deepEqual(dossier.manifest.rulePack, {
+    version: e.rulePack.version,
+    legalVersion: e.rulePack.legalVersion,
+    researchedAsOf: e.rulePack.researchedAsOf,
+    legalReview: e.rulePack.legalReview,
+  });
+  assert.equal(dossier.manifest.methodologyVersion, e.rulePack.version);
+  const originalDossier = Buffer.from(payload);
+  const keyList = (user = owner) =>
+    api("/api/dossier/keys?" + new URLSearchParams({ tenantId }), { user });
+  let published = await keyList();
+  assert.deepEqual(
+    published.keys.map((k) => [k.keyId, k.status]),
+    [[dossier.signature.keyId, "active"]],
+  );
+  assert.equal(
+    published.trust[dossier.signature.keyId],
+    dossier.signature.publicKeySPKI,
+  );
+  // The client member sees the same verification keys.
+  assert.deepEqual((await keyList(viewer)).trust, published.trust);
+  const keyRows = (
+    await testDb
+      .prepare("SELECT * FROM dossier_keys WHERE tenant_id=?")
+      .bind(tenantId)
+      .all()
+  ).results;
+  assert.equal(keyRows.length, 1);
+  assert(!("private_key" in keyRows[0]), "no plaintext private key column");
+  assert.match(keyRows[0].wrapped_key, /^A256GCM\./);
+  assert.match(keyRows[0].kek_id, /^kek-[0-9a-f]{16}$/);
   dossier.files.find((f) => f.path === "report.json").contentBase64 =
     Buffer.from("{}").toString("base64");
   await fs.writeFile(dossierPath, JSON.stringify(dossier));
@@ -1555,6 +1674,74 @@ try {
     { user: viewer, status: 404 },
   );
   assert(sealed.record.body.manifestSha256);
+  // Rotation: practice admins only, a management event, and the old key
+  // stays published so the dossier sealed before still verifies (#25).
+  assert.match(
+    (
+      await api("/api/dossier", {
+        body: {
+          tenantId,
+          engagementId: e.id,
+          reportId: report.id,
+          op: "rotate_key",
+        },
+        status: 400,
+      })
+    ).error,
+    /management op rotateSigningKey/,
+  );
+  for (const user of [reviewer, viewer])
+    await api("/api/management", {
+      user,
+      body: {
+        tenantId,
+        expectedVersion: w.managementVersion,
+        op: "rotateSigningKey",
+        data: { reason: "Not an administrator" },
+      },
+      status: 403,
+    });
+  const rotated = await mgmt("rotateSigningKey", {
+    reason: "Fixture rotation",
+  });
+  assert.notEqual(rotated.details.keyId, dossier.signature.keyId);
+  const rotationEvent = await testDb
+    .prepare(
+      "SELECT actor,details FROM management_events WHERE tenant_id=? AND action='rotateSigningKey'",
+    )
+    .bind(tenantId)
+    .first();
+  assert.equal(rotationEvent.actor, owner);
+  assert.deepEqual(JSON.parse(rotationEvent.details), rotated.details);
+  published = await keyList();
+  assert.deepEqual(
+    published.keys.map((k) => [k.keyId, k.status, k.retiredReason]),
+    [
+      [dossier.signature.keyId, "retired", "Fixture rotation"],
+      [rotated.details.keyId, "active", null],
+    ],
+  );
+  const retiredRow = await testDb
+    .prepare("SELECT wrapped_key,kek_id FROM dossier_keys WHERE id=?")
+    .bind(dossier.signature.keyId)
+    .first();
+  assert.deepEqual(retiredRow, { wrapped_key: null, kek_id: null });
+  await fs.writeFile(dossierPath, originalDossier);
+  await fs.writeFile(trustPath, JSON.stringify(published.trust));
+  const afterRotation = await processRun([
+    "-m",
+    "engine.assurance",
+    "verify",
+    "--dossier",
+    dossierPath,
+    "--trusted-keys",
+    trustPath,
+    "--require-trusted-signature",
+  ]);
+  assert.equal(afterRotation.code, 0, afterRotation.out + afterRotation.error);
+  console.log(
+    "PASS wrapped signing key, manifest 1.1, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
+  );
   const stored = await testDb
     .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
     .bind(tenantId, e.id)
@@ -1605,6 +1792,24 @@ try {
     ),
   );
   assert(withheldPayload.manifest.withheld.some((x) => x.id === documentId));
+  assert.equal(withheldPayload.signature.keyId, rotated.details.keyId);
+  assert.equal(withheldPayload.manifest.signingKeyId, rotated.details.keyId);
+  await fs.writeFile(dossierPath, JSON.stringify(withheldPayload));
+  const rotatedVerified = await processRun([
+    "-m",
+    "engine.assurance",
+    "verify",
+    "--dossier",
+    dossierPath,
+    "--trusted-keys",
+    trustPath,
+    "--require-trusted-signature",
+  ]);
+  assert.equal(
+    rotatedVerified.code,
+    0,
+    rotatedVerified.out + rotatedVerified.error,
+  );
   assert(
     !withheldPayload.files.some((x) =>
       x.path.startsWith("evidence/" + documentId + "/"),
