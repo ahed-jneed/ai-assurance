@@ -278,7 +278,14 @@ export type Run = {
   procedureBinding?: {
     procedureId: string;
     procedureRevision: number;
+    /**
+     * The `Procedure.planHash` the run was queued for. Absent on runs queued
+     * before runs recorded it and on external job runs, which bind the plan
+     * revision.
+     */
+    planHash?: string;
     briefRevision: number;
+    /** The program revision in force when the run was queued: a record only. */
     programRevision: number;
   };
   contractVersion: "1.0" | "1.1" | "1.2";
