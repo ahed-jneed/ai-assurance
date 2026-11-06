@@ -255,7 +255,9 @@ export function useUrlSync({
       url.setSort(q.sort);
     }
     url.setReportSection(
-      link.section === "completion" ? "completion" : "packages",
+      ["completion", "quality"].includes(link.section ?? "")
+        ? (link.section as string)
+        : "packages",
     );
     if (link.module === "My work")
       url.setInboxQuery(

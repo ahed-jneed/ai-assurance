@@ -61,6 +61,10 @@ const permissions = [
     "Independently reviews papers and classification; confirms retests.",
   ],
   [
+    "Engagement Quality Reviewer",
+    "Outside the engagement team: reviews significant judgments and signs off the final package before release. Cannot edit audit work.",
+  ],
+  [
     "Client Contributor",
     "Submits evidence only to assigned, expiring client requests.",
   ],
