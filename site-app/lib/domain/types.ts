@@ -324,8 +324,8 @@ export type Run = {
     procedureRevision: number;
     /**
      * The `Procedure.planHash` the run was queued for. Absent on runs queued
-     * before runs recorded it and on external job runs, which bind the plan
-     * revision.
+     * before runs recorded it and on runs of external jobs queued before jobs
+     * recorded it, which bind the plan revision.
      */
     planHash?: string;
     briefRevision: number;

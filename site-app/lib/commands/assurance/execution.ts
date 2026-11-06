@@ -20,6 +20,8 @@ import {
 } from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
+import { substantivePlan } from "../../workflow/command";
+import { planPinsCurrent } from "../../workflow-state";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -232,9 +234,14 @@ export const execution: AssuranceModule = defineCommands({
           },
           profile,
           seed: 42,
+          // The job binds the plan content, as runs do: the plan hash is kept
+          // on first use for procedures planned before plan hashes.
           procedure: {
             id: p.id,
             revision: p.revision,
+            planHash: (p.planHash ??= await sha256(
+              JSON.stringify(substantivePlan(p)),
+            )),
             briefRevision: e.workflow!.brief!.revision,
             programRevision: e.workflow!.program.revision,
           },
@@ -400,7 +407,24 @@ export const execution: AssuranceModule = defineCommands({
       const packet = JSON.parse(new TextDecoder().decode(bytes)),
         results = hostedResults(packet.hostedResults),
         frozen = JSON.parse(job.request),
-        resolved = pinned(e),
+        procedure = e.workflow?.procedures.find(
+          (q) => q.id === frozen.procedure.id,
+        );
+      // The result compiles only while it binds the procedure's current plan
+      // and scope, the rule activeJobGuard applies while the job runs.
+      if (
+        !procedure ||
+        !planPinsCurrent(e, procedure, {
+          procedureRevision: frozen.procedure.revision,
+          planHash: frozen.procedure.planHash,
+          briefRevision: frozen.procedure.briefRevision,
+        })
+      )
+        throw new ApiError(
+          409,
+          "The procedure's plan or scope changed after this job was queued; queue it again",
+        );
+      const resolved = pinned(e),
         p = templatePaper(
           resolved,
           roleTemplate(resolved.pack, "externalExecutionPaper"),
@@ -464,6 +488,9 @@ export const execution: AssuranceModule = defineCommands({
       const binding = {
         procedureId: frozen.procedure.id,
         procedureRevision: frozen.procedure.revision,
+        ...(frozen.procedure.planHash
+          ? { planHash: frozen.procedure.planHash }
+          : {}),
         briefRevision: frozen.procedure.briefRevision,
         programRevision: frozen.procedure.programRevision,
       };

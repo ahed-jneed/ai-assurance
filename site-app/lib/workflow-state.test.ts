@@ -439,6 +439,28 @@ describe("planning pins", () => {
       false,
     );
   });
+
+  it("follow the plan hash a procedure-bound sample recorded (#105)", () => {
+    const e = structuredEngagement({ workflow: workflow() }),
+      p = procedure(e.workflow!);
+    p.planHash = "a".repeat(64);
+    const sample = {
+      procedureId,
+      procedureRevision: p.revision,
+      planHash: "a".repeat(64),
+      briefRevision: 1,
+      programRevision: 1,
+    };
+    expect(planPinsCurrent(e, p, sample)).toBe(true);
+    // A plan changed and then restored: the revision moved, the hash did not.
+    p.revision += 2;
+    expect(planPinsCurrent(e, p, sample)).toBe(true);
+    // A content change to the plan makes the sample an earlier pin, even
+    // where the revision would still match.
+    p.revision = sample.procedureRevision;
+    p.planHash = "b".repeat(64);
+    expect(planPinsCurrent(e, p, sample)).toBe(false);
+  });
 });
 
 describe("recovery draft revisions", () => {

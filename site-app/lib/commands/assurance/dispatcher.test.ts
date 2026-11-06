@@ -27,6 +27,9 @@ import { getEngagement, loadEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
+import { at, declaration } from "@/lib/workflow/test-fixtures";
+import { resolveNew } from "@/lib/criteria/pin";
+import { seedWorkflow } from "@/lib/workflow-seed";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -384,6 +387,7 @@ describe("POST /api/assurance", () => {
         {
           id: "PROC-1",
           revision: 1,
+          instructions: [],
           selected: true,
           applicability: "applicable",
           modelId: model.id,
@@ -440,6 +444,9 @@ describe("POST /api/assurance", () => {
       "freezeExternalExecution",
       { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
+    // The job binds the plan content: a procedure planned before plan hashes
+    // keeps the hash it was queued with (#105).
+    expect(e.workflow!.procedures[0].planHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 
@@ -568,6 +575,55 @@ describe("GET /api/assurance", () => {
     expect(recordPage).toHaveBeenCalledWith(ctx, e.id, options);
     expect(recordCount).not.toHaveBeenCalled();
     expect(jobs).not.toHaveBeenCalled();
+  });
+});
+
+describe("setAccess and declared conflicts (#112)", () => {
+  function conflicted() {
+    const e = stored();
+    e.workflow = {
+      ...seedWorkflow(resolveNew(), "user-lead", at),
+      declarations: [
+        declaration("auditor", {
+          userId: "user-2",
+          exclusions: ["financial_interest"],
+        }),
+      ],
+    };
+    env.DB = fakeD1((sql) =>
+      sql.startsWith("SELECT 1 FROM memberships") ? { 1: 1 } : null,
+    ).db;
+    load(e);
+    statements();
+    return e;
+  }
+
+  it("refuses to grant access to a person with a declared conflict", async () => {
+    const e = conflicted();
+    const response = await post(e, "setAccess", {
+      userId: "user-2",
+      active: true,
+      reason: "Joins the review",
+    });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error:
+        "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+    });
+    expect(recordStatement).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("still revokes their access, and grants others", async () => {
+    const e = conflicted();
+    for (const data of [
+      { userId: "user-2", active: false, reason: "Leaves the team" },
+      { userId: "user-3", active: true, reason: "Joins the review" },
+    ]) {
+      const response = await post(e, "setAccess", data);
+      expect(response.status, data.userId).toBe(200);
+    }
+    expect(save).toHaveBeenCalledTimes(2);
   });
 });
 
