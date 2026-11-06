@@ -17,7 +17,7 @@ from . import GENAI_VERSION, hashing, limits, plan as plans, recompute, taxonomy
 from .errors import GenaiInputError, Warnings, fail, require
 from .families import heuristic_family
 from .formats import common, deepeval, garak, inspect, judge_validation, lm_eval, marking, promptfoo, pyrit, ragas
-from .readers import decode_text, first_jsonl_object, load_jsonl, loads
+from .readers import ZipArchive, decode_text, first_jsonl_object, load_jsonl, loads
 
 COMPUTATION_SCHEMA = "genai-computation/0.1"
 PARSER_VERSIONS = {
@@ -31,16 +31,26 @@ REVISION = re.compile(r"^[0-9a-f]{7,40}$|^sha256:[0-9a-f]{64}$")
 # ---------------------------------------------------------------- detection
 
 
-def detect(data: bytes):
-    """(format, role) from content, never from a file name; (None, None) when nothing matches."""
+def detect(data: bytes, *, strict: bool = False):
+    """(format, role) from content, never from a file name; (None, None) when nothing matches.
+
+    With `strict` (the pipeline), an input that the readers reject raises the reader's own code
+    (`zip_entry_unsafe_name`, `zip_invalid`, `duplicate_key`, `number_out_of_range`,
+    `nesting_too_deep`, ...) instead of becoming `unknown_format` (design section 11.2 rule 4).
+    Without it (CLI `detect`), detection never raises.
+    """
     if data[:4] == b"PK\x03\x04":
+        if strict:
+            names = ZipArchive(data).names()
+            return ("inspect_eval", "log") if "header.json" in names or "_journal/start.json" in names else (None, None)
         return ("inspect_eval", "log") if inspect.detect_eval(data) else (None, None)
     head = data.lstrip()[:1]
     if head == b"{":
+        doc_error = None
         try:
             doc = loads(decode_text(data))
-        except GenaiInputError:
-            doc = None
+        except GenaiInputError as exc:
+            doc, doc_error = None, exc
         if doc is not None:
             if inspect.detect_json(doc):
                 return "inspect_json", "log"
@@ -52,8 +62,14 @@ def detect(data: bytes):
                 return "deepeval_test_run", "log"
             if not _looks_like_jsonl(data):
                 return None, None
+        elif not _looks_like_jsonl(data):
+            if strict:
+                raise doc_error
+            return None, None
         first = first_jsonl_object(data)
         if first is None:
+            if strict and doc_error is not None:
+                _raise_reader_error(data, doc_error)
             return None, None
         if garak.detect(first):
             return "garak_report", "log"
@@ -70,10 +86,20 @@ def detect(data: bytes):
         try:
             rows = [row for _, row in load_jsonl(data, "input")]
         except GenaiInputError:
+            if strict:
+                raise
             return None, None
         if ragas.detect(rows):
             return "ragas_results", "log"
     return None, None
+
+
+def _raise_reader_error(data: bytes, doc_error):
+    """Strict detection when the first line is not one JSON object: raise the code of the reading the input intends."""
+    first_line = next((line.strip() for line in data.split(b"\n") if line.strip()), b"")
+    if first_line.endswith(b"}"):
+        load_jsonl(data, "input")  # JSON Lines: raises the code of the first bad line
+    raise doc_error  # a pretty-printed single document
 
 
 def _looks_like_jsonl(data: bytes) -> bool:
@@ -260,8 +286,9 @@ def validate_judges(label_files, runs, manifest, plan):
     level = plan["confidenceLevel"]
     rules = plan["judgeValidation"]
     out = []
-    by_ref = {spec.get("judgeRef"): (spec, parsed) for spec, parsed in label_files}
-    for ref, (spec, parsed) in sorted(by_ref.items(), key=lambda kv: kv[0] or ""):
+    # normalize_manifest allows one label file per judgeRef; each unbound file (no judgeRef) is reported on its own.
+    for spec, parsed in sorted(label_files, key=lambda sp: (sp[0].get("judgeRef") or "", sp[1]["sha256"])):
+        ref = spec.get("judgeRef")
         k = judge_validation.kappa(parsed["labels"], parsed["labelSet"], level)
         pc = judge_validation.position_consistency(parsed["pairs"], level)
         bindings = []
@@ -397,7 +424,7 @@ def ingest_bundle(inputs, manifest, plan, *, provenance=None):
         require(data is not None, "input_hash_mismatch", f"{spec['name']}: no input with the declared SHA-256")
         require(len(data) <= limits.MAX_INPUT_FILE_BYTES, "input_too_large", spec["name"])
         require(hashlib.sha256(data).hexdigest() == spec["sha256"] and len(data) == spec["bytes"], "input_hash_mismatch", spec["name"])
-        fmt, role = detect(data)
+        fmt, role = detect(data, strict=True)
         require(fmt is not None, "unknown_format", spec["name"])
         require(fmt == spec["format"], "format_mismatch", f"{spec['name']}: detected {fmt}, declared {spec['format']}")
         expected_roles = {"results": ("results",), "samples": ("samples",), "hitlog": ("hitlog",), "judge_validation": ("judge_validation",), "marking": ("marking",)}.get(role, ("log", "attack_set"))

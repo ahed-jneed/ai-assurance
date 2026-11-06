@@ -17,7 +17,7 @@ from unittest import mock
 
 from engine.genai import hashing, limits, readers
 from engine.genai.errors import GenaiInputError
-from engine.genai.ingest import run_bundle
+from engine.genai.ingest import detect, run_bundle
 from engine.tests import genai_support as gs
 
 TOOL_PACKAGES = ("inspect_ai", "lm_eval", "garak", "promptfoo", "pyrit", "deepeval", "ragas")
@@ -271,6 +271,43 @@ class ZipLimitsTest(unittest.TestCase):
         data[cd + 10:cd + 12] = struct.pack("<H", 93)
         with mock.patch.object(readers, "zstd_backend", return_value=None):
             self.assertEqual(code(self.read, data), "zstd_unavailable")
+
+
+class PipelineReaderCodesTest(unittest.TestCase):
+    """Design section 11.2 rule 4: through run_bundle a rejected input keeps the reader's code; unknown_format is for well-formed input only."""
+
+    def expect(self, data, fmt, expected, role="log"):
+        self.assertEqual(code(ingest, [("input", bytes(data), fmt, role)]), expected)
+
+    def test_zip_codes(self):
+        unsafe = bytes(_zip([("header.json", b"{}")])).replace(b"header.json", b"../x.json__")
+        self.expect(unsafe, "inspect_eval", "zip_entry_unsafe_name")
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("header.json", b"{}")
+            with self.assertWarns(UserWarning):
+                archive.writestr("header.json", b"[]")
+        self.expect(buffer.getvalue(), "inspect_eval", "zip_invalid")
+        mismatch = _zip([("header.json", b'{"version": 2}')])
+        mismatch[30:41] = b"heaDer.json"
+        self.expect(mismatch, "inspect_eval", "zip_invalid")
+        self.expect(_zip([("other.json", b"{}")]), "inspect_eval", "unknown_format")
+        self.assertEqual(detect(unsafe), (None, None))  # CLI detection never raises
+
+    def test_json_codes(self):
+        cases = [
+            (b'{"a": 1, "a": 2}', "inspect_json", "duplicate_key"),
+            (b'{\n  "a": 1,\n  "a": 2\n}\n', "inspect_json", "duplicate_key"),
+            (b'{"a": 1e999}', "promptfoo_results", "number_out_of_range"),
+            (b'{"a": ' + b"[" * 70 + b"]" * 70 + b"}", "inspect_json", "nesting_too_deep"),
+            (b'{"a": 1, "a": 2}\n{"b": 1}\n', "garak_report", "duplicate_key"),
+            (b'{"x": 1}', "inspect_json", "unknown_format"),
+            (b'{\n  "x": 1\n}\n', "inspect_json", "unknown_format"),
+        ]
+        for data, fmt, expected in cases:
+            with self.subTest(data=data[:24]):
+                self.expect(data, fmt, expected)
+                self.assertEqual(detect(data), (None, None))
 
 
 if __name__ == "__main__":

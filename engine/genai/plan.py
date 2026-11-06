@@ -363,7 +363,11 @@ def normalize_manifest(manifest):
     at = manifest.get("declaredAt")
     require(by is None or (isinstance(by, str) and 0 < len(by) <= 300), "manifest_invalid", "manifest.declaredBy")
     require(at is None or (isinstance(at, str) and 0 < len(at) <= 64), "manifest_invalid", "manifest.declaredAt")
+    bound_refs = set()
     for entry in out_inputs:
         if "judgeRef" in entry:
             require(entry["judgeRef"] in {j["ref"] for j in out_declared.get("judges", [])}, "manifest_invalid", "inputs[].judgeRef names no declared judge")
+            # One label file per declared judge: otherwise manifest order would decide which kappa counts.
+            require(entry["judgeRef"] not in bound_refs, "manifest_invalid", f"inputs[].judgeRef {entry['judgeRef']} binds more than one label file")
+            bound_refs.add(entry["judgeRef"])
     return {"schemaVersion": MANIFEST_SCHEMA, "origin": manifest["origin"], "inputs": out_inputs, "declared": out_declared, "declaredBy": by, "declaredAt": at}
