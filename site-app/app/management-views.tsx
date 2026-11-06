@@ -7,6 +7,8 @@ import {
   FolderOpen,
   Settings2,
   ChevronLeft,
+  Mail,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +30,9 @@ import {
 } from "@/components/ui/select";
 import { DatabaseToolbar } from "./database-toolbar";
 import { toast } from "sonner";
-import type { WorkspaceData } from "./workspace-types";
+import type { OpenModal } from "./workspace/types";
+import type { Member, WorkspaceData } from "./workspace-types";
+import { engagementFlags } from "./workspace/modals/member";
 
 type Props = {
   onOnboard: () => void;
@@ -38,7 +42,7 @@ type Props = {
   clientId: string | null;
   setClientId: (id: string | null) => void;
   onEngagement: (id: string) => void;
-  open: (name: string, defaults?: Record<string, string>) => void;
+  open: OpenModal;
   busy: boolean;
   search: string;
   setSearch: (value: string) => void;
@@ -96,6 +100,12 @@ export function ManagementViews({
       ),
   );
   const clients = data.clients.filter((c) => matches(c.name + " " + c.sector));
+  const practiceName =
+    data.memberships.find((m) => m.tenant_id === data.tenantId)?.name ?? "";
+  const invitations = data.invitations ?? [];
+  const activeAdmins = data.members.filter(
+    (m) => m.practice_admin && m.status === "active",
+  ).length;
   const members = data.members.filter(
     (m) =>
       (memberView === "all" || m.status === memberView) &&
@@ -209,6 +219,25 @@ export function ManagementViews({
           </div>
         </div>
         {lead && (
+          <section className="panel practice-settings">
+            <div>
+              <p className="subtle">Practice</p>
+              <b>{practiceName}</b>{" "}
+              <span className="subtle">
+                · {activeAdmins} active administrator
+                {activeAdmins === 1 ? "" : "s"}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => open("practiceRename", { name: practiceName })}
+            >
+              <Settings2 size={15} /> Rename practice
+            </Button>
+          </section>
+        )}
+        {lead && (
           <section className="panel">
             <DatabaseToolbar
               label="Users"
@@ -223,6 +252,13 @@ export function ManagementViews({
               onSearch={setSearch}
               count={members.length}
             >
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => open("invite", { role: "Auditor" })}
+              >
+                <Mail size={15} /> Invite by email
+              </Button>
               <Button disabled={busy} onClick={onOnboard}>
                 <Plus size={15} /> Add member
               </Button>
@@ -233,6 +269,7 @@ export function ManagementViews({
                   <TableHead>Person</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Access</TableHead>
+                  <TableHead>Engagement grants</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead />
                 </TableRow>
@@ -245,6 +282,12 @@ export function ManagementViews({
                         {m.display_name}
                         {m.user_id === data.identity.id ? " (you)" : ""}
                       </b>
+                      {m.practice_admin && (
+                        <span className="badge neutral ml-2">
+                          <ShieldCheck size={12} className="inline mr-1" />
+                          Administrator
+                        </span>
+                      )}
                       <details className="account-id">
                         <summary>Account ID</summary>
                         <span className="mono">{m.user_id}</span>
@@ -255,6 +298,9 @@ export function ManagementViews({
                       {m.client_id
                         ? data.clients.find((c) => c.id === m.client_id)?.name
                         : "Assigned engagements"}
+                    </TableCell>
+                    <TableCell data-label="Engagement grants">
+                      <MemberGrants member={m} />
                     </TableCell>
                     <TableCell data-label="Status">
                       <span
@@ -280,8 +326,14 @@ export function ManagementViews({
                                   userId: m.user_id,
                                   displayName: m.display_name,
                                   role: m.role,
+                                  originalRole: m.role,
                                   clientId: m.client_id ?? "",
                                 },
+                                m.status === "active"
+                                  ? engagementFlags(
+                                      (m.grants ?? []).map((g) => g.id),
+                                    )
+                                  : {},
                               )
                             }
                           >
@@ -304,8 +356,61 @@ export function ManagementViews({
                               Revoke
                             </Button>
                           )}
+                          {m.status === "active" &&
+                            !m.practice_admin &&
+                            !["Client Viewer", "Client Contributor"].includes(
+                              m.role,
+                            ) && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    open("adminGrant", {
+                                      userId: m.user_id,
+                                      displayName: m.display_name,
+                                    })
+                                  }
+                                >
+                                  Make administrator
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    open("adminTransfer", {
+                                      userId: m.user_id,
+                                      displayName: m.display_name,
+                                    })
+                                  }
+                                >
+                                  Transfer administration
+                                </Button>
+                              </>
+                            )}
                         </div>
                       )}
+                      {m.practice_admin &&
+                        m.status === "active" &&
+                        activeAdmins > 1 && (
+                          <div className="row-actions">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={busy}
+                              onClick={() =>
+                                open("adminRevoke", {
+                                  userId: m.user_id,
+                                  displayName: m.display_name,
+                                })
+                              }
+                            >
+                              Remove administration
+                            </Button>
+                          </div>
+                        )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -313,6 +418,62 @@ export function ManagementViews({
             </Table>
             {!members.length && (
               <p className="empty-result">No matching members.</p>
+            )}
+          </section>
+        )}
+        {lead && (
+          <section className="panel">
+            <h2 className="panel-title">Pending invitations</h2>
+            {invitations.length ? (
+              <Table className="compact-register management-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Scope</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitations.map((i) => (
+                    <TableRow key={i.id}>
+                      <TableCell>
+                        <b className="font-medium">{i.email}</b>
+                        {i.display_name && (
+                          <span className="block subtle">{i.display_name}</span>
+                        )}
+                      </TableCell>
+                      <TableCell data-label="Role">{i.role}</TableCell>
+                      <TableCell data-label="Scope">
+                        {i.client_id
+                          ? data.clients.find((c) => c.id === i.client_id)?.name
+                          : i.engagement_ids.length + " engagement(s)"}
+                      </TableCell>
+                      <TableCell data-label="Expires">
+                        {i.expires_at.slice(0, 10)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() =>
+                            open("invitationCancel", {
+                              invitationId: i.id,
+                              email: i.email,
+                            })
+                          }
+                        >
+                          Cancel
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="empty-result">No pending invitations.</p>
             )}
           </section>
         )}
@@ -324,19 +485,22 @@ export function ManagementViews({
               controls.
             </li>
             <li>
-              They sign in, open <b>Members & access</b>, and share their
-              account ID with you.
+              Use <b>Invite by email</b> to choose their role, client and
+              engagements. They join this practice the next time they sign in
+              with that email. Alternatively, they sign in, share their account
+              ID from <b>Members & access</b>, and you use <b>Add member</b>.
             </li>
             <li>
-              Use <b>Add member</b> to assign a role. Client Viewers and Client
-              Contributors also need a client assignment. Assign internal
-              engagement access from Assurance workbench → Team & runtime.
-              Assign contributor requests from Evidence vault → Requests.
+              Assign further internal engagement access from Assurance workbench
+              → Team & runtime, and contributor requests from Evidence vault →
+              Requests.
             </li>
           </ol>
           <p className="subtle">
-            Practice membership does not send an invitation or change Site
-            sharing.
+            The platform sends no email: tell the colleague you invited them.
+            Revoking a member or changing their role withdraws their engagement
+            access and the runner workers they sponsored; restoring access
+            grants only what you choose again.
           </p>
         </details>
         <details className="help-panel">
@@ -527,6 +691,33 @@ export function ManagementViews({
         {/* eslint-disable-next-line react-hooks/static-components -- EngagementTable closes over this render's filters; hoisting it would also end its per-render remount, a behaviour change */}
         <EngagementTable />
       </section>
+    </>
+  );
+}
+
+/** A member's live engagement grants and the runner workers they sponsor. */
+function MemberGrants({ member }: { member: Member }) {
+  const grants = member.grants ?? [];
+  if (member.status !== "active") return <span className="subtle">None</span>;
+  return (
+    <>
+      {grants.length ? (
+        <ul className="grant-list">
+          {grants.map((g) => (
+            <li key={g.id}>{g.title}</li>
+          ))}
+        </ul>
+      ) : (
+        <span className="subtle">
+          {member.client_id ? "Client access" : "None"}
+        </span>
+      )}
+      {!!member.sponsored_workers && (
+        <small className="block subtle">
+          Sponsors {member.sponsored_workers} runner worker
+          {member.sponsored_workers === 1 ? "" : "s"}
+        </small>
+      )}
     </>
   );
 }

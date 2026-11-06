@@ -6,7 +6,8 @@ import type { Engagement } from "./domain";
 import { hydrate, dehydrate } from "./engagement-storage";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
-import type { Context } from "./tenancy";
+import { assertSaveQuota } from "./access-policy";
+import { refuseReadOnly, type Context } from "./tenancy";
 import {
   isClientRole,
   activeGrant,
@@ -52,7 +53,13 @@ export async function getEngagement(ctx: Context, engagementId: string) {
   e.version = row.version;
   if (
     ctx.role === "Client Contributor" &&
-    activeGrant(e.workflow, ctx.user.userId).length === 0
+    activeGrant(
+      e.workflow,
+      ctx.user.userId,
+      undefined,
+      undefined,
+      ctx.accessSince,
+    ).length === 0
   )
     throw new ApiError(404, "Engagement not found");
   stored.set(e, {
@@ -66,7 +73,10 @@ export async function getEngagement(ctx: Context, engagementId: string) {
  * if it is still at `expectedVersion`. A write that would take the stored
  * record over the metadata limit, or take the room kept under it for
  * approving the scope and program (metadataReserve in lib/workflow-state.ts),
- * is refused with 413 before anything is written.
+ * is refused with 413 before anything is written. Client Viewers never write,
+ * a Client Contributor writes only under a live request grant named in
+ * `details` (F-56), and each practice saves at most its hourly quota of
+ * versions (lib/access-policy.ts).
  */
 export async function save(
   ctx: Context,
@@ -76,6 +86,23 @@ export async function save(
   details: Record<string, unknown>,
   extra: (commandId: string) => D1PreparedStatement[] = () => [],
 ) {
+  refuseReadOnly(ctx);
+  if (
+    ctx.role === "Client Contributor" &&
+    !(
+      typeof details.grantId === "string" &&
+      typeof details.requestId === "string" &&
+      activeGrant(
+        e.workflow,
+        ctx.user.userId,
+        details.requestId,
+        Date.now(),
+        ctx.accessSince,
+      ).some((g) => g.id === details.grantId)
+    )
+  )
+    throw new ApiError(403, "Request access expired or was revoked");
+  await assertSaveQuota(db(), ctx.tenantId);
   const commandId = id("CMD"),
     event = {
       id: id("EV"),
@@ -114,7 +141,7 @@ export async function save(
     "EXISTS(SELECT 1 FROM engagements WHERE tenant_id=? AND id=? AND last_command_id=?)";
   const accessGuard =
     ctx.role === "Client Contributor"
-      ? " AND EXISTS(SELECT 1 FROM json_each(engagements.body,'$.workflow.clientGrants') g WHERE json_extract(g.value,'$.id')=? AND json_extract(g.value,'$.userId')=? AND json_extract(g.value,'$.requestId')=? AND json_extract(g.value,'$.active')=1 AND julianday(json_extract(g.value,'$.expiresAt'))>julianday('now'))"
+      ? " AND EXISTS(SELECT 1 FROM json_each(engagements.body,'$.workflow.clientGrants') g WHERE json_extract(g.value,'$.id')=? AND json_extract(g.value,'$.userId')=? AND json_extract(g.value,'$.requestId')=? AND json_extract(g.value,'$.active')=1 AND julianday(json_extract(g.value,'$.expiresAt'))>julianday('now') AND json_extract(g.value,'$.at')>=COALESCE((SELECT access_since FROM memberships WHERE tenant_id=engagements.tenant_id AND user_id=?),''))"
       : isClientRole(ctx.role)
         ? ""
         : " AND EXISTS(SELECT 1 FROM engagement_access WHERE tenant_id=? AND engagement_id=? AND user_id=? AND active=1)";
@@ -141,6 +168,7 @@ export async function save(
               String(details.grantId ?? ""),
               ctx.user.userId,
               String(details.requestId ?? ""),
+              ctx.user.userId,
             ]
           : isClientRole(ctx.role)
             ? []
