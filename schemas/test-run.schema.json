@@ -6060,6 +6060,7 @@
           "too_many_groups",
           "small_cell_exact_test_not_significant",
           "chance_exact_test_not_significant",
+          "mean_baseline_not_beaten",
           "interval_straddles_band",
           "within_criterion_multiplicity",
           "multiplicity_adjustment",
@@ -6076,7 +6077,7 @@
         ]
       },
       "minItems": 0,
-      "maxItems": 25
+      "maxItems": 26
     },
     "statisticsMetricDetails": {
       "type": "object",
