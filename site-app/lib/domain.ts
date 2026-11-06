@@ -28,7 +28,7 @@ export type {
 } from "./domain/classification";
 export { articleNames, classify } from "./domain/classification";
 export { risk } from "./domain/risk";
-export type { AuditGate, FinalReport } from "./domain/gates";
+export type { AuditGate, FinalReport, GateFeatures } from "./domain/gates";
 export {
   completionGates,
   finalReportGates,

@@ -6,7 +6,7 @@ import type { Role } from "@/lib/domain";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
 import { WorkingPaperRegister } from "../../paper-register";
-import type { WorkspaceData } from "../../workspace-types";
+import { packFeatures, type WorkspaceData } from "../../workspace-types";
 import type { LabIntentState } from "../lab-intent";
 import { classificationDefaults } from "../modals/classification";
 import {
@@ -143,6 +143,7 @@ export function WorkspaceViews({
     <>
       <PageHead
         view={view}
+        criteria={data.criteria}
         engagement={e}
         tenantId={data.tenantId}
         viewer={viewer}
@@ -167,7 +168,8 @@ export function WorkspaceViews({
         onSettings={() => onModal("rename")}
         onNavigate={nav.navigate}
         action={
-          view === "Regulatory mapping"
+          view === "Regulatory mapping" &&
+          packFeatures(data).aiActClassification
             ? {
                 label: "Assess classification",
                 onClick: () => {
@@ -323,6 +325,7 @@ export function WorkspaceViews({
       )}
       {view === "Regulatory mapping" && (
         <RegulatoryMapping
+          features={packFeatures(data)}
           engagement={e}
           catalog={data.catalog}
           reviewer={reviewer}
@@ -334,6 +337,7 @@ export function WorkspaceViews({
         <Suspense fallback={panelFallback}>
           <ReportWorkspace
             key={e.id}
+            features={packFeatures(data)}
             engagement={e}
             tenantId={data.tenantId}
             role={role}

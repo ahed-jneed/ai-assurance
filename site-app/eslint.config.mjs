@@ -36,6 +36,7 @@ const eslintConfig = defineConfig([
     // The criteria loader and its bundle are server-only: client components
     // receive projections from the API (docs/design/criteria-model.md 14.4).
     files: ["app/**/*.tsx"],
+    ignores: ["app/**/*.test.tsx"],
     rules: {
       "no-restricted-imports": [
         "error",

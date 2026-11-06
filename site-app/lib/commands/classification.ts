@@ -82,6 +82,7 @@ export const classification = defineCommands({
   classify: {
     roles: ["Auditor", "Lead Auditor"],
     handle(e, d, ctx) {
+      requireFeature(e, "aiActClassification");
       const a = input.parse(d);
       try {
         e.classification = recordClassification(e.classification, a, {
@@ -103,6 +104,7 @@ export const classification = defineCommands({
   approveClassification: {
     roles: ["Reviewer", "Lead Auditor"],
     async handle(e, d, ctx) {
+      requireFeature(e, "aiActClassification");
       const classifiedEvent = await db()
         .prepare(
           "SELECT actor FROM audit_events WHERE tenant_id=? AND engagement_id=? AND action=? ORDER BY created_at DESC LIMIT 1",

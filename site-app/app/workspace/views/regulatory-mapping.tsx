@@ -28,12 +28,15 @@ import {
 export function RegulatoryMapping({
   engagement: e,
   catalog,
+  features,
   reviewer,
   busy,
   onApprove,
 }: {
   engagement: Engagement;
   catalog: WorkspaceData["catalog"];
+  /** What the engagement's criteria pack switches on. */
+  features: { aiActClassification: boolean };
   reviewer: boolean;
   busy: boolean;
   /** Independent approval of a provisional classification. */
@@ -56,6 +59,7 @@ export function RegulatoryMapping({
         <TabsContent value="classification">
           <Classification
             engagement={e}
+            classified={features.aiActClassification}
             pack={pack}
             today={today}
             reviewer={reviewer}
@@ -83,6 +87,7 @@ export function RegulatoryMapping({
 
 function Classification({
   engagement: e,
+  classified,
   pack,
   today,
   reviewer,
@@ -90,6 +95,8 @@ function Classification({
   onApprove,
 }: {
   engagement: Engagement;
+  /** The pack has the AI Act classification (criteria model section 7.1). */
+  classified: boolean;
   pack: RegulatorySnapshot | null;
   today: string;
   reviewer: boolean;
@@ -98,29 +105,27 @@ function Classification({
 }) {
   return (
     <>
-      <ClassificationPanel
-        engagement={e}
-        pack={pack}
-        today={today}
-        reviewer={reviewer}
-        busy={busy}
-        onApprove={onApprove}
-      />
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Regulatory basis</h2>
-          <BookOpen size={20} />
-        </div>
-        <div className="content-pad body-copy">
-          {pack ? (
+      {classified && (
+        <ClassificationPanel
+          engagement={e}
+          pack={pack}
+          today={today}
+          reviewer={reviewer}
+          busy={busy}
+          onApprove={onApprove}
+        />
+      )}
+      {pack && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Regulatory basis</h2>
+            <BookOpen size={20} />
+          </div>
+          <div className="content-pad body-copy">
             <RegulatoryBasis pack={pack} today={today} />
-          ) : (
-            <p className="subtle">
-              This engagement&apos;s criteria have no EU AI Act rule pack.
-            </p>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
       <section className="panel">
         <div className="panel-head">
           <h2>Article-to-evidence mapping</h2>

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
 import { roles, stageGates } from "../domain";
 import { db, now, sha256 } from "../engagement-repo";
-import { resolveFollowup } from "../criteria/pin";
+import { packFeatures, resolveFollowup } from "../criteria/pin";
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
 import { calendarDate } from "../workflow-service";
@@ -52,7 +52,7 @@ export const engagement = defineCommands({
           "Sign-off",
         ])
         .parse(d.stage);
-      const gates = stageGates(e, stage);
+      const gates = stageGates(e, stage, packFeatures(e));
       if (gates.length)
         throw new ApiError(
           400,

@@ -18,6 +18,7 @@ import {
   type Engagement,
   type Role,
 } from "@/lib/domain";
+import type { GateFeatures } from "@/lib/domain";
 import {
   assuranceLevelIds,
   assuranceLevels,
@@ -306,11 +307,14 @@ export function ReportReadiness({
   onGate,
   onAudience,
   busy = false,
+  features,
 }: {
   engagement: Engagement;
   role: Role;
   userId: string;
   terms: ReportTerms;
+  /** What the engagement's criteria pack switches on (the classification gate). */
+  features?: GateFeatures;
   onTerms: (terms: ReportTerms) => void;
   onGate: GateAction;
   /** Sets who a signed paper is written for; Lead Auditors only. */
@@ -321,7 +325,7 @@ export function ReportReadiness({
   const signed = e.papers.filter(
     (p) => paperCurrent(p) && p.status === "signed",
   );
-  const gates = finalReportGates(e, terms),
+  const gates = finalReportGates(e, terms, features),
     exceptions = e.findings.filter(
       (f) => f.status !== "closed" && ["High", "Critical"].includes(f.severity),
     ).length;
