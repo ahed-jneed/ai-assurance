@@ -102,8 +102,9 @@ export function EngagementOverview({
   const outstandingRequests = (e.evidenceRequests ?? []).filter(
     (r) => !["accepted", "waived"].includes(r.status),
   );
-  // A due classification re-review (#19) is a work item since #104: it
-  // shows in the task queue and in the work inbox.
+  // A due classification re-review (#19) is a work item since #104, in the
+  // work inbox and the task queue: personal for Auditors and Lead Auditors
+  // (who may reclassify); a Reviewer sees it waiting under "all".
   const checkpoints = [
     ...(e.classification.status !== "approved" &&
     !gates.some((g) => g.kind === "classification")
