@@ -15,7 +15,12 @@ EXCLUDED = {'__pycache__', '.test-tmp', '.venv', 'worker-jobs', 'node_modules', 
 ENGINE_SPECIAL = {'Dockerfile', '.dockerignore', '.gitignore'}
 EXAMPLES = {'predictions.csv', 'reference.csv', 'config.json', 'report.json', 'report-v1.1.json',
     'report-v1.1.1.json', 'generate_fixture.py'}
+# Hand-maintained input that schemas/.build-run-schema.py generates test-run.schema.json from.
+SCHEMA_INPUTS = {'test-run.base.json'}
 SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'external-runs.v1.2.json', 'procedure-execution.json'}
+# Engine tests, their fixtures and the scripts that generate those fixtures stay
+# in the repository; the runtime package ships source, examples and schemas only.
+EXCLUDED_ENGINE_FOLDERS = {'tests'}
 
 
 def sources(root):
@@ -32,12 +37,15 @@ def sources(root):
             if not file.is_file():
                 continue
             if folder == 'engine':
+                if relative.parts[1] in EXCLUDED_ENGINE_FOLDERS:
+                    continue
                 if 'examples' in relative.parts:
                     allowed = file.parent == base/'examples' and file.name in EXAMPLES
                 else:
                     allowed = file.suffix in {'.py', '.md'} or file.name in ENGINE_SPECIAL or file.name in {'requirements.txt', 'requirements-optional.txt'}
             else:
-                allowed = file.parent == base and (file.suffix in {'.py', '.mjs', '.md'} or file.name.endswith('.schema.json'))
+                allowed = file.parent == base and (file.suffix in {'.py', '.mjs', '.md'} or file.name.endswith('.schema.json')
+                    or file.name in SCHEMA_INPUTS)
                 allowed = allowed or file.parent == base/'fixtures' and file.name in SCHEMA_FIXTURES
             if not allowed:
                 continue
