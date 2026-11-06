@@ -14,6 +14,7 @@ import {
   save,
   sha256,
 } from "@/lib/store";
+import { uploadGate, uploadHeader } from "@/lib/special-category";
 import { activeGrant } from "@/lib/workflow-state";
 import type { Submission } from "@/lib/workflow-types";
 export const dynamic = "force-dynamic";
@@ -138,6 +139,15 @@ export async function POST(request: Request) {
       artifactIds: string[] = [],
       hashes: string[] = [];
     scope = { tenantId: ctx.tenantId, engagementId: e.id, submissionId };
+    // A client cannot declare columns free of special-category data: such
+    // columns need the basis the audit team records first (#60, D-11).
+    for (const file of bundle)
+      uploadGate(e, {
+        category: g.category,
+        headers: uploadHeader(file.name, await file.arrayBuffer()),
+        handlingBasis: g.handlingBasis,
+        declaration: null,
+      });
     for (const file of bundle) {
       const artifactId = id("EV"),
         payload = await file.arrayBuffer(),

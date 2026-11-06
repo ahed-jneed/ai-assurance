@@ -8,6 +8,7 @@ import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { recordVersions } from "../../rule-pack-current";
+import { externalGate } from "../../special-category";
 import { requireRole } from "../../tenancy";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -78,6 +79,7 @@ export const execution: AssuranceModule = defineCommands({
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
       assertExternalProtocol(profile);
+      externalGate(profile, v.mode);
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;

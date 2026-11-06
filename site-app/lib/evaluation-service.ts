@@ -14,6 +14,11 @@ import {
 } from "./evaluation";
 import { inspectCSV, validateEvaluation } from "./diagnostics";
 import { recordVersions } from "./rule-pack-current";
+import {
+  declarationInputSchema,
+  declareProtocol,
+  hostedGate,
+} from "./special-category";
 const short = z.string().trim().min(1).max(300),
   notes = z.string().trim().max(5000);
 const cardSchema = z
@@ -111,7 +116,9 @@ export function registerProfile(
   data: Record<string, unknown>,
   actor: string,
 ) {
-  const a = profileSchema.parse(data);
+  const { specialCategory: declaration, ...a } = profileSchema
+    .extend({ specialCategory: declarationInputSchema.optional() })
+    .parse(data);
   try {
     assertSuite(a.task, a.suite);
   } catch (error) {
@@ -159,11 +166,14 @@ export function registerProfile(
       409,
       "This protocol name and version already exist. Create a new version.",
     );
+  const createdAt = now(),
+    specialCategory = declareProtocol(e, a, declaration, actor, createdAt);
   const p: EvaluationProfile = {
     ...a,
+    ...(specialCategory ? { specialCategory } : {}),
     id: id("PROTOCOL"),
     schemaVersion: "1.0",
-    createdAt: now(),
+    createdAt,
     createdBy: actor,
   };
   (e.evaluationProfiles ??= []).push(p);
@@ -223,7 +233,9 @@ export async function datasetCSV(e: Engagement, artifactId: string) {
 /**
  * Freezes a new evaluation of a registered model against a saved protocol.
  * A protocol is required: registerProfile checks what an explicit suite and
- * configuration would skip, such as the fairness data-handling basis.
+ * configuration would skip, such as the fairness data-handling basis. A
+ * fairness protocol on special-category data also needs the hosted route,
+ * its recorded basis and `acknowledgeSpecialCategory`.
  */
 export async function queueEvaluation(
   e: Engagement,
@@ -237,6 +249,8 @@ export async function queueEvaluation(
       profileId: short.optional(),
       suite: suiteSchema.optional(),
       config: configSchema.optional(),
+      /** Hosted processing of special-category data, acknowledged. */
+      acknowledgeSpecialCategory: z.literal(true).optional(),
     })
     .strict()
     .parse(data);
@@ -262,13 +276,15 @@ export async function queueEvaluation(
       profile,
       suite: profile.suite,
       config: profile.config,
+      acknowledged: !!a.acknowledgeSpecialCategory,
     },
     actor,
   );
 }
 /**
  * Queues a new run with the frozen request of a failed or cancelled run: its
- * protocol, or the suite and configuration of a legacy explicit run.
+ * protocol, or the suite and configuration of a legacy explicit run. It
+ * repeats the source's acknowledgement of hosted special-category processing.
  */
 export async function queueRetry(e: Engagement, source: Run, actor: string) {
   const profile = source.profileId
@@ -284,6 +300,7 @@ export async function queueRetry(e: Engagement, source: Run, actor: string) {
       profile,
       suite: profile?.suite ?? source.suite,
       config: profile?.config ?? source.config,
+      acknowledged: !!source.manifest?.specialCategoryAcknowledgement,
     },
     actor,
   );
@@ -296,6 +313,7 @@ async function freezeRun(
     profile,
     suite,
     config,
+    acknowledged = false,
   }: {
     modelId: string;
     datasetId: string;
@@ -303,6 +321,8 @@ async function freezeRun(
     profile: EvaluationProfile | null;
     suite: string[];
     config: Run["config"];
+    /** The auditor acknowledged hosted special-category processing. */
+    acknowledged?: boolean;
   },
   actor: string,
 ) {
@@ -324,6 +344,7 @@ async function freezeRun(
   } catch (error) {
     throw new ApiError(400, (error as Error).message);
   }
+  const specialCategory = hostedGate(profile, acknowledged);
   if (e.runs.filter((r) => ["queued", "running"].includes(r.state)).length >= 3)
     throw new ApiError(429, "Complete or cancel outstanding runs first");
   const { a: dataset, csv } = await datasetCSV(e, datasetId);
@@ -393,7 +414,17 @@ async function freezeRun(
         : profile.datasetContext.split === "training"
           ? ["Training data evaluates fit, not independent generalization."]
           : []),
+      ...(specialCategory ? [specialCategory] : []),
     ],
+    ...(specialCategory
+      ? {
+          specialCategoryAcknowledgement: {
+            column: config.groupColumn,
+            acknowledgedBy: actor,
+            acknowledgedAt: now(),
+          },
+        }
+      : {}),
   };
   if (profile)
     run.provenance.inputHashes.protocol = await sha256(JSON.stringify(profile));
