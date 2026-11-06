@@ -1,3 +1,10 @@
+import {
+  queueStates,
+  reviewQueuePage,
+  reviewQueueSummary,
+  searchRecords,
+  type QueueState,
+} from "../assurance-search";
 import { jobs, recordCount, recordPage } from "../assurance-store";
 import { db } from "../bindings";
 import { getEngagement } from "../engagement-repo";
@@ -15,7 +22,8 @@ async function internalEngagement(ctx: Context, engagementId: string) {
  * What the assurance workbench loads for an internal member: the first page of
  * the engagement's assurance records (with their total and the cursor of the
  * next page), its external jobs, enrolled workers and access grants, the
- * members a Lead Auditor may grant access to, what the platform can and cannot
+ * members a Lead Auditor may grant access to, the caller's review queue
+ * (counts and the next assessment of each), what the platform can and cannot
  * attest, and the external queue's telemetry. Client roles are refused.
  */
 export async function assuranceView(ctx: Context, engagementId: string) {
@@ -40,6 +48,7 @@ export async function assuranceView(ctx: Context, engagementId: string) {
   return {
     ...(await recordPage(ctx, e.id)),
     total: await recordCount(ctx, e.id),
+    queue: await reviewQueueSummary(ctx, e.id),
     jobs: recent,
     workers,
     access,
@@ -87,4 +96,38 @@ export async function assuranceRecordPage(
 ) {
   const e = await internalEngagement(ctx, engagementId);
   return recordPage(ctx, e.id, options);
+}
+/**
+ * One page of the engagement's records that match a search (kinds, text and
+ * review state), each with its review state, and on the first page how many
+ * match in all. Covers every record, not only those a browser has loaded.
+ */
+export async function assuranceSearch(
+  ctx: Context,
+  engagementId: string,
+  options: {
+    kinds?: string[];
+    term?: string;
+    review?: string;
+    cursor?: string;
+    limit?: number;
+  },
+) {
+  const e = await internalEngagement(ctx, engagementId);
+  return searchRecords(ctx, e.id, options);
+}
+/**
+ * The caller's review queue: without `state` its summary, with `state` one
+ * page of the assessments in that part of the queue.
+ */
+export async function assuranceReviewQueue(
+  ctx: Context,
+  engagementId: string,
+  options: { state?: string; cursor?: string; limit?: number },
+) {
+  const e = await internalEngagement(ctx, engagementId);
+  if (!options.state) return reviewQueueSummary(ctx, e.id);
+  if (!queueStates.includes(options.state as QueueState))
+    throw new ApiError(400, "Invalid review queue");
+  return reviewQueuePage(ctx, e.id, options.state as QueueState, options);
 }
