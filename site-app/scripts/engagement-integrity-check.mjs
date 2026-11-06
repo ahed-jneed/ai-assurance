@@ -92,7 +92,8 @@ try {
         op: "createReport",
         data: {
           kind: "draft",
-          opinion: "Readiness assessment",
+          engagementType: "readiness",
+          conclusion: "readiness",
           summary: "Integrity fixture snapshot.",
         },
       },
