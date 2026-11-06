@@ -453,7 +453,9 @@ export type DeclaredThreat = {
 /**
  * One person's dated independence and competence declaration for one
  * engagement period. A later declaration by the same person for the same
- * period supersedes it; earlier ones stay as the record.
+ * period supersedes it; earlier ones stay as the record. A renewal keeps the
+ * declared relationships and unresolved threats, and the evaluation of a
+ * threat it repeats unchanged (lib/workflow/acceptance-commands.ts).
  */
 export type Declaration = {
   id: string;
@@ -471,7 +473,19 @@ export type Declaration = {
   /** Earlier implementation or governance work on the system, if any. */
   priorWork: string;
   threats: DeclaredThreat[];
+  /** The disqualifying relationships declared and not withdrawn. */
   exclusions: ExclusionKind[];
+  /**
+   * Relationships a Lead Auditor or Reviewer other than the declarant
+   * withdrew as declared in error, with their reason. A renewal by the
+   * declarant cannot remove one.
+   */
+  exclusionWithdrawals?: {
+    kind: ExclusionKind;
+    userId: string;
+    at: string;
+    reason: string;
+  }[];
   competence: Record<CompetenceArea, CompetenceLevel>;
   /** The field this person serves in as practitioner's expert, if any. */
   expertField: string;

@@ -294,7 +294,7 @@ export function AcceptancePanel({
           label: exclusionLabels[k],
         })),
         ids: d?.exclusions ?? [],
-        hint: "Modelled on the NYC Local Law 144 independent-auditor exclusions and applied to every engagement; pending legal review. No safeguard resolves them.",
+        hint: "Modelled on the NYC Local Law 144 independent-auditor exclusions and applied to every engagement; pending legal review. No safeguard resolves them, and a renewal cannot remove one: a Lead Auditor or Reviewer other than you withdraws a relationship declared in error. A renewal also keeps every threat nobody has resolved.",
       },
       ...competenceAreas.map((k): Field => ({
         name: "competence." + k,
@@ -373,6 +373,31 @@ export function AcceptancePanel({
       ],
       save: (v) =>
         act("resolveDeclaredThreat", {
+          declarationId: d.id,
+          kind,
+          reason: v.reason,
+        }),
+    });
+  }
+
+  function withdrawForm(d: Declaration, kind: ExclusionKind) {
+    onForm({
+      title: "Withdraw a disqualifying relationship",
+      action: "Withdraw relationship",
+      description:
+        name(d.userId) +
+        " declared: " +
+        exclusionLabels[kind] +
+        ". Withdraw it only if it was declared in error or does not exist; no safeguard resolves it.",
+      fields: [
+        {
+          name: "reason",
+          label: "Why the relationship does not exist",
+          type: "area",
+        },
+      ],
+      save: (v) =>
+        act("withdrawDeclaredExclusion", {
           declarationId: d.id,
           kind,
           reason: v.reason,
@@ -595,9 +620,27 @@ export function AcceptancePanel({
                         <span className="subtle">None declared</span>
                       )}
                       {d?.exclusions.map((k) => (
-                        <p key={k} className="record-text">
-                          <b>Disqualifying:</b> {exclusionLabels[k]}
-                        </p>
+                        <div key={k} className="acceptance-threat">
+                          <p className="record-text">
+                            <b>Disqualifying:</b> {exclusionLabels[k]}
+                          </p>
+                          {reviewer && d.userId !== uid && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() => withdrawForm(d, k)}
+                            >
+                              Withdraw as declared in error
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      {d?.exclusionWithdrawals?.map((x, i) => (
+                        <small key={x.kind + i} className="subtle block">
+                          Withdrawn: {exclusionLabels[x.kind]} · by{" "}
+                          {name(x.userId)} · {day(x.at)}: {x.reason}
+                        </small>
                       ))}
                       {d?.priorWork && (
                         <p className="record-text">

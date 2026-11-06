@@ -5,6 +5,7 @@ import { seedWorkflow } from "../workflow-seed";
 import {
   acceptancePrompt,
   acceptanceApplies,
+  declarationStatus,
   engagementTeam,
 } from "./acceptance";
 import {
@@ -604,5 +605,167 @@ describe("independence and competence declarations", () => {
       "lead",
     );
     expect(workflowOf(e).acceptance!.team).toEqual(["lead", "second-auditor"]);
+  });
+
+  const approve = (e: Engagement) =>
+    command(
+      e,
+      "approveAcceptance",
+      { revision: workflowOf(e).acceptance!.revision, reason: "Accepted" },
+      "lead",
+    );
+  const conflicted =
+    "A team member declared an unresolved independence threat or a disqualifying relationship; resolve it before accepting the engagement";
+
+  it("a renewal cannot clear a disqualifying relationship", async () => {
+    const e = await accepted(["lead", "reviewer"]);
+    await declare(e, "lead");
+    await declare(e, "reviewer", { exclusions: ["employment"] });
+    await expectFailure(approve(e), 409, conflicted);
+    // Declaring again without the relationship is refused, so the gate, the
+    // approval and the assignment check still see it.
+    const removed =
+      "A renewal cannot remove a disqualifying relationship you declared; a Lead Auditor or Reviewer other than you withdraws it with a reason";
+    await expectFailure(
+      declare(e, "reviewer", { exclusions: [] }),
+      409,
+      removed,
+    );
+    await expectFailure(
+      declare(e, "reviewer", { exclusions: ["financial_interest"] }),
+      409,
+      removed,
+    );
+    expect(workflowOf(e).declarations).toHaveLength(2);
+    await expectFailure(approve(e), 409, conflicted);
+    expect(declarationStatus(workflowOf(e), "reviewer")).toBe("excluded");
+    await expectFailure(
+      command(
+        e,
+        "saveProcedurePlan",
+        planSave(e, { reviewerId: "reviewer" }),
+        "auditor",
+      ),
+      400,
+      "This person declared a disqualifying relationship with the engagement and cannot be assigned",
+    );
+    // A renewal may add to what was declared.
+    await declare(e, "reviewer", {
+      exclusions: ["employment", "financial_interest"],
+    });
+    const d = workflowOf(e).declarations!.at(-1)!;
+    const withdraw = (kind: string, userId: string) =>
+      command(
+        e,
+        "withdrawDeclaredExclusion",
+        { declarationId: d.id, kind, reason: "Declared in error" },
+        userId,
+      );
+    await expectFailure(
+      withdraw("employment", "reviewer"),
+      403,
+      "Someone other than the declarant must withdraw a disqualifying relationship",
+    );
+    await expectFailure(
+      withdraw("employment", "auditor"),
+      403,
+      "An independent Reviewer or Lead Auditor must approve",
+    );
+    await expectFailure(
+      withdraw("system_involvement", "lead"),
+      404,
+      "This relationship is not declared",
+    );
+    await expectFailure(
+      command(
+        e,
+        "withdrawDeclaredExclusion",
+        {
+          declarationId: workflowOf(e).declarations![1].id,
+          kind: "employment",
+          reason: "Declared in error",
+        },
+        "lead",
+      ),
+      409,
+      "Evaluate the person's current declaration",
+    );
+    await withdraw("employment", "lead");
+    await expectFailure(approve(e), 409, conflicted);
+    await withdraw("financial_interest", "second-lead");
+    expect(d.exclusions).toEqual([]);
+    expect(d.exclusionWithdrawals).toEqual([
+      { kind: "employment", userId: "lead", at, reason: "Declared in error" },
+      {
+        kind: "financial_interest",
+        userId: "second-lead",
+        at,
+        reason: "Declared in error",
+      },
+    ]);
+    expect(await approve(e)).toEqual({ acceptanceRevision: "1" });
+    // After the withdrawal, a renewal without the relationship is allowed.
+    await declare(e, "reviewer");
+    expect(declarationStatus(workflowOf(e), "reviewer")).toBe("current");
+  });
+
+  it("a renewal cannot drop an unresolved threat and keeps unchanged evaluations", async () => {
+    const e = await accepted(["lead", "reviewer"]);
+    const familiarity = {
+      kind: "familiarity",
+      description: "Ten years auditing this client",
+      safeguards: "Rotation of the engagement partner",
+    };
+    await declare(e, "lead");
+    await declare(e, "reviewer", { threats: [familiarity] });
+    const dropped =
+      "A renewal cannot drop an independence threat nobody has resolved; a Lead Auditor or Reviewer other than you evaluates it";
+    await expectFailure(declare(e, "reviewer", { threats: [] }), 409, dropped);
+    await expectFailure(approve(e), 409, conflicted);
+    // Restating the threat is allowed; it stays unresolved.
+    const restated = { ...familiarity, description: "Eleven years" };
+    await declare(e, "reviewer", { threats: [restated] });
+    expect(declarationStatus(workflowOf(e), "reviewer")).toBe("unresolved");
+    await command(
+      e,
+      "resolveDeclaredThreat",
+      {
+        declarationId: workflowOf(e).declarations!.at(-1)!.id,
+        kind: "familiarity",
+        reason: "Rotation is effective",
+      },
+      "lead",
+    );
+    // Renewing with the threat unchanged keeps its evaluation.
+    await declare(e, "reviewer", {
+      threats: [restated],
+      expertField: "Fairness statistics",
+    });
+    expect(workflowOf(e).declarations!.at(-1)!.threats[0].resolution).toEqual({
+      userId: "lead",
+      at,
+      reason: "Rotation is effective",
+    });
+    expect(await approve(e)).toEqual({ acceptanceRevision: "1" });
+    // Changing the threat's circumstances or safeguards needs a new
+    // evaluation, and the changed threat cannot then be dropped.
+    await declare(e, "reviewer", {
+      threats: [{ ...restated, safeguards: "" }],
+    });
+    expect(declarationStatus(workflowOf(e), "reviewer")).toBe("unresolved");
+    await expectFailure(declare(e, "reviewer", { threats: [] }), 409, dropped);
+    // A threat someone resolved may be dropped when it no longer applies.
+    await command(
+      e,
+      "resolveDeclaredThreat",
+      {
+        declarationId: workflowOf(e).declarations!.at(-1)!.id,
+        kind: "familiarity",
+        reason: "Acceptable without rotation for this period",
+      },
+      "second-lead",
+    );
+    await declare(e, "reviewer", { threats: [] });
+    expect(declarationStatus(workflowOf(e), "reviewer")).toBe("current");
   });
 });

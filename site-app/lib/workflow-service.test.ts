@@ -71,6 +71,7 @@ const asClientViewer: Record<string, FirstFailure> = {
     "Only Auditors, Lead Auditors and Reviewers declare independence",
   ],
   resolveDeclaredThreat: reviewerOnly,
+  withdrawDeclaredExclusion: reviewerOnly,
 };
 
 // The next check: a Lead Auditor on a legacy engagement without a workflow.
@@ -144,6 +145,7 @@ describe("workflow command dispatch", () => {
       "approveAcceptance",
       "saveDeclaration",
       "resolveDeclaredThreat",
+      "withdrawDeclaredExclusion",
     ]);
     expect(Object.keys(asClientViewer).sort()).toEqual([...workflowOps].sort());
   });

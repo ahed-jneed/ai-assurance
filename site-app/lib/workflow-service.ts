@@ -55,6 +55,7 @@ export const workflowOps = [
   "approveAcceptance",
   "saveDeclaration",
   "resolveDeclaredThreat",
+  "withdrawDeclaredExclusion",
 ];
 // A Map, so inherited object keys such as `constructor` stay unknown.
 const commands = new Map<string, WorkflowHandler>(

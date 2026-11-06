@@ -11,6 +11,7 @@ import {
   competenceLevels,
   exclusionKinds,
   threatKinds,
+  type DeclaredThreat,
   type Workflow,
 } from "../workflow-types";
 import {
@@ -18,6 +19,7 @@ import {
   currentDeclaration,
   declarationConflicted,
   engagementTeam,
+  unresolvedThreats,
   type Period,
 } from "./acceptance";
 import {
@@ -211,6 +213,39 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
         413,
         "This engagement reached its declaration limit; continue in a follow-up engagement",
       );
+    // A renewal for the same period never clears a conflict: the declarant
+    // cannot drop a disqualifying relationship or an unresolved threat by
+    // declaring again. Someone else withdraws the one and evaluates the
+    // other. An evaluation carries forward while the threat is unchanged.
+    const prior = currentDeclaration(x, c.userId, period);
+    if (prior?.exclusions.some((k) => !a.exclusions.includes(k)))
+      fail(
+        409,
+        "A renewal cannot remove a disqualifying relationship you declared; a Lead Auditor or Reviewer other than you withdraws it with a reason",
+      );
+    if (
+      prior &&
+      unresolvedThreats(prior).some(
+        (t) => !a.threats.some((n) => n.kind === t.kind),
+      )
+    )
+      fail(
+        409,
+        "A renewal cannot drop an independence threat nobody has resolved; a Lead Auditor or Reviewer other than you evaluates it",
+      );
+    const threats = a.threats.map((t): DeclaredThreat => {
+      const p = prior?.threats.find((p) => p.kind === t.kind);
+      return {
+        kind: t.kind,
+        description: t.description,
+        safeguards: t.safeguards,
+        ...(p?.resolution &&
+        p.description === t.description &&
+        p.safeguards === t.safeguards
+          ? { resolution: p.resolution }
+          : {}),
+      };
+    });
     const id = c.id("DEC");
     x.declarations = [
       ...(x.declarations ?? []),
@@ -223,11 +258,7 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
         periodEnd: period.periodEnd,
         team: [...new Set([...engagementTeam(x), c.userId])].sort(),
         priorWork: a.priorWork,
-        threats: a.threats.map((t) => ({
-          kind: t.kind,
-          description: t.description,
-          safeguards: t.safeguards,
-        })),
+        threats,
         exclusions: a.exclusions,
         competence: a.competence,
         expertField: a.expertField,
@@ -258,6 +289,38 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
       fail(404, "This threat was not declared");
     if (t.resolution) fail(409, "This threat is already resolved");
     t.resolution = { userId: c.userId, at: c.at, reason: a.reason };
+    return { declarationId: d.id };
+  },
+  async withdrawDeclaredExclusion({ c, reviewer, w }, data) {
+    reviewer();
+    const a = z
+      .object({
+        declarationId: short,
+        kind: z.enum(exclusionKinds),
+        reason: text,
+      })
+      .strict()
+      .parse(data);
+    const x = w(),
+      d =
+        x.declarations?.find((d) => d.id === a.declarationId) ??
+        fail(404, "Declaration not found in this engagement");
+    if (d.userId === c.userId)
+      fail(
+        403,
+        "Someone other than the declarant must withdraw a disqualifying relationship",
+      );
+    if (currentDeclaration(x, d.userId) !== d)
+      fail(409, "Evaluate the person's current declaration");
+    if (!d.exclusions.includes(a.kind))
+      fail(404, "This relationship is not declared");
+    // A correction, not a safeguard: the relationship was declared in error
+    // or does not exist. The withdrawal stays on the declaration.
+    d.exclusions = d.exclusions.filter((k) => k !== a.kind);
+    d.exclusionWithdrawals = [
+      ...(d.exclusionWithdrawals ?? []),
+      { kind: a.kind, userId: c.userId, at: c.at, reason: a.reason },
+    ];
     return { declarationId: d.id };
   },
 };

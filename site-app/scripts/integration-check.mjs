@@ -1986,6 +1986,8 @@ try {
     owner,
     409,
   );
+  // Declaring again cannot clear the declarant's own unresolved threat.
+  await command("saveDeclaration", declaration, reviewer, 409);
   await command("resolveDeclaredThreat", {
     declarationId: e.workflow.declarations.at(-1).id,
     kind: "familiarity",
