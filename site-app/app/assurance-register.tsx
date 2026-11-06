@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { ReactNode } from "react";
+import type { SearchedRecord } from "@/lib/assurance-search";
 import { workbenchReviewState } from "@/lib/workbench-presentation";
 const words = (s: string) => s.replaceAll("_", " ").replace(/([A-Z])/g, " $1");
 export const recordReviewState = workbenchReviewState;
@@ -58,9 +59,13 @@ function recordContext(r: AssuranceRecord) {
                 ? String(b.items?.length ?? 0) + " cited items"
                 : String(b.auditorAssessment ?? b.assessment ?? "");
 }
+/**
+ * Rows of a register. Each assessment row shows the review state the server
+ * computed for it (lib/assurance-search.ts), so a register never needs every
+ * record of the engagement.
+ */
 export function AssuranceRegister({
   rows,
-  all,
   onOpen,
   empty,
   filtered,
@@ -68,9 +73,8 @@ export function AssuranceRegister({
   onReset,
   emptyAction,
 }: {
-  rows: AssuranceRecord[];
-  all: AssuranceRecord[];
-  onOpen: (r: AssuranceRecord) => void;
+  rows: SearchedRecord[];
+  onOpen: (r: SearchedRecord) => void;
   empty: string;
   filtered: boolean;
   person: (id: string) => string;
@@ -101,7 +105,7 @@ export function AssuranceRegister({
       {rows.map((r) => {
         const assessed = ["assertion", "obligation", "impact"].includes(r.kind),
           state = assessed
-            ? recordReviewState(r, all)
+            ? (r.reviewState ?? "Awaiting review")
             : (r.body.conclusion ??
               r.body.decision ??
               (r.kind === "system"

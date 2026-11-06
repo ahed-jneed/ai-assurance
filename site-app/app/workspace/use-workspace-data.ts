@@ -65,6 +65,7 @@ const actMessages: Record<string, string> = {
   reopenEvidenceRequest: "Evidence request reopened",
   createFinding: "Finding recorded",
   createReport: "Report snapshot created",
+  setPaperAudience: "Paper audience updated",
   classify: "Classification saved",
   approveClassification: "Classification approved",
   setStage: "Engagement stage updated",
@@ -75,6 +76,40 @@ const actMessages: Record<string, string> = {
   createEvaluationProfile: "Evaluation protocol saved",
   queueRun: "Evaluation request frozen",
 };
+
+/** Workspace commands whose effect reaches beyond the saved engagement. */
+const reloadingOps = new Set([
+  // Creates the follow-up engagement in the directory.
+  "openFollowup",
+]);
+/**
+ * The workspace after a workspace command saved `engagement`: the engagement
+ * itself, its directory row, and its audit trail and stored size when the
+ * response carried them.
+ */
+export function applySaved(
+  data: WorkspaceData,
+  engagement: Engagement,
+  events?: WorkspaceData["events"],
+  metadataBytes?: number | null,
+): WorkspaceData {
+  return {
+    ...data,
+    engagement,
+    engagements: data.engagements.map((row) =>
+      row.id === engagement.id
+        ? {
+            ...row,
+            title: engagement.title,
+            stage: engagement.stage,
+            due_date: engagement.dueDate,
+          }
+        : row,
+    ),
+    ...(events ? { events } : {}),
+    ...(metadataBytes !== undefined ? { metadataBytes } : {}),
+  };
+}
 
 export function useWorkspaceData() {
   const [data, setData] = useState<WorkspaceData | null>(null),
@@ -141,6 +176,9 @@ export function useWorkspaceData() {
         listener.current?.onClientAudience(body.identity.role);
       setData(body);
       setSignedOut(false);
+      // The selected engagement failed to load intact; the rest of the
+      // workspace is usable, and the banner says why nothing is open.
+      if (body.engagementError) setError(body.engagementError.error);
       const requested = restoreRequest.current;
       if (
         requested &&
@@ -236,6 +274,8 @@ export function useWorkspaceData() {
             error?: string;
             engagement: Engagement;
             details?: Record<string, string>;
+            events?: WorkspaceData["events"];
+            metadataBytes?: number | null;
           };
         if (!res.ok) throw Error(body.error ?? "Request failed");
         if (op === "editPaper") {
@@ -244,13 +284,22 @@ export function useWorkspaceData() {
           );
           if (saved) listener.current?.onPaperSaved(saved);
         }
+        // The response carries everything the save changed in this
+        // workspace, so it is applied in place; only an op that changes the
+        // directory itself, or a response without the trail, reloads.
+        const reload = reloadingOps.has(op) || !body.events;
         setData((previous) =>
           previous?.tenantId === current.tenantId &&
           previous.engagement?.id === body.engagement.id
-            ? { ...previous, engagement: body.engagement }
+            ? applySaved(
+                previous,
+                body.engagement,
+                body.events,
+                body.metadataBytes,
+              )
             : previous,
         );
-        await load(current.tenantId, body.engagement.id);
+        if (reload) await load(current.tenantId, body.engagement.id);
         toast.success(actMessages[op] ?? "Changes saved");
         return body as {
           engagement: Engagement;

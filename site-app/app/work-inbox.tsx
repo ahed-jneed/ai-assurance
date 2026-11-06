@@ -40,6 +40,13 @@ const views = [
   ["snoozed", "Snoozed"],
 ] as const;
 const viewLabels = Object.fromEntries(views);
+/** An engagement the inbox could not load intact (GET /api/work-inbox). */
+type IntegrityNotice = {
+  engagementId: string;
+  engagement: string;
+  client: string;
+  error: string;
+};
 export function WorkInbox({
   data,
   onOpen,
@@ -56,7 +63,9 @@ export function WorkInbox({
   const [items, setItems] = useState<WorkItem[]>([]),
     [page, setPage] = useState<number | null>(0),
     [busy, setBusy] = useState(true),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    // Engagements of the loaded pages that failed to load intact.
+    [damaged, setDamaged] = useState<IntegrityNotice[]>([]);
   const [loaded, setLoaded] = useState(0),
     [updated, setUpdated] = useState<Date | null>(null),
     [reminderBusy, setReminderBusy] = useState(false);
@@ -108,6 +117,7 @@ export function WorkInbox({
         const value = (await response.json()) as {
           error?: string;
           items: WorkItem[];
+          integrityErrors?: IntegrityNotice[];
           nextPage: number | null;
           loadedEngagements: number;
         };
@@ -129,6 +139,10 @@ export function WorkInbox({
         setLoaded((old) =>
           p ? old + value.loadedEngagements : value.loadedEngagements,
         );
+        setDamaged((old) => [
+          ...(p ? old : []),
+          ...(value.integrityErrors ?? []),
+        ]);
         setPage(value.nextPage);
         setUpdated(new Date());
         setError("");
@@ -512,6 +526,18 @@ export function WorkInbox({
             </span>
           )}
           <button onClick={reset}>Clear filters</button>
+        </div>
+      )}
+      {damaged.length > 0 && (
+        <div role="alert" className="form-error">
+          {damaged.map((d) => (
+            <p key={d.engagementId}>
+              <strong>
+                {d.engagement} ({d.client})
+              </strong>
+              : {d.error}
+            </p>
+          ))}
         </div>
       )}
       {(error || pref.error) && (

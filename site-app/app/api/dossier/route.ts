@@ -6,14 +6,18 @@ import {
   context,
   getEngagement,
   now,
-  readBounded,
+  readJson,
   requireRole,
   responseError,
   sha256,
 } from "@/lib/store";
 import { buildDossier, signDossier, signingKey } from "@/lib/dossier";
 import { addRecord, dossierSeal } from "@/lib/assurance-store";
-import { isClientRole, isReleased } from "@/lib/workflow-state";
+import {
+  isClientRole,
+  isClientVisible,
+  isReleased,
+} from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   try {
@@ -36,11 +40,7 @@ export async function POST(request: Request) {
             .default([]),
         })
         .strict()
-        .parse(
-          JSON.parse(
-            new TextDecoder().decode(await readBounded(request, 20000)),
-          ),
-        ),
+        .parse(await readJson(request, 20000)),
       ctx = await context(v.tenantId),
       e = await getEngagement(ctx, v.engagementId);
     requireRole(ctx, ["Lead Auditor"]);
@@ -121,14 +121,14 @@ export async function GET(request: Request) {
       e = await getEngagement(ctx, u.searchParams.get("engagementId") ?? ""),
       client = isClientRole(ctx.role),
       r = e.reports.find((r) => r.id === u.searchParams.get("reportId"));
-    if (!r || (client && !isReleased(r)))
+    if (!r || (client && !isClientVisible(r)))
       throw new ApiError(404, "Dossier not available");
     const audience = client
       ? "client"
       : u.searchParams.get("audience") === "client"
         ? "client"
         : "internal";
-    if (audience === "client" && !isReleased(r))
+    if (audience === "client" && !isClientVisible(r))
       throw new ApiError(404, "Client dossier not released");
     const seal = await dossierSeal(ctx, e.id, r.id, audience);
     if (!seal)

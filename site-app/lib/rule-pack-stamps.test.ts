@@ -37,7 +37,12 @@ async function capture(e: Engagement) {
   await reports.run(
     e,
     "createReport",
-    { kind: "draft", opinion: "Readiness assessment", summary: "Draft" },
+    {
+      kind: "draft",
+      engagementType: "readiness",
+      conclusion: "readiness",
+      summary: "Draft",
+    },
     caller(),
   );
   return e.reports.at(-1) as Report;

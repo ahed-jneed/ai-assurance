@@ -23,6 +23,11 @@ import {
   type Report,
   type Role,
 } from "@/lib/domain";
+import {
+  opinionLabel,
+  termsLabel,
+  type ReportTerms,
+} from "@/lib/domain/report-model";
 import { reportRows, type RegisterQuery } from "@/lib/register-views";
 import {
   packageOpenLabel,
@@ -39,8 +44,9 @@ type Props = {
   role: Role;
   userId: string;
   busy: boolean;
-  opinion: string;
-  onOpinion: (value: string) => void;
+  terms: ReportTerms;
+  onTerms: (value: ReportTerms) => void;
+  onAudience: (paperId: string, audience: "internal" | "client") => void;
   onGate: GateAction;
   onCreate: (kind: "draft" | "final") => void;
   onOpen: (report: Report) => void;
@@ -57,8 +63,9 @@ export function ReportWorkspace({
   role,
   userId,
   busy,
-  opinion,
-  onOpinion,
+  terms,
+  onTerms,
+  onAudience,
   onGate,
   onCreate,
   onOpen,
@@ -70,7 +77,7 @@ export function ReportWorkspace({
 }: Props) {
   const clientView = ["Client Viewer", "Client Contributor"].includes(role),
     lead = role === "Lead Auditor";
-  const gates = clientView ? [] : finalReportGates(e, opinion);
+  const gates = clientView ? [] : finalReportGates(e, terms);
   const next =
     gates.find((g) => g.kind === "workflow") ??
     gates.find((g) => g.kind !== "stage") ??
@@ -165,7 +172,7 @@ export function ReportWorkspace({
                     {packageStatusLabel(r, clientView)}
                   </span>
                 </header>
-                <p>{String(r.snapshot.opinion ?? "Opinion not recorded")}</p>
+                <p>{opinionLabel(r.snapshot)}</p>
                 <dl>
                   <div>
                     <dt>Captured</dt>
@@ -190,6 +197,12 @@ export function ReportWorkspace({
                     <div>
                       <dt>Replaces</dt>
                       <dd>{r.replaces.join(", ")}</dd>
+                    </div>
+                  )}
+                  {!!r.supersededBy && (
+                    <div>
+                      <dt>Superseded by</dt>
+                      <dd>{r.supersededBy}</dd>
                     </div>
                   )}
                 </dl>
@@ -272,9 +285,7 @@ export function ReportWorkspace({
                       {packageStatusLabel(r, clientView)}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    {String(r.snapshot.opinion ?? "Not recorded")}
-                  </TableCell>
+                  <TableCell>{opinionLabel(r.snapshot)}</TableCell>
                   <TableCell>
                     <time dateTime={r.createdAt}>{date(r.createdAt)}</time>
                   </TableCell>
@@ -406,7 +417,7 @@ export function ReportWorkspace({
             </h2>
             <p>
               {gates.length
-                ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${opinion.toLowerCase()}. Draft snapshots are available throughout the audit.`
+                ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${termsLabel(terms).toLowerCase()}. Draft snapshots are available throughout the audit.`
                 : "Package approval and client release remain separate recorded decisions."}
             </p>
           </div>
@@ -456,9 +467,11 @@ export function ReportWorkspace({
             engagement={e}
             role={role}
             userId={userId}
-            opinion={opinion}
-            onOpinion={onOpinion}
+            terms={terms}
+            onTerms={onTerms}
             onGate={onGate}
+            onAudience={lead ? onAudience : undefined}
+            busy={busy}
           />
         </TabsContent>
       </Tabs>
