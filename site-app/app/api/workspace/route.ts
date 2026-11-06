@@ -4,8 +4,12 @@ import { dispatch } from "@/lib/commands";
 import { short } from "@/lib/commands/fields";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
-import { workspaceView } from "@/lib/read-models/workspace-view";
-import { context, refuseReadOnly } from "@/lib/tenancy";
+import {
+  engagementTrail,
+  workspaceView,
+} from "@/lib/read-models/workspace-view";
+import { context, refuseReadOnly, type Context } from "@/lib/tenancy";
+import type { Engagement } from "@/lib/domain";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
@@ -17,6 +21,18 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     return responseError(error);
+  }
+}
+/**
+ * The saved engagement's audit trail and stored size, or nothing when they
+ * cannot be read: the save is already committed, so the response still
+ * confirms it and the UI reloads the workspace instead.
+ */
+async function savedTrail(ctx: Context, e: Engagement) {
+  try {
+    return await engagementTrail(ctx, e);
+  } catch {
+    return {};
   }
 }
 const command = z
@@ -43,8 +59,13 @@ export async function POST(request: Request) {
     if (e.version !== payload.expectedVersion)
       throw new ApiError(409, "The engagement changed. Reload before saving.");
     const result = await dispatch(e, payload.op, payload.data, ctx);
+    // The response carries what the save changed (the engagement, its audit
+    // trail and stored size), so the UI applies it without a reload.
     if ("saved" in result)
-      return Response.json({ engagement: sanitize(result.saved, ctx) });
+      return Response.json({
+        engagement: sanitize(result.saved, ctx),
+        ...(await savedTrail(ctx, result.saved)),
+      });
     await save(
       ctx,
       e,
@@ -56,6 +77,7 @@ export async function POST(request: Request) {
     return Response.json({
       engagement: sanitize(e, ctx),
       details: result.details,
+      ...(await savedTrail(ctx, e)),
     });
   } catch (error) {
     if (error instanceof z.ZodError)

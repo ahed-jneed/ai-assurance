@@ -125,7 +125,13 @@ export function WorkspaceViews({
       </Suspense>
     );
   if (!e)
-    return (
+    return data.engagementError ? (
+      <Empty
+        icon={Building2}
+        title="This engagement cannot be opened"
+        text="Choose another engagement from the directory. The banner above says what is wrong with this one."
+      />
+    ) : (
       <Empty
         icon={Building2}
         title="No engagement is assigned"
