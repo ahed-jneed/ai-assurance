@@ -175,11 +175,21 @@ export function DossierControls({
       <details className="provenance">
         <summary>Verification trust and limits</summary>
         <p>
-          Application Ed25519 signing uses versioned server-held practice keys.
-          Verify offline with the standalone assurance tool and an independently
-          pinned public key. An embedded key alone does not establish trusted
-          origin. External timestamping, KMS attestation and qualified
-          signatures are not configured.
+          Application Ed25519 signing uses the practice&apos;s current key,
+          stored wrapped under a platform secret; a practice administrator
+          rotates it. Verify offline with the standalone assurance tool and an
+          independently pinned public key. An embedded key alone does not
+          establish trusted origin. External timestamping, KMS attestation and
+          qualified signatures are not configured.
+        </p>
+        <p>
+          <a
+            href={"/api/dossier/keys?" + new URLSearchParams({ tenantId })}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Practice verification keys (active and retired)
+          </a>
         </p>
         {Object.values(sealed).map((s) => (
           <p key={s.keyId}>

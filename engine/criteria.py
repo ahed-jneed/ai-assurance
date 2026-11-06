@@ -6,6 +6,7 @@ a report result (docs/design/audit-statistics.md sections 4, 5.11 and 11).
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import random
@@ -80,6 +81,14 @@ def group_columns(plan: dict[str, Any] | None, config: dict[str, Any]) -> list[s
 def group_label(values: list[str]) -> str:
     """One protected column gives its value; several give an intersectional stratum label (a JSON array)."""
     return values[0] if len(values) == 1 else json.dumps(values, ensure_ascii=False, separators=(",", ":"))
+
+
+def performance_labels(config):
+    """(positive, other) for binary performance: the class recall is measured on (performancePositiveLabel,
+    which defaults to the favourable positiveLabel) and the other declared label. Group comparisons and
+    calibration keep counting the favourable positiveLabel."""
+    positive = config.get("performancePositiveLabel") or config["positiveLabel"]
+    return positive, config["negativeLabel"] if positive == config["positiveLabel"] else config["positiveLabel"]
 
 
 def binary_counts(observations, positive):
@@ -168,7 +177,7 @@ class Evaluation:
     def data_for(self, criterion):
         kind = criterion["kind"]
         if kind == "performance":
-            return {"groups": [{"group": "all", **binary_counts(self.observations, self.config["positiveLabel"])}]}
+            return {"groups": [{"group": "all", **binary_counts(self.observations, performance_labels(self.config)[0])}]}
         if kind == "multiclass_performance":
             return multiclass_data(self.observations)
         if kind == "regression_performance":
@@ -267,7 +276,63 @@ def baseline_note(outcome):
     return [f"RMSE {short(rmse['estimate'], 4)} does not beat the mean-prediction baseline RMSE {short(base['estimate'], 4)} (gate p {short(base['counts']['gatePValue'], 3)}): the model is not shown to predict better than the mean of the reference values."]
 
 
-def criterion_result(spec, outcome, config, plan, notes):
+def class_table(observations, labels):
+    """Per-class support, predictions, correct predictions, recall, precision and F1 (the hosted runner's
+    classPerformance rows), in the given label order."""
+    table = []
+    for label in labels:
+        support = sum(1 for o in observations if o["target"] == label)
+        predicted = sum(1 for o in observations if o["prediction"] == label)
+        tp = sum(1 for o in observations if o["target"] == label and o["prediction"] == label)
+        table.append({"slice": label, "support": support, "predicted": predicted, "tp": tp, "recall": tp / support if support else None, "precision": tp / predicted if predicted else None, "f1": 2 * tp / (support + predicted) if support + predicted else None})
+    return table
+
+
+def unexpected_predictions(observations):
+    """Section 4.8 / traditional-ml-2.1.0: predicted labels the reference column never contains. They count as
+    errors; a multiclass one also leaves its class without support, which blocks a pass (single_class)."""
+    reference = {o["target"] for o in observations}
+    counts = defaultdict(int)
+    for o in observations:
+        if o["prediction"] not in reference:
+            counts[o["prediction"]] += 1
+    if not counts:
+        return []
+    listed = ", ".join(f"'{label}' ({counts[label]} rows)" for label in sorted(counts, key=st.code_point_key))
+    return [f"Predicted labels absent from the reference column: {listed}. They count as errors."]
+
+
+def descriptive_proportion(metric, x, n, level):
+    """A descriptive Wilson proportion (no band, never decides), in the statistics entry shape."""
+    if n == 0:
+        return st.member(metric, None, None, "wilson", None, counts={"x": x, "n": n}, status="undefined", reasons=["undefined_zero_denominator"], level=level, descriptive=True)
+    return st.member(metric, None, x / n, "wilson", lambda z: st.wilson(x, n, z), counts={"x": x, "n": n}, level=level, descriptive=True)
+
+
+def performance_context(spec, observations, config, level):
+    """Descriptive evidence beside a performance criterion's members (traditional-ml-2.1.0): prevalence and the
+    majority-class baseline accuracy as descriptive entries, the per-class table for the balanced-accuracy
+    entry's slices, and the notes that say which class recall refers to. None for other kinds."""
+    n = len(observations)
+    if spec["kind"] == "performance":
+        positive, other = performance_labels(config)
+        table = class_table(observations, [positive, other])
+        positives, negatives = table[0]["support"], table[1]["support"]
+        entries = [descriptive_proportion("prevalence", positives, n, level), descriptive_proportion("majority_baseline_accuracy", max(positives, negatives), n, level)]
+        notes = [f"Recall (sensitivity), precision and F1 refer to the performance positive class '{positive}'; specificity is the recall of '{other}'. Prevalence is the share of '{positive}' in the reference column; the majority-class baseline is the accuracy of always predicting the more frequent reference class and is descriptive."]
+        if positive != config["positiveLabel"]:
+            notes.append(f"Fairness tests count the favourable outcome '{config['positiveLabel']}', not the performance positive class.")
+    elif spec["kind"] == "multiclass_performance":
+        labels = multiclass_data(observations)["labels"]
+        table = class_table(observations, labels)
+        entries = [descriptive_proportion("majority_baseline_accuracy", max((row["support"] for row in table), default=0), n, level)]
+        notes = ["Macro recall (balanced accuracy) averages recall over the classes; the majority-class baseline is the accuracy of always predicting the most frequent reference class and is descriptive."]
+    else:
+        return None
+    return {"entries": entries, "table": table, "notes": notes + unexpected_predictions(observations)}
+
+
+def criterion_result(spec, outcome, config, plan, notes, context=None):
     """Map one evaluated criterion to a report result (section 11.4)."""
     kind, decision = spec["kind"], outcome["decision"]
     sample_size = decision["sampleSize"]
@@ -289,6 +354,11 @@ def criterion_result(spec, outcome, config, plan, notes):
         for entry in entries:
             name = "macro_recall" if multiclass and entry["memberId"] == "balanced_accuracy" else entry["memberId"]
             metrics.append(_entry_metric(entry, role, name, UNITS.get(entry["metric"], "ratio"), sample_size, config))
+            if context and entry["metric"] == "balanced_accuracy" and entry["subject"] is None:
+                metrics[-1]["slices"] = copy.deepcopy(context["table"])
+    if context:
+        metrics.extend(_entry_metric(entry, "descriptive", entry["memberId"], "ratio", sample_size, config) for entry in context["entries"])
+        notes = [*notes, *context["notes"]]
     reasons = list(decision["reasons"])
     for entry in outcome["descriptive"]:
         reasons.extend(r for r in entry["reasons"] if r.startswith("bootstrap_"))
@@ -302,5 +372,6 @@ def criterion_result(spec, outcome, config, plan, notes):
 def evaluate_plan_results(plan, observations, config, notes=()):
     """Evaluate a normalised plan on validated observations. Returns (results, evaluation)."""
     evaluation = Evaluation(plan, observations, config).evaluate()
-    results = [criterion_result(spec, outcome, config, plan, list(notes)) for spec, outcome in zip(plan["criteria"], evaluation["criteria"])]
+    level = plan["confidenceLevel"]
+    results = [criterion_result(spec, outcome, config, plan, list(notes), performance_context(spec, observations, config, level)) for spec, outcome in zip(plan["criteria"], evaluation["criteria"])]
     return results, evaluation

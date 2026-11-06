@@ -1428,6 +1428,11 @@
           "minLength": 1,
           "maxLength": 5000
         },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
         "minGroupSize": {
           "type": "integer",
           "minimum": 2,
@@ -1616,6 +1621,28 @@
               "positiveLabel",
               "negativeLabel"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "enum": [
+                  "multiclass_classification",
+                  "regression"
+                ]
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "performancePositiveLabel"
+              ]
+            }
           }
         }
       ]
@@ -6805,6 +6832,11 @@
           "minLength": 1,
           "maxLength": 5000
         },
+        "performancePositiveLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
         "minGroupSize": {
           "type": "integer",
           "minimum": 2,
@@ -7003,6 +7035,28 @@
               "positiveLabel",
               "negativeLabel"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task": {
+                "enum": [
+                  "multiclass_classification",
+                  "regression"
+                ]
+              }
+            },
+            "required": [
+              "task"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "performancePositiveLabel"
+              ]
+            }
           }
         },
         {

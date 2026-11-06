@@ -51,6 +51,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the portal and the audit team sees it; internal commands are refused |
 | `client-viewer.spec.ts` | Client Viewer sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
 | `self-approval.spec.ts` | The Lead Auditor who classified the system or prepared the engagement brief cannot approve it; the Reviewer's approval of the classification succeeds |
+| `quality-reviewer.spec.ts` | The Lead Auditor appoints `qa-eqr` as Engagement Quality Reviewer (an Auditor cannot be appointed); the reviewer records a stand-back checklist item in the Quality review tab; the reviewer's paper edits and the Lead's checklist save are refused |
 | `isolation.spec.ts` | An outsider is refused the demo practice in the UI and API; no cross-practice reads; practice switching for `qa-lead2`; a stale engagement version is refused |
 
 Setup steps that are not the subject of a spec (an evidence upload before a

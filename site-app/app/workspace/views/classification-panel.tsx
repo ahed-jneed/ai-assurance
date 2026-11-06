@@ -321,6 +321,9 @@ export function ClassificationPanel({
                 <li key={g.id}>
                   {g.title}: {g.reference}, {g.status}
                   {g.date ? " (" + legalDate(g.date) + ")" : ""}
+                  {g.legalEffect && (
+                    <small className="subtle"> {g.legalEffect}</small>
+                  )}
                 </li>
               ))}
             </ul>

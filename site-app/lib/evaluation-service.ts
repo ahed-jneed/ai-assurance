@@ -9,7 +9,6 @@ import {
   tasks,
   assertSuite,
   fairnessSelected,
-  performancePositiveLabel,
   runnerVersion,
   testDefinitionVersion,
 } from "./evaluation";
@@ -290,28 +289,6 @@ function registerPlanProfile(
   };
   (e.evaluationProfiles ??= []).push(p);
   return p;
-}
-/**
- * Refuses a protocol the external worker cannot run as frozen. The worker
- * measures binary recall on the favourable label only (`translate_config`
- * in engine/worker_contract.py), so a separate performance positive class
- * would be reported as measured when it was not. Lift this once the worker
- * honours `performancePositiveLabel` (#65).
- */
-export function assertExternalProtocol(
-  profile: Pick<EvaluationProfile, "task" | "suite" | "config">,
-) {
-  const favourable = profile.config.positiveLabel,
-    positive = performancePositiveLabel(profile.config);
-  if (
-    profile.task === "Binary classification" &&
-    profile.suite.includes("performance") &&
-    positive !== favourable
-  )
-    throw new ApiError(
-      400,
-      `External execution measures binary recall on the favourable label '${favourable}' only, so it cannot apply this protocol's performance positive class '${positive}'. Use a protocol version whose performance positive class is the favourable label, or evaluate saved predictions in the Testing lab.`,
-    );
 }
 export async function datasetCSV(e: Engagement, artifactId: string) {
   const a = e.artifacts.find((x) => x.id === artifactId);

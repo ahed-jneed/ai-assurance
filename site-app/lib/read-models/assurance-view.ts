@@ -72,7 +72,7 @@ export async function assuranceView(ctx: Context, engagementId: string) {
       assistant:
         "Cited source assistant available; generative provider not configured",
       signing:
-        "Application Ed25519 signing; server-held practice keys, independent trust pin required",
+        "Application Ed25519 signing; practice keys wrapped at rest, independent trust pin required",
       anchor: "External timestamp anchor not configured",
     },
     telemetry: {

@@ -185,11 +185,30 @@ export type GuidanceDocument = {
   id: string;
   title: string;
   status: string;
+  draftPublished?: string;
+  listedDate?: string;
+  /** The document reference, for example "C(2026) 7702 final". */
+  reference?: string;
+  legalEffect?: string;
+  /** The document's dated history, oldest first. */
+  dates?: { event: string; date: string }[];
+  /** The research entry a revised entry reproduces (research.revisions). */
+  researchRef?: string;
   url?: string;
   note?: string;
   platformUse?: string;
   sourceIds: string[];
   verification: Verification;
+};
+/** A later revision of the pack from further verified research. */
+export type ResearchRevision = {
+  rulePackVersion: string;
+  issue: string;
+  report: string;
+  data: string;
+  edits: string[];
+  amendments: { edit: string; target: string; fields: string[] }[];
+  resolvesUnverified: string[];
 };
 export type LegalReviewItem = {
   id: string;
@@ -225,7 +244,12 @@ export type RegulatorySnapshot = {
   researchedAsOf: string;
   /** Research older than this many days shows the staleness banner. */
   staleAfterDays: number;
-  research: { issue: string; report: string; data: string };
+  research: {
+    issue: string;
+    report: string;
+    data: string;
+    revisions?: ResearchRevision[];
+  };
   approval: Approval & { tracking: string; note: string };
   amendingRegulation: string;
   baseAct: { title: string; celex: string; ojReference: string; eli: string };
@@ -320,6 +344,25 @@ export function engagementRulePack(
   return e.rulePack.version === current.version
     ? { kind: "current", stamp: e.rulePack }
     : { kind: "other", stamp: e.rulePack };
+}
+
+/** "2026.11.2" → a key that sorts revisions numerically. */
+const versionKey = (v: string) =>
+  v
+    .split(".")
+    .map((n) => n.padStart(6, "0"))
+    .join(".");
+/**
+ * The revisions of the pack made after a stamped version: what changed since
+ * an engagement was stamped. An unstamped or later stamp gets none.
+ */
+export function laterRevisions(
+  pack: Pick<RegulatorySnapshot, "research">,
+  stampVersion: string,
+): ResearchRevision[] {
+  return (pack.research.revisions ?? []).filter(
+    (r) => versionKey(r.rulePackVersion) > versionKey(stampVersion),
+  );
 }
 
 const months = [

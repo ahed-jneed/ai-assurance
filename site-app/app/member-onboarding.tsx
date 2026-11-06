@@ -276,6 +276,7 @@ export function MemberOnboarding({
                   "Auditor",
                   "Lead Auditor",
                   "Reviewer",
+                  "Engagement Quality Reviewer",
                   "Client Contributor",
                   "Client Viewer",
                 ].map((r) => (
@@ -305,11 +306,13 @@ export function MemberOnboarding({
             <p className="subtle">
               {role === "Reviewer"
                 ? "Reviews independently assigned work."
-                : role === "Client Contributor"
-                  ? "Supplies evidence through assigned, expiring requests."
-                  : role === "Client Viewer"
-                    ? "Reads released reports and explicitly shared client material."
-                    : "Works only within assigned audit engagements."}
+                : role === "Engagement Quality Reviewer"
+                  ? "Reviews the engagement from outside its team and signs off final packages; never edits audit work."
+                  : role === "Client Contributor"
+                    ? "Supplies evidence through assigned, expiring requests."
+                    : role === "Client Viewer"
+                      ? "Reads released reports and explicitly shared client material."
+                      : "Works only within assigned audit engagements."}
             </p>
           </div>
         )}
