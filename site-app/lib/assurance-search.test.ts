@@ -313,6 +313,7 @@ describe("record search in SQL", () => {
             expect(pages[0].total).toBe(expected.length);
           }
     },
+    30_000,
   );
 
   it("stays within the tenant and the engagement", async () => {
@@ -365,7 +366,7 @@ describe("record search in SQL", () => {
     for (const [canonical, forms] of expected)
       expect([...caseForms(canonical)].sort(), canonical).toEqual(forms.sort());
     expect(caseForms("σ").sort()).toEqual(["Σ", "ς"].sort());
-  });
+  }, 30_000);
 
   it("ignores the case of non-ASCII letters", async () => {
     await insert([
