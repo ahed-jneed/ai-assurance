@@ -236,6 +236,17 @@ export async function buildDossier(
         409,
         "Captured source is no longer available for this audience",
       );
+    // A client-held pin (#102) has no bytes here: the dossier lists it with
+    // its SHA-256, which the client's own copy can be checked against.
+    if (artifact.custody === "client") {
+      excluded.push({
+        id: captured.id,
+        reason:
+          "Held by the client; the platform holds only its SHA-256 " +
+          artifact.sha256,
+      });
+      continue;
+    }
     const object = await bucket().get(artifact.key);
     if (!object)
       throw new ApiError(

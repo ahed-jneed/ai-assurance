@@ -2666,7 +2666,8 @@ export type Decision = {
   decidingMemberId: string | null;
   sampleSize: number;
   coverage: Coverage | null;
-  suppressedGroups: { group: string; n: number }[] | null;
+  /** n is null in a run on a client-held dataset, which withholds groups below the minimum (#102). */
+  suppressedGroups: { group: string; n: number | null }[] | null;
   libraryEntry: LibraryView | null;
   reasons: string[];
 };

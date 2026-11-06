@@ -46,12 +46,27 @@ def hosted_request(data=CSV, *, task="Binary classification", suite=None):
     return {"schemaVersion": "1.0", "executionMode": "provided_predictions", "model": {"id": "model-fixture", "format": "Prediction file", "task": task, "sourceSha256": sha256(data)}, "dataset": {"id": "data-fixture", "name": "predictions.csv", "sha256": sha256(data), "size": len(data)}, "profile": profile, "engineConfig": {"contractVersion": "1.1", "id": "run-fixture", "engagementId": "engagement-fixture", "modelId": "model-fixture", "datasetId": "data-fixture", "task": task, "suite": suite, "config": c, "negativeLabel": "0", "policyId": "fixture-policy", "policyVersion": "1", "seed": 42}, "seed": 42, "inputHashes": {"dataset": sha256(data), "modelArtifact": sha256(data)}}
 
 
+def client_request(data=CSV, **kwargs):
+    """A client-local request whose dataset stays with the client (#102): the platform holds only its pin."""
+    request = hosted_request(data, **kwargs)
+    request["executionMode"] = "client_local"
+    request["dataset"]["custody"] = "client"
+    return request
+
+
 def translated_report(path, legacy):
     """Run a golden hosted_config case (section 13.1) through the worker translation: an engineConfig 1.1
     request with the legacy profile, as the platform freezes it, translated and run by the engine."""
     data = Path(path).read_bytes()
     request = hosted_request(data, task=legacy["task"], suite=legacy["suite"])
     request["engineConfig"]["config"] = request["profile"]["config"] = dict(legacy["config"])
+    rows, _ = read_csv(path)
+    return run(path, translate_config(request, rows))
+
+
+def run_request(path, data, request):
+    """The engine report for a request on data written to path, as a platform-held run computes it."""
+    Path(path).write_bytes(data)
     rows, _ = read_csv(path)
     return run(path, translate_config(request, rows))
 
@@ -236,7 +251,7 @@ class RunnerServer:
                     return self.reject(409, "No compatible enrolled capability")
                 for index, queued in enumerate(fixture.queue):
                     frozen = json.loads(queued["requestJSON"])
-                    if (frozen.get("model", {}).get("format") if frozen.get("executionMode") == "auditor_model" else "provided_predictions") in accepted:
+                    if ("client_local" if frozen.get("dataset", {}).get("custody") == "client" else frozen.get("model", {}).get("format") if frozen.get("executionMode") == "auditor_model" else "provided_predictions") in accepted:
                         fixture.start(fixture.queue.pop(index))
                         return self.respond(fixture.issued[-1], headers=(("Content-Type", "application/json"), ("Cache-Control", "no-store")))
                 return self.respond({"idle": True})
@@ -305,6 +320,8 @@ class RunnerServer:
                     return self.reject(500, REQUEST_FAILED)
                 if first["input"] == "model" and json.loads(job["claim"]["requestJSON"]).get("executionMode") != "auditor_model":
                     return self.reject(403, "Model bytes are not authorized for this prediction-only request")
+                if first["input"] == "dataset" and json.loads(job["claim"]["requestJSON"])["dataset"].get("custody") == "client":
+                    return self.reject(403, "This dataset stays in the client's environment; the platform holds only its SHA-256 pin")
                 if first["input"] == "model":
                     return self.reject(404, "Pinned input bytes unavailable")
                 headers = (("Content-Type", "application/octet-stream"), ("Cache-Control", "private, no-store"), ("X-Evidence-SHA256", sha256(fixture.data)))
@@ -365,6 +382,8 @@ class RunnerServer:
         frozen, provenance = json.loads(job["claim"]["requestJSON"]), packet["provenance"]
         if provenance["requestSha256"] != job["claim"]["requestSha256"] or provenance["inputHashes"].get("dataset") != frozen["inputHashes"]["dataset"] or frozen["executionMode"] == "auditor_model" and provenance["inputHashes"].get("modelArtifact") != frozen["inputHashes"]["modelArtifact"] or provenance.get("imageDigest") != IMAGE or provenance.get("executionMode") != frozen["executionMode"]:
             return 400, "Consumed input or runtime pins mismatch"
+        if (frozen["dataset"].get("custody") == "client") != (provenance.get("execution", {}).get("datasetCustody") == "client"):
+            return 400, "Dataset custody differs from the frozen request"
         suite, results = frozen["profile"]["suite"], packet["hostedResults"]
         if len({result["testId"] for result in results}) != len(results) or len(suite) != len(results) or any(result["testId"] not in suite or result["article"] != ("15" if result["testId"] in {"performance", "regression"} else "10") for result in results):
             return 400, "Result definitions do not match requested tests"
@@ -744,6 +763,269 @@ class WorkerTests(unittest.TestCase):
                 self.assertNotIn("tampered", json.dumps(result))
             # Rejected bytes never receive the dataset's name, even partially.
             self.assertEqual(list((self.root/option).glob("job-*/inputs/dataset.csv*")), [])
+
+    def client_worker(self, transport, client_data, workspace="jobs"):
+        return self.worker(transport, workspace=workspace, client_data=client_data)
+
+    def client_files(self, *files, directory="client-data"):
+        folder = self.root/directory
+        folder.mkdir()
+        for name, raw in files:
+            (folder/name).write_bytes(raw)
+        return folder
+
+    def test_client_local_job_reads_the_pinned_local_file_and_sends_no_dataset_bytes(self):
+        # The client names its file as it likes; a file of another size is never read.
+        folder = self.client_files(("applicants-2026-q3.csv", CSV), ("other.csv", CSV+b"1,1,C\n"))
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed", server.errors)
+            # Nothing was downloaded: the platform holds no bytes to send.
+            self.assertEqual(server.gets, [])
+            self.assertEqual(server.errors, [])
+            claim = next(body for body, _ in server.posts if body["op"] == "claim")
+            self.assertEqual(claim["formats"], ["provided_predictions", "client_local"])
+            complete, raw = next((body, raw) for body, raw in server.posts if body["op"] == "complete")
+            packet = json.loads(complete["resultJSON"])
+            execution = packet["provenance"]["execution"]
+            self.assertEqual((execution["controller"], execution["datasetCustody"]), ("client_local_worker", "client"))
+            self.assertTrue(any("stayed in the client's environment" in note for note in execution["limitations"]))
+            self.assertEqual(packet["provenance"]["inputHashes"]["dataset"], sha256(CSV))
+            # Only aggregates travel: no data row, and no group cell beside its outcome.
+            for line in CSV.decode().splitlines()[1:]:
+                self.assertNotIn(line.encode(), raw)
+            # Every request the worker made is accounted for; none carried the dataset.
+            self.assertTrue(all(CSV not in raw for _, raw in server.posts))
+        inputs = Path(result["resultFile"]).parent.parent/"inputs"
+        self.assertEqual((inputs/"dataset.csv").read_bytes(), CSV)
+        self.assertEqual(list(inputs.glob("*.partial")), [])
+        # The client's files are left as they were.
+        self.assertEqual(sorted(p.name for p in folder.iterdir()), ["applicants-2026-q3.csv", "other.csv"])
+
+    def test_client_local_mismatched_or_missing_file_is_refused_without_a_download(self):
+        changed = CSV[:-2]+b"1\n"  # Same size, different SHA-256.
+        for name, files, code in (
+            ("changed", (("data.csv", changed),), "dataset_input_pin_mismatch"),
+            ("missing", (("data.csv", CSV+b"0,0,A\n"),), "client_dataset_unavailable"),
+            ("empty", (), "client_dataset_unavailable"),
+        ):
+            with self.subTest(name):
+                folder = self.client_files(*files, directory="client-"+name)
+                with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+                    result = self.client_worker(server.transport(), folder, workspace=name).once()
+                    self.assertEqual((result["state"], result["error"]), ("failed", code))
+                    self.assertEqual(server.gets, [])
+                    self.assertFalse(any(body["op"] == "complete" for body, _ in server.posts))
+                    self.assertEqual([body["error"] for body, _ in server.posts if body["op"] == "fail"], [code])
+                # A refused file never receives the dataset's name in the job, even partially.
+                self.assertEqual(list((self.root/name).glob("job-*/inputs/dataset.csv*")), [])
+
+    def test_client_local_jobs_need_the_clients_own_worker(self):
+        # Without a client data directory the worker does not offer client_local, so the job is not served.
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            self.assertEqual(self.worker(server.transport()).once(), {"state": "idle"})
+            self.assertEqual(next(body for body, _ in server.posts if body["op"] == "claim")["formats"], ["provided_predictions"])
+        # A platform that serves it anyway gets the job failed before anything is read or downloaded.
+        claim = Claim.parse(claim_body(client_request()))
+        with self.assertRaises(ProtocolError) as refused:
+            self.worker(None, workspace="no-client-data").execute(claim, time.monotonic()+60)
+        self.assertEqual(refused.exception.code, "client_dataset_unavailable")
+        # Only a client-local request may pin a client-held dataset.
+        for mode in ("provided_predictions", "auditor_model"):
+            request = client_request()
+            request["executionMode"] = mode
+            with self.assertRaises(ValueError):
+                validate_request(request)
+        request = client_request()
+        request["dataset"]["custody"] = "platform"
+        with self.assertRaises(ValueError):
+            validate_request(request)
+
+    def test_client_data_directory_must_be_separate_from_the_workspace(self):
+        workspace = self.root/"jobs"
+        workspace.mkdir()
+        for value in (self.root/"absent", workspace, self.root, workspace/"inner"):
+            if value.name == "inner":
+                value.mkdir()
+            with self.subTest(str(value)), self.assertRaises((ValueError, OSError)):
+                self.worker(None, client_data=value)
+        file = self.root/"file.csv"
+        file.write_bytes(CSV)
+        with self.assertRaises(ValueError):
+            self.worker(None, workspace="jobs-2", client_data=file)
+        credentials = {"ASSURANCE_WORKER_TOKEN": TOKEN}
+        code, stdout, stderr = self.cli(["--site", "https://runner.example", "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--client-data-dir", str(self.root/"absent"), "--once"], credentials)
+        self.assertEqual((code, stdout), (2, ""))
+        self.assertEqual(json.loads(stderr), {"state": "configuration_rejected", "error": "invalid_worker_configuration_or_runtime"})
+
+    def test_a_result_must_state_the_frozen_dataset_custody(self):
+        folder = self.client_files(("data.csv", CSV))
+        with RunnerServer(client_request(), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed")
+            claim = Claim.parse(server.issued[0])
+        raw = Path(result["resultFile"]).read_bytes()
+        verify_result_bytes(raw, claim, IMAGE)
+        packet = json.loads(raw)
+        packet["provenance"]["execution"]["datasetCustody"] = "platform"
+        with self.assertRaises(ValueError):
+            verify_result_bytes(json_bytes(packet), claim, IMAGE)
+
+    def test_client_held_results_withhold_groups_below_the_minimum_group_size(self):
+        # A one-row group C: reported exactly, its slice would give that person's group, label and prediction.
+        data = BIG+b"1,0,C\n"
+        folder = self.client_files(("data.csv", data))
+        with RunnerServer(client_request(data), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed", server.errors)
+            claim = Claim.parse(server.issued[0])
+            raw = next(raw for body, raw in server.posts if body["op"] == "complete")
+        packet = json.loads(Path(result["resultFile"]).read_bytes())
+        verify_result_bytes(Path(result["resultFile"]).read_bytes(), claim, IMAGE)
+        # The same rows held by the platform, for comparison, and the rows without C.
+        exact = {r["testId"]: r for r in hosted_results(run_request(self.root/"exact.csv", data, hosted_request(data)), hosted_request(data))}
+        without = {r["testId"]: r for r in hosted_results(run_request(self.root/"without.csv", BIG, hosted_request(BIG)), hosted_request(BIG))}
+        for source in (packet["hostedResults"], [r for r in packet["externalReport"]["results"] if "decision" in r]):
+            for r in source:
+                if r["decision"]["kind"] != "group_comparison":
+                    continue
+                with self.subTest(r["testId"]):
+                    self.assertEqual(r["decision"]["suppressedGroups"], [{"group": "C", "n": None}])
+                    headline = r["metrics"][0]
+                    c = next(s for s in headline["slices"] if s["slice"] == "C")
+                    self.assertEqual(c, {"slice": "C", "n": None, "declared": False, "suppressed": True, "withheld": True})
+                    self.assertEqual([s["n"] for s in headline["slices"] if s["slice"] != "C"], [400, 400])
+                    involving = [m for m in r["metrics"] if "C" in (m["details"]["subject"], m["details"]["comparator"])]
+                    self.assertTrue(involving)
+                    for m in involving:
+                        self.assertEqual((m["value"], m["numerator"], m["denominator"], m["confidenceInterval"], m["pValue"], m["details"]["counts"], m["details"]["fisherExactP"]), (None,)*7)
+                    self.assertTrue(any("withheld" in note for note in r["limitations"]))
+                    # C's row counts only towards coverage, which decides but is not reported. Suppressed groups
+                    # never decide, so withholding C changes no group decision.
+                    self.assertIsNone(r["decision"]["coverage"])
+                    self.assertEqual(r["decision"]["sampleSize"], 800)
+                    same = exact[r["testId"]]
+                    ignored = {"suppressedGroups": None, "coverage": None, "sampleSize": None}
+                    self.assertEqual({**r["decision"], **ignored}, {**same["decision"], **ignored})
+                    self.assertEqual(r["outcome"], same["outcome"])
+                    self.assertEqual(same["decision"]["suppressedGroups"], [{"group": "C", "n": 1}])
+                    self.assertEqual(same["decision"]["coverage"]["populationRows"], 801)
+        # C's row is left out of every other criterion too: each reports exactly what the rows without C give,
+        # so no total minus the eligible groups gives back C's size, label or prediction.
+        for r in packet["hostedResults"]:
+            if r["decision"]["kind"] == "group_comparison":
+                continue
+            with self.subTest(r["testId"]):
+                other = without[r["testId"]]
+                self.assertEqual(r["decision"], other["decision"])
+                self.assertEqual(r["metrics"], other["metrics"])
+                self.assertTrue(any("left out" in note for note in r["limitations"]))
+        self.assertEqual(packet["externalReport"]["provenance"]["inputs"]["data"]["rowCount"], 800)
+        # Nothing in the completion the platform received states C's size, rates or counts.
+        def about_c(value):
+            if isinstance(value, dict):
+                if "C" in (value.get("slice"), value.get("group"), value.get("subject"), value.get("comparator")):
+                    yield value
+                for item in value.values():
+                    yield from about_c(item)
+            elif isinstance(value, list):
+                for item in value:
+                    yield from about_c(item)
+        sent = json.loads(json.loads(raw)["resultJSON"])
+        found = list(about_c(sent))
+        self.assertTrue(found)
+        for item in found:
+            self.assertIsNone(item.get("n"))
+            self.assertFalse({"x", "counts", "selectionNumerator", "selectionRate", "tpr", "fpr", "observed"} & {k for k, v in item.items() if v is not None})
+
+        # No figure anywhere in the completion counts C's row: 801 rows, 401 positives or 301 selections would
+        # give it back by subtraction.
+        def integers(value):
+            if isinstance(value, bool):
+                return
+            if isinstance(value, int):
+                yield value
+            elif isinstance(value, dict):
+                for item in value.values():
+                    yield from integers(item)
+            elif isinstance(value, list):
+                for item in value:
+                    yield from integers(item)
+        self.assertFalse({801, 401, 301} & set(integers(sent)))
+        for r in sent["hostedResults"]:
+            if r["decision"]["kind"] == "group_comparison":
+                eligible = [s for s in r["metrics"][0]["slices"] if s["n"] is not None]
+                self.assertEqual(sum(s["n"] for s in eligible), max(m["sampleSize"] for m in r["metrics"]))
+
+    def test_client_held_runs_leave_out_rows_that_another_group_column_withholds(self):
+        from engine.criteria import withheld_strata
+        # Leaving out one ethnicity's rows can shrink a sex group below the minimum; that group goes too.
+        observations = [{"fields": {"eth": e, "sex": x}} for e, x, n in (("A", "F", 40), ("A", "M", 40), ("B", "F", 31), ("C", "M", 5), ("D", "X", 25), ("A", "X", 6), (None, "F", 3)) for _ in range(n)]
+        plan = {"minimums": {"groupSize": 30}, "criteria": [{"kind": "group_comparison", "groupFields": ["eth"]}, {"kind": "group_comparison", "groupFields": ["sex"]}]}
+        strata = withheld_strata(observations, plan, {"columns": {}})
+        # The three rows without an ethnicity are fewer than the minimum, so they go too (None).
+        self.assertEqual(strata, {("eth",): {"C", "D", None}, ("sex",): {"X"}})
+        from engine.criteria import is_withheld
+        remaining = [o for o in observations if not is_withheld(o["fields"], strata)]
+        self.assertEqual(len(remaining), 40+40+31)
+        # At or above the minimum, rows without a value stay, like a group.
+        observations += [{"fields": {"eth": None, "sex": "F"}} for _ in range(27)]
+        self.assertEqual(withheld_strata(observations, plan, {"columns": {}}), {("eth",): {"C", "D"}, ("sex",): {"X"}})
+
+    def client_held_pair(self, extra):
+        """A run on 200 rows (group A/B x sex F/M, 50 each) plus `extra` CSV rows, by the platform and client-held."""
+        def criterion(id, fields):
+            return {"id": id, "role": "confirmatory", "kind": "group_comparison", "metric": "selection_rate_difference", "groupFields": fields, "comparison": {"mode": "all_pairs"}, "band": {"lower": -0.2, "upper": 0.2}, "minimumCoverage": 1.0}
+        plan = {"criteria": [{"id": "acc", "role": "confirmatory", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": 0.1, "upper": 0.99}}]}, criterion("par-g", ["group"]), criterion("par-s", ["sex"]), criterion("par-gs", ["group", "sex"])]}
+        config = {"contractVersion": "1.3", "id": "run-two-columns", "engagementId": "eng", "modelId": "model", "datasetId": "data", "task": "binary_classification", "suite": ["performance", "fairness"], "seed": 1729, "columns": {"target": "actual", "prediction": "predicted", "protected": "group"}, "statistics": plan, "thresholds": {"policyId": "p", "policyVersion": "1", "source": "internal_policy", "values": {}}, "positiveLabel": "1", "negativeLabel": "0"}
+        lines = ["actual,predicted,group,sex"] + [f"{i % 2},{i // 2 % 2},{g},{s}" for g in "AB" for s in "FM" for i in range(50)] + list(extra)
+        path = self.root/"two-columns.csv"
+        path.write_text("\n".join(lines)+"\n", encoding="utf-8")
+        return ({r["testId"]: r for r in run(path, config, withhold_small_groups=held)["results"]} for held in (False, True))
+
+    def test_client_held_coverage_counts_rows_left_out_for_another_column(self):
+        # C,F is left out because C is small in the group column; in the sex column it belongs to F, which is
+        # eligible, so par-s still passes with full coverage as on the platform-held rows.
+        platform, client = self.client_held_pair(["1,1,C,F"])
+        self.assertEqual((platform["par-s"]["outcome"], platform["par-s"]["decision"]["coverage"]["value"]), ("pass", 1.0))
+        for test_id, r in platform.items():
+            with self.subTest(test_id):
+                self.assertEqual(client[test_id]["outcome"], r["outcome"])
+                self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
+        self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
+
+    def test_client_held_runs_leave_out_a_few_rows_without_a_group_value(self):
+        # One row without a group: kept, performance minus the group comparisons would give back its sex, label
+        # and prediction. Fewer than the minimum such rows are left out; coverage decides as before.
+        platform, client = self.client_held_pair(["1,0,,F"])
+        self.assertEqual(platform["acc"]["decision"]["sampleSize"], 201)
+        for test_id, r in platform.items():
+            with self.subTest(test_id):
+                self.assertEqual(client[test_id]["outcome"], r["outcome"])
+                self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
+                self.assertEqual(client[test_id]["decision"]["sampleSize"], 200)
+        self.assertIn("insufficient_coverage", client["par-g"]["decision"]["reasons"])
+        self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
+        self.assertTrue(all(s["n"] == 50 for s in client["par-gs"]["metrics"][0]["slices"]))
+
+    def test_client_held_calibration_withholds_small_bins(self):
+        from engine.criteria import withhold_small_groups
+        interval = {"lower": 0.1, "upper": 0.3, "level": 0.95, "method": "wilson"}
+        details = {"role": "headline", "metric": "calibration", "subject": None, "comparator": None, "counts": None, "band": None, "status": "evaluated", "direction": "none", "smallCell": False, "fisherExactP": None, "chanceExactP": None, "reasons": []}
+        big = {"slice": "bin1", "n": 40, "declared": False, "suppressed": False, "numerator": 8, "denominator": 40, "observedRate": 0.2, "confidenceInterval": interval, "meanProbability": 0.15, "lower": 0.1, "upper": 0.2}
+        small = {"slice": "bin9", "n": 1, "declared": False, "suppressed": True, "numerator": 0, "denominator": 1, "observedRate": 0.0, "confidenceInterval": interval, "meanProbability": 0.95, "lower": 0.9, "upper": 1.0}
+        result = {"testId": "CAL", "metrics": [{"name": "maximum_calibration_gap", "value": 0.05, "slices": [big, small], "details": details}], "limitations": [], "decision": {"kind": "calibration", "sampleSize": 41, "reasons": ["group_suppressed_below_minimum"], "suppressedGroups": [{"group": "bin9", "n": 1}]}}
+        plan = {"minimums": {"groupSize": 30}, "criteria": [{"id": "CAL", "kind": "calibration", "subgroup": None}]}
+        withhold_small_groups([result], plan)
+        self.assertEqual(result["metrics"][0]["slices"], [big, {"slice": "bin9", "n": None, "declared": False, "suppressed": True, "withheld": True, "lower": 0.9, "upper": 1.0}])
+        self.assertEqual(result["decision"]["suppressedGroups"], [{"group": "bin9", "n": None}])
+        self.assertEqual(result["metrics"][0]["value"], 0.05)
+        # A calibration subgroup below the minimums withholds every estimate.
+        result = {"testId": "CAL", "metrics": [{"name": "maximum_calibration_gap", "value": 0.05, "numerator": None, "denominator": None, "confidenceInterval": None, "pValue": None, "slices": [small], "details": dict(details)}, {"name": "expected_calibration_error", "value": 0.4, "numerator": None, "denominator": None, "confidenceInterval": interval, "pValue": None, "slices": [], "details": {**details, "role": "descriptive", "counts": {"n": 1, "bins": 1}}}], "limitations": [], "decision": {"kind": "calibration", "sampleSize": 1, "reasons": ["below_minimum_sample_size"], "suppressedGroups": [{"group": "bin9", "n": 1}]}}
+        plan["criteria"][0]["subgroup"] = {"field": "group", "value": "C"}
+        withhold_small_groups([result], plan)
+        self.assertEqual([(m["value"], m["confidenceInterval"], m["details"]["counts"]) for m in result["metrics"][1:]], [(None, None, None)])
+        self.assertEqual(len(result["limitations"]), 2)
 
     def operator_log(self):
         return [json.loads(line) for line in (self.root/"jobs"/"operator-log.jsonl").read_text(encoding="utf-8").splitlines()]

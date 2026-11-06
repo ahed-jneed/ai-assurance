@@ -10,6 +10,7 @@ import { activeSigningKey, sign } from "../../signing-keys";
 import { isReleaseTimeRecord, paperCurrent } from "../../domain";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
+import { platformKey } from "../../special-category";
 import { now, sha256 } from "../../ids";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -39,7 +40,7 @@ export const assistant: AssuranceModule = defineCommands({
       for (const sourceId of v.sourceIds) {
         const r = pick(locations, sourceId, "location"),
           artifact = accepted(r.body.artifactId),
-          o = await bucket().get(artifact.key);
+          o = await bucket().get(platformKey(artifact));
         if (
           !o ||
           artifact.sha256 !== r.body.artifactSha256 ||
@@ -129,7 +130,7 @@ export const assistant: AssuranceModule = defineCommands({
           .strict()
           .parse(d),
         artifact = accepted(v.artifactId),
-        o = await bucket().get(artifact.key);
+        o = await bucket().get(platformKey(artifact));
       if (!o || o.size > 2 * 1024 * 1024)
         throw new ApiError(400, "Select a permitted briefing JSON up to 2 MB");
       const bytes = await o.arrayBuffer();
@@ -385,7 +386,7 @@ export const assistant: AssuranceModule = defineCommands({
         const a = accepted(loc.body.artifactId);
         if (a.sha256 !== loc.body.artifactSha256)
           throw new ApiError(409, "Cited source pin changed");
-        const o = await bucket().get(a.key);
+        const o = await bucket().get(platformKey(a));
         if (!o || (await sha256(await o.arrayBuffer())) !== a.sha256)
           throw new ApiError(409, "Cited source bytes unavailable or altered");
       }
@@ -427,7 +428,7 @@ export const assistant: AssuranceModule = defineCommands({
         if (!source) throw new ApiError(409, "A cited revision is unavailable");
         if (source.kind === "location") {
           const artifact = accepted(source.body.artifactId),
-            o = await bucket().get(artifact.key);
+            o = await bucket().get(platformKey(artifact));
           if (
             artifact.sha256 !== source.body.artifactSha256 ||
             !o ||
