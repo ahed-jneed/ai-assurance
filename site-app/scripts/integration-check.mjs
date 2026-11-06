@@ -347,7 +347,10 @@ try {
     const scope = new URLSearchParams({ tenantId, engagementId: legacyId });
     const legacy = await request("/api/workspace?" + scope);
     assert.equal(legacy.criteria.origin, "legacy");
-    assert.deepEqual(legacy.criteria.pin, workspace.criteria.pin);
+    // Every legacy class resolves to pack #1 2026.11.2; new engagements pin
+    // the current version (2026.11.3 since #61, the same programme).
+    assert.equal(legacy.criteria.pin.packId, workspace.criteria.pin.packId);
+    assert.equal(legacy.criteria.pin.packVersion, "2026.11.2");
     assert.equal(legacy.catalog.methodologyVersion, "2026.11.2");
     // Its template commands behave as before and write no pin.
     const created = await request("/api/workspace", {
@@ -368,6 +371,54 @@ try {
       .bind(tenantId, legacyId)
       .first();
     assert.equal(stored.criteria, null, "M0 writes nothing to the engagement");
+    // M1 (#61): the explicit legacy pin goes through the normal save, with
+    // an audit event and a version bump, and its reversal removes it.
+    const storedPin = async () =>
+      (await testDb
+        .prepare(
+          "SELECT json_extract(body,'$.criteria.origin') AS origin, json_extract(body,'$.criteria.pin.packVersion') AS version FROM engagements WHERE tenant_id=? AND id=?",
+        )
+        .bind(tenantId, legacyId)
+        .first()) ?? {};
+    const pinnedM1 = await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "pinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: created.engagement.version,
+      },
+    });
+    assert.equal(pinnedM1.engagement.version, created.engagement.version + 1);
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: "legacy", version: "2026.11.2" },
+    );
+    const afterPin = await request("/api/workspace?" + scope);
+    assert.equal(afterPin.criteria.origin, "legacy");
+    assert.deepEqual(afterPin.criteria.pin, legacy.criteria.pin);
+    const event = await testDb
+      .prepare(
+        "SELECT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY rowid DESC LIMIT 1",
+      )
+      .bind(tenantId, legacyId)
+      .first();
+    assert.equal(event?.action, "pinCriteria");
+    await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "unpinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: pinnedM1.engagement.version,
+      },
+    });
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: null, version: null },
+    );
     const views = await request("/api/coverage?" + scope);
     assert.deepEqual(
       views.views.map((v) => v.key),
@@ -393,7 +444,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {

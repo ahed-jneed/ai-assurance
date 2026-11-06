@@ -41,7 +41,7 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 
 import { assuranceRecords } from "@/lib/assurance-store-client";
 
-import obligations from "@/lib/obligation-subitems.json";
+import type { ObligationOptions } from "@/lib/criteria/types";
 import { packFeatures } from "./workspace-types";
 
 import type {
@@ -136,7 +136,7 @@ const label = (s: string) => s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
 const pendingLegalReview = (itemIds: string[]) =>
   "Pending legal review · " + itemIds.join(", ");
 /** An obligation subitem in a picker, with its legal-review flag when it has one. */
-function obligationOptionLabel(o: (typeof obligations.items)[number]) {
+function obligationOptionLabel(o: ObligationOptions["items"][number]) {
   const label = o.article + " · " + o.title;
   return o.legalReview?.required
     ? label + " (" + pendingLegalReview(o.legalReview.itemIds) + ")"
@@ -172,8 +172,12 @@ export function AssuranceWorkbench({
     reviewer = ["Lead Auditor", "Reviewer"].includes(data.identity.role),
     // Obligation-subitem assessments exist only on packs that switch them on
     // (docs/design/criteria-model.md section 7.1); other packs take their
-    // assertion criteria from the pack's requirements.
-    obligationsOn = packFeatures(data).obligationAssessments;
+    // assertion criteria from the pack's requirements. The subitems are those
+    // of the pinned AI Act framework, served by GET /api/workspace.
+    obligations = packFeatures(data).obligationAssessments
+      ? data.criteria?.obligations
+      : undefined,
+    obligationsOn = !!obligations;
 
   const query = location.search,
     reviewFilter = location.review,
@@ -373,7 +377,7 @@ export function AssuranceWorkbench({
       {
         name: "code",
         label: "Obligation subitem",
-        options: obligations.items.map((o) => ({
+        options: (obligations?.items ?? []).map((o) => ({
           value: o.code,
           label: obligationOptionLabel(o),
         })),
@@ -715,7 +719,7 @@ export function AssuranceWorkbench({
       {
         name: "criterion",
         label: obligationsOn ? "Criterion / obligation subitem" : "Criterion",
-        options: obligationsOn
+        options: obligations
           ? obligations.items.map((o) => ({
               value: o.code,
               label: obligationOptionLabel(o),
@@ -2040,7 +2044,7 @@ export function AssuranceWorkbench({
                 )}
               </div>
               {list(["impact"], "No change assessments recorded")}
-              {obligationsOn && (
+              {obligations && (
                 <>
                   <h2 className="workbench-subhead">Obligation assessments</h2>
                   {list(["obligation"], "No subitem assessments recorded")}
@@ -2050,7 +2054,7 @@ export function AssuranceWorkbench({
                       prompts
                     </summary>
                     <p>{obligations.scope}</p>
-                    <p>{obligations.decisionPolicy.providerResponsibility}</p>
+                    <p>{obligations.providerResponsibility}</p>
                     <a
                       className="source-link"
                       href={obligations.source.url}

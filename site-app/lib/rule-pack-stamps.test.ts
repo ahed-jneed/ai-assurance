@@ -194,7 +194,9 @@ describe("version stamps on captured records", () => {
     // A build whose pack #1 carries a later rule pack, injected as a registry.
     const later = structuredClone(generated) as unknown as Bundle;
     const pack = later.documents.find(
-      (d) => d.documentType === "pack",
+      (d) =>
+        d.documentType === "pack" &&
+        d.version === later.index.defaults.pack.version,
     ) as PackDocument;
     pack.methodologyVersion = "2026.12.1";
     Object.assign(pack.compat!.catalog!.regulatorySnapshot, {
