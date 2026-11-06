@@ -12,6 +12,7 @@ import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
 import { acceptanceGates } from "../workflow/acceptance";
 import type { Engagement, Paper } from "./types";
+import { qualityReviewGates } from "./quality-review";
 import { reportElements } from "./report-gates";
 import {
   requiresSupport,
@@ -37,7 +38,8 @@ export type AuditGate = {
     | "conclusion"
     | "workflow"
     | "acceptance"
-    | "report";
+    | "report"
+    | "quality_review";
   recordId?: string;
   title: string;
   message: string;
@@ -261,8 +263,10 @@ export type FinalReport = ReportTerms & { particulars?: ReportParticulars };
  * engagement is in Sign-off and every stage's work is complete, except the
  * release-time records the release itself records. With full report terms
  * the terms must also be a valid combination and the report elements
- * complete; a bare conclusion (or the opinion of a legacy report, captured
- * before report elements existed) checks the evidence gates only.
+ * complete, and an assurance engagement needs its engagement quality review;
+ * a bare conclusion (or the opinion of a legacy report, captured before
+ * report elements existed) checks the evidence gates and an appointed
+ * quality reviewer's checklist only.
  */
 export function finalReportGates(
   e: Engagement,
@@ -282,6 +286,12 @@ export function finalReportGates(
         ]
       : []),
     ...completionGates(e, conclusion),
+    // The engagement quality review (ISQM 2) before capture; its sign-off of
+    // the exact package is checked at release.
+    ...qualityReviewGates(
+      e,
+      typeof report === "string" ? undefined : report.engagementType,
+    ),
     ...(typeof report === "string"
       ? []
       : reportElements(e, report, report.particulars)

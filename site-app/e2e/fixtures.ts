@@ -20,6 +20,7 @@ export type PersonaId =
   | "qa-auditor"
   | "qa-reviewer"
   | "qa-lead2"
+  | "qa-eqr"
   | "qa-contrib"
   | "qa-viewer"
   | "qa-outsider";

@@ -670,3 +670,100 @@
   align-items: flex-start;
   gap: 8px;
 }
+
+/* Engagement quality review (app/quality-review-panel.tsx). */
+.quality-review {
+  display: grid;
+  gap: 16px;
+  padding: 16px 0;
+}
+.quality-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.quality-review-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+.quality-review-head p {
+  margin: 0;
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.quality-review-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+}
+.quality-review-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.quality-review-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.quality-review-card dt {
+  color: #6b7280;
+}
+.quality-review-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.quality-review-card label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+.quality-review-card select {
+  max-width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: transparent;
+}
+.quality-review-appoint,
+.quality-review-packages form {
+  display: grid;
+  gap: 10px;
+  max-width: 640px;
+}
+.quality-review-checklist,
+.quality-review-packages {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.quality-review-checklist > li,
+.quality-review-packages > li {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.quality-review-checklist small {
+  color: #6b7280;
+}
+@media (max-width: 700px) {
+  .quality-review-head {
+    flex-direction: column;
+  }
+}
