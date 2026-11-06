@@ -43,6 +43,10 @@ export const triggerProfiles = obligations.triggerProfiles as Record<
   TriggerProfile
 >;
 
+/**
+ * The rules of a rule pack. Criteria without an EU AI Act rule pack have no
+ * Art 5 practices or guidance; the Art 50 items still apply.
+ */
 export function classificationRules(
   pack: Pick<
     RegulatorySnapshot,
@@ -52,8 +56,17 @@ export function classificationRules(
     | "applicationDates"
     | "guidanceDocuments"
     | "legalReviewItems"
-  >,
+  > | null,
 ): ClassificationRules {
+  if (!pack)
+    return {
+      rulePackVersion: "",
+      legalVersion: "",
+      practices: [],
+      art50Items,
+      profiles: triggerProfiles,
+      guidance: [],
+    };
   const entries = new Map(pack.applicationDates.map((e) => [e.id, e]));
   const guidance = (id: string) => {
     const g = pack.guidanceDocuments.find((x) => x.id === id) as

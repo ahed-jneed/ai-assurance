@@ -10,6 +10,7 @@ vi.mock("@/lib/domain", async (original) => ({
 }));
 
 import { classificationDefaults } from "./classification";
+import { classificationPayload, formRules } from "./classification-form";
 import { requestFormDefaults } from "./evidence-request";
 import { procedureFindingDefaults } from "./finding";
 import { remediationDefaults } from "./finding-edit";
@@ -42,6 +43,12 @@ const engagement = {
     highRisk: true,
     transparency: true,
     profiling: false,
+    answers: {
+      deployerGeneratesDeepFakes: { value: true },
+      deployerUsesEmotionRecognition: { value: false },
+      smeStatus: { value: "sme" },
+      placedOnMarketDate: { value: "2026-05-01" },
+    },
   },
 } as unknown as Engagement;
 const data = {
@@ -370,19 +377,73 @@ describe("form defaults", () => {
   });
 
   it("opens the classification from the engagement's current one", () => {
+    // Tri-state answers open as choices; dates are named fields.
     expect(classificationDefaults(engagement)).toEqual({
-      choices: { operatorRole: "Deployer", annexRoute: "Article 50 only" },
-      checks: {
-        prohibited: false,
-        highRisk: true,
-        transparency: true,
-        profiling: false,
+      choices: {
+        operatorRole: "Deployer",
+        annexRoute: "Article 50 only",
+        "fact:deployerGeneratesDeepFakes": "yes",
+        "fact:deployerUsesEmotionRecognition": "no",
+        "fact:smeStatus": "sme",
       },
+      checks: {},
     });
     expect(classificationDefaults(undefined)).toEqual({
       choices: { operatorRole: "Provider", annexRoute: "Unassessed" },
       checks: {},
     });
+    // A free-text route from before #19 opens as Unassessed.
+    expect(
+      classificationDefaults({
+        ...engagement,
+        classification: {
+          ...engagement.classification,
+          annexRoute: "Annex III point 5(b)",
+        },
+      }).choices.annexRoute,
+    ).toBe("Unassessed");
+  });
+
+  it("submits only the facts the form asks for the role and answers", () => {
+    const rules = formRules(null);
+    const payload = classificationPayload(
+      rules,
+      {
+        operatorRole: "Deployer",
+        annexRoute: "Article 50 only",
+        "fact:deployerGeneratesDeepFakes": "yes",
+        "fact:personalNonProfessionalUseOnly": "yes",
+        // A provider fact left over from an earlier role is not sent.
+        "fact:interactsDirectlyWithNaturalPersons": "yes",
+        // Hidden while emotion recognition is answered no.
+        "fact:lawEnforcementPermittedErBc": "yes",
+        "fact:deployerUsesEmotionRecognition": "no",
+      },
+      {
+        intendedPurpose: "Marketing videos",
+        rationale: "Deep fakes in campaigns",
+        "evidence:personalNonProfessionalUseOnly": "EV-2",
+        "date:placedOnMarketDate": "2026-05-01",
+      },
+    );
+    expect(payload).toMatchObject({
+      operatorRole: "Deployer",
+      annexRoute: "Article 50 only",
+      evidence: { personalNonProfessionalUseOnly: "EV-2" },
+    });
+    expect(payload.facts).toMatchObject({
+      deployerGeneratesDeepFakes: "yes",
+      deployerUsesEmotionRecognition: "no",
+      deployerUsesBiometricCategorisation: "unknown",
+      placedOnMarketDate: "2026-05-01",
+      putIntoServiceDate: "",
+      smeStatus: "unknown",
+    });
+    expect(payload.facts).not.toHaveProperty(
+      "interactsDirectlyWithNaturalPersons",
+    );
+    expect(payload.facts).not.toHaveProperty("lawEnforcementPermittedErBc");
+    expect(payload.derogation).toBeUndefined();
   });
 
   it("prefills a procedure exception's finding", () => {
