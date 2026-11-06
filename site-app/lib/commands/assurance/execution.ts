@@ -4,6 +4,11 @@ import { bucket, db } from "../../bindings";
 import type { Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
 import { assertExternalProtocol } from "../../evaluation-service";
+import {
+  assertClaimFits,
+  assertModelSpecLimits,
+  frozenLabelPair,
+} from "../../external-worker-contract";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
@@ -49,7 +54,8 @@ export const execution: AssuranceModule = defineCommands({
             datasetCardRecordId: short.optional(),
             predictionId: short.optional(),
             securityReviewId: short.optional(),
-            negativeLabel: z.string().max(300).default("0"),
+            // Empty: the system revision's other output class (D-12).
+            negativeLabel: short.optional(),
             predictionOutput: z.string().max(300).default(""),
             predictionKind: z.enum(["label", "probability"]).default("label"),
           })
@@ -80,6 +86,13 @@ export const execution: AssuranceModule = defineCommands({
         );
       assertExternalProtocol(profile);
       externalGate(profile, v.mode);
+      const outputLabels: string[] = system.body.outputs.classOrder,
+        labels = frozenLabelPair({
+          task: m.task,
+          classOrder: outputLabels,
+          positiveLabel: profile.config.positiveLabel,
+          requested: v.negativeLabel,
+        });
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;
@@ -140,6 +153,11 @@ export const execution: AssuranceModule = defineCommands({
           );
         if (["ONNX", "PMML"].includes(m.format) && !v.predictionOutput)
           throw new ApiError(400, "Specify the adapter prediction output name");
+        assertModelSpecLimits({
+          task: m.task,
+          featureCount: system.body.features.length,
+          outputLabels,
+        });
       }
       const pending = await jobs(ctx, e.id);
       if (
@@ -200,7 +218,7 @@ export const execution: AssuranceModule = defineCommands({
             task: m.task,
             suite: profile.suite,
             config: profile.config,
-            negativeLabel: v.negativeLabel,
+            ...(labels ? { negativeLabel: labels.negativeLabel } : {}),
             policyId: profile.id,
             policyVersion: profile.version,
             seed: 42,
@@ -216,7 +234,7 @@ export const execution: AssuranceModule = defineCommands({
                     featureColumns: system.body.features.map(
                       (f: { name: string }) => f.name,
                     ),
-                    outputLabels: system.body.outputs.classOrder,
+                    outputLabels,
                     decisionThreshold: system.body.outputs.threshold ?? 0.5,
                     ...(v.predictionOutput
                       ? { predictionOutput: v.predictionOutput }
@@ -234,14 +252,15 @@ export const execution: AssuranceModule = defineCommands({
           ],
         };
       const text = JSON.stringify(requestBody),
-        hash = await sha256(text),
-        log = await recordStatement(ctx, e.id, "execution_request", {
-          jobId,
-          requestSha256: hash,
-          systemId: system.id,
-          procedureId: p.id,
-          mode: v.mode,
-        });
+        hash = await sha256(text);
+      assertClaimFits(jobId, hash, text);
+      const log = await recordStatement(ctx, e.id, "execution_request", {
+        jobId,
+        requestSha256: hash,
+        systemId: system.id,
+        procedureId: p.id,
+        mode: v.mode,
+      });
       await save(
         ctx,
         e,

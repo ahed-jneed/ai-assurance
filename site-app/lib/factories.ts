@@ -69,6 +69,9 @@ export function freshEngagement(
       status: "provisional",
       version: currentRulePack.legalVersion,
       asOf: currentRulePack.researchedAsOf,
+      model: 2,
+      answers: {},
+      history: [],
     },
     rulePack: { ...currentRulePack },
     papers: structured

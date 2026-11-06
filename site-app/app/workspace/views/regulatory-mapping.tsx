@@ -1,9 +1,8 @@
 "use client";
 import { BookOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { classify, type Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain";
 import {
   asRulePack,
   isoToday,
@@ -14,6 +13,7 @@ import {
 import type { WorkspaceData } from "../../workspace-types";
 import { articleCoverage } from "../coverage";
 import { Badge } from "../workspace-ui";
+import { ClassificationPanel } from "./classification-panel";
 import {
   ObligationsByDate,
   RulePackSources,
@@ -98,63 +98,29 @@ function Classification({
 }) {
   return (
     <>
-      <div className="split-grid">
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Risk classification</h2>
-            <Badge value={e.classification.status} />
-          </div>
-          <div className="content-pad body-copy">
-            <h3>{classify(e.classification)}</h3>
-            <p>
-              {e.classification.rationale ||
-                "Complete the guided assessment and record your legal classification rationale."}
+      <ClassificationPanel
+        engagement={e}
+        pack={pack}
+        today={today}
+        reviewer={reviewer}
+        busy={busy}
+        onApprove={onApprove}
+      />
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Regulatory basis</h2>
+          <BookOpen size={20} />
+        </div>
+        <div className="content-pad body-copy">
+          {pack ? (
+            <RegulatoryBasis pack={pack} today={today} />
+          ) : (
+            <p className="subtle">
+              This engagement&apos;s criteria have no EU AI Act rule pack.
             </p>
-            <p>
-              <b>Operator:</b> {e.classification.operatorRole}
-              <br />
-              <b>Route:</b> {e.classification.annexRoute}
-              <br />
-              <b>Transparency duties:</b>{" "}
-              {e.classification.transparency
-                ? "Flagged separately"
-                : "Not flagged"}
-              <br />
-              <b>Profiling:</b>{" "}
-              {e.classification.profiling
-                ? "Flagged; high-risk assessment required"
-                : "Not flagged"}
-              <br />
-              <b>Recorded against:</b> {e.classification.version}, researched{" "}
-              {legalDate(e.classification.asOf)}
-            </p>
-            <p>
-              <b>Intended purpose:</b>{" "}
-              {e.classification.intendedPurpose || "Unrecorded"}
-            </p>
-            {reviewer && e.classification.status === "provisional" && (
-              <Button disabled={busy} onClick={onApprove}>
-                Approve independently
-              </Button>
-            )}
-          </div>
-        </section>
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Regulatory basis</h2>
-            <BookOpen size={20} />
-          </div>
-          <div className="content-pad body-copy">
-            {pack ? (
-              <RegulatoryBasis pack={pack} today={today} />
-            ) : (
-              <p className="subtle">
-                This engagement&apos;s criteria have no EU AI Act rule pack.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
+          )}
+        </div>
+      </section>
       <section className="panel">
         <div className="panel-head">
           <h2>Article-to-evidence mapping</h2>
