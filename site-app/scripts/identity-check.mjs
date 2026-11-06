@@ -47,7 +47,9 @@ async function withWorker(bindings, check, outboundService) {
     modulesRoot: path.resolve("dist/server"),
     compatibilityDate: "2026-05-15",
     compatibilityFlags: ["nodejs_compat"],
-    bindings,
+    // The checks below sign in first-time users, which provisions their
+    // practice only where self-signup is allowed (lib/access-policy.ts).
+    bindings: { SELF_SIGNUP: "open", ...bindings },
     ...(outboundService ? { outboundService } : {}),
     d1Databases: { DB: "identity-fixture" },
     r2Buckets: { BUCKET: "identity-fixture-evidence" },

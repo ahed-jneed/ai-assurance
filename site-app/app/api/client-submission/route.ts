@@ -53,9 +53,13 @@ export async function POST(request: Request) {
     const e = await getEngagement(ctx, a.engagementId);
     if (e.version !== a.expectedVersion)
       throw new ApiError(409, "The request changed. Reload before submitting");
-    const g = activeGrant(e.workflow, ctx.user.userId).find(
-      (g) => g.id === a.grantId,
-    );
+    const g = activeGrant(
+      e.workflow,
+      ctx.user.userId,
+      undefined,
+      undefined,
+      ctx.accessSince,
+    ).find((g) => g.id === a.grantId);
     if (!g) throw new ApiError(403, "Request access expired or was revoked");
     const r = e.evidenceRequests?.find((r) => r.id === g.requestId);
     if (!r || ["accepted", "waived"].includes(r.status))
