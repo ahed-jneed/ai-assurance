@@ -2,7 +2,14 @@ import { ApiError, bucket, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
-import { storedBodies } from "./assurance-store";
+import { pinnedRecordFacts, storedBodies } from "./assurance-store";
+import {
+  describeScope,
+  inScope,
+  maxDossierFiles,
+  type DossierScope,
+  type DossierScopeDefinition,
+} from "./dossier-scope";
 import { legalDate } from "./rule-pack";
 import { sign, type SigningKey } from "./signing-keys";
 export function base64(bytes: ArrayBuffer | Uint8Array) {
@@ -65,7 +72,7 @@ function rulePackLine(snapshot: Record<string, unknown>) {
 /** A version label the verifier accepts: nonempty text of at most 200 characters. */
 const versionText = (v: unknown): v is string =>
   typeof v === "string" && v.trim() !== "" && v.length <= 200;
-/** The captured rule-pack stamp as signed in manifest 1.1, or null. */
+/** The captured rule-pack stamp as signed in manifests 1.1 and 1.2, or null. */
 function signedRulePack(snapshot: Record<string, unknown>) {
   const pack = snapshot.rulePack as Partial<RulePackStamp> | undefined;
   if (
@@ -83,6 +90,47 @@ function signedRulePack(snapshot: Record<string, unknown>) {
     legalReview: pack.legalReview,
   };
 }
+/** The key a scoped seal is found by: the digest of its canonical definition. */
+export const scopeSha256 = (scope: DossierScopeDefinition) =>
+  sha256(canonical(scope));
+type Pin = { id: string; sha256: string };
+/**
+ * The pinned records a dossier includes and its signed scope: every pin for
+ * the full dossier (scope null), else the pins within the scope (#83).
+ */
+async function selectPins(
+  ctx: Context,
+  e: Engagement,
+  pins: Pin[],
+  scope: DossierScopeDefinition | null,
+): Promise<{ selected: Pin[]; signed: DossierScope | null }> {
+  if (!scope) return { selected: pins, signed: null };
+  const facts = await pinnedRecordFacts(ctx, e.id),
+    selected = pins.filter((pin) => {
+      const f = facts.get(pin.id);
+      if (!f)
+        throw new ApiError(
+          409,
+          "Pinned assurance record unavailable or altered: " + pin.id,
+        );
+      return inScope(scope, f);
+    });
+  if (!selected.length)
+    throw new ApiError(
+      409,
+      "The scope selects none of the report's " +
+        pins.length +
+        " pinned assurance records",
+    );
+  return {
+    selected,
+    signed: {
+      ...scope,
+      pinnedRecords: pins.length,
+      includedRecords: selected.length,
+    },
+  };
+}
 export async function buildDossier(
   ctx: Context,
   e: Engagement,
@@ -90,11 +138,14 @@ export async function buildDossier(
   client: boolean,
   signingKeyId: string,
   withheld: { id: string; reason: string }[] = [],
+  scope: DossierScopeDefinition | null = null,
 ) {
   const snapshot = client ? r.clientSnapshot : r.snapshot,
     reportHash = client ? r.clientSha256 : r.sha256;
   if (!snapshot || (await sha256(JSON.stringify(snapshot))) !== reportHash)
     throw new ApiError(409, "Captured report integrity mismatch");
+  if (client && scope)
+    throw new ApiError(400, "Scoped exports are internal audit files");
   const files: { path: string; contentBase64: string }[] = [],
     leaves: {
       path: string;
@@ -151,6 +202,39 @@ export async function buildDossier(
         conclusionStatus?: string;
       }[])
     : [];
+  const evidence = (snapshot.evidence ?? []) as {
+    id: string;
+    name: string;
+    sha256: string;
+    status: string;
+  }[];
+  // Select the pinned records and count the files before reading any record
+  // body or evidence byte: a dossier the verifier would refuse is refused
+  // here, within the Worker's memory and time limits (#83).
+  const { selected, signed: signedScope } = client
+    ? { selected: [] as Pin[], signed: null }
+    : await selectPins(ctx, e, (snapshot.assurancePins ?? []) as Pin[], scope);
+  const evidenceFiles =
+      scope?.evidence === "withheld"
+        ? 0
+        : evidence.filter(
+            (c) =>
+              c.status === "accepted" &&
+              !withheld.some((w) => w.id === c.id) &&
+              e.artifacts.find((a) => a.id === c.id)?.custody !== "client",
+          ).length,
+    plannedFiles = 3 + papers.length + selected.length + evidenceFiles;
+  if (plannedFiles > maxDossierFiles)
+    throw new ApiError(
+      413,
+      "This dossier would hold " +
+        plannedFiles +
+        " files (" +
+        selected.length +
+        " pinned assurance records); the verifier accepts at most " +
+        maxDossierFiles +
+        ". Seal scoped exports by procedure, period or record type instead.",
+    );
   const html =
     '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Audit report</title><style>body{max-width:900px;margin:48px auto;font:16px/1.6 system-ui;color:#222;padding:24px}h1,h2,h3{line-height:1.3}section{margin-top:36px;border-top:1px solid #ddd;padding-top:20px}pre{white-space:pre-wrap;font:inherit}small{color:#666}</style></head><body><small>' +
     escaped(client ? "Client projection" : "Internal audit file") +
@@ -163,6 +247,9 @@ export async function buildDossier(
     "</h2>" +
     rulePackLine(snapshot) +
     criteriaLine(snapshot) +
+    (signedScope
+      ? "<p><strong>" + escaped(describeScope(signedScope)) + "</strong></p>"
+      : "") +
     "<pre>" +
     escaped(snapshot.summary) +
     "</pre>" +
@@ -204,11 +291,8 @@ export async function buildDossier(
       bytes(JSON.stringify(p)),
       "application/json",
     );
-  if (!client) {
-    const pins = (snapshot.assurancePins ?? []) as {
-      id: string;
-      sha256: string;
-    }[];
+  {
+    const pins = selected;
     // A hundred pinned records per query: a query per record would pass D1's
     // per-request query limit on a large engagement.
     for (let start = 0; start < pins.length; start += 100) {
@@ -237,12 +321,7 @@ export async function buildDossier(
       }
     }
   }
-  for (const captured of (snapshot.evidence ?? []) as {
-    id: string;
-    name: string;
-    sha256: string;
-    status: string;
-  }[]) {
+  for (const captured of evidence) {
     if (captured.status !== "accepted") {
       excluded.push({
         id: captured.id,
@@ -251,6 +330,15 @@ export async function buildDossier(
       continue;
     }
     if (withheld.some((w) => w.id === captured.id)) continue;
+    if (scope?.evidence === "withheld") {
+      excluded.push({
+        id: captured.id,
+        reason:
+          "Outside this scoped export (evidence bytes withheld); SHA-256 " +
+          captured.sha256,
+      });
+      continue;
+    }
     const artifact = e.artifacts.find((a) => a.id === captured.id);
     if (
       !artifact ||
@@ -301,11 +389,11 @@ export async function buildDossier(
     });
   }
   const instructions =
-    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. The platform cannot certify the audit conclusion.\n";
+    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. A scoped export (the manifest's scope, from manifest 1.2) holds only the pinned assurance records within its signed scope and states how many of the report's pinned records it includes; report.json lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The platform cannot certify the audit conclusion.\n";
   await add("README.txt", bytes(instructions), "text/plain");
   leaves.sort((a, b) => a.path.localeCompare(b.path));
   const manifest = {
-    schemaVersion: "1.1",
+    schemaVersion: "1.2",
     audience: client ? "client" : "internal",
     reportId: r.id,
     reportSha256: reportHash!,
@@ -313,13 +401,15 @@ export async function buildDossier(
     files: leaves,
     withheld: excluded,
     custody,
-    // Manifest 1.1 signs the key ID and the captured rule-pack and
+    // Manifests 1.1 and 1.2 sign the key ID and the captured rule-pack and
     // methodology versions along with the files.
     signingKeyId,
     rulePack: signedRulePack(snapshot),
     methodologyVersion: versionText(snapshot.methodologyVersion)
       ? snapshot.methodologyVersion
       : null,
+    // Manifest 1.2 signs the export scope: null for the full dossier (#83).
+    scope: signedScope,
   };
   return {
     schemaVersion: "1.0",
