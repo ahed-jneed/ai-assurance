@@ -1,7 +1,7 @@
 import type { Report, Role } from "./domain";
 
 export function packageStatus(report: Report, clientView = false) {
-  if (clientView) return "released";
+  if (clientView) return report.supersededBy ? "superseded" : "released";
   return report.kind === "draft"
     ? "draft"
     : (report.release?.state ?? "internal");
@@ -16,7 +16,11 @@ export function packageStatusLabel(report: Report, clientView = false) {
     superseded: "Superseded",
     withdrawn: "Withdrawn",
   };
-  return labels[packageStatus(report, clientView)] ?? "Internal package";
+  const state = packageStatus(report, clientView);
+  // The client projection names the successor on the report itself.
+  const successor = report.supersededBy ?? report.release?.supersededBy;
+  if (state === "superseded" && successor) return "Superseded by " + successor;
+  return labels[state] ?? "Internal package";
 }
 
 export function packageOpenLabel(report: Report, role: Role, userId: string) {

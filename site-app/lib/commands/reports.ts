@@ -1,20 +1,48 @@
 import { z } from "zod";
 import { annexIVIndex, annexMapVersion } from "../annex-iv";
 import { assurancePins, jobs, assuranceGates } from "../assurance-store";
-import { clientFinding } from "../client-projection";
-import { finalReportGates, paperCurrent, type Engagement } from "../domain";
+import { clientReportSnapshot, paperAudience } from "../client-projection";
+import {
+  finalReportGates,
+  paperCurrent,
+  type Engagement,
+  type FinalReport,
+} from "../domain";
+import {
+  criteriaPhrase,
+  criterionRollup,
+  reportElements,
+  subjectPhrase,
+} from "../domain/report-gates";
+import {
+  assuranceLevelIds,
+  conclusionStatement,
+  conclusionTypeIds,
+  engagementTypeIds,
+  snapshotConclusion,
+  snapshotParticulars,
+  snapshotTerms,
+  termsLabel,
+  termsProblem,
+} from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { recordVersions } from "../rule-pack-current";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
-import { text } from "./fields";
+import { short, text } from "./fields";
 /**
  * The papers a report captures: every current paper for a draft, the current
  * signed papers for a final report. Superseded papers and retired limitation
- * memos are history, not current work.
+ * memos are history, not current work. Report model v2 snapshots also record
+ * each paper's audience, which decides what the client snapshot publishes;
+ * older snapshots are compared without it.
  */
-function capturedPapers(e: Engagement, kind: "draft" | "final") {
+function capturedPapers(
+  e: Engagement,
+  kind: "draft" | "final",
+  withAudience = true,
+) {
   return e.papers
     .filter(
       (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
@@ -25,6 +53,7 @@ function capturedPapers(e: Engagement, kind: "draft" | "final") {
       title: p.title,
       revision: p.revision,
       status: p.status,
+      ...(withAudience && { audience: paperAudience(p) }),
       body: p.body,
       evidenceIds: p.evidenceIds,
       runIds: p.runIds,
@@ -32,9 +61,13 @@ function capturedPapers(e: Engagement, kind: "draft" | "final") {
       signatures: p.signatures,
     }));
 }
+const optionalText = (max: number) => z.string().trim().max(max).default("");
 /**
  * Report capture: the hashed internal snapshot with its Annex IV map, and the
- * client snapshot published when the report is released.
+ * client snapshot published when the report is released. A report states its
+ * engagement type, assurance level and conclusion (report model v2,
+ * lib/domain/report-model.ts); a final report must also contain every report
+ * element.
  */
 export const reports = defineCommands({
   createReport: {
@@ -43,15 +76,29 @@ export const reports = defineCommands({
       const a = z
         .object({
           kind: z.enum(["draft", "final"]),
-          opinion: z.enum([
-            "Readiness assessment",
-            "Qualified conclusion",
-            "Adverse conclusion",
-            "Unable to conclude",
-          ]),
+          engagementType: z.enum(engagementTypeIds),
+          assuranceLevel: z.enum(assuranceLevelIds).nullable().default(null),
+          conclusion: z.enum(conclusionTypeIds),
           summary: text,
+          addressee: optionalText(300),
+          location: optionalText(300),
+          signatory: optionalText(300),
+          basisForModification: optionalText(5000),
         })
         .parse(d);
+      const terms = {
+          engagementType: a.engagementType,
+          assuranceLevel: a.assuranceLevel,
+          conclusion: a.conclusion,
+        },
+        particulars = {
+          addressee: a.addressee,
+          location: a.location,
+          signatory: a.signatory,
+          basisForModification: a.basisForModification,
+        };
+      const problem = termsProblem(terms);
+      if (problem) throw new ApiError(400, problem);
       if (a.kind === "final") {
         if (
           (await jobs(ctx, e.id)).some((j) =>
@@ -62,10 +109,10 @@ export const reports = defineCommands({
             409,
             "Complete or cancel external execution before final capture",
           );
-        const assuranceBlockers = await assuranceGates(ctx, e.id, a.opinion);
+        const assuranceBlockers = await assuranceGates(ctx, e.id, a.conclusion);
         if (assuranceBlockers.length)
           throw new ApiError(409, assuranceBlockers[0]);
-        const gates = finalReportGates(e, a.opinion);
+        const gates = finalReportGates(e, { ...terms, particulars });
         if (gates[0]?.kind === "stage")
           throw new ApiError(400, gates[0].message);
         if (gates.length)
@@ -77,17 +124,35 @@ export const reports = defineCommands({
               .join("; "),
           );
       }
-      const annexIV = annexIVIndex(e);
+      const createdAt = now(),
+        annexIV = annexIVIndex(e);
+      // The part of the report written for its reader, in both snapshots.
+      const elements = reportElements(e, terms, particulars, createdAt).map(
+        ({ id, label, value }) => ({ id, label, value }),
+      );
+      const report = {
+        terms,
+        particulars,
+        reportTitle: elements.find((el) => el.id === "title")?.value ?? "",
+        elements,
+        conclusionStatement: conclusionStatement(
+          terms,
+          subjectPhrase(e),
+          criteriaPhrase,
+        ),
+        criteria: criterionRollup(e),
+      };
       const snapshot = {
         workflow: e.workflow ? structuredClone(e.workflow) : null,
-        contractVersion: "1.1",
+        contractVersion: "2.0",
         engagement: {
           id: e.id,
           title: e.title,
           stage: e.stage,
           classification: e.classification,
         },
-        opinion: a.opinion,
+        opinion: termsLabel(terms),
+        ...report,
         summary: a.summary,
         evidenceRequests: e.evidenceRequests ?? [],
         papers: capturedPapers(e, a.kind),
@@ -119,7 +184,7 @@ export const reports = defineCommands({
         annexIV,
         annexMapVersion,
         auditEventHead: e.eventHead,
-        createdAt: now(),
+        createdAt,
         ...recordVersions(),
         regulatorySource: "https://eur-lex.europa.eu/eli/reg/2024/1689",
         limitations:
@@ -132,64 +197,40 @@ export const reports = defineCommands({
         r = {
           id: id("REPORT"),
           kind: a.kind,
-          createdAt: now(),
+          createdAt,
           actor: ctx.user.userId,
           sha256: hash,
           snapshot,
           release: { state: "internal" as const, history: [] },
         };
-      const clientSnapshot = {
-        scope: e.workflow?.brief
-          ? {
-              systemName: e.workflow.brief.systemName,
-              intendedUse: e.workflow.brief.intendedUse,
-              boundary: e.workflow.brief.boundary,
-              periodStart: e.workflow.brief.periodStart,
-              periodEnd: e.workflow.brief.periodEnd,
-              deliverables: e.workflow.brief.deliverables,
-            }
-          : null,
-        engagement: {
-          id: e.id,
-          title: e.title,
-          classification: e.classification,
-        },
-        opinion: a.opinion,
-        summary: a.summary,
-        createdAt: r.createdAt,
-        papers: e.papers
-          .filter((p) => paperCurrent(p) && p.status === "signed")
-          .map((p) => ({
-            id: p.id,
-            title: p.title,
-            revision: p.revision,
-            status: p.status,
-            conclusion: p.body.conclusion,
-            conclusionStatus: p.body.conclusionStatus,
-          })),
-        evidence: e.artifacts
-          .filter((a) => a.visibility === "client" && a.status === "accepted")
-          .map(({ key, ...a }) => a),
-        findings: e.findings
-          .filter((f) => f.visibility === "client")
-          .map(clientFinding),
-        limitations:
-          snapshot.limitations +
-          ((e.evidenceRequests ?? []).some(
-            (q) => q.disposition === "unobtainable",
-          )
-            ? " Evidence availability limitations were recorded; refer to the scoped opinion and executive summary."
-            : ""),
-        regulatorySource: snapshot.regulatorySource,
-        rulePack: snapshot.rulePack,
-        methodologyVersion: snapshot.methodologyVersion,
-      };
+      const clientSnapshot = clientReportSnapshot(e, { ...snapshot, report });
       Object.assign(r, {
         clientSnapshot,
         clientSha256: await sha256(JSON.stringify(clientSnapshot)),
       });
       e.reports.push(r);
       return { details: { reportId: r.id, kind: r.kind, sha256: hash } };
+    },
+  },
+  setPaperAudience: {
+    roles: ["Lead Auditor"],
+    handle(e, d) {
+      const a = z
+          .object({
+            paperId: short,
+            audience: z.enum(["internal", "client"]),
+          })
+          .strict()
+          .parse(d),
+        p = e.papers.find((p) => p.id === a.paperId);
+      if (!p) throw new ApiError(404, "Working paper not found");
+      if (!paperCurrent(p))
+        throw new ApiError(
+          409,
+          "A superseded or retired paper stays as it was captured",
+        );
+      p.audience = a.audience;
+      return { details: { paperId: p.id, audience: a.audience } };
     },
   },
 });
@@ -214,10 +255,16 @@ export async function assertReleasable(
       409,
       "Assurance sources changed after capture; prepare and approve a new report",
     );
+  // A legacy report (captured before report model v2) is rechecked with its
+  // opinion string; a v2 report with its terms and report elements.
+  const terms = snapshotTerms(r.snapshot),
+    report: FinalReport | string = terms
+      ? { ...terms, particulars: snapshotParticulars(r.snapshot) }
+      : snapshotConclusion(r.snapshot);
   const assuranceBlockers = await assuranceGates(
     ctx,
     e.id,
-    String(r.snapshot.opinion),
+    snapshotConclusion(r.snapshot),
   );
   if (assuranceBlockers.length) throw new ApiError(409, assuranceBlockers[0]);
   if (
@@ -229,7 +276,7 @@ export async function assertReleasable(
       409,
       "Complete or cancel external execution before release",
     );
-  const gates = finalReportGates(e, String(r.snapshot.opinion));
+  const gates = finalReportGates(e, report);
   if (gates.length) throw new ApiError(409, gates[0].message);
   const frozen = r.snapshot.workflow as Engagement["workflow"];
   if (
@@ -245,7 +292,7 @@ export async function assertReleasable(
     JSON.stringify(frozen.procedures) !==
       JSON.stringify(e.workflow?.procedures) ||
     JSON.stringify(r.snapshot.papers) !==
-      JSON.stringify(capturedPapers(e, "final")) ||
+      JSON.stringify(capturedPapers(e, "final", !!terms)) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
     JSON.stringify(
       (
