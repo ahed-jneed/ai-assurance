@@ -1574,32 +1574,44 @@ def evaluate_power(inp):
     return criterion_power(crit, level, target, inp.get("familySize", 1), {**FLOORS, **inp.get("minimums", {})})
 
 
-# ---------------------------------------------------------------- NYC LL144 reporting (selection rates)
+# ---------------------------------------------------------------- NYC LL144 reporting (section 10.2)
+LL144_RATE_KEYS = {"selection": ("selected", "selectionRate", "selectionRateInterval"), "scoring": ("scoredAboveMedian", "scoringRate", "scoringRateInterval")}
+
+
 def evaluate_ll144(inp, level=0.95):
+    """One LL144 table (sex, race/ethnicity or intersectional categories) from per-category counts.
+
+    Each category gives n and `selected`, the individuals selected (selection rates) or scoring above the
+    full-sample median (scoring rates, inp["rate"] == "scoring"). A category with no individuals has no rate.
+    The reference category is the first maximum in input order among the categories that are not excluded;
+    when its rate is zero every impact ratio is undefined (None)."""
+    count_key, rate_key, interval_key = LL144_RATE_KEYS[inp.get("rate", "selection")]
     z = zcrit(level)
     cats = inp["categories"]
     known = sum(c["n"] for c in cats)
     unknown = inp.get("unknownCount", 0)
     total = known + unknown  # "the data being used for the bias audit" includes the unknown category (section 10.2)
+    _require(total > 0, "an LL144 table needs at least one individual")
     excluded = set(inp.get("excluded", []))
     rows = []
     for c in cats:
         share = c["n"] / total
         _require(c["name"] not in excluded or share < 0.02, "2% exclusion only allowed below 2% of the data")
-        lo, hi = wilson(c["selected"], c["n"], z)
-        rows.append({"category": c["name"], "n": c["n"], "selected": c["selected"], "selectionRate": c["selected"] / c["n"], "selectionRateInterval": {"lower": lo, "upper": hi, "level": level, "method": "wilson"}, "shareOfData": share, "shareOfKnown": c["n"] / known, "eligibleForTwoPercentExclusion": share < 0.02, "excluded": c["name"] in excluded})
-    included = [r for r in rows if not r["excluded"]]
-    ref = max(included, key=lambda r: r["selectionRate"])  # first maximum in input order
-    for r in rows:
-        if r["excluded"]:
-            r["impactRatio"], r["impactRatioInterval"] = None, None
-        elif r is ref:
-            r["impactRatio"], r["impactRatioInterval"] = 1.0, None
-        else:
-            xs, ns, xc, nc = r["selected"], r["n"], ref["selected"], ref["n"]
+        rate, interval = None, None
+        if c["n"] > 0:
+            lo, hi = wilson(c["selected"], c["n"], z)
+            rate, interval = c["selected"] / c["n"], {"lower": lo, "upper": hi, "level": level, "method": "wilson"}
+        rows.append({"category": c["name"], "n": c["n"], count_key: c["selected"], rate_key: rate, interval_key: interval, "shareOfData": share, "shareOfKnown": c["n"] / known if known else 0.0, "eligibleForTwoPercentExclusion": share < 0.02, "excluded": c["name"] in excluded, "impactRatio": None, "impactRatioInterval": None})
+    included = [r for r in rows if not r["excluded"] and r["n"] > 0]
+    ref = max(included, key=lambda r: r[rate_key]) if included else None  # first maximum in input order
+    if ref is not None and ref[count_key] > 0:
+        for r in included:
+            if r is ref:
+                r["impactRatio"] = 1.0
+                continue
+            xs, ns, xc, nc = r[count_key], r["n"], ref[count_key], ref["n"]
             method = ratio_method(xs, ns, xc, nc)
             lo, hi = katz(xs, ns, xc, nc, z) if method == "katz_log" else koopman(xs, ns, xc, nc, z)
             r["impactRatio"] = (xs / ns) / (xc / nc)
             r["impactRatioInterval"] = {"lower": lo, "upper": hi, "level": level, "method": method}
-    return {"referenceCategory": ref["category"], "totalIndividuals": total, "totalAssessedKnown": known, "unknownCategoryCount": unknown, "categories": rows}
-
+    return {"referenceCategory": ref["category"] if ref else None, "totalIndividuals": total, "totalAssessedKnown": known, "unknownCategoryCount": unknown, "categories": rows}
