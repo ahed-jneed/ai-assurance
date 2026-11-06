@@ -2263,6 +2263,8 @@ try {
     }),
     immutableFinal,
   );
+  assert.deepEqual(e.reports.at(-1).snapshot.rulePack, e.rulePack);
+  assert.deepEqual(e.reports.at(-1).clientSnapshot.rulePack, e.rulePack);
   // The released package seals into both audiences' dossiers; the internal
   // one carries every pinned assurance record byte for byte.
   const seals = {};
@@ -2312,6 +2314,28 @@ try {
         await hex(Buffer.from(file.contentBase64, "base64")),
         dossier.manifest.files.find((leaf) => leaf.path === file.path).sha256,
       );
+    // The released report keeps the rule-pack and methodology versions it
+    // was captured under (#18), in both the hashed and the readable copy.
+    const dossierText = (name) =>
+        Buffer.from(
+          dossier.files.find((f) => f.path === name).contentBase64,
+          "base64",
+        ).toString("utf8"),
+      dossierReport = JSON.parse(dossierText("report.json"));
+    assert.deepEqual(dossierReport.rulePack, e.rulePack);
+    assert.equal(
+      dossierReport.methodologyVersion,
+      workspace.catalog.methodologyVersion,
+    );
+    assert(
+      dossierText("report.html").includes(
+        "Rule pack " +
+          e.rulePack.version +
+          " (legal text " +
+          e.rulePack.legalVersion,
+      ),
+      "released report.html names the rule pack",
+    );
     const pinnedFiles = dossier.files.filter((f) =>
       f.path.startsWith("assurance/"),
     );
