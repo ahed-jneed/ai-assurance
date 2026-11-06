@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:statistics-plan:1.0.0",
+  "title": "Pre-registered statistics plan (DRAFT for statistics specification 1.0.0)",
+  "description": "Design artifact for docs/design/audit-statistics.md section 9, not yet a live contract: #21 and #22 copy it into the schemas/ generator. It accepts a plan as written (omitted fields take the listed defaults) and the normalised plan (every field present). The plan hash is the SHA-256 of the RFC 8785 canonical JSON of the normalised plan. Rules that JSON Schema cannot state are normative in section 9: criterion ids are unique, a band must satisfy the section 3 table (new plans are rejected; derived legacy plans evaluate an invalid band as invalid_band), a library-derived band must equal the band its entry produces, and minimums never fall below the floors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["criteria"],
+  "if": {"properties": {"derivedFrom": {"type": "null"}}},
+  "then": {
+    "description": "passBlockedBy is set only by legacy derivation (section 9.3).",
+    "properties": {"criteria": {"items": {"properties": {"passBlockedBy": {"maxItems": 0}}}}}
+  },
+  "properties": {
+    "statisticsVersion": {"const": "1.0.0", "default": "1.0.0"},
+    "confidenceLevel": {"enum": [0.9, 0.95, 0.99], "default": 0.95},
+    "minimums": {
+      "description": "Applied minimums. Each is at least its floor (30, 30, 10).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sampleSize": {"type": "integer", "minimum": 30, "maximum": 1000000, "default": 30},
+        "groupSize": {"type": "integer", "minimum": 30, "maximum": 1000000, "default": 30},
+        "classCount": {"type": "integer", "minimum": 10, "maximum": 1000000, "default": 10}
+      },
+      "default": {"sampleSize": 30, "groupSize": 30, "classCount": 10}
+    },
+    "configuredMinimums": {
+      "description": "The minimums a legacy configuration specified, recorded beside the applied max(floor, configured) values. Null for plans that were not derived.",
+      "default": null,
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sampleSize", "groupSize", "classCount"],
+          "properties": {
+            "sampleSize": {"type": ["integer", "null"], "minimum": 1},
+            "groupSize": {"type": ["integer", "null"], "minimum": 1},
+            "classCount": {"type": ["integer", "null"], "minimum": 1}
+          }
+        }
+      ]
+    },
+    "multiplicity": {
+      "description": "Fixed in 1.0.0 (section 6).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "confirmatory": {"const": "bonferroni"},
+        "exploratory": {"const": "benjamini_hochberg"}
+      },
+      "default": {"confirmatory": "bonferroni", "exploratory": "benjamini_hochberg"}
+    },
+    "clusterField": {"description": "Engine only (section 5.11).", "type": ["string", "null"], "minLength": 1, "maxLength": 300, "default": null},
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"replicates": {"type": "integer", "minimum": 1000, "maximum": 10000, "default": 2000}},
+      "default": {"replicates": 2000}
+    },
+    "calibrationBins": {"type": "integer", "minimum": 2, "maximum": 100, "default": 10},
+    "power": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetPower": {"type": "number", "minimum": 0.5, "maximum": 0.99, "default": 0.8},
+        "acknowledgement": {"type": ["string", "null"], "minLength": 1, "maxLength": 5000, "default": null}
+      },
+      "default": {"targetPower": 0.8, "acknowledgement": null}
+    },
+    "derivedFrom": {
+      "description": "Set when the plan was derived from a legacy configuration (section 9).",
+      "default": null,
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "contractVersion"],
+          "properties": {
+            "source": {"enum": ["hosted_config", "engine_thresholds"]},
+            "contractVersion": {"enum": ["1.0", "1.1"]}
+          }
+        }
+      ]
+    },
+    "criteria": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/criterion"}}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "probability": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+    "probabilityOrPerGroup": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/probability"},
+        {"type": "object", "minProperties": 1, "maxProperties": 1000, "additionalProperties": {"$ref": "#/$defs/probability"}}
+      ]
+    },
+    "band": {
+      "description": "Inclusive acceptable region. At least one bound is a number.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lower": {"type": ["number", "null"]},
+        "upper": {"type": ["number", "null"]}
+      },
+      "anyOf": [
+        {"required": ["lower"], "properties": {"lower": {"type": "number"}}},
+        {"required": ["upper"], "properties": {"upper": {"type": "number"}}}
+      ]
+    },
+    "proportionBand": {
+      "allOf": [
+        {"$ref": "#/$defs/band"},
+        {"properties": {"lower": {"minimum": 0, "maximum": 1}, "upper": {"minimum": 0, "maximum": 1}}}
+      ]
+    },
+    "differenceBand": {
+      "allOf": [
+        {"$ref": "#/$defs/band"},
+        {"properties": {"lower": {"minimum": -1, "maximum": 1}, "upper": {"minimum": -1, "maximum": 1}}}
+      ]
+    },
+    "ratioBand": {
+      "allOf": [
+        {"$ref": "#/$defs/band"},
+        {"properties": {"lower": {"minimum": 0}, "upper": {"minimum": 0}}}
+      ]
+    },
+    "errorBand": {
+      "allOf": [
+        {"$ref": "#/$defs/band"},
+        {"properties": {"lower": {"type": "null"}, "upper": {"exclusiveMinimum": 0}}}
+      ]
+    },
+    "libraryEntry": {
+      "description": "A versioned threshold-library entry (section 10.1). parameters holds every parameter value after defaults; overriddenParameters names those that differ from the entry's defaults.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"enum": ["screen.us.four-fifths", "policy.eu-aia.selection-rate-difference", "policy.eu-aia.impact-ratio", "policy.eu-aia.equalized-odds", "policy.eu-aia.declared-performance", "policy.eu-aia.calibration"]},
+        "version": {"type": "integer", "minimum": 1, "default": 1},
+        "parameters": {"type": "object", "maxProperties": 10, "additionalProperties": {"type": ["number", "string"]}, "default": {}},
+        "overriddenParameters": {"type": "array", "maxItems": 10, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "binaryPerformanceAssumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "prevalence", "truePositiveRate", "trueNegativeRate"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 1, "maximum": 10000000},
+        "prevalence": {"$ref": "#/$defs/probability"},
+        "truePositiveRate": {"$ref": "#/$defs/probability"},
+        "trueNegativeRate": {"$ref": "#/$defs/probability"}
+      }
+    },
+    "multiclassAssumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "classShares", "perClassRecall"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 1, "maximum": 10000000},
+        "classShares": {"type": "object", "minProperties": 2, "maxProperties": 100, "additionalProperties": {"$ref": "#/$defs/probability"}},
+        "perClassRecall": {"type": "object", "minProperties": 2, "maxProperties": 100, "additionalProperties": {"$ref": "#/$defs/probability"}}
+      }
+    },
+    "regressionAssumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n", "errorSd"],
+      "properties": {
+        "n": {"type": "integer", "minimum": 1, "maximum": 10000000},
+        "errorSd": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "groupAssumptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groupSizes"],
+      "properties": {
+        "groupSizes": {"type": "object", "minProperties": 2, "maxProperties": 1000, "additionalProperties": {"type": "integer", "minimum": 1, "maximum": 10000000}},
+        "baselineRate": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/probability"}]},
+        "assumedRates": {"anyOf": [{"type": "null"}, {"type": "object", "maxProperties": 1000, "additionalProperties": {"$ref": "#/$defs/probability"}}]},
+        "prevalence": {"$ref": "#/$defs/probabilityOrPerGroup"},
+        "truePositiveRate": {"$ref": "#/$defs/probabilityOrPerGroup"},
+        "falsePositiveRate": {"$ref": "#/$defs/probabilityOrPerGroup"}
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["performance", "multiclass_performance", "regression_performance", "group_comparison", "calibration"]},
+        "role": {"enum": ["confirmatory", "exploratory"], "default": "confirmatory"},
+        "rationale": {"type": ["string", "null"], "minLength": 1, "maxLength": 5000, "default": null},
+        "libraryEntry": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/libraryEntry"}], "default": null}
+      },
+      "oneOf": [
+        {"$ref": "#/$defs/performanceCriterion"},
+        {"$ref": "#/$defs/multiclassCriterion"},
+        {"$ref": "#/$defs/regressionCriterion"},
+        {"$ref": "#/$defs/groupCriterion"},
+        {"$ref": "#/$defs/calibrationCriterion"}
+      ],
+      "unevaluatedProperties": false
+    },
+    "performanceCriterion": {
+      "description": "Binary performance. An empty members array only occurs in a derived plan whose policy sets no performance threshold (no_threshold).",
+      "required": ["kind", "members"],
+      "properties": {
+        "kind": {"const": "performance"},
+        "members": {
+          "type": "array",
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "band"],
+            "properties": {
+              "metric": {"enum": ["accuracy", "precision", "recall", "specificity", "false_positive_rate", "balanced_accuracy", "f1"]},
+              "band": {"$ref": "#/$defs/proportionBand"}
+            }
+          }
+        },
+        "powerAssumptions": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/binaryPerformanceAssumptions"}], "default": null}
+      }
+    },
+    "multiclassCriterion": {
+      "required": ["kind", "members"],
+      "properties": {
+        "kind": {"const": "multiclass_performance"},
+        "members": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "band"],
+            "properties": {
+              "metric": {"enum": ["accuracy", "balanced_accuracy", "macro_precision", "macro_f1"]},
+              "band": {"$ref": "#/$defs/proportionBand"}
+            }
+          }
+        },
+        "powerAssumptions": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/multiclassAssumptions"}], "default": null}
+      }
+    },
+    "regressionCriterion": {
+      "required": ["kind", "members"],
+      "properties": {
+        "kind": {"const": "regression_performance"},
+        "members": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "band"],
+            "properties": {
+              "metric": {"enum": ["mae", "rmse"]},
+              "band": {"$ref": "#/$defs/errorBand"}
+            }
+          }
+        },
+        "passBlockedBy": {
+          "description": "Derived plans only (section 4.8): R2, which today's engine rule requires to meet a threshold and which 1.0.0 cannot decide, blocks a pass (undecidable_metric).",
+          "type": "array",
+          "maxItems": 1,
+          "items": {"const": "r2"},
+          "default": []
+        },
+        "powerAssumptions": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/regressionAssumptions"}], "default": null}
+      }
+    },
+    "groupCriterion": {
+      "description": "A null band only occurs in a derived plan whose policy sets no value for this criterion (no_threshold).",
+      "required": ["kind", "metric", "band"],
+      "properties": {
+        "kind": {"const": "group_comparison"},
+        "metric": {"enum": ["selection_rate_difference", "selection_rate_ratio", "equalized_odds"]},
+        "band": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/band"}]},
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"enum": ["all_pairs", "reference"]},
+            "referenceGroup": {"type": ["string", "null"], "minLength": 1, "maxLength": 5000}
+          },
+          "default": {"mode": "all_pairs", "referenceGroup": null}
+        },
+        "groupFields": {
+          "description": "Protected columns; several make intersectional strata. Null means the configuration's protected-group column.",
+          "default": null,
+          "anyOf": [{"type": "null"}, {"type": "array", "minItems": 1, "maxItems": 5, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 300}}]
+        },
+        "declaredGroups": {
+          "default": null,
+          "anyOf": [{"type": "null"}, {"type": "array", "minItems": 1, "maxItems": 1000, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 5000}}]
+        },
+        "minimumCoverage": {"type": "number", "minimum": 0.5, "maximum": 1, "default": 1.0},
+        "powerAssumptions": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/groupAssumptions"}], "default": null}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"metric": {"const": "selection_rate_ratio"}}, "required": ["metric"]},
+          "then": {"properties": {"band": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/ratioBand"}]}}},
+          "else": {"properties": {"band": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/differenceBand"}]}}}
+        },
+        {
+          "if": {"properties": {"comparison": {"properties": {"mode": {"const": "reference"}}, "required": ["mode"]}}, "required": ["comparison"]},
+          "then": {"properties": {"comparison": {"properties": {"referenceGroup": {"type": "string"}}, "required": ["referenceGroup"]}}}
+        },
+        {
+          "if": {"properties": {"metric": {"const": "equalized_odds"}}, "required": ["metric"]},
+          "then": {"properties": {"powerAssumptions": {"anyOf": [{"type": "null"}, {"properties": {"prevalence": {"not": {"type": "null"}}, "truePositiveRate": {"not": {"type": "null"}}, "falsePositiveRate": {"not": {"type": "null"}}}, "required": ["prevalence", "truePositiveRate", "falsePositiveRate"]}]}}},
+          "else": {"properties": {"powerAssumptions": {"anyOf": [{"type": "null"}, {"properties": {"baselineRate": {"$ref": "#/$defs/probability"}}, "required": ["baselineRate"]}]}}}
+        }
+      ]
+    },
+    "calibrationCriterion": {
+      "description": "Engine only. band is the per-bin calibration-gap band (null in a derived plan); members may add a Brier-score maximum.",
+      "required": ["kind"],
+      "properties": {
+        "kind": {"const": "calibration"},
+        "band": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/differenceBand"}], "default": null},
+        "members": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "band"],
+            "properties": {
+              "metric": {"const": "brier_score"},
+              "band": {"$ref": "#/$defs/errorBand"}
+            }
+          },
+          "default": []
+        },
+        "minimumCoverage": {"type": "number", "minimum": 0.5, "maximum": 1, "default": 1.0},
+        "subgroup": {
+          "description": "Per-group calibration: restrict the criterion to rows whose field equals value.",
+          "default": null,
+          "anyOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["field", "value"], "properties": {"field": {"type": "string", "minLength": 1, "maxLength": 300}, "value": {"type": "string", "minLength": 1, "maxLength": 5000}}}]
+        },
+        "passBlockedBy": {
+          "description": "Derived plans only (section 4.8): the expected calibration error, which today's engine rule requires to meet a threshold and which 1.0.0 cannot decide, blocks a pass (undecidable_metric).",
+          "type": "array",
+          "maxItems": 1,
+          "items": {"const": "expected_calibration_error"},
+          "default": []
+        },
+        "powerAssumptions": {"type": "null", "default": null}
+      }
+    }
+  }
+}
