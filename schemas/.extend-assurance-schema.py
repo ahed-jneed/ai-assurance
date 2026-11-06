@@ -1,4 +1,4 @@
-"""Add authenticated external projections; callable and idempotent on regeneration."""
+"""Add dataset-card pins and authenticated external projections; callable and idempotent on regeneration."""
 import copy
 import json
 from pathlib import Path
@@ -6,6 +6,14 @@ from pathlib import Path
 
 def extend_schema(schema):
     defs = schema['$defs']
+    # Hosted and external runs may pin the frozen dataset governance card.
+    defs['predictionDataset']['properties']['cardPin'] = {
+        'type': 'object', 'additionalProperties': False,
+        'required': ['recordId', 'sha256', 'card'], 'properties': {
+            'recordId': {'$ref': '#/$defs/id'},
+            'sha256': {'$ref': '#/$defs/sha256'},
+            'card': {'type': 'object', 'description': ('Frozen dataset governance card; application '
+                'validation enforces its version, artifact hash, and engagement.')}}}
     external = copy.deepcopy(defs['hostedRun'])
     external['description'] = ('Authenticated external attempt projected into an audit run. '
         'Exact external report bytes remain preserved separately; application validation '
@@ -74,5 +82,6 @@ def extend_schema(schema):
 
 if __name__ == '__main__':
     file = Path(__file__).with_name('test-run.schema.json')
+    # newline='\n' keeps the output LF on Windows too, so it matches Git and the runtime zip.
     file.write_text(json.dumps(extend_schema(json.loads(file.read_text(encoding='utf-8'))),
-        indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+        indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')

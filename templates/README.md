@@ -1,10 +1,10 @@
 # Reusable audit templates
 
-Use `catalog.json` as the versioned program catalog, `working-paper.schema.json` as the machine-readable contract and the Markdown files as narrative drafting templates. Instantiate an item inside an engagement; copy its immutable catalog id/version, selected procedures and required evidence into a working-paper revision. Preserve the catalog item when engagement-specific tailoring is approved. Omitted procedures require a reason and reviewer approval.
+Use `catalog.json` as the versioned program catalog, [`../schemas/working-paper.schema.json`](../schemas/working-paper.schema.json) (its `paperRevision` definition) as the machine-readable contract and the Markdown files as narrative drafting templates. Instantiate an item inside an engagement; copy its immutable catalog id/version, selected procedures and required evidence into a working-paper revision. Preserve the catalog item when engagement-specific tailoring is approved. Omitted procedures require a reason and reviewer approval.
 
 The standard paper header, evidence reference and review fields are defined in `working-paper.md`. Article-specific fieldwork programs are in `article-fieldwork.md`; planning, evaluation, automation and remediation have separate templates. Memo templates cover acceptance, significant judgments, management response, reporting and sign-off. Catalog-specific procedures populate the appropriate template; templates are starting points and may not contain fabricated evidence or conclusions.
 
-`working-paper.blank.json` is a draft specimen, not a completed or approved paper. The schema permits incomplete narrative fields while the paper is a draft. The workflow service must enforce stage-dependent completeness, role permissions, exact revision/digest approval and report issue gates in addition to JSON validation. JSON Schema alone cannot enforce reviewer independence, tenant access or evidence truthfulness.
+`working-paper.blank.json` is a draft specimen, not a completed or approved paper. The schema permits incomplete narrative fields while the paper is a draft; `node schemas/validate-working-paper-schema.mjs` (run in CI) validates the specimen and the status gates. The workflow service must enforce stage-dependent completeness, role permissions, exact revision/digest approval and report issue gates in addition to JSON validation. JSON Schema alone cannot enforce reviewer independence, tenant access or evidence truthfulness.
 
 Stable id families:
 
