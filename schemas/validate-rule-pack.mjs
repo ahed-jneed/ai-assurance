@@ -6,10 +6,12 @@
  * rules (D-02), secondary-only sourcing, and agreement with the verified research
  * file the pack names. Run from the repository root:
  *
- *   node schemas/validate-rule-pack.mjs
+ *   node schemas/validate-rule-pack.mjs [--ajv-package path/to/package.json]
  *
  * It also proves that the checks reject a set of single mutations. Uses Ajv from
- * the existing Site dependency tree, like the other validators here.
+ * the existing Site dependency tree, like the other validators here. The runtime
+ * package ships this file and the schema but no templates/ folder; there it only
+ * checks that the schema compiles.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -20,9 +22,9 @@ const directory = dirname(fileURLToPath(import.meta.url));
 const workspace = resolve(directory, '..');
 const readJSON = path => JSON.parse(readFileSync(path, 'utf8'));
 
-/** Compiles the rule-pack schema with Ajv 2020 from site-app/node_modules. */
-export function loadValidator(schema = readJSON(resolve(directory, 'rule-pack.schema.json'))) {
-  const require = createRequire(resolve(workspace, 'site-app/package.json'));
+/** Compiles the rule-pack schema with Ajv 2020 from site-app/node_modules (or the given package). */
+export function loadValidator(schema = readJSON(resolve(directory, 'rule-pack.schema.json')), ajvPackage = resolve(workspace, 'site-app/package.json')) {
+  const require = createRequire(resolve(ajvPackage));
   const Ajv2020 = require('ajv/dist/2020').default;
   const ajv = new Ajv2020({ allErrors: true, strict: false });
   if (!ajv.validateSchema(schema)) throw new Error('Invalid rule-pack schema: ' + JSON.stringify(ajv.errors));
@@ -346,8 +348,13 @@ export const mutations = [
 ];
 
 function main() {
+  const args = process.argv.slice(2);
+  const validate = args.includes('--ajv-package') ? loadValidator(undefined, args[args.indexOf('--ajv-package') + 1]) : loadValidator();
+  if (!existsSync(resolve(workspace, 'templates/catalog.json'))) {
+    console.log('PASS rule-pack schema compiles; templates/ absent (runtime package), rule pack not checked');
+    return;
+  }
   const inputs = loadInputs();
-  const validate = loadValidator();
   const problems = checkRulePack({ ...inputs, validate });
   if (problems.length) {
     console.error(`FAIL rule pack: ${problems.length} problem(s)`);
