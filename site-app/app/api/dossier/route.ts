@@ -12,7 +12,7 @@ import {
   sha256,
 } from "@/lib/store";
 import { buildDossier, signDossier, signingKey } from "@/lib/dossier";
-import { addRecord, records } from "@/lib/assurance-store";
+import { addRecord, dossierSeal } from "@/lib/assurance-store";
 import { isClientRole, isReleased } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
@@ -58,14 +58,8 @@ export async function POST(request: Request) {
         409,
         "Select a captured report; client dossiers require release approval",
       );
-    const seals = (await records(ctx, e.id)).filter(
-      (x) =>
-        x.kind === "dossier" &&
-        x.body.reportId === r.id &&
-        x.body.audience === v.audience,
-    );
-    if (seals.length)
-      return Response.json({ record: seals[0], existing: true });
+    const sealed = await dossierSeal(ctx, e.id, r.id, v.audience);
+    if (sealed) return Response.json({ record: sealed, existing: true });
     if (
       v.withheld.some(
         (w) =>
@@ -136,12 +130,7 @@ export async function GET(request: Request) {
         : "internal";
     if (audience === "client" && !isReleased(r))
       throw new ApiError(404, "Client dossier not released");
-    const seal = (await records(ctx, e.id)).find(
-      (x) =>
-        x.kind === "dossier" &&
-        x.body.reportId === r.id &&
-        x.body.audience === audience,
-    );
+    const seal = await dossierSeal(ctx, e.id, r.id, audience);
     if (!seal)
       throw new ApiError(
         409,

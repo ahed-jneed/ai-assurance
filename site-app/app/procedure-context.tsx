@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
+import { assuranceRecords } from "@/lib/assurance-store-client";
 import { CheckCircle2, Circle } from "lucide-react";
 import { procedureWork } from "@/lib/work-items";
 import { currentExecution } from "@/lib/workflow-state";
@@ -20,20 +21,13 @@ export function ProcedureContext({
   const [samples, setSamples] = useState<AssuranceRecord[]>([]);
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(
-      "/api/assurance?" + new URLSearchParams({ tenantId, engagementId: e.id }),
-      { signal: controller.signal, cache: "no-store" },
+    void assuranceRecords(
+      { tenantId, engagementId: e.id, kind: "sample" },
+      { signal: controller.signal },
     )
-      .then(async (r) => {
-        if (r.ok) {
-          const v = (await r.json()) as { records: AssuranceRecord[] };
-          setSamples(
-            v.records.filter(
-              (r) => r.kind === "sample" && r.body.procedureId === p.id,
-            ),
-          );
-        }
-      })
+      .then((samples) =>
+        setSamples(samples.filter((r) => r.body.procedureId === p.id)),
+      )
       .catch(() => {});
     return () => controller.abort();
   }, [tenantId, e.id, p.id, e.version]);

@@ -10,7 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import type { AssuranceRecord } from "@/lib/assurance-core";
+import { assuranceRecords } from "@/lib/assurance-store-client";
 type CapturedEvidence = { id: string; name: string; status: string };
 type SealedDossier = { files: number; keyId: string; publicKeySPKI: string };
 export function DossierControls({
@@ -46,24 +46,19 @@ export function DossierControls({
         if (
           !["Client Viewer", "Client Contributor"].includes(v.identity.role)
         ) {
-          const res = await fetch(
-            "/api/assurance?" + new URLSearchParams({ tenantId, engagementId }),
-            { cache: "no-store" },
-          );
-          if (res.ok) {
-            const s = (await res.json()) as { records: AssuranceRecord[] };
-            if (active)
-              setSealed(
-                Object.fromEntries(
-                  s.records
-                    .filter(
-                      (x) =>
-                        x.kind === "dossier" && x.body.reportId === reportId,
-                    )
-                    .map((x) => [x.body.audience, x.body]),
-                ),
-              );
-          }
+          const dossiers = await assuranceRecords({
+            tenantId,
+            engagementId,
+            kind: "dossier",
+          });
+          if (active)
+            setSealed(
+              Object.fromEntries(
+                dossiers
+                  .filter((x) => x.body.reportId === reportId)
+                  .map((x) => [x.body.audience, x.body]),
+              ),
+            );
         }
       })
       .catch(() => {});
