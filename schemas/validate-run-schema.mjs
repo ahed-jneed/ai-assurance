@@ -41,6 +41,52 @@ function negative(label, fixture, mutate) {
   rejected++;
 }
 
+// RFC 8785 canonical JSON: keys sorted by UTF-16 code units, ECMAScript number text (section 9.2).
+const jcs = value => Array.isArray(value) ? '[' + value.map(jcs).join(',') + ']'
+  : value !== null && typeof value === 'object' ? '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + jcs(value[key])).join(',') + '}'
+  : JSON.stringify(value);
+const close = (a, b) => Math.abs(a - b) <= 1e-12 * Math.max(1, Math.abs(b));
+function benjaminiHochberg(values) {
+  const order = values.map((_, index) => index).sort((a, b) => values[a] - values[b]);
+  const adjusted = new Array(values.length).fill(1);
+  let running = 1;
+  for (let rank = values.length - 1; rank >= 0; rank--) {
+    running = Math.min(running, values.length * values[order[rank]] / (rank + 1));
+    adjusted[order[rank]] = Math.min(1, running);
+  }
+  return adjusted;
+}
+
+// Statistics 1.0.0 cross-field rules (docs/design/audit-statistics.md section 11.6) shared by engine
+// report 1.3 and external run 1.5: plan hash, result ids in plan order, outcome against the decision,
+// family adjustments, run aggregation over confirmatory criteria and undecided results, review flags.
+function statisticsBindings(run, plan = run.configuration?.statistics, planHash = run.provenance?.statisticsPlanSha256) {
+  const decided = run.results.filter(result => result.decision);
+  if (plan === null) {
+    assert.equal(decided.length, 0);
+  } else {
+    assert.equal(createHash('sha256').update(jcs(plan), 'utf8').digest('hex'), planHash, 'statistics plan hash');
+    assert.deepEqual(decided.map(result => result.testId), plan.criteria.map(criterion => criterion.id), 'results follow the plan order');
+    const alpha = 1 - plan.confidenceLevel;
+    for (const role of ['confirmatory', 'exploratory']) {
+      const family = decided.filter(result => result.decision.role === role);
+      const bh = benjaminiHochberg(family.map(result => result.decision.pValue));
+      family.forEach((result, index) => {
+        const d = result.decision;
+        assert.equal(d.familySize, family.length);
+        assert.ok(close(d.adjustedPValue, role === 'confirmatory' ? Math.min(1, family.length * d.pValue) : bh[index]), `${result.testId}: family adjustment`);
+        const outcome = p => (d.direction === 'pass' || d.direction === 'fail') && p <= alpha + 1e-12 ? d.direction : 'inconclusive';
+        assert.equal(result.outcome, outcome(d.adjustedPValue), `${result.testId}: outcome follows the adjusted decision`);
+        assert.equal(d.unadjustedOutcome, outcome(d.pValue));
+      });
+    }
+  }
+  const counted = run.results.filter(result => !result.decision || result.decision.role === 'confirmatory').map(result => result.outcome);
+  const aggregate = ['fail', 'inconclusive', 'pass'].find(outcome => counted.includes(outcome)) ?? 'not_applicable';
+  assert.equal(run.outcome, aggregate, 'run outcome aggregates confirmatory criteria and undecided results');
+  assert.deepEqual(run.reviewFlags, decided.filter(result => result.decision.role === 'exploratory' && result.outcome === 'fail').map(result => result.testId));
+}
+
 // Equality, checksum recomputation and order are outside portable JSON Schema.
 // These fixture assertions mirror the application's frozen-manifest checks;
 // they are not a substitute for authorization, custody verification or review.
@@ -85,6 +131,26 @@ function hostedBindings(run) {
 
 for (const name of ['report.json', 'report-v1.1.1.json']) {
   positive(`Python ${name}`, json(resolve(workspace, 'engine/examples', name)));
+}
+// Engine report 1.3 (statistics 1.0.0): decided criteria carry a decision and the shared metric shape.
+const engine13 = json(resolve(workspace, 'engine/examples/report-v1.3.json'));
+positive('Python report-v1.3.json', engine13);
+statisticsBindings(engine13);
+const firstDecided = engine13.results.findIndex(result => result.decision);
+const firstDescriptive = engine13.results[firstDecided].metrics.findIndex(metric => metric.details.role === 'descriptive');
+for (const [label, mutate] of [
+  ['1.3 decided result without its decision', run => { delete run.results[firstDecided].decision; }],
+  ['1.3 descriptive entry with a p-value', run => { run.results[firstDecided].metrics[firstDescriptive].pValue = 0.01; }],
+  ['1.3 descriptive entry with a band', run => { run.results[firstDecided].metrics[firstDescriptive].details.band = { lower: 0.5, upper: null }; }],
+  ['1.3 unknown reason code', run => { run.results[firstDecided].decision.reasons.push('point_estimate_passes'); }],
+  ['1.3 Holm adjustment', run => { run.results[firstDecided].decision.adjustment = 'holm'; }],
+  ['1.3 configuration minimums below the floors', run => { run.configuration.contractVersion = '1.3'; run.configuration.minSampleSize = 20; }],
+  ['1.3 plan below the floors', run => { run.configuration.statistics.minimums.sampleSize = 20; }],
+  ['1.3 missing plan hash', run => { delete run.provenance.statisticsPlanSha256; }],
+  ['1.3 missing review flags', run => { delete run.reviewFlags; }],
+  ['1.3 group result under article 15', run => { run.results.find(result => result.decision?.kind === 'group_comparison').article = '15'; }],
+]) {
+  negative(label, engine13, mutate);
 }
 const fixturePath = resolve(option('--fixtures') ?? resolve(directory, 'fixtures/hosted-runs.v1.1.json'));
 assert.ok(existsSync(fixturePath), `Missing hosted fixtures: ${fixturePath}`);

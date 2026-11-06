@@ -7,15 +7,23 @@ from collections.abc import Iterable
 
 # Change a definition's version when its metric, eligibility, or acceptance
 # procedure changes. This catalog is separate from the runner release version.
+# 2.0.0: performance, calibration and group criteria are decided by statistics
+# 1.0.0 intervals (docs/design/audit-statistics.md) instead of point estimates.
+# A criterion of an explicit plan takes the version of its kind.
 TEST_DEFINITION_VERSIONS = {
-    "PERF-BINARY": "1.0.0",
-    "PERF-CAL": "1.0.0",
-    "PERF-MULTI": "1.0.0",
-    "PERF-REG": "1.0.0",
+    "PERF-BINARY": "2.0.0",
+    "PERF-CAL": "2.0.0",
+    "PERF-MULTI": "2.0.0",
+    "PERF-REG": "2.0.0",
     "FAIR-SCOPE": "1.0.0",
-    "FAIR-DP": "1.0.0",
-    "FAIR-DI": "1.0.0",
-    "FAIR-EO": "1.0.0",
+    "FAIR-DP": "2.0.0",
+    "FAIR-DI": "2.0.0",
+    "FAIR-EO": "2.0.0",
+    "criterion:performance": "2.0.0",
+    "criterion:multiclass_performance": "2.0.0",
+    "criterion:regression_performance": "2.0.0",
+    "criterion:calibration": "2.0.0",
+    "criterion:group_comparison": "2.0.0",
     "DRIFT-INPUT": "1.0.0",
     "DRIFT-NUMERIC": "1.0.0",
     "EXPL-SHAP": "1.0.0",
@@ -29,11 +37,13 @@ TEST_DEFINITION_VERSIONS = {
 }
 
 
-def definition_versions(test_ids: Iterable[str]) -> dict[str, str]:
-    """Snapshot the exact definitions consumed by this completed run."""
+def definition_versions(test_ids: Iterable[str], kinds: dict[str, str] | None = None) -> dict[str, str]:
+    """Snapshot the exact definitions consumed by this completed run. `kinds` maps the ids of statistics
+    criteria to their kind; a criterion id outside the catalog takes its kind's definition."""
+    kinds = kinds or {}
     versions = {}
     for test_id in test_ids:
-        definition_id = test_id if test_id in TEST_DEFINITION_VERSIONS else "DRIFT-NUMERIC" if test_id.startswith("DRIFT-") else None
+        definition_id = test_id if test_id in TEST_DEFINITION_VERSIONS and not test_id.startswith("criterion:") else "criterion:"+kinds[test_id] if test_id in kinds else "DRIFT-NUMERIC" if test_id.startswith("DRIFT-") else None
         if definition_id is None:
             raise ValueError(f"Test definition version is missing for {test_id}")
         versions[test_id] = TEST_DEFINITION_VERSIONS[definition_id]
