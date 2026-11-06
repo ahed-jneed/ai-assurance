@@ -11,6 +11,7 @@ import { parseCSV } from "../../diagnostics";
 import { datasetCSV } from "../../evaluation-service";
 import { ApiError } from "../../http";
 import { sha256 } from "../../ids";
+import { substantivePlan } from "../../workflow/command";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -100,6 +101,11 @@ export const sources: AssuranceModule = defineCommands({
             ? {
                 procedureId: p.id,
                 procedureRevision: p.revision,
+                // The plan content the sample was drawn for, as runs pin it;
+                // a procedure planned before plan hashes gets its hash here.
+                planHash:
+                  p.planHash ??
+                  (await sha256(JSON.stringify(substantivePlan(p)))),
                 programRevision: e.workflow!.program.revision,
                 briefRevision: e.workflow?.brief?.revision,
               }
