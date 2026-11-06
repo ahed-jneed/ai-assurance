@@ -90,11 +90,14 @@ export async function engagementTrail(ctx: Context, e: Engagement) {
   ).results;
   return { events, metadataBytes: storedSize(e) ?? null };
 }
+/** How many engagements the default selection tries before giving up. */
+const defaultAttempts = 3;
 /**
  * What the workspace loads for the caller: their practices, the clients and
  * engagements they may open, the selected engagement projected for their role,
  * its people and audit trail, and practice administration data for admins.
- * Without a requested engagement the first permitted one is selected.
+ * Without a requested engagement the first permitted one that loads intact is
+ * selected.
  */
 export async function workspaceView(
   ctx: Context,
@@ -131,25 +134,33 @@ export async function workspaceView(
     );
   // Only the selected engagement is loaded with its R2 parts. One that fails
   // to load intact leaves the rest of the workspace usable: the row carries an
-  // integrity error and the response says why nothing is selected.
-  const selectedId =
-    requestedEngagementId ??
-    engagementRows.find((row) => !row.integrity_error)?.id;
+  // integrity error and the response says why nothing is selected. Without a
+  // requested engagement the default selection falls back past engagements
+  // whose body or R2 parts are damaged, trying at most defaultAttempts so a
+  // widespread outage never reads the parts of every engagement.
+  const candidates = requestedEngagementId
+    ? [requestedEngagementId]
+    : engagementRows
+        .filter((row) => !row.integrity_error)
+        .slice(0, defaultAttempts)
+        .map((row) => row.id);
   let e: Engagement | null = null,
     engagementError: { engagementId: string; error: string } | null = null;
-  if (selectedId)
+  for (const candidateId of candidates) {
     try {
-      e = await getEngagement(ctx, selectedId);
+      e = await getEngagement(ctx, candidateId);
+      engagementError = null;
+      break;
     } catch (error) {
       if (!(error instanceof IntegrityError)) throw error;
-      const row = engagementRows.find((row) => row.id === selectedId);
+      const row = engagementRows.find((row) => row.id === candidateId);
       if (!row?.integrity_error) await recordIntegrityIncident(ctx, error);
-      engagementError = {
-        engagementId: selectedId,
-        error: integrityMessage(error),
-      };
-      if (row) row.integrity_error = engagementError.error;
+      const message = integrityMessage(error);
+      // When nothing opens, the response names the first engagement tried.
+      engagementError ??= { engagementId: candidateId, error: message };
+      if (row) row.integrity_error = message;
     }
+  }
   // Administrators see each member's live engagement grants, sponsored runner
   // workers and administration, and the pending invitations.
   const members = ctx.practiceAdmin
