@@ -64,6 +64,13 @@ def translated_report(path, legacy):
     return run(path, translate_config(request, rows))
 
 
+def run_request(path, data, request):
+    """The engine report for a request on data written to path, as a platform-held run computes it."""
+    Path(path).write_bytes(data)
+    rows, _ = read_csv(path)
+    return run(path, translate_config(request, rows))
+
+
 def claim_body(request=None, *, job="JOB-0123456789ab", attempt="ATTEMPT-0123456789ab", lease_seconds=120):
     """A claim response shaped like route.ts: id('JOB'), crypto.randomUUID() nonce, toISOString()."""
     request = request or hosted_request()
@@ -827,6 +834,75 @@ class WorkerTests(unittest.TestCase):
         packet["provenance"]["execution"]["datasetCustody"] = "platform"
         with self.assertRaises(ValueError):
             verify_result_bytes(json_bytes(packet), claim, IMAGE)
+
+    def test_client_held_results_withhold_groups_below_the_minimum_group_size(self):
+        # A one-row group C: reported exactly, its slice would give that person's group, label and prediction.
+        data = BIG+b"1,0,C\n"
+        folder = self.client_files(("data.csv", data))
+        with RunnerServer(client_request(data), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed", server.errors)
+            claim = Claim.parse(server.issued[0])
+            raw = next(raw for body, raw in server.posts if body["op"] == "complete")
+        packet = json.loads(Path(result["resultFile"]).read_bytes())
+        verify_result_bytes(Path(result["resultFile"]).read_bytes(), claim, IMAGE)
+        # The same rows held by the platform, for comparison.
+        exact = {r["testId"]: r for r in hosted_results(run_request(self.root/"exact.csv", data, hosted_request(data)), hosted_request(data))}
+        for source in (packet["hostedResults"], [r for r in packet["externalReport"]["results"] if "decision" in r]):
+            for r in source:
+                if r["decision"]["kind"] != "group_comparison":
+                    continue
+                with self.subTest(r["testId"]):
+                    self.assertEqual(r["decision"]["suppressedGroups"], [{"group": "C", "n": None}])
+                    headline = r["metrics"][0]
+                    c = next(s for s in headline["slices"] if s["slice"] == "C")
+                    self.assertEqual(c, {"slice": "C", "n": None, "declared": False, "suppressed": True, "withheld": True})
+                    self.assertEqual([s["n"] for s in headline["slices"] if s["slice"] != "C"], [400, 400])
+                    involving = [m for m in r["metrics"] if "C" in (m["details"]["subject"], m["details"]["comparator"])]
+                    self.assertTrue(involving)
+                    for m in involving:
+                        self.assertEqual((m["value"], m["numerator"], m["denominator"], m["confidenceInterval"], m["pValue"], m["details"]["counts"], m["details"]["fisherExactP"]), (None,)*7)
+                    self.assertTrue(any("withheld" in note for note in r["limitations"]))
+                    # Suppressed groups never decide, so withholding them changes no decision.
+                    same = exact[r["testId"]]
+                    self.assertEqual({**r["decision"], "suppressedGroups": None}, {**same["decision"], "suppressedGroups": None})
+                    self.assertEqual(r["outcome"], same["outcome"])
+                    self.assertEqual(same["decision"]["suppressedGroups"], [{"group": "C", "n": 1}])
+        # Nothing in the completion the platform received states C's size, rates or counts.
+        def about_c(value):
+            if isinstance(value, dict):
+                if "C" in (value.get("slice"), value.get("group"), value.get("subject"), value.get("comparator")):
+                    yield value
+                for item in value.values():
+                    yield from about_c(item)
+            elif isinstance(value, list):
+                for item in value:
+                    yield from about_c(item)
+        sent = json.loads(json.loads(raw)["resultJSON"])
+        found = list(about_c(sent))
+        self.assertTrue(found)
+        for item in found:
+            self.assertIsNone(item.get("n"))
+            self.assertFalse({"x", "counts", "selectionNumerator", "selectionRate", "tpr", "fpr", "observed"} & {k for k, v in item.items() if v is not None})
+
+    def test_client_held_calibration_withholds_small_bins(self):
+        from engine.criteria import withhold_small_groups
+        interval = {"lower": 0.1, "upper": 0.3, "level": 0.95, "method": "wilson"}
+        details = {"role": "headline", "metric": "calibration", "subject": None, "comparator": None, "counts": None, "band": None, "status": "evaluated", "direction": "none", "smallCell": False, "fisherExactP": None, "chanceExactP": None, "reasons": []}
+        big = {"slice": "bin1", "n": 40, "declared": False, "suppressed": False, "numerator": 8, "denominator": 40, "observedRate": 0.2, "confidenceInterval": interval, "meanProbability": 0.15, "lower": 0.1, "upper": 0.2}
+        small = {"slice": "bin9", "n": 1, "declared": False, "suppressed": True, "numerator": 0, "denominator": 1, "observedRate": 0.0, "confidenceInterval": interval, "meanProbability": 0.95, "lower": 0.9, "upper": 1.0}
+        result = {"testId": "CAL", "metrics": [{"name": "maximum_calibration_gap", "value": 0.05, "slices": [big, small], "details": details}], "limitations": [], "decision": {"kind": "calibration", "sampleSize": 41, "reasons": ["group_suppressed_below_minimum"], "suppressedGroups": [{"group": "bin9", "n": 1}]}}
+        plan = {"minimums": {"groupSize": 30}, "criteria": [{"id": "CAL", "kind": "calibration", "subgroup": None}]}
+        withhold_small_groups([result], plan)
+        self.assertEqual(result["metrics"][0]["slices"], [big, {"slice": "bin9", "n": None, "declared": False, "suppressed": True, "withheld": True, "lower": 0.9, "upper": 1.0}])
+        self.assertEqual(result["decision"]["suppressedGroups"], [{"group": "bin9", "n": None}])
+        self.assertEqual(result["metrics"][0]["value"], 0.05)
+        # A calibration subgroup below the minimums withholds every estimate.
+        result = {"testId": "CAL", "metrics": [{"name": "maximum_calibration_gap", "value": 0.05, "numerator": None, "denominator": None, "confidenceInterval": None, "pValue": None, "slices": [small], "details": dict(details)}, {"name": "expected_calibration_error", "value": 0.4, "numerator": None, "denominator": None, "confidenceInterval": interval, "pValue": None, "slices": [], "details": {**details, "role": "descriptive", "counts": {"n": 1, "bins": 1}}}], "limitations": [], "decision": {"kind": "calibration", "sampleSize": 1, "reasons": ["below_minimum_sample_size"], "suppressedGroups": [{"group": "bin9", "n": 1}]}}
+        plan["criteria"][0]["subgroup"] = {"field": "group", "value": "C"}
+        withhold_small_groups([result], plan)
+        self.assertEqual([(m["value"], m["confidenceInterval"], m["details"]["counts"]) for m in result["metrics"][1:]], [(None, None, None)])
+        self.assertEqual(len(result["limitations"]), 2)
 
     def operator_log(self):
         return [json.loads(line) for line in (self.root/"jobs"/"operator-log.jsonl").read_text(encoding="utf-8").splitlines()]

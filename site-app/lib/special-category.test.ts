@@ -769,7 +769,7 @@ describe("specialCategoryLimitations", () => {
     ).toEqual([
       "Run RUN-1 evaluated special-category column ethnicity on the platform under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
       "Run JOB-1 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
-      "Run JOB-2 evaluated special-category column ethnicity on the client's own worker in the client's environment, which returned only aggregates, with no basis recorded on its protocol.",
+      "Run JOB-2 evaluated special-category column ethnicity on the client's own worker in the client's environment, which returned only aggregates and withheld groups below the minimum group size, with no basis recorded on its protocol.",
     ]);
   });
 });

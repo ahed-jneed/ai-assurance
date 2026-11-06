@@ -529,7 +529,8 @@ def compute_job(inputs, outputs):
     # Data, label and model problems inside run() carry their own codes; an
     # uncoded error at this point is an engine defect.
     with failure_stage("compute_internal_error"):
-        report = run(data_path, native, adapter=adapter)
+        # A client-held dataset's report withholds groups below the minimum group size (#102).
+        report = run(data_path, native, adapter=adapter, withhold_small_groups=client_held(request))
         validate_report(report)
         result = evidence_envelope(report, claim, image_digest=envelope["imageDigest"], execution=envelope["execution"])
     payload = json_bytes(result)+b"\n"
@@ -675,7 +676,7 @@ class Worker:
         local = client_held(request)
         if local and self.client_data is None:
             raise ProtocolError("client_dataset_unavailable")
-        execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "datasetCustody": "client" if local else "platform", "limitations": (["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."])+(["The dataset stayed in the client's environment: the worker read it there by its SHA-256 pin, and only the aggregate results in this envelope reached the platform."] if local else [])}
+        execution = {"kind": "model_inference" if inference else "provided_predictions", "networkIsolation": self.executor.network_isolation, "controller": "client_local_worker" if request["executionMode"] == "client_local" else "external_auditor_worker", "datasetCustody": "client" if local else "platform", "limitations": (["Provided predictions do not establish independent inference or source-label truth."] if not inference else ["This worker evaluates already prepared numeric columns. Feature preparation, dataset independence and artifact safety require separate review."])+(["The dataset stayed in the client's environment: the worker read it there by its SHA-256 pin, and only the aggregate results in this envelope reached the platform. Groups and calibration bins below the minimum group size are withheld; groups at or above it are reported exactly."] if local else [])}
         with LeaseKeeper(self.transport, claim, deadline, interval=self.heartbeat) as lease:
             lease.valid()
             if local:

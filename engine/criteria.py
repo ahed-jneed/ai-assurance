@@ -352,6 +352,56 @@ def criterion_result(spec, outcome, config, plan, notes, context=None):
     return {"testId": spec["id"], "label": label, "article": ARTICLES[kind], "outcome": outcome["outcome"], "metrics": metrics, "limitations": list(dict.fromkeys(limitations)), "decision": decision}
 
 
+# Client-held datasets (#102): what a result keeps of a group or calibration bin below the minimum group size.
+WITHHELD_NOTE = ("The dataset is held by the client: groups and calibration bins below the minimum group size are withheld. "
+    "Their row counts, rates, intervals and comparisons are not reported; only their labels are. Overall figures (sample "
+    "size, coverage, expected calibration error and Brier score) still include their rows, so the combined number of "
+    "withheld rows can be derived, but not any withheld row's outcome.")
+WITHHELD_SUBGROUP_NOTE = ("The dataset is held by the client and this calibration subgroup is below the minimum group size, "
+    "so its estimates are withheld.")
+
+
+def _withheld_slice(s):
+    out = {"slice": s["slice"], "n": None, "declared": s["declared"], "suppressed": True, "withheld": True}
+    if "lower" in s:
+        out.update(lower=s["lower"], upper=s["upper"])
+    return out
+
+
+def _withhold_metric(m):
+    m.update(value=None, numerator=None, denominator=None, confidenceInterval=None, pValue=None, slices=[])
+    m["details"].update(counts=None, direction="none", smallCell=False, fisherExactP=None, chanceExactP=None)
+
+
+def withhold_small_groups(results, plan):
+    """For a run on a client-held dataset, withhold every value that describes a group or calibration bin below
+    the plan's minimum group size: its slice keeps only the label (n null, "withheld": true), each comparison
+    involving it loses its estimate, counts and interval, and decision.suppressedGroups no longer states its n.
+    Suppressed groups never decide (section 4.3), so no decision changes. A calibration subgroup below the
+    minimum group size that is also below the minimum sample size (so nothing decides) withholds all its
+    estimates. Results are changed in place."""
+    minimum = plan["minimums"]["groupSize"]
+    criteria = {c["id"]: c for c in plan["criteria"]}
+    for result in results:
+        decision = result.get("decision")
+        if decision is None or decision["kind"] not in ("group_comparison", "calibration"):
+            continue
+        criterion = criteria.get(result["testId"], {})
+        small = {g["group"] for g in decision.get("suppressedGroups") or ()}
+        subgroup = decision["kind"] == "calibration" and criterion.get("subgroup") is not None and decision["sampleSize"] < minimum and "below_minimum_sample_size" in decision["reasons"]
+        if not small and not subgroup:
+            continue
+        decision["suppressedGroups"] = [{"group": g["group"], "n": None} for g in decision.get("suppressedGroups") or ()]
+        for m in result["metrics"]:
+            details = m["details"]
+            if details["role"] == "headline":
+                m["slices"] = [_withheld_slice(s) if s.get("suppressed") else s for s in m["slices"]]
+            elif subgroup or details["subject"] in small or details["comparator"] in small:
+                _withhold_metric(m)
+        result["limitations"] = list(dict.fromkeys(result["limitations"] + [WITHHELD_NOTE] + ([WITHHELD_SUBGROUP_NOTE] if subgroup else [])))
+    return results
+
+
 def evaluate_plan_results(plan, observations, config, notes=()):
     """Evaluate a normalised plan on validated observations. Returns (results, evaluation)."""
     evaluation = Evaluation(plan, observations, config).evaluate()

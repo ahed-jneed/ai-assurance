@@ -21,7 +21,7 @@ from typing import Any
 
 from . import __version__
 from . import statistics as stats
-from .criteria import evaluate_plan_results, group_columns, multiclass_data, threshold_for
+from .criteria import evaluate_plan_results, group_columns, multiclass_data, threshold_for, withhold_small_groups as withhold
 from .errors import EngineError
 from .provenance import definition_versions, runtime_dependencies
 
@@ -419,7 +419,9 @@ def _inference(call, records):
         raise EngineError("model_inference_failed", "Model inference raised "+type(exc).__name__) from exc
 
 
-def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Path | None = None, *, adapter=None) -> dict[str, Any]:
+def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Path | None = None, *, adapter=None, withhold_small_groups: bool = False) -> dict[str, Any]:
+    """Evaluate a frozen configuration on a dataset. withhold_small_groups (a run on a client-held dataset, #102)
+    withholds the values of groups and calibration bins below the minimum group size (criteria.withhold_small_groups)."""
     started_at = datetime.now(timezone.utc).isoformat()
     frozen = validate_config(config)
     from .connectors import read_dataset
@@ -469,7 +471,8 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
         observations, omitted = prediction_rows(rows, frozen, group_columns(declared, frozen))
         plan = derived_plan(frozen, observations)
         if plan is not None:
-            diagnostics.extend(statistical_results(observations, frozen, plan, omitted)[0])
+            decided = statistical_results(observations, frozen, plan, omitted)[0]
+            diagnostics.extend(withhold(decided, plan) if withhold_small_groups else decided)
         if "fairness" in frozen["suite"] and frozen["task"] != "binary_classification":
             diagnostics.append(result("FAIR-SCOPE", "Binary outcome fairness suite", "10", [], ["These fairness definitions require a binary decision. A task-specific group-fairness protocol is required for regression or multiclass tasks."], "not_applicable"))
     from_predictions = list(diagnostics)

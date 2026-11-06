@@ -95,6 +95,7 @@ def add_shapes(defs):
         'details': ref('statisticsMetricDetails'), 'pValue': nullable(RATIO)})
     # Section 4.4: descriptive entries carry no band, direction or p-value.
     defs['statisticsMetric']['allOf'] = [{'if': {'properties': {'details': {'properties': {'role': {'const': 'descriptive'}}}}}, 'then': {'properties': {'pValue': {'type': 'null'}, 'details': {'properties': {'band': {'type': 'null'}, 'direction': {'const': 'none'}}}}}}]
+    # suppressedGroups[].n is null in a run on a client-held dataset, which withholds groups below the minimum (#102).
     coverage = obj({'eligibleRows': COUNT, 'populationRows': COUNT, 'unknownGroupRows': COUNT, 'value': RATIO, 'minimum': RATIO})
     library = obj({'id': st(1, 300), 'version': {'type': 'integer', 'minimum': 1}, 'legalStatus': {'enum': ['screening_heuristic', 'reporting_only', 'no_legal_safe_harbour']}, 'caveat': st(1, 5000)})
     defs['statisticsDecision'] = obj({
@@ -103,7 +104,7 @@ def add_shapes(defs):
         'direction': {'enum': ['pass', 'fail', 'none']}, 'pValue': RATIO, 'adjustedPValue': RATIO,
         'adjustment': {'enum': ['bonferroni', 'benjamini_hochberg']}, 'familySize': {'type': 'integer', 'minimum': 1, 'maximum': MAX_RESULTS},
         'unadjustedOutcome': {'enum': ['pass', 'fail', 'inconclusive']}, 'decidingMemberId': nullable(st(1, MAX_NAME)),
-        'sampleSize': COUNT, 'coverage': nullable(coverage), 'suppressedGroups': nullable(arr(obj({'group': st(0, 5000), 'n': COUNT}), 0, 1000)),
+        'sampleSize': COUNT, 'coverage': nullable(coverage), 'suppressedGroups': nullable(arr(obj({'group': st(0, 5000), 'n': nullable(COUNT)}), 0, 1000)),
         'libraryEntry': nullable(library), 'reasons': ref('statisticsReasons')})
     decision_rules = [
         {'if': {'properties': {'role': {'const': 'confirmatory'}}}, 'then': {'properties': {'adjustment': {'const': 'bonferroni'}}}, 'else': {'properties': {'adjustment': {'const': 'benjamini_hochberg'}}}},

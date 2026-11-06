@@ -1101,16 +1101,27 @@ try {
   // #102: a special-category fairness protocol on a dataset the client keeps.
   // The platform records only the file's SHA-256 pin; the client's own worker
   // reads the file in the client's environment and returns aggregates.
-  const clientCsv = csv
+  const baseCsv = csv
       .replace(
         /^actual,predicted,score,group,/,
         "actual,predicted,score,ethnicity,",
       )
       .replace(/,A,/g, ",group-alpha,")
       .replace(/,B,/g, ",group-beta,"),
+    [clientHeader, firstRow] = baseCsv.split("\n"),
+    // One person in group-gamma: below the minimum group size, so the
+    // client's worker withholds that group's counts and rates.
+    clientCsv = baseCsv.replace(
+      clientHeader + "\n",
+      clientHeader +
+        "\n" +
+        firstRow.replace("group-alpha", "group-gamma") +
+        "\n",
+    ),
     clientRows = clientCsv.trim().split("\n").slice(1),
     clientBytes = Buffer.from(clientCsv);
-  assert(clientRows.length >= 60 && clientRows[0].includes("group-alpha"));
+  assert(clientRows.length >= 60 && clientRows[1].includes("group-alpha"));
+  assert(clientRows[0].includes("group-gamma"));
   // Uploading the file is refused: its ethnicity column has no basis.
   const refusedUpload = new FormData();
   for (const [key, val] of Object.entries({
@@ -1406,6 +1417,30 @@ try {
     clientEnvelope.hostedResults.find((r) => r.testId === "demographic_parity"),
   );
   assert(parity.includes("group-alpha") && parity.includes("group-beta"));
+  // The one-row group is withheld: its label only, no n, rates or counts.
+  const parityResult = JSON.parse(parity);
+  assert.deepEqual(parityResult.decision.suppressedGroups, [
+    { group: "group-gamma", n: null },
+  ]);
+  assert.deepEqual(
+    parityResult.metrics[0].slices.find((s) => s.slice === "group-gamma"),
+    {
+      slice: "group-gamma",
+      n: null,
+      declared: false,
+      suppressed: true,
+      withheld: true,
+    },
+  );
+  const gammaPairs = parityResult.metrics.filter((m) =>
+    [m.details.subject, m.details.comparator].includes("group-gamma"),
+  );
+  assert(gammaPairs.length > 0);
+  for (const m of gammaPairs)
+    assert.deepEqual(
+      [m.value, m.details.counts, m.confidenceInterval],
+      [null, null, null],
+    );
   await assurance("importJob", { jobId: clientJob.jobId });
   const clientRun = e.runs.find((r) => r.externalJobId === clientJob.jobId);
   assert.equal(clientRun.manifest.executionMode, "client_local");
@@ -1422,7 +1457,7 @@ try {
     JSON.stringify(clientRun, null, 2),
   );
   console.log(
-    "PASS client-local special-category job: pinned by SHA-256, read in the client's environment, no dataset bytes on the platform, a changed file refused, aggregates imported",
+    "PASS client-local special-category job: pinned by SHA-256, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
   );
   // A schemaVersion 1.1 protocol pre-registers an explicit plan whose
   // criterion ids differ from the suite names: queueExternal freezes

@@ -297,7 +297,7 @@ export const execution: AssuranceModule = defineCommands({
             "Worker signature authenticates enrolled service origin, not completeness or truth.",
             ...(clientHeld
               ? [
-                  "The dataset stays in the client's environment: the platform holds only its SHA-256 and size, and the client's worker returns aggregate results only. The auditor has not inspected the rows.",
+                  "The dataset stays in the client's environment: the platform holds only its SHA-256 and size, and the client's worker returns aggregate results only, withholding groups below the minimum group size. The auditor has not inspected the rows.",
                 ]
               : []),
           ],

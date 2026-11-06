@@ -642,7 +642,7 @@ export function specialCategoryLimitations(runs: readonly Run[]) {
           ? "on the platform"
           : r.manifest!.executionMode === "client_local"
             ? r.manifest!.dataset?.custody === "client"
-              ? "on the client's own worker in the client's environment, which returned only aggregates,"
+              ? "on the client's own worker in the client's environment, which returned only aggregates and withheld groups below the minimum group size,"
               : "on the client's own worker"
             : "on the auditor's external worker";
     return [
