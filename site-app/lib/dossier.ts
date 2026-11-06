@@ -1,18 +1,16 @@
-import { ApiError, bucket, db, id, now, sha256, type Context } from "./store";
+import { ApiError, bucket, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
 import { storedBodies } from "./assurance-store";
 import { legalDate } from "./rule-pack";
+import { sign, type SigningKey } from "./signing-keys";
 export function base64(bytes: ArrayBuffer | Uint8Array) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let s = "";
   for (let i = 0; i < data.length; i += 8192)
     s += String.fromCharCode(...data.subarray(i, i + 8192));
   return btoa(s);
-}
-export function unbase64(s: string) {
-  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 }
 const escaped = (s: unknown) =>
   String(s ?? "").replace(
@@ -39,11 +37,33 @@ function rulePackLine(snapshot: Record<string, unknown>) {
     "</small>"
   );
 }
+/** A version label the verifier accepts: nonempty text of at most 200 characters. */
+const versionText = (v: unknown): v is string =>
+  typeof v === "string" && v.trim() !== "" && v.length <= 200;
+/** The captured rule-pack stamp as signed in manifest 1.1, or null. */
+function signedRulePack(snapshot: Record<string, unknown>) {
+  const pack = snapshot.rulePack as Partial<RulePackStamp> | undefined;
+  if (
+    !pack ||
+    !versionText(pack.version) ||
+    !versionText(pack.legalVersion) ||
+    !versionText(pack.researchedAsOf) ||
+    (pack.legalReview !== "pending" && pack.legalReview !== "approved")
+  )
+    return null;
+  return {
+    version: pack.version,
+    legalVersion: pack.legalVersion,
+    researchedAsOf: pack.researchedAsOf,
+    legalReview: pack.legalReview,
+  };
+}
 export async function buildDossier(
   ctx: Context,
   e: Engagement,
   r: Report,
   client: boolean,
+  signingKeyId: string,
   withheld: { id: string; reason: string }[] = [],
 ) {
   const snapshot = client ? r.clientSnapshot : r.snapshot,
@@ -255,11 +275,11 @@ export async function buildDossier(
     });
   }
   const instructions =
-    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. Pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. The platform cannot certify the audit conclusion.\n";
+    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. The platform cannot certify the audit conclusion.\n";
   await add("README.txt", bytes(instructions), "text/plain");
   leaves.sort((a, b) => a.path.localeCompare(b.path));
   const manifest = {
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     audience: client ? "client" : "internal",
     reportId: r.id,
     reportSha256: reportHash!,
@@ -267,6 +287,13 @@ export async function buildDossier(
     files: leaves,
     withheld: excluded,
     custody,
+    // Manifest 1.1 signs the key ID and the captured rule-pack and
+    // methodology versions along with the files.
+    signingKeyId,
+    rulePack: signedRulePack(snapshot),
+    methodologyVersion: versionText(snapshot.methodologyVersion)
+      ? snapshot.methodologyVersion
+      : null,
   };
   return {
     schemaVersion: "1.0",
@@ -275,65 +302,19 @@ export async function buildDossier(
     files,
   };
 }
-export async function signingKey(ctx: Context, rotate = false) {
-  const existing = await db()
-    .prepare(
-      "SELECT * FROM dossier_keys WHERE tenant_id=? AND active=1 ORDER BY created_at DESC LIMIT 1",
-    )
-    .bind(ctx.tenantId)
-    .first<{ id: string; private_key: string; public_key: string }>();
-  if (existing && !rotate) return existing;
-  const pair = (await crypto.subtle.generateKey("Ed25519", true, [
-      "sign",
-      "verify",
-    ])) as CryptoKeyPair,
-    key = {
-      id: id("KEY"),
-      private_key: base64(
-        await crypto.subtle.exportKey("pkcs8", pair.privateKey),
-      ),
-      public_key: base64(await crypto.subtle.exportKey("spki", pair.publicKey)),
-    };
-  await db().batch([
-    db()
-      .prepare(
-        "UPDATE dossier_keys SET active=0 WHERE tenant_id=? AND active=1",
-      )
-      .bind(ctx.tenantId),
-    db()
-      .prepare(
-        "INSERT INTO dossier_keys(tenant_id,id,private_key,public_key,active,created_at) VALUES(?,?,?,?,1,?)",
-      )
-      .bind(ctx.tenantId, key.id, key.private_key, key.public_key, now()),
-  ]);
-  return key;
-}
 export async function signDossier(
-  ctx: Context,
+  key: SigningKey,
   dossier: Awaited<ReturnType<typeof buildDossier>>,
 ) {
-  const key = await signingKey(ctx),
-    privateKey = await crypto.subtle.importKey(
-      "pkcs8",
-      unbase64(key.private_key),
-      "Ed25519",
-      false,
-      ["sign"],
-    ),
-    signature = base64(
-      await crypto.subtle.sign(
-        "Ed25519",
-        privateKey,
-        new TextEncoder().encode(canonical(dossier.manifest)),
-      ),
-    );
+  if (dossier.manifest.signingKeyId !== key.id)
+    throw new ApiError(500, "Dossier manifest names another signing key");
   return {
     ...dossier,
     signature: {
       algorithm: "Ed25519",
       keyId: key.id,
-      publicKeySPKI: key.public_key,
-      signature,
+      publicKeySPKI: key.publicKeySPKI,
+      signature: await sign(key, canonical(dossier.manifest)),
     },
   };
 }

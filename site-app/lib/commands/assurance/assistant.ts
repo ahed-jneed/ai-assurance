@@ -6,7 +6,7 @@ import {
   recordStatement,
 } from "../../assurance-store";
 import { bucket } from "../../bindings";
-import { base64, signingKey, unbase64 } from "../../dossier";
+import { activeSigningKey, sign } from "../../signing-keys";
 import { isReleaseTimeRecord, paperCurrent } from "../../domain";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
@@ -96,21 +96,8 @@ export const assistant: AssuranceModule = defineCommands({
           sources,
         },
         packetSha256 = await sha256(canonical(base)),
-        key = await signingKey(ctx),
-        privateKey = await crypto.subtle.importKey(
-          "pkcs8",
-          unbase64(key.private_key),
-          "Ed25519",
-          false,
-          ["sign"],
-        ),
-        signature = base64(
-          await crypto.subtle.sign(
-            "Ed25519",
-            privateKey,
-            new TextEncoder().encode(canonical(base)),
-          ),
-        );
+        key = await activeSigningKey(ctx),
+        signature = await sign(key, canonical(base));
       const record = await addRecord(ctx, e.id, "assistant_export", {
         packetSha256,
         sourcePins: sources.map(({ excerpt, engagementId, ...s }) => s),
@@ -129,7 +116,7 @@ export const assistant: AssuranceModule = defineCommands({
             packetSha256,
             signature: { algorithm: "Ed25519", keyId: key.id, signature },
           },
-          trust: { [key.id]: key.public_key },
+          trust: { [key.id]: key.publicKeySPKI },
         },
         { headers: { "Cache-Control": "no-store" } },
       );

@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";
 import { spawn } from "node:child_process";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { Miniflare } from "miniflare";
 const python =
   process.env.ASSURANCE_TEST_PYTHON ??
@@ -29,6 +29,8 @@ const mf = new Miniflare({
     IDENTITY_TRUSTED_HEADERS: "loopback-tests",
     // First sign-ins provision the fixture practices (lib/access-policy.ts).
     SELF_SIGNUP: "open",
+    // A key-encryption key generated for this run (docs/security/signing-keys.md).
+    DOSSIER_KEK: randomBytes(32).toString("base64"),
   },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
@@ -1904,6 +1906,40 @@ try {
     "--require-trusted-signature",
   ]);
   assert.equal(verified.code, 0, verified.out + verified.error);
+  // Manifest 1.1 signs the key ID and the captured versions (#25).
+  assert.equal(dossier.manifest.schemaVersion, "1.1");
+  assert.equal(dossier.manifest.signingKeyId, dossier.signature.keyId);
+  assert.deepEqual(dossier.manifest.rulePack, {
+    version: e.rulePack.version,
+    legalVersion: e.rulePack.legalVersion,
+    researchedAsOf: e.rulePack.researchedAsOf,
+    legalReview: e.rulePack.legalReview,
+  });
+  assert.equal(dossier.manifest.methodologyVersion, e.rulePack.version);
+  const originalDossier = Buffer.from(payload);
+  const keyList = (user = owner) =>
+    api("/api/dossier/keys?" + new URLSearchParams({ tenantId }), { user });
+  let published = await keyList();
+  assert.deepEqual(
+    published.keys.map((k) => [k.keyId, k.status]),
+    [[dossier.signature.keyId, "active"]],
+  );
+  assert.equal(
+    published.trust[dossier.signature.keyId],
+    dossier.signature.publicKeySPKI,
+  );
+  // The client member sees the same verification keys.
+  assert.deepEqual((await keyList(viewer)).trust, published.trust);
+  const keyRows = (
+    await testDb
+      .prepare("SELECT * FROM dossier_keys WHERE tenant_id=?")
+      .bind(tenantId)
+      .all()
+  ).results;
+  assert.equal(keyRows.length, 1);
+  assert(!("private_key" in keyRows[0]), "no plaintext private key column");
+  assert.match(keyRows[0].wrapped_key, /^A256GCM\./);
+  assert.match(keyRows[0].kek_id, /^kek-[0-9a-f]{16}$/);
   dossier.files.find((f) => f.path === "report.json").contentBase64 =
     Buffer.from("{}").toString("base64");
   await fs.writeFile(dossierPath, JSON.stringify(dossier));
@@ -1928,6 +1964,74 @@ try {
     { user: viewer, status: 404 },
   );
   assert(sealed.record.body.manifestSha256);
+  // Rotation: practice admins only, a management event, and the old key
+  // stays published so the dossier sealed before still verifies (#25).
+  assert.match(
+    (
+      await api("/api/dossier", {
+        body: {
+          tenantId,
+          engagementId: e.id,
+          reportId: report.id,
+          op: "rotate_key",
+        },
+        status: 400,
+      })
+    ).error,
+    /management op rotateSigningKey/,
+  );
+  for (const user of [reviewer, viewer])
+    await api("/api/management", {
+      user,
+      body: {
+        tenantId,
+        expectedVersion: w.managementVersion,
+        op: "rotateSigningKey",
+        data: { reason: "Not an administrator" },
+      },
+      status: 403,
+    });
+  const rotated = await mgmt("rotateSigningKey", {
+    reason: "Fixture rotation",
+  });
+  assert.notEqual(rotated.details.keyId, dossier.signature.keyId);
+  const rotationEvent = await testDb
+    .prepare(
+      "SELECT actor,details FROM management_events WHERE tenant_id=? AND action='rotateSigningKey'",
+    )
+    .bind(tenantId)
+    .first();
+  assert.equal(rotationEvent.actor, owner);
+  assert.deepEqual(JSON.parse(rotationEvent.details), rotated.details);
+  published = await keyList();
+  assert.deepEqual(
+    published.keys.map((k) => [k.keyId, k.status, k.retiredReason]),
+    [
+      [dossier.signature.keyId, "retired", "Fixture rotation"],
+      [rotated.details.keyId, "active", null],
+    ],
+  );
+  const retiredRow = await testDb
+    .prepare("SELECT wrapped_key,kek_id FROM dossier_keys WHERE id=?")
+    .bind(dossier.signature.keyId)
+    .first();
+  assert.deepEqual(retiredRow, { wrapped_key: null, kek_id: null });
+  await fs.writeFile(dossierPath, originalDossier);
+  await fs.writeFile(trustPath, JSON.stringify(published.trust));
+  const afterRotation = await processRun([
+    "-m",
+    "engine.assurance",
+    "verify",
+    "--dossier",
+    dossierPath,
+    "--trusted-keys",
+    trustPath,
+    "--require-trusted-signature",
+  ]);
+  assert.equal(afterRotation.code, 0, afterRotation.out + afterRotation.error);
+  console.log(
+    "PASS wrapped signing key, manifest 1.1, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
+  );
   const stored = await testDb
     .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
     .bind(tenantId, e.id)
@@ -1978,6 +2082,24 @@ try {
     ),
   );
   assert(withheldPayload.manifest.withheld.some((x) => x.id === documentId));
+  assert.equal(withheldPayload.signature.keyId, rotated.details.keyId);
+  assert.equal(withheldPayload.manifest.signingKeyId, rotated.details.keyId);
+  await fs.writeFile(dossierPath, JSON.stringify(withheldPayload));
+  const rotatedVerified = await processRun([
+    "-m",
+    "engine.assurance",
+    "verify",
+    "--dossier",
+    dossierPath,
+    "--trusted-keys",
+    trustPath,
+    "--require-trusted-signature",
+  ]);
+  assert.equal(
+    rotatedVerified.code,
+    0,
+    rotatedVerified.out + rotatedVerified.error,
+  );
   assert(
     !withheldPayload.files.some((x) =>
       x.path.startsWith("evidence/" + documentId + "/"),

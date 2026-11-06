@@ -12,6 +12,7 @@ import { admins } from "./admins";
 import { invitations } from "./invitations";
 import { members } from "./members";
 import { practice } from "./practice";
+import { signingKeys } from "./signing-keys";
 /** Every op POST /api/management accepts, each listed by exactly one module. */
 export const managementModules: readonly ManagementModule[] = [
   clients,
@@ -20,6 +21,7 @@ export const managementModules: readonly ManagementModule[] = [
   admins,
   invitations,
   practice,
+  signingKeys,
 ];
 /**
  * The ops in module order, which is also the order the envelope's

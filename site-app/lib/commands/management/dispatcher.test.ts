@@ -42,6 +42,7 @@ const ops = [
   "inviteMember",
   "cancelInvitation",
   "renamePractice",
+  "rotateSigningKey",
 ];
 // Valid data for each op, against the practice below.
 const valid: Record<string, Record<string, unknown>> = {
@@ -57,6 +58,7 @@ const valid: Record<string, Record<string, unknown>> = {
   inviteMember: { email: "Nia@Example.test", role: "Auditor" },
   cancelInvitation: { invitationId: "INV-1" },
   renamePractice: { name: "Lea & Partners" },
+  rotateSigningKey: { reason: "Scheduled annual rotation" },
 };
 // The members of the fixture practice besides the caller (user-lead).
 const people: Record<string, Record<string, unknown>> = {
@@ -132,9 +134,12 @@ const own = (d1: ReturnType<typeof practice>) => d1.batches[0].slice(1, -1);
 
 beforeEach(() => {
   vi.resetAllMocks();
+  // A generated test key-encryption key for rotateSigningKey.
+  env.DOSSIER_KEK = Buffer.alloc(32, 9).toString("base64");
 });
 afterEach(() => {
   delete env.DB;
+  delete env.DOSSIER_KEK;
 });
 
 describe("POST /api/management", () => {
@@ -250,6 +255,7 @@ describe("POST /api/management", () => {
           inviteMember: ["invitations"],
           cancelInvitation: ["invitations"],
           renamePractice: ["tenants"],
+          rotateSigningKey: ["dossier_keys", "dossier_keys"],
         }[op],
       );
     },
@@ -616,6 +622,55 @@ describe("invitations and practice settings (F-44)", () => {
     ).toEqual({ status: 400, error: "Use at most 80 characters" });
     await post("renamePractice", { name: "  Lea & Partners " });
     expect(own(d1)[0].args.slice(0, 2)).toEqual(["Lea & Partners", "tenant-1"]);
+  });
+
+  it("rotates the signing key with a reason, retiring the active key", async () => {
+    const d1 = practice();
+    signIn(caller());
+    expect(await refusal(await post("rotateSigningKey", {}))).toEqual({
+      status: 400,
+      error: "Required",
+    });
+    expect(
+      await refusal(await post("rotateSigningKey", { reason: "  " })),
+    ).toEqual({ status: 400, error: "Give a reason for the rotation" });
+    const response = await post("rotateSigningKey", {
+      reason: " Suspected exposure ",
+    });
+    const { details } = (await response.json()) as {
+      details: Record<string, string>;
+    };
+    expect(details).toEqual({
+      keyId: expect.stringMatching(/^KEY-/),
+      publicKeySPKI: expect.stringMatching(/^MC/),
+      reason: "Suspected exposure",
+    });
+    const [retire, insert] = own(d1);
+    expect(retire.sql).toMatch(
+      /^UPDATE dossier_keys SET active=0,wrapped_key=NULL,kek_id=NULL,/,
+    );
+    expect(retire.args.slice(1, 3)).toEqual(["Suspected exposure", "tenant-1"]);
+    expect(insert.args.slice(0, 2)).toEqual(["tenant-1", details.keyId]);
+    expect(insert.args[2]).toMatch(/^A256GCM\./);
+    expect(insert.args[4]).toBe(details.publicKeySPKI);
+    // The management event records the new key, never its wrapped private half.
+    const event = d1.batches[0].at(-1)!;
+    expect(event.args[4]).toBe(JSON.stringify(details));
+    expect(String(event.args[4])).not.toContain("A256GCM");
+  });
+
+  it("refuses a signing key rotation without DOSSIER_KEK", async () => {
+    delete env.DOSSIER_KEK;
+    const d1 = practice();
+    signIn(caller());
+    expect(
+      await refusal(await post("rotateSigningKey", valid.rotateSigningKey)),
+    ).toEqual({
+      status: 503,
+      error:
+        "Signing is not configured: the platform operator must set the DOSSIER_KEK Worker secret (docs/security/signing-keys.md). Nothing was signed.",
+    });
+    expect(d1.batches).toEqual([]);
   });
 
   it("refuses an engagement over the practice quota", async () => {

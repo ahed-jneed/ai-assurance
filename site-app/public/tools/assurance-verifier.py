@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-TOOL_VERSION = "1.1.0"
+TOOL_VERSION = "1.2.0"
 MAX_RECORDS = 100_000
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_CONTAINER_BYTES = 64 * 1024 * 1024
@@ -619,9 +619,28 @@ def _path_set(paths):
     _expect(all("/".join(path.split("/")[:i]) not in names for path in folded for i in range(1, len(path.split("/")))), "File/directory path collision")
 
 
+MANIFEST_KEYS = ("schemaVersion", "audience", "reportId", "reportSha256", "createdAt", "files", "withheld", "custody")
+# Manifest 1.1 also signs the signing key ID and the captured rule-pack and
+# methodology versions (null when the report captured none).
+MANIFEST_KEYS_1_1 = MANIFEST_KEYS + ("signingKeyId", "rulePack", "methodologyVersion")
+RULE_PACK_KEYS = ("version", "legalVersion", "researchedAsOf", "legalReview")
+
+
 def _manifest(manifest):
-    _keys(manifest, ("schemaVersion", "audience", "reportId", "reportSha256", "createdAt", "files", "withheld", "custody"), ("schemaVersion", "audience", "reportId", "reportSha256", "createdAt", "files", "withheld", "custody"), "manifest")
-    _expect(manifest["schemaVersion"] == "1.0" and manifest["audience"] in {"internal", "client"}, "Unsupported manifest version or audience")
+    _expect(isinstance(manifest, dict) and manifest.get("schemaVersion") in {"1.0", "1.1"}, "Unsupported manifest version or audience")
+    keys = MANIFEST_KEYS if manifest["schemaVersion"] == "1.0" else MANIFEST_KEYS_1_1
+    _keys(manifest, keys, keys, "manifest")
+    _expect(manifest["audience"] in {"internal", "client"}, "Unsupported manifest version or audience")
+    if manifest["schemaVersion"] == "1.1":
+        _text(manifest["signingKeyId"], "signing key ID", 300)
+        pack = manifest["rulePack"]
+        if pack is not None:
+            _keys(pack, RULE_PACK_KEYS, RULE_PACK_KEYS, "manifest rule pack")
+            for key in RULE_PACK_KEYS:
+                _text(pack[key], "rule pack " + key, 200)
+            _expect(pack["legalReview"] in {"pending", "approved"}, "Rule pack legal review must be pending or approved")
+        if manifest["methodologyVersion"] is not None:
+            _text(manifest["methodologyVersion"], "methodology version", 200)
     _text(manifest["reportId"], "report ID", 3000)
     _expect(isinstance(manifest["reportSha256"], str) and HASH.fullmatch(manifest["reportSha256"]), "Invalid report digest")
     _timestamp(manifest["createdAt"], "manifest creation time")
@@ -752,6 +771,8 @@ def verify_dossier(container, *, trusted_keys=None, require_trusted_signature=Fa
             _keys(signature, ("algorithm", "publicKeySPKI", "signature", "keyId"), ("algorithm", "publicKeySPKI", "signature", "keyId"), "signature")
             _expect(signature["algorithm"] == "Ed25519", "Unsupported signature algorithm")
             _text(signature["keyId"], "signing key ID", 300)
+            if container["manifest"]["schemaVersion"] != "1.0":
+                _expect(signature["keyId"] == container["manifest"]["signingKeyId"], "Signature key ID differs from the signed manifest's signingKeyId")
             key_data = _b64(signature["publicKeySPKI"], "public key SPKI", 1024)
             signature_data = _b64(signature["signature"], "signature bytes", 64)
             _expect(len(signature_data) == 64, "Ed25519 signatures require 64 bytes")
@@ -802,6 +823,7 @@ def sign_dossier(container, *, private_key_path, key_id):
     _expect("signature" not in container, "Already signed containers cannot be silently re-signed")
     proof = verify_dossier(container)
     _expect(proof["integrityValid"] and proof["valid"], "Cannot sign an invalid dossier")
+    _expect(container["manifest"]["schemaVersion"] == "1.0" or container["manifest"]["signingKeyId"] == key_id, "The key ID must match the manifest's signingKeyId")
     source = Path(private_key_path)
     _expect(source.is_file() and source.stat().st_size <= 65536, "Private key path/size is invalid")
     try:
