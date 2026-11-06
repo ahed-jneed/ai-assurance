@@ -20,6 +20,14 @@ describe("reportEditing", () => {
     expect(reportEditing(open, "audit-program", false)).toEqual([]);
   });
 
+  it("keeps the Testing lab's setup open when its dataset card form closes", () => {
+    // Both editors live in the Testing lab; each reports under its own key.
+    let open = reportEditing([], "testing-lab", true);
+    open = reportEditing(open, "dataset-registry", true);
+    open = reportEditing(open, "dataset-registry", false);
+    expect(open).toEqual(["testing-lab"]);
+  });
+
   it("keeps the same list when nothing changes", () => {
     const open = reportEditing([], "testing-lab", true);
     expect(reportEditing(open, "testing-lab", true)).toBe(open);

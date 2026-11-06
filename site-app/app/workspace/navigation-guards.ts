@@ -16,6 +16,8 @@ export const editingSources = [
   "request-access",
   "assurance-workbench",
   "testing-lab",
+  // The Testing lab's dataset card form, apart from the lab's own dialogs.
+  "dataset-registry",
   "member-onboarding",
   "finding-assurance",
   "report-release",

@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ai-assurance:working-paper:1.0",
+  "$id": "urn:ai-assurance:working-paper:2.0",
   "title": "AI Assurance working paper or memo revision",
-  "description": "Two distinct artifacts: generated diagnostic draft or complete frozen human-evaluated audit revision. A draft is supporting evidence and cannot satisfy report issuance gates.",
+  "description": "Single working-paper contract with two distinct artifacts: a catalog working-paper or memo revision (paperRevision) and an engine-generated diagnostic draft (generatedDraft). Schema validity does not establish reviewer independence, tenant access, evidence truthfulness or legal sufficiency; the workflow service enforces those.",
   "oneOf": [
     {
-      "$ref": "#/$defs/frozenRevision"
+      "$ref": "#/$defs/paperRevision"
     },
     {
       "$ref": "#/$defs/generatedDraft"
@@ -22,116 +22,647 @@
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
     },
-    "frozenRevision": {
+    "paperRevision": {
+      "title": "Catalog working-paper or memo revision",
+      "description": "A revision of a templates/catalog.json item. Drafts may leave narrative fields empty; submitted, reviewed, approved and sealed revisions require procedures, an evaluation rationale, approvals and, once sealed, two approvals and a content digest. templates/working-paper.blank.json is a draft specimen.",
       "type": "object",
       "additionalProperties": false,
       "required": [
         "schemaVersion",
         "id",
+        "tenantId",
+        "clientId",
         "engagementId",
+        "catalogId",
+        "templateVersion",
         "revision",
-        "template",
-        "kind",
-        "title",
+        "status",
         "stage",
-        "objective",
-        "criteria",
+        "title",
         "scope",
+        "applicability",
+        "riskReferences",
         "procedures",
         "evidence",
+        "runReferences",
         "evaluation",
-        "conclusion",
-        "findings",
-        "limitations",
-        "preparedBy",
-        "preparedAt"
+        "reviewComments",
+        "approvals",
+        "provenance"
       ],
       "properties": {
         "schemaVersion": {
-          "const": "1.0"
+          "const": "1.0.0"
         },
         "id": {
-          "$ref": "#/$defs/id"
+          "type": "string",
+          "minLength": 1
         },
         "tenantId": {
-          "$ref": "#/$defs/id"
+          "type": "string",
+          "minLength": 1
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1
         },
         "engagementId": {
-          "$ref": "#/$defs/id"
+          "type": "string",
+          "minLength": 1
         },
-        "systemVersionIds": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "minItems": 1,
-          "uniqueItems": true
+        "catalogId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateVersion": {
+          "type": "string",
+          "minLength": 1
         },
         "revision": {
           "type": "integer",
           "minimum": 1
         },
-        "parentRevisionId": {
+        "status": {
+          "enum": [
+            "draft",
+            "in_progress",
+            "submitted",
+            "returned",
+            "reviewed",
+            "approved",
+            "sealed",
+            "superseded"
+          ]
+        },
+        "stage": {
+          "enum": [
+            "Planning",
+            "Fieldwork",
+            "Evidence Evaluation",
+            "Reporting",
+            "Sign-off",
+            "Remediation and Monitoring"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "applicability": {
+          "$ref": "#/$defs/applicability"
+        },
+        "riskReferences": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "procedures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/procedure"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "runReferences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/run"
+          }
+        },
+        "evaluation": {
+          "$ref": "#/$defs/evaluation"
+        },
+        "reviewComments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/comment"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approval"
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "createdBy",
+            "createdAt",
+            "contentOrigin",
+            "supersedesId",
+            "amendmentReason"
+          ],
+          "properties": {
+            "createdBy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "contentOrigin": {
+              "enum": [
+                "human",
+                "automation_draft",
+                "import",
+                "hybrid"
+              ]
+            },
+            "supersedesId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "amendmentReason": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "contentDigest": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "submitted",
+                  "reviewed",
+                  "approved",
+                  "sealed"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "procedures": {
+                "minItems": 1
+              },
+              "evaluation": {
+                "properties": {
+                  "rationale": {
+                    "type": "string",
+                    "minLength": 20
+                  },
+                  "evidenceSufficiency": {
+                    "enum": [
+                      "sufficient",
+                      "insufficient",
+                      "limited"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "reviewed",
+                  "approved",
+                  "sealed"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approvals": {
+                "minItems": 1
+              },
+              "evaluation": {
+                "properties": {
+                  "auditorConclusion": {
+                    "enum": [
+                      "supported",
+                      "deficiency",
+                      "unable_to_conclude",
+                      "not_applicable"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "sealed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "approvals": {
+                "minItems": 2
+              },
+              "provenance": {
+                "required": [
+                  "contentDigest"
+                ],
+                "properties": {
+                  "contentDigest": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "systemId",
+        "modelVersionIds",
+        "periodStart",
+        "periodEnd",
+        "rulePackId",
+        "operatorRoles",
+        "criteria",
+        "boundary",
+        "exclusions"
+      ],
+      "properties": {
+        "systemId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "modelVersionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "periodStart": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "periodEnd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "rulePackId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operatorRoles": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "provider",
+              "deployer",
+              "importer",
+              "distributor",
+              "authorised_representative",
+              "other"
+            ]
+          }
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "boundary": {
+          "type": "string"
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "applicability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "rationale",
+        "regulatoryReferences",
+        "sourceVersion",
+        "approvedBy",
+        "approvedAt"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "applicable",
+            "not_applicable",
+            "readiness"
+          ]
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "regulatoryReferences": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sourceVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedBy": {
           "type": [
             "string",
             "null"
           ]
         },
-        "contentHash": {
-          "$ref": "#/$defs/sha256"
+        "approvedAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "procedure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "mode",
+        "criterion",
+        "diagnosticState",
+        "observation",
+        "sample",
+        "evidenceVersionIds",
+        "runIds",
+        "findingIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
         },
-        "template": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "enum": [
+            "manual",
+            "automated",
+            "hybrid"
+          ]
+        },
+        "criterion": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "code",
-            "version"
+            "source",
+            "metric",
+            "operator",
+            "threshold",
+            "justification",
+            "policyVersion",
+            "approvedBy"
           ],
           "properties": {
-            "code": {
-              "type": "string",
-              "minLength": 1
+            "source": {
+              "type": "string"
             },
-            "version": {
-              "type": "string",
-              "minLength": 1
+            "metric": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operator": {
+              "enum": [
+                "gte",
+                "lte",
+                "between",
+                "eq",
+                "manual",
+                null
+              ]
+            },
+            "threshold": {
+              "type": [
+                "number",
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "number"
+              }
+            },
+            "justification": {
+              "type": "string"
+            },
+            "policyVersion": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "approvedBy": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         },
-        "kind": {
+        "diagnosticState": {
           "enum": [
-            "working_paper",
-            "memo",
-            "checklist",
-            "interview",
-            "evidence_index"
+            "pending",
+            "pass",
+            "attention",
+            "fail",
+            "inconclusive",
+            "not_run",
+            "error"
           ]
         },
-        "title": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 300
+        "observation": {
+          "type": "string"
         },
-        "stage": {
-          "enum": [
-            "administration",
-            "planning",
-            "fieldwork",
-            "evidence_evaluation",
-            "reporting",
-            "signoff",
-            "post_audit"
-          ]
+        "sample": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "population",
+            "unit",
+            "method",
+            "size",
+            "rationale",
+            "selectedIds",
+            "seed",
+            "limits"
+          ],
+          "properties": {
+            "population": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "method": {
+              "enum": [
+                "complete_population",
+                "random",
+                "stratified",
+                "systematic",
+                "judgmental",
+                "other"
+              ]
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "rationale": {
+              "type": "string"
+            },
+            "selectedIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "limits": {
+              "type": "string"
+            }
+          }
         },
-        "visibility": {
-          "enum": [
-            "internal",
-            "client_released"
-          ]
+        "evidenceVersionIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "objective": {
+        "runIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactVersionId",
+        "sha256",
+        "source",
+        "custodian",
+        "period",
+        "systemVersion",
+        "assertions",
+        "reliability",
+        "completeness",
+        "limitations"
+      ],
+      "properties": {
+        "artifactVersionId": {
           "type": "string",
           "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "custodian": {
+          "type": "string",
+          "minLength": 1
+        },
+        "period": {
+          "type": "string"
+        },
+        "systemVersion": {
+          "type": "string"
         },
         "assertions": {
           "type": "array",
@@ -140,497 +671,258 @@
             "minLength": 1
           }
         },
-        "criteria": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "controlId",
-              "rulesetVersion",
-              "provision",
-              "actorDuty",
-              "applicability"
-            ],
-            "properties": {
-              "controlId": {
-                "$ref": "#/$defs/id"
-              },
-              "rulesetVersion": {
-                "type": "string",
-                "minLength": 1
-              },
-              "provision": {
-                "type": "string",
-                "minLength": 1
-              },
-              "actorDuty": {
-                "type": "string",
-                "minLength": 1
-              },
-              "applicability": {
-                "enum": [
-                  "applicable",
-                  "not_applicable",
-                  "needs_information"
-                ]
-              },
-              "applicabilitySnapshotId": {
-                "$ref": "#/$defs/id"
-              },
-              "rationale": {
-                "type": "string"
-              }
-            }
-          }
+        "reliability": {
+          "type": "string"
         },
-        "scope": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "description",
-            "period",
-            "population",
-            "sampling"
-          ],
-          "properties": {
-            "description": {
-              "type": "string",
-              "minLength": 1
-            },
-            "period": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "start",
-                "end"
-              ],
-              "properties": {
-                "start": {
-                  "type": "string",
-                  "format": "date"
-                },
-                "end": {
-                  "type": "string",
-                  "format": "date"
-                }
-              }
-            },
-            "population": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "description",
-                "size"
-              ],
-              "properties": {
-                "description": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "size": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
-                  "minimum": 0
-                },
-                "sourceArtifactId": {
-                  "$ref": "#/$defs/id"
-                }
-              }
-            },
-            "sampling": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "method",
-                "rationale",
-                "sampleSize"
-              ],
-              "properties": {
-                "method": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "rationale": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "sampleSize": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
-                  "minimum": 0
-                },
-                "seed": {
-                  "type": "integer",
-                  "minimum": 0
-                },
-                "manifestHash": {
-                  "$ref": "#/$defs/sha256"
-                }
-              }
-            },
-            "exclusions": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "materiality": {
-              "type": "string"
-            }
-          }
-        },
-        "procedures": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "description",
-              "method",
-              "status",
-              "results"
-            ],
-            "properties": {
-              "id": {
-                "$ref": "#/$defs/id"
-              },
-              "description": {
-                "type": "string",
-                "minLength": 1
-              },
-              "method": {
-                "enum": [
-                  "inspection",
-                  "inquiry",
-                  "observation",
-                  "reperformance",
-                  "automated_test",
-                  "walkthrough",
-                  "analytical_review"
-                ]
-              },
-              "status": {
-                "enum": [
-                  "planned",
-                  "completed",
-                  "blocked",
-                  "not_applicable"
-                ]
-              },
-              "performedBy": {
-                "$ref": "#/$defs/id"
-              },
-              "performedAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "testRunIds": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/id"
-                },
-                "uniqueItems": true
-              },
-              "evidenceIds": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/id"
-                },
-                "uniqueItems": true
-              },
-              "results": {
-                "type": "string"
-              },
-              "exceptions": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              },
-              "designEffectiveness": {
-                "enum": [
-                  "effective",
-                  "ineffective",
-                  "unable_to_conclude",
-                  "not_applicable"
-                ]
-              },
-              "operatingEffectiveness": {
-                "enum": [
-                  "effective",
-                  "ineffective",
-                  "unable_to_conclude",
-                  "not_applicable"
-                ]
-              },
-              "limitationApprovalId": {
-                "$ref": "#/$defs/id"
-              }
-            },
-            "allOf": [
-              {
-                "if": {
-                  "properties": {
-                    "status": {
-                      "const": "completed"
-                    }
-                  }
-                },
-                "then": {
-                  "required": [
-                    "performedBy",
-                    "performedAt"
-                  ],
-                  "properties": {
-                    "results": {
-                      "minLength": 1
-                    }
-                  }
-                }
-              }
-            ]
-          }
-        },
-        "evidence": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "artifactId",
-              "sha256",
-              "description",
-              "relevance",
-              "reliability"
-            ],
-            "properties": {
-              "artifactId": {
-                "$ref": "#/$defs/id"
-              },
-              "sha256": {
-                "$ref": "#/$defs/sha256"
-              },
-              "objectVersion": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string",
-                "minLength": 1
-              },
-              "relevance": {
-                "type": "string",
-                "minLength": 1
-              },
-              "reliability": {
-                "enum": [
-                  "verified",
-                  "corroborated",
-                  "client_statement",
-                  "unverified"
-                ]
-              },
-              "locator": {
-                "type": "string",
-                "description": "Page/section/query window; never a secret signed URL."
-              },
-              "receivedAt": {
-                "type": "string",
-                "format": "date-time"
-              }
-            }
-          }
-        },
-        "evaluation": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "analysis",
-            "contradictoryEvidence",
-            "sufficiency"
-          ],
-          "properties": {
-            "analysis": {
-              "type": "string",
-              "minLength": 1
-            },
-            "contradictoryEvidence": {
-              "type": "string"
-            },
-            "sufficiency": {
-              "enum": [
-                "sufficient",
-                "insufficient",
-                "pending"
-              ]
-            },
-            "uncertainty": {
-              "type": "string"
-            },
-            "residualRisk": {
-              "type": "string"
-            }
-          }
-        },
-        "conclusion": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "status",
-            "rationale",
-            "humanDecisionRequired"
-          ],
-          "properties": {
-            "status": {
-              "enum": [
-                "pending",
-                "satisfied",
-                "partially_satisfied",
-                "not_satisfied",
-                "not_applicable",
-                "unable_to_conclude"
-              ]
-            },
-            "rationale": {
-              "type": "string",
-              "minLength": 1
-            },
-            "humanDecisionRequired": {
-              "const": true
-            },
-            "decidedBy": {
-              "$ref": "#/$defs/id"
-            },
-            "decidedAt": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "status": {
-                    "enum": [
-                      "satisfied",
-                      "partially_satisfied",
-                      "not_satisfied",
-                      "not_applicable"
-                    ]
-                  }
-                }
-              },
-              "then": {
-                "required": [
-                  "decidedBy",
-                  "decidedAt"
-                ]
-              }
-            }
-          ]
-        },
-        "memo": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "background",
-            "issue",
-            "analysis",
-            "recommendation"
-          ],
-          "properties": {
-            "background": {
-              "type": "string",
-              "minLength": 1
-            },
-            "issue": {
-              "type": "string",
-              "minLength": 1
-            },
-            "analysis": {
-              "type": "string",
-              "minLength": 1
-            },
-            "alternatives": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "recommendation": {
-              "type": "string",
-              "minLength": 1
-            },
-            "managementPosition": {
-              "type": "string"
-            }
-          }
-        },
-        "findings": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "uniqueItems": true
+        "completeness": {
+          "type": "string"
         },
         "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "manifestArtifactVersionId",
+        "manifestDigest",
+        "testSuiteVersion",
+        "environmentDigest",
+        "inputArtifactVersionIds",
+        "policyVersion",
+        "seed",
+        "warnings"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestArtifactVersionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "testSuiteVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environmentDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "inputArtifactVersionIds": {
           "type": "array",
           "items": {
             "type": "string",
             "minLength": 1
           }
         },
-        "relatedPaperIds": {
+        "policyVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "warnings": {
           "type": "array",
           "items": {
-            "$ref": "#/$defs/id"
-          },
-          "uniqueItems": true
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceSufficiency",
+        "contradictions",
+        "limitations",
+        "auditorConclusion",
+        "rationale",
+        "findingIds",
+        "managementResponseId",
+        "subsequentEventsThrough"
+      ],
+      "properties": {
+        "evidenceSufficiency": {
+          "enum": [
+            "not_assessed",
+            "sufficient",
+            "insufficient",
+            "limited"
+          ]
         },
-        "preparedBy": {
-          "$ref": "#/$defs/id"
+        "contradictions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
-        "preparedAt": {
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "auditorConclusion": {
+          "enum": [
+            "not_assessed",
+            "supported",
+            "deficiency",
+            "unable_to_conclude",
+            "not_applicable"
+          ]
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "findingIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "managementResponseId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subsequentEventsThrough": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        }
+      }
+    },
+    "comment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision",
+        "reviewerId",
+        "severity",
+        "text",
+        "state",
+        "response",
+        "resolvedBy",
+        "resolution"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reviewerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "blocking",
+            "nonblocking"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "open",
+            "responded",
+            "resolved",
+            "reopened"
+          ]
+        },
+        "response": {
+          "type": "string"
+        },
+        "resolvedBy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolution": {
+          "type": "string"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actorId",
+        "role",
+        "decision",
+        "revision",
+        "contentDigest",
+        "approvedAt",
+        "signatureReference"
+      ],
+      "properties": {
+        "actorId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "preparer",
+            "reviewer",
+            "lead_auditor"
+          ]
+        },
+        "decision": {
+          "enum": [
+            "approve",
+            "return"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contentDigest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "approvedAt": {
           "type": "string",
           "format": "date-time"
         },
-        "changeReason": {
-          "type": "string"
-        },
-        "generatedFromRunIds": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/id"
-          },
-          "uniqueItems": true
+        "signatureReference": {
+          "type": "string",
+          "minLength": 1
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "kind": {
-                "const": "memo"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "memo"
-            ]
-          }
-        }
-      ]
+      }
     },
     "generatedDraft": {
+      "title": "Engine-generated diagnostic draft",
+      "description": "Draft working paper that engine/diagnostics.py derives from one diagnostic result. It is supporting evidence, always requires human review, carries no sign-offs and cannot satisfy report issuance gates.",
       "type": "object",
       "additionalProperties": false,
       "required": [

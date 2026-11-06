@@ -1,6 +1,6 @@
 import catalog from "../catalog.json";
 import { sanitize } from "../client-projection";
-import { db, getEngagement } from "../engagement-repo";
+import { db, getEngagement, storedSize } from "../engagement-repo";
 import { ApiError } from "../http";
 import type { Context } from "../tenancy";
 import { isClientRole, isInternalRole } from "../workflow-state";
@@ -120,6 +120,9 @@ export async function workspaceView(
     clients: clientRows,
     engagements: engagementRows,
     engagement: e ? sanitize(e, ctx) : null,
+    // The stored size, for the audit program's warning near the limit.
+    metadataBytes:
+      e && isInternalRole(ctx.role) ? (storedSize(e) ?? null) : null,
     members,
     people,
     managementVersion,

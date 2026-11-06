@@ -22,6 +22,12 @@ const mf = new Miniflare({
   modulesRoot: path.resolve("dist/server"),
   compatibilityDate: "2026-05-15",
   compatibilityFlags: ["nodejs_compat"],
+  // The fixture identity headers below are trusted only because this opts in
+  // to the loopback-only test mode (docs/security/identity.md).
+  bindings: {
+    IDENTITY_MODE: "trusted-headers",
+    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+  },
   d1Databases: { DB: "assurance-fixture" },
   r2Buckets: { BUCKET: "assurance-fixture-evidence" },
   d1Persist: false,
@@ -266,6 +272,18 @@ try {
     rationale: "Numerical integration fixture only",
   });
   const profileId = e.evaluationProfiles.at(-1).id;
+  // Recall of "0" rather than of the favourable "1": the external worker
+  // measures recall on the favourable label only.
+  await cmd("createEvaluationProfile", {
+    name: "External acceptance",
+    version: "2",
+    task: "Binary classification",
+    suite: ["performance"],
+    config: { ...config, performancePositiveLabel: "0" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+  });
+  const classProfileId = e.evaluationProfiles.at(-1).id;
   const system = (
     await assurance("registerSystem", {
       name: "Fixture AI system",
@@ -631,6 +649,23 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
+  // A second procedure, planned with the protocol the worker cannot run.
+  const classProcedure = e.workflow.procedures.find(
+    (p) => p.templateId === "WP-A15-02",
+  );
+  Object.assign(classProcedure, {
+    selected: true,
+    applicability: "readiness",
+    ownerId: owner,
+    reviewerId: reviewer,
+    method: "automated",
+    modelId,
+    datasetId,
+    profileId: classProfileId,
+    rationale: "Synthetic",
+    population: "Fixture",
+    sampling: "Full fixture",
+  });
   await testDb
     .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
     .bind(JSON.stringify(e), tenantId, e.id)
@@ -672,6 +707,16 @@ try {
     securityReview:
       "Synthetic fixture process, not native model sandbox validation",
   });
+  const refused = await assurance(
+    "queueExternal",
+    { ...plan, profileId: classProfileId, procedureId: classProcedure.id },
+    owner,
+    400,
+  );
+  assert.match(
+    refused.error,
+    /recall on the favourable label '1' only, so it cannot apply this protocol's performance positive class '0'/,
+  );
   const job = await assurance("queueExternal", plan);
   const runtime = await processRun(
     [

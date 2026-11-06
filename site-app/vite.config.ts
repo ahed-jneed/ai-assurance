@@ -11,7 +11,8 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 // `.openai/hosting.json` is checkout-local (Git ignores `.openai/`). Clean
 // clones and CI fall back to the bindings declared in cloudflare-env.d.ts.
 const hostingConfigFile = new URL("./.openai/hosting.json", import.meta.url);
-const { d1, r2 }: { d1?: string; r2?: string } = existsSync(hostingConfigFile)
+const sitesProject = existsSync(hostingConfigFile);
+const { d1, r2 }: { d1?: string; r2?: string } = sitesProject
   ? JSON.parse(readFileSync(hostingConfigFile, "utf8"))
   : { d1: "DB", r2: "BUCKET" };
 
@@ -56,7 +57,28 @@ export default defineConfig(async ({ command }) => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
+  // Identity (docs/security/identity.md). The Worker trusts no identity unless
+  // IDENTITY_MODE names one: the development server uses the loopback persona
+  // mock, the Sites build (a checkout with .openai/hosting.json) trusts Sites
+  // dispatch, and any other build answers 401 until the deployment sets it.
+  // The Sites build also compiles `sites` in as the default for an unset
+  // IDENTITY_MODE, in case the Sites publisher does not apply the vars of
+  // dist/server/wrangler.json. An explicit IDENTITY_MODE still wins. The
+  // browser reads the same define only to label the sign-in button.
+  const mockAuth = command === "serve" && !managedLinux;
+  const sitesBuild = command === "build" && sitesProject;
+  const identityVars: Record<string, string> = mockAuth
+    ? { IDENTITY_MODE: "dev" }
+    : sitesBuild
+      ? { IDENTITY_MODE: "sites" }
+      : {};
+
   return {
+    define: {
+      __SITES_IDENTITY_DEFAULT__: sitesBuild
+        ? JSON.stringify("sites")
+        : "undefined",
+    },
     build: {
       // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
       // load, so it made `npm run build` output non-deterministic.
@@ -72,13 +94,14 @@ export default defineConfig(async ({ command }) => {
     },
     plugins: [
       vinext(),
-      sites({ mockAuth: !managedLinux }),
+      sites({ mockAuth }),
       connectorPreview(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
         config: {
           ...localBindingConfig,
+          vars: identityVars,
           ...(command === "serve"
             ? {
                 services: [

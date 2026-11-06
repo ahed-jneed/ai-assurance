@@ -88,7 +88,7 @@ Release gates: approved architecture and methodology; all mandatory security/wor
 
 ## Contract and migration safeguards
 
-`schemas/test-run.schema.json` uses an extensible v1.0 envelope: string suite IDs, frozen policy/configuration, state, outcome, results, provenance and paper IDs. It validates both current runners and supports richer production suite definitions and approval metadata. `schemas/working-paper.schema.json` separates an automatically generated **draft** from a complete frozen **human-evaluated revision**. Schema conformance is necessary but does not authorize access, validate legal applicability or prove evidence authenticity.
+`schemas/test-run.schema.json` uses an extensible v1.0 envelope: string suite IDs, frozen policy/configuration, state, outcome, results, provenance and paper IDs. It validates both current runners and supports richer production suite definitions and approval metadata. `schemas/working-paper.schema.json` separates an automatically generated **draft** from a **human-evaluated catalog revision** whose status, through sealing, determines the required evaluation, approvals and content digest. Schema conformance is necessary but does not authorize access, validate legal applicability or prove evidence authenticity.
 
 Semantic validators still enforce: metric interval order and denominator consistency; same-engagement/system/purpose input compatibility; test registry version; approved plan identity/hash; timestamps and seed limits; policy approval before execution; succeeded/outcome consistency; no unsafe executable parameters; result aggregation rules; run → paper referential integrity. Contract changes require compatibility tests against the interactive app, Python fixture and exported reports.
 

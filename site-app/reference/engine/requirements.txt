@@ -1,3 +1,0 @@
-# Core runner: Python 3.12+ standard library only; no pip packages required.
-# Validated bundled runtime: CPython 3.12.14.
-# Optional adapter implementations must pin their own reviewed dependencies.

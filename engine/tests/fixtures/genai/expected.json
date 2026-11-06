@@ -1,0 +1,1254 @@
+{
+ "fixtures": {
+  "deepeval/test_run_20261105_170925.json": {
+   "format": "deepeval_test_run",
+   "judgeModels": [
+    "fixture-stub-judge-v1"
+   ],
+   "metrics": {
+    "Exact Match": {
+     "estimate": 0.666667,
+     "n": 3,
+     "seIid": 0.333333
+    },
+    "Faithfulness": {
+     "estimate": 0.666667,
+     "n": 3,
+     "seIid": 0.333333
+    },
+    "Pattern Match": {
+     "estimate": 1.0,
+     "n": 3,
+     "seIid": 0.0
+    }
+   },
+   "runKey": "deepeval:039a9afcdc48ccfe",
+   "scorerKinds": {
+    "Exact Match": [
+     "deterministic"
+    ],
+    "Faithfulness": [
+     "model_graded"
+    ],
+    "Pattern Match": [
+     "deterministic"
+    ]
+   },
+   "testCases": 3,
+   "tool": {
+    "name": "deepeval",
+    "version": null,
+    "versionSource": "not recorded in file; declare in manifest"
+   },
+   "toolReported": {
+    "testFailed": 1,
+    "testPassed": 2
+   }
+  },
+  "garak/tiny.report.jsonl": {
+   "attackMembers": {
+    "none": {
+     "all": {
+      "n": 12,
+      "wilson95": [
+       0.088942,
+       0.532305
+      ],
+      "x": 3
+     }
+    },
+    "technique": {
+     "goodside.WhoIsRiley": {
+      "n": 6,
+      "wilson95": [
+       0.0,
+       0.390334
+      ],
+      "x": 0
+     },
+     "lmrc.Anthropomorphisation": {
+      "n": 6,
+      "wilson95": [
+       0.187616,
+       0.812384
+      ],
+      "x": 3
+     }
+    }
+   },
+   "attemptEntries": 24,
+   "evaluatedAttempts": 12,
+   "format": "garak_report",
+   "generations": 2,
+   "hitlogRows": 6,
+   "items": 24,
+   "outcomeRule": "any_detector_threshold, then epochs (generations) reduced with any",
+   "perProbeDetector": {
+    "goodside.WhoIsRiley|goodside.RileyIsnt": {
+     "generationLevel": {
+      "hits": 0,
+      "nones": 0,
+      "scored": 12
+     },
+     "itemLevel": {
+      "n": 6,
+      "rule": "any_generation_hit (this detector only; reconciliation view)",
+      "wilson95": [
+       0.0,
+       0.390334
+      ],
+      "x": 0
+     },
+     "toolReported": {
+      "fails": 0,
+      "nones": 0,
+      "passed": 12,
+      "total_evaluated": 12
+     }
+    },
+    "lmrc.Anthropomorphisation|lmrc.Anthro": {
+     "generationLevel": {
+      "hits": 6,
+      "nones": 0,
+      "scored": 12
+     },
+     "itemLevel": {
+      "n": 6,
+      "rule": "any_generation_hit (this detector only; reconciliation view)",
+      "wilson95": [
+       0.187616,
+       0.812384
+      ],
+      "x": 3
+     },
+     "toolReported": {
+      "fails": 6,
+      "nones": 0,
+      "passed": 6,
+      "total_evaluated": 12
+     }
+    }
+   },
+   "runKey": "garak:0594ace4-730c-4b6b-8a8d-08a351b9ffec",
+   "threshold": 0.5,
+   "tool": {
+    "name": "garak",
+    "version": "0.17.1"
+   }
+  },
+  "inspect/canary_injection.json": {
+   "datasetFingerprint": "25725e267231e2e9c04760bce02994f473c4859645be2cdbe61021f7666f2333",
+   "decoding": {
+    "max_connections": 1,
+    "max_tokens": 32,
+    "temperature": 0.0
+   },
+   "epochsConfigured": 1,
+   "format": "inspect_json",
+   "judgeModels": [],
+   "judgePromptTemplateSha256": [],
+   "logVersion": 2,
+   "postRunEdits": {
+    "invalidatedSampleEpochs": 0,
+    "logInvalidated": false,
+    "logUpdates": 0,
+    "scoreEdits": 0
+   },
+   "primary": {
+    "original": {
+     "attackMembers": {
+      "none": {
+       "all": {
+        "n": 4,
+        "wilson95": [
+         0.150039,
+         0.849961
+        ],
+        "x": 2
+       }
+      },
+      "technique": {
+       "direct_override": {
+        "n": 1,
+        "wilson95": [
+         0.206549,
+         1.0
+        ],
+        "x": 1
+       },
+       "indirect_injection": {
+        "n": 1,
+        "wilson95": [
+         0.0,
+         0.793451
+        ],
+        "x": 0
+       },
+       "role_play": {
+        "n": 1,
+        "wilson95": [
+         0.206549,
+         1.0
+        ],
+        "x": 1
+       },
+       "translation": {
+        "n": 1,
+        "wilson95": [
+         0.0,
+         0.793451
+        ],
+        "x": 0
+       }
+      }
+     },
+     "attackSuccess": {
+      "n": 4,
+      "rate": 0.5,
+      "wilson95": [
+       0.150039,
+       0.849961
+      ],
+      "x": 2
+     },
+     "estimate": 0.5,
+     "n": 4,
+     "seIid": 0.288675
+    },
+    "scorer": "includes"
+   },
+   "runKey": "inspect:YUdGr2hmXeNcuZg8dRFWhZ",
+   "sampleEpochRecords": 4,
+   "status": "success",
+   "sutModel": "mockllm/model",
+   "systemPromptSha256": "c3dc70809352c68e13859c021180d5ab62a7455d6ab899515bf8d9d5e26998e9",
+   "task": "canary_injection",
+   "taskVersion": "1.0.0",
+   "tool": {
+    "name": "inspect_ai",
+    "version": "0.3.287"
+   },
+   "toolReported": {
+    "includes.accuracy": 0.5,
+    "includes.stderr": 0.288675
+   },
+   "toolsOffered": []
+  },
+  "inspect/judged_qa_30.eval": {
+   "datasetFingerprint": "0b2e5a18b3b4de0d46f4f51d9badfe9597592b910c7d62490fec6e443ff99f2f",
+   "decoding": {
+    "max_connections": 1,
+    "max_tokens": 8,
+    "temperature": 0.0
+   },
+   "epochsConfigured": 1,
+   "format": "inspect_eval",
+   "judgeModels": [
+    "mockllm/judge"
+   ],
+   "judgePromptTemplateSha256": [
+    "9c26c9772a48132d37be78270e27f56485690d1f6558a11982fcfe75a4e74014"
+   ],
+   "logVersion": 2,
+   "postRunEdits": {
+    "invalidatedSampleEpochs": 0,
+    "logInvalidated": false,
+    "logUpdates": 0,
+    "scoreEdits": 0
+   },
+   "primary": {
+    "original": {
+     "decisionExample": {
+      "band": {
+       "lower": 0.7,
+       "upper": null
+      },
+      "method": "wilson",
+      "outcome": "pass",
+      "pValue": 0.016827,
+      "zStar": 2.390457
+     },
+     "estimate": 0.9,
+     "n": 30,
+     "seIid": 0.055709,
+     "wilson95": [
+      0.743789,
+      0.9654
+     ]
+    },
+    "scorer": "model_graded_qa"
+   },
+   "runKey": "inspect:26J9VHebzofAtTb52sJ4Ee",
+   "sampleEpochRecords": 30,
+   "status": "success",
+   "sutModel": "mockllm/model",
+   "systemPromptSha256": "6c09b841088c7149657d37f8006e09ea9512c07df24baf307dae58ca79a1deb2",
+   "task": "judged_qa_30",
+   "taskVersion": "1.0.0",
+   "tool": {
+    "name": "inspect_ai",
+    "version": "0.3.287"
+   },
+   "toolReported": {
+    "match.accuracy": 0.9,
+    "match.stderr": 0.055709,
+    "model_graded_qa.accuracy": 0.9,
+    "model_graded_qa.stderr": 0.055709
+   },
+   "toolsOffered": [],
+   "zipEntries": 37
+  },
+  "inspect/tiny_agent.eval": {
+   "datasetFingerprint": "bd4f0f85d8ecf6872319d95029be7f20e5ca08f16b8e613002da8ae2e3dd83be",
+   "decoding": {
+    "max_connections": 1,
+    "max_tokens": 32,
+    "temperature": 0.0
+   },
+   "epochsConfigured": 4,
+   "format": "inspect_eval",
+   "judgeModels": [],
+   "judgePromptTemplateSha256": [],
+   "logVersion": 2,
+   "passK": {
+    "pass@1": 0.5,
+    "pass@2": 0.611111,
+    "pass^1": 0.5,
+    "pass^2": 0.388889,
+    "pass^3": 0.333333,
+    "pass^4": 0.333333,
+    "successesPerTask": {
+     "t1": 4,
+     "t2": 2,
+     "t3": 0
+    },
+    "trialsPerTask": 4
+   },
+   "postRunEdits": {
+    "invalidatedSampleEpochs": 0,
+    "logInvalidated": false,
+    "logUpdates": 0,
+    "scoreEdits": 0
+   },
+   "primary": {
+    "original": {
+     "estimate": 0.5,
+     "n": 3,
+     "seIid": 0.288675
+    },
+    "scorer": "match"
+   },
+   "runKey": "inspect:DVivbW7qTQnFaaoh8iNhtc",
+   "sampleEpochRecords": 12,
+   "status": "success",
+   "sutModel": "mockllm/model",
+   "systemPromptSha256": "f2f5e8d53f6d90cde05d0d64d78b375df2f794371f287a86c7f2fb096e497d1e",
+   "task": "tiny_agent",
+   "taskVersion": "1.0.0",
+   "tool": {
+    "name": "inspect_ai",
+    "version": "0.3.287"
+   },
+   "toolReported": {
+    "match.accuracy": 0.5,
+    "match.stderr": 0.288675
+   },
+   "toolsOffered": [
+    "add"
+   ],
+   "zipEntries": 19
+  },
+  "inspect/tiny_qa.edited.eval": {
+   "datasetFingerprint": "73fc42417995f7d77423e8082711228657dfe4654c277cf7fb06a6b21986e6fa",
+   "decoding": {
+    "max_connections": 1,
+    "max_tokens": 16,
+    "seed": 1234,
+    "temperature": 0.0
+   },
+   "epochsConfigured": 2,
+   "format": "inspect_eval",
+   "judgeModels": [
+    "mockllm/judge"
+   ],
+   "judgePromptTemplateSha256": [
+    "9c26c9772a48132d37be78270e27f56485690d1f6558a11982fcfe75a4e74014"
+   ],
+   "logVersion": 2,
+   "postRunEdits": {
+    "invalidatedSampleEpochs": 1,
+    "logInvalidated": true,
+    "logUpdates": 1,
+    "scoreEdits": 1
+   },
+   "primary": {
+    "asEdited": {
+     "estimate": 0.5,
+     "n": 4,
+     "seCluster": {
+      "clusters": 3,
+      "key": "passage_id",
+      "value": 0.216506
+     },
+     "seIid": 0.204124
+    },
+    "original": {
+     "estimate": 0.5,
+     "n": 4,
+     "seCluster": {
+      "clusters": 3,
+      "key": "passage_id",
+      "value": 0.216506
+     },
+     "seIid": 0.204124
+    },
+    "reconciliationView": {
+     "description": "edited scores, invalidated samples kept (the view Inspect 0.3.287 header metrics reflect)",
+     "estimate": 0.625,
+     "n": 4,
+     "seCluster": {
+      "clusters": 3,
+      "key": "passage_id",
+      "value": 0.143205
+     },
+     "seIid": 0.125
+    },
+    "scorer": "match"
+   },
+   "runKey": "inspect:bWPraLRgFFM9Vo6hZGHUsV",
+   "sampleEpochRecords": 8,
+   "status": "success",
+   "sutModel": "mockllm/model",
+   "systemPromptSha256": "4128668c2d49ebf02306487369e6418f1b0d61016fc23b0b6b72ca84fc46ce2e",
+   "task": "tiny_qa",
+   "taskVersion": "1.0.0",
+   "tool": {
+    "name": "inspect_ai",
+    "version": "0.3.287"
+   },
+   "toolReported": {
+    "match.accuracy": 0.625,
+    "match.stderr": 0.125,
+    "model_graded_qa.accuracy": 0.5,
+    "model_graded_qa.stderr": 0.204124
+   },
+   "toolsOffered": [],
+   "zipEntries": 13
+  },
+  "inspect/tiny_qa.eval": {
+   "datasetFingerprint": "73fc42417995f7d77423e8082711228657dfe4654c277cf7fb06a6b21986e6fa",
+   "decoding": {
+    "max_connections": 1,
+    "max_tokens": 16,
+    "seed": 1234,
+    "temperature": 0.0
+   },
+   "epochsConfigured": 2,
+   "format": "inspect_eval",
+   "judgeModels": [
+    "mockllm/judge"
+   ],
+   "judgePromptTemplateSha256": [
+    "9c26c9772a48132d37be78270e27f56485690d1f6558a11982fcfe75a4e74014"
+   ],
+   "logVersion": 2,
+   "postRunEdits": {
+    "invalidatedSampleEpochs": 0,
+    "logInvalidated": false,
+    "logUpdates": 0,
+    "scoreEdits": 0
+   },
+   "primary": {
+    "original": {
+     "estimate": 0.5,
+     "n": 4,
+     "seCluster": {
+      "clusters": 3,
+      "key": "passage_id",
+      "value": 0.216506
+     },
+     "seIid": 0.204124
+    },
+    "scorer": "match"
+   },
+   "runKey": "inspect:bWPraLRgFFM9Vo6hZGHUsV",
+   "sampleEpochRecords": 8,
+   "status": "success",
+   "sutModel": "mockllm/model",
+   "systemPromptSha256": "4128668c2d49ebf02306487369e6418f1b0d61016fc23b0b6b72ca84fc46ce2e",
+   "task": "tiny_qa",
+   "taskVersion": "1.0.0",
+   "tool": {
+    "name": "inspect_ai",
+    "version": "0.3.287"
+   },
+   "toolReported": {
+    "match.accuracy": 0.5,
+    "match.stderr": 0.204124,
+    "model_graded_qa.accuracy": 0.5,
+    "model_graded_qa.stderr": 0.204124
+   },
+   "toolsOffered": [],
+   "zipEntries": 16
+  },
+  "lm_eval/results_2026-11-05T16-54-06.848117.json": {
+   "format": "lm_eval_samples",
+   "model": "dummy",
+   "modelArgs": {},
+   "reconciliationRule": "Only metrics whose configs[task].metric_list aggregation is mean are reconciled; every other aggregation (acc_all, median, nanmean, perplexity, f1, mcc, bleu, chrf, chrf++, ter, ...) is not_comparable.",
+   "tasks": {
+    "tiny_gen": {
+     "items": 3,
+     "metrics": {
+      "exact_match,strip": {
+       "aggregation": "mean",
+       "estimate": 0.333333,
+       "n": 3,
+       "reconciliation": {
+        "stderr": "match",
+        "value": "match"
+       },
+       "seIid": 0.333333,
+       "toolReported": {
+        "stderr": 0.333333,
+        "value": 0.333333
+       }
+      }
+     },
+     "primaryScoreDefault": "exact_match,strip",
+     "promptHashMatchesArg0": true,
+     "runKey": "lm_eval:i82qcls7:2026-11-05T16-54-06.848117:tiny_gen",
+     "systemPromptSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "systemPromptSource": "computed",
+     "targetHashMatches": true,
+     "taskHashMatches": true
+    },
+    "tiny_mc": {
+     "items": 6,
+     "metrics": {
+      "acc,none": {
+       "aggregation": "mean",
+       "estimate": 0.0,
+       "n": 6,
+       "reconciliation": {
+        "stderr": "match",
+        "value": "match"
+       },
+       "seIid": 0.0,
+       "toolReported": {
+        "stderr": 0.0,
+        "value": 0.0
+       }
+      },
+      "acc_norm,none": {
+       "aggregation": "mean",
+       "estimate": 0.166667,
+       "n": 6,
+       "reconciliation": {
+        "stderr": "match",
+        "value": "match"
+       },
+       "seCluster": {
+        "clusters": 3,
+        "key": "doc.passage",
+        "value": 0.166667
+       },
+       "seIid": 0.166667,
+       "toolReported": {
+        "stderr": 0.166667,
+        "value": 0.166667
+       }
+      }
+     },
+     "primaryScoreDefault": "acc,none",
+     "promptHashMatchesArg0": true,
+     "runKey": "lm_eval:i82qcls7:2026-11-05T16-54-06.848117:tiny_mc",
+     "systemPromptSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+     "systemPromptSource": "computed",
+     "targetHashMatches": true,
+     "taskHashMatches": true
+    }
+   },
+   "tool": {
+    "name": "lm_eval",
+    "version": "0.4.13"
+   }
+  },
+  "promptfoo/echo_repeat.results.json": {
+   "format": "promptfoo_results",
+   "gate": "test-2 has a javascript assertion (scorer kind unknown), so its overall score is unknown; a deciding criterion on overall is blocked (genai_judge_not_validated, reason scorer_kind_unknown) until the score is declared deterministic and a reviewer acknowledges it, or declared model-graded with a validated judge.",
+   "groups": 3,
+   "passRate": {
+    "estimate": 0.666667,
+    "n": 3,
+    "primaryScore": "overall",
+    "reducer": "mean",
+    "seIid": 0.333333
+   },
+   "repeats": 2,
+   "resultsVersion": 3,
+   "rowLevelPassRate": 0.666667,
+   "rows": 6,
+   "runKey": "promptfoo:h-f39a28dff2f9ed48:echo:echo-model:24b4de4bb127c2437ad6cce6a4d224c4be9369bfe77cd63d5dcddabdf80a5212",
+   "scorerKinds": {
+    "contains": [
+     "deterministic"
+    ],
+    "icontains": [
+     "deterministic"
+    ],
+    "javascript": [
+     "unknown"
+    ],
+    "overall": [
+     "deterministic",
+     "unknown"
+    ]
+   },
+   "tool": {
+    "name": "promptfoo",
+    "version": "0.125.1"
+   },
+   "toolReported": {
+    "errors": 0,
+    "failures": 2,
+    "successes": 4
+   },
+   "unstableGroups": 0
+  },
+  "promptfoo/redteam_shaped.results.json": {
+   "attackMembers": {
+    "none": {
+     "all": {
+      "n": 8,
+      "wilson95": [
+       0.215216,
+       0.784784
+      ],
+      "x": 4
+     }
+    },
+    "technique": {
+     "excessive-agency": {
+      "n": 2,
+      "wilson95": [
+       0.34238,
+       1.0
+      ],
+      "x": 2
+     },
+     "harmful:hate": {
+      "n": 2,
+      "wilson95": [
+       0.0,
+       0.65762
+      ],
+      "x": 0
+     },
+     "hijacking": {
+      "n": 2,
+      "wilson95": [
+       0.094531,
+       0.905469
+      ],
+      "x": 1
+     },
+     "pii:direct": {
+      "n": 2,
+      "wilson95": [
+       0.094531,
+       0.905469
+      ],
+      "x": 1
+     }
+    },
+    "technique_variant": {
+     "excessive-agency/basic": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     },
+     "excessive-agency/prompt-injection": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     },
+     "harmful:hate/basic": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "harmful:hate/leetspeak": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "hijacking/base64": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "hijacking/basic": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     },
+     "pii:direct/basic": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "pii:direct/rot13": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     }
+    },
+    "variant": {
+     "base64": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "basic": {
+      "n": 4,
+      "wilson95": [
+       0.150039,
+       0.849961
+      ],
+      "x": 2
+     },
+     "leetspeak": {
+      "n": 1,
+      "wilson95": [
+       0.0,
+       0.793451
+      ],
+      "x": 0
+     },
+     "prompt-injection": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     },
+     "rot13": {
+      "n": 1,
+      "wilson95": [
+       0.206549,
+       1.0
+      ],
+      "x": 1
+     }
+    }
+   },
+   "attackSuccess": {
+    "n": 8,
+    "note": "groupBy none; descriptive only (section 8.4)",
+    "wilson95": [
+     0.215216,
+     0.784784
+    ],
+    "x": 4
+   },
+   "errorsExcluded": 1,
+   "format": "promptfoo_results",
+   "rows": 9,
+   "runKey": "promptfoo:h-4e9178075c5168f2:h-53eb0a80de825f6f:travel-target:7808d886018625b8586ead4ba54e254c1b3c8c5cabbbd07ff8ef86c352e76eba",
+   "systemPromptSha256": "e521bb3b1d9927403d1f1ae3ff036239c1a7f0abfe06424f0b435cb4777d6ad3",
+   "tool": {
+    "name": "promptfoo",
+    "version": "0.125.1"
+   }
+  },
+  "pyrit/attacks.pyrit-export.jsonl": {
+   "attackMembers": {
+    "none": {
+     "all": {
+      "n": 6,
+      "wilson95": [
+       0.187616,
+       0.812384
+      ],
+      "x": 3
+     }
+    },
+    "technique": {
+     "PromptSendingAttack": {
+      "n": 6,
+      "wilson95": [
+       0.187616,
+       0.812384
+      ],
+      "x": 3
+     }
+    },
+    "technique_variant": {
+     "PromptSendingAttack/Base64Converter": {
+      "n": 3,
+      "wilson95": [
+       0.061492,
+       0.79234
+      ],
+      "x": 1
+     },
+     "PromptSendingAttack/none": {
+      "n": 3,
+      "wilson95": [
+       0.20766,
+       0.938508
+      ],
+      "x": 2
+     }
+    },
+    "variant": {
+     "Base64Converter": {
+      "n": 3,
+      "wilson95": [
+       0.061492,
+       0.79234
+      ],
+      "x": 1
+     },
+     "none": {
+      "n": 3,
+      "wilson95": [
+       0.20766,
+       0.938508
+      ],
+      "x": 2
+     }
+    }
+   },
+   "attackSuccess": {
+    "n": 6,
+    "x": 3
+   },
+   "attacks": 6,
+   "format": "pyrit_export",
+   "pieceHashesVerified": true,
+   "runKey": "pyrit:557e09de41b0c911",
+   "tool": {
+    "name": "pyrit",
+    "version": "1.1.0"
+   }
+  },
+  "ragas/results.jsonl": {
+   "format": "ragas_results",
+   "metrics": {
+    "exact_match": {
+     "estimate": 0.333333,
+     "n": 3,
+     "seIid": 0.333333
+    },
+    "non_llm_context_precision_with_reference": {
+     "estimate": 0.666667,
+     "n": 3,
+     "seIid": 0.333333
+    },
+    "non_llm_context_recall": {
+     "estimate": 0.666667,
+     "n": 3,
+     "seIid": 0.333333
+    },
+    "non_llm_string_similarity": {
+     "estimate": 0.461538,
+     "n": 3,
+     "seIid": 0.291226
+    },
+    "string_present": {
+     "estimate": 0.666667,
+     "n": 3,
+     "seIid": 0.333333
+    }
+   },
+   "rows": 3,
+   "runKey": "ragas:11b3c910043c0001",
+   "scorerKinds": {
+    "exact_match": [
+     "deterministic"
+    ],
+    "non_llm_context_precision_with_reference": [
+     "deterministic"
+    ],
+    "non_llm_context_recall": [
+     "deterministic"
+    ],
+    "non_llm_string_similarity": [
+     "deterministic"
+    ],
+    "string_present": [
+     "deterministic"
+    ]
+   },
+   "tool": {
+    "name": "ragas",
+    "version": null,
+    "versionSource": "not recorded in file; declare in manifest"
+   }
+  }
+ },
+ "judgeValidation": {
+  "judge_validation/judge_large_200.jsonl": {
+   "bindingAgainstJudgedQa30J1": {
+    "model": true,
+    "promptTemplate": true,
+    "sampledFrom": true,
+    "snapshot": true
+   },
+   "bytes": 29214,
+   "chanceAgreement": 0.521,
+   "ci95": [
+    0.74192,
+    0.903174
+   ],
+   "crossCheck": "statsmodels 0.15.0 cohens_kappa: identical to 6 decimals",
+   "format": "judge_validation_jsonl",
+   "kappa": 0.822547,
+   "n": 200,
+   "observedAgreement": 0.915,
+   "seFleissCohenEveritt": 0.041137,
+   "sha256": "199b386d4faeeb143e9f3bca41749f5d6bf6db540103592861d1d5e3a00097de",
+   "tableRowsHumanColsJudge": [
+    [
+     112,
+     8
+    ],
+    [
+     9,
+     71
+    ]
+   ],
+   "validatedAtDefaultRule": true
+  },
+  "judge_validation/judge_small_60.jsonl": {
+   "bindingAgainstJudgedQa30J1": {
+    "model": true,
+    "promptTemplate": true,
+    "sampledFrom": true,
+    "snapshot": true
+   },
+   "bytes": 8994,
+   "chanceAgreement": 0.54,
+   "ci95": [
+    0.478603,
+    0.869223
+   ],
+   "crossCheck": "statsmodels 0.15.0 cohens_kappa: identical to 6 decimals",
+   "format": "judge_validation_jsonl",
+   "kappa": 0.673913,
+   "n": 60,
+   "observedAgreement": 0.85,
+   "seFleissCohenEveritt": 0.09965,
+   "sha256": "59ba543d5ad8457b9a3c853babfe192e74bea685c9835e7fa3ce7956b5ceb0db",
+   "tableRowsHumanColsJudge": [
+    [
+     34,
+     4
+    ],
+    [
+     5,
+     17
+    ]
+   ],
+   "validatedAtDefaultRule": false
+  }
+ },
+ "provenance": "Design-time reference values for issue #31, computed on 2026-11-05 (revised after review, same day) by throwaway scripts that apply the mapping and formulas in docs/design/genai-evidence.md. Wilson, kappa, paired-difference and z values were cross-checked against statsmodels 0.15.0 / scipy 1.17.1. The engine (#32) must re-derive every value independently; a disagreement is a defect in one of the two and must be resolved, not copied.",
+ "rounding": "6 decimal places; intervals are two-sided 95% unless stated.",
+ "schemaVersion": "genai-fixture-expectations/0.2",
+ "workedExamples": {
+  "bonferroniWilsonForFourTechniques": {
+   "intervals": {
+    "excessive-agency": [
+     0.242762,
+     1.0
+    ],
+    "harmful:hate": [
+     0.0,
+     0.757238
+    ],
+    "hijacking": [
+     0.064903,
+     0.935097
+    ],
+    "pii:direct": [
+     0.064903,
+     0.935097
+    ]
+   },
+   "level": 0.9875,
+   "z_scipy": 2.497705,
+   "z_stdlib": 2.497705
+  },
+  "clusteredStandardError": {
+   "C": 3,
+   "clusters": [
+    "arith",
+    "geo",
+    "phys",
+    "geo"
+   ],
+   "se": 0.216506,
+   "seIid": 0.204124,
+   "values": [
+    1.0,
+    0.5,
+    0.5,
+    0.0
+   ]
+  },
+  "degenerateClusteredWilson": {
+   "band": {
+    "upper": 0.05
+   },
+   "clusterSizes": "10 x 30",
+   "clusters": 10,
+   "minimumEqualClustersToPassUpper005": 73,
+   "n": 300,
+   "nEff": 10.0,
+   "note": "With 10 equal clusters and no successes the 95% Wilson upper bound is z^2/(C + z^2); passing {upper: 0.05} needs C >= 73.",
+   "outcome": "not_pass",
+   "rule": "variance degenerate (mean 0) and clusterKey set: nEff = n^2 / sum_c m_c^2",
+   "wilson95IgnoringClusters": [
+    0.0,
+    0.012643
+   ],
+   "wilson95OnNEff": [
+    0.0,
+    0.277533
+   ],
+   "x": 0
+  },
+  "degenerateClusteredWilsonUnequal": {
+   "clusterSizes": [
+    40,
+    30,
+    20,
+    10
+   ],
+   "n": 100,
+   "nEff": 3.333333,
+   "note": "C = 4 is below minimums.clusters, so a criterion would be gated; the case pins nEff for unequal sizes",
+   "wilson95OnNEff": [
+    0.0,
+    0.53541
+   ],
+   "x": 0
+  },
+  "effectiveSampleSizeWilson": {
+   "clusters": 4,
+   "designEffect": 3.25,
+   "mean": 0.8,
+   "n": 40,
+   "nEff": 12.0,
+   "note": "C = 4 is below minimums.clusters = 10, so a criterion would be gated; the case pins the formula only",
+   "seCluster": 0.11547,
+   "seIid": 0.064051,
+   "wilson95OnNEff": [
+    0.517272,
+    0.937231
+   ],
+   "wilson95Unadjusted": [
+    0.652427,
+    0.895
+   ]
+  },
+  "pairedDifference": {
+   "A": [
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1
+   ],
+   "B": [
+    1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0,
+    1,
+    1,
+    0
+   ],
+   "ci95": [
+    0.000611,
+    0.599389
+   ],
+   "corrAB": 0.5,
+   "meanDiff": 0.3,
+   "our_t_equivalent": 1.963961,
+   "scipy_ttest_rel_stat": 1.963961,
+   "sePaired": 0.152753,
+   "sePairedViaCorrelation": 0.152753,
+   "seUnpaired": 0.213437
+  },
+  "passK": {
+   "pass@1": 0.5,
+   "pass@2": 0.611111,
+   "pass^1": 0.5,
+   "pass^2": 0.388889,
+   "pass^3": 0.333333,
+   "pass^4": 0.333333
+  },
+  "wilson95": [
+   {
+    "n": 4,
+    "ours": [
+     0.150039,
+     0.849961
+    ],
+    "statsmodels": [
+     0.150039,
+     0.849961
+    ],
+    "x": 2
+   },
+   {
+    "n": 8,
+    "ours": [
+     0.215216,
+     0.784784
+    ],
+    "statsmodels": [
+     0.215216,
+     0.784784
+    ],
+    "x": 4
+   },
+   {
+    "n": 6,
+    "ours": [
+     0.187616,
+     0.812384
+    ],
+    "statsmodels": [
+     0.187616,
+     0.812384
+    ],
+    "x": 3
+   },
+   {
+    "n": 6,
+    "ours": [
+     0.0,
+     0.390334
+    ],
+    "statsmodels": [
+     0.0,
+     0.390334
+    ],
+    "x": 0
+   },
+   {
+    "n": 1,
+    "ours": [
+     0.206549,
+     1.0
+    ],
+    "statsmodels": [
+     0.206549,
+     1.0
+    ],
+    "x": 1
+   },
+   {
+    "n": 3,
+    "ours": [
+     0.20766,
+     0.938508
+    ],
+    "statsmodels": [
+     0.20766,
+     0.938508
+    ],
+    "x": 2
+   },
+   {
+    "n": 3,
+    "ours": [
+     0.061492,
+     0.79234
+    ],
+    "statsmodels": [
+     0.061492,
+     0.79234
+    ],
+    "x": 1
+   },
+   {
+    "n": 2,
+    "ours": [
+     0.094531,
+     0.905469
+    ],
+    "statsmodels": [
+     0.094531,
+     0.905469
+    ],
+    "x": 1
+   },
+   {
+    "n": 2,
+    "ours": [
+     0.34238,
+     1.0
+    ],
+    "statsmodels": [
+     0.34238,
+     1.0
+    ],
+    "x": 2
+   },
+   {
+    "n": 2,
+    "ours": [
+     0.0,
+     0.65762
+    ],
+    "statsmodels": [
+     0.0,
+     0.65762
+    ],
+    "x": 0
+   }
+  ]
+ }
+}

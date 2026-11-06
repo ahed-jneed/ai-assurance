@@ -2,7 +2,7 @@
   "version": "6",
   "dialect": "sqlite",
   "id": "72d0bf71-65ce-4260-89c1-4aef2c6df917",
-  "prevId": "95611858-90d0-4343-ab5e-a9579e32c29e",
+  "prevId": "5168c72f-c95e-47bf-8616-fe7d0074498f",
   "tables": {
     "engagement_access_policies": {
       "name": "engagement_access_policies",

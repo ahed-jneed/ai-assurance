@@ -76,13 +76,15 @@ The profile is task-aware. Binary demographic parity/disparate impact need group
 
 Predefined starting criteria are illustrative internal policies. Their presence does not imply legal approval. Capture why each threshold is appropriate to the use, harm, data and audit objective before running; changing criteria later creates another immutable profile and run.
 
+Every new hosted run uses a saved profile, so its checks cannot be bypassed: an explicit suite and configuration would skip, for example, the reviewed data-handling basis that fairness tests require. Explicit configurations remain only to retry a frozen legacy run that was queued with one.
+
 ## 5. Dataset preflight and queueing
 
 The server preflight is authoritative; browser field validation is assistance. For an accepted Prediction file source, preflight:
 
 1. Confirms tenant/engagement membership, evidence acceptance, source/dataset identity, artifact type and configured size limits.
 2. Reads the object from the evidence bucket and verifies the bytes against the registered/uploaded SHA-256. Storage metadata alone is insufficient.
-3. Parses CSV with existing bounds and rejects malformed or duplicate headers, invalid row structure and incompatible values.
+3. Parses CSV with existing bounds and rejects malformed or duplicate headers, invalid row structure, blank rows and incompatible values. A row whose cells are all empty is a record with every value missing, so it is refused rather than dropped; line breaks that end the file are not rows.
 4. Produces a parsed column profile: headers, row count, missingness and task-relevant label, class/group or numeric support information.
 5. Validates every selected test's required mappings and task compatibility. Ambiguous labels, absent columns, non-finite regression values and unmet structural requirements have actionable messages.
 6. Presents the registered source, profile version, declared split/provenance and limitations for confirmation before creating the run.
@@ -95,17 +97,21 @@ Repeat integrity verification immediately before execution. If stored bytes chan
 
 ### Binary classification
 
-Retain the existing confusion-based performance procedure and binary demographic parity, disparate impact and equalized odds. Preserve actual support and undefined-denominator limitations. Group fairness is a diagnostic signal, not a legal finding by itself. A policy ratio such as 0.8 is not a statutory EU AI Act compliance threshold.
+Performance is measured on its own positive class, the class the protocol's minimum recall applies to. It defaults to the favourable label and is frozen with a protocol that includes the performance test; a protocol without one freezes no performance positive class, and its runs do not require one among the labels. Demographic parity, disparate impact and equalized odds keep counting the favourable outcome. Results report accuracy; precision, recall (sensitivity) and F1 of the positive class; specificity, the recall of the other class; balanced accuracy with each class's support and recall; the positive class's prevalence; and the majority-class baseline, the accuracy of always predicting the more frequent reference class.
+
+The criterion (test definitions `traditional-ml-2.1.0`) is inconclusive below the total or per-class support minimum. It fails when balanced accuracy does not exceed 50%, which a constant prediction of either class never does at any class balance, and when accuracy or recall misses its threshold. It is inconclusive when accuracy meets its threshold but does not exceed the majority-class baseline: at that class balance the accuracy criterion cannot show that the model performs. Otherwise it passes. The rules compare point estimates; they sit in `site-app/lib/diagnostic-decisions.ts` so interval-based rules can replace them. External runs do not apply them yet (section 8).
+
+Preserve actual support and undefined-denominator limitations. An inconclusive fairness result names its cause: too few rows, fewer than two groups, groups below the minimum size, groups without both outcomes (equalized odds) or no favourable prediction at all (disparate impact). Group fairness is a diagnostic signal, not a legal finding by itself. A policy ratio such as 0.8 is not a statutory EU AI Act compliance threshold.
 
 ### Multiclass classification
 
-Compute actual classification metrics from the saved labels and predictions: overall accuracy, macro F1, balanced accuracy and per-class support. Make the evaluated class set explicit and show unsupported or absent class denominators. Macro metrics give each class equal influence; they should not hide rare-class support or be represented as a guarantee of use-case suitability. Apply the profile's minimum sample/class support criteria and report inconclusive outcomes where a meaningful assessment cannot be supported.
+Compute actual classification metrics from the saved labels and predictions: overall accuracy, macro F1, balanced accuracy, the majority-class baseline and per-class support. Make the evaluated class set explicit and show unsupported or absent class denominators. Macro metrics give each class equal influence; they should not hide rare-class support or be represented as a guarantee of use-case suitability. Apply the profile's minimum sample/class support criteria to the reference classes and report inconclusive outcomes where a meaningful assessment cannot be supported. A predicted label absent from the reference column is flagged and counts as an error; it does not make a failing result inconclusive. The binary rules apply with balanced accuracy, averaged over the reference classes, compared against the 1/k of a constant prediction.
 
 ### Regression
 
 Compute MAE and RMSE in the target's units, and R-squared as a dimensionless measure. Validate finite values and retain actual evaluated sample counts. Constant-target data makes ordinary R-squared undefined; do not manufacture a successful score. An undefined metric should be presented with its reason, and its effect on the procedure outcome should follow the declared policy. R-squared can be negative; do not clamp it to zero or treat it as a probability.
 
-For every task, distinguish execution state from result outcome. A successfully executed job may produce an outside-criterion or inconclusive result. Failed/cancelled execution cannot become a pass, and an unavailable selected procedure cannot silently disappear from the result set.
+For every task, distinguish execution state from result outcome. A successfully executed job may produce an outside-criterion or inconclusive result. Failed/cancelled execution cannot become a pass, and an unavailable selected procedure cannot silently disappear from the result set. A run fails when any result fails and passes only when every result passes; no results, or an unrecognised outcome, make it inconclusive, never a pass.
 
 ## 7. Frozen traceability from run to report
 
@@ -135,6 +141,8 @@ Existing review independence remains in force: authors/contributors cannot appro
 The external Python engine is a separately executed path, not a hidden capability of the hosted browser runner. Its existing saved-prediction procedures and reference/current numeric drift can be run locally using its documented configuration.
 
 Trusted native inference adapters exist for ONNX, PMML, native XGBoost JSON and native LightGBM text, subject to explicit trust, file/format/schema validation and the required optional runtimes. PMML additionally requires the separately provisioned Java/runtime path. Pickle/joblib loading is prohibited by the existing optional-adapter implementation; a Scikit-learn inventory label does not enable arbitrary Python deserialization. Ordered numeric features, output-label semantics and supported shapes remain required. Missing runtime or adapter support is an unavailable capability, not a completed test.
+
+External runs do not yet apply the binary performance rules of `traditional-ml-2.1.0` (issue #65). The worker's hosted projection (`hosted_results` in `engine/worker_contract.py`) decides on its support minimums, accuracy and the recall of the favourable label, without the balanced-accuracy and majority-baseline rules, so a constant predictor can still pass there. The worker also measures recall on the favourable label only. The platform therefore refuses (400) to queue an external job for a binary performance protocol whose performance positive class differs from the favourable label, rather than label the worker's results with a class it did not measure.
 
 The existing external model-diagnostics code supports held-out numeric permutation importance and a constrained one-feature perturbation procedure with a declared approved protocol. These remain separate from browser saved-prediction testing. Permutation importance is exploratory relevance evidence, and constrained perturbations are local sensitivity evidence; neither is an explanation of causality or a cybersecurity certification. An explicit trust flag and subprocess are not proof of a production isolation boundary.
 

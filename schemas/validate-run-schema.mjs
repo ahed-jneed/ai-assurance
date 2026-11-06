@@ -105,7 +105,11 @@ assert.ok(complete && queued && regression && multiclass && cardFixture, 'Expect
 const legacy = copy(complete);
 legacy.contractVersion = '1.0';
 for (const key of ['task', 'profileId', 'manifest']) delete legacy[key];
-legacy.provenance = { inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
+// Contract 1.0 predates the performance positive class of test definitions
+// 2.1.0, which fresh `--fixtures` runs freeze.
+delete legacy.config.performancePositiveLabel;
+delete legacy.thresholds.performancePositiveLabel;
+legacy.provenance ={ inputHashes: { dataset: complete.provenance.inputHashes.dataset, modelMetadata: complete.provenance.inputHashes.modelMetadata }, runnerVersion: 'interactive-predictions-1.0', policyVersion: '1.0' };
 positive('Legacy interactive completed', legacy);
 const oldConfig = copy(legacy);
 for (const key of ['minimumSampleSize', 'minimumClassCount', 'maximumOddsGap', 'minimumRecall', 'minimumMacroF1', 'maximumRmse']) {
@@ -132,6 +136,16 @@ const undefinedR2 = copy(regression);
 undefinedR2.results[0].metrics.find(metric => metric.name === 'r2').value = null;
 undefinedR2.results[0].limitations.push('R² is undefined for this target population.');
 positive('Hosted null R² evidence', undefinedR2);
+// Test definitions 2.1.0: binary performance freezes its positive class and
+// reports specificity, prevalence and the majority-class baseline.
+const perClass = copy(complete);
+perClass.config.performancePositiveLabel = perClass.config.positiveLabel;
+perClass.thresholds.performancePositiveLabel = perClass.config.positiveLabel;
+const perClassResult = perClass.results.find(result => result.testId === 'performance');
+for (const name of ['specificity', 'prevalence', 'majority_baseline_accuracy']) perClassResult.metrics.push({ name, value: 0.5, unit: 'ratio', sampleSize: perClassResult.metrics[0].sampleSize });
+positive('Hosted performance positive class and per-class evidence', perClass);
+negative('per-class ratio outside range', perClass, run => { run.results.find(result => result.testId === 'performance').metrics.at(-1).value = 1.5; });
+negative('per-class metric on a fairness result', perClass, run => { run.results.find(result => result.testId === 'demographic_parity').metrics.push({ name: 'specificity', value: 0.5, unit: 'ratio', sampleSize: 1 }); });
 
 const mutations = [
   ['unknown contract', complete, run => { run.contractVersion = '2.0'; }],
@@ -178,6 +192,19 @@ const mutations = [
   ['Hugging Face path traversal', cardFixture, run => { run.manifest.model.card.source.filename = '../model.onnx'; }],
 ];
 for (const mutation of mutations) negative(...mutation);
+
+// queueRun and queueExternal pin the selected dataset governance card into the
+// manifest. Schema shape only: the server checks the card against the record.
+const cardPin = { recordId: 'REC-dataset-card-fixture', sha256: 'c'.repeat(64), card: { schemaVersion: '1.0', artifactId: complete.datasetId } };
+const pinnedHosted = copy(complete);
+pinnedHosted.manifest.dataset.cardPin = copy(cardPin);
+positive('Hosted run with dataset-card pin', pinnedHosted);
+for (const [label, mutate] of [
+  ['dataset-card pin malformed hash', run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; }],
+  ['dataset-card pin missing record', run => { delete run.manifest.dataset.cardPin.recordId; }],
+  ['dataset-card pin missing card', run => { delete run.manifest.dataset.cardPin.card; }],
+  ['dataset-card pin unknown field', run => { run.manifest.dataset.cardPin.arbitrary = true; }],
+]) negative(label, pinnedHosted, mutate);
 
 // Current importJob retains the exact completed worker envelope separately.
 // Its 1.2 projection uses frozen request declarations, one compilation paper,
@@ -243,7 +270,6 @@ function externalBindings(fixture) {
 }
 
 const external = json(resolve(option('--external-fixtures') ?? resolve(directory, 'fixtures/external-runs.v1.2.json')));
-if (option('--external-run')) positive('Supplied actual external import projection', json(resolve(option('--external-run'))));
 assert.ok(Array.isArray(external) && external.length >= 4, 'Expected real computed binary, multiclass, regression and client-local fixtures');
 assert.equal(schema.$id, 'urn:ai-assurance:test-run:1.2', 'Regeneration must preserve the 1.2 discriminator');
 for (const fixture of external) {
@@ -303,6 +329,20 @@ for (const [label, mutate] of [
   mutate(fixture);
   assert.throws(() => externalBindings(fixture), undefined, `${label}: binding tamper accepted`);
   rejected++;
+}
+const pinnedExternal = copy(ext);
+pinnedExternal.manifest.dataset.cardPin = copy(cardPin);
+positive('External run with dataset-card pin', pinnedExternal);
+negative('external dataset-card pin malformed hash', pinnedExternal, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
+// A fresh platform projection, e.g. the assurance harness's
+// tmp/assurance-worker-fixture/hosted-external-run.json.
+if (option('--external-run')) {
+  const current = json(resolve(option('--external-run')));
+  positive('Supplied external import projection', current);
+  if (current.manifest?.dataset?.cardPin) {
+    negative('Supplied projection malformed dataset-card hash', current, run => { run.manifest.dataset.cardPin.sha256 = 'invalid'; });
+    negative('Supplied projection missing dataset-card identity', current, run => { delete run.manifest.dataset.cardPin.recordId; });
+  }
 }
 const engine = json(resolve(workspace, 'engine/examples/report-v1.1.1.json'));
 negative('Python runtime missing implementation', engine, run => { delete run.provenance.dependencies.python.implementation; });

@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FrozenReportDetails } from "./report-details";
 import { FindingActions } from "./finding-actions";
-import { protocolConfigKeys } from "@/lib/evaluation";
+import { performancePositiveLabel, protocolConfigKeys } from "@/lib/evaluation";
 import { humanLabel, readableResults } from "@/lib/presentation";
 import type {
   Engagement,
@@ -268,6 +268,9 @@ function formatMetric(metric: Metric) {
       "f1",
       "macro_f1",
       "balanced_accuracy",
+      "specificity",
+      "prevalence",
+      "majority_baseline_accuracy",
     ].includes(metric.name)
   )
     return (metric.value * 100).toFixed(1) + "%";
@@ -383,7 +386,11 @@ function Criterion({ result, run }: { result: Result; run: Run }) {
               ((c.minimumMacroF1 ?? 0.7) * 100).toFixed(1) +
               "%"
             : c.minimumRecall !== undefined
-              ? " · Recall ≥ " + (c.minimumRecall * 100).toFixed(1) + "%"
+              ? " · Recall of '" +
+                performancePositiveLabel(c) +
+                "' ≥ " +
+                (c.minimumRecall * 100).toFixed(1) +
+                "%"
               : "")
         : result.testId === "regression"
           ? "RMSE ≤ " + c.maximumRmse + " target units"

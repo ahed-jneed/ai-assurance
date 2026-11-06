@@ -48,7 +48,7 @@ The follow-up [usability restructure](usability-update.md) adds verified tenant-
 
 The PostgreSQL tests establish migration and selected authorization behavior; they are not a hosted PostgreSQL deployment, full penetration test or regulatory certification. Cloudflare/D1 reference storage has application authorization and bounded aggregates, rather than PostgreSQL RLS.
 
-The local Worker harness tests domain authorization using fictional identity headers on an ephemeral loopback-only runtime. It does not validate Sites sign-in/access policies, enterprise IdP provisioning or a production authentication boundary. The published Site remains private through the hosting platform.
+The local Worker harness tests domain authorization using fictional identity headers on an ephemeral loopback-only runtime, in the explicitly enabled `trusted-headers` identity mode. The identity harness checks the Worker's own boundary: forged identity headers are refused in every mode but `sites`, and Cloudflare Access tokens are verified against a stub key set (`docs/security/identity.md`). Neither validates Sites sign-in/access policies, a live Cloudflare Access application, enterprise IdP provisioning or a production authentication boundary. The published Site remains private through the hosting platform.
 
 ONNX Runtime, PMML/Java, native XGBoost/LightGBM and pyarrow were absent, so optional adapter/Parquet golden-artifact integration tests remain pending. SHAP/LIME, cross-validation, adversarial and source-system logging tests are unavailable rather than reported as passed.
 
