@@ -42,6 +42,7 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import { assuranceRecords } from "@/lib/assurance-store-client";
 
 import obligations from "@/lib/obligation-subitems.json";
+import { packFeatures } from "./workspace-types";
 
 import type {
   ReviewQueueSummary,
@@ -168,7 +169,11 @@ export function AssuranceWorkbench({
   const e = data.engagement!,
     writer = ["Auditor", "Lead Auditor"].includes(data.identity.role),
     lead = data.identity.role === "Lead Auditor",
-    reviewer = ["Lead Auditor", "Reviewer"].includes(data.identity.role);
+    reviewer = ["Lead Auditor", "Reviewer"].includes(data.identity.role),
+    // Obligation-subitem assessments exist only on packs that switch them on
+    // (docs/design/criteria-model.md section 7.1); other packs take their
+    // assertion criteria from the pack's requirements.
+    obligationsOn = packFeatures(data).obligationAssessments;
 
   const query = location.search,
     reviewFilter = location.review,
@@ -709,11 +714,16 @@ export function AssuranceWorkbench({
       },
       {
         name: "criterion",
-        label: "Criterion / obligation subitem",
-        options: obligations.items.map((o) => ({
-          value: o.code,
-          label: obligationOptionLabel(o),
-        })),
+        label: obligationsOn ? "Criterion / obligation subitem" : "Criterion",
+        options: obligationsOn
+          ? obligations.items.map((o) => ({
+              value: o.code,
+              label: obligationOptionLabel(o),
+            }))
+          : (data.criteria?.requirements ?? []).map((r) => ({
+              value: r.reference,
+              label: r.citation + (r.title ? " · " + r.title : ""),
+            })),
         required: true,
       },
       {
@@ -2015,12 +2025,14 @@ export function AssuranceWorkbench({
                 </div>
                 {writer && (
                   <div className="row-actions">
-                    <Button
-                      variant="outline"
-                      onClick={() => open("obligationDecision")}
-                    >
-                      Assess obligation
-                    </Button>
+                    {obligationsOn && (
+                      <Button
+                        variant="outline"
+                        onClick={() => open("obligationDecision")}
+                      >
+                        Assess obligation
+                      </Button>
+                    )}
                     <Button onClick={() => open("impact")}>
                       Assess change
                     </Button>
@@ -2028,50 +2040,55 @@ export function AssuranceWorkbench({
                 )}
               </div>
               {list(["impact"], "No change assessments recorded")}
-              <h2 className="workbench-subhead">Obligation assessments</h2>
-              {list(["obligation"], "No subitem assessments recorded")}
-              <details className="help-panel">
-                <summary>
-                  Obligation subitems · {obligations.items.length} review
-                  prompts
-                </summary>
-                <p>{obligations.scope}</p>
-                <p>{obligations.decisionPolicy.providerResponsibility}</p>
-                <a
-                  className="source-link"
-                  href={obligations.source.url}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Reviewed legal source · {obligations.source.version}
-                </a>
-                <div className="obligation-list">
-                  {obligations.items.map((o) => (
-                    <div key={o.code}>
-                      <b>
-                        {o.article} · {o.title}
-                      </b>
-                      {o.legalReview?.required && (
-                        <>
-                          {" "}
-                          <span
-                            className="badge amber"
-                            title={
-                              o.reviewNote ?? "Pending qualified legal review"
-                            }
-                          >
-                            {pendingLegalReview(o.legalReview.itemIds)}
-                          </span>
-                        </>
-                      )}
-                      <small className="block subtle">
-                        {o.actor.join(", ")} · {o.code} ·{" "}
-                        {o.evidenceCategories.join(", ")}
-                      </small>
+              {obligationsOn && (
+                <>
+                  <h2 className="workbench-subhead">Obligation assessments</h2>
+                  {list(["obligation"], "No subitem assessments recorded")}
+                  <details className="help-panel">
+                    <summary>
+                      Obligation subitems · {obligations.items.length} review
+                      prompts
+                    </summary>
+                    <p>{obligations.scope}</p>
+                    <p>{obligations.decisionPolicy.providerResponsibility}</p>
+                    <a
+                      className="source-link"
+                      href={obligations.source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Reviewed legal source · {obligations.source.version}
+                    </a>
+                    <div className="obligation-list">
+                      {obligations.items.map((o) => (
+                        <div key={o.code}>
+                          <b>
+                            {o.article} · {o.title}
+                          </b>
+                          {o.legalReview?.required && (
+                            <>
+                              {" "}
+                              <span
+                                className="badge amber"
+                                title={
+                                  o.reviewNote ??
+                                  "Pending qualified legal review"
+                                }
+                              >
+                                {pendingLegalReview(o.legalReview.itemIds)}
+                              </span>
+                            </>
+                          )}
+                          <small className="block subtle">
+                            {o.actor.join(", ")} · {o.code} ·{" "}
+                            {o.evidenceCategories.join(", ")}
+                          </small>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </details>
+                  </details>
+                </>
+              )}
             </>
           )}
 

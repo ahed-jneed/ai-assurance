@@ -2,6 +2,7 @@
 import type { Engagement, Role } from "../domain";
 import { freshEngagement } from "../factories";
 import type { Context } from "../tenancy";
+import { resolveNew } from "../criteria/pin";
 
 /** A signed-in caller of the fixture practice, acting in `role`. */
 export function caller(
@@ -23,7 +24,12 @@ export function caller(
 
 /** An engagement without the structured workflow, as getEngagement loads it. */
 export function stored(version = 3): Engagement {
-  const e = freshEngagement("CL-1", "Model risk audit", "user-lead");
+  const e = freshEngagement(
+    resolveNew(),
+    "CL-1",
+    "Model risk audit",
+    "user-lead",
+  );
   e.version = version;
   return e;
 }

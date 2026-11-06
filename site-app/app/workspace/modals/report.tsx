@@ -2,6 +2,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { finalReportGates, type FinalReport } from "@/lib/domain";
+import { packFeatures } from "../../workspace-types";
 import {
   assuranceLevelIds,
   assuranceLevels,
@@ -46,7 +47,7 @@ function ReportFields({
   const report = formReport(choices),
     type = engagementTypes[report.engagementType],
     conclusion = conclusionTypes[report.conclusion],
-    gates = e ? finalReportGates(e, report) : [];
+    gates = e ? finalReportGates(e, report, packFeatures(data)) : [];
   /** Changes one term and keeps the others valid for it. */
   const pick = (key: string, value: string) => {
     const t = normalizeTerms({ ...report, [key]: value });
@@ -205,17 +206,19 @@ function ReportFields({
 const finalBlocked = (
   choices: Record<string, string>,
   e: ModalFieldsProps["engagement"],
+  data: ModalFieldsProps["data"],
 ) =>
   choices.kind === "final" &&
   !!e &&
-  !!finalReportGates(e, formReport(choices)).length;
+  !!finalReportGates(e, formReport(choices), packFeatures(data)).length;
 export const reportModal: ModalDefinition = {
   title: "Create immutable report snapshot",
   submitLabel: "Create snapshot",
   Fields: ReportFields,
-  blocked: ({ choices, engagement }) => finalBlocked(choices, engagement),
-  validate: ({ choices, engagement }) => {
-    if (finalBlocked(choices, engagement))
+  blocked: ({ choices, engagement, data }) =>
+    finalBlocked(choices, engagement, data),
+  validate: ({ choices, engagement, data }) => {
+    if (finalBlocked(choices, engagement, data))
       throw Error(
         "Resolve the final-report requirements or choose a draft snapshot.",
       );

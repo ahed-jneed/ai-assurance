@@ -1,5 +1,11 @@
-import catalog from "../catalog.json";
 import { sanitize } from "../client-projection";
+import {
+  criteriaRegistry,
+  criteriaView,
+  defaultCatalog,
+  pinnedCatalog,
+} from "../criteria/pin";
+import { selectablePacks } from "../criteria/registry";
 import type { Engagement } from "../domain";
 import { db, getEngagement, storedSize } from "../engagement-repo";
 import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
@@ -242,6 +248,17 @@ export async function workspaceView(
     managementVersion,
     managementEvents,
     events: trail?.events ?? [],
-    catalog: isClientRole(ctx.role) ? null : catalog,
+    // The catalogue projection of the engagement's pinned pack (or the
+    // default pack without one), and what the pack switches on
+    // (docs/design/criteria-model.md section 10).
+    catalog: isClientRole(ctx.role)
+      ? null
+      : e
+        ? pinnedCatalog(e)
+        : defaultCatalog(),
+    criteria: e ? criteriaView(e, isInternalRole(ctx.role)) : null,
+    selectablePacks: ctx.practiceAdmin
+      ? selectablePacks(criteriaRegistry())
+      : [],
   };
 }

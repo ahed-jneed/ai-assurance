@@ -9,11 +9,11 @@ import {
   assertModelSpecLimits,
   frozenLabelPair,
 } from "../../external-worker-contract";
+import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { diagnosticNarrative } from "../../presentation";
-import { recordVersions } from "../../rule-pack-current";
 import {
   externalGate,
   heldByClient,
@@ -441,7 +441,12 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "The procedure's plan or scope changed after this job was queued; queue it again",
         );
-      const p = templatePaper("WP-A15-01", ctx.user.userId);
+      const resolved = pinned(e),
+        p = templatePaper(
+          resolved,
+          roleTemplate(resolved.pack, "externalExecutionPaper"),
+          ctx.user.userId,
+        );
       p.required = false;
       p.title = "External execution — " + v.jobId;
       // Worker 1.2.0 copies the engine's statistics 1.0.0 decision into every
@@ -570,7 +575,7 @@ export const execution: AssuranceModule = defineCommands({
         createdAt: job.created_at,
         startedAt: attempt?.started_at ?? job.created_at,
         completedAt: job.completed_at,
-        ...recordVersions(),
+        ...recordVersions(e),
         procedureBinding: binding,
         provenance: {
           inputHashes: {

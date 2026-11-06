@@ -284,7 +284,11 @@ function CapturedRuns({
 export function FrozenReportDetails({ value }: { value: Row }) {
   const snapshot = record(value.snapshot) ? value.snapshot : {},
     audit = record(snapshot.engagement) ? snapshot.engagement : {},
+    // Only packs with the AI Act classification capture one (criteria
+    // model section 7.1); every snapshot from before #27 has it.
+    classified = record(audit.classification),
     classification = record(audit.classification) ? audit.classification : {},
+    pack = record(snapshot.criteriaPack) ? snapshot.criteriaPack : null,
     papers = rows(snapshot.papers),
     evidence = rows(snapshot.evidence),
     findings = rows(snapshot.findings),
@@ -516,20 +520,39 @@ export function FrozenReportDetails({ value }: { value: Row }) {
             <p className="record-text">{text(snapshot.limitations)}</p>
           </section>
           <details className="provenance">
-            <summary>Captured classification & regulatory basis</summary>
+            <summary>
+              {classified
+                ? "Captured classification & regulatory basis"
+                : "Captured criteria"}
+            </summary>
             <dl className="document-properties">
-              <div>
-                <dt>Operator role</dt>
-                <dd>{text(classification.operatorRole)}</dd>
-              </div>
-              <div>
-                <dt>Route</dt>
-                <dd>{text(classification.annexRoute)}</dd>
-              </div>
-              <div>
-                <dt>Legal snapshot</dt>
-                <dd>{text(classification.version)}</dd>
-              </div>
+              {classified && (
+                <>
+                  <div>
+                    <dt>Operator role</dt>
+                    <dd>{text(classification.operatorRole)}</dd>
+                  </div>
+                  <div>
+                    <dt>Route</dt>
+                    <dd>{text(classification.annexRoute)}</dd>
+                  </div>
+                  <div>
+                    <dt>Legal snapshot</dt>
+                    <dd>{text(classification.version)}</dd>
+                  </div>
+                </>
+              )}
+              {pack && (
+                <div>
+                  <dt>Criteria pack</dt>
+                  <dd>
+                    {text(pack.packId)} {text(pack.packVersion)}
+                    {pack.legalReviewPending === true
+                      ? " · legal content pending qualified legal review"
+                      : ""}
+                  </dd>
+                </div>
+              )}
               {snapshot.annexMapVersion != null && (
                 <div>
                   <dt>Annex map</dt>
@@ -555,7 +578,9 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                 </div>
               )}
             </dl>
-            <p className="record-text">{text(classification.rationale)}</p>
+            {classified && (
+              <p className="record-text">{text(classification.rationale)}</p>
+            )}
             {source && (
               <a
                 className="source-link"

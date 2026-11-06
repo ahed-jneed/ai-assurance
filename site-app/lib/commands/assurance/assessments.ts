@@ -2,6 +2,7 @@ import { z } from "zod";
 import { assertionSchema, impactSchema } from "../../assurance-core";
 import { addRecord } from "../../assurance-store";
 import { ApiError } from "../../http";
+import { requireFeature } from "../../criteria/pin";
 import obligations from "../../obligation-subitems.json";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -62,6 +63,10 @@ export const assessments: AssuranceModule = defineCommands({
   obligationDecision: {
     roles: ["Auditor", "Lead Auditor"],
     async handle({ e, accepted, revision }, d, ctx) {
+      // Phase 1 validates codes against the build's obligation catalogue
+      // (docs/design/criteria-model.md section 7.1); phase 2 (#61) against
+      // the pinned framework.
+      requireFeature(e, "obligationAssessments");
       const v = z
           .object({
             supersedesId: short.optional(),
@@ -123,6 +128,7 @@ export const assessments: AssuranceModule = defineCommands({
   reviewObligation: {
     roles: ["Reviewer", "Lead Auditor"],
     async handle({ e, find }, d, ctx) {
+      requireFeature(e, "obligationAssessments");
       const v = z
           .object({
             obligationId: short,

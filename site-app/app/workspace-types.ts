@@ -1,3 +1,4 @@
+import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 export type CatalogItem = {
   id: string;
@@ -90,4 +91,23 @@ export type WorkspaceData = {
     /** The rule pack (lib/rule-pack.ts asRulePack); empty without one. */
     regulatorySnapshot: Record<string, unknown>;
   } | null;
+  /**
+   * The selected engagement's criteria pack and what it switches on
+   * (docs/design/criteria-model.md section 10); null without an engagement.
+   */
+  criteria?: CriteriaView | null;
+  /** The packs a practice administrator may pin a new engagement to. */
+  selectablePacks?: PackSummary[];
 };
+/** What the selected engagement's pack switches on; pack #1 (all on) without one. */
+export function packFeatures(
+  data: Pick<WorkspaceData, "criteria"> | null | undefined,
+) {
+  return (
+    data?.criteria?.features ?? {
+      annexIvIndex: true,
+      aiActClassification: true,
+      obligationAssessments: true,
+    }
+  );
+}

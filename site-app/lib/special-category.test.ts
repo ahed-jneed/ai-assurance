@@ -30,6 +30,7 @@ import {
 import { context } from "./tenancy";
 import { sqliteD1 } from "./test-d1";
 import { seedWorkflow } from "./workflow-seed";
+import { resolveNew } from "./criteria/pin";
 
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenancy")>()),
@@ -568,7 +569,7 @@ describe("POST /api/evidence", () => {
       },
       e = JSON.parse(row.body) as Engagement,
       at = "2026-11-01T00:00:00.000Z";
-    e.workflow = seedWorkflow("user-lead", at);
+    e.workflow = seedWorkflow(resolveNew(), "user-lead", at);
     e.evidenceRequests = [
       {
         id: "REQ-1",

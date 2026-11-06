@@ -11,6 +11,7 @@ import catalog from "./catalog.json";
 import { freshEngagement, templatePaper } from "./factories";
 import type { Context } from "./tenancy";
 import { sqliteD1 } from "./test-d1";
+import { resolveNew } from "./criteria/pin";
 
 /** An R2 stand-in holding objects in memory and recording each get. */
 export function countingBucket() {
@@ -53,7 +54,7 @@ export function member(
  * awaiting approval, a released one, a paper history and run results.
  */
 export function engagementWithParts(id: string, title: string) {
-  const e = freshEngagement("CL-1", title, "lead", true);
+  const e = freshEngagement(resolveNew(), "CL-1", title, "lead", true);
   e.id = id;
   const report = (rid: string, state: string) =>
     ({
@@ -74,7 +75,7 @@ export function engagementWithParts(id: string, title: string) {
     report(id + "-open", "internal"),
     report(id + "-out", "released"),
   );
-  e.papers.push(templatePaper(catalog.items[0].id, "auditor"));
+  e.papers.push(templatePaper(resolveNew(), catalog.items[0].id, "auditor"));
   e.papers[0].history = [
     { revision: 0, at: "2026-11-01T00:00:00.000Z" },
   ] as unknown as Engagement["papers"][number]["history"];

@@ -27,6 +27,7 @@ import {
   structuredEngagement,
   workflowOf,
 } from "./test-fixtures";
+import { resolveNew } from "../criteria/pin";
 
 const leadOnly = "A Lead Auditor must authorize this decision";
 const writerOnly = "An Auditor or Lead Auditor must record this audit work";
@@ -35,7 +36,9 @@ const writerOnly = "An Auditor or Lead Auditor must record this audit work";
 function planned(): Engagement {
   const w = approvedWorkflow([
     {
-      ...seedWorkflow("lead", at).procedures.find((p) => p.id === procedureId)!,
+      ...seedWorkflow(resolveNew(), "lead", at).procedures.find(
+        (p) => p.id === procedureId,
+      )!,
       selected: true,
       applicability: "applicable",
       ownerId: "auditor",
@@ -190,7 +193,9 @@ describe("the Planning-exit acceptance gate", () => {
   });
 
   it("applies to every workflow adopted or created from now on", async () => {
-    expect(seedWorkflow("lead", at).acceptanceRequired).toBe(true);
+    expect(seedWorkflow(resolveNew(), "lead", at).acceptanceRequired).toBe(
+      true,
+    );
     const e = engagement();
     await command(e, "adoptWorkflow", {}, "lead");
     expect(workflowOf(e).acceptanceRequired).toBe(true);

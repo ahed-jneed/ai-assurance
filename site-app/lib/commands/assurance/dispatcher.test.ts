@@ -29,6 +29,7 @@ import { sha256 } from "@/lib/ids";
 import type { assuranceView } from "@/lib/read-models/assurance-view";
 import { context, type Context } from "@/lib/tenancy";
 import { at, declaration } from "@/lib/workflow/test-fixtures";
+import { resolveNew } from "@/lib/criteria/pin";
 import { seedWorkflow } from "@/lib/workflow-seed";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
@@ -696,7 +697,7 @@ describe("setAccess and declared conflicts (#112)", () => {
   function conflicted() {
     const e = stored();
     e.workflow = {
-      ...seedWorkflow("user-lead", at),
+      ...seedWorkflow(resolveNew(), "user-lead", at),
       declarations: [
         declaration("auditor", {
           userId: "user-2",

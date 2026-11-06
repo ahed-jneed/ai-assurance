@@ -1,0 +1,55 @@
+{
+  "documentType": "index",
+  "schemaVersion": "1.0.0",
+  "documents": [
+    {
+      "documentType": "framework",
+      "id": "eu-ai-act",
+      "edition": "02024R1689-20260727",
+      "version": "2026.11.2",
+      "path": "frameworks/eu-ai-act/02024R1689-20260727/2026.11.2.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #27)",
+          "at": "2026-11-06"
+        }
+      ],
+      "legalReview": "pending",
+      "releasedAt": "2026-11-06",
+      "sha256": "70b523750de2d69a6cbf359459835f09bbf6954a79bd883b92067d3462f15421"
+    },
+    {
+      "documentType": "pack",
+      "id": "eu-ai-act-amended",
+      "version": "2026.11.2",
+      "path": "packs/eu-ai-act-amended/2026.11.2.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #27)",
+          "at": "2026-11-06"
+        }
+      ],
+      "releasedAt": "2026-11-06",
+      "selectable": true,
+      "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
+    }
+  ],
+  "defaults": {
+    "pack": {
+      "id": "eu-ai-act-amended",
+      "version": "2026.11.2"
+    }
+  },
+  "legacy": {
+    "packId": "eu-ai-act-amended",
+    "fallbackVersion": "2026.11.2",
+    "stamps": {
+      "2026.11.1": "2026.11.2",
+      "2026.11.2": "2026.11.2"
+    }
+  }
+}
