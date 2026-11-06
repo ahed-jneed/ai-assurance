@@ -52,6 +52,8 @@ export function frozenLabelPair(input: {
       400,
       `The protocol's favourable label '${positiveLabel}' is not one of the system revision's output classes (${quoted(classOrder)}). Use a protocol version whose favourable label is one of them.`,
     );
+  // Safe: systemSchema (lib/assurance-core.ts) refuses duplicate output
+  // classes, so a two-class order always holds one class besides positiveLabel.
   const negativeLabel = classOrder.find((l) => l !== positiveLabel)!;
   if (requested !== undefined && requested !== negativeLabel)
     throw new ApiError(
