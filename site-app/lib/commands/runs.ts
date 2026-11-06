@@ -3,6 +3,7 @@ import { recordsById } from "../assurance-store";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain";
 import { getEngagement, now, save, sha256 } from "../engagement-repo";
+import { cardDescribes } from "../dataset-card";
 import { describePlan } from "../hosted-statistics";
 import {
   registerModel,
@@ -10,6 +11,7 @@ import {
   queueEvaluation,
   queueRetry,
   executionCSV,
+  pinDatasetCard,
   verifyFrozenInputs,
 } from "../evaluation-service";
 import { templatePaper } from "../factories";
@@ -17,9 +19,18 @@ import { ApiError } from "../http";
 import { diagnosticNarrative } from "../presentation";
 import { runAuditDetails } from "../special-category";
 import { substantivePlan } from "../workflow/command";
-import { runBindsProcedure } from "../workflow-state";
+import { activeProcedureRun, runBindsProcedure } from "../workflow-state";
 import { defineCommands } from "./command";
 import { short } from "./fields";
+/** Refuses a second queued or running run of the procedure. */
+function refuseDuplicate(e: Engagement, procedureId: string) {
+  const active = activeProcedureRun(e, procedureId);
+  if (active)
+    throw new ApiError(
+      409,
+      `Evaluation ${active.id} of this procedure is already ${active.state}. Open it, or cancel it before queueing another`,
+    );
+}
 /**
  * Interactive evaluations: registering models and protocols, queueing frozen
  * runs, executing them into draft working papers, and retry, recovery and
@@ -62,35 +73,25 @@ export const runs = defineCommands({
           409,
           "Use the approved procedure model, dataset and protocol",
         );
+      if (p) refuseDuplicate(e, p.id);
       const card = datasetCardRecordId
-        ? (await recordsById(ctx, e.id, [datasetCardRecordId])).find(
-            (r) => r.id === datasetCardRecordId && r.kind === "dataset",
-          )
-        : undefined;
+          ? (await recordsById(ctx, e.id, [datasetCardRecordId])).find(
+              (r) => r.id === datasetCardRecordId,
+            )
+          : undefined,
+        dataset = e.artifacts.find(
+          (a) => a.id === args.datasetId && a.status === "accepted",
+        );
       if (
         datasetCardRecordId &&
-        (!card ||
-          card.body.artifactId !== args.datasetId ||
-          card.body.artifactSha256 !==
-            e.artifacts.find(
-              (a) => a.id === args.datasetId && a.status === "accepted",
-            )?.sha256)
+        (!card || !dataset || !cardDescribes(card, dataset))
       )
         throw new ApiError(
           409,
           "The dataset card must match the accepted evaluation bytes",
         );
       const run = await queueEvaluation(e, args, ctx.user.userId);
-      if (card && run.manifest) {
-        run.manifest.dataset.cardPin = {
-          recordId: card.id,
-          sha256: card.sha256,
-          card: card.body,
-        };
-        run.provenance.inputHashes.manifest = await sha256(
-          JSON.stringify(run.manifest),
-        );
-      }
+      if (card) await pinDatasetCard(run, card);
       // The run binds the plan content, as executions do: the plan hash is
       // kept on first use for procedures planned before plan hashes.
       if (p)
@@ -145,7 +146,30 @@ export const runs = defineCommands({
           409,
           "The audit scope or procedure changed. Queue a new planned evaluation",
         );
+      if (p) refuseDuplicate(e, p.id);
+      // The retry is evaluated against the card its source pinned, while that
+      // record still describes the same bytes.
+      const pin = source.manifest.dataset.cardPin,
+        card = pin
+          ? (await recordsById(ctx, e.id, [pin.recordId])).find(
+              (r) => r.id === pin.recordId,
+            )
+          : undefined;
+      if (
+        pin &&
+        (!card ||
+          card.sha256 !== pin.sha256 ||
+          !cardDescribes(card, {
+            id: source.datasetId,
+            sha256: source.provenance.inputHashes.dataset,
+          }))
+      )
+        throw new ApiError(
+          409,
+          "The dataset card pinned to this run changed. Queue a new evaluation with a current card",
+        );
       const run = await queueRetry(e, source, ctx.user.userId);
+      if (card) await pinDatasetCard(run, card);
       run.retryOf = source.id;
       if (source.procedureBinding) {
         run.procedureBinding = { ...source.procedureBinding };

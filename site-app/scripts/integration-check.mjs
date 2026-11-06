@@ -1792,6 +1792,31 @@ try {
     sampling: currentPlan().sampling + "; source manifest reconciled",
   });
   await command("retryRun", { runId: early.details.runId }, owner, 409);
+  // A procedure has one queued or running planned run at a time, and a
+  // retry keeps the dataset card its source pinned (#67).
+  const plannedInput = {
+    procedureId: proc.id,
+    modelId: runInput.modelId,
+    datasetId: uploaded.artifactId,
+    profileId,
+  };
+  const cardRun = await command("queueRun", {
+    ...plannedInput,
+    datasetCardRecordId: datasetCard.id,
+  });
+  await command("queueRun", plannedInput, owner, 409);
+  await command("cancelRun", { runId: cardRun.details.runId });
+  const cardRetry = await command("retryRun", {
+    runId: cardRun.details.runId,
+  });
+  assert.equal(e.runs.at(-1).retryOf, cardRun.details.runId);
+  assert.deepEqual(
+    e.runs.at(-1).manifest.dataset.cardPin,
+    e.runs.find((r) => r.id === cardRun.details.runId).manifest.dataset.cardPin,
+  );
+  assert.equal(e.runs.at(-1).manifest.dataset.cardPin.recordId, datasetCard.id);
+  await command("retryRun", { runId: cardRun.details.runId }, owner, 409);
+  await command("cancelRun", { runId: cardRetry.details.runId });
   const planned = await command("queueRun", {
     procedureId: proc.id,
     modelId: runInput.modelId,

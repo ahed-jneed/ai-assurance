@@ -116,6 +116,18 @@ export function runBindsProcedure(e: Engagement, p: Procedure, r: Run) {
   return !!b && b.procedureId === p.id && planPinsCurrent(e, p, b);
 }
 /**
+ * The latest queued or running run bound to this procedure. While one
+ * exists, another planned run of the procedure is refused: duplicate queued
+ * runs block final issuance until someone cancels them.
+ */
+export function activeProcedureRun(e: Engagement, procedureId: string) {
+  return e.runs.findLast(
+    (r) =>
+      ["queued", "running"].includes(r.state) &&
+      r.procedureBinding?.procedureId === procedureId,
+  );
+}
+/**
  * The revision a recovery draft of a procedure form is based on. A saved
  * draft can be restored only while this is unchanged, so restoring it cannot
  * revert a change saved since. Every procedure form depends on the plan, the
