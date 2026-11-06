@@ -386,6 +386,7 @@ describe("POST /api/assurance", () => {
         {
           id: "PROC-1",
           revision: 1,
+          instructions: [],
           selected: true,
           applicability: "applicable",
           modelId: model.id,
@@ -442,6 +443,9 @@ describe("POST /api/assurance", () => {
       "freezeExternalExecution",
       { jobId: reply.jobId, requestSha256: reply.requestSha256 },
     ]);
+    // The job binds the plan content: a procedure planned before plan hashes
+    // keeps the hash it was queued with (#105).
+    expect(e.workflow!.procedures[0].planHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 
