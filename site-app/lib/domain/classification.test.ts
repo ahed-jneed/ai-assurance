@@ -713,8 +713,12 @@ describe("Art 50 triggers", () => {
       status: "needs_information",
       missingFacts: ["scientificResearchOnly"],
     });
-    // Art 50(5) is certain, so the label is; the approval still waits.
-    expect(classify(open)).toBe("Specific transparency");
+    // Art 50(5) follows its only paragraph 1-4 item, so neither is certain.
+    expect(statusOf(open, "AIA-50-5")).toMatchObject({
+      status: "needs_information",
+      missingFacts: ["scientificResearchOnly"],
+    });
+    expect(classify(open)).toBe("Needs information");
     expect(approvalBlockers(open, rules).join(" ")).toContain("Art 50(1)");
     const guidance = record({
       facts: {
@@ -742,6 +746,53 @@ describe("Art 50 triggers", () => {
       evidence: { personalNonProfessionalUseOnly: "EV-1" },
     });
     expect(statusOf(personal, "AIA-50-3").status).toBe("excluded");
+  });
+
+  it("takes Art 50(5) out with the paragraph 1-4 items a scope exclusion removes", () => {
+    const research = record({
+      facts: {
+        interactsDirectlyWithNaturalPersons: "yes",
+        scientificResearchOnly: "yes",
+      },
+      evidence: { scientificResearchOnly: "EV-3 research charter" },
+    });
+    expect(statusOf(research, "AIA-50-5")).toMatchObject({
+      status: "excluded",
+      exclusion: { id: "EX-SCOPE-RD" },
+    });
+    expect(research.transparency).toBe(false);
+    expect(classify(research)).toBe("Minimal risk");
+    const personal = record({
+      operatorRole: "Deployer",
+      facts: {
+        deployerGeneratesDeepFakes: "yes",
+        personalNonProfessionalUseOnly: "yes",
+      },
+      evidence: { personalNonProfessionalUseOnly: "EV-1 use statement" },
+    });
+    expect(statusOf(personal, "AIA-50-4-DF").status).toBe("excluded");
+    expect(statusOf(personal, "AIA-50-5")).toMatchObject({
+      status: "excluded",
+      exclusion: { id: "EX-SCOPE-PERSONAL" },
+    });
+    expect(classify(personal)).toBe("Minimal risk");
+    // One remaining candidate of a held role keeps Art 50(5) a candidate.
+    const both = record({
+      operatorRole: "Provider and deployer",
+      facts: {
+        interactsDirectlyWithNaturalPersons: "yes",
+        scientificResearchOnly: "no",
+        authorisedByLawForCriminalOffences: "no",
+        deployerGeneratesDeepFakes: "yes",
+        generatesSyntheticImage: "yes",
+        ...art50_2No,
+        personalNonProfessionalUseOnly: "yes",
+      },
+      evidence: { personalNonProfessionalUseOnly: "EV-1 use statement" },
+    });
+    expect(statusOf(both, "AIA-50-4-DF").status).toBe("excluded");
+    expect(statusOf(both, "AIA-50-5").status).toBe("candidate");
+    expect(classify(both)).toBe("Specific transparency");
   });
 
   it("tests a claimed Art 50(1), (3) or (4) exception per item instead of excluding (option a)", () => {
@@ -996,6 +1047,15 @@ describe("canonical data", () => {
           fact === "highRiskRoute",
         fact,
       ).toBe(true);
+  });
+
+  it("lets Art 50(5) follow the paragraph 1-4 items, as exclusionType says", () => {
+    expect(obligations.exclusionType.followsItems).toContain("Article 2(6)");
+    expect(
+      rules.art50Items.find((i) => i.code === "AIA-50-5")?.followsItems,
+    ).toEqual(
+      rules.art50Items.map((i) => i.code).filter((code) => code !== "AIA-50-5"),
+    );
   });
 
   it("keeps the Art 50 profiles free of a high-risk confirmation", () => {

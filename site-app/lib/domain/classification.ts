@@ -591,6 +591,8 @@ export type ObligationRule = {
   trigger: { profile: string; conditions: FactCondition[] };
   exclusions?: ExclusionRule[];
   exceptionsTestedPerItem?: ExclusionRule[];
+  /** Items whose results decide this one once it is triggered (Art 50(5)). */
+  followsItems?: string[];
 };
 export type TriggerProfile = {
   extends?: string;
@@ -770,9 +772,41 @@ export type Art50Result = {
  * The Art 50 items: the operator's role, then the trigger (three-valued),
  * then the exclusionRule (excluded when any exclusion's ifAll is true; needs
  * information when none is true and one is unknown). Exceptions claimed under
- * Art 50(1), (3) and (4) never exclude: they are tested per item.
+ * Art 50(1), (3) and (4) never exclude: they are tested per item. A
+ * triggered item with followsItems (Art 50(5)) then follows the listed items
+ * of the roles the operator holds: candidate if one is, else needs
+ * information if one does, else excluded if one is, else not triggered. So a
+ * scope exclusion (Art 2(6), 2(10)) of every paragraph 1-4 item also
+ * removes Art 50(5).
  */
 export function art50Assessment(
+  c: Pick<Classification, "operatorRole" | "annexRoute" | "answers" | "status">,
+  rules: ClassificationRules,
+): Art50Result[] {
+  const own = art50OwnResults(c, rules),
+    byCode = new Map(own.map((r) => [r.code, r]));
+  return own.map((r, i): Art50Result => {
+    const follows = rules.art50Items[i].followsItems;
+    if (!follows?.length || r.status !== "candidate") return r;
+    const held = follows.flatMap((code) => {
+      const x = byCode.get(code);
+      return x && x.status !== "role_not_held" ? [x] : [];
+    });
+    if (held.some((x) => x.status === "candidate")) return r;
+    const open = held.filter((x) => x.status === "needs_information");
+    if (open.length)
+      return {
+        ...r,
+        status: "needs_information",
+        missingFacts: [...new Set(open.flatMap((x) => x.missingFacts))],
+      };
+    const excluded = held.find((x) => x.status === "excluded");
+    return excluded
+      ? { ...r, status: "excluded", exclusion: excluded.exclusion }
+      : { ...r, status: "not_triggered" };
+  });
+}
+function art50OwnResults(
   c: Pick<Classification, "operatorRole" | "annexRoute" | "answers" | "status">,
   rules: ClassificationRules,
 ): Art50Result[] {
