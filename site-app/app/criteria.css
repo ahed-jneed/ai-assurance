@@ -38,6 +38,9 @@
 .pack-card .block {
   display: block;
 }
+.pack-card .badge {
+  margin-left: 6px;
+}
 
 /* Criteria coverage heatmap (docs/design/criteria-model.md section 15.2).
    States differ by pattern and text, never colour alone; "Not mapped" is

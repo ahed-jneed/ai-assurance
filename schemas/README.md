@@ -88,4 +88,19 @@ Beyond the schema, the validator checks unique ids; that every source, legal-rev
 
 Hosted 1.1 and external 1.2 runs may also carry `rulePack` and `methodologyVersion`: the rule pack and methodology version the run was made under. Both are optional because earlier runs lack them.
 
+## Criteria packs
+
+`criteria-pack.schema.json` (Draft 2020-12) validates the five criteria document types of `docs/design/criteria-model.md`: frameworks, engagement packs, crosswalks, the index and bundles. The documents live in `templates/criteria/` (see its README). `validate-criteria.mjs` adds what JSON Schema cannot express: the integrity rules 1 to 12 of design section 14.2 (trees, persistent ids, criteria sets and links, items and roles, features, crosswalk endpoints, legal effects, the index structure, digests, licences and the approvals of Q4), the methodology-drift check (the default pack must project to `templates/catalog.json` and its AI Act framework to `docs/obligation-subitems.json`) and, with `--base <commit>`, rule 13, the index history, failing closed on a base that is not present. CI runs it in the `engine` job against the pull request's base or the previous tip of `main`.
+
+```powershell
+node schemas/validate-criteria.mjs                            # schema, rules 1-12 and drift
+node schemas/validate-criteria.mjs --base origin/main         # also rule 13
+node schemas/validate-criteria.mjs --stamp                    # fill in the JCS digests of released entries
+node schemas/validate-criteria.mjs --legacy-check rows.json   # the pre-deploy check of design section 11.4
+```
+
+`fixtures/criteria-pack.eu-ai-act-amended.sample.json` is the design's sample of pack #1; `fixtures/criteria-pack.en18286-iso42001.sample.json` holds the section 12 pack as drafts, which the Site tests load to prove that a new pack works from data alone. `npm run sync` writes the generated bundle `site-app/lib/criteria/bundle.generated.json` from the released documents.
+
+## Threshold library
+
 `threshold-library.json` is the threshold library of statistics 1.0.0 (`docs/design/audit-statistics.md` section 10): versioned acceptance rules with their legal status, timeless caveat and dated status notes. `site-app/lib/threshold-library.json` is its generated copy (`npm run sync`), and `engine/tests/test_threshold_library.py` keeps `engine/statistics.py` LIBRARY equal to its decidable entries.
