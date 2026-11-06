@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   assertClaimFits,
+  assertDeclaredLabel,
   assertModelSpecLimits,
   claimResponse,
   claimResponseBytes,
@@ -109,6 +110,42 @@ describe("frozenLabelPair", () => {
     expect(
       refusal(() => frozenLabelPair({ ...multiclass, requested: "a" })).status,
     ).toBe(400);
+  });
+});
+
+describe("assertDeclaredLabel", () => {
+  const plan = { version: "1.0.0", criteria: [] };
+  it("accepts a binary plan whose declared other label is the system's", () => {
+    expect(() =>
+      assertDeclaredLabel(plan, "no", { negativeLabel: "no" }),
+    ).not.toThrow();
+  });
+  it("refuses a binary plan that declares another other label", () => {
+    const error = refusal(() =>
+      assertDeclaredLabel(plan, "0", { negativeLabel: "no" }),
+    );
+    expect(error.status).toBe(400);
+    expect(error.message).toContain(
+      "declares the other binary class label '0', but the system revision's other output class is 'no'",
+    );
+  });
+  it("has nothing to check without a plan or for other tasks", () => {
+    // A 1.0 protocol: the frozen pair comes from the system alone.
+    expect(() =>
+      assertDeclaredLabel(undefined, "0", { negativeLabel: "no" }),
+    ).not.toThrow();
+    // Multiclass and regression 1.1 protocols store negativeLabel ''.
+    expect(() => assertDeclaredLabel(plan, "", undefined)).not.toThrow();
+  });
+  it("lets an empty request on a non-binary 1.1 protocol through", () => {
+    const pair = frozenLabelPair({
+      task: "Multiclass classification",
+      classOrder: ["a", "b", "c"],
+      positiveLabel: "",
+      requested: "",
+    });
+    expect(pair).toBeUndefined();
+    expect(() => assertDeclaredLabel(plan, "", pair)).not.toThrow();
   });
 });
 
