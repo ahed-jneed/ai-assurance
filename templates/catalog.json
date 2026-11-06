@@ -158,7 +158,7 @@
           "provider",
           "deployer"
         ],
-        "summary": "Prohibited AI practices: placing on the market, putting into service or use (point (h): use) of AI systems for the eight original practices. See prohibitedPractices.",
+        "summary": "Prohibited AI practices: placing on the market, putting into service or use (point (h): use) of AI systems for the eight original practices. The eight practices are listed under this entry.",
         "transitional": [
           {
             "reference": "Art 111(1) and (2)",
@@ -412,7 +412,7 @@
           "provider",
           "deployer"
         ],
-        "summary": "Legal basis for processing special categories of personal data for bias detection and correction, replacing Art 10(5). See specialCategoryData for the exact conditions.",
+        "summary": "Legal basis for processing special categories of personal data for bias detection and correction, replacing Art 10(5). The Art 4a(1) and (2) conditions are listed under this entry.",
         "legalBasis": {
           "reference": "Art 113, third paragraph, point (a) (Chapter I) read with entry into force of Regulation (EU) 2026/1744",
           "amendedBy": "Art 4a inserted by Regulation (EU) 2026/1744, Art 1, point (6); Art 10 amended by Art 1, point (9)."
@@ -1584,6 +1584,223 @@
         }
       }
     ],
+    "specialCategoryData": {
+      "provision": "Art 4a, Processing of special categories of personal data for bias detection and correction",
+      "insertedBy": "Regulation (EU) 2026/1744, Art 1, point (6)",
+      "replaces": "Art 10(5), deleted by Regulation (EU) 2026/1744, Art 1, point (9)(b)",
+      "inForceFrom": "2026-07-27",
+      "entryId": "aia-2026-07-27-art4a-bias-data",
+      "paragraph1": {
+        "who": "Providers of high-risk AI systems.",
+        "purpose": "Bias detection and correction in accordance with Art 10(2)(f) and (g).",
+        "threshold": "Exceptionally, to the extent strictly necessary, subject to appropriate safeguards for fundamental rights and freedoms, and in addition to Regulations (EU) 2016/679 and 2018/1725 and Directive (EU) 2016/680 as applicable.",
+        "allConditionsRequired": [
+          {
+            "point": "(a)",
+            "condition": "Bias detection and correction cannot be effectively fulfilled by processing other data, including synthetic or anonymised data."
+          },
+          {
+            "point": "(b)",
+            "condition": "Technical limitations on re-use of the data, and state-of-the-art security and privacy-preserving measures, including pseudonymisation."
+          },
+          {
+            "point": "(c)",
+            "condition": "Measures to secure and protect the data, with suitable safeguards including strict controls and documentation of access, so that only authorised persons with confidentiality obligations have access."
+          },
+          {
+            "point": "(d)",
+            "condition": "The data are not transmitted, transferred or otherwise accessed by other parties."
+          },
+          {
+            "point": "(e)",
+            "condition": "The data are deleted once the bias has been corrected or the data have reached the end of their retention period, whichever comes first."
+          },
+          {
+            "point": "(f)",
+            "condition": "The records of processing activities under Regulations (EU) 2016/679 and 2018/1725 and Directive (EU) 2016/680 include why the processing was strictly necessary to detect and correct biases and why other data could not achieve that objective."
+          }
+        ]
+      },
+      "paragraph2": {
+        "who": "Providers and deployers of other AI systems and models, and deployers of high-risk AI systems.",
+        "conditions": [
+          {
+            "point": "(a)",
+            "condition": "The processing is strictly necessary for bias detection and correction in view of possible biases likely to affect health and safety, have a negative impact on fundamental rights or lead to discrimination prohibited under Union law, especially where outputs influence inputs for future operations."
+          },
+          {
+            "point": "(b)",
+            "condition": "All conditions and safeguards of paragraph 1 are applied."
+          }
+        ],
+        "noObligation": "Paragraph 2 does not create an obligation to conduct bias detection and correction."
+      },
+      "relatedProvisions": [
+        "Art 10(1) as replaced: training, validation and testing data sets of data-trained high-risk systems must meet Art 10(2) to (4) and Art 4a(1).",
+        "Art 10(6) as replaced: for high-risk systems not using model training, Art 10(2) to (4) and Art 4a(1) apply only to testing data sets.",
+        "Art 2(7) as replaced: data protection law is unaffected, without prejudice to Arts 4a and 59."
+      ],
+      "sourceIds": [
+        "SRC-OJ-2026-1744",
+        "SRC-CONS-2024-1689-20260727"
+      ],
+      "verification": {
+        "status": "verified",
+        "verifiedOn": "2026-11-05",
+        "method": "Structured paraphrase of the OJ text; the authentic text governs."
+      },
+      "legalReview": {
+        "required": true,
+        "itemIds": [
+          "LR-06"
+        ]
+      }
+    },
+    "provisionReferences": [
+      {
+        "provision": "Art 5(1), first subparagraph, points (ba) and (bb)",
+        "change": "inserted",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (7)(a)",
+        "appliesFrom": "2026-12-02",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 5(1a), points (a)(i), (a)(ii) and (b), and Art 5(1b)",
+        "change": "inserted",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (7)(b)",
+        "appliesFrom": "2026-12-02",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 111(2)",
+        "change": "replaced",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (39)(a)",
+        "effect": "Legacy cut-off moves from the fixed date 2 Aug 2026 to the date of application of Chapter III referred to in Art 113; the public-authority deadline of 2 Aug 2030 is unchanged.",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727",
+          "SRC-OJ-2024-1689"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 111(4)",
+        "change": "added",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (39)(b)",
+        "effect": "Art 50(2) transition to 2 Dec 2026 for generative systems placed on the market before 2 Aug 2026.",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 113, third paragraph, point (a)",
+        "change": "replaced",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(a)",
+        "effect": "Chapters I and II from 2 Feb 2025, except Art 5(1)(ba) and (bb) and Art 5(1a) and (1b), which apply from 2 Dec 2026.",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 113, third paragraph, point (c)",
+        "change": "replaced",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(b)",
+        "effect": "Chapter III Sections 1 to 3, except Art 6(5), apply from (i) 2 Dec 2027 for Art 6(2)/Annex III systems and (ii) 2 Aug 2028 for Art 6(1)/Annex I systems. Previously Art 6(1) and corresponding obligations from 2 Aug 2027, the rest of Chapter III (other than Section 4) from 2 Aug 2026.",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727",
+          "SRC-OJ-2024-1689"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 113, third paragraph, point (d)",
+        "change": "added",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (40)(c)",
+        "effect": "Arts 102 to 110 apply from 27 Jul 2026.",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 113, second paragraph and third paragraph, point (b)",
+        "change": "unchanged",
+        "amendingProvision": null,
+        "effect": "General application 2 Aug 2026; Chapter III Section 4, Chapter V, Chapter VII, Chapter XII and Art 78 from 2 Aug 2025, except Art 101.",
+        "sourceIds": [
+          "SRC-CONS-2024-1689-20260727",
+          "SRC-OJ-2024-1689"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 6(4) and Annex VIII Section B",
+        "change": "Art 6(4) unchanged; Annex VIII Section B points 7 and 9 deleted",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (42)",
+        "effect": "A provider relying on the Art 6(3) derogation still documents its assessment and registers under Art 49(2); the registration no longer asks for the summary of grounds (point 7) or the Member States concerned (point 9).",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727",
+          "SRC-OJ-2024-1689"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      },
+      {
+        "provision": "Art 40(2), fourth subparagraph",
+        "change": "added",
+        "amendingProvision": "Regulation (EU) 2026/1744, Art 1, point (17)",
+        "effect": "The Commission must request, without undue delay, standardisation deliverables (including harmonised standards, as appropriate) that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and with the relevant requirements and obligations of the Annex I legislation (recital (21)). Art 40(1), which sets the presumption and refers to Section 2 requirements and Chapter V obligations, is unchanged (LR-01).",
+        "sourceIds": [
+          "SRC-OJ-2026-1744",
+          "SRC-CONS-2024-1689-20260727"
+        ],
+        "verification": {
+          "status": "verified",
+          "verifiedOn": "2026-11-05"
+        }
+      }
+    ],
     "standardsCitationRule": "Standards are paywalled. Cite them by reference, edition and clause number with our own short titles of at most 80 characters, and never reproduce their text. Only a standard cited in the OJ can give a presumption of conformity, and only for the clauses it covers.",
     "standards": [
       {
@@ -2271,7 +2488,8 @@
         "topic": "Scope of the EN 18286:2026 presumption",
         "question": "Art 40(1), unchanged, grants a presumption for Chapter III Section 2 requirements (Arts 8 to 15) and Chapter V obligations; Art 17 sits in Section 3. The fourth subparagraph of Art 40(2), added by Regulation (EU) 2026/1744, Art 1, point (17), requires the Commission to request deliverables that facilitate joint compliance and presumption of conformity with the requirements or obligations of Chapter III Sections 2 and 3 and the relevant Annex I legislation (recital (21)), but it does not amend Art 40(1), and EN 18286 was requested earlier under C(2025) 3871. Recital (1) of Implementing Decision (EU) 2026/2274 summarises Art 40 without the Section 2 limit, and the Commission and CEN-CENELEC describe a presumption for the Art 17 requirements the standard covers. Secondary sources say Annex ZA maps Art 17(1) and the first sentence of Art 11(1). Confirm the legal basis and exact scope, and check Annex ZA in a licensed copy.",
         "relatedIds": [
-          "STD-EN-18286-2026"
+          "STD-EN-18286-2026",
+          "provisionReferences"
         ],
         "status": "pending",
         "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"
@@ -2328,7 +2546,8 @@
         "topic": "Art 4a timing and external auditors",
         "question": "Confirm that Art 4a applies from 27 Jul 2026 (recital (9) refers to the date of entry into application of 'that Regulation'), and whether an external auditor or audit platform is an 'other party' under Art 4a(1)(d), so that special-category data may not be transferred to it under Art 4a.",
         "relatedIds": [
-          "aia-2026-07-27-art4a-bias-data"
+          "aia-2026-07-27-art4a-bias-data",
+          "specialCategoryData"
         ],
         "status": "pending",
         "tracking": "https://github.com/ahed-jneed/ai-assurance/issues/57"

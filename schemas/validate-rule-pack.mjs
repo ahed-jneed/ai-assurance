@@ -54,6 +54,15 @@ const realDate = value => {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Research summaries that point at a research data key ("See
+ * specialCategoryData") and the sentence the rule pack shows instead, pointing
+ * at content the product renders under the same entry. Nothing else may differ.
+ */
+const summaryPointers = {
+  'aia-2025-02-02-prohibitions': ['See prohibitedPractices.', 'The eight practices are listed under this entry.'],
+  'aia-2026-07-27-art4a-bias-data': ['See specialCategoryData for the exact conditions.', 'The Art 4a(1) and (2) conditions are listed under this entry.'],
+};
 const versionKey = v => v.split('.').map(n => n.padStart(6, '0')).join('.');
 
 /** Visits every object in a JSON value with its JSON pointer. */
@@ -157,11 +166,23 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
     if (history.some(h => versionKey(h.rulePackVersion) > versionKey(pack.rulePackVersion ?? '0.0.0'))) fail(`${e.id}: history names a rule pack later than ${pack.rulePackVersion}`);
   }
   for (const s of list('standards')) flags(s.id, s.legalReview);
+  const art4a = pack.specialCategoryData;
+  if (art4a) {
+    flags('specialCategoryData', art4a.legalReview);
+    const entry = entries.get(art4a.entryId);
+    if (!entry) fail(`specialCategoryData: unknown entry ${art4a.entryId}`);
+    else {
+      if (entry.date !== art4a.inForceFrom) fail(`specialCategoryData: inForceFrom ${art4a.inForceFrom} differs from ${art4a.entryId} (${entry.date})`);
+      for (const id of art4a.legalReview?.itemIds ?? []) if (!entry.legalReview?.itemIds?.includes(id)) fail(`specialCategoryData: legal-review item ${id} is not flagged on ${art4a.entryId}`);
+    }
+  }
   for (const item of obligations?.items ?? []) if (item.legalReview) flags('obligation ' + item.code, item.legalReview);
   const unapproved = [...entries.values()].filter(e => e.approval?.status !== 'approved').map(e => e.id);
   const openItems = [...reviewItems.values()].filter(i => i.status !== 'resolved').map(i => i.id);
   if (pack.approval?.status === 'approved' && (unapproved.length || openItems.length)) fail(`rule pack approved while ${[...unapproved, ...openItems].slice(0, 5).join(', ')} are pending`);
-  const known = new Set([...entries.keys(), ...deadlines.keys(), ...list('standards').map(s => s.id)]);
+  // Related ids name entries, deadlines, standards or a whole section of the pack.
+  const sections = ['specialCategoryData', 'provisionReferences'].filter(key => pack[key] !== undefined);
+  const known = new Set([...entries.keys(), ...deadlines.keys(), ...list('standards').map(s => s.id), ...sections]);
   for (const item of reviewItems.values()) {
     if (!flagged.has(item.id)) fail(`legal-review item ${item.id} is not referenced by any entry`);
     for (const id of item.relatedIds ?? []) if (!known.has(id)) fail(`${item.id}: unknown related id ${id}`);
@@ -216,6 +237,9 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
   for (const s of list('standards')) {
     if (typeof s.title === 'string' && s.title.length > 80) fail(`${s.id}: title longer than 80 characters`);
     if (s.category === 'harmonised_standard_cited' && s.presumptionOfConformity?.clauseScope?.status === 'secondary_only' && !s.legalReview?.required) fail(`${s.id}: an unverified presumption scope needs a legal-review flag`);
+    const scope = s.presumptionOfConformity?.clauseScope;
+    const overlap = (scope?.covers ?? []).filter(clause => (scope?.excludes ?? []).includes(clause));
+    if (overlap.length) fail(`${s.id}: clause scope both covers and excludes ${overlap.join(', ')}`);
   }
 
   // Agreement with the verified research.
@@ -236,7 +260,20 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
         for (const field of fields) if (!same(x[field], r[field])) fail(`${label} ${id}: ${field} differs from the research`);
       }
     };
-    compare('applicationDates', list('applicationDates'), research.applicationDates ?? [], ['date', 'dateType', 'provisions', 'actors', 'appliesIf', 'exceptIf', 'sourceIds', 'verification', 'legalReview', 'legalBasis']);
+    compare('applicationDates', list('applicationDates'), research.applicationDates ?? [], ['date', 'dateType', 'provisions', 'scope', 'actors', 'conditions', 'appliesIf', 'exceptIf', 'notes', 'sourceIds', 'verification', 'legalReview', 'legalBasis']);
+    // The summary is the research text, except that a pointer to a research
+    // data key reads as a pointer the product resolves (summaryPointers).
+    for (const r of research.applicationDates ?? []) {
+      const e = entries.get(r.id);
+      if (!e) continue;
+      const [from, to] = summaryPointers[r.id] ?? ['', ''];
+      if (e.summary !== (from ? r.summary?.replace(from, to) : r.summary)) fail(`applicationDates ${r.id}: summary differs from the research`);
+    }
+    if (art4a) {
+      const { entryId, ...ours } = art4a;
+      if (!same(ours, research.specialCategoryData)) fail('specialCategoryData differs from the research');
+    } else if (research.specialCategoryData) fail('specialCategoryData is missing');
+    if (!same(pack.provisionReferences, research.provisionReferences)) fail('provisionReferences differ from the research');
     for (const r of research.applicationDates ?? []) {
       const e = entries.get(r.id);
       if (!e) continue;
@@ -267,7 +304,7 @@ export function checkRulePack({ catalog, obligations, annexMap, research = null,
       if (r.ojCitation && (s.ojCitation?.celex !== r.ojCitation.celex || s.ojCitation?.publicationDate !== r.ojCitation.publicationDate || s.ojCitation?.eli !== r.ojCitation.eli)) fail(`standards ${s.id}: OJ citation differs from the research`);
     }
     compare('guidanceDocuments', list('guidanceDocuments'), research.guidance ?? [], ['title', 'status', 'sourceIds', 'verification', 'statutoryDeadline', 'draftPublished', 'expectedFinal']);
-    compare('legalReviewItems', list('legalReviewItems'), research.legalReviewItems ?? [], ['topic', 'question']);
+    compare('legalReviewItems', list('legalReviewItems'), research.legalReviewItems ?? [], ['topic', 'question', 'relatedIds']);
     compare('unverified', list('unverified'), research.unverified ?? [], ['claim', 'status', 'reason', 'sourceIds']);
     compare('sources', list('sources'), research.sources ?? [], ['title', 'publisher', 'kind', 'canonicalUrl', 'accessUrl', 'sha256', 'retrievedOn']);
     if (research.approval?.status !== 'approved' && pack.approval?.status === 'approved') fail('rule pack approved although the research is unapproved');
@@ -298,6 +335,14 @@ export const mutations = [
   ['duplicate id', p => { p.authorityDeadlines[0].id = p.applicationDates[0].id; }],
   ['rule-pack version differs from the methodology version', p => { p.rulePackVersion = '2026.11.2'; }],
   ['consolidated text presented as having legal effect', p => { p.consolidatedTextLegalEffect = 'authentic'; }],
+  ['summary differs from the verified research', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-12-02-art50-2-legacy-transition'); e.summary = e.summary.replace('2 Dec 2026', '2 Feb 2027'); }],
+  ['condition differs from the verified research', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-12-02-art5-new-prohibitions'); e.conditions[1] = e.conditions[1].replace('only where', 'where'); }],
+  ['summary pointer to a research data key', p => { const e = p.applicationDates.find(x => x.id === 'aia-2026-07-27-art4a-bias-data'); e.summary = e.summary.replace('The Art 4a(1) and (2) conditions are listed under this entry.', 'See specialCategoryData for the exact conditions.'); }],
+  ['Art 4a condition differs from the verified research', p => { p.specialCategoryData.paragraph1.allConditionsRequired.pop(); }],
+  ['Art 4a conditions linked to an unknown entry', p => { p.specialCategoryData.entryId = 'aia-2026-07-27-unknown'; }],
+  ['Art 4a legal-review flag dropped', p => { p.specialCategoryData.legalReview = { required: false, itemIds: [] }; }],
+  ['legal-review related id dropped', p => { p.legalReviewItems.find(i => i.id === 'LR-06').relatedIds = ['aia-2026-07-27-art4a-bias-data']; }],
+  ['clause scope covers and excludes the same clause', p => { const scope = p.standards.find(s => s.presumptionOfConformity.clauseScope).presumptionOfConformity.clauseScope; scope.excludes.push(scope.covers[0]); }],
 ];
 
 function main() {
