@@ -7,7 +7,7 @@ import {
   assuranceRecordPage,
   assuranceView,
 } from "@/lib/read-models/assurance-view";
-import { context } from "@/lib/tenancy";
+import { context, refuseReadOnly } from "@/lib/tenancy";
 import { isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
 /**
@@ -51,10 +51,11 @@ export async function POST(request: Request) {
           new TextDecoder().decode(await readBounded(request, 1024 * 1024)),
         ),
       ),
-      ctx = await context(a.tenantId),
-      e = await getEngagement(ctx, a.engagementId);
+      ctx = await context(a.tenantId);
+    refuseReadOnly(ctx);
     if (isClientRole(ctx.role))
       throw new ApiError(403, "The assurance workbench is internal");
+    const e = await getEngagement(ctx, a.engagementId);
     const result = await dispatchAssurance(
       assuranceTarget(e, ctx),
       a.op,

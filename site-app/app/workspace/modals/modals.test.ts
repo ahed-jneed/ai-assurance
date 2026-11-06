@@ -102,6 +102,15 @@ describe("modal definitions", () => {
       member: ["Add member", "Add member"],
       memberEdit: ["Edit access", "Update access"],
       memberRevoke: ["Revoke practice access", "Revoke access"],
+      invite: ["Invite by email", "Save invitation"],
+      invitationCancel: ["Cancel invitation", "Cancel invitation"],
+      practiceRename: ["Rename practice", "Save name"],
+      adminGrant: ["Grant practice administration", "Grant administration"],
+      adminRevoke: ["Remove practice administration", "Remove administration"],
+      adminTransfer: [
+        "Transfer practice administration",
+        "Transfer administration",
+      ],
       upload: ["Upload evidence", "Upload for acceptance"],
       classification: [
         "Guided regulatory classification",
@@ -248,9 +257,15 @@ describe("form submission", () => {
       displayName: "Avery",
       role: "Auditor",
       clientId: null,
+      engagementIds: [],
     });
     const update = context("memberEdit", {
-      choices: { userId: "u9", role: "Client Viewer", clientId: "c1" },
+      choices: {
+        userId: "u9",
+        role: "Client Viewer",
+        originalRole: "Auditor",
+        clientId: "c1",
+      },
       values: { displayName: "Avery" },
     });
     await submit("memberEdit", update);
@@ -260,6 +275,77 @@ describe("form submission", () => {
       role: "Client Viewer",
       clientId: "c1",
     });
+  });
+
+  // F-24: a restore or a role change lists the engagements explicitly; an
+  // edit of the name alone sends none, so grants are kept.
+  it("lists engagements only when access starts afresh", async () => {
+    const restore = context("member", {
+      choices: { userId: "u9", role: "Reviewer" },
+      checks: { "engagement:e1": true, "engagement:e2": false },
+      values: { displayName: "Avery" },
+    });
+    await submit("member", restore);
+    expect(restore.manage).toHaveBeenCalledWith("grantMember", {
+      userId: "u9",
+      displayName: "Avery",
+      role: "Reviewer",
+      clientId: null,
+      engagementIds: ["e1"],
+    });
+    const rename = context("memberEdit", {
+      choices: { userId: "u9", role: "Auditor", originalRole: "Auditor" },
+      checks: { "engagement:e1": true },
+      values: { displayName: "Avery B." },
+    });
+    await submit("memberEdit", rename);
+    expect(rename.manage).toHaveBeenCalledWith("updateMember", {
+      userId: "u9",
+      displayName: "Avery B.",
+      role: "Auditor",
+      clientId: null,
+    });
+    const promote = context("memberEdit", {
+      choices: { userId: "u9", role: "Reviewer", originalRole: "Auditor" },
+      checks: {},
+      values: { displayName: "Avery" },
+    });
+    await submit("memberEdit", promote);
+    expect(promote.manage).toHaveBeenCalledWith("updateMember", {
+      userId: "u9",
+      displayName: "Avery",
+      role: "Reviewer",
+      clientId: null,
+      engagementIds: [],
+    });
+  });
+
+  it("invites by email with the role's scope", async () => {
+    const internal = context("invite", {
+      choices: { role: "Auditor" },
+      checks: { "engagement:e1": true },
+      values: { email: "nia@example.test", displayName: " " },
+    });
+    await submit("invite", internal);
+    expect(internal.manage).toHaveBeenCalledWith("inviteMember", {
+      email: "nia@example.test",
+      role: "Auditor",
+      engagementIds: ["e1"],
+    });
+    const viewer = context("invite", {
+      choices: { role: "Client Viewer", clientId: "c1" },
+      values: { email: "v@example.test", displayName: "Vic" },
+    });
+    await submit("invite", viewer);
+    expect(viewer.manage).toHaveBeenCalledWith("inviteMember", {
+      email: "v@example.test",
+      displayName: "Vic",
+      role: "Client Viewer",
+      clientId: "c1",
+    });
+    expect(() =>
+      validate("invite", { choices: { role: "Client Viewer" } }),
+    ).toThrow("Choose the client this person belongs to.");
   });
 
   it("opens a created paper and a created engagement", async () => {

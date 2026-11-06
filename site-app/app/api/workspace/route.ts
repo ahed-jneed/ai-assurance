@@ -5,7 +5,7 @@ import { short } from "@/lib/commands/fields";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readBounded, responseError } from "@/lib/http";
 import { workspaceView } from "@/lib/read-models/workspace-view";
-import { context } from "@/lib/tenancy";
+import { context, refuseReadOnly } from "@/lib/tenancy";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
@@ -37,8 +37,9 @@ export async function POST(request: Request) {
           new TextDecoder().decode(await readBounded(request, 2 * 1024 * 1024)),
         ),
       ),
-      ctx = await context(payload.tenantId),
-      e = await getEngagement(ctx, payload.engagementId);
+      ctx = await context(payload.tenantId);
+    refuseReadOnly(ctx);
+    const e = await getEngagement(ctx, payload.engagementId);
     if (e.version !== payload.expectedVersion)
       throw new ApiError(409, "The engagement changed. Reload before saving.");
     const result = await dispatch(e, payload.op, payload.data, ctx);

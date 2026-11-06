@@ -28,7 +28,7 @@ vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
   getEngagement: vi.fn(),
 }));
 
-// The ops of the old envelope enum, in its order.
+// Every op, in module order (the envelope enum's order).
 const ops = [
   "createClient",
   "updateClient",
@@ -36,21 +36,72 @@ const ops = [
   "grantMember",
   "updateMember",
   "revokeMember",
+  "grantAdmin",
+  "revokeAdmin",
+  "transferAdmin",
+  "inviteMember",
+  "cancelInvitation",
+  "renamePractice",
 ];
-// Valid data for each op, against a practice where CL-1 and user-2 exist.
+// Valid data for each op, against the practice below.
 const valid: Record<string, Record<string, unknown>> = {
   createClient: { name: "Acme Lending", sector: "Financial services" },
   updateClient: { clientId: "CL-1", name: "Acme", sector: "Insurance" },
   createEngagement: { clientId: "CL-1", title: "Credit model audit" },
-  grantMember: { userId: "user-2", displayName: "Ada", role: "Auditor" },
-  updateMember: { userId: "user-2", displayName: "Ada", role: "Reviewer" },
+  grantMember: { userId: "user-new", displayName: "Nia", role: "Auditor" },
+  updateMember: { userId: "user-2", displayName: "Ada L.", role: "Auditor" },
   revokeMember: { userId: "user-2" },
+  grantAdmin: { userId: "user-2" },
+  revokeAdmin: { userId: "user-4" },
+  transferAdmin: { userId: "user-2" },
+  inviteMember: { email: "Nia@Example.test", role: "Auditor" },
+  cancelInvitation: { invitationId: "INV-1" },
+  renamePractice: { name: "Lea & Partners" },
 };
-function practice(changes = 1) {
-  const d1 = fakeD1((sql) => {
+// The members of the fixture practice besides the caller (user-lead).
+const people: Record<string, Record<string, unknown>> = {
+  "user-2": { role: "Auditor", status: "active", client_id: null, admin: 0 },
+  "user-4": {
+    role: "Lead Auditor",
+    status: "active",
+    client_id: null,
+    admin: 1,
+  },
+  "user-5": { role: "Auditor", status: "revoked", client_id: null, admin: 0 },
+  "user-v": {
+    role: "Client Viewer",
+    status: "active",
+    client_id: "CL-1",
+    admin: 0,
+  },
+};
+function practice(
+  changes = 1,
+  {
+    otherAdmins = 1,
+    engagements = 0,
+    grants = [] as string[],
+    workers = [] as string[],
+  } = {},
+) {
+  const d1 = fakeD1((sql, args) => {
     if (sql.startsWith("SELECT id FROM clients")) return { id: "CL-1" };
-    if (sql.startsWith("SELECT user_id,status FROM memberships"))
-      return { user_id: "user-2", status: "active" };
+    if (
+      sql.includes("FROM memberships m WHERE m.tenant_id=? AND m.user_id=?")
+    ) {
+      const p = people[String(args[1])];
+      return p && { ...p, practice_admin: p.admin };
+    }
+    if (sql.startsWith("SELECT COUNT(*) AS n FROM practice_admins"))
+      return { n: otherAdmins };
+    if (sql.startsWith("SELECT COUNT(*) AS n FROM engagements"))
+      return { n: engagements };
+    if (sql.startsWith("SELECT email FROM invitations"))
+      return args[1] === "INV-1" ? { email: "nia@example.test" } : null;
+    if (sql.startsWith("SELECT engagement_id FROM engagement_access"))
+      return grants.map((engagement_id) => ({ engagement_id }));
+    if (sql.startsWith("SELECT id FROM runner_workers"))
+      return workers.map((id) => ({ id }));
     return null;
   }, changes);
   env.DB = d1.db;
@@ -69,8 +120,15 @@ function post(op: string, data: Record<string, unknown>, expectedVersion = 7) {
     }),
   );
 }
+async function refusal(response: Response) {
+  return { status: response.status, ...((await response.json()) as object) };
+}
+const reply = async (response: Response) =>
+  (await response.json()) as { details?: unknown; error?: string };
 const tables = (batch: FakeStatement[]) =>
   batch.map((s) => s.sql.match(/^(?:UPDATE|INSERT INTO) (\w+)/)?.[1]);
+/** The op's own statements: the batch without the bump and the event. */
+const own = (d1: ReturnType<typeof practice>) => d1.batches[0].slice(1, -1);
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -88,7 +146,9 @@ describe("POST /api/management", () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
         error:
-          "Invalid enum value. Expected 'createClient' | 'updateClient' | 'createEngagement' | 'grantMember' | 'updateMember' | 'revokeMember', received '" +
+          "Invalid enum value. Expected " +
+          ops.map((o) => "'" + o + "'").join(" | ") +
+          ", received '" +
           op +
           "'",
       });
@@ -106,12 +166,26 @@ describe("POST /api/management", () => {
         const response = await post(op, valid[op]);
         expect(response.status, role).toBe(403);
         expect(await response.json(), role).toEqual({
-          error: "Practice administration permission is required",
+          error:
+            role === "Client Viewer"
+              ? "Client Viewers have read-only access"
+              : "Practice administration permission is required",
         });
       }
       expect(d1.batches).toEqual([]);
     },
   );
+
+  // F-56: even a Client Viewer recorded as an administrator only reads.
+  it.each(ops)("refuses %s with 403 to a Client Viewer", async (op) => {
+    const d1 = practice();
+    signIn(caller("Client Viewer", true));
+    expect(await refusal(await post(op, valid[op]))).toEqual({
+      status: 403,
+      error: "Client Viewers have read-only access",
+    });
+    expect(d1.batches).toEqual([]);
+  });
 
   it.each(ops)(
     "commits %s with the version bump and the management event",
@@ -120,7 +194,10 @@ describe("POST /api/management", () => {
       const ctx = caller();
       signIn(ctx);
       const response = await post(op, valid[op]);
-      expect(response.status).toBe(200);
+      expect(
+        response.status,
+        JSON.stringify(await response.clone().json()),
+      ).toBe(200);
       const reply = (await response.json()) as {
         details: Record<string, unknown>;
         managementVersion: number;
@@ -161,7 +238,18 @@ describe("POST /api/management", () => {
           ],
           grantMember: ["memberships"],
           updateMember: ["memberships"],
-          revokeMember: ["memberships"],
+          revokeMember: [
+            "memberships",
+            "engagement_access",
+            "runner_workers",
+            "practice_admins",
+          ],
+          grantAdmin: ["practice_admins"],
+          revokeAdmin: ["practice_admins"],
+          transferAdmin: ["practice_admins", "practice_admins"],
+          inviteMember: ["invitations"],
+          cancelInvitation: ["invitations"],
+          renamePractice: ["tenants"],
         }[op],
       );
     },
@@ -188,7 +276,9 @@ describe("POST /api/management", () => {
 
   it("lets only a Lead Auditor grant engagement access with a membership", async () => {
     const grant = { ...valid.grantMember, engagementIds: ["ENG-1"] };
-    for (const role of roles.filter((r) => r !== "Lead Auditor")) {
+    for (const role of roles.filter(
+      (r) => r !== "Lead Auditor" && r !== "Client Viewer",
+    )) {
       const d1 = practice();
       signIn(caller(role));
       const response = await post("grantMember", grant);
@@ -205,10 +295,300 @@ describe("POST /api/management", () => {
     const response = await post("grantMember", grant);
     expect(response.status).toBe(200);
     expect(getEngagement).toHaveBeenCalledWith(ctx, "ENG-1");
-    expect(tables(d1.batches[0].slice(1, -1))).toEqual([
+    expect(tables(own(d1))).toEqual(["memberships", "engagement_access"]);
+  });
+});
+
+describe("access lifecycle (F-24)", () => {
+  it("withdraws grants, sponsored workers and administration on revoke", async () => {
+    const d1 = practice(1, { grants: ["ENG-1", "ENG-2"], workers: ["W-1"] });
+    signIn(caller());
+    const response = await post("revokeMember", { userId: "user-2" });
+    expect(response.status).toBe(200);
+    expect((await reply(response)).details).toEqual({
+      userId: "user-2",
+      status: "revoked",
+      withdrawn: { engagementIds: ["ENG-1", "ENG-2"], workerIds: ["W-1"] },
+      practiceAdminRemoved: false,
+    });
+    const [membership, access, workers, admin] = own(d1);
+    expect(membership.sql).toMatch(
+      /^UPDATE memberships SET status=\?,access_since=\?/,
+    );
+    expect(membership.args.slice(0, 1)).toEqual(["revoked"]);
+    expect(access.sql).toMatch(
+      /^UPDATE engagement_access SET active=0,actor=\?,updated_at=\? WHERE tenant_id=\? AND user_id=\? AND active=1/,
+    );
+    expect(access.args.slice(2, 4)).toEqual(["tenant-1", "user-2"]);
+    expect(workers.sql).toMatch(
+      /^UPDATE runner_workers SET active=0 WHERE tenant_id=\? AND created_by=\?/,
+    );
+    expect(workers.args.slice(0, 2)).toEqual(["tenant-1", "user-2"]);
+    expect(admin.sql).toMatch(/^UPDATE practice_admins SET active=0/);
+  });
+
+  it("refuses to revoke access that is already revoked", async () => {
+    practice();
+    signIn(caller());
+    expect(
+      await refusal(await post("revokeMember", { userId: "user-5" })),
+    ).toEqual({
+      status: 409,
+      error: "This member's access is already revoked",
+    });
+  });
+
+  it("requires a re-grant to list its engagements and restores nothing else", async () => {
+    let d1 = practice();
+    signIn(caller());
+    const restore = {
+      userId: "user-5",
+      displayName: "Former",
+      role: "Auditor",
+    };
+    expect(await refusal(await post("grantMember", restore))).toEqual({
+      status: 400,
+      error:
+        "List the engagements to grant again; earlier grants are not restored",
+    });
+    expect(d1.batches).toEqual([]);
+    d1 = practice(1, { grants: ["ENG-OLD"], workers: ["W-OLD"] });
+    vi.mocked(getEngagement).mockResolvedValue(stored());
+    const response = await post("grantMember", {
+      ...restore,
+      engagementIds: ["ENG-1"],
+    });
+    expect(response.status).toBe(200);
+    expect((await reply(response)).details).toMatchObject({
+      engagementIds: ["ENG-1"],
+      withdrawn: { engagementIds: ["ENG-OLD"], workerIds: ["W-OLD"] },
+    });
+    expect(tables(own(d1))).toEqual([
+      "engagement_access",
+      "runner_workers",
       "memberships",
       "engagement_access",
     ]);
+    const [, , membership, grant] = own(d1);
+    // A fresh grant: client request grants issued before it lapse.
+    expect(membership.sql).toContain("access_since=excluded.access_since");
+    expect(grant.args.slice(0, 3)).toEqual(["tenant-1", "ENG-1", "user-5"]);
+  });
+
+  it("withdraws every grant on a role change and grants only those listed", async () => {
+    practice();
+    signIn(caller());
+    expect(
+      await refusal(
+        await post("updateMember", {
+          userId: "user-2",
+          displayName: "Ada",
+          role: "Reviewer",
+        }),
+      ),
+    ).toEqual({
+      status: 400,
+      error:
+        "List the engagements this member keeps with the new role; earlier grants are withdrawn",
+    });
+    const d1 = practice();
+    const response = await post("updateMember", {
+      userId: "user-2",
+      displayName: "Ada",
+      role: "Reviewer",
+      engagementIds: [],
+    });
+    expect(response.status).toBe(200);
+    expect(tables(own(d1))).toEqual([
+      "engagement_access",
+      "runner_workers",
+      "memberships",
+    ]);
+    expect(own(d1)[2].sql).toMatch(/access_since=\?/);
+  });
+
+  it("keeps grants when only the name changes", async () => {
+    const d1 = practice();
+    signIn(caller());
+    await post("updateMember", valid.updateMember);
+    expect(tables(own(d1))).toEqual(["memberships"]);
+    expect(own(d1)[0].sql).toContain("access_since=access_since");
+  });
+
+  it("keeps an administrator out of client roles", async () => {
+    practice();
+    signIn(caller());
+    expect(
+      await refusal(
+        await post("updateMember", {
+          userId: "user-4",
+          displayName: "Lee",
+          role: "Client Viewer",
+          clientId: "CL-1",
+        }),
+      ),
+    ).toEqual({
+      status: 409,
+      error:
+        "Remove practice administration before giving this member a client role",
+    });
+  });
+});
+
+describe("practice administration (F-43)", () => {
+  it("keeps at least one active administrator", async () => {
+    const d1 = practice(1, { otherAdmins: 0 });
+    signIn(caller());
+    expect(
+      await refusal(await post("revokeAdmin", { userId: "user-lead" })),
+    ).toEqual({
+      status: 404,
+      error: "This member does not administer the practice",
+    });
+    expect(
+      await refusal(await post("revokeAdmin", { userId: "user-4" })),
+    ).toEqual({
+      status: 409,
+      error:
+        "A practice needs at least one active administrator. Grant or transfer administration first.",
+    });
+    expect(d1.batches).toEqual([]);
+  });
+
+  it("guards the revocation in SQL as well", async () => {
+    const d1 = practice();
+    signIn(caller());
+    await post("revokeAdmin", { userId: "user-4" });
+    expect(own(d1)[0].sql).toContain(
+      "EXISTS(SELECT 1 FROM practice_admins o JOIN memberships m",
+    );
+  });
+
+  it("grants administration only to active internal members once", async () => {
+    practice();
+    signIn(caller());
+    for (const [userId, status, error] of [
+      ["user-5", 404, "Select an active member of this practice"],
+      [
+        "user-v",
+        400,
+        "Practice administration needs an internal role (Auditor, Lead Auditor or Reviewer)",
+      ],
+      ["user-4", 409, "This member already administers the practice"],
+      ["nobody", 404, "Select an active member of this practice"],
+    ] as const)
+      expect(
+        await refusal(await post("grantAdmin", { userId })),
+        userId,
+      ).toEqual({ status, error });
+  });
+
+  it("transfers the caller's administration to another member", async () => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("transferAdmin", { userId: "user-2" });
+    expect((await reply(response)).details).toEqual({
+      from: "user-lead",
+      to: "user-2",
+    });
+    const [grant, revoke] = own(d1);
+    expect(grant.args.slice(0, 2)).toEqual(["tenant-1", "user-2"]);
+    expect(revoke.args.slice(0, 2)).toEqual(["tenant-1", "user-lead"]);
+    expect(
+      await refusal(await post("transferAdmin", { userId: "user-lead" })),
+    ).toEqual({ status: 400, error: "Choose another member to transfer to" });
+  });
+});
+
+describe("invitations and practice settings (F-44)", () => {
+  it("stores an invitation by normalized email with its scope and expiry", async () => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("inviteMember", {
+      email: " Nia@Example.test ",
+      displayName: "Nia",
+      role: "Client Contributor",
+      clientId: "CL-1",
+    });
+    expect(response.status).toBe(200);
+    const { details } = (await response.json()) as {
+      details: Record<string, unknown>;
+    };
+    expect(details).toMatchObject({
+      email: "nia@example.test",
+      role: "Client Contributor",
+      clientId: "CL-1",
+      engagementIds: [],
+    });
+    const [insert] = own(d1);
+    expect(insert.args.slice(2, 7)).toEqual([
+      "nia@example.test",
+      "Nia",
+      "Client Contributor",
+      "CL-1",
+      "[]",
+    ]);
+    expect(Date.parse(String(details.expiresAt)) - Date.now()).toBeGreaterThan(
+      29 * 86400000,
+    );
+  });
+
+  it("refuses an invalid, duplicate or self invitation", async () => {
+    practice();
+    signIn(caller());
+    expect(
+      await refusal(
+        await post("inviteMember", { email: "not-an-email", role: "Auditor" }),
+      ),
+    ).toEqual({ status: 400, error: "Enter a valid email address" });
+    expect(
+      await refusal(
+        await post("inviteMember", {
+          email: "LEAD@fixture.invalid",
+          role: "Auditor",
+        }),
+      ),
+    ).toEqual({ status: 400, error: "You cannot invite yourself" });
+    const d1 = fakeD1((sql) =>
+      sql.startsWith("SELECT 1 FROM invitations") ? { 1: 1 } : null,
+    );
+    env.DB = d1.db;
+    expect(
+      await refusal(await post("inviteMember", valid.inviteMember)),
+    ).toEqual({
+      status: 409,
+      error:
+        "An invitation for this email is already pending. Cancel it to invite again.",
+    });
+  });
+
+  it("cancels only a pending invitation", async () => {
+    practice();
+    signIn(caller());
+    expect(
+      await refusal(await post("cancelInvitation", { invitationId: "INV-9" })),
+    ).toEqual({ status: 404, error: "No pending invitation to cancel" });
+  });
+
+  it("renames the practice within 80 characters", async () => {
+    const d1 = practice();
+    signIn(caller());
+    expect(
+      await refusal(await post("renamePractice", { name: "x".repeat(81) })),
+    ).toEqual({ status: 400, error: "Use at most 80 characters" });
+    await post("renamePractice", { name: "  Lea & Partners " });
+    expect(own(d1)[0].args.slice(0, 2)).toEqual(["Lea & Partners", "tenant-1"]);
+  });
+
+  it("refuses an engagement over the practice quota", async () => {
+    const d1 = practice(1, { engagements: 200 });
+    signIn(caller());
+    const response = await post("createEngagement", valid.createEngagement);
+    expect(response.status).toBe(429);
+    expect((await reply(response)).error).toMatch(
+      /^This practice has reached its limit of 200 engagements/,
+    );
+    expect(d1.batches).toEqual([]);
   });
 });
 
