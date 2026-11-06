@@ -1,16 +1,20 @@
 import base64
 import copy
 import hashlib
+import io
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 from engine.assurance import (
     bootstrap_interval, build_dossier, canonical_bytes, collect_jsonl,
-    compare_replay, intersectional_slices, quality_checks, read_json,
+    compare_replay, intersectional_slices, main, quality_checks, read_json,
     sample_records, sign_dossier, verify_dossier,
 )
 
@@ -371,6 +375,88 @@ class DossierTests(unittest.TestCase):
             verified = subprocess.run([sys.executable, str(standalone), "verify", "--dossier", str(package)], capture_output=True, text=True)
             self.assertEqual(verified.returncode, 0, verified.stderr)
             self.assertTrue(json.loads(verified.stdout)["integrityValid"])
+
+
+class PackCommandTests(unittest.TestCase):
+    """`pack` may produce a client dossier; sources must stay inside one base directory."""
+
+    def setUp(self):
+        self.temp = temporary_directory()
+        self.root = Path(self.temp.name)
+        self.specs = self.root / "specs"
+        (self.specs / "evidence").mkdir(parents=True)
+        (self.specs / "report.json").write_bytes(b'{"reportId":"R-1"}')
+        (self.specs / "evidence" / "observations.csv").write_bytes(b"id,value\n1,2\n")
+        (self.root / "outside.json").write_bytes(b'{"private":"outside the engagement"}')
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def pack(self, *sources, base_dir=None):
+        spec = self.specs / "spec.json"
+        files = [{"path": "report.json", "source": "report.json"}] + [{"path": f"evidence/{index}.bin", "source": source} for index, source in enumerate(sources)]
+        spec.write_text(json.dumps({"reportId": "R-1", "reportPath": "report.json", "audience": "client", "createdAt": "2025-01-01T00:00:00Z", "files": files}), encoding="utf-8")
+        output = self.root / f"dossier-{len(list(self.root.glob('dossier-*')))}.json"
+        argv = ["pack", "--spec", str(spec), "--output", str(output)] + (["--base-dir", str(base_dir)] if base_dir else [])
+        errors = io.StringIO()
+        with redirect_stderr(errors):
+            code = main(argv)
+        return code, errors.getvalue(), output
+
+    def test_relative_sources_inside_the_spec_directory_are_packed(self):
+        code, errors, output = self.pack("evidence/observations.csv", "./evidence/observations.csv")
+        self.assertEqual(code, 0, errors)
+        container = json.loads(output.read_text(encoding="utf-8"))
+        self.assertTrue(verify_dossier(container)["integrityValid"])
+        self.assertEqual(base64.b64decode(container["files"][0]["contentBase64"]), b"id,value\n1,2\n")
+
+    def test_absolute_parent_and_drive_paths_are_rejected(self):
+        # Each case must fail its own check: re-rooted under the base, an
+        # absolute path would otherwise fail only because nothing is there.
+        relative, leaves = "must be relative to the specification directory", "cannot leave the base directory"
+        for source, reason in ((str(self.root / "outside.json"), relative), ("C:outside.json", relative), ("/outside.json", relative), ("\\\\server\\share\\outside.json", relative), ("../outside.json", leaves), ("evidence/../../outside.json", leaves), ("evidence\\..\\..\\outside.json", leaves), ("..", leaves)):
+            with self.subTest(source=source):
+                code, errors, output = self.pack(source)
+                self.assertEqual(code, 2)
+                self.assertIn("Assurance procedure rejected: Pack sources "+reason, errors)
+                self.assertNotIn("outside the engagement", errors)
+                self.assertFalse(output.exists())
+
+    def test_symlinked_sources_are_rejected(self):
+        # Portable on Windows without symlink-creation privileges.
+        (self.specs / "linked.json").write_bytes(b"{}")
+        with patch.object(Path, "is_symlink", autospec=True, side_effect=lambda path: path.name == "linked.json"):
+            code, errors, output = self.pack("linked.json")
+        self.assertEqual(code, 2)
+        self.assertIn("symbolic links", errors)
+        self.assertFalse(output.exists())
+        with patch.object(Path, "is_symlink", autospec=True, side_effect=lambda path: path.name == "evidence"):
+            code, errors, _ = self.pack("evidence/observations.csv")
+        self.assertEqual(code, 2)
+        self.assertIn("symbolic links", errors)
+
+    def test_real_symlink_to_outside_file_is_rejected(self):
+        link = self.specs / "real-link.json"
+        try:
+            os.symlink(self.root / "outside.json", link)
+        except (OSError, NotImplementedError):
+            self.skipTest("Creating symbolic links requires a privilege this account lacks")
+        code, errors, output = self.pack("real-link.json")
+        self.assertEqual(code, 2)
+        self.assertFalse(output.exists())
+
+    def test_base_dir_confines_sources_instead_of_the_spec_directory(self):
+        evidence = self.root / "evidence-root"
+        evidence.mkdir()
+        (evidence / "report.json").write_bytes(b'{"reportId":"R-1"}')
+        (evidence / "extra.csv").write_bytes(b"a\n1\n")
+        code, errors, output = self.pack("extra.csv", base_dir=evidence)
+        self.assertEqual(code, 0, errors)
+        self.assertTrue(verify_dossier(json.loads(output.read_text(encoding="utf-8")))["integrityValid"])
+        code, errors, _ = self.pack("../outside.json", base_dir=evidence)
+        self.assertEqual(code, 2)
+        code, errors, _ = self.pack("evidence/observations.csv", base_dir=evidence)
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

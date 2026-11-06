@@ -9,24 +9,54 @@ import copy
 import hashlib
 import hmac
 import json
+import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .contract import HASH, ID, validate_report
 from .diagnostics import MAX_BYTES, canonical_bytes, finite_number, sha256, validate_config
+from .errors import EngineError
 
-WORKER_VERSION = "1.0.1"
-TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.0.0"
+WORKER_VERSION = "1.1.0"
+TRANSLATION_VERSION = "hosted-1.1-to-engine-1.0/1.1.0"
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
 MAX_COMPLETION_BYTES = 10 * 1024 * 1024
 TASKS = {"Binary classification": "binary_classification", "Multiclass classification": "multiclass_classification", "Regression": "regression"}
 FORMAT_ALIASES = {"onnx": "onnx", "ONNX": "onnx", "pmml": "pmml", "PMML": "pmml", "xgboost_json": "xgboost_json", "XGBoost": "xgboost_json", "lightgbm_text": "lightgbm_text", "LightGBM": "lightgbm_text"}
 FAIRNESS = {"demographic_parity": "FAIR-DP", "disparate_impact": "FAIR-DI", "equalized_odds": "FAIR-EO"}
-SUITES = {"performance": ["performance"], "regression": ["performance"], **{name: ["fairness"] for name in FAIRNESS}, "drift": ["drift"], "permutation": ["permutation_importance"], "perturbation": ["perturbation"], "explainability": ["shap", "lime"], "cross_validation": ["cross_validation", "adversarial"]}
-LABELS = {"performance": "Classification performance", "regression": "Regression performance", "demographic_parity": "Demographic parity", "disparate_impact": "Disparate impact", "equalized_odds": "Equalized odds", "drift": "Numeric distribution drift", "permutation": "Permutation importance", "perturbation": "Approved-range perturbation", "explainability": "SHAP / LIME", "cross_validation": "Cross-validation / adversarial robustness"}
+# The hosted tests a platform profile can select (site-app/lib/evaluation.ts
+# suiteSchema). The platform never sends any other test and can import only
+# these results, so the worker accepts exactly this catalog.
+SUITES = {"performance": ["performance"], "regression": ["performance"], **{name: ["fairness"] for name in FAIRNESS}}
+LABELS = {"performance": "Classification performance", "regression": "Regression performance", "demographic_parity": "Demographic parity", "disparate_impact": "Disparate impact", "equalized_odds": "Equalized odds"}
 METRIC_ALIASES = {"demographic_parity_difference": "maximum_selection_rate_gap", "disparate_impact_ratio": "minimum_selection_rate_ratio", "equalized_odds_difference": "maximum_tpr_fpr_gap"}
+
+# Sanitized failure codes: the only `error` values posted with op:"fail",
+# besides http_<status>. engine/WORKER.md documents every code and a test
+# keeps both lists identical. A code never carries rows, paths or messages.
+# The compute process may report only COMPUTE_FAILURE_CODES in error.json.
+COMPUTE_FAILURE_CODES = frozenset({
+    "request_contract_rejected", "model_not_locally_approved_or_runtime_unavailable",
+    "dataset_input_pin_mismatch", "model_input_pin_mismatch",
+    "dataset_malformed", "dataset_limit_exceeded", "missing_column", "missing_value",
+    "invalid_numeric_value", "label_set_mismatch", "cardinality_limit_exceeded", "protocol_config_invalid",
+    "model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch",
+    "model_interface_mismatch", "model_output_invalid", "model_inference_failed",
+    "evidence_too_large", "compute_timeout", "compute_resource_exhausted", "compute_internal_error",
+})
+FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
+    "lease_expired_on_receipt", "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
+    "transport_unavailable", "transport_idle_timeout", "response_deadline_exceeded", "response_truncated", "response_size_rejected", "model_input_size_mismatch",
+    "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
+})
+HTTP_FAILURE = re.compile(r"^http_[1-5][0-9]{2}$")
+
+
+def failure_code(code):
+    """Return a documented failure code unchanged; anything else is internal."""
+    return code if isinstance(code, str) and (code in FAILURE_CODES or HTTP_FAILURE.fullmatch(code)) else "worker_internal_error"
 
 
 def strict_json(data: str | bytes, *, maximum: int = MAX_ENVELOPE_BYTES) -> Any:
@@ -87,6 +117,25 @@ def timestamp(value):
         raise ValueError("Invalid leaseUntil timestamp") from exc
 
 
+def claim_pins(body):
+    """Validate only the attempt pins that every later operation echoes.
+
+    A claim whose request is unusable can still be failed by these pins.
+    """
+    if not isinstance(body, dict):
+        raise ValueError("Claim must be an object")
+    job = valid_id(body.get("jobId"), "jobId")
+    attempt = valid_id(body.get("attemptId"), "attemptId")
+    fence = body.get("fence")
+    if isinstance(fence, bool) or not isinstance(fence, int) or not 1 <= fence <= 2**53-1:
+        raise ValueError("Invalid fence")
+    nonce = body.get("nonce")
+    if not isinstance(nonce, str) or not 16 <= len(nonce) <= 256 or any(ord(c) < 32 for c in nonce):
+        raise ValueError("Invalid attempt nonce")
+    digest = valid_hash(body.get("requestSha256"), "request")
+    return {"jobId": job, "attemptId": attempt, "fence": fence, "nonce": nonce, "requestSha256": digest}
+
+
 @dataclass(frozen=True)
 class Claim:
     job_id: str
@@ -99,30 +148,23 @@ class Claim:
     request_json: str
 
     @classmethod
-    def parse(cls, body, *, check_expiry=True):
-        if not isinstance(body, dict):
-            raise ValueError("Claim must be an object")
-        job = valid_id(body.get("jobId"), "jobId")
-        attempt = valid_id(body.get("attemptId"), "attemptId")
-        fence = body.get("fence")
-        if isinstance(fence, bool) or not isinstance(fence, int) or not 1 <= fence <= 2**53-1:
-            raise ValueError("Invalid fence")
-        nonce = body.get("nonce")
-        if not isinstance(nonce, str) or not 16 <= len(nonce) <= 256 or any(ord(c) < 32 for c in nonce):
-            raise ValueError("Invalid attempt nonce")
-        lease = timestamp(body.get("leaseUntil"))
-        if check_expiry and lease <= datetime.now(timezone.utc):
-            raise ValueError("Attempt lease has expired")
-        digest = valid_hash(body.get("requestSha256"), "request")
+    def parse(cls, body):
+        """Validate a claim's pins, lease timestamp and exact request.
+
+        Whether the lease is still running is a question for the server's
+        clock, so the worker checks it with the claim response's Date header.
+        """
+        pins = claim_pins(body)
+        timestamp(body.get("leaseUntil"))
         request_json = body.get("requestJSON")
         # Exact server bytes remove JavaScript/Python number serialization ambiguity.
         if not isinstance(request_json, str):
             raise ValueError("Claim requires exact requestJSON bytes")
         request = strict_json(request_json)
-        if not isinstance(request, dict) or request != body.get("request") or sha256(request_json.encode("utf-8")) != digest:
+        if not isinstance(request, dict) or request != body.get("request") or sha256(request_json.encode("utf-8")) != pins["requestSha256"]:
             raise ValueError("Request JSON/hash mismatch")
         validate_request(request)
-        return cls(job, attempt, fence, nonce, body["leaseUntil"], digest, request, request_json)
+        return cls(pins["jobId"], pins["attemptId"], pins["fence"], pins["nonce"], body["leaseUntil"], pins["requestSha256"], request, request_json)
 
     def pins(self):
         return {"jobId": self.job_id, "attemptId": self.attempt_id, "fence": self.fence, "nonce": self.nonce, "requestSha256": self.request_sha256}
@@ -167,8 +209,11 @@ def validate_request(request):
         declared = request["model"].get("sha256", request["model"].get("sourceSha256"))
         if declared != model_hash:
             raise ValueError("Model artifact hash differs from request")
+        size = request["model"].get("size")
+        if size is not None and (isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= MAX_BYTES):
+            raise ValueError("Model size exceeds worker byte limits")
     suite = config.get("suite")
-    if not isinstance(suite, list) or not suite or len(suite) > 10 or any(not isinstance(s, str) or s not in SUITES for s in suite) or len(set(suite)) != len(suite):
+    if not isinstance(suite, list) or not suite or len(suite) > len(SUITES) or any(not isinstance(s, str) or s not in SUITES for s in suite) or len(set(suite)) != len(suite):
         raise ValueError("Invalid hosted suite selection")
     if any(s in FAIRNESS for s in suite) and config["task"] != "Binary classification":
         raise ValueError("Binary fairness is incompatible with this task")
@@ -181,6 +226,10 @@ def validate_request(request):
             raise ValueError("Named frozen internal policy is required")
     if "modelSpec" in config:
         validate_model_spec(config["modelSpec"], TASKS[config["task"]])
+        if request["executionMode"] == "auditor_model" and config["task"] == "Binary classification":
+            # The same check compute makes, here so that a model whose labels
+            # are not the frozen pair fails at claim time, before any download.
+            binary_labels(config, inference=True)
 
 
 def validate_model_spec(spec, task):
@@ -195,7 +244,9 @@ def validate_model_spec(spec, task):
         raise ValueError("modelSpec requires explicit outputLabels")
     if task == "regression" and labels or task == "binary_classification" and len(labels) != 2 or task == "multiclass_classification" and not 2 <= len(labels) <= 100:
         raise ValueError("Output class order differs from task")
-    if "decisionThreshold" in spec and not 0 <= finite_number(spec["decisionThreshold"], "decisionThreshold") <= 1:
+    threshold = spec.get("decisionThreshold", .5)
+    # A JSON number only: finite_number would also accept text such as "0.5".
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0 <= threshold <= 1:
         raise ValueError("Invalid decision threshold")
     if spec.get("predictionKind", "label") not in {"label", "probability"} or spec.get("labelEncoding", "label") not in {"label", "class_index"}:
         raise ValueError("Unsupported output encoding")
@@ -224,20 +275,25 @@ def translate_config(request, rows):
     if c.get("scoreColumn"):
         columns["score"] = c["scoreColumn"]
     if any(not isinstance(v, str) or not v.strip() or len(v) > 300 for v in columns.values()) or len(set(columns.values())) != len(columns):
-        raise ValueError("Mapped role columns must be nonempty and distinct")
+        raise EngineError("protocol_config_invalid", "Mapped role columns must be nonempty and distinct")
     inference = request["executionMode"] == "auditor_model"
     required = [name for role, name in columns.items() if not inference or role not in {"prediction", "score"}]
-    if not rows or any(name not in rows[0] for name in required):
-        raise ValueError("Required mapped input columns are absent")
+    absent = [name for name in required if not rows or name not in rows[0]]
+    if absent:
+        raise EngineError("missing_column", "Required mapped input columns are absent: "+", ".join(map(repr, absent)))
     if any(not str(row.get(name, "")).strip() for row in rows for name in required):
-        raise ValueError("Mapped inputs cannot silently drop missing values")
-    for row in rows:
+        raise EngineError("missing_value", "Mapped inputs cannot silently drop missing values")
+    for row_number, row in enumerate(rows, 2):
         if task == "regression":
             for name in (columns["target"], *([] if inference else [columns["prediction"]])):
-                if abs(finite_number(row[name], "regression input")) > 1e100:
-                    raise ValueError("Regression inputs exceed numeric bounds")
+                try:
+                    value = finite_number(row[name], f"row {row_number} column {name!r}")
+                except ValueError as exc:
+                    raise EngineError("invalid_numeric_value", str(exc)) from exc
+                if abs(value) > 1e100:
+                    raise EngineError("invalid_numeric_value", "Regression inputs exceed numeric bounds")
     if "protected" in columns and len({row[columns["protected"]].strip() for row in rows}) > 1000:
-        raise ValueError("Protected-group cardinality exceeds engine bounds")
+        raise EngineError("cardinality_limit_exceeded", "Protected-group cardinality exceeds engine bounds")
     suites = list(dict.fromkeys(s for test in selected for s in SUITES[test]))
     values = {}
 
@@ -261,26 +317,46 @@ def translate_config(request, rows):
         criterion("maximumOddsGap", "equalized_odds_difference", "<=", c.get("maximumParityGap", .1))
     native = {"contractVersion": "1.0", **{key: hosted[key] for key in ("id", "engagementId", "modelId", "datasetId", "seed")}, "task": task, "suite": suites, "columns": columns, "minSampleSize": integer(c, "minimumSampleSize", 20), "minClassCount": max(2, integer(c, "minimumClassCount", 5, minimum=1)), "minGroupSize": integer(c, "minimumGroupSize", 30), "thresholds": {"policyId": hosted["policyId"], "policyVersion": hosted["policyVersion"], "source": "internal_policy", "values": values}, "hostedTranslation": {"version": TRANSLATION_VERSION, "sourceContract": "1.1", "selectedTests": selected, "sourceConfiguration": copy.deepcopy(c), "minimumClassCount": c.get("minimumClassCount", 5), "supplementalMetricPolicy": "descriptive; only selected named acceptance criteria determine hostedResults"}}
     if task == "binary_classification":
-        positive = c.get("positiveLabel")
-        if not isinstance(positive, str) or not positive:
-            raise ValueError("A favourable binary class label is required")
-        names = set(hosted.get("modelSpec", {}).get("outputLabels", [])) if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
-        if len(names) != 2 or positive not in names:
-            raise ValueError("Binary class order/observations require two labels and the favourable label")
-        native.update(positiveLabel=positive, negativeLabel=next(label for label in names if label != positive))
-    if "drift" in suites:
-        native["driftFeatures"] = c.get("driftFeatures", hosted.get("modelSpec", {}).get("featureColumns"))
-        if not native["driftFeatures"]:
-            raise ValueError("Drift requires frozen numeric driftFeatures")
-    for key in ("modelSpec", "permutation", "perturbation"):
-        if key in hosted:
-            native[key] = copy.deepcopy(hosted[key])
+        native.update(binary_labels(hosted, rows, columns, inference=inference))
+    if "modelSpec" in hosted:
+        native["modelSpec"] = copy.deepcopy(hosted["modelSpec"])
     return validate_config(native)
 
 
+def binary_labels(hosted, rows=None, columns=None, *, inference):
+    """The frozen favourable and other binary labels.
+
+    The platform freezes engineConfig.negativeLabel, so the label pair never
+    depends on which labels happen to occur: a dataset with a single
+    observed class is evaluated and reported as inconclusive. A model's
+    outputLabels must be exactly that pair, and observed labels outside it
+    are rejected when predictions are read. Only a request frozen without
+    negativeLabel and without a model reads `rows` (the `columns` roles).
+    """
+    positive = hosted["config"].get("positiveLabel")
+    if not isinstance(positive, str) or not positive.strip():
+        raise EngineError("protocol_config_invalid", "A favourable binary class label is required")
+    labels = hosted.get("modelSpec", {}).get("outputLabels", []) if inference else None
+    declared = set(labels) if inference else None
+    negative = hosted.get("negativeLabel")
+    if negative is None:
+        # Requests frozen without negativeLabel: derive the other label.
+        names = declared if inference else {row[column].strip() for row in rows for column in (columns["target"], columns["prediction"])}
+        others = names-{positive}
+        if len(others) != 1 or inference and positive not in names:
+            raise EngineError("label_set_mismatch", "Freeze engineConfig.negativeLabel; the other binary label cannot be derived from these labels")
+        negative = others.pop()
+    if not isinstance(negative, str) or not negative.strip() or negative.strip() == positive:
+        raise EngineError("protocol_config_invalid", "negativeLabel must be a nonempty label that differs from positiveLabel")
+    negative = negative.strip()
+    if inference and declared != {positive, negative}:
+        raise EngineError("label_set_mismatch", f"Model outputLabels {labels!r} differ from the frozen positiveLabel and negativeLabel {[positive, negative]!r}")
+    return {"positiveLabel": positive, "negativeLabel": negative}
+
+
 def _selected_sources(report, test, task):
-    ids = {"performance": ["PERF-BINARY" if task == "binary_classification" else "PERF-MULTI"], "regression": ["PERF-REG"], **{name: [result_id] for name, result_id in FAIRNESS.items()}, "permutation": ["EXPL-PERM"], "perturbation": ["ROB-PERT"], "explainability": ["EXPL-SHAP", "EXPL-LIME"], "cross_validation": ["ROB-CV", "ROB-ADV"]}
-    return [result for result in report["results"] if result["testId"].startswith("DRIFT-")] if test == "drift" else [result for result in report["results"] if result["testId"] in ids[test]]
+    ids = {"performance": ["PERF-BINARY" if task == "binary_classification" else "PERF-MULTI"], "regression": ["PERF-REG"], **{name: [result_id] for name, result_id in FAIRNESS.items()}}
+    return [result for result in report["results"] if result["testId"] in ids[test]]
 
 
 def hosted_results(report, request):
@@ -316,9 +392,6 @@ def hosted_results(report, request):
             eligible &= len(slices) >= 2 and all(s["n"] >= c["minimumGroupSize"] for s in slices)
             if test == "equalized_odds":
                 eligible &= all(min(s["tprDenominator"], s["fprDenominator"]) >= minimum_class for s in slices)
-        else:
-            # External-only protocols retain original engine conclusions.
-            eligible &= all(source["outcome"] not in {"inconclusive", "not_applicable"} for source in sources) if test != "regression" else True
         if not eligible or not selected_metrics or any(m["value"] is None for m in selected_metrics):
             outcome = "inconclusive"
             limitations.append("Selected acceptance is inconclusive because evidence, eligibility, or a frozen criterion is unavailable.")
@@ -336,7 +409,7 @@ def hosted_results(report, request):
         limitations.append("Only selected named internal criteria determine this projection; the unchanged external report retains its own conservative outcome and supplemental evidence.")
         if minimum_class == 1:
             limitations.append("The engine's full report applies a conservative minimum class count of two; this hosted projection separately applies the frozen minimum of one.")
-        result_list.append({"testId": test, "label": LABELS[test], "article": "10" if test in FAIRNESS or test == "drift" else "15", "outcome": outcome, "metrics": metrics, "limitations": list(dict.fromkeys(limitations))})
+        result_list.append({"testId": test, "label": LABELS[test], "article": "10" if test in FAIRNESS else "15", "outcome": outcome, "metrics": metrics, "limitations": list(dict.fromkeys(limitations))})
     return result_list
 
 
