@@ -1,9 +1,12 @@
 // Report release commands: independent approval of both exact final
 // packages, their release to the client and withdrawal. Only one final
 // report is released at a time: releasing one supersedes the one released
-// before and records the client notification.
+// before and records the client notification. Where the engagement needs a
+// quality review, release also needs the Engagement Quality Reviewer's
+// sign-off of both exact packages (lib/domain/quality-review.ts).
 import { z } from "zod";
 import { releaseRequirements, releaseTimeTemplates } from "../domain/gates";
+import { qualityReviewReleaseProblem } from "../domain/quality-review";
 import {
   currentClientSnapshot,
   legacyPackageMessage,
@@ -84,6 +87,8 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
       );
     if (releaseRequirements(e).length)
       fail(409, "Resolve current scope/program completion before release");
+    const qualityReview = qualityReviewReleaseProblem(e, r);
+    if (qualityReview) fail(409, qualityReview);
     // Every released report is superseded, so the client never holds two
     // released opinions. A named predecessor must be one of them; without
     // one, the latest is recorded as the predecessor.
