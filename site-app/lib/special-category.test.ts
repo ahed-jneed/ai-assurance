@@ -16,6 +16,7 @@ import {
   csvHeader,
   namesSpecialCategory,
   normalizeColumn,
+  specialCategoryLimitation,
   specialCategoryLimitations,
   specialColumns,
   uploadGate,
@@ -661,5 +662,51 @@ describe("specialCategoryLimitations", () => {
       "Run RUN-1 evaluated special-category column ethnicity on the platform under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
       "Run JOB-1 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
     ]);
+  });
+  it("gives the sentence an external run's paper states (#103)", () => {
+    const profile = {
+      suite: ["demographic_parity"],
+      config: { groupColumn: "ethnicity" },
+    } as unknown as EvaluationProfile;
+    expect(
+      specialCategoryLimitation(
+        "JOB-2",
+        {
+          ...profile,
+          specialCategory: {
+            column: "ethnicity",
+            specialCategory: true,
+            route: "client_side",
+            basis,
+            declaredBy: "user-lead",
+            declaredAt: "2026-11-02T09:00:00.000Z",
+          },
+        },
+        "auditor_model",
+      ),
+    ).toBe(
+      "Run JOB-2 evaluated special-category column ethnicity on the auditor's external worker under GDPR Art 9(2)(g): Substantial public interest under Union or Member State law; confirmed by Client DPO on 2026-11-01; basis BASIS-1.",
+    );
+    // A protocol saved before declarations counts as special-category.
+    expect(specialCategoryLimitation("JOB-3", profile, "client_local")).toBe(
+      "Run JOB-3 evaluated special-category column ethnicity on the client's own worker with no basis recorded on its protocol.",
+    );
+    expect(
+      specialCategoryLimitation(
+        "JOB-4",
+        {
+          ...profile,
+          specialCategory: {
+            column: "ethnicity",
+            specialCategory: false,
+            route: "hosted",
+            basis: null,
+            declaredBy: "user-lead",
+            declaredAt: "2026-11-02T09:00:00.000Z",
+          },
+        },
+        "client_local",
+      ),
+    ).toBeNull();
   });
 });

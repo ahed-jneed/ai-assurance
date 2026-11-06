@@ -573,29 +573,45 @@ export function externalGate(profile: EvaluationProfile, mode: string) {
   );
 }
 
+/**
+ * The limitation a run states when its frozen protocol evaluated
+ * special-category data: the column, where it was processed and the basis.
+ * Null when the protocol's group column is not special-category data.
+ */
+export function specialCategoryLimitation(
+  runId: string,
+  profile: Pick<EvaluationProfile, "suite" | "config" | "specialCategory">,
+  executionMode: string,
+) {
+  if (!groupColumnIsSpecial(profile)) return null;
+  const d = profile.specialCategory,
+    where =
+      executionMode === "saved_predictions"
+        ? "on the platform"
+        : executionMode === "client_local"
+          ? "on the client's own worker"
+          : "on the auditor's external worker";
+  return (
+    "Run " +
+    runId +
+    " evaluated special-category column " +
+    profile.config.groupColumn +
+    " " +
+    where +
+    (d?.basis
+      ? " under " + basisSummary(d.basis) + "."
+      : " with no basis recorded on its protocol.")
+  );
+}
 /** The report limitation for each run that evaluated special-category data. */
 export function specialCategoryLimitations(runs: readonly Run[]) {
   return runs.flatMap((r) => {
-    const p = r.manifest?.profile;
-    if (r.state !== "succeeded" || !p || !groupColumnIsSpecial(p)) return [];
-    const d = p.specialCategory,
-      where =
-        r.manifest!.executionMode === "saved_predictions"
-          ? "on the platform"
-          : r.manifest!.executionMode === "client_local"
-            ? "on the client's own worker"
-            : "on the auditor's external worker";
-    return [
-      "Run " +
-        r.id +
-        " evaluated special-category column " +
-        p.config.groupColumn +
-        " " +
-        where +
-        (d?.basis
-          ? " under " + basisSummary(d.basis) + "."
-          : " with no basis recorded on its protocol."),
-    ];
+    const p = r.manifest?.profile,
+      line =
+        r.state === "succeeded" && p
+          ? specialCategoryLimitation(r.id, p, r.manifest!.executionMode)
+          : null;
+    return line ? [line] : [];
   });
 }
 
