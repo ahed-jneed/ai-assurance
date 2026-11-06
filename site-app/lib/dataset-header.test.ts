@@ -171,6 +171,18 @@ describe("spreadsheetColumns", () => {
       unreadable:
         "the spreadsheet could not be read: no end of central directory",
     });
+    // Corrupt deflate data in a worksheet.
+    const corrupt = await workbook([
+        '<row r="1"><c t="inlineStr"><is><t>x</t></is></c></row>'.repeat(50),
+      ]),
+      sheet = new TextEncoder().encode("xl/worksheets/sheet1.xml"),
+      at = corrupt.findIndex((_, i) =>
+        sheet.every((c, j) => corrupt[i + j] === c),
+      );
+    corrupt.fill(0xff, at + sheet.length, at + sheet.length + 12);
+    expect(await spreadsheetColumns(corrupt)).toEqual({
+      unreadable: "the spreadsheet could not be read: corrupt deflate data",
+    });
   });
 
   it("scans each complete row once as the sheet grows", () => {
