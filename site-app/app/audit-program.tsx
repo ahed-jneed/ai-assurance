@@ -554,7 +554,8 @@ export function AuditProgram({
       })),
       // Competence and independence are declared per person in the
       // acceptance panel; the brief no longer records them as free text.
-      save: (v) => act("saveBrief", { ...v, independence: "" }),
+      save: (v) =>
+        act("saveBrief", { ...v, independence: b?.independence ?? "" }),
     });
   }
   function planForm(p: Procedure) {
