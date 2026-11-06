@@ -15,6 +15,11 @@ function fakeD1() {
       void args;
       return null;
     },
+    list: (sql: string, args: unknown[]): Record<string, unknown>[] => {
+      void sql;
+      void args;
+      return [];
+    },
   };
   const write = (sql: string) =>
     /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql);
@@ -28,7 +33,7 @@ function fakeD1() {
         return state.lookup(sql, args);
       },
       async all() {
-        return { results: [] };
+        return { results: state.list(sql, args) };
       },
       async run() {
         if (write(sql)) state.writes.push({ sql, args });
@@ -65,10 +70,13 @@ function rows(answers: [RegExp, Row][]) {
 beforeEach(() => {
   env.DB = d1.db as unknown as D1Database;
   d1.state.writes = [];
+  d1.state.list = () => [];
   rows([]);
 });
 afterEach(() => {
   delete env.DB;
+  delete env.SELF_SIGNUP;
+  delete env.IDENTITY_MODE;
 });
 
 describe("context", () => {
@@ -83,7 +91,7 @@ describe("context", () => {
     rows([
       [/status='active' ORDER BY tenant_id/, { tenant_id: "tenant-1" }],
       [
-        /SELECT role,client_id FROM memberships/,
+        /SELECT role,client_id,access_since FROM memberships/,
         { role: "Auditor", client_id: null },
       ],
       [/FROM practice_admins/, null],
@@ -102,10 +110,11 @@ describe("context", () => {
   });
 
   it("provisions a first practice the user administers and may open", async () => {
+    env.SELF_SIGNUP = "open";
     let provisioned = false;
     d1.state.lookup = (sql) => {
       if (/SELECT tenant_id FROM memberships/.test(sql)) return null;
-      if (/SELECT role,client_id FROM memberships/.test(sql))
+      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
         return provisioned ? { role: "Lead Auditor", client_id: null } : null;
       if (/FROM practice_admins/.test(sql))
         return provisioned ? { 1: 1 } : null;
@@ -140,6 +149,8 @@ describe("context", () => {
         "user-lea",
       ]);
       expect(d1.state.writes[2].args).toEqual([ctx.tenantId, "user-lea"]);
+      // Named after its founder, so practices are told apart (#55).
+      expect(d1.state.writes[0].args[1]).toBe("Lea Lead practice");
     } finally {
       d1.db.batch = batch;
     }
@@ -156,5 +167,154 @@ describe("context", () => {
     const error = await as(lea, () => context()).catch((e: unknown) => e);
     expect((error as ApiError).status).toBe(403);
     expect(d1.state.writes).toEqual([]);
+  });
+
+  // F-44 / F-09: outside the development server nobody provisions a practice
+  // without an invitation unless SELF_SIGNUP allows it.
+  it.each([
+    ["unset outside dev", {}],
+    ["unset in trusted-headers mode", { IDENTITY_MODE: "trusted-headers" }],
+    ["off, even in dev", { IDENTITY_MODE: "dev", SELF_SIGNUP: "off" }],
+    ["an allowlist without the user", { SELF_SIGNUP: "boss@practice.example" }],
+  ])("refuses self-signup when SELF_SIGNUP is %s", async (_label, vars) => {
+    Object.assign(env, vars);
+    const error = await as(lea, () => context()).catch((e: unknown) => e);
+    expect(error).toEqual(
+      new ApiError(
+        403,
+        "You have no practice membership or pending invitation. Ask a practice administrator to invite lea@practice.example.",
+      ),
+    );
+    expect(d1.state.writes).toEqual([]);
+  });
+
+  it.each([
+    ["unset on the development server", { IDENTITY_MODE: "dev" }],
+    ["open", { SELF_SIGNUP: "open" }],
+    [
+      "an allowlist naming the user",
+      { SELF_SIGNUP: "x@y.test, LEA@practice.example" },
+    ],
+    ["an allowlist naming the domain", { SELF_SIGNUP: "@practice.example" }],
+  ])("allows self-signup when SELF_SIGNUP is %s", async (_label, vars) => {
+    Object.assign(env, vars);
+    await as(lea, () => context()).catch(() => undefined);
+    expect(d1.state.writes[0].sql).toMatch(/INSERT OR IGNORE INTO tenants/);
+  });
+
+  it("joins the inviting practice at first sign-in instead of provisioning one", async () => {
+    let joined = false;
+    d1.state.list = (sql, args) =>
+      /FROM invitations WHERE email=\?/.test(sql)
+        ? (expect(args[0]).toBe("lea@practice.example"),
+          [
+            {
+              tenant_id: "tenant-firm",
+              id: "INV-1",
+              display_name: "Lea",
+              role: "Auditor",
+              client_id: null,
+              engagement_ids: '["ENG-1"]',
+              invited_by: "user-admin",
+              created_at: "2026-11-01T00:00:00.000Z",
+            },
+          ])
+        : [];
+    d1.state.lookup = (sql) => {
+      if (
+        /SELECT tenant_id FROM memberships WHERE user_id=\? AND status/.test(
+          sql,
+        )
+      )
+        return joined ? { tenant_id: "tenant-firm" } : null;
+      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
+        return joined
+          ? { role: "Auditor", client_id: null, access_since: "2026-11-06" }
+          : null;
+      return null;
+    };
+    const batch = d1.db.batch;
+    d1.db.batch = async (statements) => {
+      joined = true;
+      return batch(statements);
+    };
+    try {
+      const ctx = await as(lea, () => context());
+      expect(ctx).toMatchObject({
+        tenantId: "tenant-firm",
+        role: "Auditor",
+        practiceAdmin: false,
+        accessSince: "2026-11-06",
+      });
+      const writes = d1.state.writes.map(
+        ({ sql }) => /^(?:UPDATE|INSERT INTO) (\w+)/.exec(sql)?.[1],
+      );
+      expect(writes).toEqual([
+        "invitations",
+        "memberships",
+        "engagement_access",
+        "tenants",
+        "management_events",
+      ]);
+      // A revoked membership comes back with the invited role only.
+      expect(d1.state.writes[1].sql).toContain(
+        "WHERE memberships.status<>'active' AND (memberships.access_since IS NULL OR memberships.access_since<?)",
+      );
+      // Acceptance itself refuses an invitation the current grant overtook.
+      expect(d1.state.writes[0].sql).toContain(
+        "AND NOT EXISTS(SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND access_since IS NOT NULL AND access_since>=?)",
+      );
+      expect(d1.state.writes[0].args.slice(-3)).toEqual([
+        "tenant-firm",
+        "user-lea",
+        "2026-11-01T00:00:00.000Z",
+      ]);
+      expect(d1.state.writes[4].args[3]).toBe("acceptInvitation");
+    } finally {
+      d1.db.batch = batch;
+    }
+  });
+
+  it("closes an invitation issued before a revocation as superseded and never restores the membership", async () => {
+    d1.state.list = (sql) =>
+      /FROM invitations WHERE email=\?/.test(sql)
+        ? [
+            {
+              tenant_id: "tenant-firm",
+              id: "INV-1",
+              display_name: null,
+              role: "Lead Auditor",
+              client_id: null,
+              engagement_ids: '["ENG-1"]',
+              invited_by: "user-admin",
+              created_at: "2026-11-01T00:00:00.000Z",
+            },
+          ]
+        : [];
+    rows([
+      // memberships.access_since (the revocation) is after created_at.
+      [
+        /SELECT 1 AS superseded WHERE EXISTS\(SELECT 1 FROM memberships/,
+        {
+          superseded: 1,
+        },
+      ],
+    ]);
+    await expect(as(lea, () => context("tenant-firm"))).rejects.toBeInstanceOf(
+      ApiError,
+    );
+    const writes = d1.state.writes.map(
+      ({ sql }) => /^(?:UPDATE|INSERT INTO) (\w+)/.exec(sql)?.[1],
+    );
+    expect(writes).toEqual(["invitations", "tenants", "management_events"]);
+    expect(d1.state.writes[0].sql).toMatch(
+      /^UPDATE invitations SET status='superseded'/,
+    );
+    expect(d1.state.writes[2].args[3]).toBe("supersedeInvitation");
+    expect(
+      d1.state.writes.some(({ sql }) =>
+        /memberships|engagement_access/.test(sql.split(" WHERE ")[0]),
+      ),
+    ).toBe(false);
   });
 });

@@ -1,33 +1,60 @@
 // Who is calling, in which practice and with which role: resolves the signed-in
-// user (lib/identity.ts) to an active membership, provisions a practice on
-// first sign-in and enforces role and practice-administration permissions.
-// Apart from that first provisioning, resolving the caller only reads.
+// user (lib/identity.ts) to an active membership and enforces role and
+// practice-administration permissions. A user without a membership first
+// accepts their pending invitations (lib/invitations.ts); a user with neither
+// may provision a practice of their own only where self-signup is allowed
+// (lib/access-policy.ts). Apart from those, resolving the caller only reads.
+import { selfSignupAllowed } from "./access-policy";
+import { db } from "./bindings";
 import type { Role } from "./domain";
 import { roles } from "./domain";
-import { db, now, sha256 } from "./engagement-repo";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
 import { currentUser } from "./identity";
+import { now, sha256 } from "./ids";
+import { acceptInvitations } from "./invitations";
 export type Context = {
   user: { userId: string; displayName: string; email: string };
   tenantId: string;
   role: Role;
   clientId: string | null;
   practiceAdmin?: boolean;
+  /**
+   * When the caller's current grant of this membership began. Client request
+   * grants issued before it do not apply. Null for memberships that predate it.
+   */
+  accessSince?: string | null;
 };
+type MemberRow = {
+  role: Role;
+  client_id: string | null;
+  access_since: string | null;
+};
+const memberRow = (tenantId: string, userId: string) =>
+  db()
+    .prepare(
+      "SELECT role,client_id,access_since FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
+    )
+    .bind(tenantId, userId)
+    .first<MemberRow>();
 export async function context(tenantId?: string): Promise<Context> {
   const user = currentUser();
   if (!user) throw new ApiError(401, "Sign in to access the audit workspace");
-  if (!tenantId) {
-    const existing = await db()
-      .prepare(
-        "SELECT tenant_id FROM memberships WHERE user_id=? AND status='active' ORDER BY tenant_id LIMIT 1",
-      )
-      .bind(user.userId)
-      .first<{ tenant_id: string }>();
-    if (existing) tenantId = existing.tenant_id;
-    else {
-      if (
+  let member = tenantId ? await memberRow(tenantId, user.userId) : null;
+  if (!member) {
+    // Invitations are accepted on the first request that needs them: every
+    // request without a practice, and a request for a practice the user is
+    // not (yet) an active member of.
+    await acceptInvitations(user);
+    if (!tenantId) {
+      const existing = await db()
+        .prepare(
+          "SELECT tenant_id FROM memberships WHERE user_id=? AND status='active' ORDER BY tenant_id LIMIT 1",
+        )
+        .bind(user.userId)
+        .first<{ tenant_id: string }>();
+      if (existing) tenantId = existing.tenant_id;
+      else if (
         await db()
           .prepare("SELECT tenant_id FROM memberships WHERE user_id=? LIMIT 1")
           .bind(user.userId)
@@ -35,18 +62,20 @@ export async function context(tenantId?: string): Promise<Context> {
       )
         throw new ApiError(
           403,
-          "Your practice access has been revoked. Contact a Lead Auditor.",
+          "Your practice access has been revoked. Contact a practice administrator.",
         );
-      tenantId = await provisionPractice(user);
+      else if (!selfSignupAllowed(user.email))
+        throw new ApiError(
+          403,
+          "You have no practice membership or pending invitation. Ask a practice administrator to invite " +
+            user.email +
+            ".",
+        );
+      else tenantId = await provisionPractice(user);
     }
+    member = await memberRow(tenantId, user.userId);
   }
-  const member = await db()
-    .prepare(
-      "SELECT role,client_id FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
-    )
-    .bind(tenantId, user.userId)
-    .first<{ role: Role; client_id: string | null }>();
-  if (!member || !roles.includes(member.role))
+  if (!tenantId || !member || !roles.includes(member.role))
     throw new ApiError(403, "You do not have access to this practice");
   const practiceAdmin = !!(await db()
     .prepare(
@@ -60,12 +89,17 @@ export async function context(tenantId?: string): Promise<Context> {
     role: member.role,
     clientId: member.client_id,
     practiceAdmin,
+    accessSince: member.access_since,
   };
 }
+/** The name of a practice provisioned at first sign-in, after its founder. */
+export const practiceName = (user: Context["user"]) =>
+  ((user.displayName || user.email).trim().slice(0, 60) || "New") + " practice";
 /**
- * First sign-in: a practice that the user leads and administers, with an
- * example client and an engagement only the user may open. Practices that
- * predate engagement grants were adopted once by drizzle/0005.
+ * First sign-in where self-signup is allowed: a practice that the user leads
+ * and administers, named after them, with an example client and an
+ * engagement only the user may open. Practices that predate engagement grants
+ * were adopted once by drizzle/0005.
  */
 async function provisionPractice(user: Context["user"]) {
   const tenantId = "tenant-" + (await sha256(user.userId)).slice(0, 24);
@@ -79,12 +113,12 @@ async function provisionPractice(user: Context["user"]) {
       .prepare(
         "INSERT OR IGNORE INTO tenants(id,name,created_at) VALUES(?,?,?)",
       )
-      .bind(tenantId, "Assurance practice", at),
+      .bind(tenantId, practiceName(user), at),
     db()
       .prepare(
-        "INSERT OR IGNORE INTO memberships(tenant_id,user_id,role,client_id,display_name) VALUES(?,?,?,?,?)",
+        "INSERT OR IGNORE INTO memberships(tenant_id,user_id,role,client_id,display_name,access_since) VALUES(?,?,?,?,?,?)",
       )
-      .bind(tenantId, user.userId, "Lead Auditor", null, user.displayName),
+      .bind(tenantId, user.userId, "Lead Auditor", null, user.displayName, at),
     db()
       .prepare(
         "INSERT OR IGNORE INTO practice_admins(tenant_id,user_id,active) VALUES(?,?,1)",
@@ -125,4 +159,12 @@ export function requireRole(ctx: Context, allowed: Role[]) {
 export function requireAdmin(ctx: Context) {
   if (!ctx.practiceAdmin)
     throw new ApiError(403, "Practice administration permission is required");
+}
+/**
+ * Client Viewers only read (F-56): every write path refuses them before it
+ * looks at the op or loads anything to change.
+ */
+export function refuseReadOnly(ctx: Context) {
+  if (ctx.role === "Client Viewer")
+    throw new ApiError(403, "Client Viewers have read-only access");
 }

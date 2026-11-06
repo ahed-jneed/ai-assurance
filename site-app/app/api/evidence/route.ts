@@ -127,9 +127,13 @@ export async function GET(request: Request) {
         (s) =>
           s.actor === ctx.user.userId &&
           s.evidenceIds.includes(a?.id ?? "") &&
-          activeGrant(e.workflow, ctx.user.userId).some(
-            (g) => g.id === s.grantId,
-          ),
+          activeGrant(
+            e.workflow,
+            ctx.user.userId,
+            undefined,
+            undefined,
+            ctx.accessSince,
+          ).some((g) => g.id === s.grantId),
       );
     if (
       !a ||
