@@ -673,6 +673,47 @@ describe("invitations and practice settings (F-44)", () => {
     expect(d1.batches).toEqual([]);
   });
 
+  it("pins a new engagement to the chosen criteria pack and records it", async () => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("createEngagement", {
+      ...valid.createEngagement,
+      packId: "eu-ai-act-amended",
+      packVersion: "2026.11.2",
+    });
+    expect(response.status).toBe(200);
+    const pack = {
+      id: "eu-ai-act-amended",
+      version: "2026.11.2",
+      sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    };
+    expect((await reply(response)).details).toMatchObject({ pack });
+    const insert = own(d1).find((s) =>
+      s.sql.startsWith("INSERT INTO engagements("),
+    )!;
+    const body = JSON.parse(String(insert.args[5]));
+    expect(body.criteria).toMatchObject({
+      pin: { packId: pack.id, packVersion: pack.version },
+      origin: "created",
+      pinnedBy: "user-lead",
+    });
+  });
+
+  it.each([
+    [{ packId: "no-such-pack" }],
+    [{ packId: "eu-ai-act-amended", packVersion: "2026.10.1" }],
+    [{ packVersion: "2026.11.2" }],
+  ])("refuses a criteria pack that cannot be pinned: %j", async (pack) => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("createEngagement", {
+      ...valid.createEngagement,
+      ...pack,
+    });
+    expect(response.status).toBe(400);
+    expect(d1.batches).toEqual([]);
+  });
+
   it("refuses an engagement over the practice quota", async () => {
     const d1 = practice(1, { engagements: 200 });
     signIn(caller());

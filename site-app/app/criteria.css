@@ -1,0 +1,40 @@
+/* Criteria packs (docs/design/criteria-model.md section 15.1). */
+.pack-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e3e2de;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 14px;
+  color: #37352f;
+  background: #fbfbfa;
+}
+.pack-choice {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.pack-choice legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.pack-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #e3e2de;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.pack-option input {
+  margin-top: 4px;
+}
+.pack-card {
+  display: grid;
+  gap: 2px;
+}
+.pack-card .block {
+  display: block;
+}
