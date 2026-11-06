@@ -200,6 +200,76 @@
   background: #f6f8fa;
   border-color: #d7e0e9;
 }
+/* Server-paged registers and record pickers (app/assurance-record-search.tsx). */
+.register-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 18px;
+  font-size: 12px;
+}
+.workbench-queue-list {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.workbench-queue-list > summary {
+  min-height: 32px;
+  color: #37352f;
+  cursor: pointer;
+}
+.workbench-queue-list h3 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.record-picker {
+  display: grid;
+  gap: 10px;
+}
+.record-picker-results {
+  max-height: 420px;
+  overflow: auto;
+}
+.record-picker-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.record-picker-selected li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 9px;
+  border: 1px solid #e4e6e9;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: #37352f;
+  font-size: 12px;
+}
+.record-picker-selected li > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.record-picker-selected button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 999px;
+  color: #6b7280;
+}
+.record-picker-selected button:hover {
+  background: #e4e6e9;
+}
 .workbench-queue-counts button[aria-pressed="true"] {
   color: #37638d;
   border-color: #b9cbde;
