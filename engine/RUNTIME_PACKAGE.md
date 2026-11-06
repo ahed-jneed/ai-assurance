@@ -30,7 +30,7 @@ dummy credentials and loopback/mocked transports.
 Contract versions remain distinct: engine report **1.0**, hosted configuration
 and saved-prediction run **1.1**, authenticated external compilation **1.2**,
 worker transport request/result envelope schema **1.0**. Diagnostic runner is
-**1.1.1**, worker is **1.0.1**. Earlier immutable evidence retains its versions.
+**1.2.0**, worker is **1.1.0**. Earlier immutable evidence retains its versions.
 The result envelope is retained byte for byte alongside its imported projection.
 Provided/client-local predictions never establish independent model scoring;
 native inference additionally requires approved artifact hashes, typed numeric

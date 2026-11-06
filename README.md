@@ -61,9 +61,9 @@ CI (`.github/workflows/ci.yml`) runs two jobs on every pull request and on pushe
 | `npm run format:check` | Verify Prettier formatting (`npm run format` applies it) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint; any warning fails |
-| `npm test` | Vitest unit tests (`lib/**/*.test.ts`) |
+| `npm test` | Vitest unit tests (`lib/**/*.test.ts`, `app/**/*.test.ts`) |
 | `npm run check:sync` | Generated files match their canonical sources (see below) |
-| `npm run check:build` | `npm run build`, failing if the output reports any warning |
+| `npm run check:build` | Production Worker build (`npm run build`), failing if the output reports any warning |
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
 | `npm run check:fixtures` | Validate the run, external-run and procedure records the harnesses just produced against `schemas/` |
 

@@ -1,0 +1,1187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ai-assurance:genai-evidence-item:0.1",
+  "title": "GenAI evaluation evidence: normalized per-item record (draft 0.1)",
+  "description": "One evaluated item (one prompt or task, one epoch) recovered from an ingested tool log, plus the required run metadata ($defs/runMetadata). Records carry hashes, scores and bounded labels only; raw prompts and responses stay in the hashed source log. See docs/design/genai-evidence.md. Schema validity establishes neither the origin of the log nor the correctness of the tool's scoring.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "itemKey",
+    "groupKey",
+    "runKey",
+    "epoch",
+    "itemType",
+    "source",
+    "task",
+    "status",
+    "statusReason",
+    "promptSha256",
+    "systemPromptSha256",
+    "responseSha256",
+    "targetSha256",
+    "toolHashes",
+    "technique",
+    "variant",
+    "categories",
+    "clusterId",
+    "scores",
+    "outcome",
+    "labels"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "genai-evidence-item/0.1"
+    },
+    "itemKey": {
+      "$ref": "#/$defs/key",
+      "description": "Unique within the result envelope: <runKey>|<groupKey>|<epoch>."
+    },
+    "groupKey": {
+      "$ref": "#/$defs/key",
+      "description": "Identity of the test item across epochs and across runs. Derivation is pinned per format in design section 6.2 (key derivations table); pairing matches groupKey together with promptSha256 and targetSha256 (section 8.6)."
+    },
+    "runKey": {
+      "$ref": "#/$defs/key",
+      "description": "The run this item belongs to; matches runMetadata.runKey."
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000,
+      "description": "1-based repeat index: Inspect epoch, promptfoo repeatIndex + 1, garak generation index + 1; otherwise 1. Repeats of one test item share a groupKey and are reduced per the frozen plan before statistics."
+    },
+    "itemType": {
+      "enum": [
+        "qa",
+        "attack",
+        "rag",
+        "agent_task"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "fileSha256",
+        "locator",
+        "toolItemId"
+      ],
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/format"
+        },
+        "fileSha256": {
+          "$ref": "#/$defs/sha256",
+          "description": "SHA-256 of the exact bytes of the ingested file that contains this item."
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "description": "Where the item was read: zip entry name plus JSON pointer (e.g. samples/q1_epoch_1.json#/scores/match) or <file>:<line> for JSONL."
+        },
+        "toolItemId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300,
+          "description": "The tool's own identifier when it has one (Inspect sample uuid, promptfoo result id, garak attempt uuid, PyRIT attack_result_id, lm-eval doc_id as a string)."
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/shortText"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "scored",
+        "unscored",
+        "error",
+        "invalidated"
+      ],
+      "description": "Only scored items enter denominators. Unscored, error and invalidated items are counted and reported separately."
+    },
+    "statusReason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        null,
+        "tool_error",
+        "no_score",
+        "non_finite_score",
+        "unparseable_score",
+        "invalidated_post_run",
+        "incomplete_run",
+        "excluded_by_plan",
+        "score_out_of_range"
+      ],
+      "description": "score_out_of_range: under successRule tool_native the primary score lies outside [0, 1] (for example BLEU on 0-100), so the item is unscored (design section 8.2)."
+    },
+    "promptSha256": {
+      "$ref": "#/$defs/nullableSha256",
+      "description": "Hash of the non-system input (exact recorded text, or canonical JSON of the message list); rules in the design document."
+    },
+    "systemPromptSha256": {
+      "$ref": "#/$defs/nullableSha256"
+    },
+    "responseSha256": {
+      "$ref": "#/$defs/nullableSha256",
+      "description": "Hash of the final response text of the system under test; null when there is no generated response (error, log-likelihood task)."
+    },
+    "transcriptSha256": {
+      "$ref": "#/$defs/nullableSha256",
+      "description": "Optional: canonical JSON hash of the full normalized message list for multi-turn or agent items."
+    },
+    "targetSha256": {
+      "$ref": "#/$defs/nullableSha256",
+      "description": "Hash of the reference answer or target when the tool records one."
+    },
+    "toolHashes": {
+      "type": "object",
+      "maxProperties": 10,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/sha256"
+      },
+      "description": "Hashes the tool itself recorded (e.g. lm_eval.prompt_hash, pyrit.original_value_sha256); cross-checked against the engine's own hashes."
+    },
+    "technique": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300,
+      "description": "Primary attack grouping, attack items only (design section 7): promptfoo metadata.pluginId, garak probe class, PyRIT attack class, or the sample metadata named by plan.techniqueKey (Inspect default: the task name). Null for non-attack items."
+    },
+    "variant": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300,
+      "description": "Secondary attack grouping, attack items only: promptfoo metadata.strategyId or basic, PyRIT request-converter classes joined with + or none, or the metadata named by plan.variantKey. Null when the format defines none (garak, whose detectors are scores). Member keys per groupBy are defined in design section 8.4."
+    },
+    "categories": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/categoryKey"
+      },
+      "description": "Risk categories from the platform taxonomy (design section 9.2), assigned by the translation rules of section 9.3 or by plan.categories; sorted ascending."
+    },
+    "clusterId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 300,
+      "description": "Value of the plan's cluster key for this item (e.g. shared passage), used for clustered standard errors."
+    },
+    "scores": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 50,
+      "items": {
+        "$ref": "#/$defs/score"
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "value",
+        "rule",
+        "policy"
+      ],
+      "properties": {
+        "metric": {
+          "enum": [
+            "score",
+            "correct",
+            "attack_success",
+            "task_success"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Per-item outcome used by recomputation (null when the item is not scored)."
+        },
+        "rule": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+          "description": "Derivation rule identifier, e.g. inspect.value_to_float, promptfoo.redteam_failure, garak.any_detector_threshold."
+        },
+        "policy": {
+          "enum": [
+            "original",
+            "as_edited"
+          ],
+          "description": "Whether post-run score edits were applied."
+        }
+      }
+    },
+    "usage": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "inputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "latencyMs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "timing": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "startedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "completedAt": {
+          "$ref": "#/$defs/nullableTimestamp"
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "maxProperties": 50,
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9_.:-]{1,100}$"
+      },
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ],
+        "maxLength": 500
+      },
+      "description": "Selected scalar tool metadata (sample metadata, test metadata, probe tags). Never configuration blobs, credentials or raw text bodies."
+    },
+    "excerpt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt",
+        "response",
+        "truncated"
+      ],
+      "properties": {
+        "prompt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
+        },
+        "response": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1000
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "description": "Present only when the frozen plan enables excerpts. Inert text: never rendered as markup."
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]*$"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableSha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableTimestamp": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[A-Za-z0-9._:|/#@+=-]+$",
+      "description": "Components are joined with : (and | in itemKey). A tool identifier that is empty, longer than 128 characters, contains a character outside [A-Za-z0-9._@+=/#-], looks like an escape (h- plus 16 hex) or matches a secret pattern is replaced by h-<first 16 hex of its SHA-256>. A composed runKey or groupKey longer than 250 characters keeps its first component and replaces the rest with h-<first 16 hex of the SHA-256 of the composed key>, so itemKey stays within 512 characters; a declared runKey has at most 128 characters (design section 6.2)."
+    },
+    "shortText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "format": {
+      "enum": [
+        "inspect_eval",
+        "inspect_json",
+        "lm_eval_samples",
+        "promptfoo_results",
+        "garak_report",
+        "pyrit_export",
+        "deepeval_test_run",
+        "ragas_results"
+      ]
+    },
+    "categoryKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$"
+    },
+    "family": {
+      "description": "Developer-level model family from the closed vocabulary of design section 8.7: one of the listed developers, or other-<name> for a developer outside the list (other-<listed developer> is invalid). Fine-tunes and distillations inherit the family of their base model. The different-family rule compares these values exactly, so the bundle manifest schema references this definition rather than repeating it.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "openai",
+            "anthropic",
+            "google",
+            "meta",
+            "mistral",
+            "alibaba",
+            "deepseek",
+            "xai",
+            "cohere",
+            "microsoft",
+            "nvidia",
+            "ibm",
+            "amazon",
+            "ai21"
+          ]
+        },
+        {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^other-(?!(?:openai|anthropic|google|meta|mistral|alibaba|deepseek|xai|cohere|microsoft|nvidia|ibm|amazon|ai21)$)[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      ]
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "raw",
+        "value",
+        "passed",
+        "scale",
+        "scorer",
+        "edited",
+        "original"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/shortText",
+          "description": "Unique within the item. Per format (design section 7): lm-evaluation-harness <metric>,<filter>; promptfoo <assertion type>[:<metric>], with #<k> appended to the k-th occurrence (k >= 2) of a repeated name, plus overall; Inspect <scorer>, or <scorer>/<key> for dict-valued scores; garak the detector."
+        },
+        "raw": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ],
+          "maxLength": 1000,
+          "description": "Verbatim scalar as recorded by the tool (non-finite JSON constants become null with a non_finite_score warning)."
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "description": "Numeric value after the format's documented mapping (e.g. Inspect C=1, P=0.5, I=0, N=0); null when not mappable."
+        },
+        "passed": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "The tool's own pass/fail for this score, when it has one."
+        },
+        "scale": {
+          "enum": [
+            "binary",
+            "ordinal",
+            "proportion",
+            "real",
+            "categorical"
+          ]
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scorer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "judgeRef"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "deterministic",
+                "model_graded",
+                "human",
+                "tool_detector",
+                "unknown"
+              ],
+              "description": "deterministic and tool_detector only for the per-format allowlists of design section 7; anything not on an allowlist is unknown, which the gate treats like model_graded (section 8.7). A composite score takes the most restrictive kind of its components."
+            },
+            "judgeRef": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^J[0-9]{1,3}$",
+              "description": "References runMetadata.judges[].ref when kind is model_graded."
+            }
+          }
+        },
+        "edited": {
+          "type": "boolean"
+        },
+        "original": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "raw",
+            "value"
+          ],
+          "properties": {
+            "raw": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ],
+              "maxLength": 1000
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "description": "The value the run produced, when a post-run edit changed it."
+        },
+        "edits": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "$ref": "#/$defs/edit"
+          }
+        }
+      }
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "author",
+        "reasonSha256"
+      ],
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/nullableTimestamp"
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "reasonSha256": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "fieldSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "pointer"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "extracted",
+            "declared",
+            "computed",
+            "missing"
+          ]
+        },
+        "pointer": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024,
+          "description": "Where an extracted value came from (zip entry and JSON pointer, or manifest pointer for declared values)."
+        },
+        "declaredBy": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        }
+      }
+    },
+    "modelRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "snapshot",
+        "provider",
+        "family",
+        "source"
+      ],
+      "properties": {
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "snapshot": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300,
+          "description": "Immutable snapshot or revision; moving aliases (latest, default, unversioned names) are recorded as null with a moving_model_alias warning."
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "family": {
+          "$ref": "#/$defs/family"
+        },
+        "source": {
+          "$ref": "#/$defs/fieldSource"
+        }
+      }
+    },
+    "judge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "role",
+        "model",
+        "promptTemplateSha256",
+        "validation"
+      ],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^J[0-9]{1,3}$"
+        },
+        "role": {
+          "enum": [
+            "grader",
+            "pairwise_judge",
+            "detector_model",
+            "scorer_model"
+          ]
+        },
+        "model": {
+          "$ref": "#/$defs/modelRef"
+        },
+        "promptTemplateSha256": {
+          "$ref": "#/$defs/nullableSha256",
+          "description": "Judge configuration hash (prompt template, rubric wrapper and grading options) with the per-format recipe of design section 7.9; null when neither extracted nor declared."
+        },
+        "validation": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "kappa",
+            "lower",
+            "upper",
+            "n",
+            "level",
+            "positionConsistency",
+            "binding",
+            "artifactSha256",
+            "evidenceLevel"
+          ],
+          "properties": {
+            "kappa": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": -1,
+              "maximum": 1
+            },
+            "lower": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "upper": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "n": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "level": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "positionConsistency": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "required": [
+                "consistent",
+                "pairs",
+                "estimate",
+                "lower"
+              ],
+              "properties": {
+                "consistent": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "pairs": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimate": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lower": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "description": "Pairwise judges only (null otherwise): pairIds whose verdict mirrors when the order is swapped, out of pairs, and the Wilson lower bound at the validation level that the gate compares with pairwiseMinimumConsistencyLowerBound."
+            },
+            "binding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model",
+                "snapshot",
+                "promptTemplate",
+                "sampledFrom"
+              ],
+              "properties": {
+                "model": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "snapshot": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "promptTemplate": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "sampledFrom": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "description": "Whether the label file header matches this judge and this run (design section 7.9); null when a side is unknown. Anything other than true for all four leaves the judge unvalidated unless a reviewer acknowledges the validation scope."
+            },
+            "artifactSha256": {
+              "$ref": "#/$defs/nullableSha256",
+              "description": "Pinned human-label validation file the kappa was recomputed from."
+            },
+            "evidenceLevel": {
+              "enum": [
+                "L0",
+                "L2"
+              ],
+              "description": "L2 when recomputed by the engine from item-level labels; L0 when only a reported kappa was declared."
+            }
+          }
+        }
+      }
+    },
+    "runMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Required run metadata for every GenAI result. Each field records whether it was extracted from the log, declared in the bundle manifest, computed by the engine, or is missing.",
+      "required": [
+        "runKey",
+        "format",
+        "harness",
+        "systemUnderTest",
+        "systemPrompt",
+        "decoding",
+        "tools",
+        "dataset",
+        "datasetFingerprint",
+        "attackSet",
+        "judges",
+        "epochs",
+        "n",
+        "dates",
+        "completeness"
+      ],
+      "properties": {
+        "runKey": {
+          "$ref": "#/$defs/key"
+        },
+        "datasetFingerprint": {
+          "$ref": "#/$defs/sha256",
+          "description": "Computed: SHA-256 of the canonical JSON list of the run's distinct [groupKey, promptSha256, targetSha256] triples over all items, sorted by groupKey, then promptSha256, then targetSha256, null before any string (design section 6.1). Equal fingerprints mean the same items, whatever the epoch counts."
+        },
+        "format": {
+          "$ref": "#/$defs/format"
+        },
+        "harness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "source"
+          ],
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/shortText"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 100
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "systemUnderTest": {
+          "$ref": "#/$defs/modelRef"
+        },
+        "systemPrompt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sha256",
+            "distinctCount",
+            "source"
+          ],
+          "properties": {
+            "sha256": {
+              "$ref": "#/$defs/nullableSha256"
+            },
+            "distinctCount": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "decoding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "temperature",
+            "topP",
+            "topK",
+            "maxTokens",
+            "seed",
+            "generationsPerItem",
+            "source"
+          ],
+          "properties": {
+            "temperature": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "topP": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "topK": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "maxTokens": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "generationsPerItem": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "other": {
+              "type": "object",
+              "maxProperties": 30,
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ],
+                "maxLength": 300
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentic",
+            "offered",
+            "source"
+          ],
+          "properties": {
+            "agentic": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "offered": {
+              "type": "array",
+              "maxItems": 200,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "permission",
+                  "definitionSha256"
+                ],
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/shortText"
+                  },
+                  "permission": {
+                    "enum": [
+                      "read",
+                      "write",
+                      "execute",
+                      "network",
+                      "unknown"
+                    ]
+                  },
+                  "definitionSha256": {
+                    "$ref": "#/$defs/nullableSha256"
+                  }
+                }
+              }
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "dataset": {
+          "$ref": "#/$defs/versionedRef"
+        },
+        "attackSet": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/versionedRef"
+            }
+          ]
+        },
+        "judges": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "$ref": "#/$defs/judge"
+          }
+        },
+        "epochs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "source"
+          ],
+          "properties": {
+            "value": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "n": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Computed counts: items (item and epoch records), groups (distinct groupKeys) and scored (items with status scored). Decisions use scored groups after epoch reduction, which each criterion reports.",
+          "required": [
+            "items",
+            "groups",
+            "scored"
+          ],
+          "properties": {
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "groups": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "scored": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "dates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runStartedAt",
+            "runCompletedAt",
+            "source"
+          ],
+          "properties": {
+            "runStartedAt": {
+              "$ref": "#/$defs/nullableTimestamp"
+            },
+            "runCompletedAt": {
+              "$ref": "#/$defs/nullableTimestamp"
+            },
+            "source": {
+              "$ref": "#/$defs/fieldSource"
+            }
+          }
+        },
+        "completeness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "missing",
+            "declaredOnly"
+          ],
+          "properties": {
+            "missing": {
+              "$ref": "#/$defs/metadataFieldList"
+            },
+            "declaredOnly": {
+              "$ref": "#/$defs/metadataFieldList"
+            }
+          }
+        }
+      }
+    },
+    "versionedRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "sha256",
+        "source"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 300
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 100
+        },
+        "sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "source": {
+          "$ref": "#/$defs/fieldSource"
+        }
+      }
+    },
+    "metadataFieldList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "harness",
+          "systemUnderTest.snapshot",
+          "systemUnderTest.family",
+          "systemPrompt",
+          "decoding",
+          "tools",
+          "dataset",
+          "attackSet",
+          "judges.model",
+          "judges.family",
+          "judges.promptTemplate",
+          "judges.validation",
+          "epochs",
+          "dates"
+        ]
+      }
+    }
+  }
+}

@@ -4,3 +4,5 @@ __pycache__
 .test-tmp
 worker-jobs
 .venv
+# GenAI evidence test fixtures (real tool logs and reference values); the worker never reads them.
+tests/fixtures/genai

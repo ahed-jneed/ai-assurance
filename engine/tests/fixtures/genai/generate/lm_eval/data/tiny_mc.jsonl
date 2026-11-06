@@ -1,0 +1,6 @@
+{"id": "m1", "passage": "p1", "question": "Which planet is known as the Red Planet?", "choices": ["Venus", "Mars", "Jupiter", "Mercury"], "answer": 1}
+{"id": "m2", "passage": "p1", "question": "Which planet has the most prominent ring system?", "choices": ["Saturn", "Earth", "Mars", "Venus"], "answer": 0}
+{"id": "m3", "passage": "p2", "question": "What gas do plants absorb from the air for photosynthesis?", "choices": ["Oxygen", "Nitrogen", "Carbon dioxide", "Helium"], "answer": 2}
+{"id": "m4", "passage": "p2", "question": "What is the chemical symbol for water?", "choices": ["H2O", "CO2", "NaCl", "O2"], "answer": 0}
+{"id": "m5", "passage": "p3", "question": "How many sides does a hexagon have?", "choices": ["Five", "Six", "Seven", "Eight"], "answer": 1}
+{"id": "m6", "passage": "p3", "question": "What is 7 multiplied by 8?", "choices": ["54", "56", "58", "64"], "answer": 1}

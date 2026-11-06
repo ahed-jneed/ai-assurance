@@ -1,33 +1,9 @@
 import assert from "node:assert/strict";
-import fs from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import ts from "typescript";
+import { sourceURL } from "./ts-modules.mjs";
 
 // Load the actual predicates and their relative imports without a browser/server.
-const modules = new Map();
-async function sourceURL(file) {
-  const filename = path.resolve(file);
-  if (modules.has(filename)) return modules.get(filename);
-  let output = ts.transpileModule(await fs.readFile(filename, "utf8"), {
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
-  for (const match of [...output.matchAll(/from\s+(['"])(\.\.?\/[^'"]+)\1/g)]) {
-    const dependency = path.resolve(path.dirname(filename), match[2] + ".ts");
-    output = output.replace(
-      match[0],
-      "from " + JSON.stringify(await sourceURL(dependency)),
-    );
-  }
-  const url =
-    "data:text/javascript;base64," +
-    Buffer.from(output, "utf8").toString("base64");
-  modules.set(filename, url);
-  return url;
-}
 const { engagementWork, procedureWork, orderWork } = await import(
   await sourceURL("lib/work-items.ts")
 );

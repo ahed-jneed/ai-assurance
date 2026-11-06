@@ -1,0 +1,29 @@
+task: tiny_gen
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: data/tiny_gen.jsonl
+test_split: test
+output_type: generate_until
+doc_to_text: "Q: {{question}}\nA:"
+doc_to_target: "{{answer_text}}"
+generation_kwargs:
+  until:
+    - "\n"
+  do_sample: false
+  temperature: 0.0
+repeats: 2
+filter_list:
+  - name: "strip"
+    filter:
+      - function: "regex"
+        regex_pattern: "(\\S+)"
+      - function: "take_first"
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+    ignore_case: true
+    ignore_punctuation: true
+metadata:
+  version: 1.0
