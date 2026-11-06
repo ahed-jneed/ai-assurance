@@ -2,7 +2,7 @@
 
 `test-run.schema.json` uses JSON Schema Draft 2020-12. It accepts three explicit contracts:
 
-- **1.0:** Existing external Python reports and legacy hosted evaluations. The external runner is currently 1.1.1; runner version and report contract version are separate.
+- **1.0:** Existing external Python reports and legacy hosted evaluations. The external runner is currently 1.2.0; runner version and report contract version are separate.
 - **1.1:** Hosted saved-prediction evaluations. These require a frozen model card, dataset metadata, normalized configuration, protocol when selected, test-definition version and SHA-256 input bindings. Queued, running, succeeded, failed and cancelled states have distinct rules.
 - **1.2:** Completed authenticated external attempts compiled by the platform. These require an external job ID, approved procedure revisions, non-null frozen protocol, original request/result digest pins, system/model/dataset declarations, and the complete worker metrics including counts, confidence intervals, thresholds and slices. The original envelope and engine report remain unchanged.
 

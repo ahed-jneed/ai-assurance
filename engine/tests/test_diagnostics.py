@@ -9,6 +9,30 @@ from pathlib import Path
 from engine.diagnostics import fairness, ks_statistic, prediction_rows, psi, run, validate_config, verify_report, wasserstein, wilson, write_report
 from engine.contract import validate_report
 
+try:
+    import jsonschema
+except ImportError:  # Installed by engine/requirements-dev.txt.
+    jsonschema = None
+
+SCHEMA = Path(__file__).resolve().parents[2]/"schemas"/"test-run.schema.json"
+requires_jsonschema = unittest.skipUnless(jsonschema, "jsonschema is not installed; install engine/requirements-dev.txt")
+_validators = {}
+
+
+def schema_violations(report):
+    """Readable violations of the shared run schema for an engine 1.0 report."""
+    if not _validators:
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator.check_schema(schema)
+        # Narrowing the version-discriminated oneOf to the engine branch makes
+        # an error name the offending field instead of three branch mismatches.
+        _validators["engine"] = jsonschema.Draft202012Validator({**schema, "oneOf": [{"$ref": "#/$defs/legacyRun"}]})
+        _validators["full"] = jsonschema.Draft202012Validator(schema)
+    errors = ["/".join(map(str, error.absolute_path))+": "+error.message[:300] for error in _validators["engine"].iter_errors(report)]
+    if not errors and not _validators["full"].is_valid(report):
+        errors.append("report does not match exactly one schema branch")
+    return errors
+
 
 def config(task="binary_classification", suites=None):
     return {"contractVersion": "1.0", "id": "run-test-001", "engagementId": "eng-001", "modelId": "model-001", "datasetId": "data-001", "task": task, "suite": suites or ["performance", "fairness"], "seed": 1729, "columns": {"target": "actual", "prediction": "predicted", "protected": "group", "score": "score"}, "minGroupSize": 2, "minClassCount": 2, "minSampleSize": 2, "thresholds": {"policyId": "test-policy", "policyVersion": "1", "source": "internal_policy", "values": {"accuracy": {"operator": ">=", "value": 0.8}, "precision": {"operator": ">=", "value": 0.8}, "recall": {"operator": ">=", "value": 0.8}, "f1": {"operator": ">=", "value": 0.8}, "balanced_accuracy": {"operator": ">=", "value": 0.8}, "brier_score": {"operator": "<=", "value": 0.2}, "expected_calibration_error": {"operator": "<=", "value": 0.2}, "demographic_parity_difference": {"operator": "<=", "value": 0.15}, "disparate_impact_ratio": {"operator": ">=", "value": 0.8}, "equalized_odds_difference": {"operator": "<=", "value": 0.15}}}}
@@ -130,6 +154,44 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(details["currentMissingRate"], 0.25)
         self.assertEqual(details["referenceN"], 4)
         self.assertEqual(run(current, cfg)["overallOutcome"], "inconclusive")
+
+    def test_drift_ids_are_positional_and_keep_feature_names(self):
+        cfg = config(suites=["drift"])
+        cfg["driftFeatures"] = ["annual income", "età", "ratio/raw"]
+        cfg["thresholds"]["values"] = {}
+        reference = self.csv("reference.csv", [{name: i for name in cfg["driftFeatures"]} for i in range(4)])
+        current = self.csv("current.csv", [{name: i+1 for name in cfg["driftFeatures"]} for i in range(4)])
+        report = run(current, cfg, reference)
+        self.assertEqual([r["testId"] for r in report["results"]], ["DRIFT-1", "DRIFT-2", "DRIFT-3"])
+        for diagnostic, feature in zip(report["results"], cfg["driftFeatures"]):
+            self.assertEqual(diagnostic["label"], "Distribution drift: "+feature)
+            self.assertTrue(diagnostic["metrics"])
+            self.assertTrue(all(m["details"]["feature"] == feature for m in diagnostic["metrics"]))
+        self.assertEqual(set(report["provenance"]["inputs"]["testDefinitions"]), {"DRIFT-1", "DRIFT-2", "DRIFT-3"})
+        validate_report(report)
+        if jsonschema:
+            self.assertEqual(schema_violations(report), [])
+
+    @requires_jsonschema
+    def test_reports_validate_against_shared_schema(self):
+        rows = [{**row, "annual income": index} for index, row in enumerate(self.balanced())]
+        binary = config(suites=["performance", "fairness", "drift", "shap", "cross_validation", "record_keeping"])
+        binary["driftFeatures"] = ["annual income"]
+        reference = self.csv("binary-reference.csv", [{"annual income": index+1} for index in range(8)])
+        multiclass = config("multiclass_classification", ["performance", "fairness"])
+        multiclass["columns"] = {"target": "actual", "prediction": "predicted"}
+        regression = config("regression", ["performance"])
+        regression["columns"] = {"target": "actual", "prediction": "predicted"}
+        reports = [
+            run(self.csv("binary.csv", rows), binary, reference),
+            run(self.csv("no-reference.csv", rows), binary),
+            run(self.csv("multiclass.csv", [{"actual": label, "predicted": label} for label in "abc" for _ in range(2)]), multiclass),
+            run(self.csv("regression.csv", [{"actual": 1, "predicted": 1}, {"actual": 2, "predicted": 3}]), regression),
+        ]
+        self.assertIn("DRIFT-1", [r["testId"] for r in reports[0]["results"]])
+        self.assertIn("DRIFT-INPUT", [r["testId"] for r in reports[1]["results"]])
+        for report in reports:
+            self.assertEqual(schema_violations(report), [], report["suite"])
 
     def test_nonfinite_duplicates_bad_labels_and_unsafe_thresholds_rejected(self):
         for bad in ("NaN", "Infinity", "-inf"):

@@ -3,6 +3,8 @@
 # engine/tests (skipped without it) and the trusted-signature verification in
 # site-app/scripts/assurance-integration-check.mjs. numpy is needed by the
 # native-adapter tests in engine/tests/test_connectors_adapters.py; its pin
-# matches requirements-optional.txt.
+# matches requirements-optional.txt. jsonschema validates engine reports
+# against schemas/test-run.schema.json (those tests skip without it).
 cryptography==50.0.2
+jsonschema==4.26.0
 numpy==2.3.5
