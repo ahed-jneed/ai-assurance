@@ -145,7 +145,7 @@ try {
       add("location", {
         label: "Quarantined holdout extract",
         locator: "rows 9001-9500",
-        artifactName: "holdout.csv",
+        artifactName: "Überprüfung holdout.csv",
       });
       continue;
     }
@@ -237,8 +237,15 @@ try {
   assert.equal(found.nextCursor, null);
   assert.equal(found.records[0].reviewState, null);
   assert.equal(found.records[0].body.locator, "rows 9001-9500");
+  // Case is ignored for non-ASCII letters too, in D1 as in the browser.
+  for (const q of ["überprüfung HOLDOUT", "ÜBERPRÜFUNG"])
+    assert.deepEqual(
+      (await api(path_({ view: "search", q }))).records.map((r) => r.id),
+      ["AS-scale-04321"],
+      q,
+    );
   console.log(
-    "PASS search finds a record far past the first page among 5,000, within the engagement",
+    "PASS search finds a record far past the first page among 5,000, within the engagement, ignoring the case of every letter",
   );
 
   // A register pages through every source and assertion exactly once.

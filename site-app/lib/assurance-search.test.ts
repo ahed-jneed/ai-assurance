@@ -63,6 +63,7 @@ const people = [
   ["user-lead", "Lena Lead"],
   ["user-auditor", "Arto Auditor"],
   ["user-reviewer", "Rhea Reviewer"],
+  ["user-mueller", "Jörg Müller"],
 ] as const;
 const person = (id: string) =>
   people.find(([user]) => user === id)?.[1] ?? "Practice member";
@@ -130,8 +131,20 @@ function generator(seed: number) {
 }
 // Words the records carry and the searches look for. None is a kind name or
 // part of a register's fallback title, so the in-memory search and the SQL
-// search must agree on them.
-const words = ["alpha", "bravo", "charlie", "delta", "echo", "50%_off"];
+// search must agree on them. Some carry non-ASCII letters, whose case the
+// search ignores too, and GLOB's own wildcards.
+const words = [
+  "alpha",
+  "bravo",
+  "charlie",
+  "delta",
+  "echo",
+  "50%_off",
+  "Überprüfung",
+  "ærøskøbing",
+  "Σχέδιο",
+  "a*[b]?c",
+];
 /**
  * Random records of the kinds the registers show: assessments with one title
  * field, reviews of any target and decision, supersession, and sources with
@@ -255,6 +268,17 @@ describe("record search in SQL", () => {
         "arto auditor",
         "AS-00",
         "nothing-matches",
+        "überprüfung",
+        "ÜBERPRÜFUNG-1",
+        "ÆRØ",
+        "σχέδιο",
+        "MÜLLER",
+        "jörg müller",
+        "*",
+        "?",
+        "[b]",
+        "A*[B]?C",
+        "[",
       ];
       for (const kinds of kindSets)
         for (const term of terms)
@@ -320,6 +344,35 @@ describe("record search in SQL", () => {
       (await searchRecords(ctx, "ENG-1", { kinds: ["assertion"] })).records[0]
         .reviewState,
     ).toBe("Awaiting review");
+  });
+
+  it("ignores the case of non-ASCII letters", async () => {
+    await insert([
+      {
+        id: "AS-1",
+        kind: "location",
+        body: { label: "überprüfung der Daten" },
+        at: at(1),
+      },
+      {
+        id: "AS-Ü-2",
+        kind: "assertion",
+        body: { statement: "x" },
+        at: at(2),
+        actor: "user-mueller",
+      },
+      { id: "AS-3", kind: "location", body: { label: "Uber" }, at: at(3) },
+    ]);
+    const find = async (term: string) =>
+      ids((await searchAll({ term })).records);
+    expect(await find("Überprüfung")).toEqual(["AS-1"]);
+    expect(await find("ÜBERPRÜFUNG DER")).toEqual(["AS-1"]);
+    expect(await find("überprüfung")).toEqual(["AS-1"]);
+    expect(await find("as-ü-2")).toEqual(["AS-Ü-2"]);
+    expect(await find("  MÜLLER  ")).toEqual(["AS-Ü-2"]);
+    expect(await find("JÖRG")).toEqual(["AS-Ü-2"]);
+    // An umlaut is its own letter, not its base letter.
+    expect(await find("uber")).toEqual(["AS-3"]);
   });
 
   it("finds a record far past the first page among 5,000", async () => {

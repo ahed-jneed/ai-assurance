@@ -98,6 +98,28 @@ const haystack = [
   "COALESCE(m.display_name,'')",
 ].join("||' '||");
 
+/**
+ * A GLOB pattern that finds `term` anywhere in a text, ignoring the case of
+ * every letter (not only ASCII ones, as LIKE would): each cased character
+ * becomes a class of its lower and upper case forms, and `*`, `?` and `[`
+ * are matched literally. `%`, `_` and `\` are ordinary characters in GLOB.
+ */
+export function caseInsensitiveGlob(term: string) {
+  let pattern = "";
+  for (const c of term) {
+    if (c === "*" || c === "?" || c === "[") {
+      pattern += "[" + c + "]";
+      continue;
+    }
+    // Only single-character case forms fit in a class (not "SS" for "ß").
+    const forms = new Set(
+      [c, c.toLowerCase(), c.toUpperCase()].filter((f) => [...f].length === 1),
+    );
+    pattern += forms.size > 1 ? "[" + [...forms].join("") + "]" : c;
+  }
+  return "*" + pattern + "*";
+}
+
 function validKinds(kinds: readonly string[] = []) {
   if (kinds.length > 20 || !kinds.every((k) => kindPattern.test(k)))
     throw new ApiError(400, "Invalid record kinds");
@@ -105,8 +127,9 @@ function validKinds(kinds: readonly string[] = []) {
 }
 /**
  * One page of the engagement's records that match `search`, in (created_at,
- * id) order, each with its review state. Matching ignores ASCII case and
- * treats `%` and `_` as ordinary characters.
+ * id) order, each with its review state. Matching ignores the case of every
+ * letter (Unicode simple case mapping) and treats every character of the
+ * term literally.
  */
 export async function searchRecords(
   ctx: Context,
@@ -138,8 +161,8 @@ export async function searchRecords(
     values.push(search.notActor);
   }
   if (term) {
-    filters.push(`(${haystack}) LIKE ? ESCAPE '\\'`);
-    values.push("%" + term.replace(/[\\%_]/g, "\\$&") + "%");
+    filters.push(`(${haystack}) GLOB ?`);
+    values.push(caseInsensitiveGlob(term));
   }
   const page = [...filters],
     pageValues = [...values];
