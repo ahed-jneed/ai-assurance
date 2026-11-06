@@ -2562,6 +2562,12 @@ try {
     "Signed: Fixture Assurance GmbH",
     "Location: Vienna, Austria",
     "Results by criterion",
+    "Executive summary",
+    // The report date is the capture date, not the release date.
+    new Date(internalFinal.createdAt).toLocaleDateString("en-GB", {
+      timeZone: "Europe/Vienna",
+      dateStyle: "long",
+    }),
   ])
     assert(html.includes(element), element);
   assert(!html.includes("Internal restriction secret"));
@@ -2840,10 +2846,11 @@ try {
     { user: viewer },
   );
   // The withdrawn report leaves the client's view; the report it superseded
-  // was issued to the client and stays readable, labelled as superseded.
+  // was issued to the client and stays readable, labelled as superseded
+  // without naming the withdrawn successor the client cannot read.
   assert.deepEqual(
     afterWithdrawal.engagement.reports.map((r) => [r.id, r.supersededBy]),
-    [[internalFinal.id, replacement.id]],
+    [[internalFinal.id, "a later report, since withdrawn"]],
   );
   await request(
     "/api/report-package?" +

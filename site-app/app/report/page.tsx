@@ -12,6 +12,7 @@ import {
   type ReportParticulars,
 } from "@/lib/domain/report-model";
 import { requestLabel } from "@/lib/evidence-requests";
+import { reportDate } from "@/lib/report-presentation";
 import { legalDate } from "@/lib/rule-pack";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ApiError, context, getEngagement, sanitize } from "@/lib/store";
@@ -89,6 +90,8 @@ type ReportSnapshot = {
     notAssurance: boolean;
   };
   criteria?: CriterionResult[];
+  /** The capture time, in both snapshots. */
+  createdAt?: string;
   /** Recorded at capture from rule pack 2026.11.1 on; absent on older snapshots. */
   rulePack?: RulePackStamp;
   methodologyVersion?: string;
@@ -143,14 +146,9 @@ const criterionResults = {
  * basis for modification, the conclusion, results by criterion and the
  * signature, date and location.
  */
-function AssuranceReport({
-  s,
-  createdAt,
-}: {
-  s: ReportSnapshot;
-  createdAt: string;
-}) {
+function AssuranceReport({ s }: { s: ReportSnapshot }) {
   const c = s.conclusionStatement!,
+    date = reportDate(s),
     element = (id: string) => s.elements?.find((e) => e.id === id),
     body = [
       "subject",
@@ -182,7 +180,10 @@ function AssuranceReport({
             </div>
           ) : null;
         })}
-        <p>{s.summary}</p>
+        <div>
+          <h3>Executive summary</h3>
+          <p>{s.summary}</p>
+        </div>
         {c.basisHeading && (
           <div>
             <h3>{c.basisHeading}</h3>
@@ -199,10 +200,12 @@ function AssuranceReport({
           <p>{"Signed: " + (s.particulars?.signatory || "Not recorded")}</p>
           <p>
             Report date:{" "}
-            {new Date(createdAt).toLocaleDateString("en-GB", {
-              timeZone: "Europe/Vienna",
-              dateStyle: "long",
-            })}
+            {date
+              ? new Date(date).toLocaleDateString("en-GB", {
+                  timeZone: "Europe/Vienna",
+                  dateStyle: "long",
+                })
+              : "Not recorded"}
           </p>
           <p>{"Location: " + (s.particulars?.location || "Not recorded")}</p>
         </div>
@@ -276,7 +279,7 @@ function reportMarkup(report: Report, s: ReportSnapshot) {
         )}
       </header>
       {v2 ? (
-        <AssuranceReport s={s} createdAt={report.createdAt} />
+        <AssuranceReport s={s} />
       ) : (
         <section>
           <h2>Scoped conclusion</h2>
