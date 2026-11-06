@@ -13,7 +13,7 @@ import {
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import { assertSaveQuota } from "./access-policy";
-import { refuseReadOnly, type Context } from "./tenancy";
+import { refuseQualityReviewer, refuseReadOnly, type Context } from "./tenancy";
 import {
   isClientRole,
   activeGrant,
@@ -133,6 +133,7 @@ export async function save(
   extra: (commandId: string) => D1PreparedStatement[] = () => [],
 ) {
   refuseReadOnly(ctx);
+  refuseQualityReviewer(ctx, action);
   if (partial.has(e))
     throw new Error("A partially loaded engagement cannot be saved");
   if (

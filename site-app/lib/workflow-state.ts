@@ -9,7 +9,12 @@ import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
   role === "Client Viewer" || role === "Client Contributor";
 export const isInternalRole = (role: Role | string) =>
-  ["Auditor", "Lead Auditor", "Reviewer"].includes(role);
+  [
+    "Auditor",
+    "Lead Auditor",
+    "Reviewer",
+    "Engagement Quality Reviewer",
+  ].includes(role);
 export const releaseState = (report: Report) =>
   report.release?.state ?? "internal";
 export const isReleased = (report: Report) =>

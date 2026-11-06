@@ -77,6 +77,8 @@ The Worker variable `SELF_SIGNUP` controls self-signup (`site-app/lib/access-pol
 
 **Revocation and re-grant.** Revoking a member, or changing their role or client, withdraws in the same management batch every engagement grant they hold, the runner workers they sponsored and (on revocation) their practice administration. Their client request grants lapse, because each membership records when its current grant began (`memberships.access_since`). A re-grant or role change to an internal role must list the engagements it grants, and restores nothing else; withdrawn runner workers must be enrolled again. A practice always keeps at least one active administrator; administrators can grant, revoke and transfer administration to active internal members.
 
+**Engagement quality reviewers.** The Engagement Quality Reviewer role reads the engagements it is granted and records only the quality review; every other engagement write refuses it (`docs/audit-workflow-implementation.md`, #24). `EQR_COOLING_OFF_DAYS` sets how many days must pass after someone's latest recorded work on a client's engagement before they may be appointed quality reviewer of another engagement for that client (default 730; 0 checks only the engagement's own team; at most 3650). Each appointment records the period it applied.
+
 **Quotas.** Each practice may hold at most `TENANT_MAX_ENGAGEMENTS` engagements (default 200) and store at most `TENANT_MAX_SAVES_PER_HOUR` engagement versions an hour (default 1000; each save keeps a full snapshot). Beyond either, the request is refused with 429 and an explanation, and nothing is written.
 
 ## Verification

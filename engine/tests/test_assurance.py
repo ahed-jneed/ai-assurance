@@ -39,6 +39,18 @@ def dossier():
     return build_dossier({"report.json": b'{"reportId":"R-1","scope":"synthetic"}', "evidence/observations.csv": b"id,value\n1,2\n"}, report_id="R-1", report_path="report.json", created_at="2025-01-01T00:00:00Z", custody=[{"id": "C-1", "action": "collected", "actor": "fixture-auditor", "at": "2025-01-01T00:00:00Z", "path": "evidence/observations.csv"}], withheld=[{"id": "private-interview", "reason": "Outside this audience's release scope"}])
 
 
+def dossier_v1_1(key_id="KEY-fixture", rule_pack=None, methodology="2026.11.1"):
+    """The web app's manifest 1.1: the key ID and captured versions are signed."""
+    container = dossier()
+    container["manifest"].update(schemaVersion="1.1", signingKeyId=key_id, rulePack={"version": "2026.11.1", "legalVersion": "02024R1689-20260727", "researchedAsOf": "2026-11-05", "legalReview": "pending"} if rule_pack is None else rule_pack, methodologyVersion=methodology)
+    return rehash(container)
+
+
+def rehash(container):
+    container["manifestSha256"] = hashlib.sha256(canonical_bytes(container["manifest"], integer_only=True)).hexdigest()
+    return container
+
+
 def temporary_directory():
     # Keep disposable test keys/files inside the known writable workspace.
     # Validate the generated absolute target before TemporaryDirectory cleanup.
@@ -403,6 +415,61 @@ class DossierTests(unittest.TestCase):
             signed["manifest"]["audience"] = "client"
             signed["manifestSha256"] = hashlib.sha256(canonical_bytes(signed["manifest"], integer_only=True)).hexdigest()
             self.assertFalse(verify_dossier(signed)["valid"])
+
+    def test_manifest_1_1_binds_versions_and_keeps_1_0(self):
+        self.assertTrue(verify_dossier(dossier())["valid"])
+        self.assertTrue(verify_dossier(dossier_v1_1())["valid"])
+        uncaptured = dossier_v1_1(methodology=None)
+        uncaptured["manifest"]["rulePack"] = None
+        self.assertTrue(verify_dossier(rehash(uncaptured))["valid"])
+        bad = []
+        missing = dossier_v1_1()
+        del missing["manifest"]["rulePack"]
+        bad.append(rehash(missing))
+        extra = dossier_v1_1()
+        extra["manifest"]["signedBy"] = "someone"
+        bad.append(rehash(extra))
+        old_with_new = dossier_v1_1()
+        old_with_new["manifest"]["schemaVersion"] = "1.0"
+        bad.append(rehash(old_with_new))
+        future = dossier_v1_1()
+        future["manifest"]["schemaVersion"] = "1.2"
+        bad.append(rehash(future))
+        review = dossier_v1_1()
+        review["manifest"]["rulePack"]["legalReview"] = "assumed"
+        bad.append(rehash(review))
+        pack_keys = dossier_v1_1()
+        pack_keys["manifest"]["rulePack"]["notes"] = "x"
+        bad.append(rehash(pack_keys))
+        empty_key = dossier_v1_1(key_id=" ")
+        bad.append(empty_key)
+        methodology = dossier_v1_1(methodology=7)
+        bad.append(methodology)
+        for container in bad:
+            self.assertFalse(verify_dossier(container)["valid"], container["manifest"])
+
+    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    def test_manifest_1_1_signature_names_the_signed_key_id(self):
+        with temporary_directory() as directory:
+            key_path = Path(directory) / "fixture.pem"
+            key_path.write_bytes(Ed25519PrivateKey.generate().private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+            with self.assertRaises(ValueError):
+                sign_dossier(dossier_v1_1(), private_key_path=key_path, key_id="KEY-other")
+            signed = sign_dossier(dossier_v1_1(), private_key_path=key_path, key_id="KEY-fixture")
+            trust = {"KEY-fixture": signed["signature"]["publicKeySPKI"]}
+            proof = verify_dossier(signed, trusted_keys=trust, require_trusted_signature=True)
+            self.assertTrue(proof["valid"], proof)
+            self.assertEqual(proof["outcome"], "pass")
+            # A relabelled signature (and a trust entry under the new label) fails.
+            relabelled = copy.deepcopy(signed)
+            relabelled["signature"]["keyId"] = "KEY-other"
+            proof = verify_dossier(relabelled, trusted_keys={"KEY-other": signed["signature"]["publicKeySPKI"]})
+            self.assertFalse(proof["valid"])
+            self.assertEqual(proof["signature"]["status"], "invalid")
+            # The captured versions are covered by the signature.
+            downgraded = copy.deepcopy(signed)
+            downgraded["manifest"]["rulePack"]["legalReview"] = "approved"
+            self.assertFalse(verify_dossier(rehash(downgraded), trusted_keys=trust)["valid"])
 
     def test_read_json_rejects_duplicate_keys_and_nonfinite(self):
         with temporary_directory() as directory:

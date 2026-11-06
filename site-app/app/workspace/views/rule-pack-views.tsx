@@ -16,6 +16,7 @@ import type { Engagement } from "@/lib/domain";
 import {
   engagementPeriod,
   engagementRulePack,
+  laterRevisions,
   legalDate,
   obligationsByDate,
   openReviewItems,
@@ -167,6 +168,21 @@ export function RulePackStatus({
           (researched {legalDate(relation.stamp.researchedAsOf)}), but this
           workspace applies rule pack {pack.rulePackVersion}. Review the
           differences before relying on these dates.
+          {laterRevisions(pack, relation.stamp.version).map((r) => (
+            <p key={r.rulePackVersion}>
+              Rule pack {r.rulePackVersion} applies research edits{" "}
+              {r.edits.join(", ")} (
+              <a
+                className="source-link"
+                href={r.issue}
+                target="_blank"
+                rel="noreferrer"
+              >
+                change record
+              </a>
+              ).
+            </p>
+          ))}
         </div>
       )}
       {relation.kind === "current" && (
@@ -836,8 +852,39 @@ export function RulePackSources({ pack }: { pack: RegulatorySnapshot }) {
                     g.title
                   )}
                 </TableCell>
-                <TableCell>{g.status}</TableCell>
-                <TableCell>{g.platformUse ?? g.note}</TableCell>
+                <TableCell>
+                  {g.status}
+                  {g.reference && (
+                    <>
+                      <br />
+                      <span className="reference-cell">{g.reference}</span>
+                    </>
+                  )}
+                  {g.dates?.length ? (
+                    <details>
+                      <summary className="subtle">
+                        {legalDate(g.dates.at(-1)!.date)}:{" "}
+                        {g.dates.at(-1)!.event}
+                      </summary>
+                      <ul className="rule-pack-list">
+                        {g.dates.map((d) => (
+                          <li key={d.date + d.event}>
+                            {legalDate(d.date)}: {d.event}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  {g.legalEffect && <p>{g.legalEffect}</p>}
+                  {(g.platformUse ?? g.note) && (
+                    <p>{g.platformUse ?? g.note}</p>
+                  )}
+                  {g.researchRef && (
+                    <p className="subtle">Research entry {g.researchRef}</p>
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

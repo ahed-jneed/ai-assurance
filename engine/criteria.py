@@ -20,7 +20,7 @@ MAX_DESCRIPTIVE_BOOTSTRAP_WORK = 5_000_000
 ARTICLES = {"performance": "15", "multiclass_performance": "15", "regression_performance": "15", "calibration": "15", "group_comparison": "10"}
 KIND_LABELS = {"performance": "Binary classification performance", "multiclass_performance": "Multiclass classification performance", "regression_performance": "Regression performance", "calibration": "Probability calibration"}
 GROUP_LABELS = {"selection_rate_difference": "Demographic parity difference", "selection_rate_ratio": "Disparate impact ratio", "equalized_odds": "Equalized odds difference"}
-UNITS = {"mae": "target_units", "rmse": "target_units", "r2": "dimensionless"}
+UNITS = {"mae": "target_units", "rmse": "target_units", "r2": "dimensionless", "baseline_rmse": "target_units"}
 # Plain-language limitation text for each reason code (section 4.4). Codes stay in decision.reasons.
 REASON_TEXT = {
     "below_minimum_sample_size": "Fewer rows were evaluated than the pre-registered minimum sample size, so no claim is made either way.",
@@ -35,6 +35,7 @@ REASON_TEXT = {
     "too_many_groups": "The number of groups exceeds the limit for this comparison mode; per-group rates are reported without a decision.",
     "small_cell_exact_test_not_significant": "A comparison has a cell under 5 and Fisher's exact test does not confirm the disparity, so the fail is not claimed.",
     "chance_exact_test_not_significant": "The exact test of independence between predictions and truth is not significant, so performance above chance is not claimed.",
+    "mean_baseline_not_beaten": "The model's mean squared error is not shown to be below that of predicting the mean of the reference values on every row (the mean-prediction baseline), so a pass is not claimed.",
     "interval_straddles_band": "The confidence interval straddles the acceptable band, so the evidence is inconclusive.",
     "within_criterion_multiplicity": "A comparison is outside the band on its own, but not after the Bonferroni adjustment over the criterion's comparisons.",
     "multiplicity_adjustment": "The claim does not survive the adjustment for the number of criteria in its family.",
@@ -49,7 +50,7 @@ REASON_TEXT = {
 BASE_NOTES = {
     "performance": "Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity and target leakage require review.",
     "multiclass_performance": "Saved predictions do not establish cross-validation, dataset independence or freedom from leakage.",
-    "regression_performance": "Saved predictions do not establish cross-validation, dataset independence or freedom from leakage; R² is descriptive.",
+    "regression_performance": "Saved predictions do not establish cross-validation, dataset independence or freedom from leakage; R² is descriptive. A pass also needs the model to beat the mean-prediction baseline (baseline_rmse).",
     "calibration": "Calibration uses fixed equal-width probability bins; the expected calibration error is descriptive and never decides.",
     "group_comparison": "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations.",
 }
@@ -259,6 +260,22 @@ def _calibration_slice(group, bins):
     return out
 
 
+def short(value, digits):
+    """A number to `digits` significant digits without trailing zeros, as the hosted runner writes it."""
+    return f"{value:.{digits}g}"
+
+
+def baseline_note(outcome):
+    """Section 5.9: when the mean baseline gate stops a regression pass, name the model's RMSE and the baseline's."""
+    if "mean_baseline_not_beaten" not in outcome["decision"]["reasons"]:
+        return []
+    entries = {e["metric"]: e for e in outcome["members"] + outcome["descriptive"]}
+    rmse, base = entries.get("rmse"), entries.get("baseline_rmse")
+    if rmse is None or base is None or rmse["estimate"] is None or base["estimate"] is None:
+        return []
+    return [f"RMSE {short(rmse['estimate'], 4)} does not beat the mean-prediction baseline RMSE {short(base['estimate'], 4)} (gate p {short(base['counts']['gatePValue'], 3)}): the model is not shown to predict better than the mean of the reference values."]
+
+
 def class_table(observations, labels):
     """Per-class support, predictions, correct predictions, recall, precision and F1 (the hosted runner's
     classPerformance rows), in the given label order."""
@@ -345,7 +362,7 @@ def criterion_result(spec, outcome, config, plan, notes, context=None):
     reasons = list(decision["reasons"])
     for entry in outcome["descriptive"]:
         reasons.extend(r for r in entry["reasons"] if r.startswith("bootstrap_"))
-    limitations = [BASE_NOTES[kind], *notes, *dict.fromkeys(REASON_TEXT[r] for r in reasons if r in REASON_TEXT)]
+    limitations = [BASE_NOTES[kind], *notes, *dict.fromkeys(REASON_TEXT[r] for r in reasons if r in REASON_TEXT), *baseline_note(outcome)]
     if decision["libraryEntry"]:
         limitations.append(f"{decision['libraryEntry']['legalStatus']}: {decision['libraryEntry']['caveat']}")
     label = KIND_LABELS.get(kind) or GROUP_LABELS[spec["metric"]]

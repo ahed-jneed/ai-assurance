@@ -8,6 +8,10 @@ import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
 import type { Role } from "./domain";
 import { roles } from "./domain";
+import {
+  qualityReviewerOps,
+  qualityReviewerRole,
+} from "./domain/quality-review";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
 import { currentUser } from "./identity";
@@ -167,4 +171,16 @@ export function requireAdmin(ctx: Context) {
 export function refuseReadOnly(ctx: Context) {
   if (ctx.role === "Client Viewer")
     throw new ApiError(403, "Client Viewers have read-only access");
+}
+/**
+ * An Engagement Quality Reviewer changes nothing but the quality review
+ * (lib/domain/quality-review.ts): every other engagement write refuses them,
+ * whatever the op's own checks would say.
+ */
+export function refuseQualityReviewer(ctx: Context, op: string) {
+  if (ctx.role === qualityReviewerRole && !qualityReviewerOps.includes(op))
+    throw new ApiError(
+      403,
+      "An Engagement Quality Reviewer reviews the engagement but cannot change its audit work",
+    );
 }

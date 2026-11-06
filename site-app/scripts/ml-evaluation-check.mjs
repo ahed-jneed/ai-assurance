@@ -66,7 +66,7 @@ for (const c of golden.cases) {
     decided++;
   });
 }
-assert.equal(decided, 44, "every hosted golden criterion is checked");
+assert.equal(decided, 46, "every hosted golden criterion is checked");
 
 // 2. Saved-prediction evaluation decides by interval, with n and an interval for every metric.
 const config = configSchema.parse({
