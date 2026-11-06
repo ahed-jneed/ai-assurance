@@ -27,7 +27,8 @@ The audit criteria stop being one fixed catalogue and become versioned data. The
    - Nothing contrary may be related to it: no exception, no qualified conclusion, no open work and no unresolved finding on any related source.
    - Readiness conclusions give "Covered (readiness)", never an applicable-law "Covered".
    - Partial contributions never add up to full. Crosswalks are not transitive. Exceptions, qualifications and open work propagate conservatively, and a qualification inherited from a group keeps capping the cell wherever its state is used. Links migrated from the catalogue claim partial overlap only.
-   - Section 9 defines the eight cell states, the algorithm and a 55-case truth table. A reference prototype passed all 55 cases and 190,000 randomised weakenings from two generators.
+   - A group rolls up to covered only when it is exhaustive, every nested group is exhaustive or covered by a full link of its own, and every requirement in it is covered or approved not applicable at full strength. A partial not-applicable link never completes a roll-up.
+   - Section 9 defines the eight cell states, the algorithm and a 61-case truth table. A reference prototype passed all 61 cases and 190,000 randomised weakenings from two generators.
 7. **Licensing is data.** Each framework declares its text policy (`full_text`, `paraphrased_titles` or `identifiers_only`) and whether that position is confirmed. The schema forbids stored text and long titles for ISO and CEN-CENELEC standards, and the validator blocks release while a licence is unconfirmed. AIUC-1 stays out until AIUC grants a licence.
 8. **Loading follows #3.** The canonical documents are copied into `site-app` at build time by the #3 sync script, as one generated bundle checked in CI. A server-only loader serves projections to the client.
 9. **Six phases.** Phase 1 is one pull request (#27): data model, validation, loader, the pack #1 migration, the pack features, pack selection and the coverage view. Phase 2 is #61, phases 4 and 5 are #28 to #30, and phases 3 and 6 are on the Later list of `ROADMAP.md` (section 17).
@@ -387,7 +388,8 @@ cellState(C, K, parentOnly):         C = contributions placed on one node; K = c
   capped = K is not empty            returned with every state below
   if C is empty:                     return parentOnly ? parent_only : unmapped
   S = C without excluded and not_applicable contributions
-  if S is empty:                     return any not_applicable in C ? not_applicable : excluded
+  if S is empty:                     return any not_applicable in C ? not_applicable : excluded,
+                                                     naFull = some full-strength not_applicable c in C
   if any c in S is not_supported:    return exception
   if any c in S is open:             return open
   F = the full-strength, supported contributions in S
@@ -426,15 +428,21 @@ cellState(C, K, parentOnly):         C = contributions placed on one node; K = c
 
 `exception` and `open` cells carry the mark too, but nothing reads it there: their own state already blocks more than a cap does.
 
+**Not applicable at full strength.** A `not_applicable` cell also records `naFull`: whether a full-strength (`equal` or `superset_of`) contribution from a not-applicable source reaches it, directly or from a group. Only such a cell can stand in for a covered one in a roll-up or a `full` group endpoint (sections 9.5 and 9.6). A `subset_of` or `intersects_with` link from a not-applicable source approves only part of the requirement as not applicable and says nothing about the rest, so it can never complete a "Covered" group (case 58). A crosswalk's not-applicable contributions are always partial (section 9.6, step 4), so in a crosswalk view only `full` cells count. Without this rule, a weakening could turn an exhaustive T group into "Covered": the weakened group link stops reaching an A child, the child falls back to `not_applicable` on its own not-applicable link, and a partial crosswalk entry then makes the T requirement `not_applicable` as well (cases 56 and 57, found in re-review round 3).
+
 ### 9.5 Groups
 
 A group row shows:
 
 - counts by state over its requirement descendants;
 - its group-level contributions, summarised with the same cell function (the group-level summary);
-- a roll-up state, which can only be `full`, and only when `exhaustive` is true and every requirement descendant is `full`, or `not_applicable` and not capped, with at least one `full`. The roll-up is readiness when any of those `full` descendants is. A capped `not_applicable` descendant does not count, because the qualification that caps it may concern it (case 53).
+- a roll-up state, which can only be `full`, and only when `exhaustive` is true and:
+  - every requirement descendant *passes*: it is `full`, or it is `not_applicable`, not capped and `naFull` (section 9.4), with at least one `full`. A capped `not_applicable` descendant does not pass, because the qualification that caps it may concern it (case 53), and neither does one reached only by partial not-applicable contributions (case 58);
+  - every group between G and those descendants (every nested group of G) is `exhaustive` or has a `full` group-level summary. A nested group that is not exhaustive lists only some of its parts, and only a full link on that group claims the parts it does not list (case 59).
 
-Otherwise there is no single group colour, only the counts. A selective child list proves nothing about the parts of the group it does not list. A full-strength link on the group itself is different: it claims the whole group, which is why its summary can be `full` and why it reaches every child (invariant 5).
+  The roll-up is readiness when any of those `full` descendants is, or when a nested group that is not exhaustive passes through a `full` (readiness) summary (case 61).
+
+Otherwise there is no single group colour, only the counts. A selective child list proves nothing about the parts of the group it does not list, at any depth. A full-strength link on the group itself is different: it claims the whole group, which is why its summary can be `full` and why it reaches every child (invariant 5).
 
 ### 9.6 Crosswalk view
 
@@ -458,11 +466,11 @@ Otherwise there is no single group colour, only the counts. A selective child li
 
 1. **Select crosswalks** as above. Keep entries whose rationale is `semantic` or `functional`. Orient each entry Ai → T, inverting single-source entries authored T → Ai and dropping multi-source ones in that direction.
 2. **Weakest wins.** For each (sources, target) pair, keep the weakest strength.
-3. **Source endpoint states.** For each A-side source, use its cell state in the criteria view, and treat `unmapped` and `parent_only` as no evidence. A requirement endpoint carries its cell's `readiness`, `qualified` and `capped` flags as section 9.4 computes them: a `partial` cell with a qualified contribution or a cap is marked `qualified` even when it would be partial without it (case 50), and a capped cell stays capped in every state, no evidence included (case 51). For a group endpoint G, take G's group-level summary and the cells of its requirement descendants, its *members*. G is capped when any member is capped, and it is:
-   - `exception` if any member is an exception;
-   - otherwise `open` if any is open;
-   - otherwise `full` if every requirement descendant is `full`, or `not_applicable` and not capped, with at least one `full`, and either G is `exhaustive` (the roll-up) or G's group-level summary is `full` (a full link on G itself, invariant 5). It is readiness unless the summary is an applicable-law `full` or, for an exhaustive G, every `full` descendant is applicable-law;
-   - otherwise `partial` if any member is covered or partly covered: readiness when all of those are, `qualified` when any member carries the `qualified` flag or G is capped (case 52);
+3. **Source endpoint states.** For each A-side source, use its cell state in the criteria view, and treat `unmapped` and `parent_only` as no evidence. A requirement endpoint carries its cell's `readiness`, `qualified` and `capped` flags as section 9.4 computes them: a `partial` cell with a qualified contribution or a cap is marked `qualified` even when it would be partial without it (case 50), and a capped cell stays capped in every state, no evidence included (case 51). For a group endpoint G, take G's group-level summary together with the cells of its requirement descendants, its *members*. Each bullet below reads the summary and the members alike, so a group whose only evidence is its own partial link is a partial endpoint (case 60). G is capped when the summary or any member is capped, and it is:
+   - `exception` if the summary or any member is an exception;
+   - otherwise `open` if any of them is open;
+   - otherwise `full` if every requirement descendant passes as in section 9.5 (`full`, or `not_applicable`, not capped and `naFull`), with at least one `full`, and either the roll-up holds (G is `exhaustive` and every nested group is `exhaustive` or has a `full` summary) or G's group-level summary is `full` (a full link on G itself, invariant 5). It is readiness unless the summary is an applicable-law `full` or the roll-up holds and is applicable-law (section 9.5);
+   - otherwise `partial` if the summary or any member is covered or partly covered: readiness when all of those are, `qualified` when any of them carries the `qualified` flag or G is capped (case 52);
    - otherwise `not_applicable`, `excluded` or no evidence, in that order.
 4. **Compose one contribution per entry:**
    - `not_supported` if any source endpoint is an exception;
@@ -479,31 +487,34 @@ Otherwise there is no single group colour, only the counts. A selective child li
 1. A cell is `full` only through a chain of full-strength, released links from a supported, reviewed conclusion, and applicable-law `full` (without "(R)") only when that chain starts from an applicable-law conclusion.
 2. Partial contributions never combine into `full`, through several objectives, several crosswalk entries or several rationales.
 3. A weakening never turns a cell, a group endpoint or a roll-up into `full`, so it never increases the count of covered requirements. Nor does it turn a `full` (readiness) result into an applicable-law `full`, with one exception:
-   - When a weakening makes a full-strength supported contribution on a group partial, the contribution stops reaching the children (section 9.3). A child for which it was the only in-scope contribution falls back to `not_applicable` when a not-applicable source also reaches it.
+   - When a weakening makes a full-strength supported contribution on a group partial, the contribution stops reaching the children (section 9.3). A child for which it was the only in-scope contribution falls back to `not_applicable` when a not-applicable source also reaches it. Only a full-strength not-applicable contribution lets that child pass in a roll-up (section 9.5); a partial one ends the roll-up instead (cases 56 to 58).
    - A roll-up or group endpoint over that child then rests on its other descendants and can lose its "(R)", and so can a crosswalk cell reached through that endpoint (cases 54 and 55).
    - Nothing is overclaimed: the result rests on the remaining applicable-law conclusions and not-applicable approvals, meets invariant 1, and is what removing the readiness claim on that child would give.
 
-   A weakening is: replacing a relationship with one of lower strength that still relates the two (for example `superset_of` to `intersects_with`); a clamp (migrated, draft, withdrawn); a supported conclusion becoming qualified; a conclusion becoming not supported or open; a new unresolved finding; or an applicable-law conclusion becoming readiness. This is property-tested with the two generators of section 9.8, one of which plants the patterns of cases 50 to 53. A scenario in which the weakening moves some requirement from `full` (readiness) to `not_applicable` is exempt from the readiness clause, and only from it. Removing a relation (`no_relationship`, or a syntactic-only entry) is not a weakening: it can legitimately remove an exception, because the reviewer has decided that the source is unrelated.
+   A weakening is: replacing a relationship with one of lower strength that still relates the two (for example `superset_of` to `intersects_with`); a clamp (migrated, draft, withdrawn); a supported conclusion becoming qualified; a conclusion becoming not supported or open; a new unresolved finding; or an applicable-law conclusion becoming readiness. This is property-tested with the two generators of section 9.8, one of which plants the patterns of cases 50 to 53, 56 and 57. A scenario in which the weakening moves some requirement from `full` (readiness) to `not_applicable` is exempt from the readiness clause, and only from it. Removing a relation (`no_relationship`, or a syntactic-only entry) is not a weakening: it can legitimately remove an exception, because the reviewer has decided that the source is unrelated.
 4. No transitivity across crosswalks.
-5. A group is `full` only through an exhaustive roll-up or a full link on the group itself, as a crosswalk endpoint too (cases 31 and 48).
+5. A group is `full` only through an exhaustive roll-up, whose nested groups are each exhaustive or covered by a full link of their own, or through a full link on the group itself, as a crosswalk endpoint too (cases 31, 48, 59 and 61).
 6. `unmapped` is never counted as an exception or as covered.
 7. Legal effects (presumption of conformity) are badges and never change a state.
 8. Summaries are counts by state with the denominator, with readiness results counted separately and never added to applicable-law counts. If a percentage is shown, it is "fully covered: n of N"; partial is never added to it.
 
 ### 9.8 Golden truth table
 
-These are the phase 1 Vitest cases. A scratch reference implementation of sections 9.1 to 9.6 passed all 55, and two randomised tests of invariant 3 with its exception:
+These are the phase 1 Vitest cases. A scratch reference implementation of sections 9.1 to 9.6 passed all 61, and two randomised tests of invariant 3 with its exception:
 
-- **The planted generator:** 30,000 weakenings (seeds 20261105, 7 and 42, 10,000 scenarios each, 938,504 cell, endpoint and roll-up checks) over random trees with nested and exhaustive groups, random sources, links and crosswalk entries in both directions. In 40 % of the scenarios it also plants one of four patterns, each in 10 %, and in half of those it weakens the planted link:
+- **The planted generator:** 30,000 weakenings (seeds 20261105, 7 and 42, 10,000 scenarios each, 1,004,346 cell, endpoint and roll-up checks) over random trees with nested and exhaustive groups, random sources, links and crosswalk entries in both directions. In 60 % of the scenarios it also plants one of six patterns, each in 10 %, and in half of those it weakens the planted link:
   - the pattern of case 50: an A cell with a full supported link and a qualified link, crossed full-strength to a T requirement that another full A cell also reaches; the weakening hits the supported link;
-  - the patterns of cases 51 to 53 before their weakening, each with a qualified link at full strength: on a group whose child has no link of its own and is crossed to T (51); on a nested group inside a non-exhaustive group that is crossed to T (52); or on a nested group inside an exhaustive group that is crossed to T, the nested group's child having only a not-applicable link (53). Each crossing has a second, full A→T entry for the same T requirement, and the weakening lowers or clamps the qualified link.
+  - the patterns of cases 51 to 53 before their weakening, each with a qualified link at full strength: on a group whose child has no link of its own and is crossed to T (51); on a nested group inside a non-exhaustive group that is crossed to T (52); or on an exhaustive nested group inside an exhaustive group that is crossed to T, the nested group's child having only a not-applicable link (53). Each crossing has a second, full A→T entry for the same T requirement, and the weakening lowers or clamps the qualified link;
+  - the patterns of cases 56 and 57 before their weakening, each with a supported link at full strength and a T side that is an exhaustive group over t1 and t2: on a non-exhaustive group whose child also has an `equal` link from a not-applicable source and is crossed partially to t1 (56); or on a nested group inside a non-exhaustive group, the nested child having an `equal` link from a not-applicable source and the outer group being crossed `equal` to t1 (57). In both, a full A leaf is crossed `equal` to t2, and the weakening lowers or clamps the supported link.
 - **A denser generator, without planting:** 160,000 weakenings (seeds 1 to 16, 4,862,916 checks) with more group links, nested groups, qualified, not-applicable and readiness sources on groups, and crosswalk entries that share targets. The exception of invariant 3 applied in 49 scenarios and was needed in one, which has the shape of case 55.
 
-Cases 1 to 34 are those of the first draft, 35 to 49 were added after the review, 50 after re-review round 1, and 51 to 55 after round 2. Under the first draft's rules, 35, 39 to 41, 43 and 46 to 53 fail; under round 1's rules, 51 to 53 fail. The property tests also showed that these rules are needed:
+Cases 1 to 34 are those of the first draft, 35 to 49 were added after the review, 50 after re-review round 1, 51 to 55 after round 2 and 56 to 61 after round 3. Under the first draft's rules, 35, 39 to 41, 43, 46 to 53, 56 to 59 and 61 fail; under round 1's rules, 51 to 53, 56 to 59 and 61; under round 2's rules, 56 to 59 and 61. Case 60 passes under round 2's rules too: it pins the reading of 9.6 step 3, in which the bullets read the group-level summary. The property tests and the cases also showed that these rules are needed:
 
-- the cap of section 9.3: without it, clamping a qualified group link lifts the qualification off the children, and the planted generator fails within the first 3 scenarios of each seed;
-- the `qualified` flag of section 9.4: with the causal reading instead, case 50 gives "full", and the planted generator fails within the first 25 scenarios of each seed;
-- each of the three uses of the `capped` mark (section 9.4). Without the crosswalk rule, without the group endpoint's mark or without the not-applicable rule, case 51, 52 or 53 gives "full" (for 53, a full roll-up), and the planted generator fails within the first 82, 14 or 33 scenarios of each seed. Round 1's generator planted only case 50's pattern and passed without the mark; the denser generator finds the gap in 9 of its 160,000 scenarios.
+- the cap of section 9.3: without it, clamping a qualified group link lifts the qualification off the children, and the planted generator fails within the first 2 scenarios of each seed;
+- the `qualified` flag of section 9.4: with the causal reading instead, case 50 gives "full", and the planted generator fails within the first 92 scenarios of each seed;
+- each of the three uses of the `capped` mark (section 9.4). Without the crosswalk rule, without the group endpoint's mark or without the not-applicable rule, case 51, 52 or 53 gives "full" (for 53, a full roll-up), and the planted generator fails within the first 6, 4 or 49 scenarios of each seed. Round 1's generator planted only case 50's pattern and passed without the mark; the denser generator finds the gap in 9 of its 160,000 scenarios;
+- the `naFull` rule of section 9.4: without it, cases 56 to 58 give a full roll-up, and the planted generator fails within the first 6 scenarios of each seed. Neither generator of round 2 met this pattern, and the denser generator still does not;
+- the nested-group rule of section 9.5: without it, cases 59 and 61 give a full, applicable-law roll-up. No weakening reaches this gap, because the roll-up is already overstated before it, so only the cases test it.
 
 "Readiness source" means a conclusion with applicability `readiness`; every other source is applicable-law.
 
@@ -561,9 +572,15 @@ Cases 1 to 34 are those of the first draft, 35 to 49 were added after the review
 | 50 | as 49, with the A cell's supported link weakened to `intersects_with`, so that the A cell is partial even without its qualified source | T partial (the `qualified` flag travels) |
 | 51 | `intersects_with` group link whose source is qualified; the child has no link of its own (capped, `parent_only`) and is crossed `equal` to T, plus another full A→T entry for the same T requirement | T partial (the cap travels) |
 | 52 | non-exhaustive A group with a full child and a nested group that a qualified source links with `intersects_with`; the group is crossed `equal` to T, plus another full A→T entry for the same T requirement | T partial (a capped member makes the group endpoint qualified) |
-| 53 | exhaustive group with a full child and a nested group that a qualified source links with `intersects_with`; the nested group's child has only an `equal` link from a not-applicable source | child not_applicable (capped), no roll-up |
+| 53 | exhaustive group with a full child and an exhaustive nested group that a qualified source links with `intersects_with`; the nested group's child has only an `equal` link from a not-applicable source | child not_applicable (capped), no roll-up |
 | 54 | exhaustive group with two children: one has its own `equal` link from a supported applicable-law source; the group has `equal` links from a not-applicable source and from a supported readiness source | other child full (readiness), roll-up full (readiness) |
 | 55 | as 54, with the readiness link weakened to `intersects_with` | other child not_applicable, roll-up full (the exception to invariant 3) |
+| 56 | non-exhaustive A group with an `intersects_with` link from a supported source; its child has an `equal` link from a not-applicable source and is crossed `intersects_with` to t1, and a full A leaf is crossed `equal` to t2, where t1 and t2 make up an exhaustive T group | t1 not_applicable, no T roll-up |
+| 57 | non-exhaustive A group G whose nested group has an `intersects_with` link from a supported source; the nested child has an `equal` link from a not-applicable source; G is crossed `equal` to t1, and a full A leaf `equal` to t2, of an exhaustive T group | t1 not_applicable, no T roll-up |
+| 58 | exhaustive group: one child full; the other child's only link is `intersects_with` from a not-applicable source | other child not_applicable, no roll-up |
+| 59 | exhaustive group with a full child and a non-exhaustive nested group whose listed child is full; the group is crossed `equal` to T | no roll-up, T partial |
+| 60 | group whose only evidence is its own `intersects_with` link from a supported source, children without links; the group is crossed `equal` to T | T partial |
+| 61 | as 59, with an `equal` link on the nested group from a supported readiness source | roll-up full (readiness), T full (readiness) |
 
 ### 9.9 What pack #1 shows on day one
 
