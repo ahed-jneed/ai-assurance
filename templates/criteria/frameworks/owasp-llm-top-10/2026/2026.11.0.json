@@ -1,0 +1,115 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "owasp-llm-top-10",
+  "edition": "2026",
+  "version": "2026.11.0",
+  "title": "OWASP Top 10 for LLM Applications 2026",
+  "shortTitle": "OWASP LLM Top 10 2026",
+  "kind": "framework",
+  "publisher": "OWASP GenAI Security Project",
+  "jurisdiction": "international",
+  "status": "published",
+  "editionDate": "2026-08-03",
+  "researchedAsOf": "2026-11-07",
+  "sources": [
+    {
+      "role": "publisher_page",
+      "url": "https://genai.owasp.org/resource/owasp-genai-llm-top-10-2026/"
+    },
+    {
+      "role": "official_text",
+      "url": "https://genai.owasp.org/download/56857/",
+      "title": "OWASP Top 10 for LLM Applications 2026 (PDF, 122 pages)"
+    }
+  ],
+  "licence": {
+    "holder": "OWASP Foundation",
+    "textPolicy": "paraphrased_titles",
+    "status": "confirmed",
+    "basis": "The document is licensed under CC BY-SA 4.0 (its page 2). The platform stores the entry identifiers and entry names with attribution and no other text of the document.",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode",
+    "attribution": "OWASP Top 10 for LLM Applications 2026, OWASP GenAI Security Project, CC BY-SA 4.0"
+  },
+  "defaultProvenance": {
+    "source": "https://genai.owasp.org/download/56857/",
+    "sourceKind": "standard_text",
+    "verification": "verified",
+    "checkedAt": "2026-11-07",
+    "legalReview": "not_required",
+    "note": "Identifiers, names and order read from the table of contents of the official PDF linked from the OWASP resource page (published 3 August 2026, v1.0) for #33. The PDF's cover still reads 'Publication date to be set'."
+  },
+  "requirements": [
+    {
+      "id": "LLM01",
+      "ref": "LLM01:2026",
+      "title": "Prompt Injection",
+      "type": "requirement",
+      "aliases": ["LLM01"]
+    },
+    {
+      "id": "LLM02",
+      "ref": "LLM02:2026",
+      "title": "Sensitive Information Disclosure",
+      "type": "requirement",
+      "aliases": ["LLM02"]
+    },
+    {
+      "id": "LLM03",
+      "ref": "LLM03:2026",
+      "title": "Excessive Agency",
+      "type": "requirement",
+      "aliases": ["LLM03"]
+    },
+    {
+      "id": "LLM04",
+      "ref": "LLM04:2026",
+      "title": "Supply Chain",
+      "type": "requirement",
+      "aliases": ["LLM04"]
+    },
+    {
+      "id": "LLM05",
+      "ref": "LLM05:2026",
+      "title": "Data and Model Poisoning",
+      "type": "requirement",
+      "aliases": ["LLM05"]
+    },
+    {
+      "id": "LLM06",
+      "ref": "LLM06:2026",
+      "title": "Unbounded Consumption",
+      "type": "requirement",
+      "aliases": ["LLM06"]
+    },
+    {
+      "id": "LLM07",
+      "ref": "LLM07:2026",
+      "title": "Misinformation",
+      "type": "requirement",
+      "aliases": ["LLM07"]
+    },
+    {
+      "id": "LLM08",
+      "ref": "LLM08:2026",
+      "title": "Hidden Context Exposure",
+      "type": "requirement",
+      "aliases": ["LLM08"]
+    },
+    {
+      "id": "LLM09",
+      "ref": "LLM09:2026",
+      "title": "Vector and Embedding Weaknesses",
+      "type": "requirement",
+      "aliases": ["LLM09"]
+    },
+    {
+      "id": "LLM10",
+      "ref": "LLM10:2026",
+      "title": "Improper Output Handling",
+      "type": "requirement",
+      "aliases": ["LLM10"]
+    }
+  ],
+  "notes": "Entry identifiers and names only. Tools tag findings with older numberings (garak uses the 2023 list, promptfoo the 2025 list); the engine translates tags by entry name, never by number (docs/design/genai-evidence.md section 9.3). The official 2026 text lists model extraction and distillation theft under LLM06 Unbounded Consumption, which confirms the translation of garak's 2023 owasp:llm10 Model Theft tag to LLM06."
+}
