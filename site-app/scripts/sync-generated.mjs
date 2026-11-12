@@ -40,6 +40,7 @@ const COPIES = [
   ["docs/obligation-subitems.json", "site-app/lib/obligation-subitems.json"],
   ["engine/assurance.py", "site-app/public/tools/assurance-verifier.py"],
   ["schemas/threshold-library.json", "site-app/lib/threshold-library.json"],
+  ["schemas/threshold-library.json", "engine/threshold-library.json"],
 ];
 const RUNTIME_ZIP = "site-app/public/tools/assurance-runtime.zip";
 

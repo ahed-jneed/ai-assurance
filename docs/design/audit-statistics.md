@@ -834,7 +834,7 @@ The derivation reads one fact from the data: for a multiclass task, k, the numbe
 
 ### 10.1 Library entries
 
-Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); the hosted runner reads its generated copy and `engine/statistics.py` mirrors the entries a criterion can reference, which `engine/tests/test_threshold_library.py` checks.
+Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); both runners read generated copies of it (`npm run sync`): the hosted runner `site-app/lib/threshold-library.json`, and `engine/statistics.py` `engine/threshold-library.json`, from which it loads the entries a criterion can reference (#113; the copy sits in `engine/` so that the compute image built from that folder carries it). `engine/tests/test_threshold_library.py` checks the copy and the loaded entries.
 - A plan references an entry by `id` and `version` and stores the parameter values (section 9.1).
 - Every result that uses an entry MUST show its `legalStatus` label and `caveat` text verbatim. `decision.libraryEntry` carries both.
 - The run schema's `threshold.source` stays `"internal_policy"`, because the auditor adopts every entry as an internal acceptance rule.

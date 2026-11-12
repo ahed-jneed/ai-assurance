@@ -13,10 +13,13 @@ from .worker_contract import WORKER_VERSION, TRANSLATION_VERSION
 
 EXCLUDED = {'__pycache__', '.test-tmp', '.venv', 'worker-jobs', 'node_modules', '.git'}
 ENGINE_SPECIAL = {'Dockerfile', '.dockerignore', '.gitignore'}
+# Data the engine loads at run time: the generated copy of schemas/threshold-library.json (npm run sync), which
+# engine/statistics.py reads, so that the compute image built from engine/ alone carries the library (#113).
+ENGINE_DATA = {'threshold-library.json'}
 EXAMPLES = {'predictions.csv', 'reference.csv', 'config.json', 'report.json', 'report-v1.1.json',
     'report-v1.1.1.json', 'report-v1.3.json', 'generate_fixture.py'}
 # Hand-maintained input that schemas/.build-run-schema.py generates test-run.schema.json from.
-# The threshold library is data the hosted runner copies and the engine mirrors (#22).
+# The canonical threshold library; both runners load generated copies of it (#22, #113).
 SCHEMA_INPUTS = {'test-run.base.json', 'threshold-library.json'}
 SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'hosted-runs.v1.4.json', 'hosted-api-runs.v1.4.json', 'external-runs.v1.2.json', 'external-runs.v1.5.json', 'procedure-execution.json', 'genai-result.example.json'}
 # Engine tests, their fixtures and the scripts that generate those fixtures stay
@@ -44,6 +47,7 @@ def sources(root):
                     allowed = file.parent == base/'examples' and file.name in EXAMPLES
                 else:
                     allowed = file.suffix in {'.py', '.md'} or file.name in ENGINE_SPECIAL or file.name in {'requirements.txt', 'requirements-optional.txt'}
+                    allowed = allowed or file.parent == base and file.name in ENGINE_DATA
             else:
                 allowed = file.parent == base and (file.suffix in {'.py', '.mjs', '.md'} or file.name.endswith('.schema.json')
                     or file.name in SCHEMA_INPUTS)
