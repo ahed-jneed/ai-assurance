@@ -39,6 +39,15 @@ vi.mock("../assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
+// The practice's report settings are read from D1; none are set here.
+vi.mock("../report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
+}));
+
 const PACK = "en18286-iso42001";
 const as = (userId: string, role: Parameters<typeof caller>[0]) => {
   const c = caller(role);

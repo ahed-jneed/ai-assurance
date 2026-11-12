@@ -2,7 +2,10 @@
 // conclusion a report expresses, as data. ISAE 3000 (Revised) distinguishes
 // limited from reasonable assurance and unmodified from modified (qualified,
 // adverse, disclaimer) conclusions; agreed-upon procedures and readiness
-// assessments are not assurance engagements and say so. The wording below is
+// assessments are not assurance engagements and say so. A readiness
+// assessment either states readiness (strict gates) or reports the gaps it
+// identified (no evidence gates, a "Gaps identified" section required),
+// labelled as not assurance either way. The wording below is
 // our own drafting around the conventional report phrases; no standard text is
 // reproduced (D-03).
 //
@@ -25,6 +28,7 @@ export const conclusionTypeIds = [
   "adverse",
   "disclaimer",
   "readiness",
+  "readiness_gaps",
   "factual_findings",
   "certification_recommended",
   "certification_deferred",
@@ -47,6 +51,7 @@ export type AssuranceLevel = (typeof assuranceLevelIds)[number];
 export type ConclusionType = (typeof conclusionTypeIds)[number];
 type AssuranceConclusion =
   "unmodified" | "qualified" | "adverse" | "disclaimer";
+type NonAssuranceConclusion = Exclude<ConclusionType, AssuranceConclusion>;
 const isAssuranceConclusion = (c: ConclusionType): c is AssuranceConclusion =>
   ["unmodified", "qualified", "adverse", "disclaimer"].includes(c);
 
@@ -62,8 +67,32 @@ export type ReportParticulars = {
   addressee: string;
   location: string;
   signatory: string;
-  /** Required for a qualified, adverse or disclaimer conclusion. */
+  /**
+   * Required for a qualified, adverse or disclaimer conclusion, where it is
+   * the basis for the modification, and for a readiness assessment with gaps,
+   * where it describes the gaps identified.
+   */
   basisForModification: string;
+  /**
+   * The firm's independence and quality-management statement as this report
+   * prints it: the practice's setting unless the report overrides it.
+   */
+  qualityStatement: string;
+};
+/**
+ * The practice's report settings (management op setReportSettings): what a
+ * new report states unless the Lead Auditor overrides it. Empty means not
+ * set; an unset quality statement falls back to `qualityStatement`.
+ */
+export type PracticeReportSettings = {
+  signatory: string;
+  location: string;
+  qualityStatement: string;
+};
+export const emptyReportSettings: PracticeReportSettings = {
+  signatory: "",
+  location: "",
+  qualityStatement: "",
 };
 
 export const engagementTypes: Record<
@@ -126,7 +155,7 @@ export const engagementTypes: Record<
     assurance: false,
     standard:
       "No assurance standard applies: an advisory readiness assessment under our methodology",
-    conclusions: ["readiness"],
+    conclusions: ["readiness", "readiness_gaps"],
     subject: "underlying",
     guidance:
       "An advisory view of preparedness against the criteria. It is not assurance and must not be presented as such.",
@@ -205,6 +234,13 @@ export const conclusionTypes: Record<
     modified: false,
     guidance:
       "States readiness against the criteria. Open High or Critical findings, unsupported conclusions and scope limitations block it.",
+  },
+  readiness_gaps: {
+    label: "Readiness assessment, gaps identified (not assurance)",
+    requiresSupport: false,
+    modified: false,
+    guidance:
+      "Reports the gaps identified against the criteria, such as open High or Critical findings or unsupported conclusions, instead of stating readiness. Describe the gaps; the report is labelled as not assurance.",
   },
   factual_findings: {
     label: "Factual findings (not assurance)",
@@ -288,7 +324,7 @@ const assuranceWording: Record<
   },
 };
 const nonAssuranceWording: Record<
-  "readiness" | "factual_findings" | CertificationConclusion,
+  NonAssuranceConclusion,
   { heading: string; basis?: string; text: string }
 > = {
   certification_recommended: {
@@ -309,6 +345,12 @@ const nonAssuranceWording: Record<
     heading: "Readiness assessment — not an assurance engagement",
     text: "This report describes the readiness of {subject} against {criteria} as we observed it during the engagement. It is not an assurance engagement: we express no opinion or conclusion that provides assurance.",
   },
+  readiness_gaps: {
+    heading:
+      "Readiness assessment, gaps identified — not an assurance engagement",
+    basis: "Gaps identified",
+    text: "This report describes the readiness of {subject} against {criteria} as we observed it during the engagement and the gaps we identified, which the Gaps identified section and the results by criterion describe. It is not an assurance engagement: we express no opinion or conclusion that provides assurance, and the report does not state that the subject matter is ready.",
+  },
   factual_findings: {
     heading: "Factual findings — not an assurance engagement",
     text: "We performed the procedures agreed with the engaging party on {subject} and report the factual findings below. This is not an assurance engagement: we express no opinion or conclusion.",
@@ -328,7 +370,11 @@ export const practitionerResponsibility: Record<EngagementType, string> = {
   readiness:
     "Our responsibility is to assess readiness against the criteria using our methodology and to report what we observed.",
 };
-/** The firm's independence and quality-management statement. */
+/**
+ * The independence and quality-management statement a report prints when the
+ * practice has set none of its own; every report captured before practice
+ * report settings existed printed it.
+ */
 export const qualityStatement =
   "We complied with the independence and other ethical requirements of the IESBA International Code of Ethics for Professional Accountants (including International Independence Standards), and our firm applies ISQM 1, which requires a system of quality management.";
 /**
@@ -337,11 +383,17 @@ export const qualityStatement =
  */
 export const certificationQualityStatement =
   "The audit team complied with the impartiality and competence requirements of ISO/IEC 17021-1 for this audit, and no member had a threat to impartiality that was not resolved before the audit.";
-/** The independence and quality statement a report of this type states. */
-export function qualityStatementFor(engagementType: string | undefined) {
-  return engagementType === "certification"
-    ? certificationQualityStatement
-    : qualityStatement;
+/**
+ * The independence and quality statement a report of this type states: the
+ * practice's own for an assurance or other report, else the default; always
+ * the ISO/IEC 17021-1 statement for a certification audit.
+ */
+export function qualityStatementFor(
+  engagementType: string | undefined,
+  practiceStatement?: string,
+) {
+  if (engagementType === "certification") return certificationQualityStatement;
+  return practiceStatement?.trim() || qualityStatement;
 }
 
 /** The conclusion a legacy (pre-v2) opinion string corresponds to. */
@@ -376,7 +428,10 @@ export function snapshotTerms(snapshot: Record<string, unknown>) {
     ? (t as ReportTerms)
     : null;
 }
-/** The particulars a v2 snapshot recorded. */
+/**
+ * The particulars a v2 snapshot recorded. A snapshot captured before practice
+ * report settings printed the fixed `qualityStatement`.
+ */
 export function snapshotParticulars(
   snapshot: Record<string, unknown>,
 ): ReportParticulars {
@@ -386,8 +441,63 @@ export function snapshotParticulars(
     location: String(p.location ?? ""),
     signatory: String(p.signatory ?? ""),
     basisForModification: String(p.basisForModification ?? ""),
+    qualityStatement: String(p.qualityStatement || qualityStatement),
   };
 }
+/** Practice report settings as stored; anything malformed reads as unset. */
+export function parseReportSettings(raw: unknown): PracticeReportSettings {
+  let value: unknown = raw;
+  if (typeof raw === "string")
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      value = null;
+    }
+  const o = (value && typeof value === "object" ? value : {}) as Record<
+      string,
+      unknown
+    >,
+    field = (k: keyof PracticeReportSettings) => {
+      const v = o[k];
+      return typeof v === "string" ? v.trim() : "";
+    };
+  return {
+    signatory: field("signatory"),
+    location: field("location"),
+    qualityStatement: field("qualityStatement"),
+  };
+}
+/**
+ * The particulars a report states: what the Lead Auditor entered and, for a
+ * signatory, location or quality statement left blank, the practice's
+ * setting; an unset quality statement falls back to `qualityStatement`.
+ */
+export function resolveParticulars(
+  stated: Omit<ReportParticulars, "qualityStatement"> & {
+    qualityStatement?: string;
+  },
+  settings: PracticeReportSettings = emptyReportSettings,
+): ReportParticulars {
+  const pick = (value: string | undefined, fallback: string) =>
+    value?.trim() ? value.trim() : fallback;
+  return {
+    addressee: stated.addressee,
+    location: pick(stated.location, settings.location),
+    signatory: pick(stated.signatory, settings.signatory),
+    basisForModification: stated.basisForModification,
+    qualityStatement: pick(
+      stated.qualityStatement,
+      settings.qualityStatement || qualityStatement,
+    ),
+  };
+}
+/**
+ * Whether the report must state a section of its own for the conclusion: the
+ * basis for a modified conclusion, or the gaps a readiness assessment
+ * identified.
+ */
+export const statesBasis = (c: ConclusionType) =>
+  conclusionTypes[c].modified || c === "readiness_gaps";
 /**
  * The conclusion a snapshot's gates are rechecked with on release: the v2
  * conclusion id, or the legacy opinion string.
@@ -470,7 +580,7 @@ export function conclusionStatement(
     : nonAssuranceWording[t.conclusion];
   return {
     heading: w.heading,
-    basisHeading: "basis" in w ? (w.basis ?? "") : "",
+    basisHeading: w.basis ?? "",
     text: w.text
       .replaceAll("{subject}", subjectPhrase)
       .replaceAll("{criteria}", criteria),
