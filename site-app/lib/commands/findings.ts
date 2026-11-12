@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { defaultFindingCriteria, findingCriteriaRefs } from "../criteria/pin";
+import {
+  defaultFindingCriteria,
+  findingArticleOf,
+  findingCriteriaRefs,
+} from "../criteria/pin";
 import { risk, type Finding } from "../domain";
 import { id, now } from "../engagement-repo";
 import { ApiError } from "../http";
@@ -17,7 +21,9 @@ export const findings = defineCommands({
       const a = z
           .object({
             title: short,
-            article: short,
+            // Optional when the finding names its criteria: its primary
+            // reference is then the first criterion's (#144).
+            article: short.optional(),
             condition: text,
             criteria: text,
             cause: z.string().max(5000),
@@ -34,6 +40,7 @@ export const findings = defineCommands({
         { criteriaRefs: refs, ...fields } = a,
         f: Finding = {
           ...fields,
+          article: fields.article ?? "",
           ...risk(a.likelihood, a.impact),
           id: id("F"),
           status: "open" as const,
@@ -79,6 +86,17 @@ export const findings = defineCommands({
             )
           : [];
       if (chosen.length) f.criteriaRefs = chosen;
+      if (!f.article) {
+        const article = chosen.length
+          ? findingArticleOf(e, chosen[0])
+          : undefined;
+        if (!article)
+          throw new ApiError(
+            400,
+            "State the finding's primary reference: an article or a criterion of the pack",
+          );
+        f.article = article;
+      }
       e.findings.push(f);
       return { details: { findingId: f.id, riskScore: f.riskScore } };
     },
