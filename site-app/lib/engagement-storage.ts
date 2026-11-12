@@ -44,17 +44,44 @@ export class IntegrityError extends ApiError {
   }
 }
 
+/**
+ * The R2 keys this request has verified (read back intact) or written, keyed
+ * by the request's Context. Parts are content-addressed, so such a key already
+ * holds exactly the bytes its name promises and dehydrate() does not put it
+ * again: a save after a load writes only the parts that changed.
+ */
+const present = new WeakMap<object, Set<string>>();
+const presentIn = (ctx: Context) =>
+  present.get(ctx) ?? present.set(ctx, new Set()).get(ctx)!;
+
+/**
+ * Moves the engagement's immutable parts to R2 and returns the record to
+ * store in D1, with storage references in their place. A part this request
+ * has already read back intact or written is not put again, and identical
+ * parts are put once.
+ */
 export async function dehydrate(ctx: Context, e: Engagement) {
   const copy = structuredClone(e) as Stored,
-    refs: StorageRefs = { reports: {}, histories: {}, results: {} };
+    refs: StorageRefs = { reports: {}, histories: {}, results: {} },
+    known = presentIn(ctx),
+    writes = new Map<string, Promise<void>>();
   async function put(type: string, value: unknown) {
     const body = JSON.stringify(value),
       hash = await sha256(body),
       key = ctx.tenantId + "/" + e.id + "/immutable/" + type + "/" + hash;
-    await bucket().put(key, body, {
-      httpMetadata: { contentType: "application/json" },
-      customMetadata: { sha256: hash },
-    });
+    if (!known.has(key)) {
+      let write = writes.get(key);
+      if (!write) {
+        write = bucket()
+          .put(key, body, {
+            httpMetadata: { contentType: "application/json" },
+            customMetadata: { sha256: hash },
+          })
+          .then(() => void known.add(key));
+        writes.set(key, write);
+      }
+      await write;
+    }
     return { key, sha256: hash };
   }
   // Written in parallel; the references are assigned in record order, so the
@@ -139,6 +166,7 @@ function read(ctx: Context | undefined, engagementId: string, ref: Ref) {
     const bytes = await o.arrayBuffer();
     if ((await sha256(bytes)) !== ref.sha256)
       throw new IntegrityError(engagementId, "mismatch", ref.key);
+    if (ctx) presentIn(ctx).add(ref.key);
     return new TextDecoder().decode(bytes);
   })();
   cache?.set(ref.key, pending);
