@@ -331,6 +331,18 @@ export const practitionerResponsibility: Record<EngagementType, string> = {
 /** The firm's independence and quality-management statement. */
 export const qualityStatement =
   "We complied with the independence and other ethical requirements of the IESBA International Code of Ethics for Professional Accountants (including International Independence Standards), and our firm applies ISQM 1, which requires a system of quality management.";
+/**
+ * A certification audit is held to the impartiality and competence
+ * requirements of ISO/IEC 17021-1, not to the IESBA Code and ISQM 1.
+ */
+export const certificationQualityStatement =
+  "The audit team complied with the impartiality and competence requirements of ISO/IEC 17021-1 for this audit, and no member had a threat to impartiality that was not resolved before the audit.";
+/** The independence and quality statement a report of this type states. */
+export function qualityStatementFor(engagementType: string | undefined) {
+  return engagementType === "certification"
+    ? certificationQualityStatement
+    : qualityStatement;
+}
 
 /** The conclusion a legacy (pre-v2) opinion string corresponds to. */
 const legacyOpinions: Record<string, ConclusionType> = {
