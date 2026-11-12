@@ -13,6 +13,7 @@ tools/convert-catalog.mjs                           converts templates/catalog.j
 ## What is here
 
 - **Pack #1, `eu-ai-act-amended` 2026.11.2**, and its framework `eu-ai-act` edition `02024R1689-20260727` data version 2026.11.2, converted from methodology 2026.11.2 (rule pack 2026.11.2). Both are released by the methodology owner with the framework's qualified legal review **pending** (decision Q4, option b; D-02). The UI, coverage view and report snapshots say so until a `legal_reviewer` approval is appended to the framework entry (#57).
+- **`nyc-ll144-bias-audit` 2026.11.0** and its framework `nyc-ll144` edition `2023-07-05` (NYC Local Law 144 and 6 RCNY §§ 5-300 to 5-304) data version 2026.11.0, added as data alone by #30 and released by the methodology owner with the legal review **pending**. Section numbers and our own titles only; research and legal-review items in `docs/research/ll144-2026-11.md`.
 - `index.legacy` maps engagements stored before criteria pins existed: engagements without the #18 rule-pack stamp and those stamped `2026.11.1` or `2026.11.2` all resolve to pack #1 2026.11.2, because the build before #27 served the 2026.11.2 catalogue to every engagement. Once on `main` this block is frozen; stamps may only be added (rule 13).
 
 ## Rules

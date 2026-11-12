@@ -1383,6 +1383,7 @@ Regulation and guidance:
 - NYC:
   - [DCWP Notice of Adoption, Local Law 144 rules (6 RCNY §§ 5-300–5-304)](https://www.sidley.com/-/media/resource-pages/ai-monitor/laws-and-regulations/20230406-nyc-dcwp-notice-of-adoption-of-final-rule-for-local-law-144.pdf?la=en) and the [NYC rules page](https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/), effective 5 July 2023. No later amendment was found; this was not re-verified beyond these pages.
   - The § 5-300 definitions and § 5-301(b)(5), (c)(1), (c)(5) and (d) were checked against the unofficial reproduction at [AGORA](https://agora.eto.tech/instrument/2002).
+  - #30 re-checked §§ 5-300 to 5-304 against the DCWP notice of adoption on the City's rules site (12 November 2026); the legal-review items are in `docs/research/ll144-2026-11.md` (LR-LL144-01 to LR-LL144-08).
 
 Statistics:
 - [Wilson 1927](https://doi.org/10.1080/01621459.1927.10502953); [Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286); [Newcombe 1998](https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8%3C873::AID-SIM779%3E3.0.CO;2-I).

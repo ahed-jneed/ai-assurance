@@ -36,6 +36,41 @@
       "releasedAt": "2026-11-06",
       "selectable": true,
       "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
+    },
+    {
+      "documentType": "framework",
+      "id": "nyc-ll144",
+      "edition": "2023-07-05",
+      "version": "2026.11.0",
+      "path": "frameworks/nyc-ll144/2023-07-05/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #30)",
+          "at": "2026-11-12"
+        }
+      ],
+      "legalReview": "pending",
+      "releasedAt": "2026-11-12",
+      "sha256": "e25d25808510cff55cf8a696fd07760c3d8328ee59737c867212df470d287df0"
+    },
+    {
+      "documentType": "pack",
+      "id": "nyc-ll144-bias-audit",
+      "version": "2026.11.0",
+      "path": "packs/nyc-ll144-bias-audit/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #30)",
+          "at": "2026-11-12"
+        }
+      ],
+      "releasedAt": "2026-11-12",
+      "selectable": true,
+      "sha256": "f6ede6d58353983d233c54cdd690a0cc8e3e9b4ee4ec5ec74d8c21d0e2af643c"
     }
   ],
   "defaults": {
