@@ -45,7 +45,7 @@ import {
   revisionWarnings,
   runBindsProcedure,
 } from "@/lib/workflow-state";
-import type { WorkspaceData } from "./workspace-types";
+import { packFeatures, type WorkspaceData } from "./workspace-types";
 import { FrozenReportDetails } from "./report-details";
 import { ProcedureContext } from "./procedure-context";
 import { ProcedureComparison } from "./revision-comparison";
@@ -60,6 +60,16 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import { datasetCardFor } from "@/lib/dataset-card";
 import { acceptanceGates } from "@/lib/workflow/acceptance";
 import { AcceptancePanel } from "./audit-program/acceptance-panel";
+import {
+  Art50StatisticalCriteria,
+  Art50Suggestion,
+} from "./audit-program/art50-plan";
+import { classificationRules } from "@/lib/classification-rules";
+import {
+  art50PaperSuggestion,
+  type PaperSuggestion,
+} from "@/lib/domain/art50-papers";
+import { asRulePack } from "@/lib/rule-pack";
 type Option = {
   value: string;
   label: string;
@@ -494,6 +504,24 @@ export function AuditProgram({
   const name = (id: string) =>
     data.people.find((m) => m.user_id === id)?.display_name ??
     (id ? "Unknown or inactive member" : "Unassigned");
+  // The applicability the classification suggests for an Art 50 paper
+  // (#120); never applied without the auditor saving the plan.
+  const classificationRulesOfPack = classificationRules(
+      asRulePack(data.catalog?.regulatorySnapshot),
+    ),
+    classified = packFeatures(data).aiActClassification,
+    catalogItem = (templateId: string) =>
+      data.catalog?.items.find((i) => i.id === templateId),
+    art50Suggestion = (p: Procedure) => {
+      const item = classified ? catalogItem(p.templateId) : undefined;
+      return item && e.classification
+        ? art50PaperSuggestion(
+            e.classification,
+            classificationRulesOfPack,
+            item,
+          )
+        : null;
+    };
   function draftScope(
     kind: DraftScope["kind"],
     recordId: string,
@@ -563,7 +591,7 @@ export function AuditProgram({
         act("saveBrief", { ...v, independence: b?.independence ?? "" }),
     });
   }
-  function planForm(p: Procedure) {
+  function planForm(p: Procedure, suggestion?: PaperSuggestion) {
     const fields: Field[] = [
       choice(
         "selected",
@@ -575,9 +603,15 @@ export function AuditProgram({
         "applicability",
         "Regulatory applicability",
         options(["pending", "applicable", "readiness", "not_applicable"]),
-        p.applicability,
+        suggestion?.applicability ?? p.applicability,
       ),
-      area("rationale", "Applicability and selection rationale", p.rationale),
+      area(
+        "rationale",
+        "Applicability and selection rationale",
+        suggestion
+          ? [suggestion.rationale, p.rationale].filter(Boolean).join("\n\n")
+          : p.rationale,
+      ),
       area("criterion", "Audit criterion and requirement", p.criterion),
       {
         name: "sourceVersion",
@@ -651,6 +685,9 @@ export function AuditProgram({
       action: "Save plan revision",
       draft: draftScope("procedure-plan", p.id, p),
       description:
+        (suggestion
+          ? "The applicability and a rationale are filled in from the classification's suggestion; review them, then save or cancel. "
+          : "") +
         "Changing what this procedure tests or how returns an approved program to draft and requires this procedure's work to be performed again. Preparer, reviewer and due-date changes keep the program approval and recorded work.",
       fields,
       save: (v) =>
@@ -1367,6 +1404,18 @@ export function AuditProgram({
                       </td>
                       <td data-label="Applicability">
                         {label(p.applicability)}
+                        {p.applicability === "pending" &&
+                          (() => {
+                            const s = art50Suggestion(p);
+                            return s && s.applicability !== "pending" ? (
+                              <small
+                                className="subtle block"
+                                data-testid={"art50-suggested-" + p.templateId}
+                              >
+                                Suggested: {label(s.applicability)}
+                              </small>
+                            ) : null;
+                          })()}
                       </td>
                       <td data-label="Owner & due date">
                         {name(p.ownerId)}
@@ -1827,6 +1876,30 @@ export function AuditProgram({
                         </p>
                       </section>
                     ))}
+                    {(() => {
+                      const s = art50Suggestion(p);
+                      return s ? (
+                        <Art50Suggestion
+                          suggestion={s}
+                          current={p.applicability}
+                          canUse={
+                            writer &&
+                            (w.program.status === "draft" || lead) &&
+                            !busy
+                          }
+                          onUse={(s) => planForm(p, s)}
+                        />
+                      ) : null;
+                    })()}
+                    <Art50StatisticalCriteria
+                      procedureIds={
+                        catalogItem(
+                          p.templateId,
+                        )?.researchProcedures?.procedures.map(
+                          (r) => r.procedureId,
+                        ) ?? []
+                      }
+                    />
                     {writer && (w.program.status === "draft" || lead) && (
                       <Button disabled={busy} onClick={() => planForm(p)}>
                         Edit plan
