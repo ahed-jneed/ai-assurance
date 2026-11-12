@@ -173,7 +173,8 @@
       "required": ["n", "errorSd"],
       "properties": {
         "n": {"type": "integer", "minimum": 1, "maximum": 10000000},
-        "errorSd": {"type": "number", "exclusiveMinimum": 0}
+        "errorSd": {"type": "number", "exclusiveMinimum": 0},
+        "targetSd": {"description": "Optional (engine only until the hosted runner mirrors it): the assumed standard deviation of the targets, which adds the mean baseline gate to the pass probability (section 8).", "type": "number", "exclusiveMinimum": 0}
       }
     },
     "groupAssumptions": {

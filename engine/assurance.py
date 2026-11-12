@@ -21,7 +21,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-TOOL_VERSION = "1.2.0"
+TOOL_VERSION = "1.3.0"
 MAX_RECORDS = 100_000
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_CONTAINER_BYTES = 64 * 1024 * 1024
@@ -623,15 +623,62 @@ MANIFEST_KEYS = ("schemaVersion", "audience", "reportId", "reportSha256", "creat
 # Manifest 1.1 also signs the signing key ID and the captured rule-pack and
 # methodology versions (null when the report captured none).
 MANIFEST_KEYS_1_1 = MANIFEST_KEYS + ("signingKeyId", "rulePack", "methodologyVersion")
+# Manifest 1.2 also signs the export scope: null for the full dossier, or the
+# procedures, record types and creation period (UTC dates, inclusive) that
+# select the pinned assurance records it includes, whether evidence bytes are
+# withheld, and how many of the report's pinned records it includes.
+MANIFEST_KEYS_1_2 = MANIFEST_KEYS_1_1 + ("scope",)
+MANIFEST_VERSIONS = {"1.0": MANIFEST_KEYS, "1.1": MANIFEST_KEYS_1_1, "1.2": MANIFEST_KEYS_1_2}
 RULE_PACK_KEYS = ("version", "legalVersion", "researchedAsOf", "legalReview")
+SCOPE_KEYS = ("procedureIds", "recordKinds", "period", "evidence", "pinnedRecords", "includedRecords")
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _scope_labels(value, name):
+    if value is None:
+        return
+    _expect(isinstance(value, list) and 1 <= len(value) <= 100, f"Scope {name} must be null or a bounded nonempty list")
+    for item in value:
+        _text(item, "scope " + name, 200)
+    _expect(value == sorted(set(value)), f"Scope {name} must be sorted and unique")
+
+
+def _scope_date(value):
+    _expect(isinstance(value, str) and DATE.fullmatch(value), "Scope period dates must be YYYY-MM-DD")
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("Scope period dates must be real calendar dates") from exc
+    return value
+
+
+def _scope(scope, files):
+    """Check manifest 1.2's scope against the files the manifest lists."""
+    if scope is None:
+        return
+    _keys(scope, SCOPE_KEYS, SCOPE_KEYS, "manifest scope")
+    _scope_labels(scope["procedureIds"], "procedure IDs")
+    _scope_labels(scope["recordKinds"], "record types")
+    if scope["period"] is not None:
+        _keys(scope["period"], ("from", "to"), ("from", "to"), "scope period")
+        _expect(_scope_date(scope["period"]["from"]) <= _scope_date(scope["period"]["to"]), "The scope period must not end before it starts")
+    _expect(scope["evidence"] in {"included", "withheld"}, "Scope evidence must be included or withheld")
+    _expect(scope["procedureIds"] is not None or scope["recordKinds"] is not None or scope["period"] is not None or scope["evidence"] == "withheld", "A scope that selects everything must be null")
+    pinned = _integer(scope["pinnedRecords"], "scope pinned records")
+    included = _integer(scope["includedRecords"], "scope included records")
+    _expect(1 <= included <= pinned, "A scope includes at least one and at most every pinned record")
+    _expect(sum(1 for path in files if path.startswith("assurance/")) == included, "Scope included records differ from the assurance files supplied")
+    if scope["evidence"] == "withheld":
+        _expect(not any(path.startswith("evidence/") for path in files), "A scope that withholds evidence cannot supply evidence files")
 
 
 def _manifest(manifest):
-    _expect(isinstance(manifest, dict) and manifest.get("schemaVersion") in {"1.0", "1.1"}, "Unsupported manifest version or audience")
-    keys = MANIFEST_KEYS if manifest["schemaVersion"] == "1.0" else MANIFEST_KEYS_1_1
+    _expect(isinstance(manifest, dict) and manifest.get("schemaVersion") in MANIFEST_VERSIONS, "Unsupported manifest version or audience")
+    keys = MANIFEST_VERSIONS[manifest["schemaVersion"]]
     _keys(manifest, keys, keys, "manifest")
     _expect(manifest["audience"] in {"internal", "client"}, "Unsupported manifest version or audience")
-    if manifest["schemaVersion"] == "1.1":
+    _expect(manifest.get("scope") is None or manifest["audience"] == "internal", "Only an internal dossier can carry an export scope")
+    if manifest["schemaVersion"] != "1.0":
         _text(manifest["signingKeyId"], "signing key ID", 300)
         pack = manifest["rulePack"]
         if pack is not None:
@@ -653,6 +700,8 @@ def _manifest(manifest):
         _integer(item["size"], "file size", 0, MAX_FILE_BYTES)
         _text(item["mediaType"], "media type", 200)
     _path_set(paths)
+    if manifest["schemaVersion"] == "1.2":
+        _scope(manifest["scope"], paths)
     report = next((item for item in manifest["files"] if item["path"] == "report.json"), None)
     _expect(report is not None and report["sha256"] == manifest["reportSha256"] and report["mediaType"] == "application/json" and report["size"] > 0, "Manifest requires report.json with the exact JSON report digest")
     _expect(sum(item["size"] for item in manifest["files"]) <= MAX_INPUT_BYTES, "Dossier decoded volume exceeds limit")
@@ -738,7 +787,7 @@ def _b64(value, name, limit):
 
 def verify_dossier(container, *, trusted_keys=None, require_trusted_signature=False):
     """Verify content and optional signature; trust is an explicit external policy."""
-    result = {"schemaVersion": "1.0", "type": "dossier_verification", "toolVersion": TOOL_VERSION, "valid": False, "integrityValid": False, "outcome": "fail", "signature": {"present": False, "valid": None, "trusted": False, "status": "unsigned"}, "errors": [], "limitations": ["Hashes and signature verification do not establish source truth, completeness, legal conformity, retention or a trusted timestamp."]}
+    result = {"schemaVersion": "1.0", "type": "dossier_verification", "toolVersion": TOOL_VERSION, "valid": False, "integrityValid": False, "outcome": "fail", "signature": {"present": False, "valid": None, "trusted": False, "status": "unsigned"}, "scope": None, "errors": [], "limitations": ["Hashes and signature verification do not establish source truth, completeness, legal conformity, retention or a trusted timestamp."]}
     try:
         _expect(isinstance(require_trusted_signature, bool), "Signature policy must be boolean")
         _keys(container, ("schemaVersion", "manifest", "manifestSha256", "signature", "files"), ("schemaVersion", "manifest", "manifestSha256", "files"), "container")
@@ -764,6 +813,11 @@ def verify_dossier(container, *, trusted_keys=None, require_trusted_signature=Fa
         _expect(matches, "Report digest is not represented by a supplied file")
         result["integrityValid"] = True
         result["reportFiles"] = matches
+        # Surface the signed scope so a part of the audit file is never read as the whole of it.
+        scope = container["manifest"].get("scope")
+        result["scope"] = copy.deepcopy(scope)
+        if scope is not None:
+            result["limitations"].append(f"Scoped export: includes {scope['includedRecords']} of {scope['pinnedRecords']} pinned assurance records" + ("; evidence files are withheld" if scope["evidence"] == "withheld" else "") + "; not the complete audit file.")
         signature = container.get("signature")
         if "signature" in container:
             _expect(signature is not None, "An optional signature must be omitted rather than null")

@@ -38,6 +38,23 @@
       "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
     },
     {
+      "documentType": "pack",
+      "id": "eu-ai-act-amended",
+      "version": "2026.11.3",
+      "path": "packs/eu-ai-act-amended/2026.11.3.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #61)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "selectable": true,
+      "sha256": "a92288fa3921dedd0099fd64152f05a063269280a9bc426e4380f075d6864554"
+    },
+    {
       "documentType": "framework",
       "id": "iso-iec-42001",
       "edition": "2023",
@@ -79,7 +96,7 @@
   "defaults": {
     "pack": {
       "id": "eu-ai-act-amended",
-      "version": "2026.11.2"
+      "version": "2026.11.3"
     }
   },
   "legacy": {

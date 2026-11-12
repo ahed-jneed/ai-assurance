@@ -2,8 +2,7 @@ import { z } from "zod";
 import { assertionSchema, impactSchema } from "../../assurance-core";
 import { addRecord } from "../../assurance-store";
 import { ApiError } from "../../http";
-import { requireFeature } from "../../criteria/pin";
-import obligations from "../../obligation-subitems.json";
+import { pinnedObligations, requireFeature } from "../../criteria/pin";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -63,10 +62,11 @@ export const assessments: AssuranceModule = defineCommands({
   obligationDecision: {
     roles: ["Auditor", "Lead Auditor"],
     async handle({ e, accepted, revision }, d, ctx) {
-      // Phase 1 validates codes against the build's obligation catalogue
-      // (docs/design/criteria-model.md section 7.1); phase 2 (#61) against
-      // the pinned framework.
+      // Codes are the obligation subitems of the pinned AI Act framework
+      // (docs/design/criteria-model.md section 7.1, phase 2), and the record
+      // carries that framework's source and catalogue version.
       requireFeature(e, "obligationAssessments");
+      const obligations = pinnedObligations(e)!;
       const v = z
           .object({
             supersedesId: short.optional(),

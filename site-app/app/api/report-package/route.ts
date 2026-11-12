@@ -6,6 +6,8 @@ import {
   sha256,
 } from "@/lib/store";
 import { isClientRole, isClientVisible } from "@/lib/workflow-state";
+import { exportedPapers } from "@/lib/papers/export";
+import { workingPaperContract } from "@/lib/papers/revision";
 import { verifyPackage } from "@/lib/report-package";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
@@ -24,15 +26,27 @@ export async function GET(request: Request) {
           409,
           "Package integrity check failed; contact the audit lead",
         );
+      // Package contract 1.2 adds the papers as working-paper contract
+      // documents (#51), internal packages only: a client snapshot keeps
+      // each paper's conclusion without user ids.
+      const documents = client ? [] : await exportedPapers(ctx, e, r);
       const body = JSON.stringify(
         {
-          contractVersion: "1.1",
+          contractVersion: "1.2",
           reportId: r.id,
           kind: r.kind,
           createdAt: r.createdAt,
           snapshot: client ? r.clientSnapshot : r.snapshot,
           sha256: proof.expectedSha256,
           proof,
+          ...(documents.length
+            ? {
+                workingPapers: {
+                  schema: workingPaperContract,
+                  documents,
+                },
+              }
+            : {}),
         },
         null,
         2,

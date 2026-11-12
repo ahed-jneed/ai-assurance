@@ -10,6 +10,7 @@ import type { Engagement } from "../domain";
 import { parseReportSettings } from "../domain/report-model";
 import { db, getEngagement, storedSize } from "../engagement-repo";
 import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
+import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import { isClientRole, isInternalRole } from "../workflow-state";
 
@@ -212,18 +213,29 @@ export async function workspaceView(
           .all()
       ).results
     : [];
-  const practiceRow = (await db()
-    .prepare("SELECT version,report_settings FROM tenants WHERE id=?")
+  const tenant = (await db()
+    .prepare(
+      "SELECT version,eqr_cooling_off_days AS cooling_off_days,report_settings FROM tenants WHERE id=?",
+    )
     .bind(ctx.tenantId)
     .first<{
       version: number;
+      cooling_off_days: number | null;
       report_settings: string | null;
     }>())!;
-  const managementVersion = practiceRow.version;
+  const managementVersion = tenant.version;
+  // The practice's quality review policy, for its internal members: the
+  // quality review panel and practice settings show it.
+  const qualityReviewPolicy = isInternalRole(ctx.role)
+    ? {
+        coolingOffDays: effectiveCoolingOffDays(tenant.cooling_off_days),
+        practiceSet: typeof tenant.cooling_off_days === "number",
+      }
+    : null;
   // What a new report states unless the Lead Auditor overrides it; clients
   // read reports only as issued.
   const reportSettings = isInternalRole(ctx.role)
-    ? parseReportSettings(practiceRow.report_settings)
+    ? parseReportSettings(tenant.report_settings)
     : null;
   const managementEvents = ctx.practiceAdmin
     ? (
@@ -254,6 +266,7 @@ export async function workspaceView(
     invitations,
     people,
     managementVersion,
+    qualityReviewPolicy,
     managementEvents,
     reportSettings,
     events: trail?.events ?? [],

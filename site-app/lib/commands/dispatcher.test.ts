@@ -234,6 +234,7 @@ describe("command registry", () => {
     approveClassification: ["Reviewer", "Lead Auditor"],
     createFinding: ["Auditor", "Lead Auditor"],
     updateFinding: ["Auditor", "Lead Auditor"],
+    setFindingCriteria: ["Auditor", "Lead Auditor"],
     closeFinding: ["Reviewer", "Lead Auditor"],
     recordSoaEntry: ["Auditor", "Lead Auditor"],
     reviewSoa: ["Reviewer", "Lead Auditor"],
@@ -253,6 +254,9 @@ describe("command registry", () => {
     setStage: ["Lead Auditor"],
     renameEngagement: ["Auditor", "Lead Auditor"],
     openFollowup: ["Lead Auditor"],
+    // M1 pins: the engagement team's writers, and only practice admins.
+    pinCriteria: ["Auditor", "Lead Auditor"],
+    unpinCriteria: ["Auditor", "Lead Auditor"],
     createReport: ["Lead Auditor"],
     setPaperAudience: ["Lead Auditor"],
     appointQualityReviewer: ["Lead Auditor"],

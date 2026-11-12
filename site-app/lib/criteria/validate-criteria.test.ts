@@ -58,6 +58,7 @@ function criteria() {
 const doc = (c: ReturnType<typeof criteria>, path: string) =>
   c.documents.get(path)!;
 const P1 = "packs/eu-ai-act-amended/2026.11.2.json";
+const P3 = "packs/eu-ai-act-amended/2026.11.3.json";
 const F1 = "frameworks/eu-ai-act/02024R1689-20260727/2026.11.2.json";
 const NP = "packs/en18286-iso42001/2027.1.0.json";
 const ISO = "frameworks/iso-iec-42001/2023/2027.1.0.json";
@@ -610,9 +611,27 @@ describe("criteria integrity rules", () => {
     ],
     [
       "rule 8",
-      "annexIvIndex needs",
+      "annexIvIndex needs an annexIvMap",
       (c) => {
         doc(c, NP).features = { annexIvIndex: true };
+      },
+    ],
+    [
+      "rule 8",
+      "annexIvIndex needs WP-NONE-01 of the Annex IV map as an item",
+      (c) => {
+        doc(c, P3).annexIvMap.sections[0].paperIds.push("WP-NONE-01");
+      },
+    ],
+    [
+      // Pack #1 2026.11.2 has no map of its own: it is served the map of
+      // the current version, whose papers it must have too.
+      "rule 8",
+      "eu-ai-act-amended 2026.11.2: annexIvIndex needs WP-PL-02",
+      (c) => {
+        doc(c, P1).items = doc(c, P1).items.filter(
+          (i: Json) => i.id !== "WP-PL-02",
+        );
       },
     ],
     [

@@ -1,0 +1,1004 @@
+[
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-c581a390-ca2",
+    "engagementId": "ENG-default",
+    "modelId": "MODEL-13fd557c-1dc",
+    "datasetId": "EV-cda52d6f-81a",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-74d57877-151",
+    "suite": [
+      "performance"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-74d57877-151",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T21:11:22.107Z",
+      "frozenBy": "fixture-owner-1793999442267",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "state": "cancelled",
+    "outcome": "inconclusive",
+    "results": [],
+    "paperIds": [],
+    "createdAt": "2026-11-06T21:11:22.107Z",
+    "rulePack": {
+      "version": "2026.11.2",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.2",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "modelMetadata": "276dd7a851c3da43668407ac2b2b346bb49fd2ff86dfa5e665af484c1fa73779",
+        "modelArtifact": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "protocol": "c79cd518c7542cde89accf5e3e19a57a12d04319ebaeb4d278b617ecc36fd5df",
+        "statisticsPlan": "3fc00c5c310fb835e2f5a84c8ad0b8ee71cd3902dde64af31c20db72c045cc4d",
+        "manifest": "35fa9a5361425c1f757fd082abf7c52df39ab199924443f14f96713a87d213bb",
+        "configuration": "a61f1aaa06a6832b472ccbe3e3c00e4cfd18dff0bf6d01f8fdabd678e5691423",
+        "auditBinding": "d60ba27d3f166add7985801d0ceb967bfc3477a1ffbea665d848e6406a8a63b2"
+      },
+      "runnerVersion": "interactive-predictions-3.1.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "name": "Synthetic predictor",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Numerical synthetic fixture validation",
+        "artifactId": "EV-cda52d6f-81a",
+        "id": "MODEL-13fd557c-1dc",
+        "familyId": "MODEL-13fd557c-1dc",
+        "status": "registered",
+        "sourceSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "registeredAt": "2026-11-06T21:10:44.091Z",
+        "registeredBy": "fixture-owner-1793999442267"
+      },
+      "dataset": {
+        "id": "EV-cda52d6f-81a",
+        "name": "predictions.csv",
+        "sha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "size": 1161,
+        "rowCount": 80,
+        "columns": [
+          "actual",
+          "predicted",
+          "score",
+          "group",
+          "feature_age"
+        ],
+        "cardPin": {
+          "recordId": "AS-8ecfe296-0ae",
+          "sha256": "11f168b029b9ee7faaf0553232d1750c28d8ad09da88628a67f8b1d608ffd698",
+          "card": {
+            "schemaVersion": "1.0",
+            "name": "Synthetic evaluation data",
+            "version": "1.0",
+            "artifactId": "EV-cda52d6f-81a",
+            "owner": "Fixture owner",
+            "split": "test",
+            "population": "80 synthetic records",
+            "periodStart": "2026-01-01",
+            "periodEnd": "2026-10-07",
+            "collectionMethod": "Controlled synthetic fixture",
+            "independence": "No real training data; synthetic only",
+            "sensitiveDataBasis": "Synthetic non-personal data",
+            "limitations": "Fixture-only assurance",
+            "baselineRationale": "",
+            "artifactSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+            "artifactName": "predictions.csv",
+            "artifactSize": 1161
+          }
+        }
+      },
+      "profile": {
+        "name": "Binary acceptance",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "minimumGroupSize": 5,
+          "maximumParityGap": 0.2,
+          "minimumImpactRatio": 0.7,
+          "minimumAccuracy": 0.8,
+          "minimumSampleSize": 20,
+          "minimumClassCount": 5,
+          "maximumOddsGap": 0.1,
+          "minimumRecall": 0.7,
+          "minimumMacroF1": 0.7,
+          "maximumRmse": 1
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic full fixture population",
+          "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+          "independence": "Synthetic fixture; no real holdout independence claim",
+          "sensitiveDataBasis": ""
+        },
+        "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+        "id": "PROTOCOL-74d57877-151",
+        "schemaVersion": "1.0",
+        "createdAt": "2026-11-06T21:10:44.471Z",
+        "createdBy": "fixture-owner-1793999442267"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": {
+          "sampleSize": 20,
+          "groupSize": 5,
+          "classCount": 5
+        },
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": {
+          "source": "hosted_config",
+          "contractVersion": "1.1"
+        },
+        "criteria": [
+          {
+            "id": "performance",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.1.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "procedureBinding": {
+      "procedureId": "PROC-WP-A09-01",
+      "procedureRevision": 5,
+      "planHash": "53ca562609178770dd7af97dce2712db3fe5f47071df6b3d9e4ce33312ac2297",
+      "briefRevision": 2,
+      "programRevision": 4
+    },
+    "overallOutcome": "inconclusive",
+    "completedAt": "2026-11-06T21:11:22.406Z"
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-9f2d8de8-28b",
+    "engagementId": "ENG-default",
+    "modelId": "MODEL-13fd557c-1dc",
+    "datasetId": "EV-cda52d6f-81a",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-74d57877-151",
+    "suite": [
+      "performance"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-74d57877-151",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T21:11:22.694Z",
+      "frozenBy": "fixture-owner-1793999442267",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "state": "cancelled",
+    "outcome": "inconclusive",
+    "results": [],
+    "paperIds": [],
+    "createdAt": "2026-11-06T21:11:22.694Z",
+    "rulePack": {
+      "version": "2026.11.2",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.2",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "modelMetadata": "276dd7a851c3da43668407ac2b2b346bb49fd2ff86dfa5e665af484c1fa73779",
+        "modelArtifact": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "protocol": "c79cd518c7542cde89accf5e3e19a57a12d04319ebaeb4d278b617ecc36fd5df",
+        "statisticsPlan": "3fc00c5c310fb835e2f5a84c8ad0b8ee71cd3902dde64af31c20db72c045cc4d",
+        "manifest": "35fa9a5361425c1f757fd082abf7c52df39ab199924443f14f96713a87d213bb",
+        "configuration": "a61f1aaa06a6832b472ccbe3e3c00e4cfd18dff0bf6d01f8fdabd678e5691423",
+        "auditBinding": "d60ba27d3f166add7985801d0ceb967bfc3477a1ffbea665d848e6406a8a63b2"
+      },
+      "runnerVersion": "interactive-predictions-3.1.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "name": "Synthetic predictor",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Numerical synthetic fixture validation",
+        "artifactId": "EV-cda52d6f-81a",
+        "id": "MODEL-13fd557c-1dc",
+        "familyId": "MODEL-13fd557c-1dc",
+        "status": "registered",
+        "sourceSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "registeredAt": "2026-11-06T21:10:44.091Z",
+        "registeredBy": "fixture-owner-1793999442267"
+      },
+      "dataset": {
+        "id": "EV-cda52d6f-81a",
+        "name": "predictions.csv",
+        "sha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "size": 1161,
+        "rowCount": 80,
+        "columns": [
+          "actual",
+          "predicted",
+          "score",
+          "group",
+          "feature_age"
+        ],
+        "cardPin": {
+          "recordId": "AS-8ecfe296-0ae",
+          "sha256": "11f168b029b9ee7faaf0553232d1750c28d8ad09da88628a67f8b1d608ffd698",
+          "card": {
+            "schemaVersion": "1.0",
+            "name": "Synthetic evaluation data",
+            "version": "1.0",
+            "artifactId": "EV-cda52d6f-81a",
+            "owner": "Fixture owner",
+            "split": "test",
+            "population": "80 synthetic records",
+            "periodStart": "2026-01-01",
+            "periodEnd": "2026-10-07",
+            "collectionMethod": "Controlled synthetic fixture",
+            "independence": "No real training data; synthetic only",
+            "sensitiveDataBasis": "Synthetic non-personal data",
+            "limitations": "Fixture-only assurance",
+            "baselineRationale": "",
+            "artifactSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+            "artifactName": "predictions.csv",
+            "artifactSize": 1161
+          }
+        }
+      },
+      "profile": {
+        "name": "Binary acceptance",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "minimumGroupSize": 5,
+          "maximumParityGap": 0.2,
+          "minimumImpactRatio": 0.7,
+          "minimumAccuracy": 0.8,
+          "minimumSampleSize": 20,
+          "minimumClassCount": 5,
+          "maximumOddsGap": 0.1,
+          "minimumRecall": 0.7,
+          "minimumMacroF1": 0.7,
+          "maximumRmse": 1
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic full fixture population",
+          "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+          "independence": "Synthetic fixture; no real holdout independence claim",
+          "sensitiveDataBasis": ""
+        },
+        "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+        "id": "PROTOCOL-74d57877-151",
+        "schemaVersion": "1.0",
+        "createdAt": "2026-11-06T21:10:44.471Z",
+        "createdBy": "fixture-owner-1793999442267"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": {
+          "sampleSize": 20,
+          "groupSize": 5,
+          "classCount": 5
+        },
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": {
+          "source": "hosted_config",
+          "contractVersion": "1.1"
+        },
+        "criteria": [
+          {
+            "id": "performance",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.1.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "retryOf": "RUN-c581a390-ca2",
+    "procedureBinding": {
+      "procedureId": "PROC-WP-A09-01",
+      "procedureRevision": 5,
+      "planHash": "53ca562609178770dd7af97dce2712db3fe5f47071df6b3d9e4ce33312ac2297",
+      "briefRevision": 2,
+      "programRevision": 4
+    },
+    "overallOutcome": "inconclusive",
+    "completedAt": "2026-11-06T21:11:23.013Z"
+  },
+  {
+    "contractVersion": "1.4",
+    "id": "RUN-fd10039c-c6f",
+    "engagementId": "ENG-default",
+    "modelId": "MODEL-13fd557c-1dc",
+    "datasetId": "EV-cda52d6f-81a",
+    "task": "Binary classification",
+    "profileId": "PROTOCOL-74d57877-151",
+    "suite": [
+      "performance"
+    ],
+    "config": {
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "seed": 42,
+    "thresholds": {
+      "source": "internal_policy",
+      "policyId": "PROTOCOL-74d57877-151",
+      "policyVersion": "1.0",
+      "frozenAt": "2026-11-06T21:11:23.293Z",
+      "frozenBy": "fixture-owner-1793999442267",
+      "labelColumn": "actual",
+      "predictionColumn": "predicted",
+      "groupColumn": "",
+      "positiveLabel": "1",
+      "performancePositiveLabel": "1",
+      "minimumGroupSize": 5,
+      "maximumParityGap": 0.2,
+      "minimumImpactRatio": 0.7,
+      "minimumAccuracy": 0.8,
+      "minimumSampleSize": 20,
+      "minimumClassCount": 5,
+      "maximumOddsGap": 0.1,
+      "minimumRecall": 0.7,
+      "minimumMacroF1": 0.7,
+      "maximumRmse": 1
+    },
+    "state": "succeeded",
+    "outcome": "inconclusive",
+    "results": [
+      {
+        "testId": "performance",
+        "label": "Binary classification performance",
+        "article": "15",
+        "outcome": "inconclusive",
+        "metrics": [
+          {
+            "name": "accuracy",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": 68,
+            "denominator": 80,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7558677143867666,
+              "upper": 0.9120595949383646,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 68,
+                "n": 80
+              },
+              "band": {
+                "lower": 0.8,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.2635524772829735
+          },
+          {
+            "name": "recall",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": 34,
+            "denominator": 40,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.709276756335103,
+              "upper": 0.9293881228267964,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "recall",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 34,
+                "n": 40
+              },
+              "band": {
+                "lower": 0.7,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": 0.03843393023678232
+          },
+          {
+            "name": "balanced_accuracy",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7504936401339845,
+              "upper": 0.9061358799964983,
+              "level": 0.95,
+              "method": "mover_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "member",
+              "metric": "balanced_accuracy",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 34,
+                "positives": 40,
+                "tn": 34,
+                "negatives": 40
+              },
+              "band": {
+                "lower": 0.5,
+                "upper": null
+              },
+              "status": "evaluated",
+              "direction": "pass",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": 2.8229894697766766e-10,
+              "reasons": []
+            },
+            "pValue": 2.8229894697766766e-10
+          },
+          {
+            "name": "precision",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": 34,
+            "denominator": 40,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.709276756335103,
+              "upper": 0.9293881228267964,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "precision",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 34,
+                "n": 40
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "specificity",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": 34,
+            "denominator": 40,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.709276756335103,
+              "upper": 0.9293881228267964,
+              "level": 0.95,
+              "method": "wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "specificity",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "x": 34,
+                "n": 40
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          },
+          {
+            "name": "f1",
+            "value": 0.85,
+            "unit": "ratio",
+            "sampleSize": 80,
+            "numerator": null,
+            "denominator": null,
+            "threshold": null,
+            "confidenceInterval": {
+              "lower": 0.7479720784184255,
+              "upper": 0.9153960876224941,
+              "level": 0.95,
+              "method": "jaccard_wilson"
+            },
+            "slices": [],
+            "details": {
+              "role": "descriptive",
+              "metric": "f1",
+              "subject": null,
+              "comparator": null,
+              "counts": {
+                "tp": 34,
+                "tpPlusFpPlusFn": 46,
+                "positives": 40
+              },
+              "band": null,
+              "status": "evaluated",
+              "direction": "none",
+              "smallCell": false,
+              "fisherExactP": null,
+              "chanceExactP": null,
+              "reasons": []
+            },
+            "pValue": null
+          }
+        ],
+        "limitations": [
+          "Saved-prediction evaluation; no independent model inference, cross-validation or holdout verification. Performance is measured on supplied labels and predictions; independence, representativeness and target leakage require review.",
+          "Recall, precision and F1 refer to the performance positive class '1'; specificity is the recall of the other class.",
+          "The confidence interval straddles the acceptable band, so the evidence is inconclusive."
+        ],
+        "decision": {
+          "statisticsVersion": "1.0.0",
+          "confidenceLevel": 0.95,
+          "role": "confirmatory",
+          "kind": "performance",
+          "direction": "pass",
+          "pValue": 0.2635524772829735,
+          "adjustedPValue": 0.2635524772829735,
+          "adjustment": "bonferroni",
+          "familySize": 1,
+          "unadjustedOutcome": "inconclusive",
+          "decidingMemberId": "accuracy",
+          "sampleSize": 80,
+          "coverage": null,
+          "suppressedGroups": null,
+          "libraryEntry": null,
+          "reasons": [
+            "interval_straddles_band"
+          ]
+        }
+      }
+    ],
+    "paperIds": [
+      "WP-15c39872-ae3"
+    ],
+    "createdAt": "2026-11-06T21:11:23.293Z",
+    "rulePack": {
+      "version": "2026.11.2",
+      "legalVersion": "02024R1689-20260727",
+      "researchedAsOf": "2026-11-05",
+      "legalReview": "pending"
+    },
+    "methodologyVersion": "2026.11.2",
+    "provenance": {
+      "inputHashes": {
+        "dataset": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "modelMetadata": "276dd7a851c3da43668407ac2b2b346bb49fd2ff86dfa5e665af484c1fa73779",
+        "modelArtifact": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "protocol": "c79cd518c7542cde89accf5e3e19a57a12d04319ebaeb4d278b617ecc36fd5df",
+        "statisticsPlan": "3fc00c5c310fb835e2f5a84c8ad0b8ee71cd3902dde64af31c20db72c045cc4d",
+        "manifest": "35fa9a5361425c1f757fd082abf7c52df39ab199924443f14f96713a87d213bb",
+        "configuration": "a61f1aaa06a6832b472ccbe3e3c00e4cfd18dff0bf6d01f8fdabd678e5691423",
+        "auditBinding": "d60ba27d3f166add7985801d0ceb967bfc3477a1ffbea665d848e6406a8a63b2"
+      },
+      "runnerVersion": "interactive-predictions-3.1.0",
+      "policyVersion": "1.0"
+    },
+    "manifest": {
+      "schemaVersion": "1.0",
+      "model": {
+        "name": "Synthetic predictor",
+        "version": "1",
+        "format": "Prediction file",
+        "task": "Binary classification",
+        "intendedPurpose": "Numerical synthetic fixture validation",
+        "artifactId": "EV-cda52d6f-81a",
+        "id": "MODEL-13fd557c-1dc",
+        "familyId": "MODEL-13fd557c-1dc",
+        "status": "registered",
+        "sourceSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "registeredAt": "2026-11-06T21:10:44.091Z",
+        "registeredBy": "fixture-owner-1793999442267"
+      },
+      "dataset": {
+        "id": "EV-cda52d6f-81a",
+        "name": "predictions.csv",
+        "sha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+        "size": 1161,
+        "rowCount": 80,
+        "columns": [
+          "actual",
+          "predicted",
+          "score",
+          "group",
+          "feature_age"
+        ],
+        "cardPin": {
+          "recordId": "AS-8ecfe296-0ae",
+          "sha256": "11f168b029b9ee7faaf0553232d1750c28d8ad09da88628a67f8b1d608ffd698",
+          "card": {
+            "schemaVersion": "1.0",
+            "name": "Synthetic evaluation data",
+            "version": "1.0",
+            "artifactId": "EV-cda52d6f-81a",
+            "owner": "Fixture owner",
+            "split": "test",
+            "population": "80 synthetic records",
+            "periodStart": "2026-01-01",
+            "periodEnd": "2026-10-07",
+            "collectionMethod": "Controlled synthetic fixture",
+            "independence": "No real training data; synthetic only",
+            "sensitiveDataBasis": "Synthetic non-personal data",
+            "limitations": "Fixture-only assurance",
+            "baselineRationale": "",
+            "artifactSha256": "d382932e3cd6580a4f36b89d15bf2310ab9b3fc3b5616c8dfcea131150f9d4dd",
+            "artifactName": "predictions.csv",
+            "artifactSize": 1161
+          }
+        }
+      },
+      "profile": {
+        "name": "Binary acceptance",
+        "version": "1.0",
+        "task": "Binary classification",
+        "suite": [
+          "performance"
+        ],
+        "config": {
+          "labelColumn": "actual",
+          "predictionColumn": "predicted",
+          "groupColumn": "",
+          "positiveLabel": "1",
+          "performancePositiveLabel": "1",
+          "minimumGroupSize": 5,
+          "maximumParityGap": 0.2,
+          "minimumImpactRatio": 0.7,
+          "minimumAccuracy": 0.8,
+          "minimumSampleSize": 20,
+          "minimumClassCount": 5,
+          "maximumOddsGap": 0.1,
+          "minimumRecall": 0.7,
+          "minimumMacroF1": 0.7,
+          "maximumRmse": 1
+        },
+        "datasetContext": {
+          "split": "test",
+          "population": "Synthetic full fixture population",
+          "predictionProvenance": "Controlled synthetic predictions generated for fixture validation",
+          "independence": "Synthetic fixture; no real holdout independence claim",
+          "sensitiveDataBasis": ""
+        },
+        "rationale": "Fixture acceptance rules assess arithmetic and workflow, not legal conformity",
+        "id": "PROTOCOL-74d57877-151",
+        "schemaVersion": "1.0",
+        "createdAt": "2026-11-06T21:10:44.471Z",
+        "createdBy": "fixture-owner-1793999442267"
+      },
+      "statistics": {
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.95,
+        "minimums": {
+          "sampleSize": 30,
+          "groupSize": 30,
+          "classCount": 10
+        },
+        "configuredMinimums": {
+          "sampleSize": 20,
+          "groupSize": 5,
+          "classCount": 5
+        },
+        "multiplicity": {
+          "confirmatory": "bonferroni",
+          "exploratory": "benjamini_hochberg"
+        },
+        "clusterField": null,
+        "bootstrap": {
+          "replicates": 2000
+        },
+        "calibrationBins": 10,
+        "power": {
+          "targetPower": 0.8,
+          "acknowledgement": null
+        },
+        "derivedFrom": {
+          "source": "hosted_config",
+          "contractVersion": "1.1"
+        },
+        "criteria": [
+          {
+            "id": "performance",
+            "kind": "performance",
+            "role": "confirmatory",
+            "rationale": null,
+            "members": [
+              {
+                "metric": "accuracy",
+                "band": {
+                  "lower": 0.8,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "recall",
+                "band": {
+                  "lower": 0.7,
+                  "upper": null
+                }
+              },
+              {
+                "metric": "balanced_accuracy",
+                "band": {
+                  "lower": 0.5,
+                  "upper": null
+                }
+              }
+            ],
+            "libraryEntry": null,
+            "powerAssumptions": null
+          }
+        ]
+      },
+      "executionMode": "saved_predictions",
+      "lineage": "registered_prediction_artifact",
+      "testDefinitionVersion": "traditional-ml-3.1.0",
+      "limitations": [
+        "Model/card/source statements are declarations until corroborated.",
+        "Metrics evaluate the registered prediction file; no independent inference or holdout verification."
+      ]
+    },
+    "procedureBinding": {
+      "procedureId": "PROC-WP-A09-01",
+      "procedureRevision": 5,
+      "planHash": "53ca562609178770dd7af97dce2712db3fe5f47071df6b3d9e4ce33312ac2297",
+      "briefRevision": 2,
+      "programRevision": 4
+    },
+    "startedAt": "2026-11-06T21:11:23.592Z",
+    "overallOutcome": "inconclusive",
+    "reviewFlags": [],
+    "completedAt": "2026-11-06T21:11:23.850Z"
+  }
+]

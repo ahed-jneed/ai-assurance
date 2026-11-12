@@ -103,6 +103,28 @@ const connects = (
     c.source.edition === t.edition);
 
 /**
+ * The crosswalk versions the coverage views of a pin use: the current
+ * version of every crosswalk that connects one of its criteria editions with
+ * the edition of a crosswalk view it offers, in crosswalk id order. Report
+ * snapshots stamp them (phase 2).
+ */
+export function pinCrosswalks(
+  r: Registry,
+  resolved: Resolved,
+): CrosswalkDocument[] {
+  const targets = offeredViews(r, resolved).filter(
+    (v) => v.kind === "crosswalk",
+  );
+  return currentCrosswalks(r)
+    .filter((c) =>
+      targets.some((t) =>
+        resolved.pack.criteria.some((a) => connects(c, a, t)),
+      ),
+    )
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
  * The views an engagement offers: one criteria view per criteria set,
  * primary first, then one crosswalk view per framework edition that is the
  * criteria of a current pack, not of this one, and connected to one of its
@@ -215,6 +237,18 @@ function criteriaEvaluation(
   }
   for (const link of result.obligationLinks)
     links.push({ ...link, clamps: fwClamps });
+  for (const link of result.findingLinks) {
+    const [framework, target] = link.requirement.split(":");
+    if (framework !== set.framework) continue;
+    links.push({
+      sourceId: link.sourceId,
+      target,
+      relationship: "equal",
+      rationale: "semantic",
+      via: "finding",
+      clamps: fwClamps,
+    });
+  }
   return {
     evaluation: evaluate(scoped(fw, set.include), place(links, sources)),
     sources,
@@ -475,7 +509,7 @@ export function coverageFor(
   if (response.notes.unplacedFindings)
     banners.push({
       id: "unplaced-findings",
-      text: `${response.notes.unplacedFindings} unresolved finding(s) are linked to no procedure or paper and are not placed.`,
+      text: `${response.notes.unplacedFindings} unresolved finding(s) are linked to no procedure, paper or criterion and are not placed.`,
     });
   if (response.migrated)
     banners.push({ id: "migration", text: MIGRATION_NOTE });

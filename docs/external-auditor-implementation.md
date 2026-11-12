@@ -124,6 +124,19 @@ The lead seals a captured audience package. Download it and retain its public ke
 
 The distributed standalone verifier uses the same checks. It rejects changed, missing or extra files, duplicate/unsafe paths, digest/size mismatches, changed report bytes and invalid/untrusted signatures. An embedded self-key is never trusted automatically. Check withheld evidence and opinion limitations as well as technical verification.
 
+### Scoped exports
+
+The verifier accepts at most 500 files per dossier, and the hosted budget is 30 MB. The platform counts a dossier's files before it reads any record body or evidence byte and refuses one that would pass 500 files (HTTP 413), so it never seals a dossier the verifier would reject. An engagement whose report pins more assurance records than that (#17) is exported in scoped internal exports (#83), which the lead seals from the report's dossier controls:
+
+- **Procedures**: the pinned records whose `procedureId` names one of the chosen procedures of the engagement's program.
+- **Record types**: the pinned records of the chosen kinds (for example `assertion` and `assertion_review`).
+- **Period**: the pinned records created on the chosen UTC calendar dates, both ends inclusive.
+- **Evidence**: included, or withheld; withheld evidence is listed in `withheld` with its SHA-256.
+
+Every part that is set must hold. Each scoped export always holds `report.json`, `report.html`, the paper revisions and `README.txt`. Manifest 1.2 signs the scope in `scope`, with `pinnedRecords` (how many records the report pins) and `includedRecords` (how many this export includes). The verifier checks that the scope is well formed and that the number of `assurance/` files equals `includedRecords`. `report.json` lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The full dossier has `scope: null`. A report keeps one seal per audience and scope (`drizzle/0012`); sealing the same scope again returns the existing seal. `GET /api/dossier?…&audience=internal&scope=<scopeSha256>` downloads a scoped export. `scopeSha256` is the SHA-256 of the canonical scope definition and is stored on the dossier record.
+
+Scoped exports are internal audit files only. A set of scoped exports is not a single signed statement that the file is complete. Use `pinnedRecords` and `report.json` to show which records each part covers.
+
 The practice application stores signing private keys in D1 as server-readable material. These are not KMS/HSM-protected keys, independently attested keys or qualified signatures. Key rotation retains prior verification material and requires a reviewed trust policy. Application custody timestamps and audit-chain hashes are not independent time anchors. External timestamp anchoring, legal hold, regulated destruction and disaster-recovery qualification remain future operational controls.
 
 ## Storage, migration and scale
