@@ -281,6 +281,7 @@ await withWorker(
         client_id: null,
         display_name: "Avery Auditor",
         status: "active",
+        email: "auditor@fixture.invalid",
         practice_admin: false,
         grants: [{ id: engagementId, title: "Credit model audit" }],
         sponsored_workers: 1,
@@ -354,7 +355,14 @@ await withWorker(
     );
 
     // An invitation issued before a revocation never restores access: it is
-    // closed as superseded at the revoked member's next request.
+    // closed as superseded at the revoked member's next request. Revocation
+    // cancels the invitations for a member's recorded email (#95,
+    // scripts/access-followups-check.mjs), so this member's is cleared, as
+    // for a member added by account ID who has not signed in since.
+    await rows(
+      "UPDATE memberships SET email=NULL WHERE tenant_id=? AND user_id='user-auditor'",
+      tenantId,
+    );
     const stale = await manage("inviteMember", {
       email: "auditor@fixture.invalid",
       role: "Lead Auditor",
