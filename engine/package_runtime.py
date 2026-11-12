@@ -18,7 +18,7 @@ EXAMPLES = {'predictions.csv', 'reference.csv', 'config.json', 'report.json', 'r
 # Hand-maintained input that schemas/.build-run-schema.py generates test-run.schema.json from.
 # The threshold library is data the hosted runner copies and the engine mirrors (#22).
 SCHEMA_INPUTS = {'test-run.base.json', 'threshold-library.json'}
-SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'hosted-runs.v1.4.json', 'external-runs.v1.2.json', 'external-runs.v1.5.json', 'procedure-execution.json', 'genai-result.example.json'}
+SCHEMA_FIXTURES = {'hosted-runs.v1.1.json', 'hosted-runs.v1.4.json', 'hosted-api-runs.v1.4.json', 'external-runs.v1.2.json', 'external-runs.v1.5.json', 'procedure-execution.json', 'genai-result.example.json'}
 # Engine tests, their fixtures and the scripts that generate those fixtures stay
 # in the repository; the runtime package ships source, examples and schemas only.
 EXCLUDED_ENGINE_FOLDERS = {'tests'}

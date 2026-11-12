@@ -34,6 +34,7 @@ import {
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { publishableSummary } from "../ll144-audit";
+import { paperContext, paperRevisions } from "../papers/revision";
 import { assertReviewerIndependent } from "../quality-review-records";
 import { practiceReportSettings } from "../report-settings";
 import {
@@ -52,24 +53,24 @@ import { short, text } from "./fields";
  * memos are history, not current work. Each paper's audience decides what the
  * client snapshot publishes.
  */
+const papersToCapture = (e: Engagement, kind: "draft" | "final") =>
+  e.papers.filter(
+    (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
+  );
 function capturedPapers(e: Engagement, kind: "draft" | "final") {
-  return e.papers
-    .filter(
-      (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
-    )
-    .map((p) => ({
-      id: p.id,
-      templateId: p.templateId,
-      title: p.title,
-      revision: p.revision,
-      status: p.status,
-      audience: paperAudience(p),
-      body: p.body,
-      evidenceIds: p.evidenceIds,
-      runIds: p.runIds,
-      reviews: p.reviews,
-      signatures: p.signatures,
-    }));
+  return papersToCapture(e, kind).map((p) => ({
+    id: p.id,
+    templateId: p.templateId,
+    title: p.title,
+    revision: p.revision,
+    status: p.status,
+    audience: paperAudience(p),
+    body: p.body,
+    evidenceIds: p.evidenceIds,
+    runIds: p.runIds,
+    reviews: p.reviews,
+    signatures: p.signatures,
+  }));
 }
 const optionalText = (max: number) => z.string().trim().max(max).default("");
 /**
@@ -191,6 +192,12 @@ export const reports = defineCommands({
         summary: a.summary,
         evidenceRequests: e.evidenceRequests ?? [],
         papers: capturedPapers(e, a.kind),
+        // The same papers as working-paper contract documents (#51), which
+        // the dossier and the report package export.
+        workingPapers: await paperRevisions(
+          papersToCapture(e, a.kind),
+          paperContext(e, ctx.tenantId),
+        ),
         supersededPapers: e.papers
           .filter((p) => p.supersededBy)
           .map((p) => ({

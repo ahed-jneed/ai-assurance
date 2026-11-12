@@ -2,6 +2,7 @@ import { ApiError, bucket, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
+import { exportedPapers } from "./papers/export";
 import { storedBodies } from "./assurance-store";
 import { legalDate } from "./rule-pack";
 import { sign, type SigningKey } from "./signing-keys";
@@ -198,12 +199,25 @@ export async function buildDossier(
     escaped(snapshot.limitations) +
     "</pre></section></body></html>";
   await add("report.html", bytes(html), "text/html");
-  for (const p of papers)
-    await add(
-      "papers/" + p.id + "-r" + p.revision + ".json",
-      bytes(JSON.stringify(p)),
-      "application/json",
-    );
+  // An internal dossier files each paper as its working-paper contract
+  // document (#51), and a released package's completion memo. A client
+  // dossier, and a package captured before the contract, keep the captured
+  // paper: a client paper is its conclusion only, without user ids.
+  const documents = client ? [] : await exportedPapers(ctx, e, r);
+  if (documents.length)
+    for (const d of documents)
+      await add(
+        "papers/" + d.id + "-r" + d.revision + ".json",
+        bytes(JSON.stringify(d)),
+        "application/json",
+      );
+  else
+    for (const p of papers)
+      await add(
+        "papers/" + p.id + "-r" + p.revision + ".json",
+        bytes(JSON.stringify(p)),
+        "application/json",
+      );
   if (!client) {
     const pins = (snapshot.assurancePins ?? []) as {
       id: string;
