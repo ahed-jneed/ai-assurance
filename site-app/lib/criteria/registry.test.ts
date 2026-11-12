@@ -90,6 +90,9 @@ describe("pack #1 projections", () => {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
     expect(pack1.pack.roles).toEqual({
       limitationMemo: "MEM-EX-01",

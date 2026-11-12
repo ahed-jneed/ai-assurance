@@ -1,0 +1,894 @@
+{
+  "documentType": "pack",
+  "schemaVersion": "1.0.0",
+  "id": "en18286-iso42001",
+  "version": "2026.11.1",
+  "title": "EN 18286 + ISO/IEC 42001 management system",
+  "summary": "One management-system programme with two sets of criteria: EN 18286:2026 for AI Act QMS readiness and ISO/IEC 42001:2023 for a certification-style audit with a Statement of Applicability, graded nonconformities and an audit recommendation.",
+  "kind": "audit_programme",
+  "methodologyVersion": "2026.11.1",
+  "engagementTypes": [
+    "readiness_assessment",
+    "attestation",
+    "direct",
+    "certification_audit"
+  ],
+  "criteria": [
+    {
+      "framework": "iso-iec-42001",
+      "edition": "2023",
+      "version": "2026.11.1",
+      "role": "primary"
+    },
+    {
+      "framework": "en-18286",
+      "edition": "2026",
+      "version": "2026.11.1",
+      "role": "primary"
+    }
+  ],
+  "phases": [
+    {
+      "id": "stage-1",
+      "title": "Stage 1"
+    },
+    {
+      "id": "stage-2",
+      "title": "Stage 2"
+    }
+  ],
+  "defaults": {
+    "initialStatus": "draft",
+    "applicability": "pending",
+    "auditorConclusion": "not_assessed",
+    "diagnosticState": "pending",
+    "numericalThreshold": null,
+    "conclusionOwner": "human_auditor",
+    "approvalBindsTo": "revision_and_content_digest",
+    "independentReview": true,
+    "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
+    "statement": "Diagnostics support an audit assessment and do not constitute legal compliance or a conformity certificate."
+  },
+  "roles": {
+    "limitationMemo": "MEM-EX-01"
+  },
+  "features": {
+    "statementOfApplicability": true,
+    "nonconformityGrading": true,
+    "certificationRecommendation": true
+  },
+  "soaControls": "iso-iec-42001:A",
+  "reporting": {
+    "limitations": "Our conclusions and recommendations do not constitute ISO/IEC 42001 certification, which only an accredited certification body grants, a conformity assessment under Regulation (EU) 2024/1689, or legal advice. Clause numbers are cited without the standards' text; read them with licensed copies."
+  },
+  "controlObjectives": [
+    {
+      "id": "CO-AIMS-SCOPE-01",
+      "statement": "Assess whether the AI management system's context, interested parties and scope are determined and documented, and whether the system is ready for Stage 2.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:4.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Stage 1 reviews the documented context, interested parties, scope and the system as established. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:4.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Stage 1 reviews the documented context, interested parties, scope and the system as established. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:4.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Stage 1 reviews the documented context, interested parties, scope and the system as established. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:4.4",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Stage 1 reviews the documented context, interested parties, scope and the system as established. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:4",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 clause 4 also sets QMS scope duties tied to the AI Act that this objective tests only in part.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-SOA-01",
+      "statement": "Assess whether the Statement of Applicability lists every Annex A control with a justified inclusion or exclusion and its implementation status.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:6.1.3",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "The Statement of Applicability is one output of risk treatment planning; the rest of the clause is tested in Stage 2.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Stage 1 checks the decision recorded for each control, not its operation.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-LEAD-01",
+      "statement": "Assess whether top management directs the AI management system through an AI policy, defined roles and a channel for concerns.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:5.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Inspection, interviews and samples cover commitment, policy, its review and alignment, roles and the reporting of concerns. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:5.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Inspection, interviews and samples cover commitment, policy, its review and alignment, roles and the reporting of concerns. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:5.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Inspection, interviews and samples cover commitment, policy, its review and alignment, roles and the reporting of concerns. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Inspection, interviews and samples cover commitment, policy, its review and alignment, roles and the reporting of concerns. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Inspection, interviews and samples cover commitment, policy, its review and alignment, roles and the reporting of concerns. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 leadership duties also cover AI Act roles that this objective does not test.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-RISK-01",
+      "statement": "Assess whether AI risks are assessed and treated by a defined process, at planned intervals and after significant changes.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:6.1.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps trace sampled AI systems through risk identification, analysis, evaluation and treatment, planned and performed. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:6.1.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps trace sampled AI systems through risk identification, analysis, evaluation and treatment, planned and performed. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:6.1.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps trace sampled AI systems through risk identification, analysis, evaluation and treatment, planned and performed. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:8.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps trace sampled AI systems through risk identification, analysis, evaluation and treatment, planned and performed. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:8.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps trace sampled AI systems through risk identification, analysis, evaluation and treatment, planned and performed. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:6",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 planning also covers quality objectives and change planning that this objective does not test.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-IMPACT-01",
+      "statement": "Assess whether AI system impact assessments are defined, performed, recorded and consider individuals, groups and society.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:6.1.4",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect the process and sample assessments for individual, group and societal impacts. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:8.4",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect the process and sample assessments for individual, group and societal impacts. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.5",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect the process and sample assessments for individual, group and societal impacts. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-SUPPORT-01",
+      "statement": "Assess whether AI objectives, planned changes, resources, competence, awareness, communication and documented information support the system.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:6.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:6.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:7.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:7.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:7.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:7.4",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:7.5",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.4",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps test objectives and change plans, resource records, competence and awareness evidence, communication and document control. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-LIFECYCLE-01",
+      "statement": "Assess whether AI systems are developed, verified, deployed, operated and documented under controlled processes using controlled data.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:8.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps sample AI systems through each life cycle stage and the data used for them. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.6",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps sample AI systems through each life cycle stage and the data used for them. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.7",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps sample AI systems through each life cycle stage and the data used for them. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:8",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 realisation duties also cover AI Act conformity steps that this objective does not test.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-PARTIES-01",
+      "statement": "Assess whether interested parties are informed, AI systems are used responsibly and third-party responsibilities are allocated.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:A.8",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect user information, external reporting, incident communication, use controls and supplier and customer arrangements. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.9",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect user information, external reporting, incident communication, use controls and supplier and customer arrangements. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:A.10",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect user information, external reporting, incident communication, use controls and supplier and customer arrangements. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 market and supply chain duties overlap only in part with these controls.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-AIMS-IMPROVE-01",
+      "statement": "Assess whether performance is monitored, internal audits and management reviews are performed and nonconformities are corrected.",
+      "addresses": [
+        {
+          "requirement": "iso-iec-42001:9.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect monitoring results, the audit programme and reports, review minutes and the corrective action log. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:9.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect monitoring results, the audit programme and reports, review minutes and the corrective action log. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:9.3",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect monitoring results, the audit programme and reports, review minutes and the corrective action log. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:10.1",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect monitoring results, the audit programme and reports, review minutes and the corrective action log. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "iso-iec-42001:10.2",
+          "relationship": "superset_of",
+          "rationale": "functional",
+          "justification": "Steps inspect monitoring results, the audit programme and reports, review minutes and the corrective action log. Pending: confirm against the licensed copy that the steps reach every element of the clause.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 monitoring duties overlap with this objective's monitoring steps.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "en-18286:10",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "EN 18286 management review duties overlap with this objective's review steps.",
+          "origin": "authored"
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "AIMS-S1-01",
+      "title": "Stage 1: AIMS documentation, context and scope",
+      "kind": "working_paper",
+      "stage": "Planning",
+      "folder": "01 Planning / Stage 1",
+      "templatePath": "templates/planning.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether the AI management system's context, interested parties and scope are determined and documented, and whether the system is ready for Stage 2.",
+      "procedures": [
+        {
+          "id": "AIMS-S1-01-P01",
+          "text": "Inspect the documented context, the list of interested parties and their relevant requirements."
+        },
+        {
+          "id": "AIMS-S1-01-P02",
+          "text": "Confirm that the documented scope states boundaries, AI systems and the organisation's AI roles."
+        },
+        {
+          "id": "AIMS-S1-01-P03",
+          "text": "Review the main AIMS documents for existence and approval before Stage 2."
+        },
+        {
+          "id": "AIMS-S1-01-P04",
+          "text": "Record the areas of concern to follow up in Stage 2 and whether Stage 2 can proceed."
+        }
+      ],
+      "evidenceRequired": [
+        "AIMS scope statement",
+        "Context and interested-party analysis",
+        "AIMS document register"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-SCOPE-01"
+      ],
+      "phase": "stage-1"
+    },
+    {
+      "id": "AIMS-S1-02",
+      "title": "Stage 1: Statement of Applicability review",
+      "kind": "working_paper",
+      "stage": "Planning",
+      "folder": "01 Planning / Stage 1",
+      "templatePath": "templates/planning.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether the Statement of Applicability lists every Annex A control with a justified inclusion or exclusion and its implementation status.",
+      "procedures": [
+        {
+          "id": "AIMS-S1-02-P01",
+          "text": "Obtain the organisation's current Statement of Applicability and its approval record."
+        },
+        {
+          "id": "AIMS-S1-02-P02",
+          "text": "Check that every Annex A control has an inclusion or exclusion decision with a justification."
+        },
+        {
+          "id": "AIMS-S1-02-P03",
+          "text": "Check that each included control states its implementation status."
+        },
+        {
+          "id": "AIMS-S1-02-P04",
+          "text": "Record the controls Stage 2 will sample and any exclusion whose justification is weak."
+        }
+      ],
+      "evidenceRequired": [
+        "Statement of Applicability",
+        "Risk treatment plan",
+        "Approval record"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-SOA-01"
+      ],
+      "phase": "stage-1"
+    },
+    {
+      "id": "AIMS-S2-01",
+      "title": "Stage 2: leadership, AI policy and roles",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether top management directs the AI management system through an AI policy, defined roles and a channel for concerns.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-01-P01",
+          "text": "Interview top management on direction, resources and review of the AI management system."
+        },
+        {
+          "id": "AIMS-S2-01-P02",
+          "text": "Inspect the AI policy, its approval, communication, alignment with other policies and planned review."
+        },
+        {
+          "id": "AIMS-S2-01-P03",
+          "text": "Trace a sample of AI roles to documented responsibilities and authorities."
+        },
+        {
+          "id": "AIMS-S2-01-P04",
+          "text": "Test the channel for reporting concerns with a sample of reports or a walkthrough."
+        }
+      ],
+      "evidenceRequired": [
+        "AI policy",
+        "Management minutes",
+        "Role descriptions",
+        "Concern reports"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-LEAD-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-02",
+      "title": "Stage 2: AI risk assessment and treatment",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether AI risks are assessed and treated by a defined process, at planned intervals and after significant changes.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-02-P01",
+          "text": "Inspect the documented risk assessment process, its criteria and the approved risk acceptance levels."
+        },
+        {
+          "id": "AIMS-S2-02-P02",
+          "text": "Trace a sample of AI systems through risk identification, analysis, evaluation and treatment."
+        },
+        {
+          "id": "AIMS-S2-02-P03",
+          "text": "Verify that assessments were repeated at planned intervals and after significant changes."
+        },
+        {
+          "id": "AIMS-S2-02-P04",
+          "text": "Reconcile the risk treatment plan with the Statement of Applicability and residual-risk approvals."
+        }
+      ],
+      "evidenceRequired": [
+        "Risk assessment procedure",
+        "Risk register extract",
+        "Risk treatment plan",
+        "Change log"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-RISK-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-03",
+      "title": "Stage 2: AI system impact assessment",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether AI system impact assessments are defined, performed, recorded and consider individuals, groups and society.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-03-P01",
+          "text": "Inspect the impact assessment process and the triggers for performing an assessment."
+        },
+        {
+          "id": "AIMS-S2-03-P02",
+          "text": "Sample recorded assessments for impacts on individuals, groups and society."
+        },
+        {
+          "id": "AIMS-S2-03-P03",
+          "text": "Verify that results feed risk treatment and are retained."
+        }
+      ],
+      "evidenceRequired": [
+        "Impact assessment procedure",
+        "Sampled impact assessments"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-IMPACT-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-04",
+      "title": "Stage 2: objectives, changes and support",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether AI objectives, planned changes, resources, competence, awareness, communication and documented information support the system.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-04-P01",
+          "text": "Inspect AI objectives, their measures and the plans to reach them."
+        },
+        {
+          "id": "AIMS-S2-04-P02",
+          "text": "Inspect how changes to the management system are planned and carried out."
+        },
+        {
+          "id": "AIMS-S2-04-P03",
+          "text": "Sample competence and awareness records of people doing AI-related work."
+        },
+        {
+          "id": "AIMS-S2-04-P04",
+          "text": "Test communication arrangements and the control of documented information."
+        },
+        {
+          "id": "AIMS-S2-04-P05",
+          "text": "Inspect resource records for data, tooling, computing and people."
+        }
+      ],
+      "evidenceRequired": [
+        "AI objectives",
+        "Change plans",
+        "Training records",
+        "Document control procedure",
+        "Resource register"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-SUPPORT-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-05",
+      "title": "Stage 2: AI system life cycle and data",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether AI systems are developed, verified, deployed, operated and documented under controlled processes using controlled data.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-05-P01",
+          "text": "Inspect operational planning and control of AI-related processes, including outsourced ones."
+        },
+        {
+          "id": "AIMS-S2-05-P02",
+          "text": "Trace a sample of AI systems from requirements through design, verification, validation and deployment."
+        },
+        {
+          "id": "AIMS-S2-05-P03",
+          "text": "Inspect operation and monitoring records, technical documentation and event logs of the sample."
+        },
+        {
+          "id": "AIMS-S2-05-P04",
+          "text": "Test data acquisition, quality, provenance and preparation records for the sample."
+        }
+      ],
+      "evidenceRequired": [
+        "Life cycle procedure",
+        "Design and validation records",
+        "Technical documentation",
+        "Data records",
+        "Event logs"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-LIFECYCLE-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-06",
+      "title": "Stage 2: information, use and third parties",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether interested parties are informed, AI systems are used responsibly and third-party responsibilities are allocated.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-06-P01",
+          "text": "Inspect user documentation, external reporting and incident communication for the sample."
+        },
+        {
+          "id": "AIMS-S2-06-P02",
+          "text": "Test processes and objectives for responsible use against the intended use of the sample."
+        },
+        {
+          "id": "AIMS-S2-06-P03",
+          "text": "Inspect supplier and customer arrangements for allocated AI responsibilities."
+        }
+      ],
+      "evidenceRequired": [
+        "User documentation",
+        "Incident communications",
+        "Supplier agreements",
+        "Customer terms"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-PARTIES-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "AIMS-S2-07",
+      "title": "Stage 2: performance evaluation and improvement",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / Stage 2",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Assess whether performance is monitored, internal audits and management reviews are performed and nonconformities are corrected.",
+      "procedures": [
+        {
+          "id": "AIMS-S2-07-P01",
+          "text": "Inspect monitoring and measurement results and their evaluation."
+        },
+        {
+          "id": "AIMS-S2-07-P02",
+          "text": "Inspect the internal audit programme, a completed audit and its follow-up."
+        },
+        {
+          "id": "AIMS-S2-07-P03",
+          "text": "Inspect management review inputs, outputs and decisions."
+        },
+        {
+          "id": "AIMS-S2-07-P04",
+          "text": "Sample nonconformities for correction, root cause, corrective action and effectiveness review."
+        }
+      ],
+      "evidenceRequired": [
+        "Monitoring reports",
+        "Internal audit reports",
+        "Management review minutes",
+        "Corrective action log"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-AIMS-IMPROVE-01"
+      ],
+      "phase": "stage-2"
+    },
+    {
+      "id": "MEM-EX-01",
+      "title": "Exception, limitation and disagreement memo",
+      "kind": "memo",
+      "stage": "Evidence Evaluation",
+      "folder": "04 Evaluation",
+      "templatePath": "templates/memo-decision.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Evaluate unresolved exceptions and their effect on conclusion.",
+      "procedures": [
+        {
+          "id": "MEM-EX-01-P01",
+          "text": "Describe criterion, missing/conflicting evidence and efforts to obtain it."
+        },
+        {
+          "id": "MEM-EX-01-P02",
+          "text": "Assess alternatives, severity and potential pervasive effects."
+        },
+        {
+          "id": "MEM-EX-01-P03",
+          "text": "Document management position and required report disclosure."
+        }
+      ],
+      "evidenceRequired": [
+        "Exception register",
+        "Evidence requests",
+        "Management correspondence",
+        "Follow-up papers"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [],
+      "derivedFrom": {
+        "packId": "eu-ai-act-amended",
+        "version": "2026.11.2",
+        "itemId": "MEM-EX-01"
+      }
+    },
+    {
+      "id": "MEM-AIMS-NC-01",
+      "title": "Nonconformity grading and corrective action review",
+      "kind": "memo",
+      "stage": "Evidence Evaluation",
+      "folder": "04 Evaluation",
+      "templatePath": "templates/memo-decision.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Record the grade of each nonconformity and the review of the organisation's corrections and corrective action plans.",
+      "procedures": [
+        {
+          "id": "MEM-AIMS-NC-01-P01",
+          "text": "List each nonconformity with the clause or control it concerns and its grade, with the reason for the grade."
+        },
+        {
+          "id": "MEM-AIMS-NC-01-P02",
+          "text": "Review the correction, root cause analysis and corrective action plan for each nonconformity."
+        },
+        {
+          "id": "MEM-AIMS-NC-01-P03",
+          "text": "Record which plans were accepted and which major nonconformities need verification on site."
+        }
+      ],
+      "evidenceRequired": [
+        "Nonconformity reports",
+        "Corrective action plans",
+        "Verification evidence"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [],
+      "phase": "stage-2"
+    },
+    {
+      "id": "MEM-AIMS-REC-01",
+      "title": "Audit recommendation to the certification decision",
+      "kind": "memo",
+      "stage": "Reporting",
+      "folder": "05 Reporting",
+      "templatePath": "templates/reporting-signoff.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Record the audit team's recommendation and its basis for the certification decision.",
+      "procedures": [
+        {
+          "id": "MEM-AIMS-REC-01-P01",
+          "text": "Summarise the Stage 1 and Stage 2 conclusions and the Statement of Applicability review."
+        },
+        {
+          "id": "MEM-AIMS-REC-01-P02",
+          "text": "State the open nonconformities by grade and the status of their corrective actions."
+        },
+        {
+          "id": "MEM-AIMS-REC-01-P03",
+          "text": "State the recommendation and what the certification decision-maker must still verify."
+        }
+      ],
+      "evidenceRequired": [
+        "Stage 1 and Stage 2 papers",
+        "Statement of Applicability",
+        "Nonconformity register"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": []
+    }
+  ]
+}

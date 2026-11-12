@@ -302,6 +302,55 @@ export type Finding = {
     closedBy?: string;
   }[];
   visibility: "internal" | "client";
+  /**
+   * The grade of a finding on a pack with nonconformity grading (#28): a
+   * major or minor nonconformity, or an opportunity for improvement.
+   */
+  grade?: NonconformityGrade;
+  /** Every grading decision, oldest first. */
+  gradeHistory?: {
+    grade: NonconformityGrade;
+    rationale: string;
+    actor: string;
+    at: string;
+  }[];
+  /** The organisation's correction and corrective action plan (#28). */
+  correctiveAction?: CorrectiveAction;
+};
+export type NonconformityGrade = "major" | "minor" | "opportunity";
+export type CorrectiveAction = {
+  /** What was done to remove the nonconformity found. */
+  correction: string;
+  rootCause: string;
+  /** What will remove the cause so it does not recur. */
+  action: string;
+  owner: string;
+  dueDate: string;
+  recordedBy: string;
+  recordedAt: string;
+  /** Acceptance of this plan, by someone other than whoever recorded it. */
+  accepted?: { by: string; at: string; note: string };
+};
+/** One control decision of the organisation's Statement of Applicability. */
+export type SoaEntry = {
+  /** The control's requirement id, e.g. "A.2.2". */
+  control: string;
+  included: boolean;
+  justification: string;
+  /** Only for an included control. */
+  implementation?:
+    "implemented" | "partially_implemented" | "planned" | "not_implemented";
+  actor: string;
+  at: string;
+};
+/** The Statement of Applicability as the auditors recorded and reviewed it. */
+export type StatementOfApplicability = {
+  /** The organisation's own document, e.g. "SoA v3 of 2026-10-01". */
+  documentRef: string;
+  entries: SoaEntry[];
+  /** Raised by every change. */
+  revision: number;
+  review?: { by: string; at: string; revision: number; note: string };
 };
 export type Metric = {
   name: string;
@@ -472,6 +521,8 @@ export type Engagement = {
    * stand-back checklist and package sign-offs. Internal only.
    */
   qualityReview?: QualityReview;
+  /** On packs with features.statementOfApplicability (#28). Internal only. */
+  statementOfApplicability?: StatementOfApplicability;
   eventHead: string;
   createdAt: string;
 };

@@ -193,6 +193,7 @@ export function PackBadge({ criteria }: { criteria: CriteriaView }) {
       {criteria.title} {criteria.pin.packVersion}
       {pending.length ? " · legal review pending" : ""}
       {criteria.withdrawn ? " · withdrawn" : ""}
+      {criteria.draft ? " · draft, not released" : ""}
     </span>
   );
 }

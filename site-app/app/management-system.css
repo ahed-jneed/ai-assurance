@@ -1,0 +1,103 @@
+/* Management-system audits (#28): programme phases, Statement of
+   Applicability and nonconformity grading. */
+.phase-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.phase-list ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+}
+.phase-list .badge,
+.nonconformity .badge {
+  margin-left: 0.5rem;
+}
+.soa-review,
+.grade-form,
+.corrective-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: flex-end;
+  margin: 0.5rem 0;
+}
+.soa-review label,
+.grade-form label,
+.corrective-action label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.soa-review input,
+.grade-form input,
+.grade-form select,
+.corrective-action input,
+.soa-table input,
+.soa-table select {
+  min-height: 2rem;
+  border: 1px solid var(--border, #d4d4d8);
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  color: inherit;
+}
+.statement-of-applicability .content-pad {
+  overflow-x: auto;
+}
+.soa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.soa-table th,
+.soa-table td {
+  border-top: 1px solid var(--border, #e4e4e7);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.soa-table thead th {
+  font-weight: 600;
+}
+.soa-table tbody th {
+  font-weight: 500;
+  min-width: 14rem;
+}
+.soa-table td input {
+  width: 100%;
+  min-width: 12rem;
+}
+.soa-table tr.soa-incomplete th {
+  border-left: 3px solid var(--warning, #d97706);
+}
+.grade-guidance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0 0 1rem;
+}
+.grade-guidance dt {
+  font-weight: 600;
+}
+.grade-guidance dd {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.nonconformity-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nonconformity {
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.nonconformity summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+}

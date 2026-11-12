@@ -260,7 +260,9 @@ export function useWorkspaceNavigation({
     else if (gate.kind === "quality_review") {
       url.setReportSection("quality");
       navigate("Reports & sign-off");
-    } else if (gate.kind === "finding") {
+    } else if (gate.kind === "management_system")
+      navigate("Regulatory mapping");
+    else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
       if (record) viewRecord(record.title, record);
     }
