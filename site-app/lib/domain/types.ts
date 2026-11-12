@@ -267,6 +267,15 @@ export type Finding = {
   createdBy: string;
   remediationBy?: string;
   remediationAt?: string;
+  /**
+   * The criteria the finding concerns, as requirement references of the
+   * pinned pack such as "eu-ai-act:AIA-ART-9" (docs/design/criteria-model.md
+   * section 7, phase 2). Defaulted from the item of `support.procedureId`;
+   * findings recorded before phase 2 have none. Coverage places an unresolved
+   * finding without a procedure or paper link on them, and the report rolls
+   * it up by criterion through them.
+   */
+  criteriaRefs?: string[];
   support?: {
     findingId: string;
     procedureId: string;

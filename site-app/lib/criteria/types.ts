@@ -140,6 +140,29 @@ export type PackRoles = {
   diagnosticPaperByResultArticle?: Record<string, string>;
   externalExecutionPaper?: string;
 };
+/** A pack's Annex IV map, in the templates/annex-iv-map.json shape. */
+export type AnnexIvMap = {
+  schemaVersion: string;
+  mapVersion: string;
+  source: Record<string, unknown>;
+  assemblyPolicy: Record<string, unknown>;
+  sections: {
+    id: string;
+    number: number;
+    reference: string;
+    title: string;
+    paperIds: string[];
+    evidenceCategories: string[];
+    legalSubitems: string[];
+    defaultAssessmentState?: string;
+    evidenceChecklist: {
+      id: string;
+      text: string;
+      specificDocumentRequired?: string;
+      cannotInferFromCategory?: boolean;
+    }[];
+  }[];
+};
 export type PackDocument = {
   documentType: "pack";
   schemaVersion: string;
@@ -160,6 +183,9 @@ export type PackDocument = {
   reporting?: { regulatorySource?: string; limitations: string };
   controlObjectives: ControlObjective[];
   items: PackItem[];
+  /** The Annex IV evidence map of features.annexIvIndex (phase 2). */
+  annexIvMap?: AnnexIvMap;
+  notes?: string;
   compat?: {
     catalog?: {
       schemaVersion: string;
@@ -278,7 +304,67 @@ export type CriteriaView = {
   /** The pack version or one of its framework data versions was withdrawn. */
   withdrawn: boolean;
   /** Assertion criteria on packs without obligation assessments. */
-  requirements?: { reference: string; citation: string; title: string }[];
+  requirements?: CriterionOption[];
+  /**
+   * The criteria a finding may reference (internal roles): every group and
+   * requirement node of the pack's criteria sets in scope, as requirement
+   * references (design section 7, phase 2).
+   */
+  findingCriteria?: CriterionOption[];
+  /**
+   * The obligation subitems of the pinned AI Act framework, on packs with
+   * obligation assessments (internal roles): the workbench's options.
+   */
+  obligations?: ObligationOptions;
+};
+export type CriterionOption = {
+  reference: string;
+  citation: string;
+  title: string;
+  /** What a finding's `article` reads for it: "9(1)" for Art. 9(1), else the citation. */
+  article?: string;
+};
+export type ObligationOptions = {
+  scope: string;
+  providerResponsibility: string;
+  source: { url: string; version: string };
+  catalogVersion: string;
+  items: {
+    code: string;
+    article: string;
+    title: string;
+    actor: string[];
+    evidenceCategories: string[];
+    reviewNote?: string;
+    legalReview?: { required: boolean; itemIds: string[] };
+  }[];
+};
+/**
+ * The criteria stamp of a report snapshot (design sections 6.7 and 10): the
+ * pin, every framework data version of the pack and every crosswalk version a
+ * coverage view of the pin uses at capture, with their digests.
+ */
+export type CriteriaStamp = {
+  packId: string;
+  packVersion: string;
+  packSha256: string;
+  legalReviewPending: boolean;
+  frameworks: {
+    id: string;
+    edition: string;
+    version: string;
+    sha256: string;
+    role: CriteriaSet["role"];
+    /** "not_required" for frameworks that are not legislation. */
+    legalReview: "pending" | "completed" | "not_required";
+  }[];
+  crosswalks: {
+    id: string;
+    version: string;
+    sha256: string;
+    source: string;
+    target: string;
+  }[];
 };
 /** A pack offered at engagement creation. */
 export type PackSummary = {
