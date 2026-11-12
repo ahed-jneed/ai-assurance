@@ -23,6 +23,15 @@ vi.mock("@/lib/assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
+// The practice's report settings are read from D1; none are set here.
+vi.mock("@/lib/report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
+}));
+
 const csv =
   "sex,ethnic_group,score\n" +
   [
