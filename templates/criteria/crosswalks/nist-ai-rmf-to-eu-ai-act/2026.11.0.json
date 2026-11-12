@@ -1,0 +1,458 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-rmf-to-eu-ai-act",
+  "version": "2026.11.0",
+  "title": "NIST AI RMF 1.0 to the EU AI Act (amended)",
+  "source": {
+    "framework": "nist-ai-rmf",
+    "edition": "1.0"
+  },
+  "target": {
+    "framework": "eu-ai-act",
+    "edition": "02024R1689-20260727"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers who want to show where evidence gathered against one framework also bears on the other.",
+    "purpose": "Show where audit evidence on AI Act obligations also bears on NIST AI RMF outcomes, and the reverse, without treating either as satisfying the other.",
+    "conceptTypes": {
+      "source": "Voluntary outcomes (AI RMF subcategories)",
+      "target": "Legal obligations (articles and paragraphs)"
+    },
+    "assumptions": "Relationships compare what each requirement asks for, not how an organisation implements it. Each entry is single-source, so it can be read in both directions. No inference may be drawn from outcomes or requirements that are not mapped. Every entry is intersects_with: a NIST outcome and the other requirement only overlap, so a full result on one side is never shown as full on the other. The NIST side was read against NIST AI 100-1 Tables 1 to 4 (checked 2026-11-13). The AI Act side follows the eu-ai-act framework data (rule pack 2026.11.2), whose legal content is pending qualified legal review (D-02); the links are methodology judgements and were not legally reviewed.",
+    "exhaustive": false
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "GV-1.4"
+      ],
+      "target": "AIA-9-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Both establish a documented risk management process. GOVERN 1.4 sets it organisation-wide through policies and controls; Art. 9(1) requires one for each high-risk system across its lifecycle."
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "GV-1.5"
+      ],
+      "target": "AIA-9-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Planned monitoring and periodic review of the risk process overlap with the maintained, regularly reviewed system of Art. 9(1) and (2); the AI Act adds system-level content that GOVERN 1.5 does not ask for."
+    },
+    {
+      "id": "X3",
+      "sources": [
+        "GV-2.1"
+      ],
+      "target": "AIA-ART-17",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Documented roles and lines of communication overlap with the accountability framework that Art. 17(1) lists among the quality management system elements; Art. 17 asks for many further provider-specific elements."
+    },
+    {
+      "id": "X4",
+      "sources": [
+        "GV-2.2"
+      ],
+      "target": "AIA-ART-4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "AI risk management training for personnel overlaps with the AI literacy measures of Art. 4 (as replaced in 2026). Art. 4 covers staff and others acting on the organisation's behalf; GOVERN 2.2 is limited to risk management duties."
+    },
+    {
+      "id": "X5",
+      "sources": [
+        "GV-3.2"
+      ],
+      "target": "AIA-14-123",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Defining roles for human-AI configurations and oversight overlaps with the oversight design of Art. 14(1) to (3), which fixes when and how oversight must be possible; GOVERN 3.2 concerns organisational roles."
+    },
+    {
+      "id": "X6",
+      "sources": [
+        "GV-3.2"
+      ],
+      "target": "AIA-26-2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Defining who oversees AI systems overlaps with the deployer duty of Art. 26(2) to assign oversight to competent, trained and supported people; Art. 26(2) applies only to deployers of high-risk systems."
+    },
+    {
+      "id": "X7",
+      "sources": [
+        "GV-4.2"
+      ],
+      "target": "AIA-AIV-5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Documenting the risks and impacts of the technology overlaps with the description of the risk management system that Annex IV point 5 requires in the technical documentation; neither prescribes the other's content."
+    },
+    {
+      "id": "X8",
+      "sources": [
+        "GV-4.3"
+      ],
+      "target": "AIA-ART-73",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Practices that let incidents be identified overlap with what serious-incident reporting under Art. 73 needs; Art. 73 sets recipients, thresholds and deadlines that GOVERN 4.3 does not."
+    },
+    {
+      "id": "X9",
+      "sources": [
+        "MP-1.1"
+      ],
+      "target": "AIA-AIV-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting intended purposes, users and deployment settings overlaps with the general description of Annex IV point 1, which also asks for items such as versions, hardware and forms of placing on the market."
+    },
+    {
+      "id": "X10",
+      "sources": [
+        "MP-1.1"
+      ],
+      "target": "AIA-9-2A",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Understanding the intended purpose and deployment context is a precondition for identifying intended-use risks under Art. 9(2)(a), but MAP 1.1 does not itself analyse those risks."
+    },
+    {
+      "id": "X11",
+      "sources": [
+        "MP-2.2"
+      ],
+      "target": "AIA-13-3B-I-III",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting knowledge limits and how outputs are used overlaps with the instructions-for-use content of Art. 13(3)(b)(i) to (iii) on purpose, performance and foreseeable risks; Art. 13 prescribes the recipient and form."
+    },
+    {
+      "id": "X12",
+      "sources": [
+        "MP-2.2"
+      ],
+      "target": "AIA-13-3D",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting how outputs are overseen by humans overlaps with the oversight information of Art. 13(3)(d); Art. 13 requires it in the instructions for use for deployers."
+    },
+    {
+      "id": "X13",
+      "sources": [
+        "MP-2.3"
+      ],
+      "target": "AIA-10-3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "TEVV considerations on data selection, availability and representativeness overlap with the data-quality criteria of Art. 10(3), which apply to training, validation and testing data of high-risk systems."
+    },
+    {
+      "id": "X14",
+      "sources": [
+        "MP-3.4"
+      ],
+      "target": "AIA-26-2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Processes for operator proficiency overlap with the deployer duty of Art. 26(2) to give oversight to people with the necessary competence and training."
+    },
+    {
+      "id": "X15",
+      "sources": [
+        "MP-3.5"
+      ],
+      "target": "AIA-14-123",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Defining and assessing human oversight processes overlaps with the oversight measures of Art. 14(1) to (3); Art. 14 also requires design measures built into the system by the provider."
+    },
+    {
+      "id": "X16",
+      "sources": [
+        "MP-5.1"
+      ],
+      "target": "AIA-9-2A",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Estimating likelihood and magnitude of identified impacts overlaps with identifying and analysing known and foreseeable risks under Art. 9(2)(a), which concerns health, safety and fundamental rights for the intended use."
+    },
+    {
+      "id": "X17",
+      "sources": [
+        "MP-5.1"
+      ],
+      "target": "AIA-ART-27",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Characterising impacts on individuals and groups overlaps with the fundamental rights impact assessment of Art. 27, which applies to certain deployers and has prescribed content and notification."
+    },
+    {
+      "id": "X18",
+      "sources": [
+        "MS-1.1"
+      ],
+      "target": "AIA-9-TEST",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Selecting metrics for the most significant risks overlaps with testing against prior defined metrics and thresholds under Art. 9(6) and (8); the AI Act requires the testing, MEASURE 1.1 the choice of metrics."
+    },
+    {
+      "id": "X19",
+      "sources": [
+        "MS-2.1"
+      ],
+      "target": "AIA-AIV-2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting test sets, metrics and tools overlaps with the validation and testing information of Annex IV point 2, which also covers design, architecture and data."
+    },
+    {
+      "id": "X20",
+      "sources": [
+        "MS-2.3"
+      ],
+      "target": "AIA-15-3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Measuring performance in conditions like deployment overlaps with declaring accuracy levels and metrics under Art. 15(3); Art. 15(3) requires the declaration in the instructions for use."
+    },
+    {
+      "id": "X21",
+      "sources": [
+        "MS-2.3"
+      ],
+      "target": "AIA-9-TEST",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Demonstrating performance before deployment overlaps with the testing duty of Art. 9(6) and (8), which adds testing against prior defined metrics and, where appropriate, in real-world conditions."
+    },
+    {
+      "id": "X22",
+      "sources": [
+        "MS-2.4"
+      ],
+      "target": "AIA-ART-72",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Monitoring behaviour in production overlaps with post-market monitoring under Art. 72, which requires a documented plan and systematic collection of data on performance."
+    },
+    {
+      "id": "X23",
+      "sources": [
+        "MS-2.4"
+      ],
+      "target": "AIA-26-5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Monitoring the system in production overlaps with the deployer duty of Art. 26(5) to monitor operation on the basis of the instructions and to act on risks and incidents."
+    },
+    {
+      "id": "X24",
+      "sources": [
+        "MS-2.5"
+      ],
+      "target": "AIA-15-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Demonstrating validity and reliability overlaps with the appropriate accuracy and robustness required by Art. 15(1) throughout the lifecycle; neither defines the other's level."
+    },
+    {
+      "id": "X25",
+      "sources": [
+        "MS-2.6"
+      ],
+      "target": "AIA-15-4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Showing that the system can fail safely overlaps with the resilience and fail-safe measures of Art. 15(4); MEASURE 2.6 also covers safety risks in general."
+    },
+    {
+      "id": "X26",
+      "sources": [
+        "MS-2.7"
+      ],
+      "target": "AIA-15-5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Evaluating security and resilience overlaps with the AI-specific cybersecurity of Art. 15(5), which names attacks such as data poisoning, adversarial examples and model flaws."
+    },
+    {
+      "id": "X27",
+      "sources": [
+        "MS-2.8"
+      ],
+      "target": "AIA-13-12",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Examining transparency risks overlaps with the transparency of operation and instructions required by Art. 13(1) and (2); Art. 13 is a design and information duty, MEASURE 2.8 an examination."
+    },
+    {
+      "id": "X28",
+      "sources": [
+        "MS-2.9"
+      ],
+      "target": "AIA-13-3B-EXPL",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Explaining the model and interpreting outputs in context overlaps with the information on output explanation and interpretation in Art. 13(3)(b)(iv) and (vii)."
+    },
+    {
+      "id": "X29",
+      "sources": [
+        "MS-2.11"
+      ],
+      "target": "AIA-10-2F",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Evaluating fairness and bias overlaps with examining data for possible biases under Art. 10(2)(f); the AI Act provision concerns data sets, MEASURE 2.11 the system as a whole."
+    },
+    {
+      "id": "X30",
+      "sources": [
+        "MS-2.11"
+      ],
+      "target": "AIA-10-2G",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Documenting bias evaluation results overlaps with measures to detect, prevent and mitigate biases under Art. 10(2)(g), which MEASURE 2.11 does not require."
+    },
+    {
+      "id": "X31",
+      "sources": [
+        "MS-3.1"
+      ],
+      "target": "AIA-9-2C",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Tracking emergent risks from deployed performance overlaps with evaluating risks from post-market monitoring data under Art. 9(2)(c)."
+    },
+    {
+      "id": "X32",
+      "sources": [
+        "MG-1.3"
+      ],
+      "target": "AIA-9-2D",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Planning responses to high-priority risks overlaps with adopting targeted risk management measures under Art. 9(2)(d); Art. 9(5) requires risks to be eliminated or reduced as far as technically feasible before residual risk is accepted, while the AI RMF also lists transfer and acceptance."
+    },
+    {
+      "id": "X33",
+      "sources": [
+        "MG-1.4"
+      ],
+      "target": "AIA-9-5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting negative residual risks overlaps with the judgment of Art. 9(5) that residual risk is acceptable; the AI Act requires that judgment, MANAGE 1.4 only the documentation."
+    },
+    {
+      "id": "X34",
+      "sources": [
+        "MG-1.4"
+      ],
+      "target": "AIA-9-5ABC",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Documenting residual risks for downstream acquirers and end users overlaps with giving deployers information under Art. 9(5)(c)."
+    },
+    {
+      "id": "X35",
+      "sources": [
+        "MG-2.4"
+      ],
+      "target": "AIA-ART-20",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Means to supersede, disengage or deactivate a deviating system overlap with the corrective actions of Art. 20 (bring into conformity, withdraw, disable or recall), which add duties to inform."
+    },
+    {
+      "id": "X36",
+      "sources": [
+        "MG-2.4"
+      ],
+      "target": "AIA-14-4E",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Deactivating a deviating system overlaps with the ability of the overseeing person to interrupt the system through a stop procedure under Art. 14(4)(e)."
+    },
+    {
+      "id": "X37",
+      "sources": [
+        "MG-4.1"
+      ],
+      "target": "AIA-ART-72",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Implementing post-deployment monitoring plans overlaps with the post-market monitoring system and plan of Art. 72; MANAGE 4.1 also covers appeal, override and decommissioning."
+    },
+    {
+      "id": "X38",
+      "sources": [
+        "MG-4.3"
+      ],
+      "target": "AIA-ART-73",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Communicating incidents to relevant actors overlaps with reporting serious incidents to market surveillance authorities under Art. 73, which sets thresholds and deadlines."
+    },
+    {
+      "id": "X39",
+      "sources": [
+        "MG-4.2"
+      ],
+      "target": "AIA-ART-17",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Continual improvement through system updates overlaps with the quality management system of Art. 17, which lists many provider-specific elements beyond improvement."
+    }
+  ],
+  "notes": "Only the strongest direct overlaps are recorded (NIST IR 8477, section 3): an AI RMF outcome without an entry is unmapped, not a gap. No entry targets an AI Act group, and none uses superset_of, subset_of or equal: the AI RMF is a voluntary, organisation-wide outcome framework, and no subcategory was judged to contain, or to be contained in, an AI Act obligation. Not an official NIST crosswalk."
+}

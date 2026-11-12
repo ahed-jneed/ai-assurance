@@ -1,0 +1,729 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-rmf",
+  "edition": "1.0",
+  "version": "2026.11.0",
+  "title": "NIST AI 100-1 Artificial Intelligence Risk Management Framework (AI RMF 1.0)",
+  "shortTitle": "NIST AI RMF 1.0",
+  "kind": "framework",
+  "publisher": "National Institute of Standards and Technology (NIST)",
+  "jurisdiction": "US",
+  "status": "published",
+  "researchedAsOf": "2026-11-13",
+  "sources": [
+    {
+      "role": "official_text",
+      "url": "https://doi.org/10.6028/NIST.AI.100-1",
+      "title": "NIST AI 100-1 (January 2023), section 5 and Tables 1 to 4"
+    },
+    {
+      "role": "explorer",
+      "url": "https://airc.nist.gov/airmf-resources/airmf/5-sec-core/",
+      "title": "NIST AI Resource Center: the AI RMF Core"
+    }
+  ],
+  "licence": {
+    "holder": "National Institute of Standards and Technology (NIST), U.S. Department of Commerce",
+    "textPolicy": "full_text",
+    "status": "confirmed",
+    "basis": "NIST-authored publication: except material marked as copyrighted, information on NIST sites is public information and may be distributed or copied, with credit requested (design section 13). We store identifiers and our own short titles only, not the publication text.",
+    "url": "https://www.nist.gov/oism/copyrights",
+    "attribution": "NIST AI 100-1, Artificial Intelligence Risk Management Framework (AI RMF 1.0), NIST, January 2023."
+  },
+  "defaultProvenance": {
+    "source": "https://doi.org/10.6028/NIST.AI.100-1",
+    "sourceKind": "authentic_text",
+    "verification": "verified",
+    "checkedAt": "2026-11-13",
+    "legalReview": "not_required",
+    "note": "Function, category and subcategory identifiers checked against Tables 1 to 4 of NIST AI 100-1 (72 subcategories in 19 categories). Titles are our own short wording, not NIST statements; read the publication for the outcome text."
+  },
+  "requirements": [
+    {
+      "id": "GV",
+      "ref": "GOVERN",
+      "title": "Govern: a culture and structures for AI risk management",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-1",
+      "ref": "GOVERN 1",
+      "title": "Risk policies, processes and practices are in place and effective",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-1.1",
+      "ref": "GOVERN 1.1",
+      "title": "AI legal and regulatory requirements understood and documented",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.2",
+      "ref": "GOVERN 1.2",
+      "title": "Trustworthy AI characteristics built into policies and practices",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.3",
+      "ref": "GOVERN 1.3",
+      "title": "Level of risk management activity set from risk tolerance",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.4",
+      "ref": "GOVERN 1.4",
+      "title": "Risk management process set by transparent policies and controls",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.5",
+      "ref": "GOVERN 1.5",
+      "title": "Monitoring and periodic review of the risk process planned",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.6",
+      "ref": "GOVERN 1.6",
+      "title": "Inventory of AI systems, resourced by risk priority",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-1.7",
+      "ref": "GOVERN 1.7",
+      "title": "Safe decommissioning and phase-out of AI systems",
+      "type": "requirement",
+      "parent": "GV-1"
+    },
+    {
+      "id": "GV-2",
+      "ref": "GOVERN 2",
+      "title": "Accountability structures for AI risk management",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-2.1",
+      "ref": "GOVERN 2.1",
+      "title": "Roles, responsibilities and communication lines documented",
+      "type": "requirement",
+      "parent": "GV-2"
+    },
+    {
+      "id": "GV-2.2",
+      "ref": "GOVERN 2.2",
+      "title": "AI risk management training for personnel and partners",
+      "type": "requirement",
+      "parent": "GV-2"
+    },
+    {
+      "id": "GV-2.3",
+      "ref": "GOVERN 2.3",
+      "title": "Executive leadership responsible for AI risk decisions",
+      "type": "requirement",
+      "parent": "GV-2"
+    },
+    {
+      "id": "GV-3",
+      "ref": "GOVERN 3",
+      "title": "Diversity, equity, inclusion and accessibility in AI risk work",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-3.1",
+      "ref": "GOVERN 3.1",
+      "title": "AI risk decisions informed by a diverse team",
+      "type": "requirement",
+      "parent": "GV-3"
+    },
+    {
+      "id": "GV-3.2",
+      "ref": "GOVERN 3.2",
+      "title": "Roles for human-AI configurations and oversight defined",
+      "type": "requirement",
+      "parent": "GV-3"
+    },
+    {
+      "id": "GV-4",
+      "ref": "GOVERN 4",
+      "title": "A culture that considers and communicates AI risk",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-4.1",
+      "ref": "GOVERN 4.1",
+      "title": "Critical-thinking and safety-first mindset fostered",
+      "type": "requirement",
+      "parent": "GV-4"
+    },
+    {
+      "id": "GV-4.2",
+      "ref": "GOVERN 4.2",
+      "title": "Teams document AI risks and impacts and communicate them",
+      "type": "requirement",
+      "parent": "GV-4"
+    },
+    {
+      "id": "GV-4.3",
+      "ref": "GOVERN 4.3",
+      "title": "Practices enable AI testing, incident identification and sharing",
+      "type": "requirement",
+      "parent": "GV-4"
+    },
+    {
+      "id": "GV-5",
+      "ref": "GOVERN 5",
+      "title": "Engagement with relevant AI actors",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-5.1",
+      "ref": "GOVERN 5.1",
+      "title": "External feedback on individual and societal impacts integrated",
+      "type": "requirement",
+      "parent": "GV-5"
+    },
+    {
+      "id": "GV-5.2",
+      "ref": "GOVERN 5.2",
+      "title": "Adjudicated feedback from AI actors fed into design",
+      "type": "requirement",
+      "parent": "GV-5"
+    },
+    {
+      "id": "GV-6",
+      "ref": "GOVERN 6",
+      "title": "Third-party software, data and supply-chain risks",
+      "type": "group",
+      "parent": "GV",
+      "exhaustive": true
+    },
+    {
+      "id": "GV-6.1",
+      "ref": "GOVERN 6.1",
+      "title": "Policies for third-party AI risks, including IP infringement",
+      "type": "requirement",
+      "parent": "GV-6"
+    },
+    {
+      "id": "GV-6.2",
+      "ref": "GOVERN 6.2",
+      "title": "Contingency for failures of high-risk third-party data or AI",
+      "type": "requirement",
+      "parent": "GV-6"
+    },
+    {
+      "id": "MP",
+      "ref": "MAP",
+      "title": "Map: context and risks of the AI system",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-1",
+      "ref": "MAP 1",
+      "title": "Context established and understood",
+      "type": "group",
+      "parent": "MP",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-1.1",
+      "ref": "MAP 1.1",
+      "title": "Intended purposes, context, laws and deployment settings documented",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-1.2",
+      "ref": "MAP 1.2",
+      "title": "Interdisciplinary and diverse actors establish the context",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-1.3",
+      "ref": "MAP 1.3",
+      "title": "Organisational mission and AI goals documented",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-1.4",
+      "ref": "MAP 1.4",
+      "title": "Business value or context of use defined or re-evaluated",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-1.5",
+      "ref": "MAP 1.5",
+      "title": "Organisational risk tolerances determined and documented",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-1.6",
+      "ref": "MAP 1.6",
+      "title": "System requirements elicited; socio-technical design choices",
+      "type": "requirement",
+      "parent": "MP-1"
+    },
+    {
+      "id": "MP-2",
+      "ref": "MAP 2",
+      "title": "Categorisation of the AI system",
+      "type": "group",
+      "parent": "MP",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-2.1",
+      "ref": "MAP 2.1",
+      "title": "Tasks and methods of the AI system defined",
+      "type": "requirement",
+      "parent": "MP-2"
+    },
+    {
+      "id": "MP-2.2",
+      "ref": "MAP 2.2",
+      "title": "Knowledge limits and human use and oversight of outputs documented",
+      "type": "requirement",
+      "parent": "MP-2"
+    },
+    {
+      "id": "MP-2.3",
+      "ref": "MAP 2.3",
+      "title": "Scientific integrity and TEVV considerations documented",
+      "type": "requirement",
+      "parent": "MP-2"
+    },
+    {
+      "id": "MP-3",
+      "ref": "MAP 3",
+      "title": "Capabilities, usage, benefits and costs against benchmarks",
+      "type": "group",
+      "parent": "MP",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-3.1",
+      "ref": "MAP 3.1",
+      "title": "Potential benefits examined and documented",
+      "type": "requirement",
+      "parent": "MP-3"
+    },
+    {
+      "id": "MP-3.2",
+      "ref": "MAP 3.2",
+      "title": "Potential costs of AI errors examined and documented",
+      "type": "requirement",
+      "parent": "MP-3"
+    },
+    {
+      "id": "MP-3.3",
+      "ref": "MAP 3.3",
+      "title": "Targeted application scope specified and documented",
+      "type": "requirement",
+      "parent": "MP-3"
+    },
+    {
+      "id": "MP-3.4",
+      "ref": "MAP 3.4",
+      "title": "Operator and practitioner proficiency processes defined",
+      "type": "requirement",
+      "parent": "MP-3"
+    },
+    {
+      "id": "MP-3.5",
+      "ref": "MAP 3.5",
+      "title": "Human oversight processes defined, assessed and documented",
+      "type": "requirement",
+      "parent": "MP-3"
+    },
+    {
+      "id": "MP-4",
+      "ref": "MAP 4",
+      "title": "Risks and benefits mapped for all components, third-party included",
+      "type": "group",
+      "parent": "MP",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-4.1",
+      "ref": "MAP 4.1",
+      "title": "Technology and legal risks of components mapped, IP included",
+      "type": "requirement",
+      "parent": "MP-4"
+    },
+    {
+      "id": "MP-4.2",
+      "ref": "MAP 4.2",
+      "title": "Internal risk controls for components identified and documented",
+      "type": "requirement",
+      "parent": "MP-4"
+    },
+    {
+      "id": "MP-5",
+      "ref": "MAP 5",
+      "title": "Impacts on individuals, groups, organisations and society",
+      "type": "group",
+      "parent": "MP",
+      "exhaustive": true
+    },
+    {
+      "id": "MP-5.1",
+      "ref": "MAP 5.1",
+      "title": "Likelihood and magnitude of each identified impact documented",
+      "type": "requirement",
+      "parent": "MP-5"
+    },
+    {
+      "id": "MP-5.2",
+      "ref": "MAP 5.2",
+      "title": "Regular engagement and feedback on impacts in place",
+      "type": "requirement",
+      "parent": "MP-5"
+    },
+    {
+      "id": "MS",
+      "ref": "MEASURE",
+      "title": "Measure: analysing, assessing and tracking AI risks",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "MS-1",
+      "ref": "MEASURE 1",
+      "title": "Appropriate methods and metrics identified and applied",
+      "type": "group",
+      "parent": "MS",
+      "exhaustive": true
+    },
+    {
+      "id": "MS-1.1",
+      "ref": "MEASURE 1.1",
+      "title": "Metrics for the most significant mapped risks selected",
+      "type": "requirement",
+      "parent": "MS-1"
+    },
+    {
+      "id": "MS-1.2",
+      "ref": "MEASURE 1.2",
+      "title": "Metrics and control effectiveness regularly reassessed",
+      "type": "requirement",
+      "parent": "MS-1"
+    },
+    {
+      "id": "MS-1.3",
+      "ref": "MEASURE 1.3",
+      "title": "Independent or non-developer experts involved in assessments",
+      "type": "requirement",
+      "parent": "MS-1"
+    },
+    {
+      "id": "MS-2",
+      "ref": "MEASURE 2",
+      "title": "AI systems evaluated for trustworthy characteristics",
+      "type": "group",
+      "parent": "MS",
+      "exhaustive": true
+    },
+    {
+      "id": "MS-2.1",
+      "ref": "MEASURE 2.1",
+      "title": "Test sets, metrics and TEVV tools documented",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.2",
+      "ref": "MEASURE 2.2",
+      "title": "Human-subject evaluations protected and representative",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.3",
+      "ref": "MEASURE 2.3",
+      "title": "Performance measured in conditions like deployment",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.4",
+      "ref": "MEASURE 2.4",
+      "title": "Functionality and behaviour monitored in production",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.5",
+      "ref": "MEASURE 2.5",
+      "title": "Validity and reliability shown; generalisation limits documented",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.6",
+      "ref": "MEASURE 2.6",
+      "title": "Safety risks evaluated; system shown to fail safely",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.7",
+      "ref": "MEASURE 2.7",
+      "title": "Security and resilience evaluated and documented",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.8",
+      "ref": "MEASURE 2.8",
+      "title": "Transparency and accountability risks examined",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.9",
+      "ref": "MEASURE 2.9",
+      "title": "Model explained and validated; outputs interpreted in context",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.10",
+      "ref": "MEASURE 2.10",
+      "title": "Privacy risk examined and documented",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.11",
+      "ref": "MEASURE 2.11",
+      "title": "Fairness and bias evaluated and documented",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.12",
+      "ref": "MEASURE 2.12",
+      "title": "Environmental impact and sustainability assessed",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-2.13",
+      "ref": "MEASURE 2.13",
+      "title": "Effectiveness of TEVV metrics and processes evaluated",
+      "type": "requirement",
+      "parent": "MS-2"
+    },
+    {
+      "id": "MS-3",
+      "ref": "MEASURE 3",
+      "title": "Tracking of identified AI risks over time",
+      "type": "group",
+      "parent": "MS",
+      "exhaustive": true
+    },
+    {
+      "id": "MS-3.1",
+      "ref": "MEASURE 3.1",
+      "title": "Existing, unanticipated and emergent risks tracked regularly",
+      "type": "requirement",
+      "parent": "MS-3"
+    },
+    {
+      "id": "MS-3.2",
+      "ref": "MEASURE 3.2",
+      "title": "Risk tracking where measurement is not yet possible",
+      "type": "requirement",
+      "parent": "MS-3"
+    },
+    {
+      "id": "MS-3.3",
+      "ref": "MEASURE 3.3",
+      "title": "Channels to report problems and appeal outcomes",
+      "type": "requirement",
+      "parent": "MS-3"
+    },
+    {
+      "id": "MS-4",
+      "ref": "MEASURE 4",
+      "title": "Feedback on the efficacy of measurement",
+      "type": "group",
+      "parent": "MS",
+      "exhaustive": true
+    },
+    {
+      "id": "MS-4.1",
+      "ref": "MEASURE 4.1",
+      "title": "Measurement tied to deployment context and expert input",
+      "type": "requirement",
+      "parent": "MS-4"
+    },
+    {
+      "id": "MS-4.2",
+      "ref": "MEASURE 4.2",
+      "title": "Trustworthiness results validated with experts and AI actors",
+      "type": "requirement",
+      "parent": "MS-4"
+    },
+    {
+      "id": "MS-4.3",
+      "ref": "MEASURE 4.3",
+      "title": "Performance changes from consultation and field data documented",
+      "type": "requirement",
+      "parent": "MS-4"
+    },
+    {
+      "id": "MG",
+      "ref": "MANAGE",
+      "title": "Manage: prioritising and treating AI risks",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "MG-1",
+      "ref": "MANAGE 1",
+      "title": "Mapped and measured risks prioritised, responded to and managed",
+      "type": "group",
+      "parent": "MG",
+      "exhaustive": true
+    },
+    {
+      "id": "MG-1.1",
+      "ref": "MANAGE 1.1",
+      "title": "Decision whether the system meets its purpose and should proceed",
+      "type": "requirement",
+      "parent": "MG-1"
+    },
+    {
+      "id": "MG-1.2",
+      "ref": "MANAGE 1.2",
+      "title": "Risk treatment prioritised by impact, likelihood and resources",
+      "type": "requirement",
+      "parent": "MG-1"
+    },
+    {
+      "id": "MG-1.3",
+      "ref": "MANAGE 1.3",
+      "title": "Responses to high-priority risks planned and documented",
+      "type": "requirement",
+      "parent": "MG-1"
+    },
+    {
+      "id": "MG-1.4",
+      "ref": "MANAGE 1.4",
+      "title": "Negative residual risks documented for acquirers and end users",
+      "type": "requirement",
+      "parent": "MG-1"
+    },
+    {
+      "id": "MG-2",
+      "ref": "MANAGE 2",
+      "title": "Strategies to maximise benefits and minimise negative impacts",
+      "type": "group",
+      "parent": "MG",
+      "exhaustive": true
+    },
+    {
+      "id": "MG-2.1",
+      "ref": "MANAGE 2.1",
+      "title": "Resources and non-AI alternatives considered",
+      "type": "requirement",
+      "parent": "MG-2"
+    },
+    {
+      "id": "MG-2.2",
+      "ref": "MANAGE 2.2",
+      "title": "Mechanisms sustain the value of deployed systems",
+      "type": "requirement",
+      "parent": "MG-2"
+    },
+    {
+      "id": "MG-2.3",
+      "ref": "MANAGE 2.3",
+      "title": "Response to and recovery from previously unknown risks",
+      "type": "requirement",
+      "parent": "MG-2"
+    },
+    {
+      "id": "MG-2.4",
+      "ref": "MANAGE 2.4",
+      "title": "Means to supersede, disengage or deactivate a deviating system",
+      "type": "requirement",
+      "parent": "MG-2"
+    },
+    {
+      "id": "MG-3",
+      "ref": "MANAGE 3",
+      "title": "Third-party AI risks and benefits managed",
+      "type": "group",
+      "parent": "MG",
+      "exhaustive": true
+    },
+    {
+      "id": "MG-3.1",
+      "ref": "MANAGE 3.1",
+      "title": "Third-party risks monitored and controls documented",
+      "type": "requirement",
+      "parent": "MG-3"
+    },
+    {
+      "id": "MG-3.2",
+      "ref": "MANAGE 3.2",
+      "title": "Pre-trained models monitored in regular maintenance",
+      "type": "requirement",
+      "parent": "MG-3"
+    },
+    {
+      "id": "MG-4",
+      "ref": "MANAGE 4",
+      "title": "Risk treatments and communication plans documented and monitored",
+      "type": "group",
+      "parent": "MG",
+      "exhaustive": true
+    },
+    {
+      "id": "MG-4.1",
+      "ref": "MANAGE 4.1",
+      "title": "Post-deployment monitoring plans implemented",
+      "type": "requirement",
+      "parent": "MG-4"
+    },
+    {
+      "id": "MG-4.2",
+      "ref": "MANAGE 4.2",
+      "title": "Continual improvement built into system updates",
+      "type": "requirement",
+      "parent": "MG-4"
+    },
+    {
+      "id": "MG-4.3",
+      "ref": "MANAGE 4.3",
+      "title": "Incidents and errors communicated, tracked and recovered from",
+      "type": "requirement",
+      "parent": "MG-4"
+    }
+  ],
+  "notes": "The AI RMF is voluntary. Its subcategories are outcomes, not obligations; a covered cell means that reviewed audit work bears on the outcome, never that an organisation conforms to the framework. Every category lists all its subcategories and every function all its categories, so the groups are exhaustive."
+}
