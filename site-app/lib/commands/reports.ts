@@ -32,6 +32,7 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
+import { publishableSummary } from "../ll144-audit";
 import { assertReviewerIndependent } from "../quality-review-records";
 import {
   criteriaStamp,
@@ -145,6 +146,9 @@ export const reports = defineCommands({
       const elements = reportElements(e, terms, particulars, createdAt).map(
         ({ id, label, value }) => ({ id, label, value }),
       );
+      const approvedLl144 = (e.ll144Audits ?? []).filter(
+        (x) => x.status === "approved",
+      );
       const report = {
         terms,
         particulars,
@@ -156,6 +160,11 @@ export const reports = defineCommands({
           criteriaPhrase,
         ),
         criteria: criterionRollup(e),
+        // The publishable LL144 summaries of the approved audits (#30). They
+        // carry no user id or row data, so both snapshots hold them.
+        ...(approvedLl144.length
+          ? { ll144Summaries: approvedLl144.map(publishableSummary) }
+          : {}),
       };
       const snapshot = {
         workflow: e.workflow ? structuredClone(e.workflow) : null,
