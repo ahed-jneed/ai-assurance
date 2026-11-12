@@ -1,10 +1,11 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "id": "{{paper_id}}",
   "tenantId": "{{tenant_id}}",
   "clientId": "{{client_id}}",
   "engagementId": "{{engagement_id}}",
   "catalogId": "WP-A10-02",
+  "kind": "working_paper",
   "templateVersion": "2026.10.1",
   "revision": 1,
   "status": "draft",
@@ -69,6 +70,17 @@
   },
   "reviewComments": [],
   "approvals": [],
+  "narrative": {
+    "objective": "Evaluate potential group disparities with context, uncertainty and follow-up.",
+    "scope": "",
+    "criteria": "",
+    "procedures": "",
+    "sampling": "",
+    "results": "",
+    "limitations": "",
+    "conclusion": "",
+    "conclusionStatus": "not_evaluated"
+  },
   "provenance": {
     "createdBy": "{{preparer_id}}",
     "createdAt": "2026-10-05T00:00:00Z",

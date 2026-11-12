@@ -8,7 +8,9 @@ Statistics 1.0.0 (docs/design/audit-statistics.md section 14, E4): the datasets
 meet the 30/30/10 floors, results are keyed by criterion id and carry the
 engine's copied decision, and the run outcome aggregates confirmatory criteria
 (section 4.6). One fixture uses an explicit plan (engineConfig 1.4) whose ids
-differ from the suite names. schemas/fixtures/external-runs.v1.2.json stays as
+differ from the suite names, and the binary fixture pins the dataset card the
+API pinned in fixtures/hosted-api-runs.v1.4.json, re-issued for its own bytes.
+schemas/fixtures/external-runs.v1.2.json stays as
 the frozen fixture of the 1.2 branch; this script writes external-runs.v1.5.json.
 """
 import argparse
@@ -28,6 +30,9 @@ from engine.worker_contract import Claim, evidence_envelope, json_bytes, transla
 DATE = '2026-10-08T16:00:00.000Z'
 IMAGE = 'sha256:' + 'a' * 64
 BASE = json.loads((ROOT/'schemas/fixtures/hosted-runs.v1.1.json').read_text(encoding='utf-8'))[0]
+# The dataset card the records API pinned to a hosted run (capture-api-fixtures.mjs).
+API_CARD = next(run['manifest']['dataset']['cardPin'] for run in json.loads(
+    (ROOT/'schemas/fixtures/hosted-api-runs.v1.4.json').read_text(encoding='utf-8')) if run['state'] == 'succeeded')
 
 
 def binary(errors_b):
@@ -112,6 +117,13 @@ def main(argv=None):
                 config = {'labelColumn': 'actual', 'predictionColumn': 'predicted', 'groupColumn': 'group', 'positiveLabel': '1', 'negativeLabel': '0'}
                 profile.update(id='PROTOCOL-external-'+name, schemaVersion='1.1', task=task, suite=suite, config=config, statistics=plan)
             dataset = {'id': 'EV-external-'+name, 'name': name+'.csv', 'sha256': sha256(data), 'size': len(data)}
+            if name == 'binary':
+                # queueExternal pins the registered card of the exact bytes; the record
+                # hash is the SHA-256 of the stored card text.
+                card = {**API_CARD['card'], 'artifactId': dataset['id'], 'artifactSha256': dataset['sha256'],
+                    'artifactName': dataset['name'], 'artifactSize': dataset['size']}
+                dataset['cardPin'] = {'recordId': 'AS-external-binary-card',
+                    'sha256': sha256(json.dumps(card, separators=(',', ':'), ensure_ascii=False).encode()), 'card': card}
             engine_config = {'contractVersion': '1.1' if plan is None else '1.4', 'id': 'JOB-external-'+name,
                 'engagementId': 'ENG-external-fixture', 'modelId': model['id'], 'datasetId': dataset['id'],
                 'task': task, 'suite': suite, 'config': config, 'policyId': profile['id'], 'policyVersion': profile['version'], 'seed': 42}
