@@ -9,13 +9,14 @@ import {
   assertModelSpecLimits,
   frozenLabelPair,
 } from "../../external-worker-contract";
+import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { diagnosticNarrative } from "../../presentation";
-import { recordVersions } from "../../rule-pack-current";
 import {
   externalGate,
+  heldByClient,
   specialCategoryLimitation,
 } from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
@@ -120,7 +121,15 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "Use a selected approved procedure with the same model, dataset and protocol",
         );
-      externalGate(profile, v.mode);
+      // A client-held pin (#102) has no bytes here: only the client's own
+      // worker can read it, in the client's environment.
+      const clientHeld = heldByClient(dataset);
+      if (clientHeld && v.mode !== "client_local")
+        throw new ApiError(
+          409,
+          "This dataset is held by the client: queue it in client-local mode for the client's own worker",
+        );
+      externalGate(profile, v.mode, clientHeld);
       const plan = profile.statistics,
         outputLabels: string[] = system.body.outputs.classOrder,
         labels = frozenLabelPair({
@@ -222,6 +231,9 @@ export const execution: AssuranceModule = defineCommands({
             name: dataset.name,
             sha256: dataset.sha256,
             size: dataset.size,
+            // The worker reads the file in the client's environment by this
+            // pin and downloads nothing (worker 1.3.0).
+            ...(clientHeld ? { custody: "client" as const } : {}),
             ...(card
               ? {
                   cardPin: {
@@ -294,6 +306,11 @@ export const execution: AssuranceModule = defineCommands({
               ? "Reviewed portable model inference; correspondence to deployed pipeline remains subject to audit."
               : "Submitted prediction lineage is declared; source completeness and model origin need corroboration.",
             "Worker signature authenticates enrolled service origin, not completeness or truth.",
+            ...(clientHeld
+              ? [
+                  "The dataset stays in the client's environment: the platform holds only its SHA-256 and size, and the client's worker returns aggregate results only, withholding groups below the minimum group size. The auditor has not inspected the rows.",
+                ]
+              : []),
           ],
         };
       const text = JSON.stringify(requestBody),
@@ -424,7 +441,12 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "The procedure's plan or scope changed after this job was queued; queue it again",
         );
-      const p = templatePaper("WP-A15-01", ctx.user.userId);
+      const resolved = pinned(e),
+        p = templatePaper(
+          resolved,
+          roleTemplate(resolved.pack, "externalExecutionPaper"),
+          ctx.user.userId,
+        );
       p.required = false;
       p.title = "External execution — " + v.jobId;
       // Worker 1.2.0 copies the engine's statistics 1.0.0 decision into every
@@ -458,6 +480,16 @@ export const execution: AssuranceModule = defineCommands({
         )
           throw new ApiError(409, "Results must follow the recorded plan");
       }
+      // The runner accepted only a result stating the frozen custody; a
+      // client-held job's run must come from the client's environment.
+      if (
+        (frozen.dataset.custody === "client") !==
+        (packet.provenance?.execution?.datasetCustody === "client")
+      )
+        throw new ApiError(
+          409,
+          "The result's dataset custody differs from the frozen request",
+        );
       p.body.results = diagnosticNarrative(results);
       p.body.procedures =
         "Authenticated external execution " +
@@ -473,6 +505,7 @@ export const execution: AssuranceModule = defineCommands({
         job.id,
         frozen.profile,
         frozen.executionMode,
+        frozen.dataset.custody,
       );
       p.body.limitations = [
         ...frozen.limitations,
@@ -542,7 +575,7 @@ export const execution: AssuranceModule = defineCommands({
         createdAt: job.created_at,
         startedAt: attempt?.started_at ?? job.created_at,
         completedAt: job.completed_at,
-        ...recordVersions(),
+        ...recordVersions(e),
         procedureBinding: binding,
         provenance: {
           inputHashes: {

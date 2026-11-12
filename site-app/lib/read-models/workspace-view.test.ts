@@ -56,6 +56,31 @@ describe("workspaceView", () => {
     });
   });
 
+  it("gives internal members the practice's report settings, clients none (#111)", async () => {
+    const { sqlite } = await practice(three());
+    // The migration's default: nothing set.
+    expect((await workspaceView(lead(), null)).reportSettings).toEqual({
+      signatory: "",
+      location: "",
+      qualityStatement: "",
+    });
+    sqlite
+      .prepare("UPDATE tenants SET report_settings=? WHERE id=?")
+      .run(
+        JSON.stringify({ signatory: "Lea & Partners", location: "Vienna" }),
+        tenantId,
+      );
+    expect((await workspaceView(auditor(), null)).reportSettings).toEqual({
+      signatory: "Lea & Partners",
+      location: "Vienna",
+      qualityStatement: "",
+    });
+    expect(
+      (await workspaceView(member("viewer", "Client Viewer", "CL-1"), null))
+        .reportSettings,
+    ).toBeNull();
+  });
+
   it("selects a requested engagement and reads only its parts", async () => {
     const { reads, objects } = await practice(three());
     const view = await workspaceView(lead(), "ENG-B");
@@ -95,6 +120,23 @@ describe("workspaceView", () => {
     expect((await workspaceView(lead(), null)).engagement?.id).toBe("ENG-A");
     await workspaceView(lead(), "ENG-B");
     expect(incidents(sqlite)).toMatchObject([{ occurrences: 2 }]);
+  });
+
+  it("shows internal members the practice's quality review policy", async () => {
+    const { sqlite } = await practice(three());
+    expect((await workspaceView(lead(), null)).qualityReviewPolicy).toEqual({
+      coolingOffDays: 730,
+      practiceSet: false,
+    });
+    sqlite.prepare("UPDATE tenants SET eqr_cooling_off_days=365").run();
+    expect((await workspaceView(auditor(), null)).qualityReviewPolicy).toEqual({
+      coolingOffDays: 365,
+      practiceSet: true,
+    });
+    expect(
+      (await workspaceView(member("viewer", "Client Viewer", "CL-1"), null))
+        .qualityReviewPolicy,
+    ).toBeNull();
   });
 
   it("reports an altered blob as an integrity mismatch", async () => {

@@ -130,11 +130,45 @@ describe("liveRecord", () => {
     ).toBe(answered);
   });
 
-  it("keeps the opened record when it is gone or of another kind", () => {
+  it("shows a report's release state after it changes (#111)", () => {
+    // The sheet was opened while the package awaited approval.
+    const opened = {
+        ...report,
+        release: { state: "pending_approval", history: [] },
+      },
+      approved = {
+        ...report,
+        release: { state: "approved", history: [{ action: "approve" }] },
+      };
+    expect(
+      liveRecord(opened, { ...engagement, reports: [approved] } as Engagement),
+    ).toBe(approved);
+  });
+
+  it("re-reads evidence, models and runs too", () => {
+    const accepted = { ...artifact, status: "accepted" },
+      renamed = { ...model, name: "Scorer v3" },
+      finished = { ...run, state: "complete" };
+    const current = {
+      ...engagement,
+      artifacts: [accepted],
+      models: [renamed],
+      runs: [finished],
+    } as unknown as Engagement;
+    expect(liveRecord(artifact, current)).toBe(accepted);
+    expect(liveRecord(model, current)).toBe(renamed);
+    expect(liveRecord(run, current)).toBe(finished);
+  });
+
+  it("keeps the opened record when it is gone or has no link kind", () => {
     expect(
       liveRecord(finding, { ...engagement, findings: [] } as Engagement),
     ).toBe(finding);
-    expect(liveRecord(report, engagement)).toBe(report);
+    expect(
+      liveRecord(report, { ...engagement, reports: [] } as Engagement),
+    ).toBe(report);
+    const event = { id: "r1", action: "createReport" };
+    expect(liveRecord(event, engagement)).toBe(event);
     expect(liveRecord(finding, null)).toBe(finding);
     expect(liveRecord(undefined, engagement)).toBeUndefined();
   });

@@ -112,6 +112,8 @@ describe("modal definitions", () => {
       invite: ["Invite by email", "Save invitation"],
       invitationCancel: ["Cancel invitation", "Cancel invitation"],
       practiceRename: ["Rename practice", "Save name"],
+      qualityReviewPolicy: ["Quality review policy", "Save policy"],
+      reportSettings: ["Report settings", "Save report settings"],
       signingKeyRotate: ["Rotate signing key", "Rotate key"],
       adminGrant: ["Grant practice administration", "Grant administration"],
       adminRevoke: ["Remove practice administration", "Remove administration"],
@@ -558,5 +560,75 @@ describe("form defaults", () => {
         execution: undefined,
       } as unknown as Procedure),
     ).toMatchObject({ article: "10", condition: "" });
+  });
+});
+
+describe("report settings and the report form (#111)", () => {
+  it("saves the practice's report settings through the management op", async () => {
+    const ctx = context("reportSettings", {
+      values: {
+        signatory: "Lea & Partners",
+        location: "Vienna, Austria",
+        qualityStatement: "",
+      },
+    });
+    await submit("reportSettings", ctx);
+    expect(ctx.manage).toHaveBeenCalledWith("setReportSettings", {
+      signatory: "Lea & Partners",
+      location: "Vienna, Austria",
+      qualityStatement: "",
+    });
+  });
+
+  it("sends blank particulars so the server states the practice settings", async () => {
+    const ctx = context("report", {
+      data: {
+        ...data,
+        reportSettings: {
+          signatory: "Lea & Partners",
+          location: "Vienna, Austria",
+          qualityStatement: "Our statement.",
+        },
+      } as WorkspaceData,
+      values: { summary: "Summary" },
+      choices: {
+        kind: "final",
+        engagementType: "readiness",
+        assuranceLevel: "",
+        conclusion: "readiness_gaps",
+        addressee: "The board",
+        basisForModification: "F-1: no monitoring plan.",
+      },
+    });
+    await submit("report", ctx);
+    expect(ctx.act).toHaveBeenCalledWith("createReport", {
+      kind: "final",
+      engagementType: "readiness",
+      assuranceLevel: null,
+      conclusion: "readiness_gaps",
+      addressee: "The board",
+      signatory: "",
+      location: "",
+      qualityStatement: "",
+      basisForModification: "F-1: no monitoring plan.",
+      summary: "Summary",
+    });
+  });
+
+  it("drops a gaps description the conclusion does not state", async () => {
+    const ctx = context("report", {
+      values: { summary: "Summary" },
+      choices: {
+        kind: "draft",
+        engagementType: "readiness",
+        conclusion: "readiness",
+        basisForModification: "Left over",
+      },
+    });
+    await submit("report", ctx);
+    expect(ctx.act).toHaveBeenCalledWith(
+      "createReport",
+      expect.objectContaining({ basisForModification: "" }),
+    );
   });
 });

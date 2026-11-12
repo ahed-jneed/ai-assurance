@@ -5,9 +5,12 @@ on:
   push:
     branches: [main]
 
+# Pull-request runs of one ref replace each other; every push to main gets a
+# group of its own and is never cancelled, so the criteria index history
+# (schemas/validate-criteria.mjs, rule 13) is checked for every push.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -18,7 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Depth 2: the criteria index check compares with the first parent of
+      # the pull request's merge commit.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - uses: actions/setup-python@v7
         with:
@@ -51,11 +58,32 @@ jobs:
       - name: Validate the rule pack
         run: node schemas/validate-rule-pack.mjs
 
+      # The criteria documents of templates/criteria: schema, integrity rules
+      # and the index history against the base (docs/design/criteria-model.md
+      # section 14.2, rule 13). A pull request compares with the base branch
+      # tip, a push to main with the tip before the push; a new branch has no
+      # base. A base that cannot be read fails the step.
+      - name: Validate the criteria documents
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            base=HEAD^1
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            git fetch --depth=1 origin "$BEFORE"
+            base="$BEFORE"
+          else
+            base=
+          fi
+          node schemas/validate-criteria.mjs ${base:+--base "$base"}
+
       - name: Validate schemas
         run: |
           node schemas/validate-run-schema.mjs
           node schemas/validate-procedure-schema.mjs
           node schemas/validate-working-paper-schema.mjs
+          node schemas/validate-dataset-card-schema.mjs
           node schemas/validate-genai-schema.mjs
 
       # The committed external fixtures carry fixed timestamps; recompute a
@@ -123,8 +151,9 @@ jobs:
       - name: Check harnesses
         run: npm run check:harnesses
 
-      # Run, procedure and external records the harnesses just produced
-      # through the API (including dataset-card pins) against the schemas.
+      # Run, procedure and external records and the internal dossier's
+      # working papers the harnesses just produced through the API (including
+      # dataset-card pins) against the schemas.
       - name: Validate fresh harness fixtures
         run: npm run check:fixtures
 

@@ -4,12 +4,14 @@ import {
   Plus,
   Users,
   Copy,
+  FileSignature,
   FolderOpen,
   Settings2,
   ChevronLeft,
   Mail,
   ShieldCheck,
   KeyRound,
+  Scale,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -108,6 +110,9 @@ export function ManagementViews({
   const practiceName =
     data.memberships.find((m) => m.tenant_id === data.tenantId)?.name ?? "";
   const invitations = data.invitations ?? [];
+  const coolingOffDays = data.qualityReviewPolicy?.coolingOffDays ?? 730;
+  // setQualityReviewPolicy is Lead-only; this view is shown only to admins.
+  const policyEditor = data.identity.role === "Lead Auditor";
   const activeAdmins = data.members.filter(
     (m) => m.practice_admin && m.status === "active",
   ).length;
@@ -250,9 +255,37 @@ export function ManagementViews({
               <Button
                 variant="ghost"
                 disabled={busy}
+                onClick={() => open("reportSettings", {})}
+              >
+                <FileSignature size={15} /> Report settings
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
                 onClick={() => open("signingKeyRotate", {})}
               >
                 <KeyRound size={15} /> Rotate signing key
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy || !policyEditor}
+                title={
+                  "Engagement quality reviewer cooling-off: " +
+                  coolingOffDays +
+                  " days" +
+                  (data.qualityReviewPolicy?.practiceSet ? "" : " (default)") +
+                  (policyEditor
+                    ? ""
+                    : ". Only a Lead Auditor who administers the practice can change it.")
+                }
+                onClick={() =>
+                  open("qualityReviewPolicy", {
+                    coolingOffDays: String(coolingOffDays),
+                  })
+                }
+              >
+                <Scale size={15} /> Quality review policy · {coolingOffDays}{" "}
+                days
               </Button>
               <a
                 href={

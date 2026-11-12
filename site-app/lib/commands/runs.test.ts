@@ -11,6 +11,7 @@ import { seedWorkflow } from "../workflow-seed";
 import type { Procedure } from "../workflow-types";
 import { runs } from "./runs";
 import { caller } from "./test-fixtures";
+import { resolveNew } from "../criteria/pin";
 
 // Registered assurance records by id, as recordsById reads them from D1.
 const records = new Map<string, AssuranceRecord>();
@@ -76,7 +77,9 @@ beforeEach(async () => {
     ],
     evaluationProfiles: [],
     runs: [],
-    workflow: approvedWorkflow(seedWorkflow("lead", "2026-11-05").procedures),
+    workflow: approvedWorkflow(
+      seedWorkflow(resolveNew(), "lead", "2026-11-05").procedures,
+    ),
   } as unknown as Engagement;
   const profile = registerProfile(
     e,

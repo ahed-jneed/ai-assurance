@@ -12,8 +12,13 @@ def extend_schema(schema):
         'required': ['recordId', 'sha256', 'card'], 'properties': {
             'recordId': {'$ref': '#/$defs/id'},
             'sha256': {'$ref': '#/$defs/sha256'},
-            'card': {'type': 'object', 'description': ('Frozen dataset governance card; application '
-                'validation enforces its version, artifact hash, and engagement.')}}}
+            'card': {'$ref': '#/$defs/datasetCard'}}}
+    # The registered card body of dataset-card.schema.json, embedded so the run
+    # schema stays self-contained.
+    card = json.loads(Path(__file__).with_name('dataset-card.schema.json').read_text(encoding='utf-8'))
+    defs['datasetCard'] = {**card['$defs']['registeredCard'], 'description': ('Frozen dataset governance card '
+        '(dataset-card.schema.json, $defs/registeredCard). Application validation enforces that it describes '
+        'the evaluated bytes and belongs to the engagement.')}
     external = copy.deepcopy(defs['hostedRun'])
     external['description'] = ('Authenticated external attempt projected into an audit run. '
         'Exact external report bytes remain preserved separately; application validation '
@@ -34,6 +39,10 @@ def extend_schema(schema):
         'reported metric sample size in this projection, not a verified source-population census.')
     dataset['properties']['size']['maximum'] = 104857600
     dataset['properties']['rowCount'].update(minimum=0, maximum=1000000)
+    # A client-held dataset pin (#102): the client's worker read the file in the client's environment by
+    # this SHA-256, and the platform never held its bytes.
+    dataset['properties']['custody'] = {'const': 'client', 'description': ('The dataset stayed in the '
+        "client's environment; the platform holds only its name, size and SHA-256.")}
     defs['externalPredictionDataset'] = dataset
     manifest['properties']['dataset'] = {'$ref': '#/$defs/externalPredictionDataset'}
     defs['externalRunManifest'] = manifest
@@ -73,7 +82,7 @@ def extend_schema(schema):
     ref = {'$ref': '#/$defs/externalAuditRun'}
     if ref not in schema['oneOf']:
         schema['oneOf'].append(ref)
-    schema['$id'] = 'urn:ai-assurance:test-run:1.2'
+    schema['$id'] = 'urn:ai-assurance:test-run:2.0'
     schema['description'] = ('Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1 '
         'and authenticated external audit projection 1.2. Schema validity is distinct from '
         'result origin, input custody, statistical suitability and legal sufficiency.')

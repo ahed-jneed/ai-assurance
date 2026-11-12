@@ -1,6 +1,8 @@
 "use client";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { roles } from "@/lib/domain";
+import { qualityStatement } from "@/lib/domain/report-model";
 import { Choice } from "../workspace-ui";
 import { checkedEngagements, EngagementChecks } from "./member";
 import type { ModalDefinition, ModalFieldsProps } from "./types";
@@ -113,6 +115,112 @@ export const practiceRenameModal: ModalDefinition = {
     </label>
   ),
   submit: ({ manage, values: v }) => manage("renamePractice", { name: v.name }),
+};
+export const qualityReviewPolicyModal: ModalDefinition = {
+  title: "Quality review policy",
+  submitLabel: "Save policy",
+  Fields: ({ choices }) => (
+    <>
+      <label>
+        Cooling-off period in days
+        <Input
+          name="coolingOffDays"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={3650}
+          step={1}
+          defaultValue={choices.coolingOffDays}
+          required
+        />
+        <small className="subtle">
+          Someone who served on the team of a client&apos;s engagement within
+          this period cannot be appointed engagement quality reviewer of another
+          engagement for that client. 0 checks only the engagement&apos;s own
+          team. Appointments already made keep the period they were checked
+          against.
+        </small>
+      </label>
+      <label>
+        Reason
+        <Input name="reason" required maxLength={5000} autoComplete="off" />
+        <small className="subtle">
+          Recorded in the practice&apos;s management history with the old and
+          new period.
+        </small>
+      </label>
+    </>
+  ),
+  validate: ({ values: v }) => {
+    const days = Number(v.coolingOffDays);
+    if (!Number.isInteger(days) || days < 0 || days > 3650)
+      throw Error("Enter a whole number of days from 0 to 3650.");
+  },
+  submit: ({ manage, values: v }) =>
+    manage("setQualityReviewPolicy", {
+      coolingOffDays: Number(v.coolingOffDays),
+      reason: v.reason,
+    }),
+};
+export const reportSettingsModal: ModalDefinition = {
+  title: "Report settings",
+  submitLabel: "Save report settings",
+  Fields: ({ data }) => {
+    const s = data?.reportSettings;
+    return (
+      <>
+        <p className="subtle">
+          New reports of every engagement state these unless the Lead Auditor
+          overrides them on the report. Reports already captured keep what they
+          state.
+        </p>
+        <label>
+          Signed by
+          <Input
+            name="signatory"
+            defaultValue={s?.signatory ?? ""}
+            maxLength={300}
+            autoComplete="off"
+          />
+          <small className="subtle">
+            The practitioner or firm signing reports.
+          </small>
+        </label>
+        <label>
+          Location
+          <Input
+            name="location"
+            defaultValue={s?.location ?? ""}
+            maxLength={300}
+            autoComplete="off"
+          />
+          <small className="subtle">
+            Where the practice practises, e.g. Vienna, Austria.
+          </small>
+        </label>
+        <label>
+          Independence and quality management statement
+          <Textarea
+            name="qualityStatement"
+            defaultValue={s?.qualityStatement ?? ""}
+            placeholder={qualityStatement}
+            maxLength={2000}
+          />
+          <small className="subtle">
+            The ethical requirements the practice complies with and its system
+            of quality management, for example ISQM 1 and the IESBA Code. Left
+            blank, reports state the default shown.
+          </small>
+        </label>
+      </>
+    );
+  },
+  submit: ({ manage, values: v }) =>
+    manage("setReportSettings", {
+      signatory: v.signatory ?? "",
+      location: v.location ?? "",
+      qualityStatement: v.qualityStatement ?? "",
+    }),
 };
 export const signingKeyRotateModal: ModalDefinition = {
   title: "Rotate signing key",

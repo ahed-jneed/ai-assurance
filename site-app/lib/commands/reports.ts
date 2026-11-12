@@ -24,6 +24,7 @@ import {
   conclusionStatement,
   conclusionTypeIds,
   engagementTypeIds,
+  resolveParticulars,
   snapshotConclusion,
   snapshotParticulars,
   snapshotTerms,
@@ -32,8 +33,18 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
-import { assertReviewerIndependent } from "../quality-review-records";
-import { recordVersions } from "../rule-pack-current";
+import { paperContext, paperRevisions } from "../papers/revision";
+import {
+  assertReviewerIndependent,
+  assertSignerActive,
+} from "../quality-review-records";
+import { practiceReportSettings } from "../report-settings";
+import {
+  criteriaStamp,
+  packFeatures,
+  pinned,
+  recordVersions,
+} from "../criteria/pin";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
@@ -44,24 +55,24 @@ import { short, text } from "./fields";
  * memos are history, not current work. Each paper's audience decides what the
  * client snapshot publishes.
  */
+const papersToCapture = (e: Engagement, kind: "draft" | "final") =>
+  e.papers.filter(
+    (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
+  );
 function capturedPapers(e: Engagement, kind: "draft" | "final") {
-  return e.papers
-    .filter(
-      (p) => paperCurrent(p) && (kind === "draft" || p.status === "signed"),
-    )
-    .map((p) => ({
-      id: p.id,
-      templateId: p.templateId,
-      title: p.title,
-      revision: p.revision,
-      status: p.status,
-      audience: paperAudience(p),
-      body: p.body,
-      evidenceIds: p.evidenceIds,
-      runIds: p.runIds,
-      reviews: p.reviews,
-      signatures: p.signatures,
-    }));
+  return papersToCapture(e, kind).map((p) => ({
+    id: p.id,
+    templateId: p.templateId,
+    title: p.title,
+    revision: p.revision,
+    status: p.status,
+    audience: paperAudience(p),
+    body: p.body,
+    evidenceIds: p.evidenceIds,
+    runIds: p.runIds,
+    reviews: p.reviews,
+    signatures: p.signatures,
+  }));
 }
 const optionalText = (max: number) => z.string().trim().max(max).default("");
 /**
@@ -86,6 +97,7 @@ export const reports = defineCommands({
           location: optionalText(300),
           signatory: optionalText(300),
           basisForModification: optionalText(5000),
+          qualityStatement: optionalText(2000),
         })
         .parse(d);
       const terms = {
@@ -93,12 +105,18 @@ export const reports = defineCommands({
           assuranceLevel: a.assuranceLevel,
           conclusion: a.conclusion,
         },
-        particulars = {
-          addressee: a.addressee,
-          location: a.location,
-          signatory: a.signatory,
-          basisForModification: a.basisForModification,
-        };
+        // A signatory, location or quality statement left blank comes from
+        // the practice's report settings; the snapshot records the result.
+        particulars = resolveParticulars(
+          {
+            addressee: a.addressee,
+            location: a.location,
+            signatory: a.signatory,
+            basisForModification: a.basisForModification,
+            qualityStatement: a.qualityStatement,
+          },
+          await practiceReportSettings(ctx),
+        );
       const problem = termsProblem(terms);
       if (problem) throw new ApiError(400, problem);
       if (a.kind === "final") {
@@ -114,7 +132,11 @@ export const reports = defineCommands({
         const assuranceBlockers = await assuranceGates(ctx, e.id, a.conclusion);
         if (assuranceBlockers.length)
           throw new ApiError(409, assuranceBlockers[0]);
-        const gates = finalReportGates(e, { ...terms, particulars });
+        const gates = finalReportGates(
+          e,
+          { ...terms, particulars },
+          packFeatures(e),
+        );
         if (gates[0]?.kind === "stage")
           throw new ApiError(400, gates[0].message);
         if (gates.length)
@@ -127,8 +149,11 @@ export const reports = defineCommands({
           );
         await assertReviewerIndependent(ctx, e);
       }
-      const createdAt = now(),
-        annexIV = annexIVIndex(e);
+      // What the pinned pack switches on and the texts it reports with
+      // (docs/design/criteria-model.md sections 7.1 and 10).
+      const { pack } = pinned(e),
+        features = packFeatures(e),
+        createdAt = now();
       // The part of the report written for its reader, in both snapshots.
       const elements = reportElements(e, terms, particulars, createdAt).map(
         ({ id, label, value }) => ({ id, label, value }),
@@ -152,13 +177,21 @@ export const reports = defineCommands({
           id: e.id,
           title: e.title,
           stage: e.stage,
-          classification: e.classification,
+          ...(features.aiActClassification
+            ? { classification: e.classification }
+            : {}),
         },
         opinion: termsLabel(terms),
         ...report,
         summary: a.summary,
         evidenceRequests: e.evidenceRequests ?? [],
         papers: capturedPapers(e, a.kind),
+        // The same papers as working-paper contract documents (#51), which
+        // the dossier and the report package export.
+        workingPapers: await paperRevisions(
+          papersToCapture(e, a.kind),
+          paperContext(e, ctx.tenantId),
+        ),
         supersededPapers: e.papers
           .filter((p) => p.supersededBy)
           .map((p) => ({
@@ -184,16 +217,24 @@ export const reports = defineCommands({
         models: e.models,
         evaluationProfiles: e.evaluationProfiles ?? [],
         runs: e.runs,
-        annexIV,
-        annexMapVersion,
+        ...(features.annexIvIndex
+          ? { annexIV: annexIVIndex(e), annexMapVersion }
+          : {}),
         auditEventHead: e.eventHead,
         createdAt,
-        ...recordVersions(),
-        regulatorySource: "https://eur-lex.europa.eu/eli/reg/2024/1689",
+        ...recordVersions(e),
+        // The pack stamp (design section 10). Named criteriaPack because
+        // `criteria` holds the results by criterion of report model v2.
+        criteriaPack: criteriaStamp(e),
+        ...(pack.reporting?.regulatorySource
+          ? { regulatorySource: pack.reporting.regulatorySource }
+          : {}),
         limitations: [
-          "Diagnostic and assurance conclusions do not constitute a notified-body conformity assessment or legal certification. The platform's diagnostics evaluate traditional ML systems; they do not yet evaluate generative AI outputs, so conclusions on generative systems rest on the auditor's own procedures and evidence.",
+          pack.reporting?.limitations ?? "",
           ...specialCategoryLimitations(e.runs),
-        ].join(" "),
+        ]
+          .filter(Boolean)
+          .join(" "),
       };
       Object.assign(snapshot, {
         assurancePins: await assurancePins(ctx, e.id),
@@ -246,6 +287,14 @@ export const reports = defineCommands({
     },
   },
 });
+const pinOfStamp = (stamp: unknown) => {
+  const s = stamp as {
+    packId?: string;
+    packVersion?: string;
+    packSha256?: string;
+  };
+  return [s.packId, s.packVersion, s.packSha256];
+};
 /**
  * Checks that a captured report may still be released: its assurance sources,
  * the release gates and every audit record it captured are unchanged. Runs
@@ -292,9 +341,11 @@ export async function assertReleasable(
       409,
       "Complete or cancel external execution before release",
     );
-  const gates = finalReportGates(e, report);
+  const features = packFeatures(e);
+  const gates = finalReportGates(e, report, features);
   if (gates.length) throw new ApiError(409, gates[0].message);
   await assertReviewerIndependent(ctx, e);
+  await assertSignerActive(ctx, e);
   const frozen = r.snapshot.workflow as Engagement["workflow"];
   if (
     !frozen ||
@@ -311,13 +362,20 @@ export async function assertReleasable(
     JSON.stringify(r.snapshot.papers) !==
       JSON.stringify(capturedPapers(e, "final")) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
-    JSON.stringify(
-      (
-        r.snapshot.engagement as {
-          classification: unknown;
-        }
-      ).classification,
-    ) !== JSON.stringify(e.classification) ||
+    // Without the AI Act classification the snapshot has none to compare.
+    (features.aiActClassification &&
+      JSON.stringify(
+        (
+          r.snapshot.engagement as {
+            classification: unknown;
+          }
+        ).classification,
+      ) !== JSON.stringify(e.classification)) ||
+    // A pin moved between capture and release forces a new capture; packages
+    // captured before pins existed have none, and legacy pins never move.
+    (r.snapshot.criteriaPack !== undefined &&
+      JSON.stringify(pinOfStamp(r.snapshot.criteriaPack)) !==
+        JSON.stringify(pinOfStamp(criteriaStamp(e)))) ||
     JSON.stringify(r.snapshot.evidenceRequests) !==
       JSON.stringify(e.evidenceRequests ?? []) ||
     JSON.stringify(r.snapshot.evidence) !==

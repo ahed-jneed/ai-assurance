@@ -2,6 +2,7 @@
 // roles people act in.
 import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
+import type { EngagementCriteria } from "../criteria/types";
 import type { Decision, Plan } from "../statistics";
 import type { QualityReview } from "./quality-review";
 import type {
@@ -119,6 +120,13 @@ export type Artifact = {
   visibility: "internal" | "client";
   status: "unverified" | "accepted" | "quarantined";
   mediaType: string;
+  /**
+   * "client": a client-held dataset pin (#102). The client keeps the file;
+   * the platform holds only its name, size and SHA-256, and `key` is empty.
+   */
+  custody?: "client";
+  /** Who at the client confirmed a client-held pin, when, and how it is kept. */
+  clientPin?: { confirmedBy: string; confirmedOn: string; custodyNote: string };
 };
 export type EvidenceRequest = {
   id: string;
@@ -376,6 +384,8 @@ export type Run = {
         sha256: string;
         card: Record<string, unknown>;
       };
+      /** External runs on a client-held pin: the bytes never left the client. */
+      custody?: "client";
     };
     profile: EvaluationProfile | null;
     executionMode:
@@ -432,6 +442,12 @@ export type Engagement = {
   classification: Classification;
   /** Written once at creation; absent on engagements created before stamps. */
   rulePack?: RulePackStamp;
+  /**
+   * The criteria pack the engagement is pinned to (docs/design/criteria-model.md
+   * section 10). Written at creation; absent on engagements created before
+   * pins, which resolve to the read-time legacy pin (lib/criteria/registry.ts).
+   */
+  criteria?: EngagementCriteria;
   papers: Paper[];
   artifacts: Artifact[];
   evidenceRequests?: EvidenceRequest[];

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { EngagementTaskQueue } from "./business-workspace";
 import { currentExecution } from "@/lib/workflow-state";
-import type { WorkspaceData } from "./workspace-types";
+import { packFeatures, type WorkspaceData } from "./workspace-types";
 import type { WorkItem } from "@/lib/work-items";
 import { NextSteps } from "./next-steps";
 import { AuditGateList, type GateAction } from "./audit-gates";
@@ -24,9 +24,6 @@ import {
 } from "@/lib/domain";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
-import { classificationRules } from "@/lib/classification-rules";
-import { reReviewTriggers } from "@/lib/domain/classification";
-import { asRulePack, isoToday } from "@/lib/rule-pack";
 
 export function EngagementOverview({
   data,
@@ -92,7 +89,7 @@ export function EngagementOverview({
     (p) => p.state === "reviewed" && currentExecution(e, p),
   ).length;
   const nextStage = stages[stages.indexOf(e.stage) + 1],
-    gates = nextStage ? stageGates(e, nextStage) : [];
+    gates = nextStage ? stageGates(e, nextStage, packFeatures(data)) : [];
   const waitingEvidence = e.artifacts.filter(
     (a) => a.status === "unverified",
   ).length;
@@ -105,29 +102,14 @@ export function EngagementOverview({
   const outstandingRequests = (e.evidenceRequests ?? []).filter(
     (r) => !["accepted", "waived"].includes(r.status),
   );
-  // #19: final Art 6 guidelines, a due Code or interoperability milestone or
-  // a new rule pack call for a re-review of an approved classification.
-  const reReview =
-    e.classification.status === "approved"
-      ? reReviewTriggers(
-          e.classification,
-          classificationRules(asRulePack(data.catalog?.regulatorySnapshot)),
-          isoToday(),
-        ).filter((t) => t.state === "due")
-      : [];
+  // A due classification re-review (#19) is a work item since #104, in the
+  // work inbox and the task queue: personal for Auditors and Lead Auditors
+  // (who may reclassify); a Reviewer sees it waiting under "all".
+  // Only packs with the AI Act classification (criteria model section 7.1).
+  const classified = packFeatures(data).aiActClassification;
   const checkpoints = [
-    ...(reReview.length
-      ? [
-          {
-            icon: BookOpen,
-            title: "Re-review classification",
-            detail: reReview.map((t) => t.title).join("; "),
-            view: "Regulatory mapping",
-            filter: "all",
-          },
-        ]
-      : []),
-    ...(e.classification.status !== "approved" &&
+    ...(classified &&
+    e.classification.status !== "approved" &&
     !gates.some((g) => g.kind === "classification")
       ? [
           {
@@ -214,7 +196,7 @@ export function EngagementOverview({
             <div
               className="overview-progress-track"
               role="progressbar"
-              aria-label="Reviewed procedure coverage"
+              aria-label="Reviewed procedure progress"
               aria-valuemin={0}
               aria-valuemax={selectedProcedures.length || 1}
               aria-valuenow={reviewedProcedures}
@@ -255,7 +237,7 @@ export function EngagementOverview({
           <div
             className="overview-progress-track"
             role="progressbar"
-            aria-label="Signed working paper coverage"
+            aria-label="Signed working paper progress"
             aria-valuemin={0}
             aria-valuemax={required.length || 1}
             aria-valuenow={signed}

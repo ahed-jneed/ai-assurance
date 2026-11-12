@@ -10,7 +10,7 @@ import copy
 import json
 import math
 import random
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any
 
 from . import statistics as st
@@ -127,7 +127,11 @@ def multiclass_data(observations):
     return {"labels": labels, "matrix": matrix}
 
 
-def group_data(criterion, observations, config):
+def group_data(criterion, observations, config, withheld=()):
+    """withheld: the observations a client-held run leaves out (#102). A group with no other rows is passed
+    as withheld with its size, and the coverage population counts every withheld row. A withheld row whose
+    group in these columns kept other rows (it was left out for another column set's small group or missing
+    value) is passed in withheldMembers, so it counts as eligible for coverage as in a run on every row."""
     fields = criterion.get("groupFields") or [config["columns"]["protected"]]
     groups, unknown = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0, "tn": 0}), 0
     positive = config["positiveLabel"]
@@ -139,7 +143,56 @@ def group_data(criterion, observations, config):
         cm = groups[group_label(values)]
         actual, predicted = o["target"] == positive, o["prediction"] == positive
         cm["tp" if actual and predicted else "fn" if actual else "fp" if predicted else "tn"] += 1
-    return {"groups": [{"group": name, **groups[name]} for name in sorted(groups, key=st.code_point_key)], "unknownGroupRows": unknown}
+    data = {"groups": [{"group": name, **groups[name]} for name in sorted(groups, key=st.code_point_key)], "unknownGroupRows": unknown}
+    if withheld:
+        labels = Counter(label for label in (stratum(o["fields"], fields) for o in withheld) if label is not None)
+        data.update(withheldGroups={label: n for label, n in labels.items() if label not in groups}, withheldMembers={label: n for label, n in labels.items() if label in groups}, withheldRows=len(withheld))
+    return data
+
+
+def stratum(fields, columns):
+    """The group label of a row's values in these columns, or None when one is missing."""
+    values = [fields.get(column) for column in columns]
+    return None if any(value is None for value in values) else group_label(values)
+
+
+def withheld_strata(observations, plan, config):
+    """For a run on a client-held dataset (#102): the groups whose rows are left out of every criterion, as
+    {columns: labels}. A group is left out when fewer than the minimum group size of the remaining observations
+    fall in it, in any column set the plan groups or subsets by (the protected column, each criterion's group
+    fields, each calibration subgroup's field). The rows with no value in a column set are left out the same
+    way (as the label None) when fewer than the minimum of them remain, since the totals minus the groups would
+    give them back too. Leaving rows out can shrink a group of another column set below the minimum, so this
+    repeats until nothing changes: every group that remains then has at least the minimum number of rows in
+    every column set, and no total in the result includes a left-out row."""
+    minimum = plan["minimums"]["groupSize"]
+    protected = config["columns"].get("protected")
+    sets = [(protected,)] if protected else []
+    for criterion in plan["criteria"]:
+        if criterion["kind"] == "group_comparison":
+            sets.append(tuple(criterion["groupFields"] or [protected]))
+        if criterion.get("subgroup"):
+            sets.append((criterion["subgroup"]["field"],))
+    sets = list(dict.fromkeys(columns for columns in sets if None not in columns))
+    strata = {columns: set() for columns in sets}
+    remaining = list(observations)
+    while True:
+        changed = False
+        for columns in sets:
+            counts = Counter(stratum(o["fields"], columns) for o in remaining)
+            small = {label for label, n in counts.items() if n < minimum}
+            if small:
+                strata[columns] |= small
+                changed = True
+        if not changed:
+            return {columns: labels for columns, labels in strata.items() if labels}
+        remaining = [o for o in remaining if not is_withheld(o["fields"], strata)]
+
+
+def is_withheld(fields, strata):
+    """Whether a row with these group values (column -> label or None) belongs to a withheld group (the label
+    None stands for the rows with no value in those columns)."""
+    return any(stratum(fields, columns) in labels for columns, labels in strata.items())
 
 
 def scored_rows(criterion, observations, config):
@@ -185,8 +238,8 @@ quantile = st.quantile
 class Evaluation:
     """Build the per-criterion data from validated observations and evaluate a normalised plan."""
 
-    def __init__(self, plan, observations, config):
-        self.plan, self.observations, self.config = plan, observations, config
+    def __init__(self, plan, observations, config, withheld=()):
+        self.plan, self.observations, self.config, self.withheld = plan, observations, config, list(withheld)
         self.task = config["task"]
         self.scored = {}
 
@@ -201,7 +254,9 @@ class Evaluation:
         if kind == "regression_performance":
             return {"errors": [o["prediction"] - o["target"] for o in observations], "targets": [o["target"] for o in observations]}
         if kind == "group_comparison":
-            return group_data(criterion, observations, self.config)
+            # Only the whole sample carries a client-held run's withheld rows (#102); a clustered plan attaches
+            # them once (cluster_parts) and merge_parts restores them for coverage (section 5.11).
+            return group_data(criterion, observations, self.config, self.withheld if whole else ())
         rows = scored_rows(criterion, observations, self.config)
         bins, index = calibration_bins(rows, self.plan["calibrationBins"])
         if whole:
@@ -217,10 +272,19 @@ class Evaluation:
             for criterion in self.plan["criteria"]:
                 if criterion["kind"] == "calibration":
                     self.data_for(criterion)  # the whole sample's scored rows, for the descriptive ECE bootstrap
-            evaluation = st.evaluate_criteria(self.plan, None, clustered=(ids, lambda criterion: [self.data_for(criterion, rows) for rows in parts], self.config["seed"]))
+            evaluation = st.evaluate_criteria(self.plan, None, clustered=(ids, lambda criterion: self.cluster_parts(criterion, parts), self.config["seed"]))
         for spec, outcome in zip(self.plan["criteria"], evaluation["criteria"]):
             self.add_bootstrap(spec, outcome)
         return evaluation
+
+    def cluster_parts(self, criterion, parts):
+        """One data object per cluster. In a client-held run (#102) the withheld rows are attached once, to the
+        first cluster's group data: they count only towards suppressed groups and coverage, never a replicate."""
+        data = [self.data_for(criterion, rows) for rows in parts]
+        if criterion["kind"] == "group_comparison" and self.withheld and data:
+            whole = group_data(criterion, self.observations, self.config, self.withheld)
+            data[0] = {**data[0], **{key: whole[key] for key in ("withheldGroups", "withheldMembers", "withheldRows") if key in whole}}
+        return data
 
     def add_bootstrap(self, spec, outcome):
         """End to end, the engine adds descriptive percentile-bootstrap intervals for ECE and R2 and, for
@@ -425,9 +489,77 @@ def criterion_result(spec, outcome, config, plan, notes, context=None):
     return {"testId": spec["id"], "label": label, "article": ARTICLES[kind], "outcome": outcome["outcome"], "metrics": metrics, "limitations": list(dict.fromkeys(limitations)), "decision": decision}
 
 
-def evaluate_plan_results(plan, observations, config, notes=()):
-    """Evaluate a normalised plan on validated observations. Returns (results, evaluation)."""
-    evaluation = Evaluation(plan, observations, config).evaluate()
+# Client-held datasets (#102): what a result keeps of a group or calibration bin below the minimum group size.
+WITHHELD_ROWS_NOTE = ("The dataset is held by the client: the rows of groups below the minimum group size, in any column the "
+    "plan groups by, and the rows with no value in such a column when there are fewer than the minimum group size of "
+    "them, are left out of every criterion, performance and calibration included, and of the reported row count.These results therefore describe only the other rows and can differ from a run on every row. The number of "
+    "rows left out and the group comparisons' coverage counts are not reported; whether coverage met its minimum still decides.")
+WITHHELD_NOTE = ("The dataset is held by the client: groups and calibration bins below the minimum group size are withheld: "
+    "only their labels are reported, without their row counts, rates, intervals or comparisons.")
+WITHHELD_BIN_NOTE = ("The calibration figures over all bins (sample size, coverage, expected calibration error and Brier score) "
+    "include the rows of the withheld calibration bins, so their scores and labels can be derived by subtraction; "
+    "none of those rows belongs to a group below the minimum group size.")
+WITHHELD_SUBGROUP_NOTE = ("The dataset is held by the client and this calibration subgroup is below the minimum group size, "
+    "so its estimates are withheld.")
+
+
+def _withheld_slice(s):
+    out = {"slice": s["slice"], "n": None, "declared": s["declared"], "suppressed": True, "withheld": True}
+    if "lower" in s:
+        out.update(lower=s["lower"], upper=s["upper"])
+    return out
+
+
+def _withhold_metric(m):
+    m.update(value=None, numerator=None, denominator=None, confidenceInterval=None, pValue=None, slices=[])
+    m["details"].update(counts=None, direction="none", smallCell=False, fisherExactP=None, chanceExactP=None)
+
+
+def withhold_small_groups(results, plan, rows_withheld=False):
+    """For a run on a client-held dataset, withhold every value that describes a group or calibration bin below
+    the plan's minimum group size: its slice keeps only the label (n null, "withheld": true), each comparison
+    involving it loses its estimate, counts and interval, and decision.suppressedGroups no longer states its n.
+    rows_withheld: the run left the rows of such groups out (withheld_strata), so every result says so and a
+    group comparison's coverage, whose population counts those rows, is not reported. Suppressed groups never
+    decide (section 4.3). A calibration subgroup below the minimum group size that is also below the minimum
+    sample size (so nothing decides) withholds all its estimates. Results are changed in place."""
+    minimum = plan["minimums"]["groupSize"]
+    criteria = {c["id"]: c for c in plan["criteria"]}
+    for result in results:
+        decision = result.get("decision")
+        if decision is None:
+            continue
+        notes = [WITHHELD_ROWS_NOTE] if rows_withheld else []
+        kind = decision["kind"]
+        if kind in ("group_comparison", "calibration"):
+            criterion = criteria.get(result["testId"], {})
+            small = {g["group"] for g in decision.get("suppressedGroups") or ()}
+            subgroup = kind == "calibration" and criterion.get("subgroup") is not None and decision["sampleSize"] < minimum and "below_minimum_sample_size" in decision["reasons"]
+            if kind == "group_comparison" and rows_withheld:
+                decision["coverage"] = None
+            if small or subgroup:
+                decision["suppressedGroups"] = [{"group": g["group"], "n": None} for g in decision.get("suppressedGroups") or ()]
+                for m in result["metrics"]:
+                    details = m["details"]
+                    if details["role"] == "headline":
+                        m["slices"] = [_withheld_slice(s) if s.get("suppressed") else s for s in m["slices"]]
+                    elif subgroup or details["subject"] in small or details["comparator"] in small:
+                        _withhold_metric(m)
+                notes.append(WITHHELD_NOTE)
+                if kind == "calibration" and small and not subgroup:
+                    notes.append(WITHHELD_BIN_NOTE)
+                if subgroup:
+                    notes.append(WITHHELD_SUBGROUP_NOTE)
+        if notes:
+            result["limitations"] = list(dict.fromkeys(result["limitations"] + notes))
+    return results
+
+
+def evaluate_plan_results(plan, observations, config, notes=(), withheld=()):
+    """Evaluate a normalised plan on validated observations. withheld: the observations a client-held run
+    leaves out (withheld_strata); they count only as suppressed groups and towards group coverage.
+    Returns (results, evaluation)."""
+    evaluation = Evaluation(plan, observations, config, withheld).evaluate()
     level = plan["confidenceLevel"]
     results = [criterion_result(spec, outcome, config, plan, list(notes), performance_context(spec, observations, config, level)) for spec, outcome in zip(plan["criteria"], evaluation["criteria"])]
     return results, evaluation

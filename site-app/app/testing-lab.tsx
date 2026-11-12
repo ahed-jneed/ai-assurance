@@ -61,6 +61,7 @@ import { PowerCheck, powerShortfalls } from "./power-check";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
 import {
+  ClientDatasetPins,
   declarationFor,
   ProtocolDeclaration,
   SpecialCategoryRegister,
@@ -828,6 +829,12 @@ export function TestingLab({
             busy={busy}
             act={act}
             onEditing={onBasisEditing}
+          />
+          <ClientDatasetPins
+            engagement={e}
+            writer={writer}
+            busy={busy}
+            act={act}
           />
           <DatasetRegistry
             engagement={e}

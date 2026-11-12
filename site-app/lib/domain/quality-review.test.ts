@@ -305,6 +305,14 @@ describe("quality review records", () => {
     expect(work("another-reviewer")).toEqual([]);
     e.qualityReview = completedQualityReview();
     expect(work("quality-reviewer")).toEqual(["Sign off final package"]);
+    // The inbox compares both hashes, as release does: a sign-off of another
+    // client package leaves the item open.
+    e.qualityReview.signOffs.push({
+      ...signOff(e.reports[0]),
+      clientHash: "another-client-package",
+    });
+    expect(work("quality-reviewer")).toEqual(["Sign off final package"]);
+    expect(qualityReviewReleaseProblem(e, e.reports[0])).not.toBe("");
     e.qualityReview.signOffs.push(signOff(e.reports[0]));
     expect(work("quality-reviewer")).toEqual([]);
   });

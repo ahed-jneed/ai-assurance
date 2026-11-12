@@ -964,9 +964,12 @@ def rate_entry(x, n, level):
     return {"x": x, "n": n, "estimate": x / n, "interval": {"lower": lo, "upper": hi, "level": level, "method": "wilson"}}
 
 
-def pair_member(metric, subject, comparator, s, c, band, mins, level, suppressed=False, decide=True):
+def pair_member(metric, subject, comparator, s, c, band, mins, level, suppressed=False, decide=True, withheld=False):
     (xs, ns), (xc, nc) = s, c
     counts = {"subject": {"x": xs, "n": ns}, "comparator": {"x": xc, "n": nc}}
+    if withheld:
+        # A pair with a group withheld in a client-held run (#102): suppressed, with no counts to compare.
+        return member(metric, band, None, "newcombe_hybrid_score", None, subject=subject, comparator=comparator, counts=None, status="suppressed", reasons=["group_below_minimum_size"], level=level)
     cells = (xs, ns - xs, xc, nc - xc)
     small = min(cells) < 5
     if ns == 0 or nc == 0:
@@ -996,15 +999,20 @@ def group_rows(g):
 
 def group_members(spec, data, mins, level):
     groups = {g["group"]: g for g in data["groups"]}
+    # A client-held run (#102) leaves the rows of groups below the minimum group size out of the data. They
+    # still count as present, suppressed groups and towards the coverage population, so no decision changes.
+    withheld = data.get("withheldGroups") or {}
     declared = spec["declaredGroups"] or []
-    names = sorted(set(groups) | set(declared), key=code_point_key)
-    size = {name: group_rows(groups[name]) if name in groups else 0 for name in names}
+    names = sorted(set(groups) | set(declared) | set(withheld), key=code_point_key)
+    size = {name: group_rows(groups[name]) if name in groups else withheld.get(name, 0) for name in names}
     present = [name for name in names if size[name] > 0]
     eligible = [name for name in present if size[name] >= mins["groupSize"]]
     suppressed = [{"group": name, "n": size[name]} for name in names if size[name] < mins["groupSize"]]
     unknown = data.get("unknownGroupRows", 0)
-    population = sum(size.values()) + unknown
-    eligible_rows = sum(size[name] for name in eligible)
+    population = sum(size.values()) + unknown + data.get("withheldRows", 0) - sum(withheld.values())
+    # A row left out for another column set still belongs to its eligible group here (withheldMembers).
+    members_withheld = data.get("withheldMembers") or {}
+    eligible_rows = sum(size[name] + members_withheld.get(name, 0) for name in eligible)
     coverage = {"eligibleRows": eligible_rows, "populationRows": population, "unknownGroupRows": unknown, "value": eligible_rows / population if population else 0.0, "minimum": spec["minimumCoverage"]}
     metrics = ["tpr_difference", "fpr_difference"] if spec["metric"] == "equalized_odds" else [spec["metric"]]
     keys = list(dict.fromkeys(RATE_KEYS[metric] for metric in metrics))
@@ -1024,12 +1032,12 @@ def group_members(spec, data, mins, level):
                 pairs = []
                 for i, a in enumerate(present):
                     for b in present[i + 1:]:
-                        (xa, na), (xb, nb) = rate_counts(key, groups[a]), rate_counts(key, groups[b])
+                        (xa, na), (xb, nb) = rate_counts(key, groups.get(a)), rate_counts(key, groups.get(b))
                         rate_a = xa / na if na else math.inf  # an undefined rate sorts as +infinity
                         rate_b = xb / nb if nb else math.inf
                         pairs.append((b, a) if rate_b < rate_a else (a, b))
             for s, c in pairs:
-                members.append(pair_member(metric, s, c, rate_counts(key, groups[s]), rate_counts(key, groups[c]), band, mins, level, suppressed=s not in eligible or c not in eligible, decide=spec.get("_decide", True)))
+                members.append(pair_member(metric, s, c, rate_counts(key, groups.get(s)), rate_counts(key, groups.get(c)), band, mins, level, suppressed=s not in eligible or c not in eligible, decide=spec.get("_decide", True), withheld=s in withheld or c in withheld))
     if suppressed:
         reasons.append("group_suppressed_below_minimum")
     if declared and any(size[name] == 0 for name in declared):
@@ -1041,7 +1049,7 @@ def group_members(spec, data, mins, level):
     if len(eligible) < 2 or (mode["mode"] == "reference" and mode["referenceGroup"] not in eligible):
         reasons.append("insufficient_groups")
         blocked = True
-    context = {"sampleSize": sum(size.values()), "suppressedGroups": suppressed, "coverage": coverage, "passBlocked": blocked, "reasons": reasons, "scale": "log" if spec["metric"] == "selection_rate_ratio" else "linear", "headlineMetric": spec["metric"], "groups": per_group, "descriptive": []}
+    context = {"sampleSize": sum(size[name] for name in names if name not in withheld), "suppressedGroups": suppressed, "coverage": coverage, "passBlocked": blocked, "reasons": reasons, "scale": "log" if spec["metric"] == "selection_rate_ratio" else "linear", "headlineMetric": spec["metric"], "groups": per_group, "descriptive": []}
     return members, context
 
 
@@ -1332,6 +1340,16 @@ def merge_parts(parts):
         out = {"groups": [{"group": name, **cells[name]} for name in sorted(cells, key=code_point_key)]}
         if any("unknownGroupRows" in part for part in parts):
             out["unknownGroupRows"] = sum(part.get("unknownGroupRows", 0) for part in parts)
+        # A client-held run's withheld rows (#102) come with one part only and count towards coverage alone.
+        for key in ("withheldGroups", "withheldMembers"):
+            if any(part.get(key) for part in parts):
+                merged = {}
+                for part in parts:
+                    for name, n in (part.get(key) or {}).items():
+                        merged[name] = merged.get(name, 0) + n
+                out[key] = merged
+        if any("withheldRows" in part for part in parts):
+            out["withheldRows"] = sum(part.get("withheldRows", 0) for part in parts)
         return out
     if "matrix" in first:
         labels = sorted({label for part in parts for label in part["labels"]}, key=code_point_key)

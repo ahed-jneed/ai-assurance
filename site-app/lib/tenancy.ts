@@ -12,6 +12,7 @@ import {
   qualityReviewerOps,
   qualityReviewerRole,
 } from "./domain/quality-review";
+import { resolveNew } from "./criteria/pin";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
 import { currentUser } from "./identity";
@@ -108,7 +109,12 @@ export const practiceName = (user: Context["user"]) =>
 async function provisionPractice(user: Context["user"]) {
   const tenantId = "tenant-" + (await sha256(user.userId)).slice(0, 24);
   const clientId = "CL-default",
-    e = freshEngagement(clientId, "New AI assurance engagement", user.userId);
+    e = freshEngagement(
+      resolveNew(),
+      clientId,
+      "New AI assurance engagement",
+      user.userId,
+    );
   e.id = "ENG-default";
   const body = JSON.stringify(e),
     at = now();

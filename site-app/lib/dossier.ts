@@ -2,6 +2,7 @@ import { ApiError, bucket, id, now, sha256, type Context } from "./store";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
+import { exportedPapers } from "./papers/export";
 import { storedBodies } from "./assurance-store";
 import { legalDate } from "./rule-pack";
 import { sign, type SigningKey } from "./signing-keys";
@@ -20,10 +21,35 @@ const escaped = (s: unknown) =>
         c
       ]!,
   );
+/**
+ * The captured criteria pack (docs/design/criteria-model.md section 10) and
+ * whether its legal content was pending qualified legal review at capture.
+ */
+function criteriaLine(snapshot: Record<string, unknown>) {
+  const c = snapshot.criteriaPack as
+    | { packId?: string; packVersion?: string; legalReviewPending?: boolean }
+    | undefined;
+  if (!c?.packId) return "";
+  return (
+    "<small>Criteria pack " +
+    escaped(c.packId) +
+    " " +
+    escaped(c.packVersion) +
+    (c.legalReviewPending
+      ? ": its legal content is pending qualified legal review"
+      : "") +
+    "</small>"
+  );
+}
 /** The captured rule-pack and methodology versions, for the readable rendition. */
 function rulePackLine(snapshot: Record<string, unknown>) {
   const pack = snapshot.rulePack as Partial<RulePackStamp> | undefined;
-  if (!pack?.version) return "";
+  if (!pack?.version)
+    return snapshot.methodologyVersion
+      ? "<small>Methodology " +
+          escaped(snapshot.methodologyVersion) +
+          "</small>"
+      : "";
   return (
     "<small>Rule pack " +
     escaped(pack.version) +
@@ -137,6 +163,7 @@ export async function buildDossier(
     escaped(opinionLabel(snapshot)) +
     "</h2>" +
     rulePackLine(snapshot) +
+    criteriaLine(snapshot) +
     "<pre>" +
     escaped(snapshot.summary) +
     "</pre>" +
@@ -172,12 +199,25 @@ export async function buildDossier(
     escaped(snapshot.limitations) +
     "</pre></section></body></html>";
   await add("report.html", bytes(html), "text/html");
-  for (const p of papers)
-    await add(
-      "papers/" + p.id + "-r" + p.revision + ".json",
-      bytes(JSON.stringify(p)),
-      "application/json",
-    );
+  // An internal dossier files each paper as its working-paper contract
+  // document (#51), and a released package's completion memo. A client
+  // dossier, and a package captured before the contract, keep the captured
+  // paper: a client paper is its conclusion only, without user ids.
+  const documents = client ? [] : await exportedPapers(ctx, e, r);
+  if (documents.length)
+    for (const d of documents)
+      await add(
+        "papers/" + d.id + "-r" + d.revision + ".json",
+        bytes(JSON.stringify(d)),
+        "application/json",
+      );
+  else
+    for (const p of papers)
+      await add(
+        "papers/" + p.id + "-r" + p.revision + ".json",
+        bytes(JSON.stringify(p)),
+        "application/json",
+      );
   if (!client) {
     const pins = (snapshot.assurancePins ?? []) as {
       id: string;
@@ -236,6 +276,17 @@ export async function buildDossier(
         409,
         "Captured source is no longer available for this audience",
       );
+    // A client-held pin (#102) has no bytes here: the dossier lists it with
+    // its SHA-256, which the client's own copy can be checked against.
+    if (artifact.custody === "client") {
+      excluded.push({
+        id: captured.id,
+        reason:
+          "Held by the client; the platform holds only its SHA-256 " +
+          artifact.sha256,
+      });
+      continue;
+    }
     const object = await bucket().get(artifact.key);
     if (!object)
       throw new ApiError(
