@@ -92,6 +92,12 @@ describe("the committed #28 documents", () => {
         textPolicy: "paraphrased_titles",
         status: "unconfirmed",
       });
+      // The data claims only what was done: our own wording, with the
+      // whole title list still going to counsel (Q1), since a generic
+      // title may coincide with a heading of the standard.
+      expect(fw.defaultProvenance.note).toMatch(/Titles are our own/);
+      expect(fw.defaultProvenance.note).toMatch(/may still coincide/);
+      expect(fw.defaultProvenance.note).toMatch(/Q1/);
       for (const n of fw.requirements) {
         expect(n).not.toHaveProperty("text");
         expect(n.title.length).toBeLessThanOrEqual(80);
@@ -320,8 +326,8 @@ describe("the pack as the release would serve it", () => {
     expect(view.controls[0]).toEqual({
       id: "A.2.2",
       ref: "A.2.2",
-      title: "Documented AI policy",
-      group: "A.2 AI-related policies",
+      title: "A written AI policy",
+      group: "A.2 Policies that direct AI work",
     });
     expect(view.controls.map((c) => c.id)).toContain("A.6.2.8");
     expect(criteriaView(e).managementSystem).toEqual(view);

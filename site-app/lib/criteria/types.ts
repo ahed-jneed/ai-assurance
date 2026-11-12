@@ -309,7 +309,7 @@ export type SoaControl = {
   id: string;
   ref: string;
   title: string;
-  /** The control's own group, e.g. "A.2 AI-related policies". */
+  /** The control's own group, e.g. "A.2 Policies that direct AI work". */
   group: string;
 };
 /** A pack offered at engagement creation. */

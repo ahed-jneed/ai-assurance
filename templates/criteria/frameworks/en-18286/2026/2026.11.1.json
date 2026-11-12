@@ -32,7 +32,7 @@
     "sourceKind": "secondary",
     "verification": "secondary_only",
     "legalReview": "required",
-    "note": "Clause number and topic from a competitor-authored summary; confirm the clause structure against the purchased standard (Q8, #57)."
+    "note": "Clause number and topic from a competitor-authored summary; confirm the clause structure against the purchased standard (Q8, #57). Titles are our own; a short generic title may still coincide with a heading of the standard, so the title list goes to counsel under Q1 (#57)."
   },
   "requirements": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "6",
       "ref": "6",
-      "title": "Planning",
+      "title": "Planning the quality management system",
       "type": "requirement"
     },
     {

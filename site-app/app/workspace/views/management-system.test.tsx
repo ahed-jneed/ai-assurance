@@ -20,14 +20,14 @@ const view: ManagementSystemView = {
     {
       id: "A.2.2",
       ref: "A.2.2",
-      title: "Documented AI policy",
-      group: "A.2 AI-related policies",
+      title: "A written AI policy",
+      group: "A.2 Policies that direct AI work",
     },
     {
       id: "A.10.4",
       ref: "A.10.4",
-      title: "Customers",
-      group: "A.10 Third-party and customer relationships",
+      title: "Meeting customer expectations for AI",
+      group: "A.10 Working with suppliers, partners and customers",
     },
   ],
   controlsFramework: "ISO/IEC 42001:2023",
@@ -111,7 +111,9 @@ describe("management-system panels", () => {
     );
     expect(html).toContain("1 of 2 controls decided");
     expect(html).toContain("No inclusion or exclusion decision");
-    expect(html).toContain('aria-label="Decision for A.10.4 Customers"');
+    expect(html).toContain(
+      'aria-label="Decision for A.10.4 Meeting customer expectations for AI"',
+    );
     expect(html).toContain("read each control in your licensed copy");
     expect(html).not.toContain("Review Statement of Applicability");
 
