@@ -22,7 +22,7 @@
 | Worker entry and build | `build/sites-worker.ts`, `build/sites-vite-plugin.ts`, `vite.config.ts`, `scripts/run-framework.mjs` | Worker fetch wrapper; dev-only mock sign-in; copies `hosting.json` and `drizzle/` into `dist/.openai` |
 | Python engine | `engine/` | Stdlib-only diagnostics CLI, a pull worker for `/api/runner` (child process or Docker executor), assurance CLIs (sampling, bootstrap, dossier verify/sign), registry import, cited assistant, runtime packager. 120 unittest cases |
 | Contracts | `schemas/` | Draft 2020-12 run contract (1.0 legacy, 1.1 hosted, 1.2 external), procedure-execution and working-paper schemas, and Ajv validators |
-| Methodology | `templates/`, `docs/obligation-subitems.json` | 33 working papers and 12 memos, the Annex IV map, 68 obligation prompts. Byte-identical copies in `site-app/lib/` seed the app |
+| Methodology | `templates/`, `docs/obligation-subitems.json` | 33 working papers and 12 memos, the Annex IV map, 68 obligation prompts. The obligation file and the Annex IV map are generated from the default criteria pack in `templates/criteria/` (#61). Byte-identical copies in `site-app/lib/` seed the app |
 | Specification only | `db/postgres.sql`, `docs/system-architecture.md` | Target PostgreSQL/OIDC/KMS design. Not deployed |
 | Copies | `site-app/reference/` (88 files, 5 diverged), `site-app/public/tools/` (runtime zip, plus a verifier identical to `engine/assurance.py`) | Duplicates with no sync check |
 
@@ -90,7 +90,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 | Group | Tables |
 |---|---|
-| Tenancy and access | `tenants` (version, last_command_id), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_policies` |
+| Tenancy and access | `tenants` (version, last_command_id; `eqr_cooling_off_days` since `drizzle/0011`), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_history` (every grant change with the holder's role, written by triggers, immutable; since `drizzle/0011`), `engagement_access_policies` |
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
 | Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |

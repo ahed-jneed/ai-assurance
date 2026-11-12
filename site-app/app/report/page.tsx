@@ -31,7 +31,11 @@ async function ReportBody({
     if (!report) throw new ApiError(404, "Released report not found");
     // Build the markup inside the try block so that a malformed snapshot still
     // renders the "Report unavailable" fallback below.
-    return reportMarkup(report, report.snapshot as ReportSnapshot);
+    return reportMarkup(
+      report,
+      report.snapshot as ReportSnapshot,
+      ctx.tenantId,
+    );
   } catch (error) {
     return (
       <main className="print-report">

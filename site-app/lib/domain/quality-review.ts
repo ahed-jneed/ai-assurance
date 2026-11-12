@@ -274,7 +274,11 @@ export function qualityReviewRequired(
 ) {
   return (
     !!e.qualityReview ||
-    (!!engagementType && !!engagementTypes[engagementType]?.assurance)
+    (!!engagementType &&
+      (!!engagementTypes[engagementType]?.assurance ||
+        // A certification audit gives no ISAE assurance level, but its
+        // recommendation still needs an independent review (#28).
+        engagementType === "certification"))
   );
 }
 

@@ -8,7 +8,12 @@ export const calendarDate = z
     const d = new Date(v + "T00:00:00Z");
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
   }, "Use a valid calendar date");
-export const datasetCardSchema = z
+/**
+ * The fields of a dataset governance card as an auditor declares it. The
+ * language-neutral contract is schemas/dataset-card.schema.json; the test
+ * lib/dataset-card-contract.test.ts fails when the two disagree.
+ */
+export const datasetCardFields = z
   .object({
     schemaVersion: z.literal("1.0"),
     name: short,
@@ -26,16 +31,46 @@ export const datasetCardSchema = z
     baselineDatasetRecordId: short.optional(),
     baselineRationale: z.string().trim().max(5000).default(""),
   })
-  .strict()
-  .refine(
-    (v) => v.periodStart <= v.periodEnd,
-    "The end date must follow the start date",
-  )
-  .refine(
-    (v) => !v.baselineDatasetRecordId || !!v.baselineRationale,
-    "Explain the baseline selection",
-  );
+  .strict();
+type CardRules = {
+  periodStart: string;
+  periodEnd: string;
+  baselineDatasetRecordId?: string;
+  baselineRationale: string;
+};
+const periodOrdered = (v: CardRules) => v.periodStart <= v.periodEnd,
+  baselineExplained = (v: CardRules) =>
+    !v.baselineDatasetRecordId || !!v.baselineRationale;
+export const datasetCardSchema = datasetCardFields
+  .refine(periodOrdered, "The end date must follow the start date")
+  .refine(baselineExplained, "Explain the baseline selection");
+const digest = z.string().regex(/^[a-f0-9]{64}$/);
+/**
+ * The card body the records API stores for registerDataset and runs pin as
+ * `manifest.dataset.cardPin.card`: the declared card with the accepted bytes
+ * it describes and, for a regression baseline, the baseline card's pin.
+ */
+export const registeredDatasetCardFields = datasetCardFields
+  .extend({
+    artifactSha256: digest,
+    // Upload names are sanitised and cut to 200 characters.
+    artifactName: z.string().max(300),
+    artifactSize: z.number().int().min(0),
+    baselinePin: z
+      .object({
+        recordId: short,
+        sha256: digest,
+        artifactSha256: digest,
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export const registeredDatasetCardSchema = registeredDatasetCardFields
+  .refine(periodOrdered, "The end date must follow the start date")
+  .refine(baselineExplained, "Explain the baseline selection");
 export type DatasetCard = z.infer<typeof datasetCardSchema>;
+export type RegisteredDatasetCard = z.infer<typeof registeredDatasetCardSchema>;
 
 /** A registered dataset card record, as the assurance records API returns it. */
 type CardRecord = {

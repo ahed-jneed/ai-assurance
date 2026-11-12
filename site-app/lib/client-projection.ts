@@ -69,6 +69,8 @@ export function clientFinding(f: Finding): Finding {
     retestEvidenceIds: [],
     createdBy: "",
     visibility: "client",
+    // The client is told the grade of a nonconformity (#28), not who graded it.
+    ...(f.grade ? { grade: f.grade } : {}),
   };
 }
 /** Evidence a client sees: no storage key and no uploader's user id. */

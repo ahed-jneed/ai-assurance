@@ -11,6 +11,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import type { CriterionOption } from "@/lib/criteria/types";
 import { risk, type Artifact, type Finding } from "@/lib/domain";
 import { humanLabel } from "@/lib/presentation";
 
@@ -49,11 +50,19 @@ const numbers = ["1", "2", "3", "4", "5"].map((value) => ({
   value,
   label: value,
 }));
-export function NewFindingForm({ choices, onChoice }: FieldProps) {
+export function NewFindingForm({
+  choices,
+  onChoice,
+  criteria,
+}: FieldProps & {
+  /** The criteria of the engagement's pack a finding may reference. */
+  criteria?: CriterionOption[];
+}) {
   const rating = risk(
     Number(choices.likelihood || 3),
     Number(choices.impact || 3),
   );
+  const criterion = criteria?.find((c) => c.reference === choices.criterion);
   return (
     <div className="finding-form">
       <section className="finding-form-section">
@@ -67,39 +76,72 @@ export function NewFindingForm({ choices, onChoice }: FieldProps) {
             maxLength={300}
           />
         </label>
-        <label>
-          Primary article
-          <Choice
-            name="article"
-            label="Article"
-            values={[
-              "4",
-              "5",
-              "6",
-              "9",
-              "10",
-              "11",
-              "12",
-              "13",
-              "14",
-              "15",
-              "16",
-              "17",
-              "18",
-              "19",
-              "25",
-              "26",
-              "27",
-              "43",
-              "49",
-              "50",
-              "72",
-              "73",
-            ].map((value) => ({ value, label: "Article " + value }))}
-            choices={choices}
-            onChoice={onChoice}
-          />
-        </label>
+        {!!criteria?.length && (
+          <label>
+            <span className="finding-field-label">
+              Criterion
+              <small>Optional; sets the article</small>
+            </span>
+            <Choice
+              name="criterion"
+              label="Criterion"
+              values={[
+                {
+                  value: "none",
+                  label: choices.procedureId
+                    ? "The criteria of the procedure's working paper"
+                    : "No criterion (article only)",
+                },
+                ...criteria.map((c) => ({
+                  value: c.reference,
+                  label: c.citation + (c.title ? " · " + c.title : ""),
+                })),
+              ]}
+              choices={{ ...choices, criterion: choices.criterion || "none" }}
+              onChoice={onChoice}
+            />
+          </label>
+        )}
+        {criterion ? (
+          <p className="subtle">
+            Article {criterion.article ?? criterion.citation}, from the chosen
+            criterion
+          </p>
+        ) : (
+          <label>
+            Primary article
+            <Choice
+              name="article"
+              label="Article"
+              values={[
+                "4",
+                "5",
+                "6",
+                "9",
+                "10",
+                "11",
+                "12",
+                "13",
+                "14",
+                "15",
+                "16",
+                "17",
+                "18",
+                "19",
+                "25",
+                "26",
+                "27",
+                "43",
+                "49",
+                "50",
+                "72",
+                "73",
+              ].map((value) => ({ value, label: "Article " + value }))}
+              choices={choices}
+              onChoice={onChoice}
+            />
+          </label>
+        )}
         {[
           ["condition", "Observed condition"],
           ["criteria", "Criteria & expectation"],

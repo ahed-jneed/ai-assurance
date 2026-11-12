@@ -21,9 +21,18 @@ import {
 import type { Bundle } from "./types";
 
 const r = registry();
-const pack1 = resolve(r, defaultPin(r));
+/** Pack #1 2026.11.2, which every legacy class resolves to. */
+const pack1 = resolve(r, legacyPin(r, {}));
 const PACK_SHA =
   "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81";
+/** Pack #1 2026.11.3 (phase 2, #61): 2026.11.2 plus its Annex IV map. */
+const PACK_SHA_2026_11_3 =
+  "a92288fa3921dedd0099fd64152f05a063269280a9bc426e4380f075d6864554";
+const legacyPinValue = {
+  packId: "eu-ai-act-amended",
+  packVersion: "2026.11.2",
+  packSha256: PACK_SHA,
+};
 
 /**
  * JCS digests of templates/catalog.json and docs/obligation-subitems.json at
@@ -59,11 +68,31 @@ describe("pack #1 projections", () => {
     );
   });
 
+  it("keeps the 2026.11.2 programme and framework in pack #1 2026.11.3", () => {
+    const next = resolve(r, defaultPin(r));
+    expect(next.pin.packVersion).toBe("2026.11.3");
+    expect(digest(legacyCatalog(next.pack))).toBe(CATALOG_2026_11_2);
+    expect(next.frameworks).toEqual(pack1.frameworks);
+    const { version, supersedes, annexIvMap, notes, ...rest } = next.pack;
+    const { version: v0, notes: n0, ...before } = pack1.pack;
+    expect([version, supersedes, v0]).toEqual([
+      "2026.11.3",
+      "2026.11.2",
+      "2026.11.2",
+    ]);
+    expect(rest).toEqual(before);
+    expect(annexIvMap?.mapVersion).toBe("2026.11.1");
+    expect(notes).not.toEqual(n0);
+  });
+
   it("switches every AI Act feature on and keeps the route roles", () => {
     expect(features(pack1.pack)).toEqual({
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
     expect(pack1.pack.roles).toEqual({
       limitationMemo: "MEM-EX-01",
@@ -91,9 +120,13 @@ describe("pins", () => {
   it("pins new engagements to the default pack", () => {
     expect(defaultPin(r)).toEqual({
       packId: "eu-ai-act-amended",
-      packVersion: "2026.11.2",
-      packSha256: PACK_SHA,
+      packVersion: "2026.11.3",
+      packSha256: PACK_SHA_2026_11_3,
     });
+    // The legacy version stays selectable by its exact version.
+    expect(defaultPin(r, "eu-ai-act-amended", "2026.11.2")).toEqual(
+      legacyPinValue,
+    );
     expect(defaultPin(r, "eu-ai-act-amended")).toEqual(defaultPin(r));
     expect(() => defaultPin(r, "no-such-pack")).toThrow(
       "Choose a released criteria pack",
@@ -111,8 +144,8 @@ describe("pins", () => {
     ["stamp 2026.11.1", { rulePack: { version: "2026.11.1" } }],
     ["stamp 2026.11.2", { rulePack: { version: "2026.11.2" } }],
   ])("resolves an engagement with %s to pack #1 2026.11.2", (_, e) => {
-    expect(legacyPin(r, e)).toEqual(defaultPin(r));
-    expect(pinOf(r, e)).toEqual(defaultPin(r));
+    expect(legacyPin(r, e)).toEqual(legacyPinValue);
+    expect(pinOf(r, e)).toEqual(legacyPinValue);
   });
 
   it("fails closed on an unknown stamp", () => {
@@ -137,11 +170,11 @@ describe("registry", () => {
     expect(digest(pack1.pack)).toBe(PACK_SHA);
   });
 
-  it("offers pack #1 and the GenAI pack at engagement creation, with legal review pending", () => {
+  it("offers pack #1, the GenAI pack and the LL144 pack at engagement creation, with their legal review pending", () => {
     expect(selectablePacks(r)).toEqual([
       expect.objectContaining({
         id: "eu-ai-act-amended",
-        version: "2026.11.2",
+        version: "2026.11.3",
         isDefault: true,
         workingPapers: 36,
         memos: 12,
@@ -156,6 +189,16 @@ describe("registry", () => {
         memos: 1,
         legalReviewPending: true,
         clauseNumbersOnly: true,
+      }),
+      expect.objectContaining({
+        id: "nyc-ll144-bias-audit",
+        version: "2026.11.0",
+        isDefault: false,
+        workingPapers: 7,
+        memos: 2,
+        legalReviewPending: true,
+        clauseNumbersOnly: true,
+        phases: ["Planning", "Fieldwork", "Reporting"],
       }),
     ]);
   });

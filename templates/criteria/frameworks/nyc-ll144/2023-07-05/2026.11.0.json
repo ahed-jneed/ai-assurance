@@ -1,0 +1,265 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "nyc-ll144",
+  "edition": "2023-07-05",
+  "version": "2026.11.0",
+  "title": "NYC Local Law 144 of 2021 (Administrative Code §§ 20-870 to 20-874) and the DCWP rules, 6 RCNY §§ 5-300 to 5-304",
+  "shortTitle": "NYC Local Law 144",
+  "kind": "local_law",
+  "publisher": "City of New York (Department of Consumer and Worker Protection)",
+  "jurisdiction": "US-NY-NYC",
+  "status": "in_force",
+  "researchedAsOf": "2026-11-12",
+  "sources": [
+    {
+      "role": "official_text",
+      "url": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+      "title": "DCWP notice of adoption, 6 RCNY Subchapter T"
+    },
+    {
+      "role": "publisher_page",
+      "url": "https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/",
+      "title": "NYC Rules: adopted rule, effective 5 July 2023"
+    },
+    {
+      "role": "publisher_page",
+      "url": "https://www.nyc.gov/assets/dca/downloads/pdf/about/DCWP-AEDT-FAQ.pdf",
+      "title": "DCWP, AEDT frequently asked questions (29 June 2023)"
+    },
+    {
+      "role": "consolidated_html",
+      "url": "https://codelibrary.amlegal.com/codes/newyorkcity/latest/NYCadmin/0-0-0-135839",
+      "title": "NYC Administrative Code, Title 20, Chapter 5, Subchapter 25"
+    }
+  ],
+  "licence": {
+    "holder": "City of New York",
+    "textPolicy": "paraphrased_titles",
+    "status": "confirmed",
+    "basis": "Section numbers and our own short titles only; no text of the Code or the rules is reproduced. Enacted laws and adopted rules of the City are public edicts."
+  },
+  "applicationSummary": [
+    {
+      "reference": "Local Law 144 of 2021 takes effect",
+      "date": "2023-01-01"
+    },
+    {
+      "reference": "DCWP rules take effect; enforcement begins",
+      "date": "2023-07-05"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "LL144-CODE",
+      "ref": "Admin. Code §§ 20-870 to 20-874",
+      "title": "Automated employment decision tools (the Local Law)",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "LL144-20-871-A",
+      "ref": "§ 20-871(a)",
+      "title": "Use only after a bias audit within a year, with its summary published",
+      "type": "requirement",
+      "parent": "LL144-CODE",
+      "aliases": [
+        "20-871(a)"
+      ],
+      "provenance": {
+        "source": "https://codelibrary.amlegal.com/codes/newyorkcity/latest/NYCadmin/0-0-0-135839",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "The Administrative Code text was not read for this version; the duty is taken from the DCWP rules that implement it and the DCWP FAQ (LR-LL144-02)."
+      }
+    },
+    {
+      "id": "LL144-20-871-B",
+      "ref": "§ 20-871(b)",
+      "title": "Notices to candidates and employees who reside in the city",
+      "type": "requirement",
+      "parent": "LL144-CODE",
+      "aliases": [
+        "20-871(b)"
+      ],
+      "provenance": {
+        "source": "https://codelibrary.amlegal.com/codes/newyorkcity/latest/NYCadmin/0-0-0-135839",
+        "sourceKind": "official_consolidation",
+        "verification": "unverified",
+        "legalReview": "required",
+        "note": "The Administrative Code text was not read for this version; the duty is taken from the DCWP rules that implement it and the DCWP FAQ (LR-LL144-02)."
+      }
+    },
+    {
+      "id": "LL144-RULES",
+      "ref": "6 RCNY §§ 5-300 to 5-304",
+      "title": "DCWP rules on automated employment decision tools",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "LL144-5-300",
+      "ref": "§ 5-300",
+      "title": "Definitions, including who may act as an independent auditor",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-300"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-301-A",
+      "ref": "§ 5-301(a)",
+      "title": "No use once more than a year has passed since the latest bias audit",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-301(a)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-301-B",
+      "ref": "§ 5-301(b)",
+      "title": "Selection rates and impact ratios by sex, race/ethnicity and intersection",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-301(b)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-301-C",
+      "ref": "§ 5-301(c)",
+      "title": "Full-sample median, scoring rates and impact ratios for scores",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-301(c)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own. The full-sample median includes the unknown category (Q4 of docs/design/audit-statistics.md; LR-LL144-03)."
+      }
+    },
+    {
+      "id": "LL144-5-301-D",
+      "ref": "§ 5-301(d)",
+      "title": "Optional exclusion of a category under 2% of the data, disclosed",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-301(d)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-302-A",
+      "ref": "§ 5-302(a)",
+      "title": "Historical data, and when other employers' data may be relied on",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-302(a)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-302-B",
+      "ref": "§ 5-302(b)",
+      "title": "Test data only if historical data is insufficient, explained",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-302(b)"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-303",
+      "ref": "§ 5-303",
+      "title": "Published audit date, summary of results and distribution date",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-303"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    },
+    {
+      "id": "LL144-5-304",
+      "ref": "§ 5-304",
+      "title": "Notice content and timing, and data-information requests",
+      "type": "requirement",
+      "parent": "LL144-RULES",
+      "aliases": [
+        "5-304"
+      ],
+      "provenance": {
+        "source": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+        "sourceKind": "authentic_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-12",
+        "legalReview": "required",
+        "note": "Checked against the DCWP notice of adoption (rule text, effective 5 July 2023). Title is our own."
+      }
+    }
+  ],
+  "notes": "Rule text checked against the DCWP notice of adoption on 2026-11-12; no later amendment was found (LR-LL144-01). The Administrative Code sections were not read (LR-LL144-02). Research and legal-review items: docs/research/ll144-2026-11.md. The qualified legal review is pending (#57, D-02)."
+}

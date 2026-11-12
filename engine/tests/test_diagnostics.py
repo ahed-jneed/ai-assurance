@@ -122,7 +122,6 @@ class DiagnosticTests(unittest.TestCase):
             (lambda c: c["statistics"]["criteria"][0].update(passBlockedBy=["r2"]), "passBlockedBy"),
             (lambda c: c["statistics"]["criteria"][0]["members"][0].update(band={"lower": 1.2}), "strictly inside"),
             (lambda c: c["statistics"].update(multiplicity={"confirmatory": "holm", "exploratory": "benjamini_hochberg"}), "family adjustments"),
-            (lambda c: c["statistics"].update(clusterField="person"), "cluster bootstrap"),
             (lambda c: c.update(contractVersion="1.0"), "requires contractVersion 1.3"),
         ]:
             cfg = plan_config(copy.deepcopy(plan), suites=["performance"])

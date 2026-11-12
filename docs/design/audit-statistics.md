@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | Issue | #9 (milestone M1, "Defensible core") |
-| Status | Statistics specification version **1.0.0** (revised after independent review and re-review; its questions were decided on 5 November 2026, section 15). Implemented in the engine by #21 (PR #87: `engine/statistics.py`, engine report 1.3, worker translation of `engineConfig` 1.1 and 1.4) and in the hosted runner by #22 (`site-app/lib/statistics.ts`, hosted run 1.4, external intake 1.5). Both runners pass every golden case they run. Amended 6 November 2026 by #68: the mean-prediction baseline gate for regression criteria (section 5.9). |
+| Status | Statistics specification version **1.0.0** (revised after independent review and re-review; its questions were decided on 5 November 2026, section 15). Implemented in the engine by #21 (PR #87: `engine/statistics.py`, engine report 1.3, worker translation of `engineConfig` 1.1 and 1.4) and in the hosted runner by #22 (`site-app/lib/statistics.ts`, hosted run 1.4, external intake 1.5). Both runners pass every golden case they run. Amended 6 November 2026 by #68: the mean-prediction baseline gate for regression criteria (section 5.9). Amended 6 November 2026 by #93: cluster-bootstrap decisions for plans with a `clusterField` (section 5.11, engine only), the MAE/RMSE bootstrap sensitivity interval (section 5.9) and the mean baseline gate in regression power (section 8). |
 | Date | 5 November 2026 |
 | Implemented by | #21 (engine, `engine/`, including the external worker), #22 (hosted runner, `site-app/`; threshold library data in `schemas/threshold-library.json`) |
 | Consumed by | #30 (NYC Local Law 144 pack), #15 (binary performance fixes) |
-| Contract files | `schemas/fixtures/statistics-golden.json` (53 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
+| Contract files | `schemas/fixtures/statistics-golden.json` (58 golden cases), `docs/design/audit-statistics-plan.schema.json` (draft plan schema), `docs/design/audit-statistics-verify.py` (verification aid, not runtime code) |
 
 The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Python engine, the external worker's projection of an engine report, or the hosted TypeScript runner. Anything not marked as engine-only applies to all of them, and the golden fixture is the arbiter when this text and an implementation disagree.
 
@@ -59,11 +59,11 @@ The words MUST, MUST NOT, SHOULD and MAY are normative. "Runner" means the Pytho
     - The existing headline metric names are kept.
     - The run outcome aggregates the confirmatory criteria and the results this specification does not govern, never exploratory criteria.
     - The external worker copies the engine's decisions instead of re-deciding (sections 11 and 12).
-12. **What the hosted runner mirrors.** It mirrors every analytic part exactly: intervals, p-values, Fisher, the family adjustments, minimums, plan normalisation and hashing, legacy derivation, power and the library. Bootstrap, clustered data and score-based calibration stay engine-only (section 12).
+12. **What the hosted runner mirrors.** It mirrors every analytic part exactly: intervals, p-values, Fisher, the family adjustments, minimums, plan normalisation and hashing, legacy derivation, power and the library. Bootstrap, clustered data, score-based calibration and the mean baseline gate in regression power stay engine-only (section 12).
 13. **Verification.**
-    - All 53 golden cases are recomputed by a standard-library reference.
-    - They are then recomputed again, independently, with scipy, statsmodels, jsonschema and Node.js: 2,028 checks with 0 discrepancies, including a second, separately written legacy derivation, the chance gate and the mean baseline gate.
-    - A mutation test confirms that the cross-check catches each of 35 deliberately corrupted values.
+    - All 58 golden cases are recomputed by a standard-library reference.
+    - They are then recomputed again, independently, with scipy, statsmodels, numpy, jsonschema and Node.js: 2,154 checks with 0 discrepancies, including a second, separately written legacy derivation, the chance gate, the mean baseline gate and the cluster bootstrap of the four clustered cases.
+    - A mutation test confirms that the cross-check catches each of 41 deliberately corrupted values.
     - Exact enumeration confirms the false-fail figures of section 6 and the chance gate of section 5.2. Monte Carlo runs confirm interval coverage and the power formulas (section 13.3).
 
 **Where this design departs from the issue text** (each departure is also a question decided in section 15):
@@ -218,10 +218,10 @@ A `performance` criterion uses the same rule on heterogeneous members. "Accuracy
 | `no_threshold` | criterion | The plan gives this criterion no member and no band, because its derived legacy policy sets no threshold that 1.0.0 can decide. The criterion is inconclusive, and all its metrics are descriptive. |
 | `undecidable_metric` | criterion; descriptive entry | The criterion's `passBlockedBy` names a metric that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval: R² for `PERF-REG` or ECE for `PERF-CAL`, in a plan derived from engine thresholds (section 4.8). That metric is reported as a descriptive entry carrying the code, with its legacy threshold, if any, shown and not applied. A pass is blocked; a fail stays possible through the members. |
 | `invalid_band` | criterion | A derived legacy band violates section 3. The criterion is inconclusive. |
-| `interval_requires_engine`, `clustered_design_requires_engine` | criterion (hosted) | The hosted runner cannot compute the required interval (score columns, cluster designs) and returns inconclusive. |
-| `bootstrap_insufficient_valid_replicates`, `bootstrap_budget_exceeded`, `small_cell_clustered` | member (engine) | See section 5.11. |
+| `interval_requires_engine`, `clustered_design_requires_engine` | criterion (hosted) | The hosted runner cannot compute the required interval (score columns, cluster designs) and returns inconclusive. Today the hosted runner rejects a plan with a `clusterField` when it is validated, so no hosted run of a clustered plan exists and `clustered_design_requires_engine` stays reserved (section 5.11). |
+| `bootstrap_insufficient_valid_replicates`, `bootstrap_budget_exceeded`, `small_cell_clustered`, `below_minimum_cluster_count` | member (engine) | See section 5.11. A member with `small_cell_clustered` makes no claim (p = 1); the criterion then records the code instead of `interval_straddles_band`. |
 
-No golden case produces `too_many_groups`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine` or the bootstrap codes. They appear only in runner output. `no_threshold` is pinned by GC-45, `undecidable_metric` by GC-48, `chance_exact_test_not_significant` by GC-50 and GC-51, and `mean_baseline_not_beaten` by GC-48, GC-52 and GC-53. The power reason codes are listed in section 8.
+No golden case produces `too_many_groups`, `invalid_band`, `interval_requires_engine`, `clustered_design_requires_engine`, `bootstrap_insufficient_valid_replicates` or `bootstrap_budget_exceeded`. They appear only in runner output; the engine tests pin the two bootstrap codes (`engine/tests/test_cluster_bootstrap.py`). `no_threshold` is pinned by GC-45, `undecidable_metric` by GC-48, `chance_exact_test_not_significant` by GC-50 and GC-51, `mean_baseline_not_beaten` by GC-48, GC-52 and GC-53, and `small_cell_clustered` and `below_minimum_cluster_count` by GC-56. The power reason codes are listed in section 8.
 
 Gates never hide numbers. Every member whose estimate is defined still reports its estimate and interval, including suppressed and insufficiently supported members, so the auditor can see how uncertain the evidence is.
 
@@ -477,8 +477,13 @@ The criterion `equalized_odds` has two members per pair of groups: `tpr_differen
   - **The gate.** With e_i = ŷ_i − y_i and d_i = e_i² − (ȳ − y_i)², mean d = MSE − SST/n = −R²·SST/n. The gate p is `2(1 − Φ(−mean d / (s_d/√n)))` on the decision scale, with s_d the sample standard deviation (n − 1 denominator), so p ≤ α exactly when the upper bound of the (1 − α) normal-approximation interval for mean d lies below 0. A reduction −mean d of at most 10⁻⁹ of SST/n counts as rounding and gives p = 1; zero-variance differences with a larger reduction give p for z = 37. SST = 0, missing targets or n < 2 give p = 1.
   - **Pass only.** When every pool member passes, P = max(member P, gate p). The gate never fails a criterion and never changes a fail, like the chance gate (section 5.2). When no member fails and the gate p exceeds α, the criterion records `mean_baseline_not_beaten`, and the limitations name the model's RMSE and the baseline RMSE.
   - **Every constant is excluded.** For a constant c, mean d = (ȳ − c)² ≥ 0, so the gate never rejects: the mean predictor gives d ≡ 0 (GC-52), any other constant a positive mean. A model with R² > 0 passes only when its MSE reduction is significant (GC-53 is a weak model with R² 0.063 that does not, GC-35 a strong one that does).
-  - **Scope and power.** ȳ is estimated from the same rows; the gate treats it as fixed, which changes the variance of mean d by O(1/n²). The power formulas of section 8 ignore the gate: they assume a model that clearly beats the mean (a follow-up adds the gate to `regression_performance` power).
-- **Caveat.** This is a CLT approximation; heavy-tailed errors can undercover. The engine also reports a percentile-bootstrap interval as a sensitivity figure, which never decides. Example: GC-35.
+  - **Scope and power.** ȳ is estimated from the same rows; the gate treats it as fixed, which changes the variance of mean d by O(1/n²). The power check of section 8 adds the gate as a pass condition when the plan states the assumed target standard deviation (`targetSd`, #93, engine only for now); without it the formulas assume a model that clearly beats the mean.
+  - **No fail direction (decided by #93).** A model whose MSE is significantly *above* the baseline's is not failed by the gate. A fail is a claim against the pre-registered band, and the band is the auditor's statement of what is acceptable: a model worse than the mean that still meets an absolute RMSE threshold fails nothing that was registered, and it already cannot pass. This matches the chance gate, which also guards only passes (section 5.2). A plan that wants that claim can register it as a band; a "beats the baseline" member is on the Later list.
+  - In a clustered plan the gate is decided by the cluster bootstrap instead (section 5.11).
+- **Caveat.** This is a CLT approximation; heavy-tailed errors can undercover. So the engine also reports, end to end and for independent rows only, a percentile-bootstrap **sensitivity interval** for every MAE and RMSE member and descriptive entry in `details.sensitivityInterval` (`{lower, upper, level, method: "percentile_bootstrap"}`, section 11.2). It never decides.
+  - It resamples rows with the plan's B and the run seed, exactly as the R² bootstrap does (type-7 quantiles at the plan's level), within the descriptive budget rows × B ≤ 5,000,000. Beyond the budget, or with fewer than 0.9·B valid replicates, it is null and the result's limitations say so.
+  - In a clustered plan the member interval is itself a bootstrap, and no sensitivity interval is added.
+  - The fixture's core level does not carry it, as for the ECE and R² intervals; for GC-35 end to end, both lie close to the normal-approximation intervals.
 
 ### 5.10 Group comparisons, suppression and coverage
 
@@ -503,23 +508,30 @@ The criterion `equalized_odds` has two members per pair of groups: `tpr_differen
 
 ### 5.11 Bootstrap and clustered data (engine-only)
 
+Implemented in the engine by #93 (`cluster_bootstrap_criteria` in `engine/statistics.py`; GC-54 to GC-57).
+
 - **When analytic intervals are invalid.** Analytic intervals assume independent rows. When the plan declares a `clusterField`, for example a person id for repeated applications:
   - the engine MUST use the cluster bootstrap for every member;
-  - the hosted runner MUST return `inconclusive` with `clustered_design_requires_engine`.
+  - the hosted runner MUST NOT decide the plan with analytic intervals. It MUST either return `inconclusive` with `clustered_design_requires_engine` or reject the plan. Today it rejects the plan at validation ("statistics.clusterField needs the engine's cluster bootstrap; the hosted runner assumes independent rows"), and the worker rejects a hosted `engineConfig` 1.4 plan with a cluster design, so only engine 1.3 configurations run clustered plans.
+  - Every evaluated row needs a cluster id; a row without one rejects the run (`missing_value`).
 - **Resampling clusters, not rows.**
-  - Every statistic in this specification is a function of per-group, per-class or per-bin counts. The engine therefore precomputes one count vector per cluster: the cells every cluster-mode member needs.
-  - Clusters are ordered by `canonical_bytes`, as in today's `_draws`. A replicate draws C cluster indices uniformly with replacement using `rng.randrange(C)` from one `random.Random(seed)` stream, where seed is the run seed. The replicate's counts are the sum of the drawn vectors.
-  - One set of B replicates serves every cluster-mode member of the run.
+  - Every statistic in this specification is a function of per-group, per-class or per-bin counts. The engine therefore precomputes one count vector per cluster: the cells every cluster-mode member needs. Per criterion kind they are: TP, FP, FN, TN (binary performance); the k × k confusion matrix (multiclass); n and the sums of |e|, e², t − c and (t − c)², with c the mean of all targets (regression); each group's cells (group criteria); and each bin's n, positives and score sum, then the scored rows and their sum of squared score errors (calibration).
+  - The criterion's own data, from which the estimates, statuses, gates, Fisher's p, `chanceExactP` and the per-group rates are computed as without clusters, is the sum of the clusters' data.
+  - Clusters are ordered by the UTF-8 bytes of their canonical JSON (`canonical_bytes`, as in `_draws`). A replicate draws C cluster indices uniformly with replacement using `rng.randrange(C)` from one `random.Random(seed)` stream, where seed is the run seed. The replicate's counts are the sum of the drawn vectors; the engine adds each cluster's vector times the number of times it was drawn, which is the same sum.
+  - One set of B replicates serves every cluster-mode member of the run, in every criterion: replicate b of one member and replicate b of another use the same draws.
   - B = `bootstrap.replicates`: default 2000, allowed 1000–10000.
-- **Decision budget.** B × C ≤ 50,000,000 cluster draws per run, about one minute of CPython at the measured 1.2 µs per draw.
+- **What is bootstrapped.** Every member and every descriptive entry with an analytic interval gets a cluster bootstrap interval with method `cluster_percentile_bootstrap`, and `bootstrap: {replicates, validReplicates, clusters}`. R², ECE and `baseline_rmse` keep their own treatment (below and section 5.9). The per-group rates in a headline's slices, and the engine's supplementary `prevalence` and `majority_baseline_accuracy` entries, keep their Wilson intervals; the result's limitations say that these assume independent rows.
+- **Decision budget.** B × C ≤ 50,000,000 cluster draws per run, about one minute of CPython at the measured 1.2 µs per draw (the `randrange` calls dominate).
   - Rows per cluster no longer matter. At B = 2000 the budget allows 25,000 clusters, and at B = 1000 it allows 50,000, whatever the number of rows.
-  - Beyond the budget, every cluster-mode member is inconclusive with `bootstrap_budget_exceeded`.
-- **Undefined replicates.** Replicates where the estimate is undefined are dropped. With fewer than 0.9·B valid replicates, the member is undefined (`bootstrap_insufficient_valid_replicates`).
-- **Interval.** The percentile interval uses type-7 linear interpolation (today's `_quantile`).
-- **Direction.** Taken from the median replicate.
-- **Decision p.** `p = max(2u*, 2/(B_valid + 1))`, where `u* = inf{u ∈ (0, 0.5] : [q(u), q(1 − u)] decides}`. Find u\* by bisection to 1e−9. The first term keeps `p ≤ α` equivalent to "the percentile interval decides".
-- **Small cells.** Fisher assumes independence, so in cluster mode any member with a 2×2 cell under 5 is inconclusive (`small_cell_clustered`).
-- **Minimum clusters.** Every compared group needs at least 10 clusters (`min_clusters`, as today).
+  - Beyond the budget no replicate is drawn: every cluster-mode member and descriptive entry is `undefined` (or stays `suppressed`) with no interval, p = 1 and `bootstrap_budget_exceeded`, so every criterion is inconclusive.
+- **Undefined replicates.** Replicates where the estimate is undefined are dropped. With fewer than 0.9·B valid replicates, the entry is undefined, has no interval and carries `bootstrap_insufficient_valid_replicates`.
+- **Interval.** The percentile interval `[q(α/2), q(1 − α/2)]` uses type-7 linear interpolation (today's `_quantile`) over the sorted valid replicates.
+- **Direction.** Taken from the median replicate q(0.5), with the boundary rule of section 4.2 (`estimate_on_band_boundary`).
+- **Decision p.** `p = max(2u*, 2/(B_valid + 1))`, where `u* = inf{u ∈ (0, 0.5] : [q(u), q(1 − u)] decides}`, with inclusive bounds for a pass and strict ones for a fail as in section 4.2. Find u\* by bisection on [0, 0.5] to 1e−9 (u\* = 0 when the range of the replicates already decides). The first term keeps `p ≤ α` equivalent to "the percentile interval decides". A pass of a chance-gated member still takes `max(p, chanceExactP)` (section 5.2): the exact test assumes independent rows, so under clustering it is one more necessary condition, not a guarantee.
+- **Headline.** The worst-member bounds of section 4.7 use each member's percentile interval at the two-sided level of the critical value: `CI(z) = [q(u), q(1 − u)]` with `u = Φ(−z)`, at the nominal level and at α/m.
+- **Small cells.** Fisher assumes independence, so in cluster mode any member with a 2×2 cell under 5 makes no claim either way: its p is 1 and it carries `small_cell_clustered`. Fisher's p is still reported. The criterion records `small_cell_clustered` instead of `interval_straddles_band` (GC-56).
+- **Minimum clusters.** Every compared group needs at least 10 clusters (`min_clusters`, as today). For a pairwise member the smaller of its two groups' cluster counts applies, for a calibration gap the clusters with rows in its bin, and for every other entry the clusters with rows in the criterion. An evaluated entry below 10 becomes `insufficient_support` with `below_minimum_cluster_count`: it is reported with its interval, blocks a pass and cannot fail (GC-56).
+- **The mean baseline gate** (section 5.9) uses the same replicates: with mean d = MSE − SST/n computed on each replicate, `p = max(2u*, 2/(B_valid + 1))` with `u* = inf{u : q(1 − u) < 0}`, and p = 1 when the median is not below 0. The rounding rule of section 5.9, fewer than 10 clusters, fewer than 0.9·B valid replicates or a run beyond the budget give p = 1. `baseline_rmse.counts` keeps the whole-sample figures, `gatePValue` is the bootstrap p and `gateMethod` is `cluster_percentile_bootstrap` (GC-55).
 - **Descriptive bootstrap.**
   - ECE and R² get an iid row-level percentile bootstrap with the same B and seed, for display only.
   - Its budget stays rows × B ≤ `MAX_BOOTSTRAP_WORK` (5,000,000). Beyond it, the descriptive entry has no interval and carries `bootstrap_budget_exceeded`.
@@ -628,7 +640,7 @@ Because the interval now decides, minimums are a safety net rather than the main
 |---|---|---|
 | `performance` (binary) | `n`, `prevalence` π, `truePositiveRate`, `trueNegativeRate` | P = nπ, N = n(1 − π), and every binary metric's true value and denominator (table below) |
 | `multiclass_performance` | `n`, `classShares` {label: share} (sum 1), `perClassRecall` {label: recall} | accuracy = Σ share·recall; balanced accuracy = mean recall |
-| `regression_performance` | `n`, `errorSd` σ | Errors are assumed normal with mean 0: MAE = σ√(2/π), SD(\|e\|) = σ√(1 − 2/π), MSE = σ², SD(e²) = √2·σ² |
+| `regression_performance` | `n`, `errorSd` σ, and optionally `targetSd` σ_y (#93, engine only until the hosted runner mirrors it) | Errors are assumed normal with mean 0: MAE = σ√(2/π), SD(\|e\|) = σ√(1 − 2/π), MSE = σ², SD(e²) = √2·σ². With σ_y, the mean baseline gate (section 5.9) becomes a pass condition (below) |
 | `group_comparison` | `groupSizes` {group: n}. Selection-rate metrics: `baselineRate` and optional `assumedRates` {group: rate} (default: every group at the baseline). Equalized odds: `prevalence`, `truePositiveRate`, `falsePositiveRate` (each a number or per group). | Members as they would be formed at evaluation; for equalized odds, the per-group positives n_g·π_g and negatives n_g·(1 − π_g) |
 | `calibration` | none | not computed (`power_not_specified_for_metric`) |
 
@@ -660,8 +672,11 @@ The members' true values and standard errors are:
 | macro_f1, macro_precision | not computed (`power_not_specified_for_metric`) | – |
 | mae | σ√(2/π) | s = σ√(1 − 2/π)/√n |
 | rmse | σ, decided on MSE: θ = σ², bound t → t² | s = √2·σ²/√n |
+| `mean_baseline_gate` (regression with `targetSd`; metric `baseline_rmse`, assumed value σ_y) | MSE reduction θ = σ_y² − σ², pass only: `P = Φ(θ/s − z_P)`, and P = 0 when σ ≥ σ_y; Q = 0 | s = sqrt(2(σ_y⁴ − σ⁴))/√n |
 | selection_rate_difference, tpr_difference, fpr_difference | r_s − r_c | s = sqrt(r_s(1 − r_s)/n_s + r_c(1 − r_c)/n_c) |
 | selection_rate_ratio | ln(r_s/r_c), bounds on the log scale | s = sqrt((1 − r_s)/(n_s r_s) + (1 − r_c)/(n_c r_c)) |
+
+**The mean baseline gate in power (#93, from the #68 follow-up).** The gate's statistic is d = e² − r² with r = ȳ − y. The model is assumed to predict the conditional mean of the target, so its error is the noise: e and r are jointly normal with Var e = σ², Var r = σ_y² and Cov(e, r) = σ², R² = 1 − σ²/σ_y². By Isserlis' theorem Var d = 2σ⁴ + 2σ_y⁴ − 4σ⁴ = 2(σ_y⁴ − σ⁴). The gate is listed after the members as the entry `mean_baseline_gate` and enters `passProbability` and its upper bound like a member; it never fails, so it does not count in the m of z_F. Without `targetSd` the formulas leave the gate out, as before (GC-44).
 
 **Gates.** The approval check applies the section 4.4 gates to the planned sizes. Denominators are expected counts and need not be integers.
 - **Member below its minimum.** A member whose planned denominator is below its minimum has P_i = Q_i = 0, with reason `planned_below_minimum`.
@@ -705,6 +720,7 @@ The failMde fields follow these rules:
 - **GC-42 (equalized odds, per-group prevalence).** A true TPR gap of exactly 0.10 sits on the band edge, so the target is unreachable at any size (`target_unreachable`). The FPR member alone would pass with probability 0.969.
 - **GC-43.** Macro F1 has no formula in 1.0.0, so the criterion is `not_computed`, while its accuracy and macro-recall members are still reported.
 - **GC-44 (regression).** With σ = 1 and 120 rows, MAE ≤ 0.9 and RMSE ≤ 1.15 pass with probabilities 0.458 and 0.705, so the criterion's range is [0.163, 0.458]. It needs 293 rows.
+- **GC-58 (regression with the mean baseline gate).** GC-44 with σ_y = 1.1 (R² ≈ 0.17): the gate passes with probability 0.666 at 120 rows, so the range falls to [0, 0.458], and the criterion needs 312 rows instead of 293.
 
 **Accuracy.** Simulating the actual decision rules (section 13.3) gives these results:
 - Every member formula is within 0.02 of its simulated rate. The largest gaps are GC-44's: 0.020 for RMSE and 0.009 for MAE, whose formula is low.
@@ -713,6 +729,7 @@ The failMde fields follow these rules:
   - GC-44: 0.461, which is 0.003 above its upper bound of 0.4585, the MAE formula. A 200,000-run simulation puts the MAE member at 0.469 and the criterion at 0.462, both ±0.001.
 - The lower bound is loose when members share groups, as in GC-40. That is the price of holding under any dependence. The approval display shows the range, and the required sizes are conservative.
 - The balanced-accuracy formulas ignore the chance gate (section 5.2). It binds only near chance, where a member's pass probability is already small. GC-41's simulation applies it, and its rates are the same as without it.
+- The mean baseline gate's formula is coarser, because d = e² − r² is skewed: for GC-58 it gives 0.666 against a simulated 0.632, so it overstates the gate's pass probability by 0.033. `--simulate` holds it to 0.04. The criterion's simulated rate, 0.321, lies inside its range.
 
 **Approval behaviour.**
 - If any confirmatory criterion's `passProbability` is below the target, or its power is `not_computed`, approval shows the numbers in plain language. For example: "With 388 people per group, a system with identical selection rates would pass this screen only 3 times in 4."
@@ -929,6 +946,7 @@ A **metric** has the shape the external 1.2 projection already uses (`externalMe
 - **Order.** `metrics` lists the headline first (group and calibration criteria), then the members in formation order, then the descriptive entries in standard order (section 4.8).
 - **`threshold`** is the legacy policy rule for the metric's name, or null. That is exactly `threshold_for` today, so a member such as `selection_rate_difference:A|B` has null.
 - **`details`** is `{role, metric, subject, comparator, counts, band, status, direction, smallCell, fisherExactP, chanceExactP, reasons}`, with role `headline`, `member` or `descriptive`. `chanceExactP` is the chance gate's p (section 5.2), and null on every metric that has no gate.
+  - Two optional, engine-only keys (#93): `bootstrap` `{replicates, validReplicates, clusters}` on every member and descriptive entry that a clustered plan decides by the cluster bootstrap (section 5.11), and `sensitivityInterval` (an interval or null) on MAE and RMSE entries for independent rows (section 5.9). The hosted runner emits neither, and the worker copies them unchanged.
 - **`confidenceInterval`** is `{lower, upper, level, method}`, or null when undefined. The method values are `wilson`, `newcombe_hybrid_score`, `katz_log`, `koopman_score`, `mover_wilson`, `jaccard_wilson`, `jaccard_wilson_bonferroni`, `wilson_bonferroni_mean`, `normal_approximation`, `normal_approximation_mse`, `percentile_bootstrap`, `cluster_percentile_bootstrap` and `worst_member_bounds`.
 
 The **decision** object is:
@@ -997,6 +1015,8 @@ In 1.4 the value range of `maximum_selection_rate_gap` widens to [−1, 1], beca
 | `tpr.*`, `fpr.*` | `tprNumerator`, `tprDenominator`, `tpr`, `tprConfidenceInterval`, and likewise for `fpr` |
 | bin `observed.*`, `meanScore` (calibration) | `numerator`, `denominator`, `observedRate`, `confidenceInterval`, `meanProbability`; the runner adds the bin edges `lower` and `upper` |
 | `expected_calibration_error`, `r2` intervals | null at core level; the engine adds a bootstrap interval end to end, and the comparison skips them |
+| member or descriptive `bootstrap` (clustered plans) | `details.bootstrap` |
+| (MAE, RMSE, independent rows) | `details.sensitivityInterval`, added end to end only; the comparison skips it |
 | `normalizedPlan`, `planSha256` | `configuration.statistics` with `provenance.statisticsPlanSha256` (engine); `manifest.statistics` with `provenance.inputHashes.statisticsPlan` (hosted and external) |
 | `overallOutcome`, `reviewFlags` | run `outcome` and `overallOutcome`; run `reviewFlags` |
 
@@ -1038,12 +1058,12 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Minimum floors; suppression; coverage; `all_pairs` and `reference` modes; group limits | **mirror exactly** | yes | `translate_config` applies `max(floor, configured)` and records both |
 | Plan normalisation, RFC 8785 hash, legacy derivation | **mirror exactly** | yes | derives the hosted plan for `engineConfig` 1.1, or carries 1.4's `statistics` |
 | Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`; without it, the other label derived from the data, or in `auditor_model` mode from `modelSpec.outputLabels` (E4) |
-| Power and MDE at plan approval | **mirror** (approval UI) | yes (CLI and report) | – |
+| Power and MDE at plan approval | **mirror** (approval UI), except the mean baseline gate of `targetSd`: the hosted plan normaliser drops `targetSd` and the approval UI does not ask for it (a follow-up of #93) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
-| LL144 computations | via #30 (same arithmetic) | via #30 | – |
-| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns, which #30 adds (section 15); until then one column | yes (`intersectional_slices`) | – |
+| LL144 computations | **mirror** (`lib/ll144.ts`, #30; same arithmetic, `schemas/fixtures/ll144-golden.json`) | yes (`engine/ll144.py`) | – |
+| Intersectional strata (several protected columns) | **mirror** (#30): a hosted plan criterion may set `groupFields` (1–5 columns); strata labels, blank values as `unknownGroupRows` and the 1,000-strata limit follow `engine/criteria.py`. A special-category declaration and its basis cover every grouped column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
-| Cluster bootstrap and descriptive bootstrap (ECE, R²) | not available; `clustered_design_requires_engine` | engine-only | copied |
+| Cluster bootstrap, descriptive bootstrap (ECE, R²) and the MAE/RMSE sensitivity interval | not available: a plan with a `clusterField` is rejected (section 5.11) | engine-only (#93) | copied; a hosted `engineConfig` 1.4 plan with a cluster design is rejected |
 | Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |
 
 ## 13. Golden cases and how they were verified
@@ -1064,10 +1084,11 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 - `groups[]` with `{tp, fp, fn, tn}` or `{selected, n}`, plus optional `unknownGroupRows`;
 - `bins[]` for calibration;
 - `labels` and `matrix` for multiclass;
-- `errors` and optional `targets` for regression.
+- `errors` and optional `targets` for regression;
+- for a plan with a `clusterField` (GC-54 to GC-57): `{seed, clusters: [{cluster, ...that cluster's data in one of the shapes above}]}`. The criterion data is the sum of the clusters' data (section 5.11), and every bootstrapped member and descriptive entry also carries `bootstrap`.
 
 **Fields per case:**
-- `runners`: `["engine"]` for calibration, otherwise both.
+- `runners`: `["engine"]` for calibration, the clustered cases and GC-58 (the mean baseline gate in power), otherwise both.
 - `endToEnd`: whether the case can also be expanded into rows and run through the real runner.
   - The expansion rule is in `howToUse.rowExpansion`. Binary labels are declared as positive `"1"` and negative `"0"`, and data with only one observed label must be evaluated.
   - The hosted runner skips cases with more than 10,000 rows, unknown-group rows, declared groups or reference mode.
@@ -1081,7 +1102,7 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 - Stored numbers have 12 significant digits, except in `normalizedPlan`, which is stored exactly. The tables below round to 4 decimal places.
 - Section 11.4 maps every fixture field to the emitted output.
 
-### 13.2 The 51 cases
+### 13.2 The cases
 
 Inputs are counts (x/n means x selected out of n). The key member is the deciding member. "Decision p" is the criterion P before family adjustment, and "adjusted p" is after Bonferroni (confirmatory) or BH (exploratory). Every performance-kind case also carries its descriptive entries, and every group case its per-group rates.
 
@@ -1148,8 +1169,13 @@ Inputs are counts (x/n means x selected out of n). The key member is the decidin
 | GC-51 | chance gate (multiclass) | GC-46's policy; matrix [[1, 39, 0], [0, 1,900, 0], [0, 60, 0]], a predictor that rarely predicts high or medium | macro recall 0.3417 [0.3348, 0.3817], interval p 6.9e−05; `chanceExactP` 0.1200 (3 classes × 2 × 0.02, from high) | 0.1200 | 0.1200 | **inconclusive**; chance_exact_test_not_significant |
 | GC-52 | mean baseline | today's hosted regression profile (RMSE ≤ 1); GC-48's 400 targets and the mean predictor | derived: RMSE ≤ 1; RMSE 0.6220, interval p 2.9e−114; descriptive R² 0.0000 and baseline RMSE 0.6220, gate p 1 | 1 | 1 | **inconclusive**; mean_baseline_not_beaten |
 | GC-53 | mean baseline | the same profile and targets; a weak model, 0.25 × each deviation from the mean ± 0.375 | RMSE 0.6020, interval p 1.5e−153; R² 0.0631; baseline RMSE 0.6220, MSE reduction 0.0244, gate p 0.2281 | 0.2281 | 0.2281 | **inconclusive**; mean_baseline_not_beaten |
+| GC-54 | clustered (binary) | recall ≥ 0.70 and BA ≥ 0.5, parity ±0.20; 40 applicants × 6 applications (3 positive), every fifth applicant's positives all missed; groups A and B of 20 applicants | recall 0.8000 [0.6750, 0.9250] by cluster bootstrap (independent rows: Wilson [0.7196, 0.8618], p 0.0168); difference 0.0000 [−0.1411, 0.1362] | 0.0720; 0.0072 | 0.1441; 0.0144 | **inconclusive**; interval_straddles_band; parity **pass** |
+| GC-55 | clustered (regression) | MAE ≤ 0.5, RMSE ≤ 0.6; 60 sites × 5 rows, errors dominated by a site effect | MAE 0.4363 [0.3771, 0.4967] (independent rows [0.4073, 0.4652]); RMSE 0.5057 [0.4501, 0.5567]; mean baseline gate p 0.0010 on the same replicates | 0.0375 | 0.0375 | **pass** |
+| GC-56 | clustered (small cells, few clusters) | four-fifths; A 36 people × 2 rows (36/72), B 8 people × 5 rows (20/40), C 40 people × 1 row (3/40) | C\|A ratio 0.1500 [0, 0.3530], p 1 (`small_cell_clustered`); A\|B and C\|B `below_minimum_cluster_count` (8 clusters). With independent rows the criterion fails (P 0.0096) | 1 | 1 | **inconclusive**; small_cell_clustered, below_minimum_cluster_count |
+| GC-57 | clustered (multiclass) | accuracy ≥ 0.6, macro recall ≥ 0.35; 45 clusters × 4 rows, errors concentrated in every fourth cluster | accuracy 0.7722 [0.6722, 0.8611] (independent rows [0.7056, 0.8274]); macro recall 0.7722 [0.6729, 0.8627], chance gate applied | 0.0010 | 0.0010 | **pass** |
+| GC-58 | power (mean baseline gate) | GC-44 with `targetSd` 1.1 | gate pass probability 0.666; range [0, 0.458]; 312 rows needed (GC-44: 293) | | | |
 
-GC-46 to GC-48 follow the first re-review's three examples of a degenerate model that would pass without the rules of section 4.8: each would pass on its other members, and today's engine rule does not pass it. GC-50 and GC-51 follow the second re-review's predictors that ignore the truth and rarely predict a class: each passes the interval of its chance baseline and is stopped by the chance gate (section 5.2). GC-52 and GC-53 (#68) are regression models that meet today's hosted RMSE threshold without beating the mean-prediction baseline: each passes its RMSE member and is stopped by the mean baseline gate (section 5.9). GC-48 now also records `mean_baseline_not_beaten`, and GC-35 reports a baseline RMSE of 5.7717 with gate p 1.4e−11.
+GC-46 to GC-48 follow the first re-review's three examples of a degenerate model that would pass without the rules of section 4.8: each would pass on its other members, and today's engine rule does not pass it. GC-50 and GC-51 follow the second re-review's predictors that ignore the truth and rarely predict a class: each passes the interval of its chance baseline and is stopped by the chance gate (section 5.2). GC-52 and GC-53 (#68) are regression models that meet today's hosted RMSE threshold without beating the mean-prediction baseline: each passes its RMSE member and is stopped by the mean baseline gate (section 5.9). GC-48 now also records `mean_baseline_not_beaten`, and GC-35 reports a baseline RMSE of 5.7717 with gate p 1.4e−11. GC-54 to GC-57 (#93) are clustered plans decided by the cluster bootstrap (section 5.11), with seed 1729 and B = 2000: GC-54 is the reason for the method, a recall that passes with independent rows but not with its 40 applicants as the unit; GC-56 pins the clustered small-cell and minimum-cluster rules. GC-58 adds the mean baseline gate to regression power (section 8).
 
 All categories the issue asks for are covered:
 - small sample: GC-01, 08, 11;
@@ -1160,7 +1186,7 @@ All categories the issue asks for are covered:
 - extreme imbalance: GC-12;
 - intersectional suppression: GC-22, 23.
 
-The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation, a policy with no thresholds, the chance baselines and their gate, and a metric that blocks a pass because 1.0.0 cannot decide it.
+The remaining cases cover zero numerators, all events, empty groups, small cells, multiplicity, power for single, three-group and multi-member criteria, calibration, reference mode, the hosted end-to-end suite, LL144, multiclass, regression, descriptive entries, legacy derivation, a policy with no thresholds, the chance baselines and their gate, a metric that blocks a pass because 1.0.0 cannot decide it, the mean baseline gate, and clustered designs.
 
 ### 13.3 Verification method
 
@@ -1169,11 +1195,11 @@ The remaining cases cover zero numerators, all events, empty groups, small cells
 - The script asserts that every closed-form z\* equals bisection within 1e−8, and it regenerates the fixture.
 
 Commands, from the repository root:
-- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 51 cases.
+- `python docs/design/audit-statistics-verify.py --check` recomputes everything and diffs it against the committed fixture: 0 differences across 58 cases.
 - `--write` regenerates the fixture.
 - `--show-plan GC-38` prints a case's normalised plan, its canonical bytes and its hash.
 
-**2. Independent recomputation.** This revision ran it with scipy 1.11.4, statsmodels 0.14.0, numpy 1.26.2 and jsonschema 4.19.2, installed outside the repository, plus Node.js 22.21.1; the #68 amendment was rechecked with scipy 1.18.1, statsmodels 0.15.0, numpy 2.3.5 and jsonschema 4.26.0. These MUST NOT be added to any requirements file.
+**2. Independent recomputation.** This revision ran it with scipy 1.11.4, statsmodels 0.14.0, numpy 1.26.2 and jsonschema 4.19.2, installed outside the repository, plus Node.js 22.21.1; the #68 amendment was rechecked with scipy 1.18.1, statsmodels 0.15.0, numpy 2.3.5 and jsonschema 4.26.0, and the #93 amendment with scipy 1.17.1, statsmodels 0.15.0, numpy 2.3.5 and jsonschema 4.26.0. These MUST NOT be added to any requirements file.
 
 `--cross-check` recomputes the fixture with separately written code:
 
@@ -1187,26 +1213,28 @@ Commands, from the repository root:
 | group_rates | 155 | Per-group Wilson intervals and suppression flags |
 | headlines | 26 | Worst-member bounds rebuilt from library intervals at the nominal and Bonferroni levels |
 | coverage, sample_sizes, ece_r2 | 26, 47, 5 | From the raw case data |
-| criterion_p, outcomes | 94, 170 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni), with the pass blocked where `passBlockedBy` is set and a regression pass P raised to the mean baseline gate p; unadjusted, adjusted and run outcomes; `reviewFlags` |
+| criterion_p, outcomes | 94, 183 | Criterion P and `decidingMemberId` from the member p-values (intersection–union and Bonferroni), with the pass blocked where `passBlockedBy` is set and a regression pass P raised to the mean baseline gate p; unadjusted, adjusted and run outcomes; `reviewFlags` |
 | mean_baseline | 55 | On every regression criterion: the baseline RMSE, baseline MSE and MSE reduction from numpy, the gate p from `scipy.stats.norm.sf` with the 10⁻⁹ rounding floor, and `mean_baseline_not_beaten` on exactly the criteria with no failing member whose gate p exceeds α |
-| family_adjustment | 49 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
-| power, sample_size_search, minimum_detectable_effects | 29, 7, 5 | Member and criterion probabilities from scipy formulas; each required size is the smallest passing integer; MDEs by `scipy.optimize.brentq` (the ratio peak by `minimize_scalar`); equality-test sizes by `samplesize_proportions_2indep_onetail` |
+| cluster_bootstrap | 80 | The four clustered cases: the same draws (they are the definition), but every replicate statistic rebuilt with numpy as a multiplicity matrix times per-cluster counts from the raw case data; `bootstrap` counts and cluster numbers; intervals by `numpy.quantile(method="linear")`; directions from `numpy.median`; u\* solved exactly on the linear pieces of the quantile function instead of by bisection; `small_cell_clustered` and `below_minimum_cluster_count`; criterion P; the clustered mean baseline gate; the headline bounds |
+| family_adjustment | 54 | `statsmodels.stats.multitest.multipletests` (`bonferroni`, `fdr_bh`) |
+| power, sample_size_search, minimum_detectable_effects | 33, 8, 5 | Member and criterion probabilities from scipy formulas, the mean baseline gate's variance from the covariance matrix by Isserlis' theorem; each required size is the smallest passing integer; MDEs by `scipy.optimize.brentq` (the ratio peak by `minimize_scalar`); equality-test sizes by `samplesize_proportions_2indep_onetail` |
 | ll144 | 22 | Totals, reference category, shares, eligibility, Wilson and Katz intervals |
 | derivation | 11 | Every derived plan (GC-38, GC-39, GC-45 to GC-53), rebuilt by a second, separately written implementation of section 9.3 and compared field by field: criteria, member order, the chance baselines (k counted from the data with numpy), `passBlockedBy`, applied and configured minimums |
-| plan_schema, plan_hashes | 124, 39 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 10 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5, `passBlockedBy` in a plan that was not derived, naming another kind's metric, or on a binary criterion); Node.js JCS hashes |
-| descriptive_entries, numerics | 185, 14 | Descriptive shape; `undecidable_metric` on exactly the criteria with a non-empty `passBlockedBy` and on their R² or ECE entries; normal quantiles and `erfc` against scipy |
+| plan_schema, plan_hashes | 137, 43 | jsonschema Draft 2020-12 validation of every plan as written and normalised; idempotent normalisation; 10 invalid plans that the schema must reject (a minimum below its floor, Holm, an unknown field, an unknown metric, a band without bounds, reference mode without a reference group, coverage below 0.5, `passBlockedBy` in a plan that was not derived, naming another kind's metric, or on a binary criterion); Node.js JCS hashes |
+| descriptive_entries, numerics | 191, 14 | Descriptive shape; `undecidable_metric` on exactly the criteria with a non-empty `passBlockedBy` and on their R² or ECE entries; normal quantiles and `erfc` against scipy |
 
-Result: **2,028 checks, 0 problems.** Ajv 8.20.0 (Draft 2020-12, the validator the repository's schema checks use, from `site-app/node_modules`, with the options of `schemas/validate-run-schema.mjs`) gives the same verdicts on the fixture plans and the 10 invalid ones.
+Result: **2,154 checks, 0 problems.** Ajv 8.20.0 (Draft 2020-12, the validator the repository's schema checks use, from `site-app/node_modules`, with the options of `schemas/validate-run-schema.mjs`) gives the same verdicts on the fixture plans and the 10 invalid ones.
 
 What the cross-check does not recompute: the library view in `decision.libraryEntry` and the text fields.
 
-`--mutation-test` corrupts 35 fixture values one at a time and the cross-check reports all 35. The corrupted values span:
+`--mutation-test` corrupts 41 fixture values one at a time and the cross-check reports all 41. The corrupted values span:
 - headlines, coverage, ECE, R², criterion and adjusted P, the deciding member, member status, outcomes, descriptive and per-group intervals, directions;
 - the plan hash, a plan below the floors, required sizes, MDEs and power probabilities;
 - a binary chance baseline lowered to the policy bound, a dropped multiclass chance baseline and an emptied `passBlockedBy`, each with the plan hash recomputed so that only the derivation check can notice;
 - a pass P despite an undecidable metric;
 - the chance gate's p, its Bonferroni factor for three classes, and GC-50 recomputed consistently without the gate, as a runner that omits it would report it;
-- GC-35's baseline RMSE, GC-53's mean baseline gate p, and GC-52 recomputed consistently without the mean baseline gate.
+- GC-35's baseline RMSE, GC-53's mean baseline gate p, and GC-52 recomputed consistently without the mean baseline gate;
+- a cluster-bootstrap interval, decision p, valid-replicate count and clustered gate p, a clustered small cell decided as if rows were independent, and GC-58's gate probability.
 
 **3. Monte Carlo (`--simulate`, 20,000 replications, seed 20261105).**
 - Power formulas against the actual decision rules, at the family-adjusted level:
@@ -1220,16 +1248,18 @@ What the cross-check does not recompute: the library view in `decision.libraryEn
 | GC-41 | range [0.3518, 0.7447] | 0.6541 (with the chance gate on its balanced-accuracy member) |
 | GC-42 | 0 | 0 |
 | GC-44 | range [0.1632, 0.4585]; members 0.4585, 0.7047 | 0.4612; members 0.4677, 0.6847 |
+| GC-58 | range [0, 0.4585]; members 0.4585, 0.7047; gate 0.6656 | 0.3213; members 0.4758, 0.6907; gate 0.6325 (a conditional-mean model, its own seed 20261106) |
 
   - Every member formula is within 0.02 of simulation; the largest gap is GC-44's RMSE member, 0.020.
   - A criterion's simulated rate lies in its formula range only up to the member formulas' approximation error, at most 0.02, not up to Monte Carlo error. GC-44's 0.4612 is 0.0028 above its upper bound, because its MAE formula is 0.009 low. A single-member criterion's range is one point, so GC-27 and GC-29 differ from it by their member's gap.
-  - `--simulate` checks both distances against 0.02 and exits non-zero if either is exceeded.
+  - `--simulate` checks both distances against 0.02 and exits non-zero if either is exceeded. The mean baseline gate's formula is held to 0.04 (GC-58: 0.033, section 8).
 - Coverage of the derived intervals:
   - F1 Jaccard–Wilson: 0.9513.
   - Balanced-accuracy MOVER: 0.9509, with 60 positives at TPR 0.7 and 340 negatives at TNR 0.9. It undercovers when a class's count is 1 to 3, which the enumeration below quantifies for the chance baseline.
   - Koopman with frequent zero counts: 0.9628.
   - Macro-F1 Bonferroni: 0.9989, and macro-precision Bonferroni: 1.000 (both conservative).
   - Headline worst-member bounds for 3 groups at rates 0.50, 0.45 and 0.40: 0.9833.
+  - Under clustering (section 5.11; 40 clusters of 6 rows with cluster rates from Beta(4, 1), 2,000 replications, its own seed 20261107): the row-level Wilson interval covers 0.8510 and the cluster percentile bootstrap (B = 1000) 0.9370. The percentile bootstrap is somewhat liberal with 40 clusters, as expected; the analytic interval is far off.
   - Headline worst-member bounds over 18 designs: 2, 3 and 5 groups, a true worst gap W of 0, 0.02 or 0.10, and 100 or 1,000 per group. The lowest coverage is 0.9428, at 2 groups, W = 0 and 100 per group. There the headline is the one Newcombe interval, whose exact coverage at d = 0 is 0.9440 (enumerated with statsmodels), so the shortfall is the member interval's own (Appendix A.3).
 
   All are at or above the nominal 0.95 within Monte Carlo error, except where the member interval itself undercovers, as Newcombe does at d = 0 with 100 per group.
@@ -1257,7 +1287,7 @@ python -m venv <temp>/stats-venv && <temp>/stats-venv/bin/pip install scipy stat
 |---|---|---|---|---|---|
 | E1 | #21 | `engine/statistics.py` (stdlib only): numerics, every interval in section 5, inversion, Fisher (two-sided, and one-sided for the chance gate), Bonferroni/BH, criterion combination, power and MDE (section 8), plan normalisation, RFC 8785 hash and legacy derivation (section 9). `engine/tests/test_statistics_golden.py` loads the fixture: every case at core level, including `normalizedPlan` and `planSha256`. | M | #10 merged | all core golden values match; no new runtime dependencies |
 | E2 | #21 | The decision engine in `engine/diagnostics.py`, the 1.3 contract and the validators (list below) | L | E1 | engine end-to-end golden cases pass; migrated tests and schema validators pass |
-| E3 | #21 | `intersectional_slices` rebuilt on the same machinery (suppression, coverage, exploratory BH); calibration criterion with bins and a Brier member; ECE/R² descriptive bootstrap; cluster-bootstrap decisions with the section 5.11 budget; `_bootstrap_protocol(purpose=…)`; `python -m engine.assurance power` | M | E2 | GC-22, 23, 24 pass end to end; cluster determinism test; budget test |
+| E3 | #21 | `intersectional_slices` rebuilt on the same machinery (suppression, coverage, exploratory BH); calibration criterion with bins and a Brier member; ECE/R² descriptive bootstrap; cluster-bootstrap decisions with the section 5.11 budget (deferred to #93, which adds them with the MAE/RMSE sensitivity interval and GC-54 to GC-58); `_bootstrap_protocol(purpose=…)`; `python -m engine.assurance power` | M | E2 | GC-22, 23, 24 pass end to end; with #93, GC-54 to GC-57 end to end, a cluster determinism test and a budget test (`engine/tests/test_cluster_bootstrap.py`) |
 | E4 | #21 | The external worker's projection (list below) | M | E2 and #10 merged | `verify_result_bytes` accepts only copied decisions; worker and schema validators pass |
 | H1 | #22 | `site-app/lib/statistics.ts`: port of E1 (AS241, `erfc`, Koopman bisection, two- and one-sided Fisher in log space, JCS with explicit key sorting); a Vitest suite over the fixture at core level for every case with `"hosted"` in `runners` | M | E1 (the roadmap makes #22 depend on #21; H1 can be developed in parallel because the fixture is final, but it merges after E1) | Vitest golden suite green in CI |
 | H2 | #22 | The hosted decision path, the 1.4 contract and the validators (list below) | L | H1, #15 | cross-runner agreement in CI; schema validators pass |
@@ -1383,6 +1413,7 @@ Regulation and guidance:
 - NYC:
   - [DCWP Notice of Adoption, Local Law 144 rules (6 RCNY §§ 5-300–5-304)](https://www.sidley.com/-/media/resource-pages/ai-monitor/laws-and-regulations/20230406-nyc-dcwp-notice-of-adoption-of-final-rule-for-local-law-144.pdf?la=en) and the [NYC rules page](https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/), effective 5 July 2023. No later amendment was found; this was not re-verified beyond these pages.
   - The § 5-300 definitions and § 5-301(b)(5), (c)(1), (c)(5) and (d) were checked against the unofficial reproduction at [AGORA](https://agora.eto.tech/instrument/2002).
+  - #30 re-checked §§ 5-300 to 5-304 against the DCWP notice of adoption on the City's rules site (12 November 2026); the legal-review items are in `docs/research/ll144-2026-11.md` (LR-LL144-01 to LR-LL144-08).
 
 Statistics:
 - [Wilson 1927](https://doi.org/10.1080/01621459.1927.10502953); [Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286); [Newcombe 1998](https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8%3C873::AID-SIM779%3E3.0.CO;2-I).
