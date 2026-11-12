@@ -1,4 +1,4 @@
-/** Working-paper contract checks: engine drafts, the blank catalog template and status gates. */
+/** Working-paper contract checks: engine drafts, the blank catalog template, status gates and, with --documents, exported papers. */
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -69,5 +69,39 @@ if (withTemplates) {
   negative('reviewed without auditor conclusion', sealed, paper => { paper.status = 'reviewed'; paper.evaluation.auditorConclusion = 'not_assessed'; });
   negative('sealed with a single approval', sealed, paper => { paper.approvals.pop(); });
   negative('sealed without content digest', sealed, paper => { paper.provenance.contentDigest = null; });
+  // Revision 1.1.0, which the application exports, carries the kind and the
+  // narrative; 1.0.0 documents stay valid without them.
+  const earlier = structuredClone(blank);
+  earlier.schemaVersion = '1.0.0';
+  delete earlier.kind;
+  delete earlier.narrative;
+  positive('Revision 1.0.0 without kind or narrative', earlier);
+  negative('1.1.0 revision without narrative', blank, paper => { delete paper.narrative; });
+  negative('1.1.0 revision without kind', blank, paper => { delete paper.kind; });
+  negative('narrative with an unknown section', blank, paper => { paper.narrative.background = ''; });
+  negative('narrative with an unknown conclusion status', blank, paper => { paper.narrative.conclusionStatus = 'pending'; });
+  negative('submitted with a blank rationale', submitted, paper => { paper.evaluation.rationale = '   '; });
+  // A memo carries the decision records it rests on.
+  const memo = structuredClone(sealed);
+  Object.assign(memo, { catalogId: 'MEM-SO-01', kind: 'memo', stage: 'Sign-off', title: 'Completion and issue authorization memo' });
+  memo.approvals.push({ ...approval('fixture-eqr', 'engagement_quality_reviewer', '2026-10-06T11:00:00Z') });
+  memo.records = {
+    qualityReview: { reviewerId: 'fixture-eqr', checklistRevision: 2, signOffs: [{ reportId: 'REPORT-1', internalHash: digest, clientHash: digest, checklistRevision: 2, conclusion: 'No matter remains unresolved', userId: 'fixture-eqr', at: '2026-10-06T11:00:00Z' }] },
+    releaseCompletion: { reportId: 'REPORT-1', templateIds: ['WP-RP-02', 'MEM-SO-01'], internalHash: digest, clientHash: digest, approvedBy: 'fixture-reviewer', approvedAt: '2026-10-06T09:00:00Z', releasedBy: 'fixture-lead', releasedAt: '2026-10-06T12:00:00Z' },
+  };
+  positive('Sealed memo with its decision records', memo);
+  negative('working paper carrying memo records', memo, paper => { paper.kind = 'working_paper'; });
+  negative('memo record with an unknown kind', memo, paper => { paper.records.minutes = {}; });
+  negative('sign-off without its package hash', memo, paper => { delete paper.records.qualityReview.signOffs[0].internalHash; });
+  negative('release completion with a malformed hash', memo, paper => { paper.records.releaseCompletion.clientHash = 'x'; });
+}
+// Documents a paper export wrote, for example the papers/*.json files of a
+// dossier or the workingPapers of a report package: a JSON array, or an
+// object whose `documents` array holds them.
+if (args.includes('--documents')) {
+  const supplied = json(resolve(args[args.indexOf('--documents') + 1]));
+  const documents = Array.isArray(supplied) ? supplied : supplied.documents;
+  assert.ok(Array.isArray(documents) && documents.length > 0, 'Expected exported working-paper documents');
+  for (const paper of documents) positive(`Exported ${paper.kind ?? 'paper'} ${paper.catalogId ?? paper.id} (${paper.status})`, paper);
 }
 console.log(`PASS working-paper contract: ${accepted} valid papers; ${rejected} rejected malformed papers; ${drafts.length} engine drafts` + (withTemplates ? '; blank catalog template validated' : '; templates/ absent, catalog revisions not checked'));
