@@ -741,7 +741,7 @@ describe("assurance record lookups", () => {
     expect(
       await dossierSeal(ctx, "ENG-1", "REPORT-1", "internal", "b".repeat(64)),
     ).toBeUndefined();
-    // drizzle 0010: one seal per report, audience and scope.
+    // drizzle 0011: one seal per report, audience and scope.
     for (const scopeSha256 of [undefined, scoped])
       await expect(
         insert([

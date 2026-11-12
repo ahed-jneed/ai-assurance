@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a6b89aa9-7bdd-4857-8fa4-7bd70f8d985e",
+  "id": "637e41cd-52c2-4b67-9912-202a5c5fbda2",
   "prevId": "1ca88991-dff6-4a36-980c-fd6249e767f9",
   "tables": {
     "engagement_access_policies": {
@@ -1515,6 +1515,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'init'"
+        },
+        "report_settings": {
+          "name": "report_settings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
         }
       },
       "indexes": {},

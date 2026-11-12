@@ -10,6 +10,7 @@ import {
   practitionerResponsibility,
   qualityStatement,
   reportTitle,
+  statesBasis,
   termsProblem,
   type ReportParticulars,
   type ReportTerms,
@@ -221,13 +222,14 @@ export function reportElements(
       id: "independence",
       label: "Independence and quality management",
       // The independence assessment is internal: it gates the element, and
-      // the report states the firm's fixed statement instead. Where the
+      // the report states the practice's statement (its report settings or
+      // the report's override, else the default) instead. Where the
       // acceptance gate applies, the approved acceptance record and every
       // team member's current, conflict-free declaration are that
       // assessment; an older workflow keeps its brief's free-text note.
       // Briefs no longer ask for that note, so an older workflow without
       // one is pointed to the acceptance record, which then applies.
-      value: qualityStatement,
+      value: particulars?.qualityStatement?.trim() || qualityStatement,
       problem: acceptanceApplies(e.workflow)
         ? acceptanceGates(e).length
           ? independenceProblem
@@ -255,13 +257,16 @@ export function reportElements(
       label: statement.heading,
       value: statement.text,
       problem:
-        particulars &&
-        conclusionTypes[t.conclusion]?.modified &&
-        !particulars.basisForModification.trim()
-          ? "State the basis for the " +
-            statement.heading.toLowerCase() +
-            ", distinguishing material from pervasive effects"
-          : "",
+        !particulars ||
+        !conclusionTypes[t.conclusion] ||
+        !statesBasis(t.conclusion) ||
+        particulars.basisForModification.trim()
+          ? ""
+          : t.conclusion === "readiness_gaps"
+            ? "Describe the gaps identified against the criteria and what remains to be addressed"
+            : "State the basis for the " +
+              statement.heading.toLowerCase() +
+              ", distinguishing material from pervasive effects",
     },
     {
       id: "signature",
