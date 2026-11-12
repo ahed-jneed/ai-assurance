@@ -90,7 +90,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 | Group | Tables |
 |---|---|
-| Tenancy and access | `tenants` (version, last_command_id; `eqr_cooling_off_days` since `drizzle/0010`), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_history` (every grant change with the holder's role, written by triggers, immutable; since `drizzle/0010`), `engagement_access_policies` |
+| Tenancy and access | `tenants` (version, last_command_id; `eqr_cooling_off_days` since `drizzle/0011`), `memberships` (role, client_id, status), `clients`, `practice_admins`, `engagement_access`, `engagement_access_history` (every grant change with the holder's role, written by triggers, immutable; since `drizzle/0011`), `engagement_access_policies` |
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
 | Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |

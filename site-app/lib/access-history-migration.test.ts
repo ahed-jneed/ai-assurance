@@ -1,4 +1,4 @@
-// Migration 0010 (#127): earlier engagement grants are rebuilt from the
+// Migration 0011 (#127): earlier engagement grants are rebuilt from the
 // management and audit events that made them, existing grants are copied
 // into engagement_access_history, a grant held now with its holder's current
 // role and a withdrawn one with an unknown (NULL) role, and every later change
@@ -33,7 +33,7 @@ function migrate(seed: string) {
   return sqlite;
 }
 
-describe("migration 0010: engagement access history", () => {
+describe("migration 0011: engagement access history", () => {
   it("copies existing grants and records later changes with the role held", () => {
     const sqlite = migrate(
       `INSERT INTO tenants(id,name,created_at) VALUES('t','P','${at}');

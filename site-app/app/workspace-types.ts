@@ -1,5 +1,6 @@
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
+import type { PracticeReportSettings } from "@/lib/domain/report-model";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -74,6 +75,8 @@ export type WorkspaceData = {
    * the practice set it (otherwise the default applies).
    */
   qualityReviewPolicy?: { coolingOffDays: number; practiceSet: boolean } | null;
+  /** The practice's report settings, for internal roles. */
+  reportSettings?: PracticeReportSettings | null;
   managementEvents: {
     id: string;
     action: string;

@@ -7,6 +7,7 @@ import {
 } from "../criteria/pin";
 import { selectablePacks } from "../criteria/registry";
 import type { Engagement } from "../domain";
+import { parseReportSettings } from "../domain/report-model";
 import { db, getEngagement, storedSize } from "../engagement-repo";
 import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
@@ -214,12 +215,13 @@ export async function workspaceView(
     : [];
   const tenant = (await db()
     .prepare(
-      "SELECT version,eqr_cooling_off_days AS cooling_off_days FROM tenants WHERE id=?",
+      "SELECT version,eqr_cooling_off_days AS cooling_off_days,report_settings FROM tenants WHERE id=?",
     )
     .bind(ctx.tenantId)
     .first<{
       version: number;
       cooling_off_days: number | null;
+      report_settings: string | null;
     }>())!;
   const managementVersion = tenant.version;
   // The practice's quality review policy, for its internal members: the
@@ -229,6 +231,11 @@ export async function workspaceView(
         coolingOffDays: effectiveCoolingOffDays(tenant.cooling_off_days),
         practiceSet: typeof tenant.cooling_off_days === "number",
       }
+    : null;
+  // What a new report states unless the Lead Auditor overrides it; clients
+  // read reports only as issued.
+  const reportSettings = isInternalRole(ctx.role)
+    ? parseReportSettings(tenant.report_settings)
     : null;
   const managementEvents = ctx.practiceAdmin
     ? (
@@ -261,6 +268,7 @@ export async function workspaceView(
     managementVersion,
     qualityReviewPolicy,
     managementEvents,
+    reportSettings,
     events: trail?.events ?? [],
     // The catalogue projection of the engagement's pinned pack (or the
     // default pack without one), and what the pack switches on

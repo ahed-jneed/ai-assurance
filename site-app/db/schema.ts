@@ -20,6 +20,9 @@ export const tenants = sqliteTable("tenants", {
   // client. NULL applies the default (lib/quality-review-policy.ts); only
   // setQualityReviewPolicy changes it, with a management event.
   eqrCoolingOffDays: integer("eqr_cooling_off_days"),
+  // The practice's report settings as JSON (lib/report-settings.ts): the
+  // signatory, location and quality-management statement new reports state.
+  reportSettings: text("report_settings").notNull().default("{}"),
 });
 export const memberships = sqliteTable(
   "memberships",
@@ -241,7 +244,7 @@ export const engagementAccess = sqliteTable(
 );
 /**
  * Every change of an engagement grant, with the grantee's membership role at
- * that moment, written by triggers on engagement_access (migration 0010) and
+ * that moment, written by triggers on engagement_access (migration 0011) and
  * never updated or deleted. A grant held under any role other than
  * Engagement Quality Reviewer makes its holder an engagement team member for
  * the quality reviewer's eligibility (lib/quality-review-records.ts), even
