@@ -553,6 +553,29 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                   </dd>
                 </div>
               )}
+              {pack && rows(pack.frameworks).length > 0 && (
+                <div>
+                  <dt>Frameworks</dt>
+                  <dd>
+                    {rows(pack.frameworks)
+                      .map(
+                        (f) =>
+                          `${text(f.id)} ${text(f.edition)} (data ${text(f.version)})`,
+                      )
+                      .join("; ")}
+                  </dd>
+                </div>
+              )}
+              {pack && rows(pack.crosswalks).length > 0 && (
+                <div>
+                  <dt>Crosswalks</dt>
+                  <dd>
+                    {rows(pack.crosswalks)
+                      .map((c) => `${text(c.id)} ${text(c.version)}`)
+                      .join("; ")}
+                  </dd>
+                </div>
+              )}
               {snapshot.annexMapVersion != null && (
                 <div>
                   <dt>Annex map</dt>

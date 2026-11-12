@@ -279,7 +279,7 @@ describe("pack #1 keeps today's behaviour", () => {
     expect(r.clientSnapshot!.engagement).toHaveProperty("classification");
     expect(r.snapshot.criteriaPack).toMatchObject({
       packId: "eu-ai-act-amended",
-      packVersion: "2026.11.2",
+      packVersion: "2026.11.3",
       legalReviewPending: true,
     });
     expect(String(r.snapshot.limitations)).toMatch(

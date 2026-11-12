@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { annexIVIndex, annexMapVersion } from "../annex-iv";
+import { annexIVIndex } from "../annex-iv";
 import { assurancePins, jobs, assuranceGates } from "../assurance-store";
 import {
   clientReportSnapshot,
@@ -40,6 +40,8 @@ import {
 } from "../quality-review-records";
 import { practiceReportSettings } from "../report-settings";
 import {
+  annexIvMapOf,
+  criteriaLookup,
   criteriaStamp,
   packFeatures,
   pinned,
@@ -75,6 +77,14 @@ function capturedPapers(e: Engagement, kind: "draft" | "final") {
   }));
 }
 const optionalText = (max: number) => z.string().trim().max(max).default("");
+/** The Annex IV index of the pinned pack's map, with the map's version. */
+function annexIvCapture(e: Engagement, resolved: ReturnType<typeof pinned>) {
+  const annexMap = annexIvMapOf(resolved);
+  return {
+    annexIV: annexIVIndex(e, annexMap),
+    annexMapVersion: annexMap.mapVersion,
+  };
+}
 /**
  * Report capture: the hashed internal snapshot with its Annex IV map, and the
  * client snapshot published when the report is released. A report states its
@@ -151,7 +161,9 @@ export const reports = defineCommands({
       }
       // What the pinned pack switches on and the texts it reports with
       // (docs/design/criteria-model.md sections 7.1 and 10).
-      const { pack } = pinned(e),
+      const resolved = pinned(e),
+        { pack } = resolved,
+        lookup = criteriaLookup(e),
         features = packFeatures(e),
         createdAt = now();
       // The part of the report written for its reader, in both snapshots.
@@ -168,7 +180,7 @@ export const reports = defineCommands({
           subjectPhrase(e),
           criteriaPhrase,
         ),
-        criteria: criterionRollup(e),
+        criteria: criterionRollup(e, undefined, lookup),
       };
       const snapshot = {
         workflow: e.workflow ? structuredClone(e.workflow) : null,
@@ -217,14 +229,14 @@ export const reports = defineCommands({
         models: e.models,
         evaluationProfiles: e.evaluationProfiles ?? [],
         runs: e.runs,
-        ...(features.annexIvIndex
-          ? { annexIV: annexIVIndex(e), annexMapVersion }
-          : {}),
+        ...(features.annexIvIndex ? annexIvCapture(e, resolved) : {}),
         auditEventHead: e.eventHead,
         createdAt,
         ...recordVersions(e),
-        // The pack stamp (design section 10). Named criteriaPack because
-        // `criteria` holds the results by criterion of report model v2.
+        // The criteria stamp (design sections 6.7 and 10): the pack, its
+        // framework data versions and the crosswalk versions in use. Named
+        // criteriaPack because `criteria` holds the results by criterion of
+        // report model v2.
         criteriaPack: criteriaStamp(e),
         ...(pack.reporting?.regulatorySource
           ? { regulatorySource: pack.reporting.regulatorySource }
@@ -254,7 +266,11 @@ export const reports = defineCommands({
         ...snapshot,
         report: {
           ...report,
-          criteria: criterionRollup(e, (f) => f.visibility === "client"),
+          criteria: criterionRollup(
+            e,
+            (f) => f.visibility === "client",
+            lookup,
+          ),
         },
       });
       Object.assign(r, {

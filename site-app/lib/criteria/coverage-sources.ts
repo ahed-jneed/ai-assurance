@@ -46,7 +46,12 @@ export type SourceResult = {
   unusable: ObligationRecord[];
   /** Obligation records as direct links: their code, relationship equal. */
   obligationLinks: LinkInput[];
-  /** Unresolved findings linked to no source (not placed in phase 1). */
+  /**
+   * Unresolved findings linked to no source but with criteria (phase 2):
+   * one open source each, placed directly on every requirement reference.
+   */
+  findingLinks: { sourceId: string; requirement: string }[];
+  /** Unresolved findings linked to no source and with no criteria. */
   unplacedFindings: number;
   /** The program is not approved: the proposed scope is used. */
   proposedScope: boolean;
@@ -201,11 +206,33 @@ export function coverageSources(
       });
     }
   }
+  // An unresolved finding that no source carries is placed through its
+  // criteria as open work on those requirements (design section 7).
+  const findingLinks: SourceResult["findingLinks"] = [];
+  let unplacedFindings = 0;
+  for (const f of unresolved) {
+    if (placed.has(f.id)) continue;
+    if (!f.criteriaRefs?.length) {
+      unplacedFindings++;
+      continue;
+    }
+    sources.push({
+      id: f.id,
+      kind: "finding",
+      state: "open",
+      readiness: false,
+      label: "Unresolved finding " + f.title,
+      evidence: { findings: findingRefs([f]) },
+    });
+    for (const requirement of f.criteriaRefs)
+      findingLinks.push({ sourceId: f.id, requirement });
+  }
   return {
     sources,
     unusable,
     obligationLinks,
-    unplacedFindings: unresolved.filter((f) => !placed.has(f.id)).length,
+    findingLinks,
+    unplacedFindings,
     proposedScope: !!e.workflow && e.workflow.program.status !== "approved",
     noApplicability: !e.workflow,
   };
