@@ -126,6 +126,23 @@
       "releasedAt": "2026-11-12",
       "selectable": true,
       "sha256": "f6ede6d58353983d233c54cdd690a0cc8e3e9b4ee4ec5ec74d8c21d0e2af643c"
+    },
+    {
+      "documentType": "pack",
+      "id": "nyc-ll144-bias-audit",
+      "version": "2026.11.1",
+      "path": "packs/nyc-ll144-bias-audit/2026.11.1.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #144)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "selectable": true,
+      "sha256": "cfdbf44c6302ae60527c32973deb80ee881998ae13441ecd7b93c5e75d66937a"
     }
   ],
   "defaults": {

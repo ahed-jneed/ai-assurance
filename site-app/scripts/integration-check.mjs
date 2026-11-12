@@ -356,6 +356,7 @@ try {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     assert.equal(workspace.criteria.draft, false);
     assert.equal(workspace.criteria.managementSystem, undefined);

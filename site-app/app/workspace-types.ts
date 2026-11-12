@@ -124,6 +124,7 @@ export function packFeatures(
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     }),
     soaControls: data?.criteria?.managementSystem?.controls ?? [],
   };
