@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AssuranceRecord } from "../../assurance-core";
 import { jobs, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Artifact, Engagement } from "../../domain";
@@ -102,9 +103,14 @@ async function resultRecord(
     envelopeSha256: string;
     jobId?: string;
     procedureId?: string;
+    bundleRecordId?: string;
   },
 ) {
   const { envelope, computation } = await verifiedEnvelope(text);
+  // Who declared the bundle, as the engine recorded it: their declarations
+  // (for example `declared.scorers`) need someone else's acknowledgement.
+  const declaredBy = (computation.manifest as { declaredBy?: unknown })
+    .declaredBy;
   // Every input the computation consumed is accepted evidence of this
   // engagement, matched by SHA-256 (design section 10.4).
   for (const input of computation.inputs)
@@ -130,9 +136,51 @@ async function resultRecord(
     );
   return recordStatement(ctx, e.id, "genai_result", {
     ...body,
+    declaredBy: typeof declaredBy === "string" ? declaredBy : null,
     channel: envelope.provenance.channel,
     summary,
   });
+}
+/**
+ * The people who prepared a GenAI result and so may not acknowledge its
+ * flags (design 12.1, "a Reviewer or Lead Auditor who is not the
+ * preparer"): its importer or compiler, the bundle's declarer (as the engine
+ * recorded it and as the bundle record names it), and the preparer of the
+ * procedure the result was queued for or whose paper links it.
+ */
+async function resultPreparers(
+  e: Engagement,
+  lookup: (ids: readonly unknown[]) => Promise<AssuranceRecord[]>,
+  result: AssuranceRecord,
+) {
+  const body = result.body as {
+    artifactId?: string;
+    declaredBy?: string | null;
+    procedureId?: string;
+    bundleRecordId?: string;
+  };
+  const people = new Set<string>([result.actor]);
+  if (body.declaredBy) people.add(body.declaredBy);
+  if (body.bundleRecordId)
+    for (const bundle of await lookup([body.bundleRecordId]))
+      if (bundle.kind === "genai_bundle") {
+        people.add(bundle.actor);
+        const by = (bundle.body.manifest as { declaredBy?: unknown })
+          ?.declaredBy;
+        if (typeof by === "string") people.add(by);
+      }
+  for (const p of e.workflow?.procedures ?? []) {
+    const paper = p.paperId
+      ? e.papers.find((q) => q.id === p.paperId)
+      : undefined;
+    if (
+      p.ownerId &&
+      (p.id === body.procedureId ||
+        (!!body.artifactId && !!paper?.evidenceIds.includes(body.artifactId)))
+    )
+      people.add(p.ownerId);
+  }
+  return people;
 }
 const existingResult = async (
   ctx: Context,
@@ -170,8 +218,9 @@ export const genai: AssuranceModule = defineCommands({
         .object({ procedureId: short, plan: z.record(z.unknown()) })
         .strict()
         .parse(d);
-      const p = approvedProcedure(e, v.procedureId),
-        plan = genaiPlan.parse(v.plan),
+      // The plan first: a lowered floor is refused as such, whatever the scope.
+      const plan = genaiPlan.parse(v.plan),
+        p = approvedProcedure(e, v.procedureId),
         text = JSON.stringify(plan);
       const log = await recordStatement(ctx, e.id, "genai_plan", {
         procedureId: p.id,
@@ -376,6 +425,9 @@ export const genai: AssuranceModule = defineCommands({
         envelopeSha256: job.result_sha256,
         jobId: job.id,
         procedureId: procedure.id,
+        ...(typeof frozen.records?.bundle === "string"
+          ? { bundleRecordId: frozen.records.bundle }
+          : {}),
       });
       const artifact: Artifact = {
         id: job.id,
@@ -437,7 +489,7 @@ export const genai: AssuranceModule = defineCommands({
   },
   acknowledgeGenaiFlag: {
     roles: ["Reviewer", "Lead Auditor"],
-    async handle({ e, find }, d, ctx) {
+    async handle({ e, find, lookup }, d, ctx) {
       const v = z
         .object({
           resultRecordId: short,
@@ -450,10 +502,10 @@ export const genai: AssuranceModule = defineCommands({
         .strict()
         .parse(d);
       const result = await find(v.resultRecordId, "genai_result");
-      if (result.actor === ctx.user.userId)
+      if ((await resultPreparers(e, lookup, result)).has(ctx.user.userId))
         throw new ApiError(
           403,
-          "The person who imported the result cannot acknowledge its flags",
+          "The person who imported or compiled the result, declared its bundle or prepared its procedure cannot acknowledge its flags",
         );
       const [context] = await resultContexts(ctx, e.id, [result]);
       if (

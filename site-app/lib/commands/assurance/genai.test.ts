@@ -55,7 +55,7 @@ function artifact(
   };
 }
 /** A GenAI-pack engagement with an approved scope and programme. */
-async function engagement(envelopeText = exampleText) {
+async function engagement(envelopeText = exampleText, ownerId = "") {
   const e: Engagement = freshEngagement(
     resolveNew("genai-evaluation"),
     "CL-1",
@@ -71,6 +71,7 @@ async function engagement(envelopeText = exampleText) {
   const p = w.procedures.find((p) => p.templateId === "WP-GA-02")!;
   p.selected = true;
   p.applicability = "applicable";
+  if (ownerId) p.ownerId = ownerId;
   // Kept on first use, as queueing does.
   p.planHash = await sha256(JSON.stringify(substantivePlan(p)));
   const envelopeSha = await sha256(envelopeText);
@@ -474,7 +475,14 @@ describe("acknowledgeGenaiFlag", () => {
     expect(
       (await refused(op("acknowledgeGenaiFlag", data, lead()))).status,
     ).toBe(403);
-    const reviewer = member("lead-2", "Lead Auditor");
+    const reviewer = secondLead();
+    // The example has no post-run edits, so nothing awaits acknowledgement.
+    expect(
+      (await refused(op("acknowledgeGenaiFlag", data, reviewer))).status,
+    ).toBe(409);
+  });
+
+  const secondLead = () => {
     store.sqlite
       .prepare(
         "INSERT INTO memberships(tenant_id,user_id,role,display_name) VALUES(?,?,?,?)",
@@ -485,9 +493,109 @@ describe("acknowledgeGenaiFlag", () => {
         "INSERT INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) VALUES(?,?,?,1,'lead',?)",
       )
       .run(tenantId, "ENG-G", "lead-2", "2026-11-01T00:00:00.000Z");
-    // The example has no post-run edits, so nothing awaits acknowledgement.
+    return member("lead-2", "Lead Auditor");
+  };
+  const acknowledge = (resultRecordId: string, ctx: Context) =>
+    op(
+      "acknowledgeGenaiFlag",
+      {
+        resultRecordId,
+        flag: "scorer_kind_declared",
+        runKey: computation.runs[0].runKey,
+        score: "model_graded_qa",
+        rationale: "Reviewed the declaration",
+      },
+      ctx,
+    );
+  const preparerRefusal =
+    "The person who imported or compiled the result, declared its bundle or prepared its procedure cannot acknowledge its flags";
+  const workerRequest = async (
+    procedure: Procedure,
+    records?: { bundle: string },
+  ) => ({
+    schemaVersion: "genai-1.0",
+    executionMode: "genai_ingest",
+    procedure: {
+      id: procedure.id,
+      revision: procedure.revision,
+      planHash: await sha256(JSON.stringify(substantivePlan(procedure))),
+      briefRevision: 1,
+      programRevision: 1,
+    },
+    ...(records ? { records } : {}),
+  });
+
+  it("refuses the bundle's declarer as the engine recorded it", async () => {
+    const c = JSON.parse(example.computationJSON);
+    c.manifest.declaredBy = "lead-2";
+    const computationJSON = JSON.stringify(c),
+      declared = JSON.stringify({
+        ...example,
+        computationJSON,
+        computationSha256: await sha256(computationJSON),
+      });
+    await engagement(declared);
+    const imported = (await op(
+      "importGenaiEnvelope",
+      { artifactId: "EV-ENV" },
+      auditor(),
+    )) as { record: { id: string; body: { declaredBy: string } } };
+    expect(imported.record.body.declaredBy).toBe("lead-2");
+    const error = await refused(acknowledge(imported.record.id, secondLead()));
+    expect([error.status, error.message]).toEqual([403, preparerRefusal]);
+  });
+
+  it("refuses the declarer of the bundle a worker result was queued from", async () => {
+    const { procedure } = await engagement();
+    const lead2 = secondLead();
+    const bundle = (await op(
+      "declareGenaiBundle",
+      {
+        manifest: {
+          schemaVersion: "genai-bundle/0.1",
+          origin: "auditee_supplied",
+          inputs: [
+            { ...logInput, format: "inspect_eval", role: "log" },
+            {
+              ...labelInput,
+              format: "judge_validation_jsonl",
+              role: "judge_validation",
+              judgeRef: "J1",
+            },
+          ],
+        },
+        inputArtifactIds: ["EV-LOG", "EV-LABELS"],
+      },
+      lead2,
+    )) as { record: { id: string } };
+    await job(
+      "JOB-G",
+      await workerRequest(procedure, { bundle: bundle.record.id }),
+      exampleText,
+    );
+    const compiled = (await op(
+      "compileGenaiResult",
+      { jobId: "JOB-G" },
+      auditor(),
+    )) as { record: { id: string; body: { bundleRecordId: string } } };
+    expect(compiled.record.body.bundleRecordId).toBe(bundle.record.id);
+    const error = await refused(acknowledge(compiled.record.id, lead2));
+    expect([error.status, error.message]).toEqual([403, preparerRefusal]);
+  });
+
+  it("refuses the preparer of the procedure the result belongs to", async () => {
+    const { procedure } = await engagement(exampleText, "lead-2");
+    await job("JOB-G", await workerRequest(procedure), exampleText);
+    const compiled = (await op(
+      "compileGenaiResult",
+      { jobId: "JOB-G" },
+      auditor(),
+    )) as { record: { id: string } };
+    const error = await refused(acknowledge(compiled.record.id, secondLead()));
+    expect([error.status, error.message]).toEqual([403, preparerRefusal]);
+    // The Lead Auditor prepared none of it: only the pending check remains.
     expect(
-      (await refused(op("acknowledgeGenaiFlag", data, reviewer))).status,
+      (await refused(acknowledge(compiled.record.id, lead()))).status,
     ).toBe(409);
   });
 });
