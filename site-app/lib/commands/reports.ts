@@ -24,6 +24,7 @@ import {
   conclusionStatement,
   conclusionTypeIds,
   engagementTypeIds,
+  resolveParticulars,
   snapshotConclusion,
   snapshotParticulars,
   snapshotTerms,
@@ -33,6 +34,7 @@ import {
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { assertReviewerIndependent } from "../quality-review-records";
+import { practiceReportSettings } from "../report-settings";
 import {
   criteriaStamp,
   packFeatures,
@@ -93,6 +95,7 @@ export const reports = defineCommands({
           location: optionalText(300),
           signatory: optionalText(300),
           basisForModification: optionalText(5000),
+          qualityStatement: optionalText(2000),
         })
         .parse(d);
       const terms = {
@@ -100,12 +103,18 @@ export const reports = defineCommands({
           assuranceLevel: a.assuranceLevel,
           conclusion: a.conclusion,
         },
-        particulars = {
-          addressee: a.addressee,
-          location: a.location,
-          signatory: a.signatory,
-          basisForModification: a.basisForModification,
-        };
+        // A signatory, location or quality statement left blank comes from
+        // the practice's report settings; the snapshot records the result.
+        particulars = resolveParticulars(
+          {
+            addressee: a.addressee,
+            location: a.location,
+            signatory: a.signatory,
+            basisForModification: a.basisForModification,
+            qualityStatement: a.qualityStatement,
+          },
+          await practiceReportSettings(ctx),
+        );
       const problem = termsProblem(terms);
       if (problem) throw new ApiError(400, problem);
       if (a.kind === "final") {

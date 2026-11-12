@@ -45,6 +45,7 @@ const ops = [
   "inviteMember",
   "cancelInvitation",
   "renamePractice",
+  "setReportSettings",
   "rotateSigningKey",
 ];
 // Valid data for each op, against the practice below.
@@ -61,6 +62,7 @@ const valid: Record<string, Record<string, unknown>> = {
   inviteMember: { email: "Nia@Example.test", role: "Auditor" },
   cancelInvitation: { invitationId: "INV-1" },
   renamePractice: { name: "Lea & Partners" },
+  setReportSettings: { signatory: "Lea & Partners", location: "Vienna" },
   rotateSigningKey: { reason: "Scheduled annual rotation" },
 };
 // The members of the fixture practice besides the caller (user-lead).
@@ -258,6 +260,7 @@ describe("POST /api/management", () => {
           inviteMember: ["invitations"],
           cancelInvitation: ["invitations"],
           renamePractice: ["tenants"],
+          setReportSettings: ["tenants"],
           rotateSigningKey: ["dossier_keys", "dossier_keys"],
         }[op],
       );
@@ -677,6 +680,47 @@ describe("invitations and practice settings (F-44)", () => {
     ).toEqual({ status: 400, error: "Use at most 80 characters" });
     await post("renamePractice", { name: "  Lea & Partners " });
     expect(own(d1)[0].args.slice(0, 2)).toEqual(["Lea & Partners", "tenant-1"]);
+  });
+
+  it("saves the practice's report settings and records them in the event (#111)", async () => {
+    const d1 = practice();
+    signIn(caller());
+    expect(
+      await refusal(
+        await post("setReportSettings", { qualityStatement: "x".repeat(2001) }),
+      ),
+    ).toEqual({ status: 400, error: "Use at most 2000 characters" });
+    expect(
+      await refusal(await post("setReportSettings", { footer: "x" })),
+    ).toMatchObject({ status: 400 });
+    const response = await post("setReportSettings", {
+      signatory: " Lea & Partners ",
+      location: "Vienna, Austria",
+      qualityStatement: "We apply ISQM 1 and the IESBA Code.",
+    });
+    const settings = {
+      signatory: "Lea & Partners",
+      location: "Vienna, Austria",
+      qualityStatement: "We apply ISQM 1 and the IESBA Code.",
+    };
+    expect(((await response.json()) as { details: unknown }).details).toEqual(
+      settings,
+    );
+    const [update] = own(d1);
+    expect(update.sql).toMatch(/^UPDATE tenants SET report_settings=\?/);
+    expect(update.args.slice(0, 2)).toEqual([
+      JSON.stringify(settings),
+      "tenant-1",
+    ]);
+    // The management event records the settings as saved.
+    expect(d1.batches[0].at(-1)!.args[4]).toBe(JSON.stringify(settings));
+    // A setting left out is cleared.
+    await post("setReportSettings", { signatory: "Lea & Partners" });
+    expect(JSON.parse(String(d1.batches[1][1].args[0]))).toEqual({
+      signatory: "Lea & Partners",
+      location: "",
+      qualityStatement: "",
+    });
   });
 
   it("rotates the signing key with a reason, retiring the active key", async () => {

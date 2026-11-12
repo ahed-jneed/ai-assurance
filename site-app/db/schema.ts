@@ -14,6 +14,9 @@ export const tenants = sqliteTable("tenants", {
   createdAt: text("created_at").notNull(),
   version: integer("version").notNull().default(1),
   lastCommandId: text("last_command_id").notNull().default("init"),
+  // The practice's report settings as JSON (lib/report-settings.ts): the
+  // signatory, location and quality-management statement new reports state.
+  reportSettings: text("report_settings").notNull().default("{}"),
 });
 export const memberships = sqliteTable(
   "memberships",
