@@ -272,6 +272,16 @@ export function WorkspaceNavigation({
     );
   }
   function attention(route: NavigationRoute) {
+    // Damaged engagement records alert practice administrators wherever they
+    // are; the Engagements page lists them.
+    if (route === "Engagements")
+      return data?.integrityIncidents?.count
+        ? {
+            count: data.integrityIncidents.count,
+            label: "integrity incidents",
+            filter: "",
+          }
+        : null;
     if (
       !e ||
       !data ||

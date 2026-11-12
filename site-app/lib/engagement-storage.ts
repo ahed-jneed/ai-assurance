@@ -222,6 +222,68 @@ export async function hydrate(
   return e;
 }
 
+/** One recorded integrity incident, as practice administrators see it. */
+export type IntegrityIncident = {
+  engagementId: string;
+  /** The engagement's title; null when the engagement row is gone. */
+  title: string | null;
+  objectKey: string;
+  kind: IntegrityKind;
+  status: number;
+  firstSeen: string;
+  lastSeen: string;
+  occurrences: number;
+  /** Who last met it: a display name, or the user id without a membership. */
+  lastSeenBy: string;
+};
+/** How many incidents the practice view lists, most recently seen first. */
+export const integrityIncidentLimit = 50;
+/**
+ * The practice's recorded integrity incidents for its administrators: how
+ * many there are and the most recently seen ones, newest first.
+ */
+export async function integrityIncidents(ctx: Context) {
+  const [count, rows] = await Promise.all([
+    db()
+      .prepare(
+        "SELECT COUNT(*) AS n FROM integrity_incidents WHERE tenant_id=?",
+      )
+      .bind(ctx.tenantId)
+      .first<{ n: number }>(),
+    db()
+      .prepare(
+        "SELECT i.engagement_id,e.title,i.object_key,i.kind,i.status,i.first_seen,i.last_seen,i.occurrences,COALESCE(m.display_name,i.last_user_id) AS last_seen_by FROM integrity_incidents i LEFT JOIN engagements e ON e.tenant_id=i.tenant_id AND e.id=i.engagement_id LEFT JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.last_user_id WHERE i.tenant_id=? ORDER BY i.last_seen DESC,i.engagement_id,i.object_key,i.kind LIMIT ?",
+      )
+      .bind(ctx.tenantId, integrityIncidentLimit)
+      .all<{
+        engagement_id: string;
+        title: string | null;
+        object_key: string;
+        kind: IntegrityKind;
+        status: number;
+        first_seen: string;
+        last_seen: string;
+        occurrences: number;
+        last_seen_by: string;
+      }>(),
+  ]);
+  return {
+    count: count?.n ?? 0,
+    incidents: rows.results.map((r): IntegrityIncident => ({
+      engagementId: r.engagement_id,
+      title: r.title,
+      objectKey: r.object_key,
+      kind: r.kind,
+      status: r.status,
+      firstSeen: r.first_seen,
+      lastSeen: r.last_seen,
+      occurrences: r.occurrences,
+      lastSeenBy: r.last_seen_by,
+    })),
+  };
+}
+export type IntegrityIncidents = Awaited<ReturnType<typeof integrityIncidents>>;
+
 /**
  * Records that an engagement failed to load intact: one row per engagement,
  * stored object and kind, counting repeats, plus a log line. Best effort: a

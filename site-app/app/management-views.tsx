@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import type { OpenModal } from "./workspace/types";
 import type { Member, WorkspaceData } from "./workspace-types";
 import { engagementFlags } from "./workspace/modals/member";
+import { IntegrityIncidentsPanel } from "./integrity-incidents";
 
 type Props = {
   onOnboard: () => void;
@@ -705,6 +706,12 @@ export function ManagementViews({
             engagements
           </span>
         </div>
+      )}
+      {view === "Engagements" && lead && data.integrityIncidents && (
+        <IntegrityIncidentsPanel
+          incidents={data.integrityIncidents}
+          onEngagement={onEngagement}
+        />
       )}
       <section className="panel">
         <DatabaseToolbar
