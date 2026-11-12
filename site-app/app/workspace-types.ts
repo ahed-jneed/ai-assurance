@@ -1,5 +1,6 @@
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
+import type { PracticeReportSettings } from "@/lib/domain/report-model";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -68,6 +69,8 @@ export type WorkspaceData = {
     client_id: string | null;
   }[];
   managementVersion: number;
+  /** The practice's report settings, for internal roles. */
+  reportSettings?: PracticeReportSettings | null;
   managementEvents: {
     id: string;
     action: string;

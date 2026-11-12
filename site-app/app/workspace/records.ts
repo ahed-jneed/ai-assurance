@@ -1,11 +1,6 @@
 // Pure helpers for the records the workspace opens: how a record in the
 // record sheet is recognised, looked up by link kind, titled and refreshed.
-import type {
-  Engagement,
-  EvidenceRequest,
-  Finding,
-  Report,
-} from "@/lib/domain";
+import type { Engagement, Finding, Report } from "@/lib/domain";
 import type { WorkspaceData } from "../workspace-types";
 
 /** Engagement records that open in the record sheet and have a link kind. */
@@ -81,22 +76,28 @@ export function recordTitle(record: EngagementRecord) {
 }
 
 /**
- * The sheet keeps the record it was opened with; findings and evidence
- * requests are re-read from the current engagement so they show saved changes.
+ * The sheet keeps the record it was opened with; every engagement record
+ * (evidence, an evidence request, a finding, a report, a model or a run) is
+ * re-read from the current engagement so it shows saved changes, such as a
+ * report's release state after an approval. A record the engagement no
+ * longer holds, and a record without a link kind (a template or an audit
+ * event), shows as it was opened.
  */
 export function liveRecord(
   value: unknown,
   engagement: Engagement | null | undefined,
 ) {
-  return value && typeof value === "object" && "id" in value
-    ? (("condition" in value
-        ? engagement?.findings.find((f) => f.id === (value as Finding).id)
-        : "responsibleParty" in value
-          ? engagement?.evidenceRequests?.find(
-              (r) => r.id === (value as EvidenceRequest).id,
-            )
-          : undefined) ?? value)
-    : value;
+  if (!engagement || !value || typeof value !== "object" || !("id" in value))
+    return value;
+  const kind = recordKind(value);
+  return (
+    (kind && findRecord(engagement, kind, String(value.id))) ||
+    // A finding opened before it had a risk score is still a finding.
+    ("condition" in value
+      ? engagement.findings.find((f) => f.id === (value as Finding).id)
+      : undefined) ||
+    value
+  );
 }
 
 /** Display name for a person, artifact, model or paper id. */
