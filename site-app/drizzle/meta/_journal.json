@@ -85,6 +85,13 @@
       "when": 1794509099355,
       "tag": "0011_quality_review_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794518583900,
+      "tag": "0012_review_subject_index",
+      "breakpoints": true
     }
   ]
 }

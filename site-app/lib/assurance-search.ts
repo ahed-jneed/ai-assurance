@@ -52,27 +52,26 @@ export const searchPageSize = 50,
   searchPageLimit = 200;
 const kindPattern = /^[a-z_]{1,40}$/;
 
-// The latest review of each (review kind, subject), as reviewFor's `.at(-1)`
-// in (created_at, id) order; the subject is assertionId ?? impactId ??
-// obligationId, as in memory.
-const latestReviews = `latest AS (
-  SELECT kind,subject,decision FROM (
-    SELECT kind,
-      COALESCE(json_extract(body,'$.assertionId'),json_extract(body,'$.impactId'),json_extract(body,'$.obligationId')) AS subject,
-      json_extract(body,'$.decision') AS decision,
-      ROW_NUMBER() OVER (PARTITION BY kind,COALESCE(json_extract(body,'$.assertionId'),json_extract(body,'$.impactId'),json_extract(body,'$.obligationId')) ORDER BY created_at DESC,id DESC) AS n
-    FROM assurance_records
-    WHERE tenant_id=? AND engagement_id=? AND kind IN ('assertion_review','impact_review','obligation_review')
-  ) WHERE n=1 AND subject IS NOT NULL
-)`;
+// The latest review of the assessment `r`, as reviewFor's `.at(-1)` in
+// (created_at, id) order: the review of its kind whose subject
+// (assertionId ?? impactId ?? obligationId, as in memory) is `r.id`. The
+// subject expression and the kind list repeat idx_review_subject's
+// (migration 0012) exactly, so this is one index lookup per assessment;
+// `+r.id` drops the column's text affinity, which the index expression does
+// not have and which would otherwise keep the subject out of the lookup.
+const latestReview = `(SELECT CASE WHEN json_extract(v.body,'$.decision') IN ('approve','confirmed') THEN 'Confirmed' ELSE 'Returned' END
+    FROM assurance_records v
+    WHERE v.tenant_id=r.tenant_id AND v.engagement_id=r.engagement_id
+      AND v.kind IN ('assertion_review','impact_review','obligation_review')
+      AND v.kind=r.kind||'_review'
+      AND COALESCE(json_extract(v.body,'$.assertionId'),json_extract(v.body,'$.impactId'),json_extract(v.body,'$.obligationId'))=+r.id
+    ORDER BY v.created_at DESC,v.id DESC LIMIT 1)`;
 // Superseded first, then the latest matching review decides. `+r.id` keeps the
 // supersession check on idx_assessment_successor.
 const stateSQL = `CASE
   WHEN r.kind NOT IN ${assessmentKinds} THEN NULL
   WHEN EXISTS(SELECT 1 FROM assurance_records s WHERE s.tenant_id=r.tenant_id AND s.engagement_id=r.engagement_id AND s.kind IN ${assessmentKinds} AND json_extract(s.body,'$.supersedesId')=+r.id) THEN 'Superseded'
-  WHEN l.kind IS NULL THEN 'Awaiting review'
-  WHEN l.decision IN ('approve','confirmed') THEN 'Confirmed'
-  ELSE 'Returned'
+  ELSE COALESCE(${latestReview},'Awaiting review')
 END`;
 // What a search term is matched against: the record's id and kind, every
 // field a register shows as its title or context, and the name of the member
@@ -100,8 +99,8 @@ const haystack = [
 
 /**
  * How many case forms the haystack replaces for one term: two bound values
- * each. With the other values of a search (at most 31) a query binds at most
- * 91, under D1's limit of 100.
+ * each. With the other values of a search (at most 29) a query binds at most
+ * 89, under D1's limit of 100.
  */
 const foldedFormLimit = 30;
 /**
@@ -223,12 +222,7 @@ export async function searchRecords(
   if (review && !reviewStates.includes(review as ReviewState))
     throw new ApiError(400, "Invalid review state");
   const filters = ["r.tenant_id=?", "r.engagement_id=?"],
-    values: (string | number)[] = [
-      ctx.tenantId,
-      engagementId,
-      ctx.tenantId,
-      engagementId,
-    ];
+    values: (string | number)[] = [ctx.tenantId, engagementId];
   if (kinds.length) {
     filters.push("r.kind IN (" + kinds.map(() => "?").join(",") + ")");
     values.push(...kinds);
@@ -250,10 +244,9 @@ export async function searchRecords(
     pageValues.push(createdAt, createdAt, recordId);
   }
   const query = (where: string[]) =>
-    `WITH ${latestReviews}, matched AS (
+    `WITH matched AS (
   SELECT r.id,r.kind,r.body,r.sha256,r.created_at,r.actor,${stateSQL} AS review_state
   FROM assurance_records r
-  LEFT JOIN latest l ON l.kind=r.kind||'_review' AND l.subject=r.id
   LEFT JOIN memberships m ON m.tenant_id=r.tenant_id AND m.user_id=r.actor
   WHERE ${where.join(" AND ")}
 )`;

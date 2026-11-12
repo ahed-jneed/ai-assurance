@@ -488,6 +488,27 @@ describe("record search in SQL", () => {
       (await searchRecords(ctx, "ENG-1", { limit: 0 })).records,
     ).toHaveLength(1);
   });
+
+  it("looks up each assessment's latest review through idx_review_subject", async () => {
+    const statements: string[] = [],
+      prepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql: string) => {
+      statements.push(sql);
+      return prepare(sql);
+    };
+    await searchRecords(ctx, "ENG-1", { review: "Confirmed" });
+    const plan = sqlite
+      .prepare("EXPLAIN QUERY PLAN " + statements[0])
+      .all()
+      .map((row) => String(row.detail));
+    // Tenant, engagement, review kind and subject, newest first: one seek.
+    expect(plan).toContain(
+      "SEARCH v USING INDEX idx_review_subject (tenant_id=? AND engagement_id=? AND kind=? AND <expr>=?)",
+    );
+    expect(plan.some((d) => d.includes("TEMP B-TREE"))).toBe(false);
+    // No window over every review of the engagement any more.
+    expect(statements[0]).not.toMatch(/ROW_NUMBER|OVER \(/);
+  });
 });
 
 describe("review queue in SQL", () => {
