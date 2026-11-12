@@ -20,6 +20,8 @@ export const editingSources = [
   "dataset-registry",
   // The Testing lab's form recording a client's special-category basis.
   "special-category-basis",
+  // The Testing lab's LL144 bias audit form (#30).
+  "ll144-audit",
   "member-onboarding",
   "finding-assurance",
   "report-release",

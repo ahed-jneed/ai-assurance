@@ -5,6 +5,7 @@ import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
+import { Ll144Panel } from "../../ll144-panel";
 import { WorkingPaperRegister } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
 import type { LabIntentState } from "../lab-intent";
@@ -313,6 +314,19 @@ export function WorkspaceViews({
             resolve={resolve}
             onEvidence={() => nav.navigate("Evidence vault")}
           />
+          {!viewer && (
+            <Ll144Panel
+              key={"ll144:" + data.tenantId + ":" + e.id}
+              engagement={e}
+              tenantId={data.tenantId}
+              writer={writer}
+              reviewer={reviewer || lead}
+              userId={data.identity.id}
+              busy={busy}
+              act={act}
+              onEditing={reporters["ll144-audit"]}
+            />
+          )}
         </Suspense>
       )}
       {view === "Findings" &&

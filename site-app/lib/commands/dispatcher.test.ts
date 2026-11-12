@@ -248,6 +248,8 @@ describe("command registry", () => {
     executeRun: ["Auditor", "Lead Auditor"],
     recoverRun: ["Lead Auditor"],
     cancelRun: ["Auditor", "Lead Auditor"],
+    computeLl144Audit: ["Auditor", "Lead Auditor"],
+    approveLl144Audit: ["Reviewer", "Lead Auditor"],
     recordSpecialCategoryBasis: ["Auditor", "Lead Auditor"],
     pinClientDataset: ["Auditor", "Lead Auditor"],
     acceptEvidence: ["Auditor", "Lead Auditor"],

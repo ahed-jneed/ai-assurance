@@ -4,6 +4,7 @@ import type { PortalRequest, Release, Workflow } from "../workflow-types";
 import type { Classification } from "./classification";
 import type { EngagementCriteria } from "../criteria/types";
 import type { Decision, Plan } from "../statistics";
+import type { Ll144Audit } from "../ll144-audit";
 import type { QualityReview } from "./quality-review";
 import type {
   SpecialCategoryAcknowledgement,
@@ -513,6 +514,8 @@ export type Engagement = {
   evaluationProfiles?: EvaluationProfile[];
   /** The client's recorded bases for special-category data (#60). */
   specialCategoryBases?: SpecialCategoryBasis[];
+  /** NYC Local Law 144 bias audits (#30), internal until a released report publishes their summaries. */
+  ll144Audits?: Ll144Audit[];
   findings: Finding[];
   runs: Run[];
   reports: Report[];

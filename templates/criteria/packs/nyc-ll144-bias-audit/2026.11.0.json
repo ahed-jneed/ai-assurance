@@ -1,0 +1,587 @@
+{
+  "documentType": "pack",
+  "schemaVersion": "1.0.0",
+  "id": "nyc-ll144-bias-audit",
+  "version": "2026.11.0",
+  "title": "NYC Local Law 144 bias audit",
+  "summary": "Independent bias audit of an automated employment decision tool under NYC Local Law 144 and the DCWP rules: independence, data source, demographic data, rates and impact ratios, and the publishable summary.",
+  "kind": "audit_programme",
+  "methodologyVersion": "2026.11.0",
+  "engagementTypes": [
+    "direct",
+    "attestation"
+  ],
+  "criteria": [
+    {
+      "framework": "nyc-ll144",
+      "edition": "2023-07-05",
+      "version": "2026.11.0",
+      "role": "primary"
+    }
+  ],
+  "phases": [
+    {
+      "id": "planning",
+      "title": "Planning"
+    },
+    {
+      "id": "fieldwork",
+      "title": "Fieldwork"
+    },
+    {
+      "id": "reporting",
+      "title": "Reporting"
+    }
+  ],
+  "defaults": {
+    "initialStatus": "draft",
+    "applicability": "pending",
+    "auditorConclusion": "not_assessed",
+    "diagnosticState": "pending",
+    "numericalThreshold": null,
+    "conclusionOwner": "human_auditor",
+    "approvalBindsTo": "revision_and_content_digest",
+    "independentReview": true,
+    "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
+    "statement": "NYC Local Law 144 requires the bias audit figures to be published; it sets no pass or fail threshold, and this audit makes no finding of discrimination."
+  },
+  "roles": {
+    "limitationMemo": "MEM-EX-01"
+  },
+  "features": {
+    "annexIvIndex": false,
+    "aiActClassification": false,
+    "obligationAssessments": false
+  },
+  "reporting": {
+    "regulatorySource": "https://rules.cityofnewyork.us/wp-content/uploads/2023/04/DCWP-NOA-for-Use-of-Automated-Employment-Decisionmaking-Tools-2.pdf",
+    "limitations": "A bias audit reports the rates and impact ratios the DCWP rules require; it is not a finding of compliance with anti-discrimination law or legal advice. The reading of the rules is pending qualified legal review."
+  },
+  "controlObjectives": [
+    {
+      "id": "CO-LL144-PL-01",
+      "statement": "Establish that every member of the audit team is an independent auditor of the tool for the whole audit.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-300",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Tests the independent-auditor definition only; the other definitions are applied in the fieldwork papers.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-PL-02",
+      "statement": "Determine that the tool is an AEDT, whether it selects, classifies or scores, and the date its use began.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-300",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Applies the AEDT, simplified-output and distribution-date definitions.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-303",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Establishes the distribution date that the published results must state.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-FW-01",
+      "statement": "Establish that the audit uses historical data where enough exists, and that any reliance on other employers' data or on test data is allowed and explained.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-302-A",
+          "relationship": "equal",
+          "rationale": "functional",
+          "justification": "Steps P01 and P02 test every condition of 5-302(a).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-302-B",
+          "relationship": "equal",
+          "rationale": "functional",
+          "justification": "Steps P03 and P04 test every condition of 5-302(b).",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-FW-02",
+      "statement": "Establish that sex and race/ethnicity are the EEO-1 categories the individuals reported, none inferred or imputed, and count the unknown category.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-301-B",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Covers the categories and the unknown count of 5-301(b)(3) and (b)(5); the rates are tested in LL144-FW-03.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-301-C",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Covers the categories and the unknown count of 5-301(c)(4) and (c)(5); the rates are tested in LL144-FW-03.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-FW-03",
+      "statement": "Compute and review the rates and impact ratios for sex, race/ethnicity and intersectional categories, and any 2% exclusions.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-301-A",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Records the audit date from which the one-year limit runs; the employer's use is not tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-301-B",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Computes the selection rates and impact ratios; categories are tested in LL144-FW-02.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-301-C",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Computes the median, scoring rates and impact ratios; categories are tested in LL144-FW-02.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-301-D",
+          "relationship": "equal",
+          "rationale": "functional",
+          "justification": "Step P03 tests the exclusion condition and its disclosure.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-FW-04",
+      "statement": "Where the engagement covers them, inspect the employer's notices and the information it gives on the tool's data.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-20-871-B",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Observes the notices; the bias audit itself does not require this paper.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-304",
+          "relationship": "equal",
+          "rationale": "functional",
+          "justification": "Steps P01 to P03 test every element of 5-304.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-LL144-RP-01",
+      "statement": "Issue the bias audit report with a summary of results that states every element the rules require.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-20-871-A",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Provides the audit and its summary; posting before use is the employer's duty.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nyc-ll144:LL144-5-303",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Provides every element of 5-303(a); posting and retention are the employer's duties.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-MEM-LL144-01",
+      "statement": "Record the methodology's reading of the points the rules leave open and their legal-review status.",
+      "addresses": [
+        {
+          "requirement": "nyc-ll144:LL144-5-300",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Records readings of the definitions.",
+          "origin": "authored"
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "LL144-PL-01",
+      "title": "Independent auditor and engagement acceptance",
+      "kind": "working_paper",
+      "stage": "Planning",
+      "folder": "00 Administration",
+      "templatePath": "templates/planning.md",
+      "regulatoryRefs": [
+        "5-300"
+      ],
+      "automationMode": "manual",
+      "objective": "Establish that every member of the audit team is an independent auditor of the tool for the whole audit.",
+      "procedures": [
+        {
+          "id": "LL144-PL-01-P01",
+          "text": "Obtain a declaration from each team member that they were never involved in using, developing or distributing the tool."
+        },
+        {
+          "id": "LL144-PL-01-P02",
+          "text": "Confirm that no team member has an employment relationship with the employer, employment agency or vendor at any point during the audit."
+        },
+        {
+          "id": "LL144-PL-01-P03",
+          "text": "Confirm that no team member has a direct, or a material indirect, financial interest in the employer, employment agency or vendor."
+        },
+        {
+          "id": "LL144-PL-01-P04",
+          "text": "Record who engaged the audit (employer, employment agency or vendor) and obtain lead approval of acceptance."
+        }
+      ],
+      "evidenceRequired": [
+        "Independence declarations of each team member",
+        "Financial-interest and employment-relationship checks",
+        "Signed engagement terms naming the tool and the engaging party"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-PL-01"
+      ],
+      "phase": "planning"
+    },
+    {
+      "id": "LL144-PL-02",
+      "title": "Tool in scope, outcome type and distribution date",
+      "kind": "working_paper",
+      "stage": "Planning",
+      "folder": "01 Planning",
+      "templatePath": "templates/planning.md",
+      "regulatoryRefs": [
+        "5-300",
+        "5-303"
+      ],
+      "automationMode": "manual",
+      "objective": "Determine that the tool is an AEDT, whether it selects, classifies or scores, and the date its use began.",
+      "procedures": [
+        {
+          "id": "LL144-PL-02-P01",
+          "text": "Inspect how the tool's simplified output is used in hiring or promotion decisions and record which limb of the AEDT definition applies."
+        },
+        {
+          "id": "LL144-PL-02-P02",
+          "text": "Determine whether the tool selects or classifies (selection rates) or scores (scoring rates), and whether it classifies into groups that each need the calculations."
+        },
+        {
+          "id": "LL144-PL-02-P03",
+          "text": "Obtain evidence of the distribution date: the date the employer or employment agency began using the tool."
+        },
+        {
+          "id": "LL144-PL-02-P04",
+          "text": "Record the date of the previous bias audit, if any, and the date by which this audit must be completed."
+        }
+      ],
+      "evidenceRequired": [
+        "Description of the tool and its simplified output",
+        "Decision-process documentation showing how the output is weighted",
+        "Evidence of the distribution date (contract, go-live record)",
+        "Previous bias audit summary, if any"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-PL-02"
+      ],
+      "phase": "planning"
+    },
+    {
+      "id": "LL144-FW-01",
+      "title": "Data source: historical or test data",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [
+        "5-302(a)",
+        "5-302(b)"
+      ],
+      "automationMode": "manual",
+      "objective": "Establish that the audit uses historical data where enough exists, and that any reliance on other employers' data or on test data is allowed and explained.",
+      "procedures": [
+        {
+          "id": "LL144-FW-01-P01",
+          "text": "Obtain the dataset and record its source, period and the employers or employment agencies whose use of the tool it covers."
+        },
+        {
+          "id": "LL144-FW-01-P02",
+          "text": "Where other employers' historical data is used, confirm that the employer provided its own historical data to the auditor or has never used the tool."
+        },
+        {
+          "id": "LL144-FW-01-P03",
+          "text": "Where test data is used, assess why historical data was insufficient for a statistically significant audit and how the test data was generated and obtained."
+        },
+        {
+          "id": "LL144-FW-01-P04",
+          "text": "Record the attestation in the Testing lab LL144 audit; the platform refuses test data without both explanations."
+        }
+      ],
+      "evidenceRequired": [
+        "Dataset extract with a description of its source and period",
+        "Statement of the employers whose historical data is included",
+        "For test data: why historical data was not used and how the test data was generated"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-FW-01"
+      ],
+      "phase": "fieldwork"
+    },
+    {
+      "id": "LL144-FW-02",
+      "title": "Demographic data and the unknown category",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [
+        "5-300",
+        "5-301(b)",
+        "5-301(c)"
+      ],
+      "automationMode": "manual",
+      "objective": "Establish that sex and race/ethnicity are the EEO-1 categories the individuals reported, none inferred or imputed, and count the unknown category.",
+      "procedures": [
+        {
+          "id": "LL144-FW-02-P01",
+          "text": "Inspect how sex and race/ethnicity were collected and confirm that no value was inferred or imputed."
+        },
+        {
+          "id": "LL144-FW-02-P02",
+          "text": "Map the recorded values to the EEO-1 Component 1 categories; list the values that mean unknown."
+        },
+        {
+          "id": "LL144-FW-02-P03",
+          "text": "Count the individuals in an unknown category for each dimension and reconcile them with the dataset total."
+        },
+        {
+          "id": "LL144-FW-02-P04",
+          "text": "Where a mapped column holds special-category data, record the client's basis before computing on the platform, or compute in the client's environment."
+        }
+      ],
+      "evidenceRequired": [
+        "Description of how demographic data was collected (self-identification forms)",
+        "Mapping of recorded values to EEO-1 categories",
+        "Client's basis for processing special-category data, where it applies"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-FW-02"
+      ],
+      "phase": "fieldwork"
+    },
+    {
+      "id": "LL144-FW-03",
+      "title": "Selection or scoring rates and impact ratios",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "5-301(a)",
+        "5-301(b)",
+        "5-301(c)",
+        "5-301(d)"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Compute and review the rates and impact ratios for sex, race/ethnicity and intersectional categories, and any 2% exclusions.",
+      "procedures": [
+        {
+          "id": "LL144-FW-03-P01",
+          "text": "Compute the LL144 audit in the Testing lab from the accepted dataset, or in the client's environment with python -m engine.ll144, and attach the output."
+        },
+        {
+          "id": "LL144-FW-03-P02",
+          "text": "For scores, confirm that the median is taken over the full sample, including the unknown category, and that rates count scores above it."
+        },
+        {
+          "id": "LL144-FW-03-P03",
+          "text": "Review every 2% exclusion: the category is below 2% of the audit data and the justification is recorded."
+        },
+        {
+          "id": "LL144-FW-03-P04",
+          "text": "Reconcile category counts with the dataset; a reviewer other than the preparer approves the audit."
+        },
+        {
+          "id": "LL144-FW-03-P05",
+          "text": "Record the audit date and the date after which the tool may not be used without a new audit."
+        }
+      ],
+      "evidenceRequired": [
+        "LL144 audit output (platform or client-environment run) with the dataset digest",
+        "Justification for each excluded category",
+        "Reviewer approval of the audit"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-FW-03"
+      ],
+      "phase": "fieldwork"
+    },
+    {
+      "id": "LL144-FW-04",
+      "title": "Notices and data-information disclosures (employer duties)",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork",
+      "templatePath": "templates/article-fieldwork.md",
+      "regulatoryRefs": [
+        "20-871(b)",
+        "5-304"
+      ],
+      "automationMode": "manual",
+      "objective": "Where the engagement covers them, inspect the employer's notices and the information it gives on the tool's data.",
+      "procedures": [
+        {
+          "id": "LL144-FW-04-P01",
+          "text": "Inspect the notice to candidates and employees and how it is given at least 10 business days before use."
+        },
+        {
+          "id": "LL144-FW-04-P02",
+          "text": "Confirm that the notice explains how to request an alternative selection process or a reasonable accommodation."
+        },
+        {
+          "id": "LL144-FW-04-P03",
+          "text": "Inspect the published information on data retention, the type and source of data, and how to request it."
+        }
+      ],
+      "evidenceRequired": [
+        "Candidate and employee notices with their publication dates",
+        "Careers-page extract on data retention, data type and source"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-FW-04"
+      ],
+      "phase": "fieldwork"
+    },
+    {
+      "id": "LL144-RP-01",
+      "title": "Bias audit report and publishable summary",
+      "kind": "working_paper",
+      "stage": "Reporting",
+      "folder": "05 Reporting",
+      "templatePath": "templates/reporting-signoff.md",
+      "regulatoryRefs": [
+        "20-871(a)",
+        "5-303"
+      ],
+      "automationMode": "manual",
+      "objective": "Issue the bias audit report with a summary of results that states every element the rules require.",
+      "procedures": [
+        {
+          "id": "LL144-RP-01-P01",
+          "text": "Capture the final report: it holds the publishable summary of each approved LL144 audit."
+        },
+        {
+          "id": "LL144-RP-01-P02",
+          "text": "Check the summary states the audit date, the data source and explanation, the number of individuals, the unknown counts, the rates and impact ratios for all categories, any exclusions and the distribution date."
+        },
+        {
+          "id": "LL144-RP-01-P03",
+          "text": "Give the client the summary page or its JSON to post on, or link from, the employment section of its website."
+        },
+        {
+          "id": "LL144-RP-01-P04",
+          "text": "Remind the client to keep the summary and distribution date posted for at least six months after the tool's latest use, and to obtain a new audit within a year."
+        }
+      ],
+      "evidenceRequired": [
+        "Final report with the captured LL144 summary",
+        "Client's confirmation of where the summary is posted"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-LL144-RP-01"
+      ],
+      "phase": "reporting"
+    },
+    {
+      "id": "MEM-LL144-01",
+      "title": "Legal reading of the LL144 rules (pending legal review)",
+      "kind": "memo",
+      "stage": "Planning",
+      "folder": "01 Planning",
+      "templatePath": "templates/memo-decision.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Record the methodology's reading of the points the rules leave open and their legal-review status.",
+      "procedures": [
+        {
+          "id": "MEM-LL144-01-P01",
+          "text": "Record the readings LR-LL144-01 to LR-LL144-08 that affect this engagement."
+        },
+        {
+          "id": "MEM-LL144-01-P02",
+          "text": "State in the report that the reading is pending qualified legal review until #57 completes it."
+        }
+      ],
+      "evidenceRequired": [
+        "Methodology research note docs/research/ll144-2026-11.md"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [
+        "CO-MEM-LL144-01"
+      ],
+      "phase": "planning"
+    },
+    {
+      "id": "MEM-EX-01",
+      "title": "Exception, limitation and disagreement memo",
+      "kind": "memo",
+      "stage": "Evidence Evaluation",
+      "folder": "04 Evaluation",
+      "templatePath": "templates/memo-decision.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Evaluate unresolved exceptions and their effect on conclusion.",
+      "procedures": [
+        {
+          "id": "MEM-EX-01-P01",
+          "text": "Describe criterion, missing/conflicting evidence and efforts to obtain it."
+        },
+        {
+          "id": "MEM-EX-01-P02",
+          "text": "Assess alternatives, severity and potential pervasive effects."
+        },
+        {
+          "id": "MEM-EX-01-P03",
+          "text": "Document management position and required report disclosure."
+        }
+      ],
+      "evidenceRequired": [
+        "Exception register",
+        "Evidence requests",
+        "Management correspondence",
+        "Follow-up papers"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [],
+      "derivedFrom": {
+        "packId": "eu-ai-act-amended",
+        "version": "2026.11.2",
+        "itemId": "MEM-EX-01"
+      }
+    }
+  ],
+  "notes": "Methodology research and legal-review items LR-LL144-01 to LR-LL144-08: docs/research/ll144-2026-11.md. Computations: docs/design/audit-statistics.md section 10.2 (lib/ll144.ts and engine/ll144.py)."
+}
