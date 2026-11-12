@@ -53,6 +53,15 @@ vi.mock("../assurance-store", async (importOriginal) => ({
   assuranceGates: vi.fn(async () => []),
 }));
 
+// The practice's report settings are read from D1; none are set here.
+vi.mock("../report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
+}));
+
 const AI_ACT = "eu-ai-act@02024R1689-20260727";
 let restore: (() => void) | undefined;
 afterEach(() => {
