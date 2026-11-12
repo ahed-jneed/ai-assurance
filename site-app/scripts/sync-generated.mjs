@@ -27,6 +27,12 @@ import {
   checkCriteria,
   readCriteria,
 } from "../../schemas/validate-criteria.mjs";
+import {
+  checkResearch,
+  loadInputs as loadArt50Inputs,
+  loadValidator as loadArt50Validator,
+  researchPath as art50ResearchPath,
+} from "../../schemas/validate-art50-research.mjs";
 
 const repo = fileURLToPath(new URL("../../", import.meta.url));
 const check = process.argv.includes("--check");
@@ -163,6 +169,49 @@ else console.log(schema.stdout.trim());
         mkdirSync(path.dirname(absolute(target)), { recursive: true });
         writeFileSync(absolute(target), text);
         console.log(`Updated ${target} from templates/criteria`);
+      }
+    }
+  }
+}
+
+// 2b. The Art 50 statistical criteria the Site shows (#120): extracted from
+// the Art 50 research, validated first, with each criterion's threshold-library
+// reference (schemas/validate-art50-research.mjs).
+{
+  const target = "site-app/lib/art50-criteria.json";
+  const inputs = loadArt50Inputs();
+  const problems = checkResearch({ ...inputs, validate: loadArt50Validator() });
+  if (problems.length)
+    drift.push(
+      `${art50ResearchPath} is invalid (node schemas/validate-art50-research.mjs):\n    ` +
+        problems.join("\n    "),
+    );
+  else {
+    const r = inputs.research;
+    const text =
+      JSON.stringify(
+        {
+          source: art50ResearchPath,
+          schemaVersion: r.schemaVersion,
+          method: r.sampling.method,
+          caveat: r.sampling.caveat,
+          procedures: r.procedures.map((p) => ({
+            id: p.id,
+            catalogItemId: p.catalogItemId,
+            criteria: p.criteria,
+          })),
+        },
+        null,
+        2,
+      ) + "\n";
+    const current = existsSync(absolute(target))
+      ? readFileSync(absolute(target), "utf8")
+      : undefined;
+    if (current !== text) {
+      if (check) drift.push(`${target} differs from ${art50ResearchPath}`);
+      else {
+        writeFileSync(absolute(target), text);
+        console.log(`Updated ${target} from ${art50ResearchPath}`);
       }
     }
   }
