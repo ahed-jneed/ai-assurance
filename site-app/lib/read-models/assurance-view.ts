@@ -27,9 +27,9 @@ async function internalEngagement(ctx: Context, engagementId: string) {
   return e;
 }
 /**
- * What the assurance workbench loads for an internal member: the first page of
- * the engagement's assurance records (with the cursor of the next page), how
- * many records it holds in all and of each kind, its 100 most recent external
+ * What the assurance workbench loads for an internal member. It returns no
+ * records: only how many the engagement holds in all and of each kind, its
+ * 100 most recent external
  * jobs (each marked when already compiled into a draft paper), enrolled
  * workers and access grants, the members a Lead Auditor may grant access to,
  * the caller's review queue (counts and the next assessment of each), what

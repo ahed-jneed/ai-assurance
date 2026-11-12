@@ -214,6 +214,7 @@ describe("workspaceView", () => {
       view = await workspaceView(admin, "ENG-B");
     expect(view.integrityIncidents).toEqual({
       count: 2,
+      recent: 2,
       incidents: [
         expect.objectContaining({
           engagementId: "ENG-A",
@@ -237,6 +238,20 @@ describe("workspaceView", () => {
     const [body, part] = view.integrityIncidents!.incidents;
     expect(body.lastSeen >= part.lastSeen).toBe(true);
     expect(part.firstSeen < part.lastSeen).toBe(true);
+    // An incident nobody has met for over a week (ENG-C stays unopened; the
+    // directory listing meets ENG-A's body again) leaves the badge count but
+    // stays in the history.
+    sqlite
+      .prepare(
+        "UPDATE integrity_incidents SET last_seen='2026-01-01T00:00:00.000Z' WHERE engagement_id='ENG-C'",
+      )
+      .run();
+    const later = (await workspaceView(admin, "ENG-B")).integrityIncidents!;
+    expect(later).toMatchObject({ count: 2, recent: 1 });
+    expect(later.incidents.map((i) => i.engagementId)).toEqual([
+      "ENG-A",
+      "ENG-C",
+    ]);
   });
 
   it("lists a record whose body is not JSON with an integrity error and opens the next one", async () => {

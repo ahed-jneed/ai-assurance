@@ -68,11 +68,17 @@ export function IntegrityIncidentsPanel({
           </h2>
           <p className="subtle">
             {incidents.count === 1
-              ? "Members found 1 damaged engagement record."
-              : "Members found " +
+              ? "Members have found 1 damaged engagement record"
+              : "Members have found " +
                 incidents.count.toLocaleString() +
-                " damaged engagement records."}{" "}
-            Each damaged engagement stays closed; the others work as before.
+                " damaged engagement records"}
+            {incidents.recent === incidents.count
+              ? ", all within the past week."
+              : ", " +
+                incidents.recent.toLocaleString() +
+                " within the past week."}{" "}
+            An engagement stays closed while its record is damaged and opens
+            again once the record is restored; this list keeps the history.
             {incidents.count > shown &&
               " Showing the " + shown + " most recently seen."}
           </p>

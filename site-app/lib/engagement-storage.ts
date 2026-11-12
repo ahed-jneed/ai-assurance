@@ -239,17 +239,28 @@ export type IntegrityIncident = {
 /** How many incidents the practice view lists, most recently seen first. */
 export const integrityIncidentLimit = 50;
 /**
+ * How long an incident counts as recent: the navigation badge counts only
+ * incidents a member met in this window, so it clears once a restored record
+ * stops failing. Incidents cannot be acknowledged yet (#121 follow-up).
+ */
+export const integrityIncidentRecentDays = 7;
+/**
  * The practice's recorded integrity incidents for its administrators: how
- * many there are and the most recently seen ones, newest first.
+ * many were ever recorded, how many were last seen in the past
+ * {@link integrityIncidentRecentDays} days, and the most recently seen ones,
+ * newest first. The rows are history: a record restored since stays listed.
  */
 export async function integrityIncidents(ctx: Context) {
+  const since = new Date(
+    Date.now() - integrityIncidentRecentDays * 86_400_000,
+  ).toISOString();
   const [count, rows] = await Promise.all([
     db()
       .prepare(
-        "SELECT COUNT(*) AS n FROM integrity_incidents WHERE tenant_id=?",
+        "SELECT COUNT(*) AS n,COALESCE(SUM(last_seen>=?),0) AS recent FROM integrity_incidents WHERE tenant_id=?",
       )
-      .bind(ctx.tenantId)
-      .first<{ n: number }>(),
+      .bind(since, ctx.tenantId)
+      .first<{ n: number; recent: number }>(),
     db()
       .prepare(
         "SELECT i.engagement_id,e.title,i.object_key,i.kind,i.status,i.first_seen,i.last_seen,i.occurrences,COALESCE(m.display_name,i.last_user_id) AS last_seen_by FROM integrity_incidents i LEFT JOIN engagements e ON e.tenant_id=i.tenant_id AND e.id=i.engagement_id LEFT JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.last_user_id WHERE i.tenant_id=? ORDER BY i.last_seen DESC,i.engagement_id,i.object_key,i.kind LIMIT ?",
@@ -269,6 +280,7 @@ export async function integrityIncidents(ctx: Context) {
   ]);
   return {
     count: count?.n ?? 0,
+    recent: count?.recent ?? 0,
     incidents: rows.results.map((r): IntegrityIncident => ({
       engagementId: r.engagement_id,
       title: r.title,
