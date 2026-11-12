@@ -862,7 +862,7 @@ describe("independence work, names and access grants (#112)", () => {
   };
   const nameOf = (id: string) => names[id];
   const acceptanceWork = (e: Engagement, role: Role, userId: string) =>
-    engagementWork(e, role, userId, "", "2026-11-05", nameOf).filter(
+    engagementWork(e, role, userId, "", "2026-11-05", { nameOf }).filter(
       (i) => i.kind === "acceptance",
     );
   const threat = () => ({
