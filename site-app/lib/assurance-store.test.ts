@@ -11,6 +11,7 @@ import {
   datasetVersions,
   dossierSeal,
   hasSuccessor,
+  pinnedRecordFacts,
   recordCount,
   recordPage,
   recordsById,
@@ -711,6 +712,62 @@ describe("assurance record lookups", () => {
     expect(
       await dossierSeal(ctx, "ENG-1", "REPORT-1", "client"),
     ).toBeUndefined();
+  });
+
+  it("find scoped seals by their scope digest and keep the full seal apart (#83)", async () => {
+    await insert(scenario);
+    const scoped = "a".repeat(64);
+    await insert([
+      {
+        id: "AS-k02",
+        kind: "dossier",
+        body: {
+          reportId: "REPORT-1",
+          audience: "internal",
+          scopeSha256: scoped,
+        },
+        at: at(33),
+      },
+    ]);
+    expect((await dossierSeal(ctx, "ENG-1", "REPORT-1", "internal"))?.id).toBe(
+      "AS-k01",
+    );
+    expect(
+      (await dossierSeal(ctx, "ENG-1", "REPORT-1", "internal", null))?.id,
+    ).toBe("AS-k01");
+    expect(
+      (await dossierSeal(ctx, "ENG-1", "REPORT-1", "internal", scoped))?.id,
+    ).toBe("AS-k02");
+    expect(
+      await dossierSeal(ctx, "ENG-1", "REPORT-1", "internal", "b".repeat(64)),
+    ).toBeUndefined();
+    // drizzle 0012: one seal per report, audience and scope.
+    for (const scopeSha256 of [undefined, scoped])
+      await expect(
+        insert([
+          {
+            id: "AS-k9" + (scopeSha256 ? "s" : "f"),
+            kind: "dossier",
+            body: { reportId: "REPORT-1", audience: "internal", scopeSha256 },
+            at: at(34),
+          },
+        ]),
+      ).rejects.toThrow("UNIQUE constraint failed");
+  });
+
+  it("read the facts a scope selects pinned records by, without bodies", async () => {
+    await insert(scenario);
+    const facts = await pinnedRecordFacts(ctx, "ENG-1"),
+      pins = await assurancePins(ctx, "ENG-1");
+    // Exactly the records a report pins.
+    expect([...facts.keys()].sort()).toEqual(pins.map((p) => p.id).sort());
+    expect(facts.get("AS-p01")).toEqual({
+      kind: "sample",
+      createdAt: at(4),
+      procedureId: "PROC-1",
+    });
+    for (const pin of pins) expect(facts.get(pin.id)?.kind).toBe(pin.kind);
+    expect(facts.has("AS-x01")).toBe(false);
   });
 });
 
