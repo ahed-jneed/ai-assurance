@@ -12,8 +12,30 @@ import {
   requireRole,
   responseError,
 } from "@/lib/store";
+import { engagementClassificationRules } from "@/lib/commands/classification";
+import { packFeatures } from "@/lib/criteria/pin";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
 export const dynamic = "force-dynamic";
+/**
+ * The classification rules of the engagement's pinned pack (#133). A pack
+ * without the AI Act classification gives no classification work, and
+ * neither does a pin this build cannot resolve: that engagement fails closed
+ * when opened, but the rest of its work stays in the queue.
+ */
+function classificationScope(e: Parameters<typeof packFeatures>[0]) {
+  try {
+    const features = packFeatures(e);
+    return {
+      features,
+      rules: features.aiActClassification
+        ? engagementClassificationRules(e)
+        : undefined,
+    };
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    return { features: { aiActClassification: false } };
+  }
+}
 /**
  * The only immutable parts work items read: the snapshots of final reports
  * still awaiting approval or release (whether the package captured the
@@ -72,7 +94,7 @@ export async function GET(request: Request) {
               ctx.user.userId,
               row.client,
               undefined,
-              nameOf,
+              { nameOf, ...classificationScope(e) },
             ),
           };
         } catch (error) {

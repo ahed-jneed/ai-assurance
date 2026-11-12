@@ -16,6 +16,9 @@ import { openReviewItems, type RegulatorySnapshot } from "./rule-pack";
 export const art50Items: ObligationRule[] = (
   obligations.items as unknown as ObligationRule[]
 ).filter((i) => i.article.startsWith("50"));
+/** The obligation items of the catalogue, as the trigger evaluator reads them. */
+export const obligationItems =
+  obligations.items as unknown as readonly ObligationRule[];
 export const triggerProfiles = obligations.triggerProfiles as Record<
   string,
   TriggerProfile
