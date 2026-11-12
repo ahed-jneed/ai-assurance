@@ -34,7 +34,10 @@ import {
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
 import { paperContext, paperRevisions } from "../papers/revision";
-import { assertReviewerIndependent } from "../quality-review-records";
+import {
+  assertReviewerIndependent,
+  assertSignerActive,
+} from "../quality-review-records";
 import { practiceReportSettings } from "../report-settings";
 import {
   criteriaStamp,
@@ -342,6 +345,7 @@ export async function assertReleasable(
   const gates = finalReportGates(e, report, features);
   if (gates.length) throw new ApiError(409, gates[0].message);
   await assertReviewerIndependent(ctx, e);
+  await assertSignerActive(ctx, e);
   const frozen = r.snapshot.workflow as Engagement["workflow"];
   if (
     !frozen ||

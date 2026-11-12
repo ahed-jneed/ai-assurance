@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { coolingOffDays } from "../access-policy";
 import type { Engagement } from "../domain";
 import {
   checklistItemIds,
@@ -13,6 +12,7 @@ import {
   onRecordedTeam,
   recordedCoolingOffConflicts,
 } from "../quality-review-records";
+import { qualityReviewPolicy } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import { releaseState } from "../workflow-state";
 import { defineCommands } from "./command";
@@ -101,7 +101,7 @@ export const qualityReview = defineCommands({
           409,
           "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
         );
-      const days = coolingOffDays(),
+      const days = (await qualityReviewPolicy(ctx.tenantId)).coolingOffDays,
         at = now();
       const conflicts = days
         ? await recordedCoolingOffConflicts(

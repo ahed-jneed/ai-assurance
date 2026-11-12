@@ -122,6 +122,23 @@ describe("workspaceView", () => {
     expect(incidents(sqlite)).toMatchObject([{ occurrences: 2 }]);
   });
 
+  it("shows internal members the practice's quality review policy", async () => {
+    const { sqlite } = await practice(three());
+    expect((await workspaceView(lead(), null)).qualityReviewPolicy).toEqual({
+      coolingOffDays: 730,
+      practiceSet: false,
+    });
+    sqlite.prepare("UPDATE tenants SET eqr_cooling_off_days=365").run();
+    expect((await workspaceView(auditor(), null)).qualityReviewPolicy).toEqual({
+      coolingOffDays: 365,
+      practiceSet: true,
+    });
+    expect(
+      (await workspaceView(member("viewer", "Client Viewer", "CL-1"), null))
+        .qualityReviewPolicy,
+    ).toBeNull();
+  });
+
   it("reports an altered blob as an integrity mismatch", async () => {
     const { objects } = await practice(three());
     const [altered] = partsOf(objects.keys(), "ENG-A");

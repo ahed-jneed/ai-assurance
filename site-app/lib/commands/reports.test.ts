@@ -30,6 +30,7 @@ vi.mock("../assurance-store", async (importOriginal) => ({
 vi.mock("../quality-review-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../quality-review-records")>()),
   assertReviewerIndependent: vi.fn(async () => {}),
+  assertSignerActive: vi.fn(async () => {}),
 }));
 
 // The practice's report settings are read from D1; none are set by default.
