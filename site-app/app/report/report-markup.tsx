@@ -49,6 +49,8 @@ export type ReportSnapshot = {
     text: string;
     levelStatement: string;
     notAssurance: boolean;
+    /** A draft captured while completion gates were open (#144). */
+    draftCaveat?: string;
   };
   criteria?: CriterionResult[];
   /** The publishable summaries of the approved LL144 audits (#30). */
@@ -155,6 +157,11 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
         )}
         <div className="assurance-conclusion">
           <h3>{c.heading}</h3>
+          {c.draftCaveat && (
+            <p className="report-draft-caveat">
+              <strong>{c.draftCaveat}</strong>
+            </p>
+          )}
           <p>{c.text}</p>
           {c.levelStatement && <p>{c.levelStatement}</p>}
         </div>

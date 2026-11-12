@@ -13,7 +13,7 @@ import {
   recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
-import { qualityStatement } from "../domain/report-model";
+import { draftCaveat, qualityStatement } from "../domain/report-model";
 import { practiceReportSettings } from "../report-settings";
 import { assertReleasable, reports } from "./reports";
 import { caller } from "./test-fixtures";
@@ -492,5 +492,43 @@ describe("readiness assessment with gaps (#111)", () => {
     ).toBe(
       "Describe the gaps identified against the criteria and what remains to be addressed",
     );
+  });
+});
+
+describe("the draft caveat (#144)", () => {
+  type Statement = { heading: string; text: string; draftCaveat?: string };
+  const statementOf = (s: Record<string, unknown>) =>
+    s.conclusionStatement as Statement;
+
+  it("marks an ISAE 3000 draft captured while gates are open, in both snapshots", async () => {
+    const e = await issuable();
+    // Without the engagement quality review a completion requirement is open.
+    delete e.qualityReview;
+    const r = await capture(e, { ...qualified, kind: "draft" });
+    for (const s of [r.snapshot, r.clientSnapshot!]) {
+      const c = statementOf(s);
+      expect(c.heading).toBe("Qualified conclusion");
+      expect(c.draftCaveat).toMatch(
+        /^Draft, gates open: \d+ completion requirements? (was|were) open when this draft was captured\. The wording below is the proposed conclusion/,
+      );
+    }
+  });
+
+  it("counts the open gates, singular and plural", () => {
+    expect(draftCaveat(1)).toMatch(
+      /^Draft, gates open: 1 completion requirement was open/,
+    );
+    expect(draftCaveat(3)).toMatch(
+      /^Draft, gates open: 3 completion requirements were open/,
+    );
+  });
+
+  it("states no caveat on a draft with every gate closed, nor on a final report", async () => {
+    const e = await issuable();
+    const draft = await capture(e, { ...qualified, kind: "draft" });
+    expect(statementOf(draft.snapshot)).not.toHaveProperty("draftCaveat");
+    const final = await capture(e, qualified);
+    for (const s of [final.snapshot, final.clientSnapshot!])
+      expect(statementOf(s)).not.toHaveProperty("draftCaveat");
   });
 });

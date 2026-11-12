@@ -23,6 +23,7 @@ import {
   assuranceLevelIds,
   conclusionStatement,
   conclusionTypeIds,
+  draftCaveat,
   engagementTypeIds,
   resolveParticulars,
   snapshotConclusion,
@@ -180,6 +181,14 @@ export const reports = defineCommands({
       const elements = reportElements(e, terms, particulars, createdAt).map(
         ({ id, label, value }) => ({ id, label, value }),
       );
+      // A draft captured while completion gates are open says so above its
+      // conclusion wording (#144); a final report has none open.
+      const openGates =
+        a.kind === "draft"
+          ? (await assuranceGates(ctx, e.id, a.conclusion)).length +
+            finalReportGates(e, { ...terms, particulars }, gateFeatures(e))
+              .length
+          : 0;
       const approvedLl144 = (e.ll144Audits ?? []).filter(
         (x) => x.status === "approved",
       );
@@ -188,11 +197,10 @@ export const reports = defineCommands({
         particulars,
         reportTitle: elements.find((el) => el.id === "title")?.value ?? "",
         elements,
-        conclusionStatement: conclusionStatement(
-          terms,
-          subjectPhrase(e),
-          criteriaPhrase,
-        ),
+        conclusionStatement: {
+          ...conclusionStatement(terms, subjectPhrase(e), criteriaPhrase),
+          ...(openGates ? { draftCaveat: draftCaveat(openGates) } : {}),
+        },
         criteria: criterionRollup(e, undefined, lookup),
         // The publishable LL144 summaries of the approved audits (#30). They
         // carry no user id or row data, so both snapshots hold them.
