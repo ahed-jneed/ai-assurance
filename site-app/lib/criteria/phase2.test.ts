@@ -555,4 +555,35 @@ describe("findings that reference criteria", () => {
       "EU AI Act (amended) Art. 50",
     );
   });
+
+  it("opens no client criterion for an internal finding below High", () => {
+    const e = freshEngagement(resolveNew(), "CL-1", "AI Act", "lead", true);
+    const p = e.workflow!.procedures.find((x) => x.templateId === "WP-A09-01")!;
+    p.selected = true;
+    p.applicability = "applicable";
+    e.findings.push({
+      ...base,
+      id: "F-1",
+      status: "open",
+      severity: "Low",
+      visibility: "internal",
+      criteriaRefs: ["eu-ai-act:AIA-ART-50"],
+    } as Finding);
+    const lookup = criteriaLookup(e);
+    const art50 = "EU AI Act (amended) Art. 50";
+    // The internal roll-up keeps the criterion of its own.
+    expect(
+      criterionRollup(e, undefined, lookup).find((c) => c.criterion === art50),
+    ).toMatchObject({ procedures: 0, openFindings: 1 });
+    // The client report does not show a criterion nothing it lists supports.
+    const clientOnly = (f: Finding) => f.visibility === "client";
+    expect(
+      criterionRollup(e, clientOnly, lookup).map((c) => c.criterion),
+    ).not.toContain(art50);
+    // An internal High finding still reaches the client result.
+    (e.findings.at(-1) as Finding).severity = "High";
+    expect(
+      criterionRollup(e, clientOnly, lookup).find((c) => c.criterion === art50),
+    ).toMatchObject({ openFindings: 0, result: "exceptions" });
+  });
 });

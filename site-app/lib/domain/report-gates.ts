@@ -83,7 +83,9 @@ export const criteriaPhrase = "the criteria set out in this report";
  * through its `criteriaRefs`: into every criterion whose procedures' items
  * link one of those requirements or an ancestor group of one, or, when none
  * does, into a criterion of its own named by the reference's citation, which
- * no procedure evaluated.
+ * no procedure evaluated. Such a criterion of its own is opened only for a
+ * finding that `counted` includes or that is High or Critical, so a Low or
+ * Medium finding left out of the client report adds no row to it.
  */
 export function criterionRollup(
   e: Engagement,
@@ -161,7 +163,11 @@ export function criterionRollup(
       );
       if (matching.length)
         for (const [criterion] of matching) addFinding(criterion, f);
-      else for (const ref of refs) addFinding(lookup.citation(ref), f);
+      // A criterion of its own only for a finding this report counts, or one
+      // that is High or Critical: otherwise a finding the reader cannot see
+      // would add a row nothing in the report supports.
+      else if (counted(f) || ["High", "Critical"].includes(f.severity))
+        for (const ref of refs) addFinding(lookup.citation(ref), f);
     }
   return [...groups.values()].map((g) => ({
     ...g,
