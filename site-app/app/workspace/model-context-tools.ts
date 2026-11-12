@@ -2,7 +2,7 @@
 // WebMCP proposal) when the browser provides it.
 import { useEffect, useRef } from "react";
 import { finalReportGates } from "@/lib/domain";
-import type { WorkspaceData } from "../workspace-types";
+import { packFeatures, type WorkspaceData } from "../workspace-types";
 import { managementNavigation, navigation } from "./modules";
 
 const modules = [...managementNavigation, ...navigation].map(
@@ -48,9 +48,11 @@ export function useModelContextTools(
             title: current.engagement.title,
             stage: current.engagement.stage,
             role: current.identity.role,
-            blockers: finalReportGates(current.engagement).map(
-              (g) => g.message,
-            ),
+            blockers: finalReportGates(
+              current.engagement,
+              undefined,
+              packFeatures(current),
+            ).map((g) => g.message),
           };
         },
       },

@@ -75,6 +75,12 @@ export function testingReadiness(
         card.body.artifactSha256 === data.sha256,
     },
   ];
+  // A client-held pin has no bytes on the platform (#102).
+  if (data?.custody === "client")
+    checks.push({
+      label: "Client-held dataset runs only in client-local mode",
+      done: s.mode === "client_local",
+    });
   if (hosted)
     checks.push({
       label: "Interactive saved predictions within the 1 MB limit",
@@ -148,7 +154,11 @@ export function testingReadiness(
           lineage.body.datasetSha256 === data?.sha256,
       });
   }
-  const format = native ? model?.format : "provided_predictions",
+  const format = native
+      ? model?.format
+      : data?.custody === "client"
+        ? "client_local"
+        : "provided_predictions",
     workerReady = workers.some((w) => {
       try {
         return w.active && JSON.parse(w.capabilities).includes(format);

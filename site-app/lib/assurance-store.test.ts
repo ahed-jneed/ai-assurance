@@ -7,6 +7,7 @@ import {
   assurancePageSize,
   assurancePins,
   briefingExport,
+  currentObligations,
   datasetVersions,
   dossierSeal,
   hasSuccessor,
@@ -807,5 +808,105 @@ describe("assurance record pages", () => {
       status: 400,
       message: "Invalid page cursor",
     });
+  });
+});
+
+describe("current obligation records for coverage", () => {
+  it("lists current records with whether their latest review confirms them", async () => {
+    const t = (n: number) => "2026-01-01T00:00:0" + n + ".000Z";
+    await insert([
+      {
+        id: "OB-1",
+        kind: "obligation",
+        at: t(1),
+        body: {
+          code: "AIA-9-1",
+          applicability: "readiness",
+          outcome: "supported",
+        },
+      },
+      {
+        id: "OR-1",
+        kind: "obligation_review",
+        at: t(2),
+        actor: "user-reviewer",
+        body: { obligationId: "OB-1", decision: "confirmed" },
+      },
+      {
+        id: "OB-2",
+        kind: "obligation",
+        at: t(3),
+        body: {
+          code: "AIA-10-1",
+          applicability: "applicable",
+          outcome: "supported",
+        },
+      },
+      {
+        id: "OR-2",
+        kind: "obligation_review",
+        at: t(4),
+        actor: "user-reviewer",
+        body: { obligationId: "OB-2", decision: "returned" },
+      },
+      {
+        id: "OB-3",
+        kind: "obligation",
+        at: t(5),
+        body: {
+          code: "AIA-9-2-a",
+          applicability: "applicable",
+          outcome: "qualified",
+        },
+      },
+      {
+        id: "OR-3",
+        kind: "obligation_review",
+        at: t(6),
+        actor: "user-reviewer",
+        body: { obligationId: "OB-3", decision: "confirmed" },
+      },
+      {
+        id: "OB-4",
+        kind: "obligation",
+        at: t(7),
+        body: {
+          code: "AIA-9-2-a",
+          applicability: "applicable",
+          outcome: "supported",
+          supersedesId: "OB-3",
+        },
+      },
+      {
+        id: "AS-1",
+        kind: "assertion",
+        at: t(8),
+        body: { statement: "A claim", conclusion: "supported" },
+      },
+    ]);
+    expect(await currentObligations(ctx, "ENG-1")).toEqual([
+      {
+        id: "OB-1",
+        code: "AIA-9-1",
+        applicability: "readiness",
+        outcome: "supported",
+        confirmed: true,
+      },
+      {
+        id: "OB-2",
+        code: "AIA-10-1",
+        applicability: "applicable",
+        outcome: "supported",
+        confirmed: false,
+      },
+      {
+        id: "OB-4",
+        code: "AIA-9-2-a",
+        applicability: "applicable",
+        outcome: "supported",
+        confirmed: false,
+      },
+    ]);
+    expect(await currentObligations(ctx, "ENG-2")).toEqual([]);
   });
 });

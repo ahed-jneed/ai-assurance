@@ -7,7 +7,11 @@ import type { Engagement, Report, RulePackStamp } from "./domain";
 import { freshEngagement } from "./factories";
 import { sha256 } from "./ids";
 import { engagementRulePack } from "./rule-pack";
-import { currentRulePack, recordVersions } from "./rule-pack-current";
+import { recordVersions, resolveNew, injectRegistry } from "./criteria/pin";
+import { packRulePack } from "./criteria/projection";
+import { registry } from "./criteria/registry";
+import generated from "./criteria/bundle.generated.json";
+import type { Bundle, PackDocument } from "./criteria/types";
 
 // Report capture reads assurance records and jobs from D1; none exist here.
 vi.mock("./assurance-store", async (importOriginal) => ({
@@ -16,6 +20,14 @@ vi.mock("./assurance-store", async (importOriginal) => ({
   jobs: vi.fn(async () => []),
   assuranceGates: vi.fn(async () => []),
 }));
+// The practice's report settings are read from D1; none are set here.
+vi.mock("./report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
+}));
 
 const stamp2026_11_2: RulePackStamp = {
   version: "2026.11.2",
@@ -23,12 +35,17 @@ const stamp2026_11_2: RulePackStamp = {
   researchedAsOf: "2026-11-05",
   legalReview: "pending",
 };
-/** An engagement saved before rule-pack stamps, pinned to 02024R1689-20260727. */
+/** The rule pack of the default criteria pack, which new engagements are stamped with. */
+const currentRulePack = packRulePack(resolveNew())!;
+/** An engagement saved before rule-pack stamps and criteria pins, pinned to 02024R1689-20260727. */
 function pinnedBeforeStamps(): Engagement {
   const e: Engagement = JSON.parse(
-    JSON.stringify(freshEngagement("CL-1", "Legacy audit", "user-lead")),
+    JSON.stringify(
+      freshEngagement(resolveNew(), "CL-1", "Legacy audit", "user-lead"),
+    ),
   );
   delete e.rulePack;
+  delete e.criteria;
   e.classification.version = "02024R1689-20260727";
   e.classification.asOf = "2026-10-05";
   return e;
@@ -52,7 +69,13 @@ describe("the engagement rule-pack stamp", () => {
   it("stamps new engagements with rule pack 2026.11.2 read from the catalog", () => {
     expect(currentRulePack).toEqual(stamp2026_11_2);
     for (const structured of [false, true]) {
-      const e = freshEngagement("CL-1", "New audit", "user-lead", structured);
+      const e = freshEngagement(
+        resolveNew(),
+        "CL-1",
+        "New audit",
+        "user-lead",
+        structured,
+      );
       expect(e.rulePack).toEqual(stamp2026_11_2);
       expect(e.rulePack?.version).toBe(catalog.methodologyVersion);
       expect(e.classification.version).toBe(catalog.regulatorySnapshot.celex);
@@ -100,7 +123,12 @@ describe("the engagement rule-pack stamp", () => {
       recordedResearchedAsOf: "2026-10-05",
     });
     // A later revision of the pack does not move a stamped engagement.
-    const stamped = freshEngagement("CL-1", "New audit", "user-lead");
+    const stamped = freshEngagement(
+      resolveNew(),
+      "CL-1",
+      "New audit",
+      "user-lead",
+    );
     expect(engagementRulePack(stamped, { version: "2027.1.1" }).kind).toBe(
       "other",
     );
@@ -108,7 +136,12 @@ describe("the engagement rule-pack stamp", () => {
 
   it("keeps the 2026.11.1 stamp of an engagement created before rule pack 2026.11.2", async () => {
     const stamp2026_11_1 = { ...stamp2026_11_2, version: "2026.11.1" };
-    const e = freshEngagement("CL-1", "Earlier audit", "user-lead");
+    const e = freshEngagement(
+      resolveNew(),
+      "CL-1",
+      "Earlier audit",
+      "user-lead",
+    );
     e.rulePack = { ...stamp2026_11_1 };
     await classification.run(
       e,
@@ -140,14 +173,14 @@ describe("the engagement rule-pack stamp", () => {
 
 describe("version stamps on captured records", () => {
   it("records the rule pack and methodology versions in report snapshots", async () => {
-    const e = freshEngagement("CL-1", "New audit", "user-lead");
+    const e = freshEngagement(resolveNew(), "CL-1", "New audit", "user-lead");
     const r = await capture(e);
     expect(r.snapshot.rulePack).toEqual(stamp2026_11_2);
     expect(r.snapshot.methodologyVersion).toBe("2026.11.2");
     expect(r.clientSnapshot?.rulePack).toEqual(stamp2026_11_2);
     expect(r.clientSnapshot?.methodologyVersion).toBe("2026.11.2");
     expect(r.sha256).toBe(await sha256(JSON.stringify(r.snapshot)));
-    expect(recordVersions()).toEqual({
+    expect(recordVersions(e)).toEqual({
       rulePack: stamp2026_11_2,
       methodologyVersion: "2026.11.2",
     });
@@ -163,22 +196,30 @@ describe("version stamps on captured records", () => {
   });
 
   it("never changes an issued snapshot when the rule pack changes", async () => {
-    const e = freshEngagement("CL-1", "New audit", "user-lead");
+    const e = freshEngagement(resolveNew(), "CL-1", "New audit", "user-lead");
     const issued = await capture(e),
       frozen = JSON.stringify(issued.snapshot);
-    const saved = { ...currentRulePack };
+    // A build whose pack #1 carries a later rule pack, injected as a registry.
+    const later = structuredClone(generated) as unknown as Bundle;
+    const pack = later.documents.find(
+      (d) => d.documentType === "pack",
+    ) as PackDocument;
+    pack.methodologyVersion = "2026.12.1";
+    Object.assign(pack.compat!.catalog!.regulatorySnapshot, {
+      researchedAsOf: "2026-12-05",
+    });
+    const restore = injectRegistry(registry(later));
     try {
-      Object.assign(currentRulePack, {
+      const recaptured = await capture(e);
+      expect(recaptured.snapshot.rulePack).toMatchObject({
         version: "2026.12.1",
         researchedAsOf: "2026-12-05",
       });
-      const later = await capture(e);
-      expect(later.snapshot.rulePack).toMatchObject({ version: "2026.12.1" });
       expect(JSON.stringify(issued.snapshot)).toBe(frozen);
       expect(issued.sha256).toBe(await sha256(frozen));
       expect(e.rulePack).toEqual(stamp2026_11_2);
     } finally {
-      Object.assign(currentRulePack, saved);
+      restore();
     }
   });
 });

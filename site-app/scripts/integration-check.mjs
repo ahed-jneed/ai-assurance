@@ -302,6 +302,100 @@ try {
     user: viewer,
     status: 403,
   });
+
+  // #27: criteria pins, the read-time legacy pin and GET /api/coverage
+  // (docs/design/criteria-model.md section 16, integration harness).
+  {
+    const packKey = "eu-ai-act@02024R1689-20260727";
+    assert.equal(workspace.criteria.pin.packId, "eu-ai-act-amended");
+    assert.equal(workspace.criteria.origin, "created");
+    assert.deepEqual(workspace.criteria.features, {
+      annexIvIndex: true,
+      aiActClassification: true,
+      obligationAssessments: true,
+    });
+    assert.equal(workspace.criteria.frameworks[0].legalReviewPending, true);
+    assert.equal(
+      e.criteria.pin.packVersion,
+      workspace.criteria.pin.packVersion,
+    );
+    assert.equal(
+      workspace.selectablePacks.map((p) => p.id).join(),
+      "eu-ai-act-amended",
+    );
+    const chosen = await management("createEngagement", {
+      clientId: e.clientId,
+      title: "Criteria pack fixture",
+      packId: "eu-ai-act-amended",
+      packVersion: workspace.criteria.pin.packVersion,
+    });
+    assert.equal(chosen.details.pack.id, "eu-ai-act-amended");
+    await management(
+      "createEngagement",
+      { clientId: e.clientId, title: "Unknown pack", packId: "no-such-pack" },
+      owner,
+      400,
+    );
+    // An engagement stored before pins: no criteria and no #18 stamp.
+    const legacyId = chosen.details.engagementId;
+    await testDb
+      .prepare(
+        "UPDATE engagements SET body=json_remove(body,'$.criteria','$.rulePack') WHERE tenant_id=? AND id=?",
+      )
+      .bind(tenantId, legacyId)
+      .run();
+    const scope = new URLSearchParams({ tenantId, engagementId: legacyId });
+    const legacy = await request("/api/workspace?" + scope);
+    assert.equal(legacy.criteria.origin, "legacy");
+    assert.deepEqual(legacy.criteria.pin, workspace.criteria.pin);
+    assert.equal(legacy.catalog.methodologyVersion, "2026.11.2");
+    // Its template commands behave as before and write no pin.
+    const created = await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "createPaper",
+        data: { templateId: "WP-A09-01" },
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: legacy.engagement.version,
+      },
+    });
+    assert(created.engagement.papers.some((p) => p.templateId === "WP-A09-01"));
+    const stored = await testDb
+      .prepare(
+        "SELECT json_type(body,'$.criteria') AS criteria FROM engagements WHERE tenant_id=? AND id=?",
+      )
+      .bind(tenantId, legacyId)
+      .first();
+    assert.equal(stored.criteria, null, "M0 writes nothing to the engagement");
+    const views = await request("/api/coverage?" + scope);
+    assert.deepEqual(
+      views.views.map((v) => v.key),
+      [packKey],
+    );
+    const coverage = await request(
+      "/api/coverage?" + scope + "&framework=" + encodeURIComponent(packKey),
+    );
+    assert.equal(coverage.summary.full, 0, "Migrated links are partial");
+    assert(coverage.summary.total > 90);
+    assert(coverage.banners.some((b) => b.id === "migration"));
+    assert(coverage.banners.some((b) => b.id === "legal-review"));
+    await request("/api/coverage?" + scope + "&framework=iso-iec-42001@2023", {
+      status: 404,
+    });
+    await request("/api/coverage?" + scope, { user: viewer, status: 403 });
+    // A rule-pack stamp the index does not know fails closed.
+    await testDb
+      .prepare(
+        'UPDATE engagements SET body=json_set(body,\'$.rulePack\',json(\'{"version":"2026.12.9","legalVersion":"x","researchedAsOf":"2026-12-01","legalReview":"pending"}\')) WHERE tenant_id=? AND id=?',
+      )
+      .bind(tenantId, legacyId)
+      .run();
+    await request("/api/coverage?" + scope, { status: 500 });
+    console.log(
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, coverage views, client 403 and unknown stamps fail closed",
+    );
+  }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
     user: reviewer,
     status: 200,
@@ -2638,16 +2732,54 @@ try {
   console.log(
     "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
   );
+  // The practice's report settings (#111): a report that leaves the
+  // signatory, location and quality statement blank states them.
+  const practiceStatement =
+    "Fixture practice statement: we comply with the IESBA Code and apply ISQM 1.";
+  await management(
+    "setReportSettings",
+    {
+      signatory: reportParticulars.signatory,
+      location: reportParticulars.location,
+      qualityStatement: practiceStatement,
+    },
+    viewer,
+    403,
+  );
+  await management("setReportSettings", {
+    signatory: reportParticulars.signatory,
+    location: reportParticulars.location,
+    qualityStatement: practiceStatement,
+  });
+  assert.deepEqual(workspace.reportSettings, {
+    signatory: reportParticulars.signatory,
+    location: reportParticulars.location,
+    qualityStatement: practiceStatement,
+  });
+  assert.equal(workspace.managementEvents[0].action, "setReportSettings");
+  assert.equal(
+    JSON.parse(workspace.managementEvents[0].details).qualityStatement,
+    practiceStatement,
+  );
   await command("createReport", {
     kind: "final",
     engagementType: "attestation",
     assuranceLevel: "reasonable",
     conclusion: "adverse",
     ...reportParticulars,
+    signatory: "",
+    location: "",
     summary:
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
   const internalFinal = e.reports.at(-1);
+  assert.deepEqual(internalFinal.snapshot.particulars, {
+    ...reportParticulars,
+    qualityStatement: practiceStatement,
+  });
+  console.log(
+    "PASS practice report settings: admin-only op with a management event, blank particulars filled at capture",
+  );
   // Every pinned record is captured, past the old 1,000-record limit.
   const pinnedIds = (
     await testDb
@@ -3011,6 +3143,8 @@ try {
     "In our opinion, because of the significance",
     "Signed: Fixture Assurance GmbH",
     "Location: Vienna, Austria",
+    // The practice's quality statement, from its report settings (#111).
+    practiceStatement,
     "Results by criterion",
     "Executive summary",
     // The report date is the capture date, not the release date.
@@ -3345,6 +3479,48 @@ try {
     400,
   );
   assert(JSON.stringify(prohibitedReadiness).includes("prohibited practice"));
+  // The readiness output with gaps (#111) reports what strict readiness
+  // cannot: it must describe the gaps and is labelled as not assurance.
+  const readinessGaps = {
+    kind: "final",
+    engagementType: "readiness",
+    conclusion: "readiness_gaps",
+    ...reportParticulars,
+    basisForModification: "",
+    summary: "Readiness with the prohibited practice reported as a gap",
+  };
+  const undescribedGaps = await command(
+    "createReport",
+    readinessGaps,
+    owner,
+    400,
+  );
+  assert(JSON.stringify(undescribedGaps).includes("Describe the gaps"));
+  await command("createReport", {
+    ...readinessGaps,
+    basisForModification:
+      "The intended use falls under a prohibited practice (Art 5(1)(c)).",
+  });
+  const gapsReport = e.reports.at(-1);
+  assert.equal(
+    gapsReport.snapshot.opinion,
+    "Readiness assessment, gaps identified (not assurance)",
+  );
+  assert.equal(
+    gapsReport.clientSnapshot.conclusionStatement.notAssurance,
+    true,
+  );
+  assert.equal(
+    gapsReport.clientSnapshot.conclusionStatement.basisHeading,
+    "Gaps identified",
+  );
+  assert(
+    gapsReport.snapshot.reportTitle.includes("not an assurance report"),
+    gapsReport.snapshot.reportTitle,
+  );
+  console.log(
+    "PASS readiness assessment with gaps: captured over a prohibited practice, gaps required, labelled not assurance",
+  );
   assert.equal(
     e.reports.find((r) => r.id === internalFinal.id).snapshot.engagement
       .classification.prohibited,

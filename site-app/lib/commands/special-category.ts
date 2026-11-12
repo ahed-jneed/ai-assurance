@@ -1,7 +1,10 @@
+import type { Artifact } from "../domain";
 import { ApiError } from "../http";
 import { id, now } from "../ids";
 import {
   basisInputSchema,
+  clientPinInputSchema,
+  heldByClient,
   normalizeColumn,
   type SpecialCategoryBasis,
 } from "../special-category";
@@ -45,6 +48,52 @@ export const specialCategory = defineCommands({
           columns: b.columns,
           confirmedBy: b.confirmedBy,
           confirmedOn: b.confirmedOn,
+        },
+      };
+    },
+  },
+  /**
+   * Pins a dataset the client keeps (#102): the platform records its name,
+   * size and SHA-256 as Dataset evidence without bytes. Accepted like other
+   * evidence, only a client-local job on the client's own worker can use it.
+   */
+  pinClientDataset: {
+    roles: ["Auditor", "Lead Auditor"],
+    handle(e, d, ctx) {
+      const v = clientPinInputSchema.parse(d),
+        at = now();
+      if (v.confirmedOn > tomorrow(at))
+        throw new ApiError(400, "The client cannot confirm a pin in future");
+      if (e.artifacts.some((a) => heldByClient(a) && a.sha256 === v.sha256))
+        throw new ApiError(409, "This client-held dataset is already pinned");
+      const artifact: Artifact = {
+        id: id("EV"),
+        name: v.name,
+        category: "Dataset",
+        size: v.size,
+        sha256: v.sha256,
+        key: "",
+        createdAt: at,
+        uploadedBy: ctx.user.userId,
+        visibility: "internal",
+        status: "unverified",
+        mediaType: "text/csv",
+        custody: "client",
+        clientPin: {
+          confirmedBy: v.confirmedBy,
+          confirmedOn: v.confirmedOn,
+          custodyNote: v.custodyNote,
+        },
+      };
+      e.artifacts.push(artifact);
+      return {
+        details: {
+          artifactId: artifact.id,
+          sha256: v.sha256,
+          size: v.size,
+          custody: "client",
+          confirmedBy: v.confirmedBy,
+          confirmedOn: v.confirmedOn,
         },
       };
     },

@@ -369,6 +369,28 @@ SELECT kind,body->'$.statement' AS statement,body->'$.description' AS descriptio
 FROM decided d
 WHERE NOT review AND NOT EXISTS(SELECT 1 FROM assurance_records s WHERE s.tenant_id=?1 AND s.engagement_id=?2 AND s.kind IN ${assessmentKinds} AND json_extract(s.body,'$.supersedesId')=+d.id)
 ORDER BY created_at,id`;
+// The current obligation records, as currentAssessmentsSQL finds them, with
+// whether their latest review confirms them: the direct requirement
+// assessments of coverage (docs/design/criteria-model.md section 9.1).
+const currentObligationsSQL = currentAssessmentsSQL.replace(
+  /SELECT kind,body->[^\n]*\nFROM decided d\nWHERE NOT review/,
+  "SELECT id,json_extract(body,'$.code') AS code,json_extract(body,'$.applicability') AS applicability,json_extract(body,'$.outcome') AS outcome,decision='confirmed' AS confirmed\nFROM decided d\nWHERE kind='obligation' AND NOT review",
+);
+/** At most 1,000 current obligation records of an engagement, oldest first. */
+export async function currentObligations(ctx: Context, engagementId: string) {
+  return (
+    await db()
+      .prepare(currentObligationsSQL + " LIMIT 1000")
+      .bind(ctx.tenantId, engagementId)
+      .all<{
+        id: string;
+        code: string;
+        applicability: string;
+        outcome: string;
+        confirmed: number | null;
+      }>()
+  ).results.map((r) => ({ ...r, confirmed: !!r.confirmed }));
+}
 type AssessmentField =
   | "statement"
   | "description"

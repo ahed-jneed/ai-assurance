@@ -4,6 +4,7 @@ import {
   evidenceRequestCommand,
   EvidenceRequestError,
 } from "../evidence-requests";
+import { pinned, roleTemplate } from "../criteria/pin";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import type { CommandModule } from "./command";
@@ -18,8 +19,14 @@ export const evidenceRequests: CommandModule = {
           userId: ctx.user.userId,
           at: now(),
           id: () => id("REQ"),
-          makeLimitationPaper: () =>
-            templatePaper("MEM-EX-01", ctx.user.userId),
+          makeLimitationPaper: () => {
+            const resolved = pinned(e);
+            return templatePaper(
+              resolved,
+              roleTemplate(resolved.pack, "limitationMemo"),
+              ctx.user.userId,
+            );
+          },
         }),
       };
     } catch (error) {

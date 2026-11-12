@@ -1,4 +1,4 @@
-import type { Engagement, Role } from "./domain";
+import type { Engagement, GateFeatures, Role } from "./domain";
 import {
   checklistProblem,
   qualityReviewSignedOff,
@@ -146,6 +146,12 @@ export interface EngagementWorkOptions {
   nameOf?: (userId: string) => string | undefined;
   /** The classification rules of the rule pack served. */
   rules?: ClassificationRules;
+  /**
+   * What the engagement's criteria pack switches on (criteria model section
+   * 7.1). Without the AI Act classification there is no classification work;
+   * absent means pack #1, which has it.
+   */
+  features?: GateFeatures;
 }
 /**
  * The work an internal member sees for the engagement. `options.nameOf`
@@ -206,7 +212,10 @@ export function engagementWork(
   // #104: the classification work. A classification recorded before #19
   // loads migrated (every fact unknown, any approval withdrawn) until it is
   // recorded again; an approved one is re-reviewed once a trigger is due.
-  const c = e.classification;
+  const c =
+    options.features?.aiActClassification === false
+      ? undefined
+      : e.classification;
   if (c && awaitsReclassification(c))
     add(
       "classification",

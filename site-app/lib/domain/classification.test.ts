@@ -30,12 +30,14 @@ import {
   type Classification,
   type ClassificationInput,
 } from "./classification";
+import { resolveNew } from "../criteria/pin";
 
 const pack = asRulePack(catalog.regulatorySnapshot)!;
 const rules = classificationRules(pack);
 const at = "2026-11-06T10:00:00.000Z";
 const fresh = () =>
-  freshEngagement("CLIENT-1", "Classification", "auditor").classification;
+  freshEngagement(resolveNew(), "CLIENT-1", "Classification", "auditor")
+    .classification;
 
 /**
  * Answers every required fact the form asks "no" (SME status "neither"),

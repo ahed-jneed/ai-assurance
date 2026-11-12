@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { WorkspaceData } from "./workspace-types";
+import { packFeatures, type WorkspaceData } from "./workspace-types";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
 import { localWorkDay, workKindLabels } from "@/lib/work-inbox";
 import { linkQuery } from "@/lib/workspace-links";
@@ -346,6 +346,7 @@ export function EngagementTaskQueue({
           rules: classificationRules(
             asRulePack(data.catalog?.regulatorySnapshot),
           ),
+          features: packFeatures(data),
         },
       ),
     ).filter((i) => i.personal),

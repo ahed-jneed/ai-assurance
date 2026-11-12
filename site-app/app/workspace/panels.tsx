@@ -61,7 +61,7 @@ export const ReportWorkspace = lazy(() =>
   loadReportWorkspace().then((m) => ({ default: m.ReportWorkspace })),
 );
 export const panelFallback = (
-  <div className="loading-grid" aria-label="Loading">
+  <div className="loading-grid" role="status" aria-label="Loading">
     <Skeleton className="h-16" />
     <Skeleton className="h-80" />
   </div>

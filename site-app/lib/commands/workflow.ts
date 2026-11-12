@@ -1,5 +1,7 @@
 import { db, id, now, sha256 } from "../engagement-repo";
+import { pinned } from "../criteria/pin";
 import { templatePaper } from "../factories";
+import { seedWorkflow } from "../workflow-seed";
 import { ApiError } from "../http";
 import {
   workflowCommand,
@@ -24,7 +26,8 @@ export const workflow: CommandModule = {
           at: now(),
           id,
           sha256,
-          makePaper: (t) => templatePaper(t, ctx.user.userId),
+          makePaper: (t) => templatePaper(pinned(e), t, ctx.user.userId),
+          seedWorkflow: (at) => seedWorkflow(pinned(e), ctx.user.userId, at),
           member: (uid) =>
             db()
               .prepare(

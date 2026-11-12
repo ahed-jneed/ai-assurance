@@ -110,6 +110,32 @@ describe("GET /api/work-inbox", () => {
     ]);
   });
 
+  it("keeps an engagement whose rule-pack stamp has no criteria pack, without classification work", async () => {
+    const [legacy, unknown] = engagements();
+    legacy.classification = {
+      ...legacy.classification,
+      model: undefined,
+      answers: undefined,
+      status: "approved",
+      approvedBy: "reviewer",
+    };
+    unknown.classification = legacy.classification;
+    const { sqlite } = await practice([legacy, unknown]);
+    sqlite
+      .prepare(
+        `UPDATE engagements SET body=json_set(json_remove(body,'$.criteria'),'$.rulePack',json('{"version":"2026.12.9","legalVersion":"x","researchedAsOf":"2026-12-01","legalReview":"pending"}')) WHERE id='ENG-B'`,
+      )
+      .run();
+    const { status, body } = await inbox();
+    expect(status).toBe(200);
+    expect(
+      body.items
+        .filter((i) => i.kind === "classification")
+        .map((i) => i.engagementId),
+    ).toEqual(["ENG-A"]);
+    expect(body.items.some((i) => i.engagementId === "ENG-B")).toBe(true);
+  });
+
   it("keeps the queue when one engagement's body is not JSON", async () => {
     const { sqlite } = await practice(engagements());
     sqlite.prepare("UPDATE engagements SET body='[' WHERE id='ENG-B'").run();

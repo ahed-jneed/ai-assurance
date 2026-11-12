@@ -1,22 +1,35 @@
-// New records built from the methodology catalog: working papers from a
-// template and engagements in their initial state.
-import catalog from "./catalog.json";
+// New records built from the engagement's criteria pack: working papers from
+// a template of the pinned pack and engagements in their initial state.
 import { templateCriterion } from "./catalog-criteria";
+import {
+  aiActFramework,
+  displayRefs,
+  item,
+  packRulePack,
+  type Resolved,
+} from "./criteria/projection";
+import type { CriteriaPin } from "./criteria/types";
 import type { Engagement, Paper } from "./domain";
 import { id, now } from "./ids";
 import { ApiError } from "./http";
-import { currentRulePack } from "./rule-pack-current";
 import { seedWorkflow } from "./workflow-seed";
-export function templatePaper(templateId: string, userId: string): Paper {
-  const t = catalog.items.find((t) => t.id === templateId);
+
+/** A paper from a template of the pinned pack; 400 for an unknown template. */
+export function templatePaper(
+  resolved: Pick<Resolved, "pack" | "frameworks">,
+  templateId: string,
+  userId: string,
+): Paper {
+  const t = item(resolved.pack, templateId);
   if (!t) throw new ApiError(400, "Unknown methodology template");
+  const refs = displayRefs(resolved, t);
   return {
     id: id("WP"),
     templateId: t.id,
     title: t.title,
     kind: t.kind,
     stage: t.stage,
-    articleRefs: t.regulatoryRefs,
+    articleRefs: refs,
     required:
       t.kind === "working_paper" && t.stage !== "Remediation and Monitoring",
     revision: 1,
@@ -28,7 +41,7 @@ export function templatePaper(templateId: string, userId: string): Paper {
     body: {
       objective: t.objective,
       scope: "",
-      criteria: templateCriterion(t),
+      criteria: templateCriterion({ ...t, regulatoryRefs: refs }),
       procedures: "",
       sampling: "",
       results: "",
@@ -44,14 +57,26 @@ export function templatePaper(templateId: string, userId: string): Paper {
     history: [],
   };
 }
+
+/**
+ * A new engagement pinned to a criteria pack. Every engagement carries a
+ * classification, so every build can read every aggregate; on a pack
+ * without features.aiActClassification it is inert, and its version and
+ * date are empty without an AI Act criteria set (design section 7.1). Only
+ * a pack with an AI Act criteria set stamps the #18 rule pack.
+ */
 export function freshEngagement(
+  resolved: Resolved & { pin: CriteriaPin },
   clientId: string,
   title: string,
   userId: string,
   structured = false,
 ): Engagement {
+  const at = now();
+  const aiAct = aiActFramework(resolved);
+  const rulePack = packRulePack(resolved);
   return {
-    ...(structured ? { workflow: seedWorkflow(userId, now()) } : {}),
+    ...(structured ? { workflow: seedWorkflow(resolved, userId, at) } : {}),
     id: id("ENG"),
     clientId,
     title,
@@ -68,18 +93,25 @@ export function freshEngagement(
       intendedPurpose: "",
       rationale: "",
       status: "provisional",
-      version: currentRulePack.legalVersion,
-      asOf: currentRulePack.researchedAsOf,
+      version: aiAct?.edition ?? "",
+      asOf: aiAct?.researchedAsOf ?? "",
       model: 2,
       answers: {},
       history: [],
     },
-    rulePack: { ...currentRulePack },
+    ...(rulePack ? { rulePack } : {}),
+    criteria: {
+      pin: { ...resolved.pin },
+      pinnedAt: at,
+      pinnedBy: userId,
+      origin: "created",
+      history: [],
+    },
     papers: structured
       ? []
-      : catalog.items
+      : resolved.pack.items
           .filter((t) => t.kind === "working_paper")
-          .map((t) => templatePaper(t.id, userId)),
+          .map((t) => templatePaper(resolved, t.id, userId)),
     artifacts: [],
     evidenceRequests: [],
     models: [],
@@ -87,6 +119,6 @@ export function freshEngagement(
     runs: [],
     reports: [],
     eventHead: "0".repeat(64),
-    createdAt: now(),
+    createdAt: at,
   };
 }

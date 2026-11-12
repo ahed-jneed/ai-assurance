@@ -1,0 +1,190 @@
+/* Criteria packs (docs/design/criteria-model.md section 15.1). */
+.pack-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #e3e2de;
+  border-radius: 3px;
+  padding: 1px 7px;
+  font-size: 14px;
+  color: #37352f;
+  background: #fbfbfa;
+}
+.pack-choice {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.pack-choice legend {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.pack-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid #e3e2de;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.pack-option input {
+  margin-top: 4px;
+}
+.pack-card {
+  display: grid;
+  gap: 2px;
+}
+.pack-card .block {
+  display: block;
+}
+.pack-card .badge {
+  margin-left: 6px;
+}
+
+/* Criteria coverage heatmap (docs/design/criteria-model.md section 15.2).
+   States differ by pattern and text, never colour alone; "Not mapped" is
+   neutral grey, never red. */
+.criteria-coverage .content-pad {
+  display: grid;
+  gap: 10px;
+}
+.coverage-views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.coverage-views button {
+  border: 1px solid #e3e2de;
+  border-radius: 4px;
+  padding: 2px 10px;
+  background: #fff;
+}
+.coverage-views button[aria-pressed="true"] {
+  background: #37352f;
+  color: #fff;
+}
+.coverage-summary {
+  margin: 0;
+  font-size: 14px;
+}
+.coverage-banner {
+  margin: 0;
+  border-left: 3px solid #d9a53f;
+  padding: 4px 10px;
+  background: #fbf3db;
+  font-size: 14px;
+}
+.coverage-banner-migration,
+.coverage-banner-crosswalk {
+  border-left-color: #9b9a97;
+  background: #f7f6f3;
+}
+.coverage-filter {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.coverage-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+}
+.coverage-rows {
+  display: grid;
+  gap: 12px;
+}
+.coverage-row-head {
+  display: grid;
+  gap: 2px;
+}
+.coverage-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.coverage-tile {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid #c9c7c2;
+  border-radius: 3px;
+  background: #fff;
+  color: #37352f;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+}
+.coverage-tile:focus-visible {
+  outline: 2px solid #2f6fdb;
+  outline-offset: 1px;
+}
+.coverage-ref {
+  font-weight: 600;
+}
+.coverage-tile.state-full {
+  background: #e5eee7;
+  border-color: #376a48;
+  border-width: 2px;
+}
+.coverage-tile.state-partial {
+  background: repeating-linear-gradient(
+    135deg,
+    #eef3ef,
+    #eef3ef 4px,
+    #fff 4px,
+    #fff 8px
+  );
+  border-color: #6b8f74;
+}
+.coverage-tile.state-exception {
+  background: #f7e4e2;
+  border-color: #b4432f;
+  border-style: double;
+  border-width: 3px;
+}
+.coverage-tile.state-open {
+  background: #fbf3db;
+  border-color: #b08620;
+  border-style: dotted;
+  border-width: 2px;
+}
+.coverage-tile.state-parent_only {
+  background: #f7f6f3;
+  border-color: #9b9a97;
+  border-style: dashed;
+}
+.coverage-tile.state-unmapped {
+  background: #f1f1ef;
+  border-color: #d3d1cb;
+  color: #787774;
+}
+.coverage-tile.state-excluded {
+  color: #787774;
+  text-decoration: line-through;
+}
+.coverage-tile.state-not_applicable {
+  color: #787774;
+  font-style: italic;
+}
+.coverage-drawer-body {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+}
+.coverage-drawer-body ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
+}
+.coverage-drawer-body .block {
+  display: block;
+}

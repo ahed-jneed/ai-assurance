@@ -24,6 +24,7 @@ import {
   type Report,
   type Role,
 } from "@/lib/domain";
+import type { GateFeatures } from "@/lib/domain";
 import {
   opinionLabel,
   termsLabel,
@@ -61,6 +62,8 @@ type Props = {
   query: RegisterQuery;
   onQuery: (patch: Partial<RegisterQuery>) => void;
   onReset: () => void;
+  /** What the engagement's criteria pack switches on (the classification gate). */
+  features?: GateFeatures;
 };
 
 export function ReportWorkspace({
@@ -82,11 +85,12 @@ export function ReportWorkspace({
   query,
   onQuery,
   onReset,
+  features,
 }: Props) {
   const clientView = ["Client Viewer", "Client Contributor"].includes(role),
     lead = role === "Lead Auditor",
     qualityReviewer = role === "Engagement Quality Reviewer";
-  const gates = clientView ? [] : finalReportGates(e, terms);
+  const gates = clientView ? [] : finalReportGates(e, terms, features);
   const next =
     gates.find((g) => g.kind === "workflow") ??
     gates.find((g) => g.kind !== "stage") ??
@@ -491,6 +495,7 @@ export function ReportWorkspace({
             onGate={onGate}
             onAudience={lead ? onAudience : undefined}
             busy={busy}
+            features={features}
           />
         </TabsContent>
         <TabsContent value="quality">

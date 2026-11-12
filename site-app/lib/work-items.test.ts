@@ -10,11 +10,12 @@ import type { Engagement, Role } from "./domain";
 import { freshEngagement } from "./factories";
 import { asRulePack } from "./rule-pack";
 import { workKindLabels } from "./work-inbox";
+import { resolveNew } from "./criteria/pin";
 
 const today = "2026-11-05";
 /** A selected, applicable, assigned and overdue procedure from the catalog. */
 function planned(templateId: string, overrides: Partial<Procedure> = {}) {
-  const p = seedWorkflow("lead", at).procedures.find(
+  const p = seedWorkflow(resolveNew(), "lead", at).procedures.find(
     (p) => p.templateId === templateId,
   );
   if (!p) throw new Error("Unknown template " + templateId);
@@ -91,7 +92,12 @@ describe("classification work (#104)", () => {
     });
   /** An approved classification under the rule pack served, for a provider. */
   function approved(overrides: Partial<Engagement["classification"]> = {}) {
-    const c = freshEngagement("client", "E", "auditor").classification;
+    const c = freshEngagement(
+      resolveNew(),
+      "client",
+      "E",
+      "auditor",
+    ).classification;
     return engagement({
       classification: {
         ...c,
@@ -105,6 +111,25 @@ describe("classification work (#104)", () => {
       },
     });
   }
+
+  it("gives no classification work on a pack without the AI Act classification", () => {
+    const off = { features: { aiActClassification: false } };
+    expect(
+      engagementWork(migrated(), "Auditor", "auditor", "", today, off).filter(
+        (i) => i.kind === "classification",
+      ),
+    ).toEqual([]);
+    expect(
+      engagementWork(
+        approved({ rulePackVersion: "2000.1.1" }),
+        "Auditor",
+        "auditor",
+        "",
+        today,
+        { rules, ...off },
+      ).filter((i) => i.kind === "classification"),
+    ).toEqual([]);
+  });
 
   it("asks a migrated pre-#19 approval to be reclassified", () => {
     const e = migrated();
@@ -182,7 +207,7 @@ describe("classification work (#104)", () => {
       pkg(
         "R-2",
         "2026-11-06T10:00:00.000Z",
-        freshEngagement("client", "E", "auditor").classification,
+        freshEngagement(resolveNew(), "client", "E", "auditor").classification,
       ),
     ];
     const reports = classificationTasks(e, "Lead Auditor", "lead").filter(
