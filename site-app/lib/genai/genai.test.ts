@@ -294,6 +294,26 @@ describe("the GenAI readiness gate", () => {
     ]);
   });
 
+  it.each(["genai_attack_success", "genai_marking", "genai_paired_difference"])(
+    "needs a standard error on every deciding member, %s too",
+    async (kind) => {
+      const without = await variant((c) => {
+        c.criteria[0].kind = kind;
+        c.criteria[0].members[0].seIid = null;
+      });
+      expect(codes(await context(without))).toEqual(["genai_interval_missing"]);
+      // A paired difference states its standard error as sePaired.
+      const paired = await variant((c) => {
+        c.criteria[0].kind = kind;
+        Object.assign(c.criteria[0].members[0], {
+          seIid: null,
+          sePaired: 0.04,
+        });
+      });
+      expect(codes(await context(paired))).toEqual([]);
+    },
+  );
+
   it("blocks agentic runs whose tool permissions are unknown", async () => {
     const text = await variant((c) => {
       c.runs[0].runMetadata.tools = {

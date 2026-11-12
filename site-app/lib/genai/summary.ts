@@ -336,7 +336,9 @@ export function genaiSummary(
               method: m.interval.method,
             }
           : null,
-        se: num(m.seIid ?? m.se),
+        // Proportion members (mean, attack success, pass^k, marking) carry
+        // seIid; a paired difference carries sePaired.
+        se: num(m.seIid ?? m.sePaired ?? m.se),
         seCluster: num(m.seCluster),
         nEff: num(m.nEff),
         pValue: num(m.pValue),

@@ -228,7 +228,8 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
       block("genai_below_minimum_items", { criterionId: k.id });
     if (reasons.has("run_incomplete"))
       block("genai_run_incomplete", { criterionId: k.id });
-    const needsSe = k.kind === "genai_mean" || k.kind === "genai_pass_k";
+    // Every deciding member needs an interval and a standard error (design
+    // 12.3): the engine gives each criterion kind one (seIid, or sePaired).
     if (
       !k.members.length ||
       k.members.some(
@@ -236,7 +237,7 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
           !m.interval ||
           m.interval.lower == null ||
           m.interval.upper == null ||
-          (needsSe && m.se == null),
+          m.se == null,
       )
     )
       block("genai_interval_missing", { criterionId: k.id });
