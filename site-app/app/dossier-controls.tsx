@@ -9,10 +9,40 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { assuranceRecords } from "@/lib/assurance-store-client";
+import { describeScope, type DossierScope } from "@/lib/dossier-scope";
 type CapturedEvidence = { id: string; name: string; status: string };
-type SealedDossier = { files: number; keyId: string; publicKeySPKI: string };
+type SealedDossier = {
+  files: number;
+  keyId: string;
+  publicKeySPKI: string;
+  scope?: DossierScope;
+  scopeSha256?: string;
+};
+/** What a scoped export (#83) can select by, from the captured report. */
+type ScopeChoices = {
+  procedures: { id: string; title: string }[];
+  kinds: { kind: string; count: number }[];
+  pinned: number;
+};
+type ScopeDraft = {
+  procedureIds: string[];
+  recordKinds: string[];
+  from: string;
+  to: string;
+  withholdEvidence: boolean;
+};
+const emptyDraft: ScopeDraft = {
+  procedureIds: [],
+  recordKinds: [],
+  from: "",
+  to: "",
+  withholdEvidence: false,
+};
+const toggled = (list: string[], value: string, on: boolean) =>
+  on ? [...list, value] : list.filter((x) => x !== value);
 export function DossierControls({
   tenantId,
   engagementId,
@@ -29,6 +59,9 @@ export function DossierControls({
     [withheld, setWithheld] = useState<Record<string, string>>({});
   const [role, setRole] = useState(""),
     [sealed, setSealed] = useState<Record<string, SealedDossier>>({}),
+    [scopedSeals, setScopedSeals] = useState<SealedDossier[]>([]),
+    [choices, setChoices] = useState<ScopeChoices | null>(null),
+    [draft, setDraft] = useState<ScopeDraft>(emptyDraft),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const q = new URLSearchParams({ tenantId, engagementId, reportId });
@@ -51,14 +84,20 @@ export function DossierControls({
             engagementId,
             kind: "dossier",
           });
-          if (active)
-            setSealed(
-              Object.fromEntries(
-                dossiers
-                  .filter((x) => x.body.reportId === reportId)
-                  .map((x) => [x.body.audience, x.body]),
-              ),
-            );
+          if (!active) return;
+          const ofReport = dossiers.filter((x) => x.body.reportId === reportId);
+          setSealed(
+            Object.fromEntries(
+              ofReport
+                .filter((x) => !x.body.scopeSha256)
+                .map((x) => [x.body.audience, x.body]),
+            ),
+          );
+          setScopedSeals(
+            ofReport
+              .filter((x) => x.body.scopeSha256)
+              .map((x) => x.body as SealedDossier),
+          );
         }
       })
       .catch(() => {});
@@ -77,9 +116,13 @@ export function DossierControls({
         v = (await r.json()) as {
           error?: string;
           engagement: {
+            workflow?: { procedures: { id: string; title: string }[] };
             reports: {
               id: string;
-              snapshot?: { evidence?: CapturedEvidence[] };
+              snapshot?: {
+                evidence?: CapturedEvidence[];
+                assurancePins?: { id: string; kind?: string }[];
+              };
               clientSnapshot?: { evidence?: CapturedEvidence[] };
             }[];
           };
@@ -89,8 +132,24 @@ export function DossierControls({
       const report = v.engagement.reports.find((r) => r.id === reportId)!;
       setCaptured({
         internal: report.snapshot?.evidence ?? [],
+        scoped: report.snapshot?.evidence ?? [],
         client: report.clientSnapshot?.evidence ?? [],
       });
+      const pins = report.snapshot?.assurancePins ?? [],
+        kinds = new Map<string, number>();
+      for (const p of pins)
+        if (p.kind) kinds.set(p.kind, (kinds.get(p.kind) ?? 0) + 1);
+      setChoices({
+        procedures: (v.engagement.workflow?.procedures ?? []).map((p) => ({
+          id: p.id,
+          title: p.title,
+        })),
+        kinds: [...kinds]
+          .map(([kind, count]) => ({ kind, count }))
+          .sort((x, y) => x.kind.localeCompare(y.kind)),
+        pinned: pins.length,
+      });
+      setDraft(emptyDraft);
       setWithheld({});
       setAudience(a);
     } catch (x) {
@@ -103,6 +162,26 @@ export function DossierControls({
     setBusy(true);
     setError("");
     try {
+      const scoped = audience === "scoped",
+        scope = scoped
+          ? {
+              ...(draft.procedureIds.length
+                ? { procedureIds: draft.procedureIds }
+                : {}),
+              ...(draft.recordKinds.length
+                ? { recordKinds: draft.recordKinds }
+                : {}),
+              ...(draft.from || draft.to
+                ? {
+                    period: {
+                      from: draft.from || draft.to,
+                      to: draft.to || draft.from,
+                    },
+                  }
+                : {}),
+              evidence: draft.withholdEvidence ? "withheld" : "included",
+            }
+          : undefined;
       const r = await fetch("/api/dossier", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -110,11 +189,12 @@ export function DossierControls({
             tenantId,
             engagementId,
             reportId,
-            audience,
+            audience: scoped ? "internal" : audience,
             withheld: Object.entries(withheld).map(([id, reason]) => ({
               id,
               reason,
             })),
+            ...(scope ? { scope } : {}),
           }),
         }),
         v = (await r.json()) as {
@@ -122,7 +202,13 @@ export function DossierControls({
           record: { body: SealedDossier };
         };
       if (!r.ok) throw Error(v.error);
-      setSealed({ ...sealed, [audience]: v.record.body });
+      if (scoped)
+        setScopedSeals((list) =>
+          list.some((s) => s.scopeSha256 === v.record.body.scopeSha256)
+            ? list
+            : [...list, v.record.body],
+        );
+      else setSealed({ ...sealed, [audience]: v.record.body });
       setAudience("");
       await onRefresh?.();
     } catch (x) {
@@ -167,6 +253,45 @@ export function DossierControls({
           )}
         </div>
       ))}
+      {!client && (
+        <div className="scoped-dossiers">
+          {role === "Lead Auditor" && (
+            <div className="row-actions">
+              <Button
+                disabled={busy}
+                variant="outline"
+                onClick={() => void prepare("scoped")}
+              >
+                <ShieldCheck size={15} />
+                Seal scoped internal export
+              </Button>
+              <small className="subtle">
+                For a large audit file: by procedure, period or record type.
+              </small>
+            </div>
+          )}
+          {scopedSeals.map((s) => (
+            <div className="row-actions" key={s.scopeSha256}>
+              <a
+                className="download-link"
+                href={
+                  "/api/dossier?" +
+                  q +
+                  "&audience=internal&scope=" +
+                  s.scopeSha256
+                }
+              >
+                <Download size={15} />
+                Download scoped export
+              </a>
+              <small className="subtle">
+                {s.scope ? describeScope(s.scope) : "Scoped export"} · {s.files}{" "}
+                verified files · key {s.keyId}
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -207,10 +332,15 @@ export function DossierControls({
       >
         <DialogContent className="audit-dialog workbench-dialog">
           <DialogHeader>
-            <DialogTitle>Seal {audience} dossier</DialogTitle>
+            <DialogTitle>
+              {audience === "scoped"
+                ? "Seal scoped internal export"
+                : "Seal " + audience + " dossier"}
+            </DialogTitle>
             <DialogDescription>
-              Verify included bytes and explain any evidence retained outside
-              this dossier. The sealed export is immutable.
+              {audience === "scoped"
+                ? "Include only the pinned assurance records within a scope. The signed manifest states the scope and how many of the report's pinned records it includes."
+                : "Verify included bytes and explain any evidence retained outside this dossier. The sealed export is immutable."}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -221,10 +351,118 @@ export function DossierControls({
           >
             <fieldset disabled={busy}>
               <p className="subtle">
-                Maximum included payload: 30 MB. Evidence exclusions reduce
-                portability and remain explicit in the signed manifest.
+                Maximum included payload: 30 MB and 500 files. Evidence
+                exclusions reduce portability and remain explicit in the signed
+                manifest.
               </p>
-              {(captured[audience] ?? [])
+              {audience === "scoped" && choices && (
+                <div className="dossier-scope">
+                  <p className="subtle">
+                    The report pins {choices.pinned} assurance records. Every
+                    part you choose must hold; leave a part empty to include
+                    all.
+                  </p>
+                  {choices.procedures.length > 0 && (
+                    <fieldset>
+                      <legend>Procedures</legend>
+                      {choices.procedures.map((p) => (
+                        <label className="check-row" key={p.id}>
+                          <input
+                            type="checkbox"
+                            checked={draft.procedureIds.includes(p.id)}
+                            onChange={(ev) =>
+                              setDraft({
+                                ...draft,
+                                procedureIds: toggled(
+                                  draft.procedureIds,
+                                  p.id,
+                                  ev.target.checked,
+                                ),
+                              })
+                            }
+                          />
+                          <span>
+                            {p.title}
+                            <small className="block subtle">{p.id}</small>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                  <fieldset>
+                    <legend>Record types</legend>
+                    {choices.kinds.map((k) => (
+                      <label className="check-row" key={k.kind}>
+                        <input
+                          type="checkbox"
+                          checked={draft.recordKinds.includes(k.kind)}
+                          onChange={(ev) =>
+                            setDraft({
+                              ...draft,
+                              recordKinds: toggled(
+                                draft.recordKinds,
+                                k.kind,
+                                ev.target.checked,
+                              ),
+                            })
+                          }
+                        />
+                        <span>
+                          {k.kind.replace(/_/g, " ")}{" "}
+                          <small className="subtle">({k.count})</small>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                  <div className="workbench-form-grid">
+                    <label className="workbench-field">
+                      Created from (UTC)
+                      <Input
+                        type="date"
+                        value={draft.from}
+                        max={draft.to || undefined}
+                        onChange={(ev) =>
+                          setDraft({ ...draft, from: ev.target.value })
+                        }
+                      />
+                    </label>
+                    <label className="workbench-field">
+                      Created to (UTC, inclusive)
+                      <Input
+                        type="date"
+                        value={draft.to}
+                        min={draft.from || undefined}
+                        onChange={(ev) =>
+                          setDraft({ ...draft, to: ev.target.value })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={draft.withholdEvidence}
+                      onChange={(ev) =>
+                        setDraft({
+                          ...draft,
+                          withholdEvidence: ev.target.checked,
+                        })
+                      }
+                    />
+                    <span>
+                      Withhold evidence bytes
+                      <small className="block subtle">
+                        Each accepted source is listed as withheld with its
+                        SHA-256.
+                      </small>
+                    </span>
+                  </label>
+                </div>
+              )}
+              {(audience === "scoped" && draft.withholdEvidence
+                ? []
+                : (captured[audience] ?? [])
+              )
                 .filter((a) => a.status === "accepted")
                 .map((a) => (
                   <div className="record-item" key={a.id}>

@@ -57,7 +57,7 @@ const kindPattern = /^[a-z_]{1,40}$/;
 // (created_at, id) order: the review of its kind whose subject
 // (assertionId ?? impactId ?? obligationId, as in memory) is `r.id`. The
 // subject expression and the kind list repeat idx_review_subject's
-// (migration 0012) exactly, so this is one index lookup per assessment;
+// (migration 0013) exactly, so this is one index lookup per assessment;
 // `+r.id` drops the column's text affinity, which the index expression does
 // not have and which would otherwise keep the subject out of the lookup.
 const latestReview = `(SELECT CASE WHEN json_extract(v.body,'$.decision') IN ('approve','confirmed') THEN 'Confirmed' ELSE 'Returned' END

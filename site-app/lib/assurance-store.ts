@@ -244,17 +244,23 @@ export async function briefingExport(
   return row ? parsed(row) : undefined;
 }
 /** The dossier sealed for this report and audience (at most one exists). */
+/**
+ * The first dossier sealed for a report, audience and scope (#83): the full
+ * dossier when `scopeSha256` is null, which seals from before scoped exports
+ * (no scopeSha256 in their body) are.
+ */
 export async function dossierSeal(
   ctx: Context,
   engagementId: string,
   reportId: string,
   audience: string,
+  scopeSha256: string | null = null,
 ) {
   const row = await db()
     .prepare(
-      "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind='dossier' AND json_extract(body,'$.reportId')=? AND json_extract(body,'$.audience')=? ORDER BY created_at,id LIMIT 1",
+      "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind='dossier' AND json_extract(body,'$.reportId')=? AND json_extract(body,'$.audience')=? AND COALESCE(json_extract(body,'$.scopeSha256'),'')=? ORDER BY created_at,id LIMIT 1",
     )
-    .bind(ctx.tenantId, engagementId, reportId, audience)
+    .bind(ctx.tenantId, engagementId, reportId, audience, scopeSha256 ?? "")
     .first<RecordRow>();
   return row ? parsed(row) : undefined;
 }
@@ -365,6 +371,37 @@ export async function assurancePins(ctx: Context, engagementId: string) {
       .bind(ctx.tenantId, engagementId)
       .all<{ id: string; kind: string; sha256: string }>()
   ).results.map((r) => ({ id: r.id, kind: r.kind, sha256: r.sha256 }));
+}
+/**
+ * The kind, creation time and procedure of every record a report could pin,
+ * by id: what a scoped dossier (#83) selects pinned records by. Returns no
+ * record body.
+ */
+export async function pinnedRecordFacts(ctx: Context, engagementId: string) {
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT id,kind,created_at,json_extract(body,'$.procedureId') AS procedure_id FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind NOT IN " +
+          unpinnedKinds,
+      )
+      .bind(ctx.tenantId, engagementId)
+      .all<{
+        id: string;
+        kind: string;
+        created_at: string;
+        procedure_id: unknown;
+      }>()
+  ).results;
+  return new Map(
+    rows.map((r) => [
+      r.id,
+      {
+        kind: r.kind,
+        createdAt: r.created_at,
+        procedureId: typeof r.procedure_id === "string" ? r.procedure_id : null,
+      },
+    ]),
+  );
 }
 // Every current assessment (no assessment supersedes it) with whether its
 // latest review of the matching kind approves it: currentAssessments and
