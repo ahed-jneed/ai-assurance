@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
@@ -8,6 +8,20 @@ const base = process.argv[2] ?? "http://127.0.0.1:5173";
 // Scoped dossiers are checked with the separately reviewed verifier
 // (`python -m engine.assurance verify`); ASSURANCE_TEST_PYTHON names the Python.
 const python = process.env.ASSURANCE_TEST_PYTHON ?? "python";
+// lib/assurance-core.ts canonical(): sorted keys, no whitespace.
+const canonicalJson = (value) =>
+  value === null || typeof value !== "object"
+    ? JSON.stringify(value)
+    : Array.isArray(value)
+      ? "[" + value.map(canonicalJson).join(",") + "]"
+      : "{" +
+        Object.keys(value)
+          .sort()
+          .map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k]))
+          .join(",") +
+        "}";
+const manifestDigest = (manifest) =>
+  createHash("sha256").update(canonicalJson(manifest)).digest("hex");
 const verifyDossier = (dossierPath, trustPath) =>
   new Promise((resolve, reject) => {
     const child = spawn(
@@ -3289,11 +3303,33 @@ try {
       );
       const verified = await verifyDossier(dossierPath, trustPath);
       assert.equal(verified.code, 0, s.name + ": " + verified.out);
-      assert.equal(JSON.parse(verified.out).outcome, "pass");
-      // Presenting it as a wider scope breaks the signature.
+      const proof = JSON.parse(verified.out);
+      assert.equal(proof.outcome, "pass");
+      // The verifier states the scope, so a part never reads as the whole file.
+      assert.deepEqual(proof.scope, dossier.manifest.scope);
+      assert(
+        proof.limitations.some((l) =>
+          l.startsWith(
+            "Scoped export: includes " +
+              s.ids.length +
+              " of " +
+              pins.length +
+              " pinned assurance records",
+          ),
+        ),
+        verified.out,
+      );
+      // Presenting it as a wider scope, with a consistent manifest digest,
+      // breaks the signature itself.
+      assert.equal(manifestDigest(dossier.manifest), dossier.manifestSha256);
       dossier.manifest.scope.period = { from: "2000-01-01", to: day(1) };
+      dossier.manifestSha256 = manifestDigest(dossier.manifest);
       await fs.writeFile(dossierPath, JSON.stringify(dossier));
-      assert.notEqual((await verifyDossier(dossierPath, trustPath)).code, 0);
+      const widened = await verifyDossier(dossierPath, trustPath);
+      assert.notEqual(widened.code, 0);
+      assert.deepEqual(JSON.parse(widened.out).errors, [
+        "Ed25519 signature verification failed",
+      ]);
     }
   } finally {
     await fs.rm(temp, { recursive: true, force: true });

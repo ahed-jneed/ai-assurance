@@ -291,34 +291,31 @@ export async function buildDossier(
       bytes(JSON.stringify(p)),
       "application/json",
     );
-  {
-    const pins = selected;
-    // A hundred pinned records per query: a query per record would pass D1's
-    // per-request query limit on a large engagement.
-    for (let start = 0; start < pins.length; start += 100) {
-      const chunk = pins.slice(start, start + 100),
-        stored = await storedBodies(
-          ctx,
-          e.id,
-          chunk.map((pin) => pin.id),
+  // A hundred pinned records per query: a query per record would pass D1's
+  // per-request query limit on a large engagement.
+  for (let start = 0; start < selected.length; start += 100) {
+    const chunk = selected.slice(start, start + 100),
+      stored = await storedBodies(
+        ctx,
+        e.id,
+        chunk.map((pin) => pin.id),
+      );
+    for (const pin of chunk) {
+      const rec = stored.get(pin.id);
+      if (
+        !rec ||
+        rec.sha256 !== pin.sha256 ||
+        (await sha256(rec.body)) !== pin.sha256
+      )
+        throw new ApiError(
+          409,
+          "Pinned assurance record unavailable or altered: " + pin.id,
         );
-      for (const pin of chunk) {
-        const rec = stored.get(pin.id);
-        if (
-          !rec ||
-          rec.sha256 !== pin.sha256 ||
-          (await sha256(rec.body)) !== pin.sha256
-        )
-          throw new ApiError(
-            409,
-            "Pinned assurance record unavailable or altered: " + pin.id,
-          );
-        await add(
-          "assurance/" + pin.id + ".json",
-          bytes(rec.body),
-          "application/json",
-        );
-      }
+      await add(
+        "assurance/" + pin.id + ".json",
+        bytes(rec.body),
+        "application/json",
+      );
     }
   }
   for (const captured of evidence) {
@@ -389,7 +386,7 @@ export async function buildDossier(
     });
   }
   const instructions =
-    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. A scoped export (the manifest's scope, from manifest 1.2) holds only the pinned assurance records within its signed scope and states how many of the report's pinned records it includes; report.json lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The platform cannot certify the audit conclusion.\n";
+    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. A scoped export (the manifest's scope, from manifest 1.2) holds only the pinned assurance records within its signed scope and states how many of the report's pinned records it includes; report.json lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The verifier reports the scope and states a scoped export as a limitation: it is not the complete audit file. The platform cannot certify the audit conclusion.\n";
   await add("README.txt", bytes(instructions), "text/plain");
   leaves.sort((a, b) => a.path.localeCompare(b.path));
   const manifest = {
