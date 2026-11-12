@@ -173,3 +173,99 @@ def ll144_audit(inp):
             row["exclusionJustification"] = mine.get(row["category"])
         tables.append({"dimension": dimension, **table, "notes": notes})
     return {"specificationVersion": SPEC_VERSION, "rate": rate, "confidenceLevel": level, "totalIndividuals": total, "medianScore": threshold, "intervalNote": INTERVAL_NOTE, "tables": tables}
+
+
+# EEO-1 Component 1 categories in the order of the DCWP examples, as site-app/lib/ll144-audit.ts declares them.
+EEO1_SEX = ["Male", "Female"]
+EEO1_RACE_ETHNICITY = ["Hispanic or Latino", "White", "Black or African American", "Native Hawaiian or Pacific Islander", "Asian", "Native American or Alaska Native", "Two or More Races"]
+
+
+def records_from_csv(text, *, rate, sex, race, outcome, selected=(), unknown=()):
+    """The records of a CSV with one row per individual, mapped as the platform's LL144 audit maps a dataset.
+
+    Blank cells and the `unknown` values (case-insensitive) are the unknown category. For selection rates a row
+    is selected when its outcome cell is one of `selected`; for scoring rates the outcome cell is the score.
+    """
+    import csv
+    import io
+
+    _require(rate in RATES, "rate must be selection or scoring")
+    _require(len({sex, race, outcome}) == 3, "mapped columns must be distinct")
+    _require(rate == "scoring" or selected, "list the outcome values that mean selected")
+    reader = csv.DictReader(io.StringIO(text))
+    missing = [c for c in (sex, race, outcome) if c not in (reader.fieldnames or [])]
+    _require(not missing, "required column missing: " + ", ".join(missing))
+    unknown_values = {v.lower() for v in unknown}
+    chosen = set(selected)
+
+    def category(value):
+        value = (value or "").strip()
+        return None if not value or value.lower() in unknown_values else value
+
+    records = []
+    for index, row in enumerate(reader):
+        cell = (row.get(outcome) or "").strip()
+        _require(cell, f"row {index + 2} has no {'outcome' if rate == 'selection' else 'score'}")
+        record = {"sex": category(row.get(sex)), "raceEthnicity": category(row.get(race))}
+        if rate == "selection":
+            record["selected"] = cell in chosen
+        else:
+            try:
+                score = float(cell)
+            except ValueError:
+                score = math.nan
+            _require(math.isfinite(score), f"row {index + 2} score is not a number")
+            record["score"] = score
+        records.append(record)
+    _require(records, "the dataset has no rows")
+    return records
+
+
+def main(argv=None):
+    """`python -m engine.ll144`: compute the LL144 tables in the client's environment, from a CSV or an input JSON."""
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(prog="python -m engine.ll144", description="NYC Local Law 144 bias audit tables (6 RCNY 5-301), as JSON.")
+    parser.add_argument("source", help="a CSV with one row per assessed individual, or with --json an LL144 input document")
+    parser.add_argument("--json", action="store_true", help="the source is an LL144 input document (rate, records, categories, exclusions)")
+    parser.add_argument("--rate", choices=RATES)
+    parser.add_argument("--sex", help="the sex column")
+    parser.add_argument("--race", help="the race/ethnicity column")
+    parser.add_argument("--outcome", help="the outcome column (selection) or score column (scoring)")
+    parser.add_argument("--selected", action="append", default=[], help="an outcome value that means selected (repeatable)")
+    parser.add_argument("--unknown", action="append", default=[], help="a cell value that means the category is unknown (repeatable)")
+    parser.add_argument("--exclusions", help="a JSON file listing {dimension, category, justification} exclusions")
+    parser.add_argument("-o", "--output", help="write the result here instead of standard output")
+    args = parser.parse_args(argv)
+    if not args.json and not (args.rate and args.sex and args.race and args.outcome):
+        parser.error("a CSV source needs --rate, --sex, --race and --outcome")
+    try:
+        with open(args.source, encoding="utf-8-sig") as handle:
+            text = handle.read()
+        if args.json:
+            inp = json.loads(text)
+        else:
+            inp = {
+                "rate": args.rate,
+                "records": records_from_csv(text, rate=args.rate, sex=args.sex, race=args.race, outcome=args.outcome, selected=args.selected, unknown=args.unknown),
+                "categories": {"sex": EEO1_SEX, "raceEthnicity": EEO1_RACE_ETHNICITY},
+            }
+            if args.exclusions:
+                with open(args.exclusions, encoding="utf-8") as handle:
+                    inp["exclusions"] = json.load(handle)
+        result = ll144_audit(inp)
+    except (OSError, ValueError) as error:
+        print("ll144: " + str(error), file=sys.stderr)
+        return 2
+    out = json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as handle:
+            handle.write(out)
+    else:
+        sys.stdout.write(out)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

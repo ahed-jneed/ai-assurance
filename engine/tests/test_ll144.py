@@ -87,6 +87,34 @@ class GoldenCases(unittest.TestCase):
         self.assertEqual([(g["group"], g["tp"] + g["fp"] + g["fn"] + g["tn"]) for g in data["groups"]], [('["F","A"]', 40), ('["F","B"]', 40), ('["M","A"]', 40), ('["M","B"]', 40)])
         self.assertEqual(data["unknownGroupRows"], 5)
 
+    def test_the_command_line_maps_a_csv_as_the_platform_does(self):
+        """`python -m engine.ll144` on LL-01 as a CSV ("Decline" and blank cells unknown) gives LL-01's tables."""
+        import contextlib
+        import io
+        import tempfile
+
+        case = next(c for c in GOLDEN["cases"] if c["id"] == "LL-01")
+        lines = ["gender,race,outcome"]
+        for r in case["input"]["records"]:
+            sex = "Decline" if r["sex"] is None else r["sex"]
+            race = r["raceEthnicity"] or ""
+            lines += [f"{sex},{race},{'advance' if r['selected'] else 'reject'}"] * r.get("count", 1)
+        expected = ll144.ll144_audit(case["input"])
+
+        def counts(result):
+            return [(t["dimension"], t["unknownCategoryCount"], {c["category"]: (c["n"], c["selected"]) for c in t["categories"] if c["n"]}) for t in result["tables"]]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            source, target = Path(tmp)/"data.csv", Path(tmp)/"out.json"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            code = ll144.main([str(source), "--rate", "selection", "--sex", "gender", "--race", "race", "--outcome", "outcome", "--selected", "advance", "--unknown", "decline", "-o", str(target)])
+            self.assertEqual(code, 0)
+            self.assertEqual(counts(json.loads(target.read_text(encoding="utf-8"))), counts(expected))
+            source.write_text("gender,race,score\nMale,Asian,high\n", encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(ll144.main([str(source), "--rate", "scoring", "--sex", "gender", "--race", "race", "--outcome", "score"]), 2)
+            self.assertIn("row 2 score is not a number", err.getvalue())
+
     def test_the_statistics_table_keeps_its_selection_shape(self):
         table = st.evaluate_ll144({"categories": [{"name": "a", "n": 0, "selected": 0}, {"name": "b", "n": 4, "selected": 2}]})
         self.assertEqual(table["referenceCategory"], "b")
