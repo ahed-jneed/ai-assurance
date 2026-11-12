@@ -45,6 +45,9 @@ describe("the NYC Local Law 144 pack", () => {
       annexIvIndex: false,
       aiActClassification: false,
       obligationAssessments: false,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
     expect(
       stageGates(e, "Fieldwork", packFeatures(e)).some(

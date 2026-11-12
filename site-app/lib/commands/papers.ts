@@ -6,7 +6,8 @@ import {
   type Paper,
 } from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
-import { pinned } from "../criteria/pin";
+import { managementSystemView, pinned } from "../criteria/pin";
+import { earlierPhasePapers } from "../domain/management-system";
 import { templatePaper } from "../factories";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
@@ -249,6 +250,15 @@ export const papers = defineCommands({
         );
       if (p.comments.some((c) => !c.resolved))
         throw new ApiError(400, "Unresolved comments block sign-off");
+      // Programme phases (#28): Stage 2 work is signed once Stage 1 is.
+      const phases = managementSystemView(pinned(e))?.phases ?? [];
+      const earlier = earlierPhasePapers(e, phases, p);
+      if (earlier.length)
+        throw new ApiError(
+          409,
+          "Sign the papers of the earlier programme phase first: " +
+            earlier.map((q) => q.templateId).join(", "),
+        );
       const hash = await sha256(
         JSON.stringify({
           body: p.body,

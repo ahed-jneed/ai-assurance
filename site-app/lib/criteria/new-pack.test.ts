@@ -117,6 +117,9 @@ describe("the EN 18286 + ISO/IEC 42001 pack, from data alone", () => {
       annexIvIndex: false,
       aiActClassification: false,
       obligationAssessments: false,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
     expect(
       completionGates(e, "readiness", undefined, features).filter(
@@ -279,7 +282,7 @@ describe("pack #1 keeps today's behaviour", () => {
     expect(r.clientSnapshot!.engagement).toHaveProperty("classification");
     expect(r.snapshot.criteriaPack).toMatchObject({
       packId: "eu-ai-act-amended",
-      packVersion: "2026.11.2",
+      packVersion: "2026.11.3",
       legalReviewPending: true,
     });
     expect(String(r.snapshot.limitations)).toMatch(

@@ -28,9 +28,13 @@ TASKS = {"multiclass": "multiclass_classification", "regression": "regression"}
 
 
 def expand(data):
-    """Rows (actual, predicted, group, score) from the case data, exactly as howToUse.rowExpansion states."""
+    """Rows (actual, predicted, group, score) from the case data, exactly as howToUse.rowExpansion states;
+    clustered data expands each cluster and adds its id in the column cluster."""
     rows = []
-    if "groups" in data:
+    if "clusters" in data:
+        for part in data["clusters"]:
+            rows += [{**row, "cluster": part["cluster"]} for row in expand(part)]
+    elif "groups" in data:
         for g in data["groups"]:
             if "selected" in g:
                 pairs = [("1", "1", g["selected"]), ("0", "0", g["n"] - g["selected"])]
@@ -55,13 +59,15 @@ def plan_configuration(case):
     data, plan = case["data"], case["plan"]
     kinds = {c["kind"] for c in plan["criteria"]}
     task = TASKS.get(data.get("kind"), "binary_classification")
+    seed = data.get("seed", 1729)
+    data = data["clusters"][0] if "clusters" in data else data
     columns = {"target": "actual", "prediction": "predicted"}
     if "groups" in data:
         columns["protected"] = "group"
     if "bins" in data:
         columns["score"] = "score"
     suite = (["performance"] if kinds - {"group_comparison"} else []) + (["fairness"] if "group_comparison" in kinds else [])
-    config = {"contractVersion": "1.3", "id": "run-" + case["id"].lower(), "engagementId": "eng-golden", "modelId": "model-golden", "datasetId": "data-golden", "task": task, "suite": suite, "seed": 1729, "columns": columns, "statistics": plan, "thresholds": {"policyId": "golden-plan", "policyVersion": "1", "source": "internal_policy", "values": {}}}
+    config = {"contractVersion": "1.3", "id": "run-" + case["id"].lower(), "engagementId": "eng-golden", "modelId": "model-golden", "datasetId": "data-golden", "task": task, "suite": suite, "seed": seed, "columns": columns, "statistics": plan, "thresholds": {"policyId": "golden-plan", "policyVersion": "1", "source": "internal_policy", "values": {}}}
     if task == "binary_classification":
         config.update(positiveLabel="1", negativeLabel="0")
     return config
@@ -80,7 +86,10 @@ def fixture_view(result, criterion):
 
     def entry(m):
         d = m["details"]
-        return {"memberId": "balanced_accuracy" if m["name"] == "macro_recall" else m["name"], "metric": d["metric"], "subject": d["subject"], "comparator": d["comparator"], "counts": d["counts"], "estimate": m["value"], "interval": m["confidenceInterval"], "band": d["band"], "status": d["status"], "direction": d["direction"], "pValue": m["pValue"], "smallCell": d["smallCell"], "fisherExactP": d["fisherExactP"], "chanceExactP": d["chanceExactP"], "reasons": d["reasons"]}
+        out = {"memberId": "balanced_accuracy" if m["name"] == "macro_recall" else m["name"], "metric": d["metric"], "subject": d["subject"], "comparator": d["comparator"], "counts": d["counts"], "estimate": m["value"], "interval": m["confidenceInterval"], "band": d["band"], "status": d["status"], "direction": d["direction"], "pValue": m["pValue"], "smallCell": d["smallCell"], "fisherExactP": d["fisherExactP"], "chanceExactP": d["chanceExactP"], "reasons": d["reasons"]}
+        if "bootstrap" in d:  # a clustered entry (section 5.11)
+            out["bootstrap"] = d["bootstrap"]
+        return out
 
     members = [entry(m) for m in metrics if m["details"]["role"] == "member"]
     descriptive = [entry(m) for m in metrics if m["details"]["role"] == "descriptive"]
@@ -156,7 +165,7 @@ class EndToEndGoldenTests(unittest.TestCase):
     def test_end_to_end_reports_validate_against_the_run_schema(self):
         from engine.tests.test_diagnostics import schema_violations
         for case in CASES:
-            if case.get("legacy") is None and case["id"] in ("GC-09", "GC-16", "GC-24", "GC-30", "GC-31", "GC-34", "GC-35"):
+            if case.get("legacy") is None and case["id"] in ("GC-09", "GC-16", "GC-24", "GC-30", "GC-31", "GC-34", "GC-35", "GC-54", "GC-55", "GC-56", "GC-57"):
                 with self.subTest(case=case["id"]):
                     self.assertEqual(schema_violations(self.report_for(case)), [])
 

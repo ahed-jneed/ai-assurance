@@ -5162,6 +5162,11 @@
         "errorSd": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "targetSd": {
+          "description": "Optional, engine only until the hosted runner mirrors it: the assumed standard deviation of the targets, which adds the mean baseline gate to the pass probability (section 8).",
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
@@ -6099,11 +6104,12 @@
           "clustered_design_requires_engine",
           "bootstrap_insufficient_valid_replicates",
           "bootstrap_budget_exceeded",
-          "small_cell_clustered"
+          "small_cell_clustered",
+          "below_minimum_cluster_count"
         ]
       },
       "minItems": 0,
-      "maxItems": 26
+      "maxItems": 27
     },
     "statisticsMetricDetails": {
       "type": "object",
@@ -6205,6 +6211,40 @@
         },
         "reasons": {
           "$ref": "#/$defs/statisticsReasons"
+        },
+        "bootstrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicates": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 10000
+            },
+            "validReplicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "clusters": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "replicates",
+            "validReplicates",
+            "clusters"
+          ]
+        },
+        "sensitivityInterval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statisticsInterval"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

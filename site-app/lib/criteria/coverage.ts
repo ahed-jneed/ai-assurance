@@ -13,10 +13,10 @@ export type SourceState =
   | "open"
   | "excluded"
   | "not_applicable";
-/** One source of evidence (section 9.1): a procedure, a paper or an obligation record. */
+/** One source of evidence (section 9.1): a procedure, a paper, an obligation record or an unresolved finding placed through its criteria (phase 2). */
 export type CoverageSource = {
   id: string;
-  kind: "procedure" | "paper" | "obligation";
+  kind: "procedure" | "paper" | "obligation" | "finding";
   state: SourceState;
   /** Concluded before the provision applies; never shown as an applicable-law result. */
   readiness: boolean;
@@ -36,7 +36,7 @@ export type CoverageSource = {
 export type Strength = "full" | "partial";
 /** How a contribution reached a node: the link path the drawer shows. */
 export type LinkPath = {
-  via: "objective" | "obligation" | "crosswalk";
+  via: "objective" | "obligation" | "finding" | "crosswalk";
   relationship: Relationship;
   rationale: Rationale;
   objectiveId?: string;

@@ -270,7 +270,10 @@ describe("withdrawn packs (case 45)", () => {
   it("caps coverage at Partly covered and says why", () => {
     const withdrawn = withSamplePack() as Bundle;
     const entry = withdrawn.index.documents.find(
-      (d) => d.documentType === "pack" && d.id === "eu-ai-act-amended",
+      (d) =>
+        d.documentType === "pack" &&
+        d.id === "eu-ai-act-amended" &&
+        d.version === withdrawn.index.defaults.pack.version,
     )!;
     Object.assign(entry, {
       status: "withdrawn",

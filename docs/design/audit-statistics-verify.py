@@ -33,6 +33,8 @@ import argparse
 import hashlib
 import json
 import math
+import operator
+import random
 import shutil
 import subprocess
 import sys
@@ -461,7 +463,10 @@ def normalize_assumptions(criterion, assumptions):
         assert abs(math.fsum(assumptions["classShares"].values()) - 1.0) <= 1e-9, "class shares must sum to 1"
         return {key: assumptions[key] for key in ("n", "classShares", "perClassRecall")}
     if kind == "regression_performance":
-        return {key: assumptions[key] for key in ("n", "errorSd")}
+        out = {key: assumptions[key] for key in ("n", "errorSd")}
+        if assumptions.get("targetSd") is not None:  # optional: models the mean baseline gate (section 8)
+            out["targetSd"] = assumptions["targetSd"]
+        return out
     raise ValueError("power assumptions are not defined for " + kind)
 
 
@@ -965,7 +970,11 @@ def library_view(entry):
 
 
 def evaluate_criterion(spec, data, level, mins):
-    alpha = 1.0 - level
+    return decide_criterion(build_criterion(spec, data, level, mins), level, mins)
+
+
+def build_criterion(spec, data, level, mins, derived=False):
+    """Members, descriptive entries and gates before the decision; the cluster bootstrap acts in between."""
     kind = spec["kind"]
     descriptive, groups = [], None
     if kind == "performance":
@@ -994,6 +1003,14 @@ def evaluate_criterion(spec, data, level, mins):
         groups, descriptive = context["groups"], context["descriptive"]
     else:
         raise ValueError(kind)
+    return {"spec": spec, "kind": kind, "members": members, "descriptive": descriptive, "groups": groups, "context": context, "invalidBand": False}
+
+
+def decide_criterion(state, level, mins):
+    alpha = 1.0 - level
+    spec, kind, members, descriptive, groups, context = state["spec"], state["kind"], state["members"], state["descriptive"], state["groups"], state["context"]
+    # Section 5.11: a clustered member with a small 2x2 cell makes no claim; its own code explains the outcome.
+    small_clustered = any("small_cell_clustered" in m["reasons"] for m in members if m["status"] != "suppressed")
     reasons = list(context["reasons"])
     if (kind in PERFORMANCE_KINDS and not spec["members"]) or (kind in ("group_comparison", "calibration") and spec["band"] is None and not spec.get("members")):
         reasons.append("no_threshold")
@@ -1021,7 +1038,7 @@ def evaluate_criterion(spec, data, level, mins):
             reasons.append("small_cell_exact_test_not_significant")
         elif p > alpha + EPS and deciding["pValue"] <= alpha + EPS:
             reasons.append("within_criterion_multiplicity")
-        elif p > alpha + EPS:
+        elif p > alpha + EPS and not small_clustered:
             reasons.append("interval_straddles_band")
     else:
         complete = bool(pool) and all(m["status"] == "evaluated" and m["direction"] == "pass" for m in pool)
@@ -1029,7 +1046,7 @@ def evaluate_criterion(spec, data, level, mins):
         if complete and not context["passBlocked"]:
             deciding = min(pool, key=lambda m: (-m["pValue"], code_point_key(m["memberId"])))
             p = deciding["pValue"]
-            if p > alpha + EPS:
+            if p > alpha + EPS and not small_clustered:
                 ungated = max(m["_pInterval"] for m in pool)  # without the chance gate of section 5.2
                 reasons.append("chance_exact_test_not_significant" if ungated <= alpha + EPS else "interval_straddles_band")
             p = max(p, context.get("baselineP", 0.0))  # the mean baseline gate (section 5.9) gates passes only
@@ -1055,7 +1072,12 @@ def aggregate(outcomes):
 def evaluate_plan(plan, data):
     level = plan["confidenceLevel"]
     alpha = 1.0 - level
-    results = [evaluate_criterion(c, data, level, plan["minimums"]) for c in plan["criteria"]]
+    if plan["clusterField"] is not None:  # section 5.11: data {"seed", "clusters": [{"cluster", ...one cluster's data}]}
+        ordered = sorted(data["clusters"], key=lambda part: cluster_key(part["cluster"]))
+        parts = [{key: value for key, value in part.items() if key != "cluster"} for part in ordered]
+        results = cluster_bootstrap_criteria(plan, [part["cluster"] for part in ordered], lambda criterion: parts, data["seed"])
+    else:
+        results = [evaluate_criterion(c, data, level, plan["minimums"]) for c in plan["criteria"]]
     for role, method, adjust in (("confirmatory", "bonferroni", bonferroni), ("exploratory", "benjamini_hochberg", benjamini_hochberg)):
         family = [r for r in results if r["decision"]["role"] == role]
         for r, adjusted in zip(family, adjust([r["decision"]["pValue"] for r in family])):
@@ -1066,6 +1088,370 @@ def evaluate_plan(plan, data):
                 d["reasons"].append("multiplicity_adjustment")
     confirmatory = [r["outcome"] for r in results if r["decision"]["role"] == "confirmatory"]
     return {"planSha256": plan_sha256(plan), "normalizedPlan": plan, "criteria": results, "overallOutcome": aggregate(confirmatory), "reviewFlags": [r["id"] for r in results if r["decision"]["role"] == "exploratory" and r["outcome"] == "fail"]}
+
+
+# ---------------------------------------------------------------- cluster bootstrap (section 5.11, engine-only)
+def _require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+MAX_DECISION_DRAWS = 50_000_000  # B x C cluster draws per run
+MIN_CLUSTERS = 10
+VALID_REPLICATE_SHARE = 0.9
+U_TOLERANCE = 1e-9
+UNBOOTSTRAPPED = frozenset(("r2", "expected_calibration_error", "baseline_rmse"))
+
+
+def cluster_key(cluster):
+    """Clusters are ordered by the UTF-8 bytes of their canonical JSON, as canonical_bytes writes it."""
+    return json.dumps(cluster, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+def quantile(ordered, probability):
+    """Type-7 (linear interpolation) quantile of an ascending list."""
+    position = (len(ordered) - 1) * probability
+    lower, upper = math.floor(position), math.ceil(position)
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+def merge_parts(parts):
+    """One criterion's data over all clusters: counts summed by group, class label or bin; regression rows and
+    Brier errors concatenated in cluster order."""
+    first = parts[0]
+    if "groups" in first:
+        cells = {}
+        for part in parts:
+            for g in part["groups"]:
+                keys = tuple(key for key in g if key != "group")
+                acc = cells.setdefault(g["group"], dict.fromkeys(keys, 0))
+                _require(set(acc) == set(keys), "a group mixes selection-only and confusion-matrix counts")
+                for key in keys:
+                    acc[key] += g[key]
+        out = {"groups": [{"group": name, **cells[name]} for name in sorted(cells, key=code_point_key)]}
+        if any("unknownGroupRows" in part for part in parts):
+            out["unknownGroupRows"] = sum(part.get("unknownGroupRows", 0) for part in parts)
+        return out
+    if "matrix" in first:
+        labels = sorted({label for part in parts for label in part["labels"]}, key=code_point_key)
+        position = {label: i for i, label in enumerate(labels)}
+        matrix = [[0] * len(labels) for _ in labels]
+        for part in parts:
+            for i, row in enumerate(part["matrix"]):
+                for j, count in enumerate(row):
+                    matrix[position[part["labels"][i]]][position[part["labels"][j]]] += count
+        return {"kind": "multiclass", "labels": labels, "matrix": matrix}
+    if "bins" in first:
+        totals = {}
+        for part in parts:
+            for b in part["bins"]:
+                cell = totals.setdefault(b["bin"], [0, 0, 0.0])
+                cell[0] += b["n"]
+                cell[1] += b["positives"]
+                cell[2] += b["n"] * b["meanScore"]
+        out = {"bins": [{"bin": index, "n": n, "positives": x, "meanScore": s / n} for index, (n, x, s) in sorted(totals.items()) if n]}
+        if any("brierErrors" in part for part in parts):
+            out["brierErrors"] = [e for part in parts for e in part.get("brierErrors", [])]
+        return out
+    out = {"kind": "regression", "errors": [e for part in parts for e in part["errors"]]}
+    if all("targets" in part for part in parts):
+        out["targets"] = [t for part in parts for t in part["targets"]]
+    return out
+
+
+class ClusterLayout:
+    """The cells of one criterion that every replicate sums: one count vector per cluster (section 5.11).
+    Performance: TP, FP, FN, TN. Multiclass: the k x k matrix. Regression: n and the sums of |e|, e^2, t - c
+    and (t - c)^2, with c the mean of all targets. Groups: each group's cells. Calibration: each bin's n,
+    positives and score sum, then the scored rows and the sum of squared score errors."""
+
+    def __init__(self, kind, merged):
+        self.kind = kind
+        if kind == "performance":
+            self.size = 4
+        elif kind == "multiclass_performance":
+            self.labels = merged["labels"]
+            self.position = {label: i for i, label in enumerate(self.labels)}
+            self.size = len(self.labels) ** 2
+        elif kind == "regression_performance":
+            targets = merged.get("targets") or [0.0] * len(merged["errors"])
+            self.centre = math.fsum(targets) / len(targets) if targets else 0.0
+            self.size = 5
+        elif kind == "group_comparison":
+            self.groups = [g["group"] for g in merged["groups"]]
+            self.cells = ("selected", "n") if any("selected" in g for g in merged["groups"]) else ("tp", "fp", "fn", "tn")
+            self.offset = {name: i * len(self.cells) for i, name in enumerate(self.groups)}
+            self.size = len(self.groups) * len(self.cells)
+        else:
+            self.bins = [b["bin"] for b in merged["bins"]]
+            self.offset = {b: 3 * i for i, b in enumerate(self.bins)}
+            self.size = 3 * len(self.bins) + 2
+
+    def vector(self, part):
+        """(this cluster's cells, its rows per unit), where a unit is the whole criterion (None), a group, a bin
+        or the scored rows ("brier"): the units whose clusters the minimum-cluster rule counts."""
+        cells = [0] * self.size
+        units = {}
+        if self.kind == "performance":
+            for g in part["groups"]:
+                for i, key in enumerate(("tp", "fp", "fn", "tn")):
+                    cells[i] += g[key]
+            units[None] = sum(cells)
+        elif self.kind == "multiclass_performance":
+            k = len(self.labels)
+            for i, row in enumerate(part["matrix"]):
+                for j, count in enumerate(row):
+                    cells[self.position[part["labels"][i]] * k + self.position[part["labels"][j]]] += count
+            units[None] = sum(cells)
+        elif self.kind == "regression_performance":
+            errors = part["errors"]
+            targets = part.get("targets") or [0.0] * len(errors)
+            shifted = [t - self.centre for t in targets]
+            cells = [len(errors), math.fsum(abs(e) for e in errors), math.fsum(e * e for e in errors), math.fsum(shifted), math.fsum(t * t for t in shifted)]
+            units[None] = len(errors)
+        elif self.kind == "group_comparison":
+            for g in part["groups"]:
+                base = self.offset[g["group"]]
+                for i, key in enumerate(self.cells):
+                    cells[base + i] += g[key]
+                units[g["group"]] = units.get(g["group"], 0) + group_rows(g)
+        else:
+            for b in part["bins"]:
+                base = self.offset[b["bin"]]
+                cells[base] += b["n"]
+                cells[base + 1] += b["positives"]
+                cells[base + 2] += b["n"] * b["meanScore"]
+                units[("bin", b["bin"])] = b["n"]
+            errors = part.get("brierErrors", [])
+            cells[-2], cells[-1] = len(errors), math.fsum(errors)
+            units["brier"] = len(errors)
+        return cells, units
+
+    def replicate(self, cells):
+        """A replicate's data in the shape the estimators read."""
+        if self.kind == "performance":
+            return dict(zip(("tp", "fp", "fn", "tn"), cells))
+        if self.kind == "multiclass_performance":
+            k = len(self.labels)
+            return {"labels": self.labels, "matrix": [cells[i * k:(i + 1) * k] for i in range(k)]}
+        if self.kind == "regression_performance":
+            return cells
+        if self.kind == "group_comparison":
+            width = len(self.cells)
+            return {name: dict(zip(self.cells, cells[self.offset[name]:self.offset[name] + width])) for name in self.groups}
+        return {"bins": {b: cells[self.offset[b]:self.offset[b] + 3] for b in self.bins}, "brier": cells[-2:]}
+
+    def units_of(self, entry):
+        if self.kind == "group_comparison":
+            return (entry["subject"], entry["comparator"])
+        if self.kind == "calibration":
+            return (("bin", int(entry["subject"][3:])),) if entry["metric"] == "calibration_gap" else ("brier",)
+        return (None,)
+
+
+def cluster_estimator(layout, entry, mins):
+    """The estimate of one member or descriptive entry on a replicate's data (None where undefined), or None
+    for the entries that keep their own interval (R2, ECE, the baseline RMSE)."""
+    metric = entry["metric"]
+    if metric in UNBOOTSTRAPPED:
+        return None
+    if layout.kind == "performance":
+        return lambda rep: binary_stat(metric, rep, mins).estimate
+    if layout.kind == "multiclass_performance":
+        return lambda rep: multiclass_stat(metric, rep, mins).estimate
+    if layout.kind == "regression_performance":
+        if metric == "mae":
+            return lambda rep: rep[1] / rep[0] if rep[0] else None
+        return lambda rep: math.sqrt(rep[2] / rep[0]) if rep[0] else None
+    if layout.kind == "group_comparison":
+        key, subject, comparator = RATE_KEYS[metric], entry["subject"], entry["comparator"]
+
+        def pair(rep):
+            (xs, ns), (xc, nc) = rate_counts(key, rep.get(subject)), rate_counts(key, rep.get(comparator))
+            if ns == 0 or nc == 0:
+                return None
+            if metric == "selection_rate_ratio":
+                return None if xc == 0 else (xs / ns) / (xc / nc)
+            return xs / ns - xc / nc
+        return pair
+    if metric == "calibration_gap":
+        index = int(entry["subject"][3:])
+        return lambda rep: (rep["bins"][index][1] - rep["bins"][index][2]) / rep["bins"][index][0] if rep["bins"][index][0] else None
+    return lambda rep: rep["brier"][1] / rep["brier"][0] if rep["brier"][0] else None
+
+
+def mean_difference(rep):
+    """mean d = MSE - SST/n on a regression replicate: the statistic of the mean baseline gate (section 5.9)."""
+    n = rep[0]
+    if n == 0:
+        return None
+    centred = rep[3] / n
+    return rep[2] / n - (rep[4] / n - centred * centred)
+
+
+def band_holds(band, direction):
+    """Whether an interval (lo, hi) lies inside the band (pass, inclusive bounds) or outside it (fail, strict)."""
+    lower, upper = band.get("lower"), band.get("upper")
+    if direction == "pass":
+        return lambda lo, hi: (lower is None or lo >= lower) and (upper is None or hi <= upper)
+    return lambda lo, hi: (lower is not None and hi < lower) or (upper is not None and lo > upper)
+
+
+def bootstrap_u_star(ordered, holds):
+    """u* = inf{u in (0, 0.5] : [q(u), q(1 - u)] decides}, by bisection to 1e-9 (section 5.11); None when even
+    the median does not decide."""
+    middle = quantile(ordered, 0.5)
+    if not holds(middle, middle):
+        return None
+    if holds(ordered[0], ordered[-1]):
+        return 0.0
+    lo, hi = 0.0, 0.5
+    while hi - lo > U_TOLERANCE:
+        mid = (lo + hi) / 2.0
+        if holds(quantile(ordered, mid), quantile(ordered, 1.0 - mid)):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def bootstrap_p(ordered, holds):
+    """p = max(2u*, 2/(B_valid + 1)), and 1 when no u decides."""
+    u = bootstrap_u_star(ordered, holds)
+    return 1.0 if u is None else max(2.0 * u, 2.0 / (len(ordered) + 1))
+
+
+def apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within):
+    """Replace an entry's analytic interval, direction and p-value by the cluster percentile bootstrap."""
+    entry.pop("_ci_at", None)
+    entry.pop("_pInterval", None)
+    entry["interval"] = None
+    entry["reasons"] = [r for r in entry["reasons"] if r != "estimate_on_band_boundary"]
+    if not descriptive:
+        entry["direction"], entry["pValue"] = "none", 1.0
+    entry["bootstrap"] = {"replicates": replicates, "validReplicates": len(values) if within else 0, "clusters": clusters}
+    if not within:
+        entry["reasons"].append("bootstrap_budget_exceeded")
+        if entry["status"] != "suppressed":
+            entry["status"] = "undefined"
+        return
+    if entry["estimate"] is None:
+        return  # undefined on the whole sample: its own status and reason stand
+    if clusters < MIN_CLUSTERS and entry["status"] == "evaluated":
+        entry["status"] = "insufficient_support"
+        entry["reasons"].append("below_minimum_cluster_count")
+    if len(values) < VALID_REPLICATE_SHARE * replicates:
+        if entry["status"] != "suppressed":
+            entry["status"] = "undefined"
+        entry["reasons"].append("bootstrap_insufficient_valid_replicates")
+        return
+    ordered = sorted(values)
+    tail = (1.0 - level) / 2.0
+    entry["interval"] = {"lower": quantile(ordered, tail), "upper": quantile(ordered, 1.0 - tail), "level": level, "method": "cluster_percentile_bootstrap"}
+
+    def ci_at(z):  # the percentile interval at the two-sided level of critical value z, for the headline
+        u = 0.5 * math.erfc(z / math.sqrt(2.0))
+        return quantile(ordered, u), quantile(ordered, 1.0 - u)
+    entry["_ci_at"] = ci_at
+    if descriptive or entry["status"] != "evaluated" or not entry["_decide"]:
+        return
+    direction = direction_of(quantile(ordered, 0.5), entry["band"])  # taken from the median replicate
+    entry["direction"] = direction
+    if direction == "none":
+        entry["reasons"].append("estimate_on_band_boundary")
+        return
+    p = bootstrap_p(ordered, band_holds(entry["band"], direction))
+    entry["pValue"] = entry["_pInterval"] = p
+    if entry["smallCell"]:  # Fisher assumes independent rows, so a small cell supports no claim either way
+        entry["pValue"] = entry["_pInterval"] = 1.0
+        entry["reasons"].append("small_cell_clustered")
+    elif direction == "pass" and entry["chanceExactP"] is not None:
+        entry["pValue"] = max(p, entry["chanceExactP"])  # the chance gate (section 5.2) stays a pass condition
+
+
+def cluster_gate(state, values, clusters, replicates, within):
+    """The mean baseline gate on the shared replicates (sections 5.9 and 5.11): p = max(2u*, 2/(B_valid + 1))
+    with u* = inf{u : q(1 - u) of mean d < 0}. The rounding rule, fewer than 10 clusters or 0.9 B valid
+    replicates, or a run beyond the budget give p = 1."""
+    entry = next(e for e in state["descriptive"] if e["metric"] == "baseline_rmse")
+    counts = entry["counts"]
+    p = 1.0
+    beaten = "meanSquaredErrorReduction" in counts and counts["meanSquaredErrorReduction"] > BASELINE_TOLERANCE * counts["meanSquaredError"]
+    if beaten and within and clusters >= MIN_CLUSTERS and len(values) >= VALID_REPLICATE_SHARE * replicates:
+        p = bootstrap_p(sorted(values), lambda lo, hi: hi < 0.0)
+    if "gatePValue" in counts:
+        counts["gatePValue"] = p
+        counts["gateMethod"] = "cluster_percentile_bootstrap"
+    state["context"]["baselineP"] = p
+
+
+def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
+    """Section 5.11: every member of a clustered plan is decided by one shared set of B cluster-bootstrap
+    replicates. Clusters come in cluster_key order; a replicate draws C indices with rng.randrange(C) from one
+    random.Random(seed) stream and sums the drawn clusters' count vectors."""
+    level, mins, derived = plan["confidenceLevel"], plan["minimums"], plan["derivedFrom"] is not None
+    replicates, count = plan["bootstrap"]["replicates"], len(cluster_ids)
+    within = replicates * count <= MAX_DECISION_DRAWS
+    states, width = [], 0
+    for spec in plan["criteria"]:
+        parts = parts_for(spec)
+        _require(len(parts) == count, "every criterion needs one data object per cluster")
+        merged = merge_parts(parts)
+        state = build_criterion(spec, merged, level, mins, derived)
+        layout = ClusterLayout(spec["kind"], merged)
+        vectors = [layout.vector(part) for part in parts]
+        clusters_in = {}
+        for _, units in vectors:
+            for unit, rows in units.items():
+                if rows:
+                    clusters_in[unit] = clusters_in.get(unit, 0) + 1
+        entries = []
+        for descriptive, items in ((False, state["members"]), (True, state["descriptive"])):
+            for entry in items:
+                estimator = cluster_estimator(layout, entry, mins)
+                if estimator is not None:
+                    entry["_decide"] = not state["invalidBand"]
+                    entries.append((entry, estimator, min(clusters_in.get(unit, 0) for unit in layout.units_of(entry)), descriptive, []))
+        gate = [] if spec["kind"] == "regression_performance" else None
+        states.append({"state": state, "layout": layout, "cells": [cells for cells, _ in vectors], "offset": width, "entries": entries, "gate": gate, "clusters": clusters_in.get(None, 0)})
+        width += layout.size
+    if within:
+        # Each cell's nonzero clusters and values: a replicate's cell is sum(multiplicity x value) over them,
+        # which equals the sum of the drawn clusters' vectors.
+        columns = [([], []) for _ in range(width)]
+        for s in states:
+            for c, cells in enumerate(s["cells"]):
+                for i, value in enumerate(cells):
+                    if value:
+                        columns[s["offset"] + i][0].append(c)
+                        columns[s["offset"] + i][1].append(value)
+        rng = random.Random(seed)
+        draw = rng.randrange
+        for _ in range(replicates):
+            multiplicity = [0] * count
+            for _ in range(count):
+                multiplicity[draw(count)] += 1
+            weight = multiplicity.__getitem__
+            dense = [sum(map(operator.mul, map(weight, clusters), values)) for clusters, values in columns]
+            for s in states:
+                rep = s["layout"].replicate(dense[s["offset"]:s["offset"] + s["layout"].size])
+                for _, estimator, _, _, values in s["entries"]:
+                    value = estimator(rep)
+                    if value is not None:
+                        values.append(value)
+                if s["gate"] is not None:
+                    value = mean_difference(rep)
+                    if value is not None:
+                        s["gate"].append(value)
+    results = []
+    for s in states:
+        for entry, _, clusters, descriptive, values in s["entries"]:
+            apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within)
+            del entry["_decide"]
+        if s["gate"] is not None:
+            cluster_gate(s["state"], s["gate"], s["clusters"], replicates, within)
+        results.append(decide_criterion(s["state"], level, mins))
+    return results
 
 
 # ---------------------------------------------------------------- power (normal approximations at assumed true values)
@@ -1153,7 +1539,24 @@ def performance_models(crit, a, n, mins):
             else:
                 q, se = sigma * sigma, math.sqrt(2.0) * sigma * sigma / math.sqrt(n)
                 models.append(power_model(metric, metric, sigma, n, lambda z, t=q, s=se, b=square_band(band): normal_probs(t, s, b, z), n >= mins["sampleSize"]))
+        if a.get("targetSd") is not None:
+            models.append(baseline_gate_model(sigma, a["targetSd"], n, mins))
     return models
+
+
+def baseline_gate_model(sigma, target_sd, n, mins):
+    """Section 8: the mean baseline gate (section 5.9) as a pass-only condition at the planned size. The model
+    is assumed to predict the conditional mean, so e and the deviation from the mean r are jointly normal with
+    Var e = sigma^2, Var r = targetSd^2 and Cov(e, r) = sigma^2: the MSE reduction is targetSd^2 - sigma^2 and
+    SD(e^2 - r^2) = sqrt(2 (targetSd^4 - sigma^4)). The gate never fails a criterion; with sigma >= targetSd it
+    never passes either."""
+    reduction = target_sd * target_sd - sigma * sigma
+    if reduction <= 0.0:
+        probs = lambda z: (0.0, 0.0)
+    else:
+        se = math.sqrt(2.0 * (target_sd ** 4 - sigma ** 4)) / math.sqrt(n)
+        probs = lambda z: (phi(reduction / se - z), 0.0)
+    return power_model("mean_baseline_gate", "baseline_rmse", target_sd, n, probs, n >= mins["sampleSize"])
 
 
 def group_models(crit, a, sizes, mins):
@@ -1444,6 +1847,54 @@ def engine_legacy(task, values):
         del config["positiveLabel"], config["negativeLabel"]
     return {"source": "engine_thresholds", "config": config}
 
+
+# GC-54 to GC-57: clustered designs (section 5.11). Each cluster carries its own data in the shape of the kind.
+def clustered_applicants():
+    """40 applicants with 6 applications each (3 positive, 3 negative); every fifth applicant's positives are
+    all missed, so recall is decided per applicant rather than per application."""
+    clusters = []
+    for i in range(40):
+        missed, flagged = i % 5 == 0, i % 3 != 0
+        clusters.append({"cluster": f"p{i + 1:02d}", "groups": [cm("A" if i < 20 else "B", 0 if missed else 3, 1 if flagged else 0, 3 if missed else 0, 2 if flagged else 3)]})
+    return {"seed": 1729, "clusters": clusters}
+
+
+def clustered_sites():
+    """60 sites with 5 rows each: dyadic targets with a site effect, and errors dominated by a site effect, so
+    the rows of a site are far from independent."""
+    noise = (0.125, -0.0625, 0.0625, -0.125, 0.0)
+    clusters = []
+    for s in range(60):
+        targets = [10.0 + ((s % 9) - 4) * 0.5 + (r - 2) * 0.25 for r in range(5)]
+        errors = [((s % 7) - 3) * 0.25 + noise[(r + s) % 5] for r in range(5)]
+        clusters.append({"cluster": f"s{s + 1:02d}", "kind": "regression", "targets": targets, "errors": errors})
+    return {"seed": 1729, "kind": "regression", "clusters": clusters}
+
+
+def clustered_small_groups():
+    """Group A: 36 people with 2 rows each; group B: 8 people with 5 rows each (40 rows, but fewer than 10 clusters);
+    group C: 40 people with 1 row each and 3 selections (a cell under 5)."""
+    clusters = [{"cluster": f"a{i + 1:02d}", "groups": [sel("A", (2, 0, 1)[i % 3], 2)]} for i in range(36)]
+    clusters += [{"cluster": f"b{i + 1:02d}", "groups": [sel("B", (2, 3)[i % 2], 5)]} for i in range(8)]
+    clusters += [{"cluster": f"c{i + 1:02d}", "groups": [sel("C", 1 if i < 3 else 0, 1)]} for i in range(40)]
+    return {"seed": 1729, "clusters": clusters}
+
+
+def clustered_classes():
+    """45 clusters of 4 rows over three classes; the errors concentrate in every fourth cluster, where three
+    rows in four are predicted as the next class."""
+    labels = ["high", "low", "medium"]
+    clusters = []
+    for c in range(45):
+        matrix = [[0, 0, 0] for _ in labels]
+        for r in range(4):
+            truth = (c + r) % 3
+            wrong = r < 3 if c % 4 == 0 else (c % 7 == 1 and r == 0)
+            matrix[truth][(truth + 1) % 3 if wrong else truth] += 1
+        clusters.append({"cluster": f"k{c + 1:02d}", "kind": "multiclass", "labels": labels, "matrix": matrix})
+    return {"seed": 1729, "kind": "multiclass", "clusters": clusters}
+
+
 CASES = [
     {"id": "GC-01", "category": "small_sample", "title": "Recall 40/50 = 0.80 against a 0.70 minimum: the point estimate passes, the interval does not", "type": "plan",
      "data": {"groups": [cm("all", 40, 6, 10, 144)]}, "plan": {"criteria": [perf("recall-minimum", [("recall", band(0.70))])]}},
@@ -1565,6 +2016,20 @@ CASES = [
     {"id": "GC-53", "category": "mean_baseline", "title": "The same profile and a weak model with R2 0.063: RMSE 0.602 meets the threshold, but the MSE reduction against the mean baseline is not significant (gate p 0.23), so the criterion is inconclusive", "type": "plan",
      "data": {"kind": "regression", "targets": MEAN_PREDICTOR_TARGETS, "errors": WEAK_MODEL_ERRORS},
      "legacy": LEGACY_HOSTED_REGRESSION},
+    {"id": "GC-54", "category": "clustered", "title": "40 applicants with 6 applications each, every fifth with all positives missed: with independent rows recall 96/120 passes 0.70 (Wilson [0.720, 0.862]), but the cluster bootstrap over applicants gives [0.675, 0.925], so the criterion is inconclusive; parity within +-0.20 passes", "type": "plan",
+     "data": clustered_applicants(),
+     "plan": {"clusterField": "cluster", "criteria": [perf("performance", [("recall", band(0.70)), ("balanced_accuracy", band(0.50))]), grp("parity-0.20", "selection_rate_difference", band(-0.2, 0.2))]}},
+    {"id": "GC-58", "category": "power_mean_baseline", "title": "GC-44 with the target standard deviation 1.1 (R2 about 0.17): the mean baseline gate becomes a pass condition with probability 0.666 at 120 rows, the pass range falls from [0.163, 0.458] to [0, 0.458] and the required size rises from 293 to 312 rows", "type": "power",
+     "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "regression-performance", "role": "confirmatory", "kind": "regression_performance", "members": [{"metric": "mae", "band": band(None, 0.9)}, {"metric": "rmse", "band": band(None, 1.15)}], "powerAssumptions": {"n": 120, "errorSd": 1.0, "targetSd": 1.1}}}},
+    {"id": "GC-55", "category": "clustered", "title": "60 sites with 5 rows each and errors dominated by a site effect: the cluster bootstrap decides MAE <= 0.5, RMSE <= 0.6 and the mean baseline gate on one replicate set, and the criterion passes", "type": "plan",
+     "data": clustered_sites(),
+     "plan": {"clusterField": "cluster", "criteria": [{"id": "regression-performance", "role": "confirmatory", "kind": "regression_performance", "members": [{"metric": "mae", "band": band(None, 0.5)}, {"metric": "rmse", "band": band(None, 0.6)}]}]}},
+    {"id": "GC-56", "category": "clustered", "title": "Clustered four-fifths screen: group B has 40 rows but 8 clusters (below_minimum_cluster_count) and group C 3 selections of 40, a cell under 5 that Fisher cannot gate under clustering (small_cell_clustered), so a ratio of 0.15 that fails with independent rows is inconclusive", "type": "plan",
+     "data": clustered_small_groups(),
+     "plan": {"clusterField": "cluster", "criteria": [grp("four-fifths-screen", "selection_rate_ratio", IR45)]}},
+    {"id": "GC-57", "category": "clustered", "title": "45 clusters over three classes with the errors concentrated in every fourth cluster: accuracy >= 0.6 and macro recall >= 0.35 pass on cluster-bootstrap intervals, the chance gate still applied", "type": "plan",
+     "data": clustered_classes(),
+     "plan": {"clusterField": "cluster", "criteria": [{"id": "multiclass-performance", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": band(0.6)}, {"metric": "balanced_accuracy", "band": band(0.35)}]}]}},
 ]
 
 
@@ -1610,6 +2075,8 @@ def end_to_end(case):
     if case["type"] != "plan":
         return {"engine": False, "hosted": False}
     data, criteria = case["data"], plan_for(case)["criteria"]
+    if "clusters" in data:  # the cluster bootstrap is engine-only (section 5.11)
+        return {"engine": True, "hosted": False}
     engine_policy = case.get("legacy", {}).get("source") == "engine_thresholds"  # an engine configuration has no hosted form
     if "groups" in data:
         rows = sum(group_rows(g) for g in data["groups"]) + data.get("unknownGroupRows", 0)
@@ -1624,7 +2091,7 @@ def build():
     cases = []
     for case in sorted(CASES, key=lambda c: int(c["id"].split("-")[1])):
         out = {k: v for k, v in case.items()}
-        out["runners"] = ["engine"] if case["category"] == "calibration" else ["engine", "hosted"]
+        out["runners"] = ["engine"] if case["category"] in ("calibration", "clustered", "power_mean_baseline") else ["engine", "hosted"]
         out["endToEnd"] = end_to_end(case)
         out["expected"] = compute(case)
         cases.append(out)
@@ -1634,10 +2101,10 @@ def build():
         "specificationVersion": SPEC_VERSION,
         "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
         "howToUse": {
-            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON.",
+            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (engine only, section 5.11) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, and every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}.",
             "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
             "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
-            "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine.",
+            "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine. Clustered data (GC-54 to GC-57) expands each cluster in the same way and adds its id in a column cluster, which the plan names as clusterField; the run seed is data.seed.",
         },
         "defaults": {"confidenceLevel": 0.95, "minimums": FLOORS, "minimumCoverage": 1.0, "confirmatoryAdjustment": "bonferroni", "exploratoryAdjustment": "benjamini_hochberg"},
         "tolerances": {"estimate": 1e-6, "interval": 1e-6, "pValueAbsolute": 1e-9, "pValueRelative": 1e-5, "probability": 1e-6, "reasonsComparedAsSets": True},
@@ -1875,6 +2342,173 @@ def cross_check(fixture):
     def sizes_of(data):
         return {g["group"]: (g["n"] if "n" in g else g["tp"] + g["fp"] + g["fn"] + g["tn"]) for g in data["groups"]}
 
+
+    # ---- clustered plans (section 5.11): the replicate statistics rebuilt with numpy from the raw cluster data,
+    # percentile intervals by numpy.quantile, and u* solved exactly on the piecewise-linear quantile function
+    # instead of by bisection. Only the draws are shared with the reference: they are the definition.
+    def solve_u(v, b, direction):
+        """inf u at which [q(u), q(1 - u)] decides, from the type-7 quantile function's linear pieces."""
+        top = len(v) - 1
+
+        def first_at_least(x):  # inf{h : q_h >= x}
+            k = int(np.searchsorted(v, x, "left"))
+            return 0.0 if k == 0 else float(top) if k > top else k - 1 + (x - v[k - 1]) / (v[k] - v[k - 1])
+
+        def last_at_most(x):  # sup{h : q_h <= x}
+            j = int(np.searchsorted(v, x, "right")) - 1
+            return float(top) if j >= top else j + (x - v[j]) / (v[j + 1] - v[j])
+        lower, upper = b.get("lower"), b.get("upper")
+        if direction == "pass":
+            parts = ([first_at_least(lower) / top] if lower is not None else []) + ([1 - last_at_most(upper) / top] if upper is not None else [])
+            return max([0.0] + parts)
+        if upper is not None and np.median(v) > upper:
+            return last_at_most(upper) / top
+        return 1 - first_at_least(lower) / top
+
+    def check_clustered(case, plan):
+        cid, data = case["id"], case["data"]
+        ordered = sorted(data["clusters"], key=lambda c: json.dumps(c["cluster"], ensure_ascii=False).encode("utf-8"))
+        count, replicates, level = len(ordered), plan["bootstrap"]["replicates"], plan["confidenceLevel"]
+        alpha, mins = 1 - level, plan["minimums"]
+        rng = random.Random(data["seed"])
+        weights = np.zeros((replicates, count))
+        for r in range(replicates):
+            for _ in range(count):
+                weights[r, rng.randrange(count)] += 1
+        valid_needed = 0.9 * replicates
+        for crit, spec in zip(case["expected"]["criteria"], plan["criteria"]):
+            kind, d = spec["kind"], crit["decision"]
+            entries = [(m, False) for m in crit["members"]] + [(m, True) for m in crit["descriptive"] if m["metric"] not in ("r2", "baseline_rmse")]
+            if kind == "performance":
+                x = np.array([[sum(g[k] for g in c["groups"]) for k in ("tp", "fp", "fn", "tn")] for c in ordered], float)
+                tp, fp, fn, tn = (weights @ x).T
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    est = {"accuracy": (tp + tn) / (tp + fp + fn + tn), "precision": tp / (tp + fp), "recall": tp / (tp + fn), "specificity": tn / (fp + tn),
+                           "false_positive_rate": fp / (fp + tn), "balanced_accuracy": (tp / (tp + fn) + tn / (fp + tn)) / 2, "f1": 2 * tp / (2 * tp + fp + fn)}
+                rows = x.sum(axis=1)
+                values = {m["memberId"]: est[m["metric"]] for m, _ in entries}
+                clusters = {m["memberId"]: int((rows > 0).sum()) for m, _ in entries}
+            elif kind == "multiclass_performance":
+                labels = sorted({label for c in ordered for label in c["labels"]})
+                k = len(labels)
+                x = np.zeros((count, k, k))
+                for i, c in enumerate(ordered):
+                    for a, row in enumerate(c["matrix"]):
+                        for b_, n in enumerate(row):
+                            x[i, labels.index(c["labels"][a]), labels.index(c["labels"][b_])] += n
+                rep = np.einsum("rc,cij->rij", weights, x)
+                diag = np.einsum("rii->ri", rep)
+                support, predicted = rep.sum(axis=2), rep.sum(axis=1)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    est = {"accuracy": diag.sum(axis=1) / rep.sum(axis=(1, 2)), "balanced_accuracy": np.where((support > 0).all(axis=1), (diag / support).mean(axis=1), np.nan),
+                           "macro_precision": np.where((predicted > 0).all(axis=1) & (support > 0).all(axis=1), (diag / predicted).mean(axis=1), np.nan),
+                           "macro_f1": np.where((support > 0).all(axis=1), (2 * diag / (support + predicted)).mean(axis=1), np.nan)}
+                values = {m["memberId"]: est[m["metric"]] for m, _ in entries}
+                clusters = {m["memberId"]: count for m, _ in entries}
+            elif kind == "regression_performance":
+                x = np.array([[len(c["errors"]), np.abs(c["errors"]).sum(), np.square(c["errors"]).sum(), np.sum(c["targets"]), np.square(c["targets"]).sum()] for c in ordered], float)
+                n, sa, se2, st1, st2 = (weights @ x).T
+                est = {"mae": sa / n, "rmse": np.sqrt(se2 / n)}
+                values = {m["memberId"]: est[m["metric"]] for m, _ in entries}
+                clusters = {m["memberId"]: count for m, _ in entries}
+                gate_d = np.sort(se2 / n - (st2 / n - (st1 / n) ** 2))
+                base = next(m for m in crit["descriptive"] if m["metric"] == "baseline_rmse")
+                y, e = np.concatenate([c["targets"] for c in ordered]), np.concatenate([c["errors"] for c in ordered])
+                reduction = float(np.mean((y.mean() - y) ** 2) - np.mean(e * e))
+                want_gate = 1.0
+                if reduction > 1e-9 * float(np.mean((y.mean() - y) ** 2)) and np.median(gate_d) < 0:
+                    want_gate = max(2 * solve_u(gate_d, {"lower": 0.0, "upper": None}, "fail"), 2 / (replicates + 1))
+                expect(abs(base["counts"]["gatePValue"] - want_gate) <= 1e-9 + 1e-5 * want_gate and base["counts"]["gateMethod"] == "cluster_percentile_bootstrap", "cluster_bootstrap", f"{cid} cluster gate p {base['counts']['gatePValue']} vs {want_gate}")
+            elif kind == "group_comparison":
+                names = sorted({g["group"] for c in ordered for g in c["groups"]})
+                cells = ("selected", "n") if "selected" in ordered[0]["groups"][0] else ("tp", "fp", "fn", "tn")
+                x = np.zeros((count, len(names), len(cells)))
+                for i, c in enumerate(ordered):
+                    for g in c["groups"]:
+                        x[i, names.index(g["group"])] += [g[k] for k in cells]
+                rep = np.einsum("rc,cgk->rgk", weights, x)
+                values, clusters = {}, {}
+                for m, _ in entries:
+                    s_, c_ = names.index(m["subject"]), names.index(m["comparator"])
+
+                    def rate(gi):
+                        r = rep[:, gi]
+                        if cells[0] == "selected":
+                            return r[:, 0], r[:, 1]
+                        tp, fp, fn, tn = r.T
+                        return {"selection_rate_difference": (tp + fp, tp + fp + fn + tn), "selection_rate_ratio": (tp + fp, tp + fp + fn + tn), "tpr_difference": (tp, tp + fn), "fpr_difference": (fp, fp + tn)}[m["metric"]]
+                    (xs, ns), (xc, nc) = rate(s_), rate(c_)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        values[m["memberId"]] = np.where((ns > 0) & (nc > 0) & (xc > 0 if m["metric"] == "selection_rate_ratio" else True), (xs / ns) / (xc / nc) if m["metric"] == "selection_rate_ratio" else xs / ns - xc / nc, np.nan)
+                    present = x.sum(axis=2) > 0
+                    clusters[m["memberId"]] = int(min(present[:, s_].sum(), present[:, c_].sum()))
+            else:
+                raise ValueError("no independent clustered check for " + kind)
+            for m, descriptive in entries:
+                v = np.sort(values[m["memberId"]][~np.isnan(values[m["memberId"]])])
+                boot = m["bootstrap"]
+                expect(boot == {"replicates": replicates, "validReplicates": len(v), "clusters": clusters[m["memberId"]]}, "cluster_bootstrap", f"{cid} {m['memberId']} bootstrap {boot} vs {len(v)} valid, {clusters[m['memberId']]} clusters")
+                if len(v) < valid_needed or m["estimate"] is None:
+                    expect(m["interval"] is None, "cluster_bootstrap", f"{cid} {m['memberId']} interval without enough valid replicates")
+                    continue
+                lo, hi = np.quantile(v, [alpha / 2, 1 - alpha / 2], method="linear")
+                expect(near(lo, m["interval"]["lower"], 1e-9) and near(hi, m["interval"]["upper"], 1e-9) and m["interval"]["method"] == "cluster_percentile_bootstrap", "cluster_bootstrap", f"{cid} {m['memberId']} interval {lo, hi} vs {m['interval']}")
+                few = clusters[m["memberId"]] < 10
+                expect(("below_minimum_cluster_count" in m["reasons"]) == (few and m["status"] != "suppressed"), "cluster_bootstrap", f"{cid} {m['memberId']} minimum clusters")
+                if descriptive:
+                    expect(m["direction"] == "none" and m["pValue"] is None, "descriptive_entries", f"{cid} {m['memberId']} descriptive shape")
+                    continue
+                if m["status"] != "evaluated":
+                    expect(m["direction"] == "none" and m["pValue"] == 1.0, "cluster_bootstrap", f"{cid} {m['memberId']} unevaluated member decides")
+                    continue
+                b, median = m["band"], float(np.median(v))
+                edge = any(e is not None and abs(median - e) <= 1e-12 * max(1, abs(e)) for e in (b["lower"], b["upper"]))
+                out = (b["lower"] is not None and median < b["lower"]) or (b["upper"] is not None and median > b["upper"])
+                want_direction = "none" if edge else "fail" if out else "pass"
+                expect(m["direction"] == want_direction, "cluster_bootstrap", f"{cid} {m['memberId']} direction {m['direction']} vs {want_direction} (median {median})")
+                if want_direction == "none":
+                    continue
+                want = max(2 * solve_u(v, b, want_direction), 2 / (len(v) + 1))
+                if m["smallCell"]:
+                    want = 1.0
+                    expect("small_cell_clustered" in m["reasons"], "cluster_bootstrap", f"{cid} {m['memberId']} small cell without small_cell_clustered")
+                elif want_direction == "pass" and m["chanceExactP"] is not None:
+                    want = max(want, m["chanceExactP"])
+                expect(abs(m["pValue"] - want) <= 1e-9 + 1e-5 * want, "cluster_bootstrap", f"{cid} {m['memberId']} p {m['pValue']} vs {want}")
+            # criterion P and the deciding member from the member p-values; the gate of a regression pass
+            pool = [m for m in crit["members"] if m["status"] != "suppressed"]
+            ev = [m for m in pool if m["status"] == "evaluated"]
+            fails = [m for m in ev if m["direction"] == "fail"]
+            if not ev:
+                want_p, want_dir = 1.0, "none"
+            elif fails:
+                want_p, want_dir = min(1.0, len(ev) * min(m["pValue"] for m in fails)), "fail"
+            else:
+                complete = all(m["status"] == "evaluated" and m["direction"] == "pass" for m in pool)
+                want_dir = "pass" if any(m["direction"] == "pass" for m in ev) else "none"
+                covered = d["coverage"] is None or d["coverage"]["value"] >= spec["minimumCoverage"] - 1e-12
+                want_p = max(m["pValue"] for m in pool) if complete and covered else 1.0
+                if complete and kind == "regression_performance":
+                    want_p = max(want_p, want_gate)
+            expect(abs(d["pValue"] - want_p) <= 1e-9 + 1e-5 * want_p and d["direction"] == want_dir, "cluster_bootstrap", f"{cid} {crit['id']} criterion P {d['pValue']} {d['direction']} vs {want_p} {want_dir}")
+            small = any("small_cell_clustered" in m["reasons"] for m in pool)
+            expect(not (small and "interval_straddles_band" in d["reasons"]) and (small == ("small_cell_clustered" in d["reasons"])), "cluster_bootstrap", f"{cid} {crit['id']} small_cell_clustered reasons")
+            if crit["headline"] is not None:
+                h = crit["headline"]
+                complete = all(m["status"] == "evaluated" for m in pool)
+                log = spec["metric"] == "selection_rate_ratio"
+                tr = (lambda t: np.log(np.maximum(t, 1e-300))) if log else (lambda t: t)
+                bounds = {}
+                for m in ev:
+                    vals = values[m["memberId"]][~np.isnan(values[m["memberId"]])]
+                    lo_b, hi_b = np.quantile(vals, [alpha / (2 * len(ev)), 1 - alpha / (2 * len(ev))], method="linear")
+                    lo_n, hi_n = np.quantile(vals, [alpha / 2, 1 - alpha / 2], method="linear")
+                    bounds[m["memberId"]] = (max(0.0, tr(lo_b), -tr(hi_b)), max(abs(tr(lo_n)), abs(tr(hi_n))))
+                fail_side = max(b_[0] for b_ in bounds.values())
+                pass_side = max(b_[1] for b_ in bounds.values()) if complete else np.inf
+                want_h = (math.exp(-pass_side), math.exp(-fail_side)) if log else (fail_side, min(pass_side, 1.0))
+                expect(near(want_h[0], h["interval"]["lower"], 1e-9) and near(want_h[1], h["interval"]["upper"], 1e-9), "cluster_bootstrap", f"{cid} {crit['id']} headline {want_h} vs {h['interval']}")
+
     alpha_of = {}
     # ---- plan cases
     for case in fixture["cases"]:
@@ -1887,7 +2521,9 @@ def cross_check(fixture):
         alpha_of[case["id"]] = alpha
         mins = plan["minimums"]
         data = case["data"]
-        for crit, spec in zip(exp["criteria"], plan["criteria"]):
+        if "clusters" in data:
+            check_clustered(case, plan)
+        for crit, spec in zip(exp["criteria"], plan["criteria"]) if "clusters" not in data else ():
             d = crit["decision"]
             for m in crit["members"]:
                 check_entry(m, case["id"])
@@ -2129,6 +2765,14 @@ def cross_check(fixture):
                     sb = {k: (None if v is None else v * v) for k, v in b.items()}
                     theta, se = sigma ** 2, math.sqrt(2) * sigma ** 2 / math.sqrt(n)
                     out.append((ind_norm(theta, se, sb, z_pass)[0], ind_norm(theta, se, sb, z_fail)[1], n >= mins["sampleSize"], True))
+        if kind == "regression_performance" and a.get("targetSd") is not None:
+            # The mean baseline gate: e and r = mean - y jointly normal with Cov(e, r) = Var e (a conditional-mean
+            # model); Var(e^2 - r^2) by Isserlis' theorem from the covariance matrix, a one-sided z-test on mean d < 0.
+            cov = np.array([[a["errorSd"] ** 2, a["errorSd"] ** 2], [a["errorSd"] ** 2, a["targetSd"] ** 2]])
+            reduction = float(cov[1, 1] - cov[0, 0])
+            var_d = 2 * cov[0, 0] ** 2 + 2 * cov[1, 1] ** 2 - 4 * cov[0, 1] ** 2
+            gate = float(norm.cdf(reduction / math.sqrt(var_d / n) - z_pass)) if reduction > 0 else 0.0
+            out.append((gate, 0.0, n >= mins["sampleSize"], True))
         return out
 
     def ind_group_members(crit, a, sizes, mins, z_pass, z_fail):
@@ -2181,7 +2825,7 @@ def cross_check(fixture):
         a, level, target, family = crit["powerAssumptions"], inp["confidenceLevel"], inp["targetPower"], inp["familySize"]
         mins = {**FLOORS, **inp.get("minimums", {})}
         alpha = 1 - level
-        m = len(exp["members"]) or 1
+        m = len([e for e in exp["members"] if e["memberId"] != "mean_baseline_gate"]) or 1  # the gate never fails
         z_pass, z_fail = norm.isf(alpha / (2 * family)), norm.isf(alpha / (2 * family * m))
         if crit["kind"] == "group_comparison":
             sizes = a["groupSizes"]
@@ -2458,6 +3102,12 @@ def mutation_test(fixture):
         "baseline RMSE": lambda f: bump(next(m for m in crit(f, "GC-35")["descriptive"] if m["metric"] == "baseline_rmse"), "estimate", 1e-4),
         "mean baseline gate p-value": lambda f: next(m for m in crit(f, "GC-53")["descriptive"] if m["metric"] == "baseline_rmse")["counts"].__setitem__("gatePValue", 0.01),
         "mean baseline gate skipped, the pass recomputed without it": lambda f: skip_mean_baseline(f, "GC-52"),
+        "cluster-bootstrap interval": lambda f: bump(crit(f, "GC-54")["members"][0]["interval"], "lower", 0.01),
+        "cluster-bootstrap decision p-value": lambda f: bump(crit(f, "GC-55")["members"][0], "pValue", 0.01),
+        "cluster-bootstrap valid replicate count": lambda f: bump(crit(f, "GC-56")["members"][0]["bootstrap"], "validReplicates", -1),
+        "clustered small cell decided as if rows were independent": lambda f: crit(f, "GC-56")["members"][1].update(pValue=0.0031, reasons=[]),
+        "cluster-bootstrap mean baseline gate p-value": lambda f: next(m for m in crit(f, "GC-55")["descriptive"] if m["metric"] == "baseline_rmse")["counts"].__setitem__("gatePValue", 0.2),
+        "mean baseline gate pass probability at plan approval": lambda f: case(f, "GC-58")["expected"]["members"][2].__setitem__("passProbability", 0.9),
     }
     missed = []
     for name, mutate in mutations.items():
@@ -2670,7 +3320,8 @@ def simulate(fixture, sims=20000):
     rng = np.random.default_rng(20261105)
     report = []
     FORMULA_ERROR = 0.02  # sections 8 and 13.3: the member formulas are normal approximations
-    worst_member, worst_range = 0.0, 0.0
+    GATE_ERROR = 0.04  # section 8: the gate's statistic e^2 - r^2 is skewed, so its normal approximation is coarser
+    worst_member, worst_range, worst_gate = 0.0, 0.0, 0.0
 
     def interval_pass(lo, hi, b):
         return (b["lower"] is None or lo >= b["lower"]) and (b["upper"] is None or hi <= b["upper"])
@@ -2731,12 +3382,22 @@ def simulate(fixture, sims=20000):
                     ok = ok and passed
                 hits += ok
         elif crit["kind"] == "regression_performance":
-            for errors in rng.normal(0.0, a["errorSd"], (sims, a["n"])):
+            # With targetSd, a conditional-mean model: y = f + eps, the prediction is f and the error -eps, and the
+            # mean baseline gate (section 5.9) is applied as the engine applies it.
+            # Its own stream keeps the earlier figures of section 13.3 unchanged.
+            signal = math.sqrt(max(a.get("targetSd", 0.0) ** 2 - a["errorSd"] ** 2, 0.0))
+            draws = np.random.default_rng(20261106) if "targetSd" in a else rng
+            for errors, signals in zip(draws.normal(0.0, a["errorSd"], (sims, a["n"])), draws.normal(0.0, signal, (sims, a["n"])) if "targetSd" in a else [None] * sims):
                 data = {"errors": [float(e) for e in errors]}
                 ok = True
                 for item in crit["members"]:
                     passed = interval_pass(*regression_stat(item["metric"], data, FLOORS).ci_at(z), item["band"])
                     member_hits[item["metric"]] += passed
+                    ok = ok and passed
+                if signals is not None:
+                    data["targets"] = [float(f - e) for f, e in zip(signals, errors)]
+                    passed = mean_baseline(data, FLOORS)[1] <= (1 - inp["confidenceLevel"]) / inp["familySize"] + EPS
+                    member_hits["mean_baseline_gate"] += passed
                     ok = ok and passed
                 hits += ok
         else:
@@ -2746,13 +3407,16 @@ def simulate(fixture, sims=20000):
         simulated_members = ", ".join(f"{count / sims:.4f}" for count in member_hits.values())
         assert len(member_hits) == len(exp["members"])
         rate = hits / sims
-        member_gap = max(abs(m["passProbability"] - count / sims) for m, count in zip(exp["members"], member_hits.values()))
+        gaps = {m["memberId"]: abs(m["passProbability"] - count / sims) for m, count in zip(exp["members"], member_hits.values())}
+        gate_gap = gaps.pop("mean_baseline_gate", 0.0)
+        member_gap = max(gaps.values())
         range_gap = max(0.0, exp["passProbability"] - rate, rate - exp["passProbabilityUpperBound"])
-        worst_member, worst_range = max(worst_member, member_gap), max(worst_range, range_gap)
+        worst_member, worst_range, worst_gate = max(worst_member, member_gap), max(worst_range, range_gap), max(worst_gate, gate_gap)
         where = "inside the range" if range_gap == 0.0 else f"outside the range by {range_gap:.4f}"
-        report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {rate:.4f} ({where}); members formula ({formula_members}), simulated ({simulated_members}), largest gap {member_gap:.4f}")
-    ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR
-    report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}: {'within' if ok else 'EXCEEDED'}")
+        gate_text = f"; mean baseline gate gap {gate_gap:.4f}" if "mean_baseline_gate" in member_hits else ""
+        report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {rate:.4f} ({where}); members formula ({formula_members}), simulated ({simulated_members}), largest member gap {member_gap:.4f}{gate_text}")
+    ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR and worst_gate <= GATE_ERROR
+    report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}; largest mean baseline gate gap {worst_gate:.4f}, against its error of {GATE_ERROR}: {'within' if ok else 'EXCEEDED'}")
 
     # Coverage of the derived intervals.
     z = zcrit(0.95)
@@ -2769,6 +3433,18 @@ def simulate(fixture, sims=20000):
     coverage("F1 via Jaccard-Wilson, n=400", lambda: tuple(rng.multinomial(400, probs)), 2 * j / (1 + j), lambda tp, fp, fn, tn: jaccard_f1(int(tp), int(tp + fp + fn), z))
     coverage("balanced accuracy MOVER, 60 pos / 340 neg", lambda: (rng.binomial(60, 0.7), rng.binomial(340, 0.9)), 0.8, lambda a, b: mover_mean([(int(a), 60), (int(b), 340)], z))
     coverage("Koopman ratio 0/x-prone, n=40 vs 40, p=0.05 vs 0.25", lambda: (rng.binomial(40, 0.05), rng.binomial(40, 0.25)), 0.2, lambda a, b: koopman(int(a), 40, int(b), 40, z) if b > 0 else (0.0, math.inf))
+    # Section 5.11: under clustering (40 clusters of 6 rows, cluster-level rates from Beta(4, 1), mean 0.8) the
+    # row-level Wilson interval undercovers and the cluster percentile bootstrap (B = 1000) does not.
+    cluster_sims, wilson_hits, boot_hits = 2000, 0, 0
+    clustered = np.random.default_rng(20261107)  # its own stream keeps the other figures of section 13.3 unchanged
+    for _ in range(cluster_sims):
+        x = clustered.binomial(6, clustered.beta(4.0, 1.0, 40))
+        lo, hi = wilson(int(x.sum()), 240, z)
+        wilson_hits += lo <= 0.8 <= hi
+        weights = clustered.multinomial(40, [1 / 40] * 40, 1000)
+        values = np.sort(weights @ x / (weights.sum(axis=1) * 6))
+        boot_hits += quantile(values, 0.025) <= 0.8 <= quantile(values, 0.975)
+    report.append(f"coverage under clustering (40 clusters of 6, Beta(4, 1) rates): row-level Wilson {wilson_hits / cluster_sims:.4f}, cluster percentile bootstrap {boot_hits / cluster_sims:.4f} (nominal 0.95; {cluster_sims} replications)")
     conf = np.array([[0.20, 0.03, 0.04], [0.02, 0.30, 0.05], [0.05, 0.04, 0.27]])
     true_macro = float(np.mean([2 * conf[i, i] / (conf[i].sum() + conf[:, i].sum()) for i in range(3)]))
     true_precision = float(np.mean([conf[i, i] / conf[:, i].sum() for i in range(3)]))

@@ -18,7 +18,7 @@ REASONS = [
     'mean_baseline_not_beaten', 'interval_straddles_band', 'within_criterion_multiplicity', 'multiplicity_adjustment', 'estimate_on_band_boundary',
     'degenerate_interval', 'no_threshold', 'undecidable_metric', 'invalid_band', 'interval_requires_engine',
     'clustered_design_requires_engine', 'bootstrap_insufficient_valid_replicates', 'bootstrap_budget_exceeded',
-    'small_cell_clustered']
+    'small_cell_clustered', 'below_minimum_cluster_count']
 METHODS = ['wilson', 'newcombe_hybrid_score', 'katz_log', 'koopman_score', 'mover_wilson', 'jaccard_wilson',
     'jaccard_wilson_bonferroni', 'wilson_bonferroni_mean', 'normal_approximation', 'normal_approximation_mse',
     'percentile_bootstrap', 'cluster_percentile_bootstrap', 'worst_member_bounds']
@@ -81,13 +81,19 @@ def add_shapes(defs):
     defs['statisticsBand'] = band
     defs['statisticsInterval'] = obj({'lower': {'type': 'number'}, 'upper': {'type': 'number'}, 'level': {'type': 'number', 'exclusiveMinimum': 0, 'exclusiveMaximum': 1}, 'method': {'enum': METHODS}})
     defs['statisticsReasons'] = arr({'enum': REASONS}, 0, len(REASONS))
-    defs['statisticsMetricDetails'] = obj({
+    details = {
         'role': {'enum': ['headline', 'member', 'descriptive']}, 'metric': st(1, 100),
         'subject': nullable(st(0, 5000)), 'comparator': nullable(st(0, 5000)),
         'counts': {'type': ['object', 'null']}, 'band': nullable(ref('statisticsBand')),
         'status': {'enum': ['evaluated', 'undefined', 'insufficient_support', 'suppressed']},
         'direction': {'enum': ['pass', 'fail', 'none']}, 'smallCell': {'type': 'boolean'},
-        'fisherExactP': nullable(RATIO), 'chanceExactP': nullable(RATIO), 'reasons': ref('statisticsReasons')})
+        'fisherExactP': nullable(RATIO), 'chanceExactP': nullable(RATIO), 'reasons': ref('statisticsReasons')}
+    required = list(details)
+    # Engine only, and optional (section 11.2): the cluster bootstrap behind a clustered entry (section 5.11)
+    # and the MAE/RMSE percentile-bootstrap sensitivity interval, which never decides (section 5.9).
+    details['bootstrap'] = obj({'replicates': {'type': 'integer', 'minimum': 1000, 'maximum': 10000}, 'validReplicates': COUNT, 'clusters': COUNT})
+    details['sensitivityInterval'] = nullable(ref('statisticsInterval'))
+    defs['statisticsMetricDetails'] = obj(details, required)
     defs['statisticsMetric'] = obj({
         'name': st(1, MAX_NAME), 'value': {'type': ['number', 'null']}, 'unit': st(1, 100), 'sampleSize': COUNT,
         'numerator': nullable(COUNT), 'denominator': nullable(COUNT), 'threshold': nullable(ref('thresholdRule')),

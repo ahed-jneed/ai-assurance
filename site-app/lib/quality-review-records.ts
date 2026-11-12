@@ -4,10 +4,17 @@
 // (observations, test executions, attestations) carry theirs. Anyone who did
 // either on an engagement is on its team, whatever the engagement record
 // itself still shows. Only the reviewer's own checklist saves and sign-offs
-// are not team work; appointing a reviewer is a Lead's act and counts.
+// are not team work; appointing a reviewer is a Lead's act and counts. An
+// engagement grant held under any other role than Engagement Quality
+// Reviewer is team membership too (engagement_access_history), even if its
+// holder never recorded any work.
 import { db } from "./bindings";
 import type { Engagement } from "./domain";
-import { coolingOffConflicts, engagementTeam } from "./domain/quality-review";
+import {
+  coolingOffConflicts,
+  engagementTeam,
+  qualityReviewerRole,
+} from "./domain/quality-review";
 import { ApiError } from "./http";
 import type { Context } from "./tenancy";
 
@@ -42,7 +49,63 @@ export async function recordedInvolvement(
       )
       .all<{ id: string; last: string }>()
   ).results;
-  return new Map(rows.map((r) => [r.id, r.last]));
+  const involvement = new Map(rows.map((r) => [r.id, r.last]));
+  for (const [id, last] of await grantInvolvement(tenantId, clientId, userId))
+    if (!involvement.has(id) || last > involvement.get(id)!)
+      involvement.set(id, last);
+  return involvement;
+}
+
+/**
+ * The user's latest team membership through engagement grants on each of the
+ * client's engagements: engagement id to timestamp. A grant held under any
+ * role other than Engagement Quality Reviewer is team membership from when it
+ * was given until it was withdrawn or changed, or until now while it is still
+ * held; a grant of unknown role (recorded before the history existed), and
+ * the withdrawal of a grant held under another role when no row in the
+ * history opened that grant, count until their recorded time. Granting a reviewer access, which appointment
+ * needs, is not team membership.
+ */
+export async function grantInvolvement(
+  tenantId: string,
+  clientId: string,
+  userId: string,
+  at = new Date().toISOString(),
+) {
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT h.engagement_id AS engagement,h.active,h.role,h.at FROM engagement_access_history h WHERE h.tenant_id=? AND h.user_id=? AND h.engagement_id IN (SELECT id FROM engagements WHERE tenant_id=? AND client_id=?) ORDER BY h.engagement_id,h.id",
+      )
+      .bind(tenantId, userId, tenantId, clientId)
+      .all<{
+        engagement: string;
+        active: number;
+        role: string | null;
+        at: string;
+      }>()
+  ).results;
+  const last = new Map<string, string>(),
+    open = new Set<string>();
+  const seen = (id: string, when: string) => {
+    const before = last.get(id);
+    if (before === undefined || when > before) last.set(id, when);
+  };
+  for (const r of rows) {
+    // Any later change of the grant ends a team grant that was open.
+    if (open.delete(r.engagement)) seen(r.engagement, r.at);
+    // A grant of unknown role, and the withdrawal of a grant held under
+    // another role, are team membership up to that time even when no row
+    // in the history opened the grant.
+    if (r.role === null || (r.active === 0 && r.role !== qualityReviewerRole))
+      seen(r.engagement, r.at);
+    if (r.active === 1 && r.role !== qualityReviewerRole) {
+      open.add(r.engagement);
+      seen(r.engagement, r.at);
+    }
+  }
+  for (const id of open) seen(id, at);
+  return last;
 }
 
 const teamMessage =
@@ -72,6 +135,28 @@ export async function assertReviewerIndependent(ctx: Context, e: Engagement) {
   const q = e.qualityReview;
   if (q && (await onRecordedTeam(ctx, e, q.reviewerId)))
     throw new ApiError(409, teamMessage);
+}
+
+/**
+ * Refuses release while the reviewer who signed off is no longer an active
+ * member with the Engagement Quality Reviewer role: a sign-off counts only
+ * while its signer still holds the role it was given under. The sign-off
+ * itself must be the appointed reviewer's (qualityReviewSignedOff).
+ */
+export async function assertSignerActive(ctx: Context, e: Engagement) {
+  const q = e.qualityReview;
+  if (!q) return;
+  const member = await db()
+    .prepare(
+      "SELECT role,status FROM memberships WHERE tenant_id=? AND user_id=?",
+    )
+    .bind(ctx.tenantId, q.reviewerId)
+    .first<{ role: string; status: string }>();
+  if (member?.status !== "active" || member.role !== qualityReviewerRole)
+    throw new ApiError(
+      409,
+      "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+    );
 }
 
 /**

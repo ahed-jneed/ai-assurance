@@ -12,7 +12,12 @@ import type { Procedure } from "../workflow-types";
 import { workflowRequirements } from "../workflow-state";
 import { acceptanceGates } from "../workflow/acceptance";
 import type { Engagement, Paper } from "./types";
+import {
+  managementSystemGates,
+  type ManagementSystemFeatures,
+} from "./management-system";
 import { qualityReviewGates } from "./quality-review";
+import type { SoaControl } from "../criteria/types";
 import { reportElements } from "./report-gates";
 import {
   requiresSupport,
@@ -39,7 +44,8 @@ export type AuditGate = {
     | "workflow"
     | "acceptance"
     | "report"
-    | "quality_review";
+    | "quality_review"
+    | "management_system";
   recordId?: string;
   title: string;
   message: string;
@@ -51,7 +57,12 @@ import { isReleaseTimeRecord } from "./release-time";
  * pack #1, which switches everything on, so every caller that does not pass
  * the pack's features keeps the behaviour of AI Act engagements.
  */
-export type GateFeatures = { aiActClassification: boolean };
+export type GateFeatures = {
+  aiActClassification: boolean;
+} & ManagementSystemFeatures & {
+    /** The Statement of Applicability controls of the pinned pack (#28). */
+    soaControls?: readonly SoaControl[];
+  };
 const aiActFeatures: GateFeatures = { aiActClassification: true };
 export {
   isReleaseTimeRecord,
@@ -303,6 +314,14 @@ export function finalReportGates(
         ]
       : []),
     ...completionGates(e, conclusion, undefined, features),
+    // Statement of Applicability, nonconformity grades and the certification
+    // recommendation, on packs that switch them on (#28).
+    ...managementSystemGates(
+      e,
+      conclusion,
+      features ?? aiActFeatures,
+      features?.soaControls,
+    ),
     // The engagement quality review (ISQM 2) before capture; its sign-off of
     // the exact package is checked at release.
     ...qualityReviewGates(

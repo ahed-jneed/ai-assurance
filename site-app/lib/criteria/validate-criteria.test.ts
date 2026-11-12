@@ -30,12 +30,24 @@ const fixture = (name: string): Json =>
 const aiActSample = fixture("criteria-pack.eu-ai-act-amended.sample.json");
 const newPack = fixture("criteria-pack.en18286-iso42001.sample.json");
 
-/** The committed criteria plus the section 12 documents as drafts. */
+/** The ids of the section 12 sample, which #28 also uses for its drafts. */
+const sampleIds = new Set<string>(
+  newPack.documents.map((d: Json) => d.id as string),
+);
+/**
+ * The committed criteria plus the section 12 documents as drafts. The
+ * committed #28 drafts share the sample's ids, so they are left out here:
+ * the rule cases mutate the sample, and the committed drafts have their own
+ * test below.
+ */
 function criteria() {
   const { index, documents } = readCriteria();
   const copy = structuredClone(index) as Json;
+  copy.documents = copy.documents.filter((e: Json) => !sampleIds.has(e.id));
   const docs = new Map<string, Json>(
-    [...documents].map(([k, v]) => [k, structuredClone(v)]),
+    [...documents]
+      .filter(([k]) => copy.documents.some((e: Json) => e.path === k))
+      .map(([k, v]) => [k, structuredClone(v)]),
   );
   newPack.index.documents.forEach((entry: Json, i: number) => {
     copy.documents.push(structuredClone(entry));
@@ -46,6 +58,7 @@ function criteria() {
 const doc = (c: ReturnType<typeof criteria>, path: string) =>
   c.documents.get(path)!;
 const P1 = "packs/eu-ai-act-amended/2026.11.2.json";
+const P3 = "packs/eu-ai-act-amended/2026.11.3.json";
 const F1 = "frameworks/eu-ai-act/02024R1689-20260727/2026.11.2.json";
 const NP = "packs/en18286-iso42001/2027.1.0.json";
 const ISO = "frameworks/iso-iec-42001/2023/2027.1.0.json";
@@ -598,9 +611,27 @@ describe("criteria integrity rules", () => {
     ],
     [
       "rule 8",
-      "annexIvIndex needs",
+      "annexIvIndex needs an annexIvMap",
       (c) => {
         doc(c, NP).features = { annexIvIndex: true };
+      },
+    ],
+    [
+      "rule 8",
+      "annexIvIndex needs WP-NONE-01 of the Annex IV map as an item",
+      (c) => {
+        doc(c, P3).annexIvMap.sections[0].paperIds.push("WP-NONE-01");
+      },
+    ],
+    [
+      // Pack #1 2026.11.2 has no map of its own: it is served the map of
+      // the current version, whose papers it must have too.
+      "rule 8",
+      "eu-ai-act-amended 2026.11.2: annexIvIndex needs WP-PL-02",
+      (c) => {
+        doc(c, P1).items = doc(c, P1).items.filter(
+          (i: Json) => i.id !== "WP-PL-02",
+        );
       },
     ],
     [
@@ -1007,7 +1038,7 @@ describe("JCS digests", () => {
   });
   it("matches the digests in the index and the design's sample", () => {
     const { index, documents } = readCriteria();
-    for (const e of index.documents)
+    for (const e of index.documents.filter((e: Json) => e.status !== "draft"))
       expect(digest(documents.get(e.path))).toBe(e.sha256);
     expect(digest(aiActSample.documents[0])).toBe(
       aiActSample.index.documents[0].sha256,
