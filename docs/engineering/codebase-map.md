@@ -22,7 +22,7 @@
 | Worker entry and build | `build/sites-worker.ts`, `build/sites-vite-plugin.ts`, `vite.config.ts`, `scripts/run-framework.mjs` | Worker fetch wrapper; dev-only mock sign-in; copies `hosting.json` and `drizzle/` into `dist/.openai` |
 | Python engine | `engine/` | Stdlib-only diagnostics CLI, a pull worker for `/api/runner` (child process or Docker executor), assurance CLIs (sampling, bootstrap, dossier verify/sign), registry import, cited assistant, runtime packager. 120 unittest cases |
 | Contracts | `schemas/` | Draft 2020-12 run contract (1.0 legacy, 1.1 hosted, 1.2 external), procedure-execution and working-paper schemas, and Ajv validators |
-| Methodology | `templates/`, `docs/obligation-subitems.json` | 33 working papers and 12 memos, the Annex IV map, 68 obligation prompts. Byte-identical copies in `site-app/lib/` seed the app |
+| Methodology | `templates/`, `docs/obligation-subitems.json` | 33 working papers and 12 memos, the Annex IV map, 68 obligation prompts. The obligation file and the Annex IV map are generated from the default criteria pack in `templates/criteria/` (#61). Byte-identical copies in `site-app/lib/` seed the app |
 | Specification only | `db/postgres.sql`, `docs/system-architecture.md` | Target PostgreSQL/OIDC/KMS design. Not deployed |
 | Copies | `site-app/reference/` (88 files, 5 diverged), `site-app/public/tools/` (runtime zip, plus a verifier identical to `engine/assurance.py`) | Duplicates with no sync check |
 

@@ -26,8 +26,16 @@
     "sourceCurrencyRule": "Source publication, research and application dates have different meanings. A new source version creates an impact-review candidate and never rewrites a historical decision."
   },
   "decisionPolicy": {
-    "candidateStates": ["suggested", "needs_information"],
-    "humanDecisionStates": ["applicable", "readiness", "not_applicable", "needs_information"],
+    "candidateStates": [
+      "suggested",
+      "needs_information"
+    ],
+    "humanDecisionStates": [
+      "applicable",
+      "readiness",
+      "not_applicable",
+      "needs_information"
+    ],
     "requiresHumanRationale": true,
     "requiresIndependentReview": true,
     "defaultAssessment": "not_assessed",
@@ -38,6 +46,168 @@
     "dataScope": "Under Article 10(1), datasets used for data-trained models are assessed; Article 10(6) limits Article 10(2)-(4) and Article 4a(1) to testing datasets for systems without model training. Article 10(5) was deleted; special-category processing is a separate Article 4a/data-protection assessment, not an upload permission. Article 4a(2) extends the same conditions and safeguards to providers and deployers of other AI systems and models and to deployers of high-risk systems, and creates no obligation to carry out bias detection and correction.",
     "retention": "Retention is actor, control, purpose and law dependent. Article 26(6) is not one universal evidence-vault retention policy.",
     "excludedActorDuties": "Other provider, deployer, representative, importer, distributor, sectoral, conformity, registration and fundamental-rights duties must be added where applicable. This selective catalog does not waive them."
+  },
+  "factValues": {
+    "highRiskRoute": [
+      "annex_iii",
+      "annex_i_section_a",
+      "annex_i_section_b",
+      "not_high_risk"
+    ]
+  },
+  "factDerivations": {
+    "rule": "A derived fact is true if any listed fact is true, false if all are false, otherwise unknown (docs/research/art50-transparency-2026-11.json, vocabularies.derivationRule). Classification never asks a derived fact directly. For art50DisclosureApplies, the facts of a role the operator does not hold (provider: interactsDirectlyWithNaturalPersons, generatesSyntheticContent; deployer: the other three) count as false.",
+    "generatesSyntheticContent": {
+      "anyOf": [
+        "generatesSyntheticText",
+        "generatesSyntheticImage",
+        "generatesSyntheticAudio",
+        "generatesSyntheticVideo"
+      ]
+    },
+    "deployerOperatesErOrBcSystem": {
+      "anyOf": [
+        "deployerUsesEmotionRecognition",
+        "deployerUsesBiometricCategorisation"
+      ]
+    },
+    "art50DisclosureApplies": {
+      "anyOf": [
+        "interactsDirectlyWithNaturalPersons",
+        "generatesSyntheticContent",
+        "deployerOperatesErOrBcSystem",
+        "deployerGeneratesDeepFakes",
+        "deployerPublishesAiTextOnPublicInterest"
+      ]
+    }
+  },
+  "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use eight facts: generatesSyntheticContent, placedOnMarketDate, highRiskRoute, firstPlacedOnMarketOrPutIntoServiceDate, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent and gpaiModelPlacedOnMarketDate. The guided classification records each of them as true, false or unknown (dates as YYYY-MM-DD or unknown): highRiskRoute from the reviewed route and the Article 6(3) derogation, generatesSyntheticContent from the four modality facts. A predicate that reads an unknown fact yields needs_information.",
+  "exclusionType": {
+    "exclusions": "A triggered item is excluded when the ifAll list of any of its exclusions is true; if none is true and one is unknown, the item needs information. An exclusion takes effect only with fact values the independent classification review approved; exclusions with basis 'guidance' rest on non-binding guidelines and stay pending legal review.",
+    "exceptionsTestedPerItem": "Decision of 6 November 2026 (option a): a statutory exception claimed under Article 50(1), (3) or (4) never excludes the item. It is tested per output, channel or deployment in fieldwork (the model is criterion A50-P-04B-C01: label present or exception supported), so the item stays a candidate.",
+    "followsItems": "Article 50(5) governs only how the information owed under Article 50(1) to (4) is given, and the scope exclusions of Article 2(6) and 2(10) take the system out of the Regulation. An item with followsItems is evaluated only after its own trigger: it is a candidate when at least one listed item of a role the operator holds is a candidate; otherwise it needs information when one of them needs information; otherwise it is excluded when one of them is excluded (with that item's exclusion); otherwise it is not triggered."
+  },
+  "triggerType": {
+    "profile": "key_of_triggerProfiles",
+    "conditions": "array_of_fact_equals_predicates",
+    "evaluation": "Candidate selection only. Unknown in a required predicate yields needs_information. Legal-period approval and scope exclusions are separate human decisions."
+  },
+  "evidenceCategories": [
+    "Dataset",
+    "Model",
+    "Training log",
+    "Validation",
+    "Pipeline code",
+    "Governance",
+    "Instructions",
+    "Oversight",
+    "Security",
+    "Other"
+  ],
+  "triggerProfiles": {
+    "provider_high_risk": {
+      "actor": "Provider",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Provider"
+    },
+    "provider_datasets": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "datasetUsed",
+          "equals": true
+        }
+      ],
+      "scopeNote": "Apply the dataScope policy; an absent training dataset is not a blanket exemption from testing-data duties."
+    },
+    "provider_annex_i_a": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "annexISectionAProduct",
+          "equals": true
+        }
+      ]
+    },
+    "provider_annex_iii_1a": {
+      "extends": "provider_high_risk",
+      "all": [
+        {
+          "fact": "annexIII1a",
+          "equals": true
+        }
+      ]
+    },
+    "deployer_high_risk": {
+      "actor": "Deployer",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Deployer"
+    },
+    "importer_high_risk": {
+      "actor": "Importer",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Importer"
+    },
+    "distributor_high_risk": {
+      "actor": "Distributor",
+      "all": [
+        {
+          "fact": "highRiskConfirmed",
+          "equals": true
+        }
+      ],
+      "roleRequired": "Distributor"
+    },
+    "operator_role_change": {
+      "anyRole": [
+        "Importer",
+        "Distributor",
+        "Deployer",
+        "Other operator"
+      ],
+      "all": [
+        {
+          "fact": "roleChangeCandidate",
+          "equals": true
+        }
+      ],
+      "scopeNote": "Review branding, substantial modification and intended-purpose changes against Article 25(1), including relevant contractual qualifications. Do not automatically reassign provider duties."
+    },
+    "provider_art50": {
+      "actor": "Provider",
+      "all": [],
+      "roleRequired": "Provider",
+      "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."
+    },
+    "deployer_art50": {
+      "actor": "Deployer",
+      "all": [],
+      "roleRequired": "Deployer",
+      "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."
+    },
+    "operator_art50": {
+      "anyRole": [
+        "Provider",
+        "Deployer"
+      ],
+      "all": [],
+      "scopeNote": "Article 50(5) attaches to the information duties of providers and deployers alike."
+    }
   },
   "factTypes": {
     "highRiskConfirmed": "boolean_or_unknown",
@@ -99,123 +269,1809 @@
     "editorialExceptionReliedOn": "boolean_or_unknown",
     "art50DisclosureApplies": "boolean_or_unknown"
   },
-  "factValues": {
-    "highRiskRoute": ["annex_iii", "annex_i_section_a", "annex_i_section_b", "not_high_risk"]
-  },
-  "factDerivations": {
-    "rule": "A derived fact is true if any listed fact is true, false if all are false, otherwise unknown (docs/research/art50-transparency-2026-11.json, vocabularies.derivationRule). Classification never asks a derived fact directly. For art50DisclosureApplies, the facts of a role the operator does not hold (provider: interactsDirectlyWithNaturalPersons, generatesSyntheticContent; deployer: the other three) count as false.",
-    "generatesSyntheticContent": {"anyOf": ["generatesSyntheticText", "generatesSyntheticImage", "generatesSyntheticAudio", "generatesSyntheticVideo"]},
-    "deployerOperatesErOrBcSystem": {"anyOf": ["deployerUsesEmotionRecognition", "deployerUsesBiometricCategorisation"]},
-    "art50DisclosureApplies": {"anyOf": ["interactsDirectlyWithNaturalPersons", "generatesSyntheticContent", "deployerOperatesErOrBcSystem", "deployerGeneratesDeepFakes", "deployerPublishesAiTextOnPublicInterest"]}
-  },
-  "dateFacts": "The rule pack's application-date predicates (templates/catalog.json, regulatorySnapshot.applicationDates) use eight facts: generatesSyntheticContent, placedOnMarketDate, highRiskRoute, firstPlacedOnMarketOrPutIntoServiceDate, significantDesignChangeOnOrAfterChapterIIIDate, intendedForUseByPublicAuthorities, annexXLargeScaleItComponent and gpaiModelPlacedOnMarketDate. The guided classification records each of them as true, false or unknown (dates as YYYY-MM-DD or unknown): highRiskRoute from the reviewed route and the Article 6(3) derogation, generatesSyntheticContent from the four modality facts. A predicate that reads an unknown fact yields needs_information.",
-  "exclusionType": {
-    "exclusions": "A triggered item is excluded when the ifAll list of any of its exclusions is true; if none is true and one is unknown, the item needs information. An exclusion takes effect only with fact values the independent classification review approved; exclusions with basis 'guidance' rest on non-binding guidelines and stay pending legal review.",
-    "exceptionsTestedPerItem": "Decision of 6 November 2026 (option a): a statutory exception claimed under Article 50(1), (3) or (4) never excludes the item. It is tested per output, channel or deployment in fieldwork (the model is criterion A50-P-04B-C01: label present or exception supported), so the item stays a candidate.",
-    "followsItems": "Article 50(5) governs only how the information owed under Article 50(1) to (4) is given, and the scope exclusions of Article 2(6) and 2(10) take the system out of the Regulation. An item with followsItems is evaluated only after its own trigger: it is a candidate when at least one listed item of a role the operator holds is a candidate; otherwise it needs information when one of them needs information; otherwise it is excluded when one of them is excluded (with that item's exclusion); otherwise it is not triggered."
-  },
-  "triggerType": {
-    "profile": "key_of_triggerProfiles",
-    "conditions": "array_of_fact_equals_predicates",
-    "evaluation": "Candidate selection only. Unknown in a required predicate yields needs_information. Legal-period approval and scope exclusions are separate human decisions."
-  },
-  "triggerProfiles": {
-    "provider_high_risk": {"actor": "Provider", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Provider"},
-    "provider_datasets": {"extends": "provider_high_risk", "all": [{"fact": "datasetUsed", "equals": true}], "scopeNote": "Apply the dataScope policy; an absent training dataset is not a blanket exemption from testing-data duties."},
-    "provider_annex_i_a": {"extends": "provider_high_risk", "all": [{"fact": "annexISectionAProduct", "equals": true}]},
-    "provider_annex_iii_1a": {"extends": "provider_high_risk", "all": [{"fact": "annexIII1a", "equals": true}]},
-    "deployer_high_risk": {"actor": "Deployer", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Deployer"},
-    "importer_high_risk": {"actor": "Importer", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Importer"},
-    "distributor_high_risk": {"actor": "Distributor", "all": [{"fact": "highRiskConfirmed", "equals": true}], "roleRequired": "Distributor"},
-    "operator_role_change": {"anyRole": ["Importer", "Distributor", "Deployer", "Other operator"], "all": [{"fact": "roleChangeCandidate", "equals": true}], "scopeNote": "Review branding, substantial modification and intended-purpose changes against Article 25(1), including relevant contractual qualifications. Do not automatically reassign provider duties."},
-    "provider_art50": {"actor": "Provider", "all": [], "roleRequired": "Provider", "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."},
-    "deployer_art50": {"actor": "Deployer", "all": [], "roleRequired": "Deployer", "scopeNote": "Article 50 applies whatever the risk class (Article 50(6)); no high-risk confirmation is required."},
-    "operator_art50": {"anyRole": ["Provider", "Deployer"], "all": [], "scopeNote": "Article 50(5) attaches to the information duties of providers and deployers alike."}
-  },
-  "evidenceCategories": ["Dataset", "Model", "Training log", "Validation", "Pipeline code", "Governance", "Instructions", "Oversight", "Security", "Other"],
   "items": [
-    {"code":"AIA-9-1","article":"9(1)","title":"Lifecycle risk-management system","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-2A","article":"9(2)(a)","title":"Intended-use risks","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-2B","article":"9(2)(b)","title":"Foreseeable-misuse risk evaluation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-2C","article":"9(2)(c)","title":"Post-market risk feedback","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-2D","article":"9(2)(d)","title":"Targeted risk treatments","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Pipeline code"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-5","article":"9(4)-(5)","title":"Control interactions and residual-risk judgment","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-5ABC","article":"9(5)(a)-(c)","title":"Design, mitigation and deployer information","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Pipeline code","Governance","Instructions"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-TEST","article":"9(6),(8)","title":"Testing against prior suitable criteria","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Validation","Governance","Training log"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-9-9","article":"9(9)","title":"Children and vulnerable-group consideration","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Dataset","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess whether adverse impacts are likely; do not omit this consideration merely because affected groups were not identified in the supplied dataset."},
-
-    {"code":"AIA-10-2A","article":"10(2)(a)","title":"Data design choices","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2B","article":"10(2)(b)","title":"Collection origin and original purpose","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2C","article":"10(2)(c)","title":"Preparation and labelling","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Pipeline code","Training log"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2D","article":"10(2)(d)","title":"Data measurement assumptions","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2E","article":"10(2)(e)","title":"Dataset availability and suitability","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2F","article":"10(2)(f)","title":"Bias and feedback examination","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Validation","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2G","article":"10(2)(g)","title":"Bias detection and mitigation","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Validation","Dataset","Pipeline code","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-2H","article":"10(2)(h)","title":"Data-gap identification and treatment","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-3","article":"10(3)","title":"Relevance, representativeness and quality","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Validation","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-4","article":"10(4)","title":"Intended-context data coverage","actor":["Provider"],"trigger":{"profile":"provider_datasets","conditions":[]},"evidenceCategories":["Dataset","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-10-6","article":"10(6)","title":"Non-training testing-data scope","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"trainingUsesData","equals":false}]},"evidenceCategories":["Dataset","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","dependencies":["10(2)-(4)","4a(1)"]},
-
-    {"code":"AIA-11-1","article":"11(1)","title":"Pre-market and current technical documentation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs. A simplified submission uses the Commission's form, which notified bodies must accept (Article 11(1), second subparagraph, as replaced). A generated audit report is not automatically the provider's complete technical documentation."},
-    {"code":"AIA-11-2","article":"11(2)","title":"Combined product technical documentation","actor":["Provider"],"trigger":{"profile":"provider_annex_i_a","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-
-    {"code":"AIA-12-1","article":"12(1)","title":"Automatic lifecycle event recording","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Pipeline code","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-12-2","article":"12(2)(a)-(c)","title":"Risk, monitoring and operation traceability","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Other","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Platform activity and metric-execution logs are not substitutes for the audited system's operational events."},
-    {"code":"AIA-12-3A","article":"12(3)(a)","title":"Biometric use start/end periods","actor":["Provider"],"trigger":{"profile":"provider_annex_iii_1a","conditions":[]},"evidenceCategories":["Other","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-12-3B","article":"12(3)(b)","title":"Biometric reference-database identity","actor":["Provider"],"trigger":{"profile":"provider_annex_iii_1a","conditions":[]},"evidenceCategories":["Other","Dataset","Pipeline code"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-12-3C","article":"12(3)(c)","title":"Biometric matched-input trace","actor":["Provider"],"trigger":{"profile":"provider_annex_iii_1a","conditions":[]},"evidenceCategories":["Other","Dataset","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-12-3D","article":"12(3)(d)","title":"Biometric verifier identities","actor":["Provider"],"trigger":{"profile":"provider_annex_iii_1a","conditions":[]},"evidenceCategories":["Other","Oversight"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-
-    {"code":"AIA-13-12","article":"13(1)-(2)","title":"Usable transparency and instructions","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Oversight","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3A","article":"13(3)(a)","title":"Provider and representative contacts","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3B-I-III","article":"13(3)(b)(i)-(iii)","title":"Purpose, validated performance and foreseeable risks","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Validation","Security","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3B-EXPL","article":"13(3)(b)(iv),(vii)","title":"Output explanation and interpretation information","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Oversight","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"These subitems contain where-applicable qualifications; assess them explicitly. A SHAP plot alone is not evidence of deployer comprehension."},
-    {"code":"AIA-13-3B-V","article":"13(3)(b)(v)","title":"Relevant group-performance information","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"subgroupPerformanceRelevant","equals":true}]},"evidenceCategories":["Instructions","Validation","Dataset"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3B-VI","article":"13(3)(b)(vi)","title":"Relevant input and dataset specifications","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"inputSpecificationsRelevant","equals":true}]},"evidenceCategories":["Instructions","Dataset","Model"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3C","article":"13(3)(c)","title":"Pre-determined changes in instructions","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"preDeterminedChanges","equals":true}]},"evidenceCategories":["Instructions","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3D","article":"13(3)(d)","title":"Oversight and interpretation measures","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Oversight","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3E","article":"13(3)(e)","title":"Resources, lifetime, maintenance and updates","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-13-3F","article":"13(3)(f)","title":"Log collection, storage and interpretation instructions","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"logMechanismsRelevant","equals":true}]},"evidenceCategories":["Instructions","Other","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-
-    {"code":"AIA-14-123","article":"14(1)-(3)","title":"Risk-proportionate oversight design","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Instructions","Pipeline code","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-4A","article":"14(4)(a)","title":"Capacity, limitations and anomaly monitoring","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-4B","article":"14(4)(b)","title":"Automation-bias awareness","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-4C","article":"14(4)(c)","title":"Correct output interpretation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-4D","article":"14(4)(d)","title":"Disregard, override and reversal","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-4E","article":"14(4)(e)","title":"Intervention and safe stop","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Oversight","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-14-5","article":"14(5)","title":"Biometric separate dual verification","actor":["Provider"],"trigger":{"profile":"provider_annex_iii_1a","conditions":[]},"evidenceCategories":["Oversight","Other","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Review proportionality exceptions for law enforcement, migration, border control and asylum under applicable Union/national law. This is audited-system oversight, not the audit platform's reviewer/signer workflow."},
-
-    {"code":"AIA-15-1","article":"15(1)","title":"Lifecycle accuracy, robustness and security","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Validation","Security","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-15-3","article":"15(3)","title":"Declared accuracy and metrics","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-15-4","article":"15(4), first and second subparagraphs","title":"Fault resilience and fail-safe measures","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Validation","Pipeline code","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-15-4-FEEDBACK","article":"15(4), third subparagraph","title":"Continual-learning feedback mitigation","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[{"fact":"learningContinuesAfterDeployment","equals":true}]},"evidenceCategories":["Dataset","Validation","Pipeline code","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-15-5","article":"15(5)","title":"Contextual and AI-specific cybersecurity","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Security","Validation","Pipeline code","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Article 15(2) is a Commission benchmark-development provision, not a separate private-operator pass/fail obligation."},
-
-    {"code":"AIA-AIV-1","article":"Annex IV, point 1(a)-(h)","title":"System description and deployment forms","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Model","Pipeline code","Governance","Instructions","Oversight","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-2","article":"Annex IV, point 2(a)-(h)","title":"Development, architecture, data, tests and security","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Model","Dataset","Training log","Pipeline code","Validation","Oversight","Security"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Point 2(g) calls for dated/signed responsible-person test reports; these are not supplied merely by an unsigned diagnostic output."},
-    {"code":"AIA-AIV-3","article":"Annex IV, point 3","title":"Monitoring, functioning and control information","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Validation","Oversight","Dataset","Instructions","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-4","article":"Annex IV, point 4","title":"Performance-metric appropriateness","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Validation","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-5","article":"Annex IV, point 5","title":"Risk-management description","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-6","article":"Annex IV, point 6","title":"Provider lifecycle changes","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-7","article":"Annex IV, point 7","title":"Standards and alternative solutions","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-AIV-8","article":"Annex IV, point 8; Article 47","title":"Actual EU declaration of conformity","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","specificDocumentRequired":"EU declaration of conformity","categoryMatchIsInsufficient":true,"reviewNote":"Pending legal review (LR-02): Article 47 sits in Chapter III Section 5, which applies from the 2 August 2026 general date on the text, but the declaration attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).","legalReview":{"required":true,"itemIds":["LR-02"]}},
-    {"code":"AIA-AIV-9","article":"Annex IV, point 9; Article 72","title":"Post-market evaluation and monitoring plan","actor":["Provider"],"trigger":{"profile":"provider_high_risk","conditions":[]},"evidenceCategories":["Governance","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Pending legal review (LR-02): Article 72 sits in Chapter IX, which applies from the 2 August 2026 general date on the text, but the plan attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).","legalReview":{"required":true,"itemIds":["LR-02"]}},
-
-    {"code":"AIA-23-1B","article":"23(1)(b)","title":"Importer technical-documentation verification","actor":["Importer"],"trigger":{"profile":"importer_high_risk","conditions":[]},"evidenceCategories":["Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-24-1","article":"24(1)","title":"Distributor markings, declaration and instructions checks","actor":["Distributor"],"trigger":{"profile":"distributor_high_risk","conditions":[]},"evidenceCategories":["Governance","Instructions","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-25-1","article":"25(1)(a)-(c)","title":"Provider-role reassessment after changes","actor":["Importer","Distributor","Deployer","Other operator"],"trigger":{"profile":"operator_role_change","conditions":[]},"evidenceCategories":["Governance","Model","Pipeline code","Instructions"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-26-1","article":"26(1)","title":"Deployer use according to instructions","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[]},"evidenceCategories":["Instructions","Oversight","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-26-2","article":"26(2)","title":"Competent, supported oversight personnel","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[]},"evidenceCategories":["Oversight","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-26-4","article":"26(4)","title":"Controlled input-data relevance and coverage","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"deployerControlsInputData","equals":true}]},"evidenceCategories":["Dataset","Validation","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-26-5","article":"26(5)","title":"Operational monitoring and risk/incident response","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[]},"evidenceCategories":["Other","Governance","Instructions","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess triggering events, recipient/escalation duties and actor/sector exceptions; no notification is sent automatically by catalog selection."},
-    {"code":"AIA-26-6","article":"26(6)","title":"Retention of controlled system logs","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"deployerControlsLogs","equals":true}]},"evidenceCategories":["Other","Governance"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Purpose-appropriate period of at least six months unless applicable law provides otherwise; assess data-protection and financial-sector qualifications."},
-    {"code":"AIA-26-11","article":"26(11)","title":"Notice to affected natural persons","actor":["Deployer"],"trigger":{"profile":"deployer_high_risk","conditions":[{"fact":"annexIIIDecisionsAboutPersons","equals":true}]},"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Assess Annex III use and law-enforcement qualifications; Article 50 obligations remain separately applicable."},
-
-    {"code":"AIA-50-1","article":"50(1)","title":"AI-interaction disclosure by design","actor":["Provider"],"trigger":{"profile":"provider_art50","conditions":[{"fact":"interactsDirectlyWithNaturalPersons","equals":true}]},"exclusions":[{"id":"EX-SCOPE-RD","label":"Sole purpose of scientific research and development (Art 2(6))","basis":"statutory","ifAll":[{"fact":"scientificResearchOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-1-OBVIOUS","label":"Interaction obvious to a reasonably well-informed, observant and circumspect person","basis":"statutory","ifAll":[{"fact":"obviousToReasonablyWellInformedPerson","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-06"]}},{"id":"EX-50-1-LE","label":"Authorised by law for criminal offences and not available to the public to report crime","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true},{"fact":"availableToPublicToReportCriminalOffence","equals":false}]}],"procedureIds":["A50-P-00","A50-P-01"],"evidenceCategories":["Instructions","Governance","Validation"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-50-2","article":"50(2)","title":"Machine-readable marking and detectability of synthetic outputs","actor":["Provider"],"trigger":{"profile":"provider_art50","conditions":[{"fact":"generatesSyntheticContent","equals":true}]},"exclusions":[{"id":"EX-50-2-LE","label":"Authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]},{"id":"EX-50-2-EDIT","label":"Only assistive functions for standard editing (system-wide)","basis":"statutory","ifAll":[{"fact":"onlyAssistiveStandardEditing","equals":true}]},{"id":"EX-50-2-NOSUB","label":"No substantial alteration of the deployer's input or its semantics (system-wide)","basis":"statutory","ifAll":[{"fact":"noSubstantialAlterationOfInput","equals":true}]},{"id":"EX-50-2-OUTOFSCOPE","label":"Only outputs the guidelines place outside Art 50(2)","basis":"guidance","ifAll":[{"fact":"outputsOnlyOutOfScopeContent","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-50-2-B2B","label":"Industrial or business-to-business application meeting guidelines point 87","basis":"guidance","ifAll":[{"fact":"b2bIndustrialConditionsMet","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-50-2-EPHEMERAL","label":"Real-time ephemeral content where marking is infeasible and persons are told","basis":"guidance","ifAll":[{"fact":"ephemeralRealTimeOnly","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-03"]}},{"id":"EX-SCOPE-RD","label":"Sole purpose of scientific research and development (Art 2(6))","basis":"statutory","ifAll":[{"fact":"scientificResearchOnly","equals":true}]}],"exceptionsTestedPerItem":[],"procedureIds":["A50-P-00","A50-P-02A","A50-P-02B","A50-P-02C","A50-P-02D","A50-P-02E","A50-P-02F"],"evidenceCategories":["Pipeline code","Validation","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Article 111(4): systems placed on the market before 2 August 2026 mark their outputs from 2 December 2026 (rule-pack entry aia-2026-12-02-art50-2-legacy-transition); systems only put into service before that date are pending legal review (LR-A50-01)."},
-    {"code":"AIA-50-3","article":"50(3)","title":"Notice of emotion recognition or biometric categorisation","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerOperatesErOrBcSystem","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-3-LE","label":"Permitted by law to detect, prevent or investigate criminal offences, with safeguards","basis":"statutory","ifAll":[{"fact":"lawEnforcementPermittedErBc","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-11"]}}],"procedureIds":["A50-P-00","A50-P-03"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"Screen Article 5(1)(f) and (g) first: a notice under Article 50(3) does not make a prohibited use lawful."},
-    {"code":"AIA-50-4-DF","article":"50(4), first subparagraph","title":"Deep-fake disclosure","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerGeneratesDeepFakes","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-4-LE","label":"Use authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]}],"procedureIds":["A50-P-00","A50-P-04A"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727","reviewNote":"An evidently artistic, creative, satirical or fictional work changes the form of the disclosure, not whether it applies (LR-A50-08)."},
-    {"code":"AIA-50-4-TXT","article":"50(4), second subparagraph","title":"Disclosure of AI-generated text on matters of public interest","actor":["Deployer"],"trigger":{"profile":"deployer_art50","conditions":[{"fact":"deployerPublishesAiTextOnPublicInterest","equals":true}]},"exclusions":[{"id":"EX-SCOPE-PERSONAL","label":"Purely personal, non-professional use by a natural person (Art 2(10))","basis":"statutory","ifAll":[{"fact":"personalNonProfessionalUseOnly","equals":true}]}],"exceptionsTestedPerItem":[{"id":"EX-50-4T-LE","label":"Use authorised by law to detect, prevent, investigate or prosecute criminal offences","basis":"statutory","ifAll":[{"fact":"authorisedByLawForCriminalOffences","equals":true}]},{"id":"EX-50-4T-EDITORIAL","label":"Human review or editorial control with editorial responsibility for the publication","basis":"statutory","ifAll":[{"fact":"editorialExceptionReliedOn","equals":true}],"legalReview":{"required":true,"itemIds":["LR-A50-09"]}}],"procedureIds":["A50-P-00","A50-P-04B"],"evidenceCategories":["Instructions","Governance","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"},
-    {"code":"AIA-50-5","article":"50(5)","title":"Clear, distinguishable, timely and accessible information","actor":["Provider","Deployer"],"trigger":{"profile":"operator_art50","conditions":[{"fact":"art50DisclosureApplies","equals":true}]},"exclusions":[],"exceptionsTestedPerItem":[],"followsItems":["AIA-50-1","AIA-50-2","AIA-50-3","AIA-50-4-DF","AIA-50-4-TXT"],"procedureIds":["A50-P-05"],"evidenceCategories":["Instructions","Validation","Other"],"legalSource":"EUR-Lex","version":"02024R1689-20260727"}
+    {
+      "code": "AIA-9-1",
+      "article": "9(1)",
+      "title": "Lifecycle risk-management system",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-2A",
+      "article": "9(2)(a)",
+      "title": "Intended-use risks",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-2B",
+      "article": "9(2)(b)",
+      "title": "Foreseeable-misuse risk evaluation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-2C",
+      "article": "9(2)(c)",
+      "title": "Post-market risk feedback",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-2D",
+      "article": "9(2)(d)",
+      "title": "Targeted risk treatments",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Pipeline code"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-5",
+      "article": "9(4)-(5)",
+      "title": "Control interactions and residual-risk judgment",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-5ABC",
+      "article": "9(5)(a)-(c)",
+      "title": "Design, mitigation and deployer information",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Governance",
+        "Instructions"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-TEST",
+      "article": "9(6),(8)",
+      "title": "Testing against prior suitable criteria",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Governance",
+        "Training log"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-9-9",
+      "article": "9(9)",
+      "title": "Children and vulnerable-group consideration",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Dataset",
+        "Validation"
+      ],
+      "reviewNote": "Assess whether adverse impacts are likely; do not omit this consideration merely because affected groups were not identified in the supplied dataset.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2A",
+      "article": "10(2)(a)",
+      "title": "Data design choices",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2B",
+      "article": "10(2)(b)",
+      "title": "Collection origin and original purpose",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2C",
+      "article": "10(2)(c)",
+      "title": "Preparation and labelling",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Pipeline code",
+        "Training log"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2D",
+      "article": "10(2)(d)",
+      "title": "Data measurement assumptions",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2E",
+      "article": "10(2)(e)",
+      "title": "Dataset availability and suitability",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2F",
+      "article": "10(2)(f)",
+      "title": "Bias and feedback examination",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2G",
+      "article": "10(2)(g)",
+      "title": "Bias detection and mitigation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Dataset",
+        "Pipeline code",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-2H",
+      "article": "10(2)(h)",
+      "title": "Data-gap identification and treatment",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-3",
+      "article": "10(3)",
+      "title": "Relevance, representativeness and quality",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-4",
+      "article": "10(4)",
+      "title": "Intended-context data coverage",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_datasets",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-10-6",
+      "article": "10(6)",
+      "title": "Non-training testing-data scope",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "trainingUsesData",
+            "equals": false
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727",
+      "dependencies": [
+        "10(2)-(4)",
+        "4a(1)"
+      ]
+    },
+    {
+      "code": "AIA-11-1",
+      "article": "11(1)",
+      "title": "Pre-market and current technical documentation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Validation"
+      ],
+      "reviewNote": "Assess Annex IV elements and any lawful simplified form; the amendment also covers SMCs. A simplified submission uses the Commission's form, which notified bodies must accept (Article 11(1), second subparagraph, as replaced). A generated audit report is not automatically the provider's complete technical documentation.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-11-2",
+      "article": "11(2)",
+      "title": "Combined product technical documentation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_i_a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-1",
+      "article": "12(1)",
+      "title": "Automatic lifecycle event recording",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Validation",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-2",
+      "article": "12(2)(a)-(c)",
+      "title": "Risk, monitoring and operation traceability",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance",
+        "Validation"
+      ],
+      "reviewNote": "Platform activity and metric-execution logs are not substitutes for the audited system's operational events.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-3A",
+      "article": "12(3)(a)",
+      "title": "Biometric use start/end periods",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Pipeline code",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-3B",
+      "article": "12(3)(b)",
+      "title": "Biometric reference-database identity",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Dataset",
+        "Pipeline code"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-3C",
+      "article": "12(3)(c)",
+      "title": "Biometric matched-input trace",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Dataset",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-12-3D",
+      "article": "12(3)(d)",
+      "title": "Biometric verifier identities",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Oversight"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-12",
+      "article": "13(1)-(2)",
+      "title": "Usable transparency and instructions",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3A",
+      "article": "13(3)(a)",
+      "title": "Provider and representative contacts",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3B-I-III",
+      "article": "13(3)(b)(i)-(iii)",
+      "title": "Purpose, validated performance and foreseeable risks",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Security",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3B-EXPL",
+      "article": "13(3)(b)(iv),(vii)",
+      "title": "Output explanation and interpretation information",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "reviewNote": "These subitems contain where-applicable qualifications; assess them explicitly. A SHAP plot alone is not evidence of deployer comprehension.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3B-V",
+      "article": "13(3)(b)(v)",
+      "title": "Relevant group-performance information",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "subgroupPerformanceRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Dataset"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3B-VI",
+      "article": "13(3)(b)(vi)",
+      "title": "Relevant input and dataset specifications",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "inputSpecificationsRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Dataset",
+        "Model"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3C",
+      "article": "13(3)(c)",
+      "title": "Pre-determined changes in instructions",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "preDeterminedChanges",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3D",
+      "article": "13(3)(d)",
+      "title": "Oversight and interpretation measures",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3E",
+      "article": "13(3)(e)",
+      "title": "Resources, lifetime, maintenance and updates",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-13-3F",
+      "article": "13(3)(f)",
+      "title": "Log collection, storage and interpretation instructions",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "logMechanismsRelevant",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Other",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-123",
+      "article": "14(1)-(3)",
+      "title": "Risk-proportionate oversight design",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Pipeline code",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-4A",
+      "article": "14(4)(a)",
+      "title": "Capacity, limitations and anomaly monitoring",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-4B",
+      "article": "14(4)(b)",
+      "title": "Automation-bias awareness",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-4C",
+      "article": "14(4)(c)",
+      "title": "Correct output interpretation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Instructions",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-4D",
+      "article": "14(4)(d)",
+      "title": "Disregard, override and reversal",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Validation",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-4E",
+      "article": "14(4)(e)",
+      "title": "Intervention and safe stop",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Pipeline code",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-14-5",
+      "article": "14(5)",
+      "title": "Biometric separate dual verification",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_annex_iii_1a",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Other",
+        "Governance"
+      ],
+      "reviewNote": "Review proportionality exceptions for law enforcement, migration, border control and asylum under applicable Union/national law. This is audited-system oversight, not the audit platform's reviewer/signer workflow.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-15-1",
+      "article": "15(1)",
+      "title": "Lifecycle accuracy, robustness and security",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Security",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-15-3",
+      "article": "15(3)",
+      "title": "Declared accuracy and metrics",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-15-4",
+      "article": "15(4), first and second subparagraphs",
+      "title": "Fault resilience and fail-safe measures",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Pipeline code",
+        "Governance",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-15-4-FEEDBACK",
+      "article": "15(4), third subparagraph",
+      "title": "Continual-learning feedback mitigation",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": [
+          {
+            "fact": "learningContinuesAfterDeployment",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Pipeline code",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-15-5",
+      "article": "15(5)",
+      "title": "Contextual and AI-specific cybersecurity",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Security",
+        "Validation",
+        "Pipeline code",
+        "Governance"
+      ],
+      "reviewNote": "Article 15(2) is a Commission benchmark-development provision, not a separate private-operator pass/fail obligation.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-1",
+      "article": "Annex IV, point 1(a)-(h)",
+      "title": "System description and deployment forms",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Model",
+        "Pipeline code",
+        "Governance",
+        "Instructions",
+        "Oversight",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-2",
+      "article": "Annex IV, point 2(a)-(h)",
+      "title": "Development, architecture, data, tests and security",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Model",
+        "Dataset",
+        "Training log",
+        "Pipeline code",
+        "Validation",
+        "Oversight",
+        "Security"
+      ],
+      "reviewNote": "Point 2(g) calls for dated/signed responsible-person test reports; these are not supplied merely by an unsigned diagnostic output.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-3",
+      "article": "Annex IV, point 3",
+      "title": "Monitoring, functioning and control information",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Oversight",
+        "Dataset",
+        "Instructions",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-4",
+      "article": "Annex IV, point 4",
+      "title": "Performance-metric appropriateness",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Validation",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-5",
+      "article": "Annex IV, point 5",
+      "title": "Risk-management description",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-6",
+      "article": "Annex IV, point 6",
+      "title": "Provider lifecycle changes",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Validation"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-7",
+      "article": "Annex IV, point 7",
+      "title": "Standards and alternative solutions",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-AIV-8",
+      "article": "Annex IV, point 8; Article 47",
+      "title": "Actual EU declaration of conformity",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Pending legal review (LR-02): Article 47 sits in Chapter III Section 5, which applies from the 2 August 2026 general date on the text, but the declaration attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727",
+      "specificDocumentRequired": "EU declaration of conformity",
+      "categoryMatchIsInsufficient": true,
+      "legalReview": {
+        "required": true,
+        "itemIds": [
+          "LR-02"
+        ]
+      }
+    },
+    {
+      "code": "AIA-AIV-9",
+      "article": "Annex IV, point 9; Article 72",
+      "title": "Post-market evaluation and monitoring plan",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Validation",
+        "Other"
+      ],
+      "reviewNote": "Pending legal review (LR-02): Article 72 sits in Chapter IX, which applies from the 2 August 2026 general date on the text, but the plan attaches to high-risk systems whose obligations apply from 2 December 2027 (Annex III) or 2 August 2028 (Annex I).",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727",
+      "legalReview": {
+        "required": true,
+        "itemIds": [
+          "LR-02"
+        ]
+      }
+    },
+    {
+      "code": "AIA-23-1B",
+      "article": "23(1)(b)",
+      "title": "Importer technical-documentation verification",
+      "actor": [
+        "Importer"
+      ],
+      "trigger": {
+        "profile": "importer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-24-1",
+      "article": "24(1)",
+      "title": "Distributor markings, declaration and instructions checks",
+      "actor": [
+        "Distributor"
+      ],
+      "trigger": {
+        "profile": "distributor_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Instructions",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-25-1",
+      "article": "25(1)(a)-(c)",
+      "title": "Provider-role reassessment after changes",
+      "actor": [
+        "Importer",
+        "Distributor",
+        "Deployer",
+        "Other operator"
+      ],
+      "trigger": {
+        "profile": "operator_role_change",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Governance",
+        "Model",
+        "Pipeline code",
+        "Instructions"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-1",
+      "article": "26(1)",
+      "title": "Deployer use according to instructions",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Oversight",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-2",
+      "article": "26(2)",
+      "title": "Competent, supported oversight personnel",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Oversight",
+        "Governance",
+        "Other"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-4",
+      "article": "26(4)",
+      "title": "Controlled input-data relevance and coverage",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "deployerControlsInputData",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Dataset",
+        "Validation",
+        "Governance"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-5",
+      "article": "26(5)",
+      "title": "Operational monitoring and risk/incident response",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": []
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance",
+        "Instructions",
+        "Validation"
+      ],
+      "reviewNote": "Assess triggering events, recipient/escalation duties and actor/sector exceptions; no notification is sent automatically by catalog selection.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-6",
+      "article": "26(6)",
+      "title": "Retention of controlled system logs",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "deployerControlsLogs",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Other",
+        "Governance"
+      ],
+      "reviewNote": "Purpose-appropriate period of at least six months unless applicable law provides otherwise; assess data-protection and financial-sector qualifications.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-26-11",
+      "article": "26(11)",
+      "title": "Notice to affected natural persons",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_high_risk",
+        "conditions": [
+          {
+            "fact": "annexIIIDecisionsAboutPersons",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Assess Annex III use and law-enforcement qualifications; Article 50 obligations remain separately applicable.",
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-1",
+      "article": "50(1)",
+      "title": "AI-interaction disclosure by design",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_art50",
+        "conditions": [
+          {
+            "fact": "interactsDirectlyWithNaturalPersons",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Validation"
+      ],
+      "exclusions": [
+        {
+          "id": "EX-SCOPE-RD",
+          "label": "Sole purpose of scientific research and development (Art 2(6))",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "scientificResearchOnly",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "exceptionsTestedPerItem": [
+        {
+          "id": "EX-50-1-OBVIOUS",
+          "label": "Interaction obvious to a reasonably well-informed, observant and circumspect person",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "obviousToReasonablyWellInformedPerson",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-06"
+            ]
+          }
+        },
+        {
+          "id": "EX-50-1-LE",
+          "label": "Authorised by law for criminal offences and not available to the public to report crime",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "authorisedByLawForCriminalOffences",
+              "equals": true
+            },
+            {
+              "fact": "availableToPublicToReportCriminalOffence",
+              "equals": false
+            }
+          ]
+        }
+      ],
+      "procedureIds": [
+        "A50-P-00",
+        "A50-P-01"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-2",
+      "article": "50(2)",
+      "title": "Machine-readable marking and detectability of synthetic outputs",
+      "actor": [
+        "Provider"
+      ],
+      "trigger": {
+        "profile": "provider_art50",
+        "conditions": [
+          {
+            "fact": "generatesSyntheticContent",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Pipeline code",
+        "Validation",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Article 111(4): systems placed on the market before 2 August 2026 mark their outputs from 2 December 2026 (rule-pack entry aia-2026-12-02-art50-2-legacy-transition); systems only put into service before that date are pending legal review (LR-A50-01).",
+      "exclusions": [
+        {
+          "id": "EX-50-2-LE",
+          "label": "Authorised by law to detect, prevent, investigate or prosecute criminal offences",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "authorisedByLawForCriminalOffences",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "id": "EX-50-2-EDIT",
+          "label": "Only assistive functions for standard editing (system-wide)",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "onlyAssistiveStandardEditing",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "id": "EX-50-2-NOSUB",
+          "label": "No substantial alteration of the deployer's input or its semantics (system-wide)",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "noSubstantialAlterationOfInput",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "id": "EX-50-2-OUTOFSCOPE",
+          "label": "Only outputs the guidelines place outside Art 50(2)",
+          "basis": "guidance",
+          "ifAll": [
+            {
+              "fact": "outputsOnlyOutOfScopeContent",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-03"
+            ]
+          }
+        },
+        {
+          "id": "EX-50-2-B2B",
+          "label": "Industrial or business-to-business application meeting guidelines point 87",
+          "basis": "guidance",
+          "ifAll": [
+            {
+              "fact": "b2bIndustrialConditionsMet",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-03"
+            ]
+          }
+        },
+        {
+          "id": "EX-50-2-EPHEMERAL",
+          "label": "Real-time ephemeral content where marking is infeasible and persons are told",
+          "basis": "guidance",
+          "ifAll": [
+            {
+              "fact": "ephemeralRealTimeOnly",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-03"
+            ]
+          }
+        },
+        {
+          "id": "EX-SCOPE-RD",
+          "label": "Sole purpose of scientific research and development (Art 2(6))",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "scientificResearchOnly",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "exceptionsTestedPerItem": [],
+      "procedureIds": [
+        "A50-P-00",
+        "A50-P-02A",
+        "A50-P-02B",
+        "A50-P-02C",
+        "A50-P-02D",
+        "A50-P-02E",
+        "A50-P-02F"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-3",
+      "article": "50(3)",
+      "title": "Notice of emotion recognition or biometric categorisation",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerOperatesErOrBcSystem",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "Screen Article 5(1)(f) and (g) first: a notice under Article 50(3) does not make a prohibited use lawful.",
+      "exclusions": [
+        {
+          "id": "EX-SCOPE-PERSONAL",
+          "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "personalNonProfessionalUseOnly",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "exceptionsTestedPerItem": [
+        {
+          "id": "EX-50-3-LE",
+          "label": "Permitted by law to detect, prevent or investigate criminal offences, with safeguards",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "lawEnforcementPermittedErBc",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-11"
+            ]
+          }
+        }
+      ],
+      "procedureIds": [
+        "A50-P-00",
+        "A50-P-03"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-4-DF",
+      "article": "50(4), first subparagraph",
+      "title": "Deep-fake disclosure",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerGeneratesDeepFakes",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "reviewNote": "An evidently artistic, creative, satirical or fictional work changes the form of the disclosure, not whether it applies (LR-A50-08).",
+      "exclusions": [
+        {
+          "id": "EX-SCOPE-PERSONAL",
+          "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "personalNonProfessionalUseOnly",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "exceptionsTestedPerItem": [
+        {
+          "id": "EX-50-4-LE",
+          "label": "Use authorised by law to detect, prevent, investigate or prosecute criminal offences",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "authorisedByLawForCriminalOffences",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "procedureIds": [
+        "A50-P-00",
+        "A50-P-04A"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-4-TXT",
+      "article": "50(4), second subparagraph",
+      "title": "Disclosure of AI-generated text on matters of public interest",
+      "actor": [
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "deployer_art50",
+        "conditions": [
+          {
+            "fact": "deployerPublishesAiTextOnPublicInterest",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Governance",
+        "Other"
+      ],
+      "exclusions": [
+        {
+          "id": "EX-SCOPE-PERSONAL",
+          "label": "Purely personal, non-professional use by a natural person (Art 2(10))",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "personalNonProfessionalUseOnly",
+              "equals": true
+            }
+          ]
+        }
+      ],
+      "exceptionsTestedPerItem": [
+        {
+          "id": "EX-50-4T-LE",
+          "label": "Use authorised by law to detect, prevent, investigate or prosecute criminal offences",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "authorisedByLawForCriminalOffences",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "id": "EX-50-4T-EDITORIAL",
+          "label": "Human review or editorial control with editorial responsibility for the publication",
+          "basis": "statutory",
+          "ifAll": [
+            {
+              "fact": "editorialExceptionReliedOn",
+              "equals": true
+            }
+          ],
+          "legalReview": {
+            "required": true,
+            "itemIds": [
+              "LR-A50-09"
+            ]
+          }
+        }
+      ],
+      "procedureIds": [
+        "A50-P-00",
+        "A50-P-04B"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    },
+    {
+      "code": "AIA-50-5",
+      "article": "50(5)",
+      "title": "Clear, distinguishable, timely and accessible information",
+      "actor": [
+        "Provider",
+        "Deployer"
+      ],
+      "trigger": {
+        "profile": "operator_art50",
+        "conditions": [
+          {
+            "fact": "art50DisclosureApplies",
+            "equals": true
+          }
+        ]
+      },
+      "evidenceCategories": [
+        "Instructions",
+        "Validation",
+        "Other"
+      ],
+      "exclusions": [],
+      "exceptionsTestedPerItem": [],
+      "followsItems": [
+        "AIA-50-1",
+        "AIA-50-2",
+        "AIA-50-3",
+        "AIA-50-4-DF",
+        "AIA-50-4-TXT"
+      ],
+      "procedureIds": [
+        "A50-P-05"
+      ],
+      "legalSource": "EUR-Lex",
+      "version": "02024R1689-20260727"
+    }
   ]
 }

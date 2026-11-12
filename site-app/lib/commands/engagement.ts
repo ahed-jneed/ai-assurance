@@ -2,9 +2,15 @@ import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
 import { roles, stageGates } from "../domain";
 import { db, now, sha256 } from "../engagement-repo";
-import { packFeatures, resolveFollowup } from "../criteria/pin";
+import {
+  assertLegacyUnpin,
+  explicitLegacyPin,
+  packFeatures,
+  resolveFollowup,
+} from "../criteria/pin";
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
+import { requireAdmin } from "../tenancy";
 import { calendarDate } from "../workflow-service";
 import { defineCommands, type CommandHandler } from "./command";
 import { short } from "./fields";
@@ -172,6 +178,47 @@ export const engagement = defineCommands({
               cmd,
             ),
         ],
+      };
+    },
+  },
+  // M1 of docs/design/criteria-model.md section 11.4: a practice
+  // administrator on the engagement team writes the read-time legacy pin
+  // into the stored aggregate, through the normal save (audit event,
+  // snapshot row, version bump). Behaviour does not change; the pin becomes
+  // visible in the stored engagement.
+  pinCriteria: {
+    roles: ["Auditor", "Lead Auditor"],
+    handle(e, d, ctx) {
+      z.object({}).strict().parse(d);
+      requireAdmin(ctx);
+      e.criteria = explicitLegacyPin(e, ctx.user.userId, now());
+      const { pin } = e.criteria;
+      return {
+        details: {
+          packId: pin.packId,
+          packVersion: pin.packVersion,
+          packSha256: pin.packSha256,
+          origin: "legacy",
+        },
+      };
+    },
+  },
+  // The reversal of M1, while the pin is a legacy pin that never moved. The
+  // engagement then resolves the same pin at read time again (M0).
+  unpinCriteria: {
+    roles: ["Auditor", "Lead Auditor"],
+    handle(e, d, ctx) {
+      z.object({}).strict().parse(d);
+      requireAdmin(ctx);
+      assertLegacyUnpin(e);
+      const { pin } = e.criteria!;
+      delete e.criteria;
+      return {
+        details: {
+          packId: pin.packId,
+          packVersion: pin.packVersion,
+          packSha256: pin.packSha256,
+        },
       };
     },
   },

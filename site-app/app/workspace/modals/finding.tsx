@@ -22,18 +22,31 @@ export const procedureFindingDefaults = (p: Procedure) => ({
   impact: "3",
   visibility: "internal",
 });
-function FindingFields({ choices, choice }: ModalFieldsProps) {
-  return <NewFindingForm choices={choices} onChoice={choice} />;
+function FindingFields({ choices, choice, data }: ModalFieldsProps) {
+  return (
+    <NewFindingForm
+      choices={choices}
+      onChoice={choice}
+      criteria={data?.criteria?.findingCriteria}
+    />
+  );
 }
 export const findingModal: ModalDefinition = {
   title: "Record audit finding",
   submitLabel: "Record finding",
   Fields: FindingFields,
-  submit: ({ act, choices, values: v }) =>
-    act("createFinding", {
+  submit: ({ act, choices, values: v, data }) => {
+    // A chosen criterion (docs/design/criteria-model.md section 7) also
+    // gives the article the registers show; without one, a finding raised
+    // from a procedure takes the criteria of its item on the server.
+    const criterion = data?.criteria?.findingCriteria?.find(
+      (c) => c.reference === choices.criterion,
+    );
+    return act("createFinding", {
       title: v.title,
       procedureId: choices.procedureId || undefined,
-      article: choices.article,
+      ...(criterion ? { criteriaRefs: [criterion.reference] } : {}),
+      article: criterion?.article ?? choices.article,
       condition: v.condition,
       criteria: v.criteria,
       cause: v.cause,
@@ -43,5 +56,6 @@ export const findingModal: ModalDefinition = {
       owner: v.owner,
       dueDate: v.dueDate,
       visibility: choices.visibility,
-    }),
+    });
+  },
 };

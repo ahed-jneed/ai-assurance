@@ -2,7 +2,7 @@
 // views an engagement offers and, with `framework`, one of them computed on
 // demand from the engagement aggregate, its pinned documents and at most
 // 1,000 current obligation records. Internal roles with engagement access
-// only; client roles get 403 in phase 1 (Q7 moved to #61).
+// only; client roles get 403 (Q7, decided in #61: coverage stays internal).
 import { currentObligations } from "../assurance-store";
 import { criteriaRegistry, pinned } from "../criteria/pin";
 import { features } from "../criteria/projection";
