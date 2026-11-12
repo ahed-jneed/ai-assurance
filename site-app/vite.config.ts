@@ -73,7 +73,25 @@ export default defineConfig(async ({ command }) => {
       ? { IDENTITY_MODE: "sites" }
       : {};
 
+  // vinext scans every app/**/*.{tsx,ts,jsx,js} for dependencies to
+  // pre-bundle, tests included. Test fixtures import ../schemas/*.mjs, outside
+  // the project root, which the scanner cannot load: the scan then fails, the
+  // development server skips pre-bundling, discovers dependencies on the first
+  // page load and reloads the page under it (the failed full-page loads seen
+  // in #81's smoke test). Tests are never served, so leave them out (#121).
+  // Vite appends vinext's entries to these.
+  const scanEntries = { optimizeDeps: { entries: ["!**/*.test.{ts,tsx}"] } };
+
   return {
+    ...(command === "serve"
+      ? {
+          environments: {
+            client: scanEntries,
+            rsc: scanEntries,
+            ssr: scanEntries,
+          },
+        }
+      : {}),
     define: {
       __SITES_IDENTITY_DEFAULT__: sitesBuild
         ? JSON.stringify("sites")
