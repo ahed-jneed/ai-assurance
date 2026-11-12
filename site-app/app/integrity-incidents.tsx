@@ -68,11 +68,11 @@ export function IntegrityIncidentsPanel({
           </h2>
           <p className="subtle">
             {incidents.count === 1
-              ? "1 damaged engagement record was found"
-              : incidents.count.toLocaleString() +
-                " damaged engagement records were found"}{" "}
-            while members loaded them. Each damaged engagement stays closed; the
-            others work as before.
+              ? "Members found 1 damaged engagement record."
+              : "Members found " +
+                incidents.count.toLocaleString() +
+                " damaged engagement records."}{" "}
+            Each damaged engagement stays closed; the others work as before.
             {incidents.count > shown &&
               " Showing the " + shown + " most recently seen."}
           </p>

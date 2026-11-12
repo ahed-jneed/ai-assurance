@@ -1747,7 +1747,7 @@ export function AssuranceWorkbench({
               <div className="section-toolbar">
                 <h2>Execution requests</h2>
                 {snapshot && (
-                  <span className="subtle" aria-label="External queue">
+                  <span className="subtle external-queue-telemetry">
                     {snapshot.telemetry.total.toLocaleString()} requests ·{" "}
                     {snapshot.telemetry.queued.toLocaleString()} queued ·{" "}
                     {snapshot.telemetry.running.toLocaleString()} running ·{" "}
