@@ -1,4 +1,4 @@
-import type { Engagement, Role } from "./domain";
+import type { Engagement, GateFeatures, Role } from "./domain";
 import {
   checklistProblem,
   qualityReviewSignedOff,
@@ -9,6 +9,13 @@ import { stagePaperQueue } from "./auditor-workflow";
 import { paperNextAction } from "./paper-workflow";
 import { paperRegisterRow } from "./paper-presentation";
 import { localWorkDay } from "./work-inbox";
+import {
+  awaitsReclassification,
+  awaitsRecapture,
+  capturedBeforeMigration,
+  reReviewTriggers,
+  type ClassificationRules,
+} from "./domain/classification";
 import { acceptanceTasks } from "./workflow/acceptance";
 
 export type WorkItem = {
@@ -19,6 +26,7 @@ export type WorkItem = {
   kind:
     | "acceptance"
     | "scope"
+    | "classification"
     | "program"
     | "procedure"
     | "paper"
@@ -133,10 +141,24 @@ export function procedureWork(
             !["reviewed", "signed"].includes(paper?.status ?? "")))),
   };
 }
+export interface EngagementWorkOptions {
+  /** A team member's display name, for titles that name them. */
+  nameOf?: (userId: string) => string | undefined;
+  /** The classification rules of the rule pack served. */
+  rules?: ClassificationRules;
+  /**
+   * What the engagement's criteria pack switches on (criteria model section
+   * 7.1). Without the AI Act classification there is no classification work;
+   * absent means pack #1, which has it.
+   */
+  features?: GateFeatures;
+}
 /**
- * The work an internal member sees for the engagement. `nameOf` gives a
- * person's display name for the titles that name a team member; the user id
- * stands in without it.
+ * The work an internal member sees for the engagement. `options.nameOf`
+ * gives a person's display name for the titles that name a team member; the
+ * user id stands in without it. With the rules of the rule pack served
+ * (`options.rules`), due classification re-review triggers are work too;
+ * without them (a caller that has no catalog) they are left out.
  */
 export function engagementWork(
   e: Engagement,
@@ -144,9 +166,11 @@ export function engagementWork(
   userId: string,
   client = "",
   today = localWorkDay(),
-  nameOf: (userId: string) => string | undefined = () => undefined,
+  options: EngagementWorkOptions = {},
 ): WorkItem[] {
   if (["Client Viewer", "Client Contributor"].includes(role)) return [];
+  const { rules } = options,
+    nameOf = options.nameOf ?? (() => undefined);
   const result: WorkItem[] = [],
     lead = role === "Lead Auditor",
     reviewer = ["Reviewer", "Lead Auditor"].includes(role),
@@ -185,6 +209,51 @@ export function engagementWork(
     });
   const w = e.workflow,
     b = w?.brief;
+  // #104: the classification work. A classification recorded before #19
+  // loads migrated (every fact unknown, any approval withdrawn) until it is
+  // recorded again; an approved one is re-reviewed once a trigger is due.
+  const c =
+    options.features?.aiActClassification === false
+      ? undefined
+      : e.classification;
+  if (c && awaitsReclassification(c))
+    add(
+      "classification",
+      "classification",
+      "Classification migrated to the guided assessment",
+      "Reclassify the system",
+      c.legacy?.status === "approved"
+        ? "The approval under the four-flag classification no longer stands: answer the facts again and obtain a new independent approval."
+        : "Recorded under the four-flag classification: answer the facts of the guided classification.",
+      "Regulatory mapping",
+      "",
+      e.dueDate,
+      writer ? "ready" : "waiting",
+      1,
+      undefined,
+      writer,
+    );
+  else if (rules && c?.status === "approved") {
+    const due = reReviewTriggers(c, rules, today).filter(
+      (t) => t.state === "due",
+    );
+    if (due.length)
+      add(
+        "classification",
+        "classification",
+        "Re-review classification",
+        "Re-review classification",
+        due.map((t) => t.title + " (" + t.basis + ")").join("; "),
+        "Regulatory mapping",
+        "",
+        // A trigger date is when the re-review became due, not a deadline.
+        "",
+        writer ? "ready" : "waiting",
+        1,
+        undefined,
+        writer,
+      );
+  }
   // Declarations are owed by the declarant; a declared threat is evaluated
   // by a Reviewer or Lead Auditor other than the declarant.
   for (const t of acceptanceTasks(w)) {
@@ -555,6 +624,28 @@ export function engagementWork(
       r.kind === "final" &&
       (!r.release || ["internal", "approved"].includes(r.release.state)),
   )) {
+    // A package captured before the classification migration holds the
+    // four-flag classification: approving or releasing it fails the
+    // source-record check, so it must be captured again.
+    if (capturedBeforeMigration(r.snapshot)) {
+      // A later final package captured since the migration retires it.
+      if (!awaitsRecapture(r, e.reports)) continue;
+      add(
+        "report",
+        r.id,
+        "Final report package",
+        lead ? "Capture the package again" : "View package dependency",
+        "Captured before the classification migration: the classification it holds no longer stands. Reclassify the system, obtain approval and capture a new final package.",
+        "Reports & sign-off",
+        "",
+        e.dueDate,
+        lead ? "ready" : "waiting",
+        1,
+        undefined,
+        lead,
+      );
+      continue;
+    }
     const approved = r.release?.state === "approved",
       eligible = approved
         ? lead && r.release?.approval?.userId !== userId

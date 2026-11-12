@@ -90,6 +90,14 @@ function statisticsBindings(run, plan = run.configuration?.statistics, planHash 
 // Equality, checksum recomputation and order are outside portable JSON Schema.
 // These fixture assertions mirror the application's frozen-manifest checks;
 // they are not a substitute for authorization, custody verification or review.
+// A pinned dataset card is the stored record: its hash is the SHA-256 of the
+// record text, and it describes the evaluated bytes over a forward period.
+function cardPinBindings(run) {
+  const { cardPin, sha256 } = run.manifest.dataset;
+  assert.equal(digest(cardPin.card), cardPin.sha256, 'dataset-card pin hash');
+  assert.equal(cardPin.card.artifactSha256, sha256, 'dataset card of other bytes');
+  assert.ok(cardPin.card.periodStart <= cardPin.card.periodEnd, 'dataset card period ends before it starts');
+}
 function hostedBindings(run) {
   const { model, dataset, profile } = run.manifest;
   const hashes = run.provenance.inputHashes;
@@ -102,6 +110,7 @@ function hostedBindings(run) {
   assert.equal(hashes.dataset, dataset.sha256);
   assert.equal(hashes.modelArtifact, dataset.sha256);
   if (model.sourceSha256) assert.equal(model.sourceSha256, dataset.sha256);
+  if (dataset.cardPin) cardPinBindings(run);
   assert.equal(hashes.modelMetadata, digest(model));
   assert.equal(hashes.manifest, digest(run.manifest));
   assert.equal(hashes.configuration, digest({ modelId: run.modelId, datasetId: run.datasetId, task: run.task, suite: run.suite, config: run.config, seed: run.seed }));
@@ -173,9 +182,13 @@ for (const [label, mutate] of [
 // keeps it equal to the runner's output) and, with --fixtures, runs the integration harness just made.
 const hosted = json(resolve(directory, 'fixtures/hosted-runs.v1.1.json'));
 const hosted14 = json(resolve(directory, 'fixtures/hosted-runs.v1.4.json'));
+// Card-pinned runs the integration harness made through the API
+// (capture-api-fixtures.mjs), frozen like the 1.1 fixture.
+const hostedApi = json(resolve(directory, 'fixtures/hosted-api-runs.v1.4.json'));
 const fresh = option('--fixtures') ? json(resolve(option('--fixtures'))) : [];
 assert.ok(Array.isArray(hosted) && hosted.length > 0 && Array.isArray(hosted14) && hosted14.length > 0);
-for (const [index, run] of [...hosted, ...hosted14, ...fresh].entries()) {
+assert.ok(hostedApi.some(run => run.state === 'succeeded' && run.manifest.dataset.cardPin), 'Expected an API-produced card-pinned run');
+for (const [index, run] of [...hosted, ...hosted14, ...hostedApi, ...fresh].entries()) {
   positive(`Hosted fixture ${index}: ${run.contractVersion} ${run.task}/${run.state}`, run);
   hostedBindings(run);
 }
@@ -319,8 +332,9 @@ const mutations = [
 for (const mutation of mutations) negative(...mutation);
 
 // queueRun and queueExternal pin the selected dataset governance card into the
-// manifest. Schema shape only: the server checks the card against the record.
-const cardPin = { recordId: 'REC-dataset-card-fixture', sha256: 'c'.repeat(64), card: { schemaVersion: '1.0', artifactId: complete.datasetId } };
+// manifest. The card is dataset-card.schema.json's registered card; the server
+// checks it against the record and the evaluated bytes.
+const cardPin = copy(hostedApi.find(run => run.state === 'succeeded').manifest.dataset.cardPin);
 const pinnedHosted = copy(complete);
 pinnedHosted.manifest.dataset.cardPin = copy(cardPin);
 positive('Hosted run with dataset-card pin', pinnedHosted);
@@ -329,7 +343,21 @@ for (const [label, mutate] of [
   ['dataset-card pin missing record', run => { delete run.manifest.dataset.cardPin.recordId; }],
   ['dataset-card pin missing card', run => { delete run.manifest.dataset.cardPin.card; }],
   ['dataset-card pin unknown field', run => { run.manifest.dataset.cardPin.arbitrary = true; }],
+  ['dataset-card pin with an empty card', run => { run.manifest.dataset.cardPin.card = {}; }],
+  ['dataset-card pin without the described bytes', run => { delete run.manifest.dataset.cardPin.card.artifactSha256; }],
+  ['dataset-card pin unknown card field', run => { run.manifest.dataset.cardPin.card.arbitrary = true; }],
+  ['dataset-card pin impossible period date', run => { run.manifest.dataset.cardPin.card.periodEnd = '2026-02-30'; }],
 ]) negative(label, pinnedHosted, mutate);
+const pinnedApi = hostedApi.find(run => run.state === 'succeeded');
+for (const [label, mutate] of [
+  ['card changed after pinning', run => { run.manifest.dataset.cardPin.card.population = 'Another population'; }],
+  ['card of other bytes', run => { run.manifest.dataset.cardPin.card.artifactSha256 = 'e'.repeat(64); run.manifest.dataset.cardPin.sha256 = digest(run.manifest.dataset.cardPin.card); }],
+]) {
+  const run = copy(pinnedApi);
+  mutate(run);
+  assert.throws(() => cardPinBindings(run), undefined, `${label}: card-pin tamper accepted`);
+  rejected++;
+}
 
 // Current importJob retains the exact completed worker envelope separately.
 // Its 1.2 projection uses frozen request declarations, one compilation paper,
@@ -447,7 +475,7 @@ for (const [label, mutate] of [
 
 const external = json(resolve(option('--external-fixtures') ?? resolve(directory, 'fixtures/external-runs.v1.2.json')));
 assert.ok(Array.isArray(external) && external.length >= 4, 'Expected real computed binary, multiclass, regression and client-local fixtures');
-assert.equal(schema.$id, 'urn:ai-assurance:test-run:1.2', 'Regeneration must preserve the 1.2 discriminator');
+assert.equal(schema.$id, 'urn:ai-assurance:test-run:2.0', 'Regeneration must preserve the schema identifier');
 for (const fixture of external) {
   positive(`External 1.2 ${fixture.fixture}`, fixture.run);
   positive(`Worker report ${fixture.fixture}`, JSON.parse(fixture.resultJSON).externalReport);
@@ -530,4 +558,4 @@ negative('Python runtime missing implementation', engine, run => { delete run.pr
 negative('Python dependency version is not text', engine, run => { run.provenance.dependencies.packages.numpy = {}; });
 negative('Python definition version is malformed', engine, run => { run.provenance.inputs.testDefinitions['PERF-BINARY'] = 'latest'; });
 negative('Python unknown configuration option', engine, run => { run.configuration.arbitrary = {}; });
-console.log(`PASS: Draft 2020-12 schema selfcheck; ${accepted} valid runs; ${rejected} rejected malformed runs/bindings; ${hosted.length} frozen hosted, ${external.length} exact-byte external 1.2 and ${external15.length} external 1.5 fixtures verified.`);
+console.log(`PASS: Draft 2020-12 schema selfcheck; ${accepted} valid runs; ${rejected} rejected malformed runs/bindings; ${hosted.length} frozen hosted, ${hostedApi.length} card-pinned API, ${external.length} exact-byte external 1.2 and ${external15.length} external 1.5 fixtures verified.`);

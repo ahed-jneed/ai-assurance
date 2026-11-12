@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ai-assurance:working-paper:2.0",
+  "$id": "urn:ai-assurance:working-paper:2.1",
   "title": "AI Assurance working paper or memo revision",
   "description": "Single working-paper contract with two distinct artifacts: a catalog working-paper or memo revision (paperRevision) and an engine-generated diagnostic draft (generatedDraft). Schema validity does not establish reviewer independence, tenant access, evidence truthfulness or legal sufficiency; the workflow service enforces those.",
   "oneOf": [
@@ -24,7 +24,7 @@
     },
     "paperRevision": {
       "title": "Catalog working-paper or memo revision",
-      "description": "A revision of a templates/catalog.json item. Drafts may leave narrative fields empty; submitted, reviewed, approved and sealed revisions require procedures, an evaluation rationale, approvals and, once sealed, two approvals and a content digest. templates/working-paper.blank.json is a draft specimen.",
+      "description": "A revision of a templates/catalog.json item. Drafts may leave narrative fields empty; submitted, reviewed, approved and sealed revisions require procedures, an evaluation rationale, approvals and, once sealed, two approvals and a content digest. schemaVersion 1.1.0 is what the application exports (site-app/lib/papers/): it adds the item kind, the narrative sections the paper is written in and, for memos, the structured decision records the memo rests on. templates/working-paper.blank.json is a draft specimen.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -52,7 +52,10 @@
       ],
       "properties": {
         "schemaVersion": {
-          "const": "1.0.0"
+          "enum": [
+            "1.0.0",
+            "1.1.0"
+          ]
         },
         "id": {
           "type": "string",
@@ -73,6 +76,13 @@
         "catalogId": {
           "type": "string",
           "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "working_paper",
+            "memo"
+          ],
+          "description": "The catalog item kind."
         },
         "templateVersion": {
           "type": "string",
@@ -107,6 +117,13 @@
         "title": {
           "type": "string",
           "minLength": 1
+        },
+        "audience": {
+          "enum": [
+            "internal",
+            "client"
+          ],
+          "description": "Who a signed paper is written for; released client reports publish client papers only."
         },
         "scope": {
           "$ref": "#/$defs/scope"
@@ -206,6 +223,12 @@
               ]
             }
           }
+        },
+        "narrative": {
+          "$ref": "#/$defs/narrative"
+        },
+        "records": {
+          "$ref": "#/$defs/memoRecords"
         }
       },
       "allOf": [
@@ -234,7 +257,8 @@
                 "properties": {
                   "rationale": {
                     "type": "string",
-                    "minLength": 20
+                    "minLength": 1,
+                    "pattern": "\\S"
                   },
                   "evidenceSufficiency": {
                     "enum": [
@@ -273,6 +297,7 @@
                   "auditorConclusion": {
                     "enum": [
                       "supported",
+                      "qualified",
                       "deficiency",
                       "unable_to_conclude",
                       "not_applicable"
@@ -310,6 +335,43 @@
                   }
                 }
               }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "schemaVersion": {
+                "const": "1.1.0"
+              }
+            },
+            "required": [
+              "schemaVersion"
+            ]
+          },
+          "then": {
+            "required": [
+              "kind",
+              "narrative"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "working_paper"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "records"
+              ]
             }
           }
         }
@@ -709,16 +771,32 @@
           "minLength": 1
         },
         "manifestDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA-256 of the frozen run manifest; null for runs made before manifests were frozen."
         },
         "testSuiteVersion": {
           "type": "string",
           "minLength": 1
         },
         "environmentDigest": {
-          "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "SHA-256 of the execution environment; null where the runner records none (the hosted runner records its runner version only)."
         },
         "inputArtifactVersionIds": {
           "type": "array",
@@ -783,6 +861,7 @@
           "enum": [
             "not_assessed",
             "supported",
+            "qualified",
             "deficiency",
             "unable_to_conclude",
             "not_applicable"
@@ -893,7 +972,8 @@
           "enum": [
             "preparer",
             "reviewer",
-            "lead_auditor"
+            "lead_auditor",
+            "engagement_quality_reviewer"
           ]
         },
         "decision": {
@@ -1100,6 +1180,630 @@
         "version": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "narrative": {
+      "title": "Paper narrative",
+      "description": "The sections a working paper or memo is written in, as the application records them. Memos use the same sections: the memo templates map background to objective and scope, the issue to criteria, the analysis and alternatives to procedures, sampling and results, and the recommendation and management position to the conclusion.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "objective",
+        "scope",
+        "criteria",
+        "procedures",
+        "sampling",
+        "results",
+        "limitations",
+        "conclusion",
+        "conclusionStatus"
+      ],
+      "properties": {
+        "objective": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "criteria": {
+          "type": "string"
+        },
+        "procedures": {
+          "type": "string"
+        },
+        "sampling": {
+          "type": "string"
+        },
+        "results": {
+          "type": "string"
+        },
+        "limitations": {
+          "type": "string"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "conclusionStatus": {
+          "enum": [
+            "not_evaluated",
+            "supported",
+            "qualified",
+            "not_supported",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "acceptanceRecord": {
+      "title": "Acceptance and continuance record",
+      "description": "The ISAE 3000 acceptance or continuance decision (#23) the acceptance and independence memo rests on, as the application recorded it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "status",
+        "decision",
+        "preconditions",
+        "scope",
+        "periodStart",
+        "periodEnd",
+        "systemBoundary",
+        "accessLevel",
+        "engagementLetter",
+        "team",
+        "competenceConclusion",
+        "changeReason",
+        "updatedBy",
+        "updatedAt",
+        "approval"
+      ],
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "draft",
+            "approved"
+          ]
+        },
+        "decision": {
+          "enum": [
+            "acceptance",
+            "continuance"
+          ]
+        },
+        "preconditions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subjectMatter",
+            "criteria",
+            "evidence",
+            "purpose"
+          ],
+          "properties": {
+            "subjectMatter": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "met",
+                "basis"
+              ],
+              "properties": {
+                "met": {
+                  "type": "boolean"
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            },
+            "criteria": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "met",
+                "basis"
+              ],
+              "properties": {
+                "met": {
+                  "type": "boolean"
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            },
+            "evidence": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "met",
+                "basis"
+              ],
+              "properties": {
+                "met": {
+                  "type": "boolean"
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            },
+            "purpose": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "met",
+                "basis"
+              ],
+              "properties": {
+                "met": {
+                  "type": "boolean"
+                },
+                "basis": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "scope": {
+          "type": "string"
+        },
+        "periodStart": {
+          "type": "string"
+        },
+        "periodEnd": {
+          "type": "string"
+        },
+        "systemBoundary": {
+          "type": "string"
+        },
+        "accessLevel": {
+          "enum": [
+            "white",
+            "grey",
+            "black"
+          ]
+        },
+        "engagementLetter": {
+          "type": "string"
+        },
+        "team": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "competenceConclusion": {
+          "type": "string"
+        },
+        "changeReason": {
+          "type": "string"
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "approval": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "userId",
+                "at",
+                "revision",
+                "hash",
+                "reason"
+              ],
+              "properties": {
+                "userId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "hash": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "stage": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "declaration": {
+      "title": "Independence and competence declaration",
+      "description": "One person's dated declaration for the engagement period (#23); a later declaration by the same person for the same period supersedes it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "userId",
+        "role",
+        "declaredAt",
+        "periodStart",
+        "periodEnd",
+        "team",
+        "priorWork",
+        "threats",
+        "exclusions",
+        "competence",
+        "expertField"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "declaredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "periodStart": {
+          "type": "string"
+        },
+        "periodEnd": {
+          "type": "string"
+        },
+        "team": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "priorWork": {
+          "type": "string"
+        },
+        "threats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "description",
+              "safeguards"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "self_interest",
+                  "self_review",
+                  "advocacy",
+                  "familiarity",
+                  "intimidation"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "safeguards": {
+                "type": "string"
+              },
+              "resolution": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "userId",
+                  "at",
+                  "reason"
+                ],
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "system_involvement",
+              "employment",
+              "financial_interest"
+            ]
+          }
+        },
+        "exclusionWithdrawals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "userId",
+              "at",
+              "reason"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "system_involvement",
+                  "employment",
+                  "financial_interest"
+                ]
+              },
+              "userId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "competence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assurance",
+            "ai_systems",
+            "statistics",
+            "regulation",
+            "management_systems",
+            "data_protection",
+            "security",
+            "domain"
+          ],
+          "properties": {
+            "assurance": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "ai_systems": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "statistics": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "regulation": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "management_systems": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "data_protection": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "security": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            },
+            "domain": {
+              "enum": [
+                "none",
+                "foundation",
+                "proficient",
+                "expert"
+              ]
+            }
+          }
+        },
+        "expertField": {
+          "type": "string"
+        }
+      }
+    },
+    "qualityReviewSignOff": {
+      "title": "Engagement quality reviewer sign-off",
+      "description": "The engagement quality reviewer's sign-off of one final package (#24), bound to both package hashes and the checklist revision it rests on.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reportId",
+        "internalHash",
+        "clientHash",
+        "checklistRevision",
+        "conclusion",
+        "userId",
+        "at"
+      ],
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "internalHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "clientHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "checklistRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "releaseCompletion": {
+      "title": "Release completion record",
+      "description": "The release-time completion record (WP-RP-02 and MEM-SO-01): the independent approval and the release of one final package, bound to both package hashes.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reportId",
+        "templateIds",
+        "internalHash",
+        "clientHash",
+        "approvedBy",
+        "approvedAt",
+        "releasedBy",
+        "releasedAt"
+      ],
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "internalHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "clientHash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "approvedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approvedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "releasedBy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "releasedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "memoRecords": {
+      "title": "Memo decision records",
+      "description": "The structured records a memo decides on, copied from the engagement when the memo leaves the application: the acceptance record and declarations for the acceptance and independence memo (MEM-AC-01), the engagement quality reviewer's sign-offs and the release completion for the completion and issue-authorisation memo (MEM-SO-01). Other memos carry none.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "$ref": "#/$defs/acceptanceRecord"
+        },
+        "declarations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/declaration"
+          }
+        },
+        "qualityReview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewerId",
+            "checklistRevision",
+            "signOffs"
+          ],
+          "properties": {
+            "reviewerId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "checklistRevision": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "signOffs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/qualityReviewSignOff"
+              }
+            }
+          }
+        },
+        "releaseCompletion": {
+          "$ref": "#/$defs/releaseCompletion"
         }
       }
     }

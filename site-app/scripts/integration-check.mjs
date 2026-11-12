@@ -3137,6 +3137,27 @@ try {
         bulkLocations.at(-1).body,
       );
     } else assert.equal(pinnedFiles.length, 0);
+    // The internal dossier files each paper as a working-paper contract
+    // document and adds the released package's completion memo (#51);
+    // check:fixtures validates them. The client dossier keeps conclusions.
+    const paperFiles = dossier.files
+      .filter((f) => f.path.startsWith("papers/"))
+      .map((f) => JSON.parse(dossierText(f.path)));
+    assert(paperFiles.length > 0);
+    if (audience === "internal") {
+      assert(paperFiles.every((d) => d.schemaVersion === "1.1.0"));
+      const memo = paperFiles.find((d) => d.catalogId === "MEM-SO-01");
+      assert.equal(memo.records.releaseCompletion.reportId, internalFinal.id);
+      assert.equal(
+        memo.records.releaseCompletion.internalHash,
+        internalFinal.sha256,
+      );
+      await fs.writeFile(
+        ".sites-runtime/dossier-papers.json",
+        JSON.stringify(paperFiles, null, 2),
+      );
+    } else
+      assert(paperFiles.every((d) => d.schemaVersion === undefined && !d.body));
   }
   // Each seal is a saved engagement change.
   await refresh();

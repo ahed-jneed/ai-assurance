@@ -80,6 +80,62 @@ describe("GET /api/work-inbox", () => {
     ).toEqual([{ engagement_id: "ENG-A", kind: "missing" }]);
   });
 
+  it("lists the classification work the server derives (#104)", async () => {
+    const [legacy, stale] = engagements();
+    // A pre-#19 approval (four flags, no model): it loads migrated.
+    legacy.classification = {
+      ...legacy.classification,
+      model: undefined,
+      answers: undefined,
+      status: "approved",
+      approvedBy: "reviewer",
+    };
+    // An approval under an earlier rule pack: the re-review is due.
+    stale.classification = {
+      ...stale.classification,
+      status: "approved",
+      approvedBy: "reviewer",
+      rulePackVersion: "2026.10.1",
+    };
+    await practice([legacy, stale]);
+    const { status, body } = await inbox();
+    expect(status).toBe(200);
+    expect(
+      body.items
+        .filter((i) => i.kind === "classification")
+        .map((i) => [i.engagementId, (i as { action?: string }).action]),
+    ).toEqual([
+      ["ENG-A", "Reclassify the system"],
+      ["ENG-B", "Re-review classification"],
+    ]);
+  });
+
+  it("keeps an engagement whose rule-pack stamp has no criteria pack, without classification work", async () => {
+    const [legacy, unknown] = engagements();
+    legacy.classification = {
+      ...legacy.classification,
+      model: undefined,
+      answers: undefined,
+      status: "approved",
+      approvedBy: "reviewer",
+    };
+    unknown.classification = legacy.classification;
+    const { sqlite } = await practice([legacy, unknown]);
+    sqlite
+      .prepare(
+        `UPDATE engagements SET body=json_set(json_remove(body,'$.criteria'),'$.rulePack',json('{"version":"2026.12.9","legalVersion":"x","researchedAsOf":"2026-12-01","legalReview":"pending"}')) WHERE id='ENG-B'`,
+      )
+      .run();
+    const { status, body } = await inbox();
+    expect(status).toBe(200);
+    expect(
+      body.items
+        .filter((i) => i.kind === "classification")
+        .map((i) => i.engagementId),
+    ).toEqual(["ENG-A"]);
+    expect(body.items.some((i) => i.engagementId === "ENG-B")).toBe(true);
+  });
+
   it("keeps the queue when one engagement's body is not JSON", async () => {
     const { sqlite } = await practice(engagements());
     sqlite.prepare("UPDATE engagements SET body='[' WHERE id='ENG-B'").run();
