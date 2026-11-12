@@ -135,6 +135,17 @@ describe("the LL144 summary page", () => {
     expect(html).not.toContain("Draft: this audit is not approved");
   });
 
+  it("marks no reference category when every rate is zero", () => {
+    const summary = publishableSummary(engagement().ll144Audits![0]);
+    for (const table of summary.tables)
+      table.notes = [...table.notes, "reference_rate_zero"];
+    const html = renderToStaticMarkup(
+      summaryMarkup({ summary, source: "live" }, "/api/ll144-summary?x=1"),
+    );
+    expect(html).not.toContain("(reference)");
+    expect(html).toContain("no impact ratio is defined");
+  });
+
   it("is captured by a report in both snapshots, which link to it", async () => {
     const e = engagement();
     await reports.run(
@@ -154,10 +165,11 @@ describe("the LL144 summary page", () => {
       expect(summaries.map((s) => s.auditId)).toEqual(["LL144-1"]);
       expect(JSON.stringify(summaries)).not.toContain("user-");
       const html = renderToStaticMarkup(
-        reportMarkup(r, snapshot as ReportSnapshot),
+        reportMarkup(r, snapshot as ReportSnapshot, "tenant-1"),
       );
       expect(html).toContain("NYC Local Law 144 bias audit summaries");
       expect(html).toContain("auditId=LL144-1");
+      expect(html).toContain("tenantId=tenant-1");
     }
   });
 });

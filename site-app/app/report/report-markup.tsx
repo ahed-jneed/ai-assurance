@@ -208,7 +208,11 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
   );
 }
 
-export function reportMarkup(report: Report, s: ReportSnapshot) {
+export function reportMarkup(
+  report: Report,
+  s: ReportSnapshot,
+  tenantId?: string,
+) {
   const scope = s.scope ?? s.workflow?.brief,
     v2 = !!snapshotTerms(s) && !!s.conclusionStatement,
     supersededBy = report.supersededBy ?? report.release?.supersededBy;
@@ -498,6 +502,7 @@ export function reportMarkup(report: Report, s: ReportSnapshot) {
                   href={
                     "/ll144-summary?" +
                     new URLSearchParams({
+                      ...(tenantId ? { tenantId } : {}),
                       engagementId: s.engagement.id,
                       auditId: x.auditId,
                       reportId: report.id,

@@ -43,7 +43,10 @@ function Table({
             <tr key={c.category}>
               <th scope="row">
                 {label(c)}
-                {c.category === table.referenceCategory ? " (reference)" : ""}
+                {c.category === table.referenceCategory &&
+                !table.notes.includes("reference_rate_zero")
+                  ? " (reference)"
+                  : ""}
                 {c.excluded ? " (excluded, under 2%)" : ""}
               </th>
               <td>{c.n}</td>
