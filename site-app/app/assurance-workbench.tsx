@@ -42,6 +42,9 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import { assuranceRecords } from "@/lib/assurance-store-client";
 
 import type { ObligationOptions } from "@/lib/criteria/types";
+import { classificationRules } from "@/lib/classification-rules";
+import { asRulePack } from "@/lib/rule-pack";
+import { ObligationSuggestions } from "./obligation-suggestions";
 import { packFeatures } from "./workspace-types";
 
 import type {
@@ -2046,6 +2049,25 @@ export function AssuranceWorkbench({
               {list(["impact"], "No change assessments recorded")}
               {obligations && (
                 <>
+                  {packFeatures(data).aiActClassification && (
+                    <ObligationSuggestions
+                      classification={e.classification}
+                      rules={classificationRules(
+                        asRulePack(data.catalog?.regulatorySnapshot),
+                      )}
+                      assessed={
+                        new Set(
+                          all
+                            .filter((r) => r.kind === "obligation")
+                            .map((r) => String(r.body.code)),
+                        )
+                      }
+                      writer={writer}
+                      onAssess={(code, actor) =>
+                        open("obligationDecision", null, { code, actor })
+                      }
+                    />
+                  )}
                   <h2 className="workbench-subhead">Obligation assessments</h2>
                   {list(["obligation"], "No subitem assessments recorded")}
                   <details className="help-panel">

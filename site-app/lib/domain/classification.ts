@@ -813,66 +813,139 @@ function art50OwnResults(
   rules: ClassificationRules,
 ): Art50Result[] {
   const facts = classificationFactValues(c),
-    roles = roleFlags(c.operatorRole);
-  return rules.art50Items.map((item): Art50Result => {
-    const profile = profileOf(rules, item.trigger.profile),
-      held = profile.roles.some((r) =>
-        r === "Provider"
-          ? roles.provider
-          : r === "Deployer"
-            ? roles.deployer
-            : false,
-      ),
-      claimedExceptions = (item.exceptionsTestedPerItem ?? []).filter(
-        (x) => conjunction(predicates(x.ifAll), facts, false) === true,
-      ),
-      base = {
-        code: item.code,
-        article: item.article,
-        title: item.title,
-        claimedExceptions,
-      };
-    if (!held)
-      return {
-        ...base,
-        status: "role_not_held",
-        missingFacts: [],
-        claimedExceptions: [],
-      };
-    const trigger = predicates([
-      ...profile.conditions,
-      ...item.trigger.conditions,
-    ]);
-    const triggered = conjunction(trigger, facts, true);
-    if (triggered === false)
-      return { ...base, status: "not_triggered", missingFacts: [] };
-    if (triggered === "unknown")
-      return {
+    holds = rolesHeld(c.operatorRole);
+  return rules.art50Items.map((item) =>
+    obligationResult(item, rules, facts, holds),
+  );
+}
+/**
+ * Whether the operator holds a trigger profile's role: the provider and
+ * deployer roles of the classification, and the importer and distributor
+ * roles for "Importer / distributor".
+ */
+function rolesHeld(operatorRole: string) {
+  const roles = roleFlags(operatorRole),
+    importerOrDistributor = operatorRole === "Importer / distributor";
+  return (role: string) =>
+    role === "Provider"
+      ? roles.provider
+      : role === "Deployer"
+        ? roles.deployer
+        : role === "Importer" || role === "Distributor"
+          ? importerOrDistributor
+          : false;
+}
+/**
+ * The generic trigger evaluator of an obligation item: the operator's role,
+ * then the trigger (three-valued), then the exclusions. Exceptions tested
+ * per item never exclude (option a).
+ */
+function obligationResult(
+  item: ObligationRule,
+  rules: ClassificationRules,
+  facts: Facts,
+  holds: (role: string) => boolean,
+): Art50Result {
+  const profile = profileOf(rules, item.trigger.profile),
+    held = profile.roles.some(holds),
+    claimedExceptions = (item.exceptionsTestedPerItem ?? []).filter(
+      (x) => conjunction(predicates(x.ifAll), facts, false) === true,
+    ),
+    base = {
+      code: item.code,
+      article: item.article,
+      title: item.title,
+      claimedExceptions,
+    };
+  if (!held)
+    return {
+      ...base,
+      status: "role_not_held",
+      missingFacts: [],
+      claimedExceptions: [],
+    };
+  const trigger = predicates([
+    ...profile.conditions,
+    ...item.trigger.conditions,
+  ]);
+  const triggered = conjunction(trigger, facts, true);
+  if (triggered === false)
+    return { ...base, status: "not_triggered", missingFacts: [] };
+  if (triggered === "unknown")
+    return {
+      ...base,
+      status: "needs_information",
+      missingFacts: unknownFacts(trigger, facts),
+    };
+  const exclusions = item.exclusions ?? [];
+  const exclusion = exclusions.find(
+    (x) => conjunction(predicates(x.ifAll), facts, false) === true,
+  );
+  if (exclusion)
+    return { ...base, status: "excluded", missingFacts: [], exclusion };
+  const open = exclusions.filter(
+    (x) => conjunction(predicates(x.ifAll), facts, false) === "unknown",
+  );
+  return open.length
+    ? {
         ...base,
         status: "needs_information",
-        missingFacts: unknownFacts(trigger, facts),
-      };
-    const exclusions = item.exclusions ?? [];
-    const exclusion = exclusions.find(
-      (x) => conjunction(predicates(x.ifAll), facts, false) === true,
-    );
-    if (exclusion)
-      return { ...base, status: "excluded", missingFacts: [], exclusion };
-    const open = exclusions.filter(
-      (x) => conjunction(predicates(x.ifAll), facts, false) === "unknown",
-    );
-    return open.length
-      ? {
-          ...base,
-          status: "needs_information",
-          missingFacts: unknownFacts(
-            open.flatMap((x) => predicates(x.ifAll)),
-            facts,
-          ),
-        }
-      : { ...base, status: "candidate", missingFacts: [] };
-  });
+        missingFacts: unknownFacts(
+          open.flatMap((x) => predicates(x.ifAll)),
+          facts,
+        ),
+      }
+    : { ...base, status: "candidate", missingFacts: [] };
 }
+/** Whether an obligation item belongs to Articles 9 to 26 (Chapter III). */
+export function isChapterIIIItem(item: Pick<ObligationRule, "article">) {
+  const n = Number(/^(\d+)/.exec(item.article)?.[1]);
+  return n >= 9 && n <= 26;
+}
+export type ObligationSuggestion = Art50Result & {
+  /** The item's actors the operator holds. */
+  actor: string[];
+};
+/**
+ * Applicability candidates for the Art 9 to 26 obligation subitems (#104),
+ * from the classification's facts with the evaluator of the Art 50 items.
+ * The high-risk route counts only once the classification is approved
+ * (highRiskConfirmed), so a provisional classification suggests nothing and
+ * names the fact it waits for. A suggestion is never an applicability
+ * decision: the auditor records that, with a rationale, for independent
+ * review (decisionPolicy of docs/obligation-subitems.json).
+ */
+export function obligationSuggestions(
+  c: Pick<Classification, "operatorRole" | "annexRoute" | "answers" | "status">,
+  rules: ClassificationRules,
+  items: readonly ObligationRule[],
+): ObligationSuggestion[] {
+  const facts = classificationFactValues(c),
+    holds = rolesHeld(c.operatorRole);
+  return items.filter(isChapterIIIItem).map((item) => ({
+    ...obligationResult(item, rules, facts, holds),
+    actor: item.actor.filter(holds),
+  }));
+}
+/** The trigger facts of the Art 9 to 26 subitems, in words. */
+export const subitemFactLabels: Readonly<Record<string, string>> = {
+  highRiskConfirmed: "An approved high-risk classification",
+  datasetUsed: "Datasets are used to develop or test the system",
+  trainingUsesData: "The model is trained with data",
+  annexISectionAProduct: "Annex I Section A product",
+  annexIII1a: "Annex III point 1(a) remote biometric identification",
+  subgroupPerformanceRelevant: "Performance for specific groups is relevant",
+  inputSpecificationsRelevant: "Input data specifications are relevant",
+  preDeterminedChanges: "Changes pre-determined at the initial assessment",
+  logMechanismsRelevant: "Log collection mechanisms are relevant",
+  learningContinuesAfterDeployment:
+    "The system keeps learning after deployment",
+  deployerControlsInputData: "The deployer controls the input data",
+  deployerControlsLogs: "The deployer controls the logs",
+  annexIIIDecisionsAboutPersons:
+    "Annex III decisions about natural persons are made or assisted",
+  roleChangeCandidate: "A possible change of role under Art 25(1)",
+};
 /**
  * AI Office competence (Art 75(1) as replaced; rule-pack entry
  * aia-2026-08-02-ai-office-competence; A50-ED-06): competent when the system
@@ -1303,14 +1376,63 @@ export function migrateClassification(c: Classification): Classification {
         : [],
   };
 }
+/**
+ * Whether a classification migrated from the four flags still awaits its
+ * new answers: no classification has been recorded since the migration.
+ */
+export function awaitsReclassification(c: Classification) {
+  return !!c.legacy && !c.history?.some((h) => h.action === "classified");
+}
+/**
+ * Whether a captured report snapshot holds a classification from before
+ * #19. Its approval would fail the source-record check (the classification
+ * loads migrated), so the package must be captured again.
+ */
+export function capturedBeforeMigration(snapshot: Record<string, unknown>) {
+  const c = (snapshot.engagement as { classification?: unknown } | undefined)
+    ?.classification as { model?: unknown } | null | undefined;
+  return !!c && typeof c === "object" && c.model !== 2;
+}
+/**
+ * Whether a final package captured before the migration must still be
+ * captured again: no later final package holds a classification recorded
+ * since #19. The old internal package cannot be withdrawn, so a later
+ * capture is what retires it. A later package whose snapshot was not loaded
+ * counts as a recapture: it was captured after this one, and a package
+ * captured from a migrated classification cannot be approved or released.
+ */
+export function awaitsRecapture(
+  report: { createdAt: string; snapshot: Record<string, unknown> },
+  reports: readonly {
+    kind: string;
+    createdAt: string;
+    snapshot: Record<string, unknown>;
+  }[],
+) {
+  return (
+    capturedBeforeMigration(report.snapshot) &&
+    !reports.some(
+      (r) =>
+        r !== report &&
+        r.kind === "final" &&
+        r.createdAt > report.createdAt &&
+        !capturedBeforeMigration(r.snapshot),
+    )
+  );
+}
 
 export type ReReviewTrigger = {
   id: string;
   title: string;
   basis: string;
-  /** due: re-review now; scheduled: from `date`; watch: no date announced. */
-  state: "due" | "scheduled" | "watch";
+  /**
+   * due: re-review now; scheduled: from `date`; watch: no date announced;
+   * reviewed: `date` has passed and the system was classified or approved
+   * again on or after it (`reviewedOn`).
+   */
+  state: "due" | "scheduled" | "watch" | "reviewed";
   date?: string;
+  reviewedOn?: string;
 };
 export const art6GuidelinesId = "GUID-ART6-HIGH-RISK-CLASSIFICATION";
 /** The Code of Practice is reviewed at least every two years (A50-ED-07). */
@@ -1318,10 +1440,25 @@ export const codeReviewDue = "2028-06-10";
 /** Code Measure 3.4(c): interoperable watermark detection (TL-13). */
 export const interoperabilityMilestone = "2027-02-02";
 /**
+ * The day the classification was last recorded or approved: the latest
+ * `classified` or `approved` event, or `approvedAt`. A dated re-review
+ * trigger on or before this day has been reviewed.
+ */
+export function lastReviewedOn(c: Classification): string {
+  const days = [
+    c.approvedAt ?? "",
+    ...(c.history ?? [])
+      .filter((h) => h.action === "classified" || h.action === "approved")
+      .map((h) => h.at ?? ""),
+  ].map((d) => d.slice(0, 10));
+  return days.reduce((a, d) => (d > a ? d : a), "");
+}
+/**
  * When the classification must be reviewed again: final Art 6 guidelines
  * (the classification cited the draft), a review of the Art 50 guidelines,
  * a Code update, the 2 February 2027 interoperability milestone, and a new
- * rule pack.
+ * rule pack. A dated trigger is due once its date has come and the
+ * classification was not recorded or approved again on or after it.
  */
 export function reReviewTriggers(
   c: Classification,
@@ -1332,8 +1469,13 @@ export function reReviewTriggers(
     facts = classificationFactValues(c),
     cited = c.guidance?.find((g) => g.id === art6GuidelinesId),
     current = rules.guidance.find((g) => g.id === art6GuidelinesId),
-    dated = (date: string): ReReviewTrigger["state"] =>
-      today >= date ? "due" : "scheduled",
+    reviewedOn = lastReviewedOn(c),
+    dated = (date: string): Pick<ReReviewTrigger, "state" | "reviewedOn"> =>
+      today < date
+        ? { state: "scheduled" }
+        : reviewedOn >= date
+          ? { state: "reviewed", reviewedOn }
+          : { state: "due" },
     out: ReReviewTrigger[] = [];
   if (current)
     out.push({
@@ -1360,7 +1502,7 @@ export function reReviewTriggers(
       id: "code-update",
       title: "Update of the Code of Practice on transparency",
       basis: "Reviewed at least every two years after the final Code",
-      state: dated(codeReviewDue),
+      ...dated(codeReviewDue),
       date: codeReviewDue,
     });
   }
@@ -1369,7 +1511,7 @@ export function reReviewTriggers(
       id: "interoperability-2027",
       title: "Interoperable watermark detection (Code Measure 3.4(c))",
       basis: "Code milestone for signatories; not a statutory date",
-      state: dated(interoperabilityMilestone),
+      ...dated(interoperabilityMilestone),
       date: interoperabilityMilestone,
     });
   if (c.rulePackVersion && c.rulePackVersion !== rules.rulePackVersion)
