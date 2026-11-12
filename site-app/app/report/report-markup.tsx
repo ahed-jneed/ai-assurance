@@ -9,6 +9,7 @@ import type {
   EvidenceRequest,
   RulePackStamp,
 } from "@/lib/domain";
+import type { CriteriaStamp } from "@/lib/criteria/types";
 import type { CriterionResult } from "@/lib/domain/report-gates";
 import {
   snapshotTerms,
@@ -518,24 +519,41 @@ export function reportMarkup(report: Report, s: ReportSnapshot) {
   );
 }
 
-type CriteriaPackStamp = {
-  packId: string;
-  packVersion: string;
-  packSha256: string;
-  /** A legislation framework of the pin was pending legal review at capture. */
-  legalReviewPending: boolean;
-};
-/** The captured pack and, as it stood at capture, its pending legal review. */
+/**
+ * The captured criteria stamp. Snapshots captured before #61 have no
+ * frameworks or crosswalks.
+ */
+type CriteriaPackStamp = Omit<CriteriaStamp, "frameworks" | "crosswalks"> &
+  Partial<Pick<CriteriaStamp, "frameworks" | "crosswalks">>;
+/**
+ * The captured pack, framework data and crosswalk versions and, as it stood
+ * at capture, the pending legal review.
+ */
 function CriteriaPackLine({ s }: { s: ReportSnapshot }) {
   if (!s.criteriaPack) return null;
+  const { frameworks = [], crosswalks = [] } = s.criteriaPack;
   return (
-    <p>
-      Criteria pack {s.criteriaPack.packId} {s.criteriaPack.packVersion}
-      {s.methodologyVersion ? " · methodology " + s.methodologyVersion : ""}
-      {s.criteriaPack.legalReviewPending
-        ? " · its legal content is pending qualified legal review"
-        : ""}
-    </p>
+    <>
+      <p>
+        Criteria pack {s.criteriaPack.packId} {s.criteriaPack.packVersion}
+        {s.methodologyVersion ? " · methodology " + s.methodologyVersion : ""}
+        {s.criteriaPack.legalReviewPending
+          ? " · its legal content is pending qualified legal review"
+          : ""}
+      </p>
+      {!!frameworks.length && (
+        <p>
+          Assessed against{" "}
+          {frameworks
+            .map((f) => `${f.id} ${f.edition} (data ${f.version})`)
+            .join("; ")}
+          {crosswalks.length
+            ? " · crosswalks " +
+              crosswalks.map((c) => c.id + " " + c.version).join("; ")
+            : ""}
+        </p>
+      )}
+    </>
   );
 }
 /** The AI Act classification as captured, with the rule pack it was made under. */
