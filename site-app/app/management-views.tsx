@@ -110,6 +110,8 @@ export function ManagementViews({
     data.memberships.find((m) => m.tenant_id === data.tenantId)?.name ?? "";
   const invitations = data.invitations ?? [];
   const coolingOffDays = data.qualityReviewPolicy?.coolingOffDays ?? 730;
+  // setQualityReviewPolicy is Lead-only; this view is shown only to admins.
+  const policyEditor = data.identity.role === "Lead Auditor";
   const activeAdmins = data.members.filter(
     (m) => m.practice_admin && m.status === "active",
   ).length;
@@ -258,12 +260,15 @@ export function ManagementViews({
               </Button>
               <Button
                 variant="ghost"
-                disabled={busy}
+                disabled={busy || !policyEditor}
                 title={
                   "Engagement quality reviewer cooling-off: " +
                   coolingOffDays +
                   " days" +
-                  (data.qualityReviewPolicy?.practiceSet ? "" : " (default)")
+                  (data.qualityReviewPolicy?.practiceSet ? "" : " (default)") +
+                  (policyEditor
+                    ? ""
+                    : ". Only a Lead Auditor who administers the practice can change it.")
                 }
                 onClick={() =>
                   open("qualityReviewPolicy", {
