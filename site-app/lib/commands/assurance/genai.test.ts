@@ -539,7 +539,7 @@ describe("acknowledgeGenaiFlag", () => {
       "importGenaiEnvelope",
       { artifactId: "EV-ENV" },
       auditor(),
-    )) as { record: { id: string; body: { declaredBy: string } } };
+    )) as { record: { id: string; body: Record<string, unknown> } };
     expect(imported.record.body.declaredBy).toBe("lead-2");
     const error = await refused(acknowledge(imported.record.id, secondLead()));
     expect([error.status, error.message]).toEqual([403, preparerRefusal]);
@@ -577,7 +577,7 @@ describe("acknowledgeGenaiFlag", () => {
       "compileGenaiResult",
       { jobId: "JOB-G" },
       auditor(),
-    )) as { record: { id: string; body: { bundleRecordId: string } } };
+    )) as { record: { id: string; body: Record<string, unknown> } };
     expect(compiled.record.body.bundleRecordId).toBe(bundle.record.id);
     const error = await refused(acknowledge(compiled.record.id, lead2));
     expect([error.status, error.message]).toEqual([403, preparerRefusal]);
