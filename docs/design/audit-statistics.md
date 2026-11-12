@@ -633,13 +633,13 @@ Because the interval now decides, minimums are a safety net rather than the main
 ## 8. Power and minimum detectable effect (at plan approval)
 
 **Inputs.** Each confirmatory criterion carries `powerAssumptions` in the plan, in a shape that depends on its kind (section 9). The approval step also needs the target power (plan `power.targetPower`, default 0.80), the confidence level and the family size F.
-- Planned sizes may be pre-filled from the registered dataset's row and group counts.
+- Planned sizes may be pre-filled from the registered dataset's row and group counts. The testing lab does so (#113): `n` is the row count, `groupSizes` are the rows of each value of the protected-group column, and a multiclass criterion asks for a share and a recall for every class of the target column.
 - Outcome-derived quantities (prevalence, assumed rates, assumed metric values) are entered by the auditor, never read from the data being tested.
 
 | Kind | `powerAssumptions` | What follows from them |
 |---|---|---|
 | `performance` (binary) | `n`, `prevalence` π, `truePositiveRate`, `trueNegativeRate` | P = nπ, N = n(1 − π), and every binary metric's true value and denominator (table below) |
-| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1), `perClassRecall` {label: recall} | accuracy = Σ share·recall; balanced accuracy = mean recall |
+| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1, every share above 0), `perClassRecall` {label: recall} (the same labels; #113) | accuracy = Σ share·recall; balanced accuracy = mean recall |
 | `regression_performance` | `n`, `errorSd` σ, and optionally `targetSd` σ_y (#93, engine only until the hosted runner mirrors it) | Errors are assumed normal with mean 0: MAE = σ√(2/π), SD(\|e\|) = σ√(1 − 2/π), MSE = σ², SD(e²) = √2·σ². With σ_y, the mean baseline gate (section 5.9) becomes a pass condition (below) |
 | `group_comparison` | `groupSizes` {group: n}. Selection-rate metrics: `baselineRate` and optional `assumedRates` {group: rate} (default: every group at the baseline). Equalized odds: `prevalence`, `truePositiveRate`, `falsePositiveRate` (each a number or per group). | Members as they would be formed at evaluation; for equalized odds, the per-group positives n_g·π_g and negatives n_g·(1 − π_g) |
 | `calibration` | none | not computed (`power_not_specified_for_metric`) |

@@ -455,6 +455,9 @@ def normalize_assumptions(criterion, assumptions):
         return {key: assumptions[key] for key in ("n", "prevalence", "truePositiveRate", "trueNegativeRate")}
     if kind == "multiclass_performance":
         _require(abs(math.fsum(assumptions["classShares"].values()) - 1.0) <= 1e-9, "class shares must sum to 1")
+        # Section 8: each class's expected support n*share is a denominator, and every class needs its recall (#113).
+        _require(all(share > 0 for share in assumptions["classShares"].values()), "every class share must be above 0")
+        _require(set(assumptions.get("perClassRecall") or {}) == set(assumptions["classShares"]), "perClassRecall must name exactly the classes of classShares")
         return {key: assumptions[key] for key in ("n", "classShares", "perClassRecall")}
     if kind == "regression_performance":
         out = {key: assumptions[key] for key in ("n", "errorSd")}

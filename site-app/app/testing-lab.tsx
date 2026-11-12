@@ -532,9 +532,6 @@ export function TestingLab({
   const classCount =
       inspect?.columns.find((c) => c.name === draft.config.labelColumn)
         ?.uniqueCount ?? null,
-    groupCount =
-      inspect?.columns.find((c) => c.name === draft.config.groupColumn)
-        ?.uniqueCount ?? 2,
     // A saved protocol keeps its frozen plan; a new one pre-registers the form's.
     lockedProfile = profiles.find((p) => p.id === profileId),
     planned = lockedProfile?.statistics
@@ -2008,7 +2005,23 @@ export function TestingLab({
                       <PowerCheck
                         plan={planned.plan}
                         rows={inspect.rowCount}
-                        groups={fair ? groupCount : 1}
+                        dataset={{
+                          tenantId,
+                          engagementId: e.id,
+                          artifactId: inspect.artifactId,
+                        }}
+                        groupColumn={
+                          fair && draft.config.groupColumn
+                            ? draft.config.groupColumn
+                            : null
+                        }
+                        labelColumn={
+                          draft.task === "Multiclass classification" &&
+                          draft.suite.includes("performance") &&
+                          draft.config.labelColumn
+                            ? draft.config.labelColumn
+                            : null
+                        }
                         assumptions={draft.plan.powerAssumptions}
                         acknowledgement={draft.plan.acknowledgement}
                         disabled={busy}
