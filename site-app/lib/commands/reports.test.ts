@@ -13,6 +13,8 @@ import {
   recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
+import { qualityStatement } from "../domain/report-model";
+import { practiceReportSettings } from "../report-settings";
 import { assertReleasable, reports } from "./reports";
 import { caller } from "./test-fixtures";
 
@@ -28,6 +30,15 @@ vi.mock("../assurance-store", async (importOriginal) => ({
 vi.mock("../quality-review-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../quality-review-records")>()),
   assertReviewerIndependent: vi.fn(async () => {}),
+}));
+
+// The practice's report settings are read from D1; none are set by default.
+vi.mock("../report-settings", () => ({
+  practiceReportSettings: vi.fn(async () => ({
+    signatory: "",
+    location: "",
+    qualityStatement: "",
+  })),
 }));
 
 const particulars = {
@@ -186,6 +197,7 @@ describe("report model v2 snapshots", () => {
     expect(s.particulars).toEqual({
       ...particulars,
       basisForModification: qualified.basisForModification,
+      qualityStatement,
     });
     expect(s.reportTitle).toBe("Independent limited assurance report");
     expect(s.conclusionStatement).toMatchObject({
@@ -375,5 +387,109 @@ describe("report model v2 snapshots", () => {
     // The acceptance record and the declarations are internal (#23).
     for (const internal of ["DEC-reviewer", "EL-2026-014", "competence"])
       expect(JSON.stringify(r.clientSnapshot)).not.toContain(internal);
+  });
+});
+
+describe("practice report settings (#111)", () => {
+  const settings = {
+    signatory: "Fixture Assurance GmbH, M. Muster",
+    location: "Graz, Austria",
+    qualityStatement:
+      "We complied with the Austrian professional code and our firm applies ISQM 1.",
+  };
+  const independence = (s: Record<string, unknown>) =>
+    (s.elements as { id: string; value: string }[]).find(
+      (el) => el.id === "independence",
+    )!.value;
+
+  it("fills a blank signatory, location and quality statement from the practice", async () => {
+    vi.mocked(practiceReportSettings).mockResolvedValueOnce(settings);
+    const e = await issuable();
+    const r = await capture(e, { ...qualified, signatory: "", location: "" });
+    expect(r.snapshot.particulars).toMatchObject(settings);
+    expect(independence(r.snapshot)).toBe(settings.qualityStatement);
+    expect(independence(r.clientSnapshot!)).toBe(settings.qualityStatement);
+    // The release gates recheck what the snapshot recorded.
+    await assertReleasable(e, { reportId: r.id }, caller());
+  });
+
+  it("lets a report override each setting", async () => {
+    vi.mocked(practiceReportSettings).mockResolvedValueOnce(settings);
+    const e = await issuable();
+    const own = "Our own statement for this engagement.";
+    const r = await capture(e, { ...qualified, qualityStatement: own });
+    expect(r.snapshot.particulars).toMatchObject({
+      signatory: particulars.signatory,
+      location: particulars.location,
+      qualityStatement: own,
+    });
+    expect(independence(r.snapshot)).toBe(own);
+  });
+
+  it("still requires a signatory and location when the practice sets none", async () => {
+    const e = await issuable();
+    const error = await refusal(e, {
+      ...qualified,
+      signatory: "",
+      location: "",
+    });
+    expect(error.message).toContain(
+      "Name the practitioner or firm signing the report",
+    );
+  });
+});
+
+describe("readiness assessment with gaps (#111)", () => {
+  const gaps = {
+    kind: "final",
+    engagementType: "readiness",
+    assuranceLevel: null,
+    conclusion: "readiness_gaps",
+    summary: "Readiness against the AI Act obligations.",
+    basisForModification:
+      "F-9: no post-market monitoring plan; the logging obligation is not met.",
+    ...particulars,
+  };
+
+  it("captures and releases with an open High finding, labelled not assurance", async () => {
+    const e = await issuable();
+    e.findings.push(
+      finding({ id: "F-9", severity: "High", visibility: "client" }),
+    );
+    // Strict readiness is refused while the High finding is open.
+    expect(
+      (
+        await refusal(e, {
+          ...gaps,
+          conclusion: "readiness",
+          basisForModification: "",
+        })
+      ).message,
+    ).toContain("F-9: unresolved high finding");
+    const r = await capture(e, gaps);
+    expect(r.snapshot).toMatchObject({
+      opinion: "Readiness assessment, gaps identified (not assurance)",
+      reportTitle: "AI readiness assessment report (not an assurance report)",
+      conclusionStatement: {
+        heading:
+          "Readiness assessment, gaps identified — not an assurance engagement",
+        basisHeading: "Gaps identified",
+        notAssurance: true,
+      },
+    });
+    expect(r.clientSnapshot).toMatchObject({
+      opinion: "Readiness assessment, gaps identified (not assurance)",
+      conclusionStatement: { notAssurance: true },
+    });
+    await assertReleasable(e, { reportId: r.id }, caller());
+  });
+
+  it("requires the gaps to be described", async () => {
+    const e = await issuable();
+    expect(
+      (await refusal(e, { ...gaps, basisForModification: "" })).message,
+    ).toBe(
+      "Describe the gaps identified against the criteria and what remains to be addressed",
+    );
   });
 });

@@ -2783,16 +2783,54 @@ try {
   console.log(
     "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
   );
+  // The practice's report settings (#111): a report that leaves the
+  // signatory, location and quality statement blank states them.
+  const practiceStatement =
+    "Fixture practice statement: we comply with the IESBA Code and apply ISQM 1.";
+  await management(
+    "setReportSettings",
+    {
+      signatory: reportParticulars.signatory,
+      location: reportParticulars.location,
+      qualityStatement: practiceStatement,
+    },
+    viewer,
+    403,
+  );
+  await management("setReportSettings", {
+    signatory: reportParticulars.signatory,
+    location: reportParticulars.location,
+    qualityStatement: practiceStatement,
+  });
+  assert.deepEqual(workspace.reportSettings, {
+    signatory: reportParticulars.signatory,
+    location: reportParticulars.location,
+    qualityStatement: practiceStatement,
+  });
+  assert.equal(workspace.managementEvents[0].action, "setReportSettings");
+  assert.equal(
+    JSON.parse(workspace.managementEvents[0].details).qualityStatement,
+    practiceStatement,
+  );
   await command("createReport", {
     kind: "final",
     engagementType: "attestation",
     assuranceLevel: "reasonable",
     conclusion: "adverse",
     ...reportParticulars,
+    signatory: "",
+    location: "",
     summary:
       "Synthetic adverse report with unresolved nonconformity disclosed.",
   });
   const internalFinal = e.reports.at(-1);
+  assert.deepEqual(internalFinal.snapshot.particulars, {
+    ...reportParticulars,
+    qualityStatement: practiceStatement,
+  });
+  console.log(
+    "PASS practice report settings: admin-only op with a management event, blank particulars filled at capture",
+  );
   // Every pinned record is captured, past the old 1,000-record limit.
   const pinnedIds = (
     await testDb
@@ -3156,6 +3194,8 @@ try {
     "In our opinion, because of the significance",
     "Signed: Fixture Assurance GmbH",
     "Location: Vienna, Austria",
+    // The practice's quality statement, from its report settings (#111).
+    practiceStatement,
     "Results by criterion",
     "Executive summary",
     // The report date is the capture date, not the release date.
@@ -3490,6 +3530,48 @@ try {
     400,
   );
   assert(JSON.stringify(prohibitedReadiness).includes("prohibited practice"));
+  // The readiness output with gaps (#111) reports what strict readiness
+  // cannot: it must describe the gaps and is labelled as not assurance.
+  const readinessGaps = {
+    kind: "final",
+    engagementType: "readiness",
+    conclusion: "readiness_gaps",
+    ...reportParticulars,
+    basisForModification: "",
+    summary: "Readiness with the prohibited practice reported as a gap",
+  };
+  const undescribedGaps = await command(
+    "createReport",
+    readinessGaps,
+    owner,
+    400,
+  );
+  assert(JSON.stringify(undescribedGaps).includes("Describe the gaps"));
+  await command("createReport", {
+    ...readinessGaps,
+    basisForModification:
+      "The intended use falls under a prohibited practice (Art 5(1)(c)).",
+  });
+  const gapsReport = e.reports.at(-1);
+  assert.equal(
+    gapsReport.snapshot.opinion,
+    "Readiness assessment, gaps identified (not assurance)",
+  );
+  assert.equal(
+    gapsReport.clientSnapshot.conclusionStatement.notAssurance,
+    true,
+  );
+  assert.equal(
+    gapsReport.clientSnapshot.conclusionStatement.basisHeading,
+    "Gaps identified",
+  );
+  assert(
+    gapsReport.snapshot.reportTitle.includes("not an assurance report"),
+    gapsReport.snapshot.reportTitle,
+  );
+  console.log(
+    "PASS readiness assessment with gaps: captured over a prohibited practice, gaps required, labelled not assurance",
+  );
   assert.equal(
     e.reports.find((r) => r.id === internalFinal.id).snapshot.engagement
       .classification.prohibited,
