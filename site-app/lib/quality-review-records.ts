@@ -61,8 +61,9 @@ export async function recordedInvolvement(
  * client's engagements: engagement id to timestamp. A grant held under any
  * role other than Engagement Quality Reviewer is team membership from when it
  * was given until it was withdrawn or changed, or until now while it is still
- * held; a grant of unknown role (recorded before the history existed) counts
- * until its recorded time. Granting a reviewer access, which appointment
+ * held; a grant of unknown role (recorded before the history existed), and
+ * the withdrawal of a grant held under another role when no row in the
+ * history opened that grant, count until their recorded time. Granting a reviewer access, which appointment
  * needs, is not team membership.
  */
 export async function grantInvolvement(
@@ -93,7 +94,11 @@ export async function grantInvolvement(
   for (const r of rows) {
     // Any later change of the grant ends a team grant that was open.
     if (open.delete(r.engagement)) seen(r.engagement, r.at);
-    if (r.role === null) seen(r.engagement, r.at);
+    // A grant of unknown role, and the withdrawal of a grant held under
+    // another role, are team membership up to that time even when no row
+    // in the history opened the grant.
+    if (r.role === null || (r.active === 0 && r.role !== qualityReviewerRole))
+      seen(r.engagement, r.at);
     if (r.active === 1 && r.role !== qualityReviewerRole) {
       open.add(r.engagement);
       seen(r.engagement, r.at);

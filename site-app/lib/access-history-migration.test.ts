@@ -132,4 +132,49 @@ describe("migration 0011: engagement access history", () => {
       delete settings.DB;
     }
   });
+
+  it("counts a withdrawal under another role whose grant left no event", async () => {
+    const eqrRole = "Engagement Quality Reviewer";
+    const ev = (n: number, action: string, details: object) =>
+      `('t','ME-${n}','lead','${action}','${JSON.stringify(details)}','h','2026-0${n}-01T00:00:00.000Z')`;
+    // q was granted as Auditor with no engagements and held a grant on E
+    // adopted by migration 0005, which left no event. The change to reviewer
+    // withdrew E, and a later update re-granted E as reviewer.
+    const sqlite = migrate(
+      `INSERT INTO tenants(id,name,created_at) VALUES('t','P','${at}');
+       INSERT INTO clients(id,tenant_id,name,sector,created_at) VALUES('c','t','C','S','${at}');
+       INSERT INTO engagements(id,tenant_id,client_id,title,version,body,last_command_id) VALUES('E','t','c','A',1,'{}','init');
+       INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status) VALUES('t','lead','Lead Auditor',NULL,'L','active'),('t','q','${eqrRole}',NULL,'Q','active');
+       INSERT INTO management_events(tenant_id,id,actor,action,details,hash,created_at) VALUES
+         ${ev(1, "grantMember", { userId: "q", role: "Auditor", engagementIds: [] })},
+         ${ev(2, "updateMember", { userId: "q", role: eqrRole, engagementIds: [], withdrawn: { engagementIds: ["E"], workerIds: [] } })},
+         ${ev(3, "updateMember", { userId: "q", role: eqrRole, engagementIds: ["E"], withdrawn: { engagementIds: [], workerIds: [] } })};
+       INSERT INTO engagement_access(tenant_id,engagement_id,user_id,active,actor,updated_at) VALUES('t','E','q',1,'lead','2026-03-01T00:00:00.000Z');`,
+    );
+    expect(
+      sqlite
+        .prepare(
+          "SELECT active,role FROM engagement_access_history WHERE user_id='q' ORDER BY id",
+        )
+        .all(),
+    ).toEqual([
+      { active: 0, role: "Auditor" },
+      { active: 1, role: eqrRole },
+      { active: 1, role: eqrRole },
+    ]);
+    const settings = env as { DB?: unknown };
+    const prepared = (sql: string, values: SQLInputValue[] = []) => ({
+      bind: (...bound: SQLInputValue[]) => prepared(sql, bound),
+      all: async () => ({ results: sqlite.prepare(sql).all(...values) }),
+    });
+    settings.DB = { prepare: (sql: string) => prepared(sql) };
+    try {
+      // The withdrawal of the Auditor grant is team membership until then.
+      expect(Object.fromEntries(await grantInvolvement("t", "c", "q"))).toEqual(
+        { E: "2026-02-01T00:00:00.000Z" },
+      );
+    } finally {
+      delete settings.DB;
+    }
+  });
 });
