@@ -45,6 +45,8 @@ export type Context = {
     role: Role;
     client_id: string | null;
     status: string;
+    /** When the member's current grant began (memberships.access_since). */
+    access_since?: string | null;
   } | null>;
 };
 export function snapshot<

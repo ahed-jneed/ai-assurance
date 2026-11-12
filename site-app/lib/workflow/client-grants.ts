@@ -2,7 +2,27 @@
 // contributor answer one evidence request, their instructions and
 // clarifications, and the acknowledgement of what the client submitted.
 import { z } from "zod";
-import { fail, short, text, type WorkflowHandler } from "./command";
+import { clientGrantLapsed } from "../workflow-state";
+import type { ClientGrant } from "../workflow-types";
+import {
+  fail,
+  short,
+  text,
+  type Context,
+  type WorkflowHandler,
+} from "./command";
+/**
+ * A grant whose contributor's membership was revoked or re-granted after it
+ * was issued has lapsed (clientGrantLapsed): the contributor can no longer
+ * use it, so it is not updated either. The Lead assigns the request again.
+ */
+async function refuseLapsed(c: Context, g: ClientGrant) {
+  if (clientGrantLapsed(g, await c.member(g.userId)))
+    fail(
+      409,
+      "This grant lapsed when the contributor's access changed. Assign the request again.",
+    );
+}
 export const clientGrantCommands: Record<string, WorkflowHandler> = {
   async grantClientRequest({ e, c, lead, authorized, w }, data) {
     lead();
@@ -72,6 +92,7 @@ export const clientGrantCommands: Record<string, WorkflowHandler> = {
         fail(404, "Grant not found");
     if (!g.active || Date.parse(g.expiresAt) <= Date.parse(c.at))
       fail(409, "Create a new grant for expired or revoked access");
+    await refuseLapsed(c, g);
     g.history ??= [];
     if (g.history.length >= 30) fail(413, "Instruction revision limit reached");
     g.history.push({
@@ -105,6 +126,7 @@ export const clientGrantCommands: Record<string, WorkflowHandler> = {
         fail(404, "Request assignment not found");
     if (!g.active || Date.parse(g.expiresAt) <= Date.parse(c.at))
       fail(409, "The client assignment has expired");
+    await refuseLapsed(c, g);
     g.communications ??= [];
     if (g.communications.length >= 80)
       fail(413, "Open a follow-up request to continue this thread");

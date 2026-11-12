@@ -24,6 +24,8 @@ export type Member = {
   practice_admin?: boolean;
   /** The engagements the member may open now (live grants only). */
   grants?: { id: string; title: string }[];
+  /** The identity email recorded on the membership, once known. */
+  email?: string | null;
   /** Active runner workers the member sponsored. */
   sponsored_workers?: number;
 };
@@ -36,6 +38,8 @@ export type Invitation = {
   client_id: string | null;
   engagement_ids: string[];
   invited_by: string;
+  /** The display name of the administrator who sent it. */
+  invited_by_name?: string | null;
   created_at: string;
   expires_at: string;
 };
@@ -61,6 +65,11 @@ export type WorkspaceData = {
   members: Member[];
   /** Pending invitations, for practice administrators. */
   invitations?: Invitation[];
+  /**
+   * Client request grants of the selected engagement still marked active
+   * whose contributor's membership was since revoked or re-granted.
+   */
+  lapsedClientGrants?: string[];
   people: {
     user_id: string;
     display_name: string;
