@@ -81,6 +81,13 @@ export function summaryMarkup(view: Ll144SummaryView, jsonHref: string) {
       <header>
         <p className="ll144-kicker">Summary of the results of a bias audit</p>
         <h1>{s.tool.name}</h1>
+        {s.classification && (
+          <p className="ll144-classification">
+            Classification group <strong>{s.classification.group}</strong>, one
+            of {s.classification.groups.length}:{" "}
+            {s.classification.groups.join(", ")} ({s.classification.rule}).
+          </p>
+        )}
         <p>{s.law}</p>
         {s.status !== "approved" && (
           <p className="ll144-draft" role="status">
