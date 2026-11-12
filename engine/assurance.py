@@ -677,6 +677,7 @@ def _manifest(manifest):
     keys = MANIFEST_VERSIONS[manifest["schemaVersion"]]
     _keys(manifest, keys, keys, "manifest")
     _expect(manifest["audience"] in {"internal", "client"}, "Unsupported manifest version or audience")
+    _expect(manifest.get("scope") is None or manifest["audience"] == "internal", "Only an internal dossier can carry an export scope")
     if manifest["schemaVersion"] != "1.0":
         _text(manifest["signingKeyId"], "signing key ID", 300)
         pack = manifest["rulePack"]
@@ -786,7 +787,7 @@ def _b64(value, name, limit):
 
 def verify_dossier(container, *, trusted_keys=None, require_trusted_signature=False):
     """Verify content and optional signature; trust is an explicit external policy."""
-    result = {"schemaVersion": "1.0", "type": "dossier_verification", "toolVersion": TOOL_VERSION, "valid": False, "integrityValid": False, "outcome": "fail", "signature": {"present": False, "valid": None, "trusted": False, "status": "unsigned"}, "errors": [], "limitations": ["Hashes and signature verification do not establish source truth, completeness, legal conformity, retention or a trusted timestamp."]}
+    result = {"schemaVersion": "1.0", "type": "dossier_verification", "toolVersion": TOOL_VERSION, "valid": False, "integrityValid": False, "outcome": "fail", "signature": {"present": False, "valid": None, "trusted": False, "status": "unsigned"}, "scope": None, "errors": [], "limitations": ["Hashes and signature verification do not establish source truth, completeness, legal conformity, retention or a trusted timestamp."]}
     try:
         _expect(isinstance(require_trusted_signature, bool), "Signature policy must be boolean")
         _keys(container, ("schemaVersion", "manifest", "manifestSha256", "signature", "files"), ("schemaVersion", "manifest", "manifestSha256", "files"), "container")
@@ -812,6 +813,11 @@ def verify_dossier(container, *, trusted_keys=None, require_trusted_signature=Fa
         _expect(matches, "Report digest is not represented by a supplied file")
         result["integrityValid"] = True
         result["reportFiles"] = matches
+        # Surface the signed scope so a part of the audit file is never read as the whole of it.
+        scope = container["manifest"].get("scope")
+        result["scope"] = copy.deepcopy(scope)
+        if scope is not None:
+            result["limitations"].append(f"Scoped export: includes {scope['includedRecords']} of {scope['pinnedRecords']} pinned assurance records" + ("; evidence files are withheld" if scope["evidence"] == "withheld" else "") + "; not the complete audit file.")
         signature = container.get("signature")
         if "signature" in container:
             _expect(signature is not None, "An optional signature must be omitted rather than null")

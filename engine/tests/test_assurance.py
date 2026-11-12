@@ -499,6 +499,17 @@ class DossierTests(unittest.TestCase):
         self.assertTrue(verify_dossier(full)["valid"], verify_dossier(full))
         scoped = dossier_v1_2(scope_fixture())
         self.assertTrue(verify_dossier(scoped)["valid"], verify_dossier(scoped))
+        # The result states the scope, so a part is never read as the whole audit file.
+        for container in (dossier(), dossier_v1_1(), full):
+            proof = verify_dossier(container)
+            self.assertIsNone(proof["scope"])
+            self.assertFalse(any(item.startswith("Scoped export") for item in proof["limitations"]))
+        proof = verify_dossier(scoped)
+        self.assertEqual(proof["scope"], scope_fixture())
+        self.assertIn("Scoped export: includes 2 of 3 pinned assurance records; evidence files are withheld; not the complete audit file.", proof["limitations"])
+        included = verify_dossier(dossier_v1_2(scope_fixture(evidence="included")))
+        self.assertIn("Scoped export: includes 2 of 3 pinned assurance records; not the complete audit file.", included["limitations"])
+        self.assertIsNone(verify_dossier({})["scope"])
         self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(procedureIds=None, period=None, recordKinds=["assertion", "sample"])))["valid"])
         self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(procedureIds=None, period=None, evidence="withheld")))["valid"])
         self.assertTrue(verify_dossier(dossier_v1_2(scope_fixture(period={"from": "2026-10-01", "to": "2026-10-01"})))["valid"])
@@ -520,11 +531,16 @@ class DossierTests(unittest.TestCase):
             "overstated pinned": (lambda c: c["manifest"]["scope"].update(includedRecords=4, pinnedRecords=3)),
             "boolean count": (lambda c: c["manifest"]["scope"].update(pinnedRecords=True)),
             "zero included": (lambda c: c["manifest"]["scope"].update(includedRecords=0)),
+            "client audience": (lambda c: c["manifest"].update(audience="client")),
         }
         for name, change in bad.items():
             container = dossier_v1_2(scope_fixture())
             change(container)
             self.assertFalse(verify_dossier(rehash(container))["valid"], name)
+        # A client dossier is always the full one: its scope is null.
+        client_full = dossier_v1_2()
+        client_full["manifest"]["audience"] = "client"
+        self.assertTrue(verify_dossier(rehash(client_full))["valid"])
         # Evidence files contradict a scope that withholds evidence.
         with_evidence = build_dossier({"report.json": b'{"reportId":"R-1"}', "assurance/AS-1.json": b"{}", "evidence/E-1/a.csv": b"a\n"}, report_id="R-1", report_path="report.json", created_at="2026-11-07T00:00:00Z")
         with_evidence["manifest"].update(schemaVersion="1.2", signingKeyId="KEY-fixture", rulePack=None, methodologyVersion=None, scope=scope_fixture(includedRecords=1))
