@@ -1,11 +1,18 @@
 import {
   queueStates,
+  recordContext,
   reviewQueuePage,
   reviewQueueSummary,
   searchRecords,
   type QueueState,
 } from "../assurance-search";
-import { jobs, recordCount, recordPage } from "../assurance-store";
+import {
+  compiledJobIds,
+  jobs,
+  jobTelemetry,
+  recordKindCounts,
+  recordPage,
+} from "../assurance-store";
 import { db } from "../bindings";
 import { loadEngagement } from "../engagement-repo";
 import { ApiError } from "../http";
@@ -21,15 +28,23 @@ async function internalEngagement(ctx: Context, engagementId: string) {
 }
 /**
  * What the assurance workbench loads for an internal member: the first page of
- * the engagement's assurance records (with their total and the cursor of the
- * next page), its external jobs, enrolled workers and access grants, the
- * members a Lead Auditor may grant access to, the caller's review queue
- * (counts and the next assessment of each), what the platform can and cannot
- * attest, and the external queue's telemetry. Client roles are refused.
+ * the engagement's assurance records (with the cursor of the next page), how
+ * many records it holds in all and of each kind, its 100 most recent external
+ * jobs (each marked when already compiled into a draft paper), enrolled
+ * workers and access grants, the members a Lead Auditor may grant access to,
+ * the caller's review queue (counts and the next assessment of each), what
+ * the platform can and cannot attest, and the external queue's telemetry over
+ * every job. Client roles are refused. The workbench reads records by search,
+ * by kind and by id from here on; it never loads all of them.
  */
 export async function assuranceView(ctx: Context, engagementId: string) {
   const e = await internalEngagement(ctx, engagementId),
-    recent = await jobs(ctx, e.id),
+    [recent, compiled, telemetry, kindCounts] = await Promise.all([
+      jobs(ctx, e.id),
+      compiledJobIds(ctx, e.id),
+      jobTelemetry(ctx, e.id),
+      recordKindCounts(ctx, e.id),
+    ]),
     workers = (
       await db()
         .prepare(
@@ -47,10 +62,13 @@ export async function assuranceView(ctx: Context, engagementId: string) {
         .all()
     ).results;
   return {
-    ...(await recordPage(ctx, e.id)),
-    total: await recordCount(ctx, e.id),
+    total: Object.values(kindCounts).reduce((sum, n) => sum + n, 0),
+    kindCounts,
     queue: await reviewQueueSummary(ctx, e.id),
-    jobs: recent,
+    jobs: recent.map((j) => ({
+      ...j,
+      compiled: compiled.includes(String(j.id)),
+    })),
     workers,
     access,
     eligibleMembers:
@@ -75,20 +93,14 @@ export async function assuranceView(ctx: Context, engagementId: string) {
         "Application Ed25519 signing; practice keys wrapped at rest, independent trust pin required",
       anchor: "External timestamp anchor not configured",
     },
-    telemetry: {
-      queued: recent.filter((j) => j.state === "queued").length,
-      stalled: recent.filter(
-        (j) =>
-          j.state === "running" &&
-          Date.parse(String(j.lease_until)) < Date.now(),
-      ).length,
-    },
+    telemetry,
   };
 }
 /**
  * One page of the engagement's assurance records, optionally of one kind:
- * `{ records, nextCursor }`. The workbench follows `nextCursor` from its first
- * page; views that need one kind of record page through that kind only.
+ * `{ records, nextCursor }`, from the first page or after `cursor`. The
+ * workbench pages through the few kinds its forms and planner offer (systems,
+ * predictions, dataset cards, obligation assessments).
  */
 export async function assuranceRecordPage(
   ctx: Context,
@@ -116,6 +128,16 @@ export async function assuranceSearch(
 ) {
   const e = await internalEngagement(ctx, engagementId);
   return searchRecords(ctx, e.id, options);
+}
+/** One record with its review state and the records its details read. */
+export async function assuranceRecord(
+  ctx: Context,
+  engagementId: string,
+  recordId: string,
+) {
+  const e = await internalEngagement(ctx, engagementId);
+  if (!recordId) throw new ApiError(400, "Name the assurance record");
+  return recordContext(ctx, e.id, recordId);
 }
 /**
  * The caller's review queue: without `state` its summary, with `state` one

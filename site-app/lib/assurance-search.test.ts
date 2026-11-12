@@ -6,6 +6,7 @@ import type { AssuranceRecord } from "./assurance-core";
 import {
   canonicalCaseForm,
   caseForms,
+  recordContext,
   reviewQueuePage,
   reviewQueueSummary,
   searchRecords,
@@ -491,8 +492,9 @@ describe("record search in SQL", () => {
 
   it("looks up each assessment's latest review through idx_review_subject", async () => {
     const statements: string[] = [],
-      prepare = env.DB.prepare.bind(env.DB);
-    env.DB.prepare = (sql: string) => {
+      d1 = env.DB!,
+      prepare = d1.prepare.bind(d1);
+    d1.prepare = (sql: string) => {
       statements.push(sql);
       return prepare(sql);
     };
@@ -508,6 +510,83 @@ describe("record search in SQL", () => {
     expect(plan.some((d) => d.includes("TEMP B-TREE"))).toBe(false);
     // No window over every review of the engagement any more.
     expect(statements[0]).not.toMatch(/ROW_NUMBER|OVER \(/);
+  });
+});
+
+describe("one record with its context", () => {
+  it.each([4, 5])(
+    "agrees with the in-memory review state and finds every review and successor (seed %i)",
+    async (seed) => {
+      await insert(randomRecords(seed, 300));
+      const all = everyRecord();
+      for (const record of all) {
+        const context = await recordContext(ctx, "ENG-1", record.id),
+          assessment = ["assertion", "impact", "obligation"].includes(
+            record.kind,
+          );
+        expect(context.record).toEqual(record);
+        expect(context.reviewState, record.id).toBe(
+          assessment ? workbenchReviewState(record, all) : null,
+        );
+        const shown = [context.record, ...context.related];
+        if (assessment) {
+          // What the details read from the related records alone.
+          expect(workbenchReviewState(record, shown), record.id).toBe(
+            context.reviewState,
+          );
+          const reviews = all.filter(
+            (r) =>
+              r.kind === record.kind + "_review" &&
+              (r.body.assertionId ?? r.body.impactId ?? r.body.obligationId) ===
+                record.id,
+          );
+          expect(
+            ids(context.related.filter((r) => r.kind.endsWith("_review"))),
+          ).toEqual(ids(reviews));
+        }
+        // Related records are in record order, once each.
+        expect(ids(context.related)).toEqual(
+          ids(all.filter((r) => context.related.some((x) => x.id === r.id))),
+        );
+      }
+    },
+  );
+
+  it("loads the records a body names, also inside its entries, and nothing outside the engagement", async () => {
+    await insert([
+      { id: "AS-L1", kind: "location", body: { label: "One" }, at: at(1) },
+      { id: "AS-L2", kind: "location", body: { label: "Two" }, at: at(2) },
+      { id: "AS-S1", kind: "system", body: { name: "Scorer" }, at: at(3) },
+      {
+        id: "AS-X",
+        kind: "location",
+        body: { label: "Elsewhere" },
+        at: at(1),
+        engagement: "ENG-2",
+      },
+      {
+        id: "AS-A1",
+        kind: "assertion",
+        body: {
+          statement: "Claim",
+          systemId: "AS-S1",
+          relations: [
+            { locationId: "AS-L1", relation: "supports" },
+            { locationId: "AS-L2", relation: "contradicts" },
+            { locationId: "AS-X", relation: "supports" },
+          ],
+        },
+        at: at(4),
+      },
+    ]);
+    const context = await recordContext(ctx, "ENG-1", "AS-A1");
+    expect(ids(context.related)).toEqual(["AS-L1", "AS-L2", "AS-S1"]);
+    expect(context.reviewState).toBe("Awaiting review");
+    const missing = await recordContext(ctx, "ENG-1", "AS-X").catch(
+      (error: unknown) => error,
+    );
+    expect(missing).toBeInstanceOf(ApiError);
+    expect(missing).toMatchObject({ status: 404 });
   });
 });
 

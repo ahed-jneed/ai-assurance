@@ -60,6 +60,7 @@ import {
 import {
   RecordPicker,
   RecordRegister,
+  useRecordContext,
   type SearchScope,
 } from "./assurance-record-search";
 import { AssuranceRecordDetails } from "./assurance-record-details";
@@ -96,21 +97,36 @@ type EngagementAccess = {
   active: number;
 };
 
+// The kinds the workbench loads in full: its forms offer them as options and
+// the execution planner reads them. They grow with system revisions,
+// prediction sets and dataset versions, not with the evidence, so they stay
+// small; every other record is read by search (registers, pickers) or by id
+// (details).
+const formKinds = ["system", "prediction", "dataset"];
+
 type Snapshot = {
-  // Every record of the engagement: the view answers the first page and the
-  // total, and load() follows the cursor through the rest. Record details,
-  // form options and the execution planner read them; the registers, the
-  // record pickers, the search and the review queue read the server instead.
+  // Records of formKinds (and obligation assessments where the pack has
+  // them), loaded page by page by kind. Never every record: the registers,
+  // the record pickers, the search, the review queue and the record details
+  // read the server instead.
   records: AssuranceRecord[];
   total: number;
+  // How many records the engagement holds of each kind.
+  kindCounts: Record<string, number>;
   // The caller's review queue, computed on the server over every record.
   queue: ReviewQueueSummary;
-  jobs: ExecutionJob[];
+  jobs: (ExecutionJob & { compiled?: boolean })[];
   workers: RunnerWorker[];
   access: EngagementAccess[];
   eligibleMembers: WorkspaceData["people"];
   capabilities: Record<string, string>;
-  telemetry: { queued: number; stalled: number };
+  // The external queue over every job of the engagement.
+  telemetry: {
+    total: number;
+    queued: number;
+    running: number;
+    stalled: number;
+  };
 };
 
 // Fields of the POST /api/assurance response that the workbench reads; each
@@ -200,15 +216,17 @@ export function AssuranceWorkbench({
     [loadError, setLoadError] = useState(""),
     [busy, setBusy] = useState(false),
     [refreshing, setRefreshing] = useState(true),
-    [progress, setProgress] = useState<{
-      loaded: number;
-      total: number;
-    } | null>(null),
     [form, setForm] = useState(""),
     // Bumped after each load, so the server-backed registers read again.
     [loaded, setLoaded] = useState(0),
-    // The record last opened from a register, until the snapshot holds it.
+    // The record last opened from a register, until its context has loaded.
     [opened, setOpened] = useState<AssuranceRecord | null>(null),
+    // Records seen in pickers and details, by id: the titles of selected
+    // records on other pages, and the kinds of selected briefing sources.
+    // Records are immutable, so an entry never goes stale.
+    [known, setKnown] = useState<ReadonlyMap<string, AssuranceRecord>>(
+      () => new Map(),
+    ),
     // Whether the review queue is listed (its pages load only when opened).
     [queueListed, setQueueListed] = useState(false),
     [dirty, setDirty] = useState(false),
@@ -240,30 +258,27 @@ export function AssuranceWorkbench({
     setRefreshing(true);
     try {
       const scope = { tenantId: data.tenantId, engagementId: e.id },
-        response = await fetch("/api/assurance?" + new URLSearchParams(scope), {
+        view = fetch("/api/assurance?" + new URLSearchParams(scope), {
           cache: "no-store",
           signal: controller.signal,
-        });
-      const value = (await response.json()) as Snapshot & {
-        nextCursor: string | null;
-        error?: string;
-      };
+        }).then(async (response) => {
+          const value = (await response.json()) as Omit<Snapshot, "records"> & {
+            error?: string;
+          };
+          if (!response.ok) throw Error(value.error ?? "Workbench unavailable");
+          return value;
+        }),
+        // The form options and the execution planner read these kinds only;
+        // they load alongside the view, never every record.
+        kinds = [...formKinds, ...(obligationsOn ? ["obligation"] : [])],
+        pages = Promise.all(
+          kinds.map((kind) =>
+            assuranceRecords({ ...scope, kind }, { signal: controller.signal }),
+          ),
+        );
+      const [value, byKind] = await Promise.all([view, pages]);
       if (generation !== requestRef.current.generation) return;
-      if (!response.ok) throw Error(value.error ?? "Workbench unavailable");
-      // The view holds the first page of records. The review queue, the
-      // registers and the form options need every record, so the remaining
-      // pages load before the snapshot replaces the previous one.
-      const records = await assuranceRecords(scope, {
-        from: value,
-        signal: controller.signal,
-        onProgress: (loaded) => {
-          // Records added while the pages load can pass the first total.
-          if (generation === requestRef.current.generation)
-            setProgress({ loaded, total: Math.max(value.total, loaded) });
-        },
-      });
-      if (generation !== requestRef.current.generation) return;
-      setSnapshot({ ...value, records });
+      setSnapshot({ ...value, records: byKind.flat() });
       setLoaded((n) => n + 1);
       setLoadError("");
     } catch (x) {
@@ -273,12 +288,9 @@ export function AssuranceWorkbench({
       )
         setLoadError(x instanceof Error ? x.message : "Workbench unavailable");
     } finally {
-      if (generation === requestRef.current.generation) {
-        setRefreshing(false);
-        setProgress(null);
-      }
+      if (generation === requestRef.current.generation) setRefreshing(false);
     }
-  }, [data.tenantId, e.id]);
+  }, [data.tenantId, e.id, obligationsOn]);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the workbench snapshot whenever the engagement changes
     void load();
@@ -336,11 +348,34 @@ export function AssuranceWorkbench({
   }, [location.recordId]);
 
   const all = snapshot?.records ?? [],
-    selected =
-      all.find((r) => r.id === location.recordId) ??
-      (opened?.id === location.recordId ? opened : null),
-    queue = snapshot?.queue,
     scope: SearchScope = { tenantId: data.tenantId, engagementId: e.id },
+    // The open record with its reviews, successors and the records it names,
+    // read by id; reloaded after each action.
+    details = useRecordContext(scope, location.recordId, loaded),
+    selected =
+      details.context?.record ??
+      (opened?.id === location.recordId ? opened : null) ??
+      known.get(location.recordId) ??
+      null,
+    related = details.context
+      ? [details.context.record, ...details.context.related]
+      : selected
+        ? [selected]
+        : [],
+    remember = (...records: AssuranceRecord[]) =>
+      setKnown((map) => {
+        if (records.every((r) => map.get(r.id) === r)) return map;
+        const next = new Map(map);
+        for (const r of records) next.set(r.id, r);
+        return next;
+      }),
+    describeRecord = (id: string) => {
+      const r = known.get(id) ?? related.find((x) => x.id === id);
+      return r ? recordTitle(r) : id;
+    },
+    hasKind = (...kinds: string[]) =>
+      kinds.some((k) => (snapshot?.kindCounts[k] ?? 0) > 0),
+    queue = snapshot?.queue,
     kind = (k: string) => all.filter((r) => r.kind === k),
     options = (k: string) =>
       kind(k).map((r) => ({
@@ -743,24 +778,6 @@ export function AssuranceWorkbench({
         })),
       },
       {
-        name: "locationId",
-        label: "Precise source location",
-        options: options("location"),
-      },
-      {
-        name: "relation",
-        label: "Source relationship",
-        options: ["supports", "contradicts", "superseded"].map((x) => ({
-          value: x,
-          label: label(x),
-        })),
-      },
-      {
-        name: "relationReason",
-        label: "Why this source is relevant",
-        multiline: true,
-      },
-      {
         name: "missingEvidence",
         label: "Missing support / unresolved evidence",
         multiline: true,
@@ -1041,9 +1058,7 @@ export function AssuranceWorkbench({
     if (form === "exportBriefing")
       values = {
         ...raw,
-        sourceIds: sourceIds.filter((id) =>
-          kind("location").some((r) => r.id === id),
-        ),
+        sourceIds: sourceIds.filter((id) => known.get(id)?.kind === "location"),
       };
 
     if (form === "registerSystem") {
@@ -1071,6 +1086,12 @@ export function AssuranceWorkbench({
         producedAt: new Date(raw.producedAt + "Z").toISOString(),
       };
 
+    if (form === "addAssertion" && relations.some((r) => !r.locationId)) {
+      setError(
+        "Choose the precise source of each source relationship, or remove it.",
+      );
+      return;
+    }
     if (form === "addAssertion")
       values = {
         ...values,
@@ -1174,7 +1195,7 @@ export function AssuranceWorkbench({
       // The snapshot may be loading or stale while the register already
       // answers; until it settles, a filtered register without matches says
       // so (and offers to clear the filters) instead of calling it empty.
-      hasRecords={refreshing || all.some((r) => kinds.includes(r.kind))}
+      hasRecords={refreshing || hasKind(...kinds)}
       onOpen={(r) => setSelected(r)}
       empty={empty}
       person={person}
@@ -1550,30 +1571,34 @@ export function AssuranceWorkbench({
       {!snapshot && refreshing && (
         <div className="workbench-load-state" role="status">
           <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
-          <p>
-            Loading assurance records…
-            {progress &&
-              " " +
-                progress.loaded.toLocaleString() +
-                " of " +
-                progress.total.toLocaleString()}
-          </p>
+          <p>Loading assurance records…</p>
         </div>
       )}
-      {snapshot && progress && (
+      {location.recordId && !selected && details.loading && (
         <p className="subtle" role="status">
-          Refreshing records: {progress.loaded.toLocaleString()} of{" "}
-          {progress.total.toLocaleString()} loaded
+          Opening assurance record…
         </p>
       )}
-      {snapshot && !loadError && location.recordId && !selected && (
-        <div className="workbench-load-error" role="alert">
-          <p>This assurance record is unavailable in this engagement.</p>
-          <Button variant="outline" size="sm" onClick={() => setSelected(null)}>
-            Back to records
-          </Button>
-        </div>
-      )}
+      {snapshot &&
+        !loadError &&
+        location.recordId &&
+        !selected &&
+        !details.loading && (
+          <div className="workbench-load-error" role="alert">
+            <p>
+              {details.error && details.error !== "Assurance record not found"
+                ? details.error
+                : "This assurance record is unavailable in this engagement."}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelected(null)}
+            >
+              Back to records
+            </Button>
+          </div>
+        )}
       {snapshot && !["execution", "access"].includes(tab) && (
         <div className="assurance-filters">
           <div className="search-field">
@@ -1721,10 +1746,18 @@ export function AssuranceWorkbench({
               />
               <div className="section-toolbar">
                 <h2>Execution requests</h2>
-                <span className="subtle">
-                  {snapshot?.telemetry.queued ?? 0} queued ·{" "}
-                  {snapshot?.telemetry.stalled ?? 0} expired leases
-                </span>
+                {snapshot && (
+                  <span className="subtle" aria-label="External queue">
+                    {snapshot.telemetry.total.toLocaleString()} requests ·{" "}
+                    {snapshot.telemetry.queued.toLocaleString()} queued ·{" "}
+                    {snapshot.telemetry.running.toLocaleString()} running ·{" "}
+                    {snapshot.telemetry.stalled.toLocaleString()} expired leases
+                    {snapshot.telemetry.total > snapshot.jobs.length &&
+                      " · listing the " +
+                        snapshot.jobs.length.toLocaleString() +
+                        " most recent"}
+                  </span>
+                )}
               </div>
               <div className="assurance-register">
                 {snapshot?.jobs.map((j) => (
@@ -1761,27 +1794,23 @@ export function AssuranceWorkbench({
                           Cancel
                         </Button>
                       )}
-                      {writer &&
-                        j.state === "succeeded" &&
-                        !kind("execution_compilation").some(
-                          (r) => r.body.jobId === j.id,
-                        ) && (
-                          <Button
-                            variant="outline"
-                            disabled={busy}
-                            onClick={() =>
-                              void act("importJob", { jobId: j.id })
-                                .then((result) => {
-                                  if (result.record?.body.paperId)
-                                    onPaper(result.record.body.paperId);
-                                })
-                                .catch(() => {})
-                            }
-                          >
-                            <FileCheck2 size={15} />
-                            Compile draft paper
-                          </Button>
-                        )}
+                      {writer && j.state === "succeeded" && !j.compiled && (
+                        <Button
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() =>
+                            void act("importJob", { jobId: j.id })
+                              .then((result) => {
+                                if (result.record?.body.paperId)
+                                  onPaper(result.record.body.paperId);
+                              })
+                              .catch(() => {})
+                          }
+                        >
+                          <FileCheck2 size={15} />
+                          Compile draft paper
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1899,18 +1928,7 @@ export function AssuranceWorkbench({
                 </div>
               </div>
               <div className="workbench-briefing-selection">
-                <span>
-                  {
-                    sourceIds.filter((id) =>
-                      all.some(
-                        (r) =>
-                          r.id === id &&
-                          ["location", "assertion"].includes(r.kind),
-                      ),
-                    ).length
-                  }{" "}
-                  of 30 sources selected
-                </span>
+                <span>{sourceIds.length} of 30 sources selected</span>
                 {sourceIds.length > 0 && (
                   <Button
                     variant="ghost"
@@ -1938,10 +1956,8 @@ export function AssuranceWorkbench({
                   detail={(r) =>
                     String(r.body.locator ?? r.body.criterion ?? "")
                   }
-                  describe={(id) => {
-                    const r = all.find((x) => x.id === id);
-                    return r ? recordTitle(r) : id;
-                  }}
+                  describe={describeRecord}
+                  onPick={remember}
                 />
               </div>
               {writer && (
@@ -1971,7 +1987,7 @@ export function AssuranceWorkbench({
               {list(
                 ["assistant"],
                 "No evidence briefings prepared yet",
-                !all.some((r) => ["location", "assertion"].includes(r.kind)) ? (
+                !hasKind("location", "assertion") ? (
                   <button
                     type="button"
                     onClick={() => selectSection("evidence")}
@@ -1987,8 +2003,8 @@ export function AssuranceWorkbench({
                     <Button
                       variant="outline"
                       disabled={
-                        !sourceIds.some((id) =>
-                          kind("location").some((r) => r.id === id),
+                        !sourceIds.some(
+                          (id) => known.get(id)?.kind === "location",
                         )
                       }
                       onClick={() => open("exportBriefing")}
@@ -2385,29 +2401,35 @@ export function AssuranceWorkbench({
                   <h3>Source relationships</h3>
                   {relations.map((r, i) => (
                     <div className="record-item" key={i}>
-                      <label className="workbench-field">
-                        Precise source
-                        <select
-                          required
-                          value={r.locationId}
-                          onChange={(ev) =>
+                      <div className="workbench-field">
+                        <span>Precise source</span>
+                        <RecordPicker
+                          scope={scope}
+                          kinds={["location"]}
+                          refreshKey={loaded}
+                          single
+                          selected={r.locationId ? [r.locationId] : []}
+                          onChange={(ids) => {
                             setRelations(
                               relations.map((x, j) =>
                                 j === i
-                                  ? { ...x, locationId: ev.target.value }
+                                  ? { ...x, locationId: ids[0] ?? "" }
                                   : x,
                               ),
-                            )
+                            );
+                            setDirty(true);
+                          }}
+                          onPick={remember}
+                          label={"Precise source " + (i + 1)}
+                          empty="No source locations recorded yet."
+                          title={(x) =>
+                            String(x.body.label ?? x.id) +
+                            (x.body.version ? " · " + x.body.version : "")
                           }
-                        >
-                          <option value="">Choose…</option>
-                          {options("location").map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                          detail={(x) => String(x.body.locator ?? "")}
+                          describe={describeRecord}
+                        />
+                      </div>
                       <label className="workbench-field">
                         Relationship
                         <select
@@ -2542,10 +2564,8 @@ export function AssuranceWorkbench({
                           r.id,
                       )
                     }
-                    describe={(id) => {
-                      const r = all.find((x) => x.id === id);
-                      return r ? recordTitle(r) : id;
-                    }}
+                    describe={describeRecord}
+                    onPick={remember}
                   />
                 </section>
               )}
@@ -2617,7 +2637,7 @@ export function AssuranceWorkbench({
             <AssuranceRecordDetails
               key={selected.id}
               record={selected}
-              records={all}
+              records={related}
               engagement={e}
               person={person}
               initialSection={detailSection}
@@ -2640,140 +2660,163 @@ export function AssuranceWorkbench({
                   )}
                   {["assertion", "impact", "obligation"].includes(
                     selected.kind,
-                  ) && (
-                    <>
-                      <h3>Independent review</h3>
-                      {!all.some(
-                        (r) =>
-                          r.kind === selected.kind + "_review" &&
-                          (r.body.assertionId ??
-                            r.body.impactId ??
-                            r.body.obligationId) === selected.id,
-                      ) && (
-                        <p className="subtle">
-                          No independent review has been recorded.
-                        </p>
-                      )}
-                      {all
-                        .filter(
+                  ) &&
+                    !details.context &&
+                    (details.error ? (
+                      <p className="form-error" role="alert">
+                        {details.error}
+                      </p>
+                    ) : (
+                      <p className="subtle" role="status">
+                        Loading the review history…
+                      </p>
+                    ))}
+                  {["assertion", "impact", "obligation"].includes(
+                    selected.kind,
+                  ) &&
+                    details.context && (
+                      <>
+                        <h3>Independent review</h3>
+                        {!related.some(
                           (r) =>
                             r.kind === selected.kind + "_review" &&
                             (r.body.assertionId ??
                               r.body.impactId ??
                               r.body.obligationId) === selected.id,
-                        )
-                        .map((r) => (
-                          <div className="record-item" key={r.id}>
-                            <b>{label(r.body.decision)}</b>
-                            <p>{r.body.reason}</p>
-                            <small className="subtle">
-                              {person(r.actor)} ·{" "}
-                              {new Date(r.createdAt).toLocaleString()}
-                            </small>
-                          </div>
-                        ))}
-                      {all.some((r) => r.body.supersedesId === selected.id) ? (
-                        <p className="subtle">
-                          A successor revision replaces this assessment for
-                          current review gates.
-                        </p>
-                      ) : (
-                        <>
-                          {writer && (
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                if (
-                                  dirty &&
-                                  !window.confirm("Discard unsaved review?")
-                                )
-                                  return;
-                                onLocation({ ...location, recordId: "" });
-                                open(
-                                  selected.kind === "assertion"
-                                    ? "addAssertion"
-                                    : selected.kind === "obligation"
-                                      ? "obligationDecision"
-                                      : "impact",
-                                  selected,
-                                );
-                              }}
-                            >
-                              Create successor revision
-                            </Button>
-                          )}
-                          {reviewer && selected.actor !== data.identity.id && (
-                            <form
-                              onSubmit={(ev) => {
-                                ev.preventDefault();
-                                const v = Object.fromEntries(
-                                    new FormData(ev.currentTarget),
-                                  ),
-                                  k = selected.kind;
-                                void act(
-                                  k === "assertion"
-                                    ? "reviewAssertion"
-                                    : k === "impact"
-                                      ? "reviewImpact"
-                                      : "reviewObligation",
-                                  { [k + "Id"]: selected.id, ...v },
-                                )
-                                  .then(() => {
-                                    setDirty(false);
-                                    onLocation({ ...location, recordId: "" });
-                                  })
-                                  .catch(() => {});
-                              }}
-                              onChange={() => setDirty(true)}
-                            >
-                              <label className="workbench-field">
-                                Independent decision
-                                <select
-                                  name="decision"
-                                  aria-label="Independent decision"
-                                  required
-                                >
-                                  <option value="">Choose…</option>
-                                  <option
-                                    value={
-                                      selected.kind === "assertion"
-                                        ? "approve"
-                                        : "confirmed"
-                                    }
-                                  >
-                                    Confirm assessment
-                                  </option>
-                                  <option
-                                    value={
-                                      selected.kind === "assertion"
-                                        ? "return"
-                                        : "returned"
-                                    }
-                                  >
-                                    Return for revision
-                                  </option>
-                                </select>
-                              </label>
-                              <label className="workbench-field">
-                                Review reasoning
-                                <Textarea
-                                  name="reason"
-                                  aria-label="Review reasoning"
-                                  required
-                                  placeholder="Explain source sufficiency, contradictions and the basis for your decision."
-                                />
-                              </label>
-                              <Button type="submit" disabled={busy}>
-                                {busy
-                                  ? "Recording review…"
-                                  : "Record independent review"}
+                        ) && (
+                          <p className="subtle">
+                            No independent review has been recorded.
+                          </p>
+                        )}
+                        {related
+                          .filter(
+                            (r) =>
+                              r.kind === selected.kind + "_review" &&
+                              (r.body.assertionId ??
+                                r.body.impactId ??
+                                r.body.obligationId) === selected.id,
+                          )
+                          .map((r) => (
+                            <div className="record-item" key={r.id}>
+                              <b>{label(r.body.decision)}</b>
+                              <p>{r.body.reason}</p>
+                              <small className="subtle">
+                                {person(r.actor)} ·{" "}
+                                {new Date(r.createdAt).toLocaleString()}
+                              </small>
+                            </div>
+                          ))}
+                        {related.some(
+                          (r) => r.body.supersedesId === selected.id,
+                        ) ? (
+                          <p className="subtle">
+                            A successor revision replaces this assessment for
+                            current review gates.
+                          </p>
+                        ) : (
+                          <>
+                            {writer && (
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  if (
+                                    dirty &&
+                                    !window.confirm("Discard unsaved review?")
+                                  )
+                                    return;
+                                  // The revision's sources and affected records
+                                  // keep their titles in the pickers.
+                                  remember(...related);
+                                  onLocation({ ...location, recordId: "" });
+                                  open(
+                                    selected.kind === "assertion"
+                                      ? "addAssertion"
+                                      : selected.kind === "obligation"
+                                        ? "obligationDecision"
+                                        : "impact",
+                                    selected,
+                                  );
+                                }}
+                              >
+                                Create successor revision
                               </Button>
-                            </form>
-                          )}
-                        </>
-                      )}
-                    </>
-                  )}
+                            )}
+                            {reviewer &&
+                              selected.actor !== data.identity.id && (
+                                <form
+                                  onSubmit={(ev) => {
+                                    ev.preventDefault();
+                                    const v = Object.fromEntries(
+                                        new FormData(ev.currentTarget),
+                                      ),
+                                      k = selected.kind;
+                                    void act(
+                                      k === "assertion"
+                                        ? "reviewAssertion"
+                                        : k === "impact"
+                                          ? "reviewImpact"
+                                          : "reviewObligation",
+                                      { [k + "Id"]: selected.id, ...v },
+                                    )
+                                      .then(() => {
+                                        setDirty(false);
+                                        onLocation({
+                                          ...location,
+                                          recordId: "",
+                                        });
+                                      })
+                                      .catch(() => {});
+                                  }}
+                                  onChange={() => setDirty(true)}
+                                >
+                                  <label className="workbench-field">
+                                    Independent decision
+                                    <select
+                                      name="decision"
+                                      aria-label="Independent decision"
+                                      required
+                                    >
+                                      <option value="">Choose…</option>
+                                      <option
+                                        value={
+                                          selected.kind === "assertion"
+                                            ? "approve"
+                                            : "confirmed"
+                                        }
+                                      >
+                                        Confirm assessment
+                                      </option>
+                                      <option
+                                        value={
+                                          selected.kind === "assertion"
+                                            ? "return"
+                                            : "returned"
+                                        }
+                                      >
+                                        Return for revision
+                                      </option>
+                                    </select>
+                                  </label>
+                                  <label className="workbench-field">
+                                    Review reasoning
+                                    <Textarea
+                                      name="reason"
+                                      aria-label="Review reasoning"
+                                      required
+                                      placeholder="Explain source sufficiency, contradictions and the basis for your decision."
+                                    />
+                                  </label>
+                                  <Button type="submit" disabled={busy}>
+                                    {busy
+                                      ? "Recording review…"
+                                      : "Record independent review"}
+                                  </Button>
+                                </form>
+                              )}
+                          </>
+                        )}
+                      </>
+                    )}
                   {selected.kind === "assistant" && writer && (
                     <form
                       onChange={() => setDirty(true)}

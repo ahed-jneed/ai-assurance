@@ -11,6 +11,7 @@ import {
   decodeCursor,
   encodeCursor,
   parsed,
+  recordsById,
   type RecordRow,
 } from "./assurance-store";
 import { db } from "./bindings";
@@ -358,3 +359,120 @@ export async function reviewQueueSummary(ctx: Context, engagementId: string) {
   };
 }
 export type ReviewQueueSummary = Awaited<ReturnType<typeof reviewQueueSummary>>;
+
+/**
+ * Body fields that name other assurance records of the engagement; the record
+ * details link them (app/assurance-record-details.tsx).
+ */
+export const recordReferenceFields = [
+  "systemId",
+  "predictionId",
+  "datasetCardRecordId",
+  "sourceIds",
+  "affectedIds",
+  "supersedesId",
+  "assertionId",
+  "impactId",
+  "obligationId",
+  "assistantId",
+  "locationId",
+  "recordId",
+  "citationIds",
+  "previousId",
+  "newId",
+] as const;
+/** At most this many referenced records are loaded with a record. */
+export const recordReferenceLimit = 500;
+/**
+ * The ids a record's body names in its reference fields, at the top level or
+ * in a list of entries (such as an assertion's source relationships).
+ */
+export function referencedIds(record: AssuranceRecord) {
+  const ids: string[] = [],
+    collect = (body: unknown) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) return;
+      for (const field of recordReferenceFields)
+        for (const value of [(body as Record<string, unknown>)[field]].flat())
+          if (typeof value === "string" && value !== record.id) ids.push(value);
+    };
+  collect(record.body);
+  for (const value of Object.values(record.body ?? {}))
+    if (Array.isArray(value)) value.forEach(collect);
+  return [...new Set(ids)].slice(0, recordReferenceLimit);
+}
+export type RecordContext = {
+  record: AssuranceRecord;
+  /** The record's review state; `null` for a record that is not an assessment. */
+  reviewState: ReviewState | null;
+  /**
+   * The records its details read: its reviews, the assessments that supersede
+   * it and the records its body names, in (created_at, id) order.
+   */
+  related: AssuranceRecord[];
+};
+/**
+ * One record of the engagement with what its details need, read by id rather
+ * than from a load of every record: its reviews (through idx_review_subject),
+ * its successors (through idx_assessment_successor) and the records it names.
+ */
+export async function recordContext(
+  ctx: Context,
+  engagementId: string,
+  recordId: string,
+): Promise<RecordContext> {
+  const [record] = await recordsById(ctx, engagementId, [recordId]);
+  if (!record) throw new ApiError(404, "Assurance record not found");
+  const assessment = ["assertion", "impact", "obligation"].includes(
+    record.kind,
+  );
+  const [reviews, successors, named] = await Promise.all([
+    assessment
+      ? db()
+          .prepare(
+            "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records v WHERE v.tenant_id=? AND v.engagement_id=? AND v.kind IN ('assertion_review','impact_review','obligation_review') AND v.kind=? AND COALESCE(json_extract(v.body,'$.assertionId'),json_extract(v.body,'$.impactId'),json_extract(v.body,'$.obligationId'))=? ORDER BY v.created_at,v.id",
+          )
+          .bind(ctx.tenantId, engagementId, record.kind + "_review", record.id)
+          .all<RecordRow>()
+          .then((r) => r.results.map(parsed))
+      : [],
+    assessment
+      ? db()
+          .prepare(
+            "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind IN " +
+              assessmentKinds +
+              " AND json_extract(body,'$.supersedesId')=? ORDER BY created_at,id",
+          )
+          .bind(ctx.tenantId, engagementId, record.id)
+          .all<RecordRow>()
+          .then((r) => r.results.map(parsed))
+      : [],
+    recordsById(ctx, engagementId, referencedIds(record)),
+  ]);
+  const related = new Map<string, AssuranceRecord>();
+  for (const r of [...reviews, ...successors, ...named]) related.set(r.id, r);
+  const ordered = [...related.values()].sort((a, b) =>
+    a.createdAt === b.createdAt
+      ? a.id < b.id
+        ? -1
+        : a.id > b.id
+          ? 1
+          : 0
+      : a.createdAt < b.createdAt
+        ? -1
+        : 1,
+  );
+  const latest = reviews.at(-1);
+  return {
+    record,
+    reviewState: !assessment
+      ? null
+      : successors.length
+        ? "Superseded"
+        : !latest
+          ? "Awaiting review"
+          : ["approve", "confirmed"].includes(latest.body.decision)
+            ? "Confirmed"
+            : "Returned",
+    related: ordered,
+  };
+}
