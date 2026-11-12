@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import annexMap from "./annex-iv-map.json";
 import { annexIVIndex } from "./annex-iv";
+import { annexIvMapOf, resolveNew } from "./criteria/pin";
 import type { Engagement, Paper } from "./domain";
 import { artifact, engagement, templatePaper } from "./workflow/test-fixtures";
 
 const section = (e: Engagement, number: number) =>
-  annexIVIndex(e).find((s) => s.number === number)!;
+  annexIVIndex(e, annexIvMapOf(resolveNew())).find((s) => s.number === number)!;
 // Section 7 maps WP-XC-06 and WP-A11-01.
 const mapped = annexMap.sections.find((s) => s.number === 7)!.paperIds;
 const missing = (t: string) =>

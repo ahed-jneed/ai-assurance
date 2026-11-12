@@ -14,6 +14,12 @@ export const tenants = sqliteTable("tenants", {
   createdAt: text("created_at").notNull(),
   version: integer("version").notNull().default(1),
   lastCommandId: text("last_command_id").notNull().default("init"),
+  // The practice's engagement quality review policy (#127): the days that
+  // must pass after someone's latest team work on a client's engagement
+  // before they may be the quality reviewer of another engagement for that
+  // client. NULL applies the default (lib/quality-review-policy.ts); only
+  // setQualityReviewPolicy changes it, with a management event.
+  eqrCoolingOffDays: integer("eqr_cooling_off_days"),
   // The practice's report settings as JSON (lib/report-settings.ts): the
   // signatory, location and quality-management statement new reports state.
   reportSettings: text("report_settings").notNull().default("{}"),
@@ -235,6 +241,30 @@ export const engagementAccess = sqliteTable(
       foreignColumns: [engagements.tenantId, engagements.id],
     }),
   ],
+);
+/**
+ * Every change of an engagement grant, with the grantee's membership role at
+ * that moment, written by triggers on engagement_access (migration 0011) and
+ * never updated or deleted. A grant held under any role other than
+ * Engagement Quality Reviewer makes its holder an engagement team member for
+ * the quality reviewer's eligibility (lib/quality-review-records.ts), even
+ * after it is withdrawn and the member is re-granted as a reviewer. A NULL
+ * role marks a grant recorded before this history existed, whose role is not
+ * known; it counts as team membership.
+ */
+export const engagementAccessHistory = sqliteTable(
+  "engagement_access_history",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    tenantId: text("tenant_id").notNull(),
+    engagementId: text("engagement_id").notNull(),
+    userId: text("user_id").notNull(),
+    active: integer("active").notNull(),
+    role: text("role"),
+    actor: text("actor").notNull(),
+    at: text("at").notNull(),
+  },
+  (t) => [index("idx_access_history_user").on(t.tenantId, t.userId)],
 );
 export const accessPolicies = sqliteTable(
   "engagement_access_policies",

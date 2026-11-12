@@ -72,6 +72,52 @@
       "format": "uri",
       "pattern": "^https://"
     },
+    "annexIvMap": {
+      "description": "The AI Act Annex IV evidence map of a pack with features.annexIvIndex: for each Annex IV section, the pack's items that feed it, the evidence categories that find candidate evidence and the checklist a reviewer works through. templates/annex-iv-map.json is generated from the default pack's map (design section 17, phase 2), so this field holds that file's content verbatim. Validator rule 8: every paperId is an item of the pack.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "mapVersion", "source", "assemblyPolicy", "sections"],
+      "properties": {
+        "schemaVersion": { "type": "string" },
+        "mapVersion": { "$ref": "#/$defs/dataVersion" },
+        "source": { "type": "object" },
+        "assemblyPolicy": { "type": "object" },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "number", "reference", "title", "paperIds", "evidenceCategories", "legalSubitems", "evidenceChecklist"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$", "maxLength": 64 },
+              "number": { "type": "integer", "minimum": 1 },
+              "reference": { "$ref": "#/$defs/shortText" },
+              "title": { "$ref": "#/$defs/shortText" },
+              "paperIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/templateId" } },
+              "evidenceCategories": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/shortText" } },
+              "legalSubitems": { "type": "array", "items": { "$ref": "#/$defs/shortText" } },
+              "defaultAssessmentState": { "$ref": "#/$defs/shortText" },
+              "evidenceChecklist": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["id", "text"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+$", "maxLength": 64 },
+                    "text": { "$ref": "#/$defs/text" },
+                    "specificDocumentRequired": { "$ref": "#/$defs/shortText" },
+                    "cannotInferFromCategory": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "date": { "type": "string", "format": "date" },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "relationship": {
@@ -773,7 +819,7 @@
           "additionalProperties": false,
           "properties": {
             "annexIvIndex": {
-              "description": "Compile the AI Act Annex IV evidence index (templates/annex-iv-map.json) into report snapshots.",
+              "description": "Compile the AI Act Annex IV evidence index into report snapshots, from the pack's annexIvMap (packs released before phase 2 have none and use the map of the current version of the same pack id; validator rule 8).",
               "type": "boolean"
             },
             "aiActClassification": {
@@ -812,6 +858,7 @@
           "maxItems": 500,
           "items": { "$ref": "#/$defs/item" }
         },
+        "annexIvMap": { "$ref": "#/$defs/annexIvMap" },
         "notes": { "$ref": "#/$defs/longText" },
         "compat": {
           "type": "object",

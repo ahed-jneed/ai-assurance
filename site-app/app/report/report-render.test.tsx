@@ -95,4 +95,35 @@ describe("report renderers", () => {
     }
     expect(details(r, r.snapshot)).toContain("Annex map");
   });
+
+  it("state the framework and crosswalk versions of the criteria stamp", async () => {
+    // The injected sample bundle releases two crosswalks to the AI Act.
+    for (const [r, framework] of [
+      [await captured(), /eu-ai-act 02024R1689-20260727 \(data [\d.]+\)/],
+      [
+        await captured("en18286-iso42001"),
+        /en-18286 2026 \(data 2027\.1\.0\); iso-iec-42001 2023 \(data 2027\.1\.0\)/,
+      ],
+    ] as const)
+      for (const snapshot of [r.snapshot, r.clientSnapshot!]) {
+        for (const html of [printed(r, snapshot), details(r, snapshot)]) {
+          expect(html).toMatch(framework);
+          expect(html).toContain("en-18286-to-eu-ai-act 2027.1.0");
+          expect(html).toContain("iso-iec-42001-to-eu-ai-act 2027.1.0");
+        }
+      }
+  });
+
+  it("render a snapshot captured before the stamps had frameworks", async () => {
+    const r = await captured();
+    const { frameworks, crosswalks, ...phase1 } = r.snapshot
+      .criteriaPack as Record<string, unknown>;
+    expect([frameworks, crosswalks].every(Array.isArray)).toBe(true);
+    const snapshot = { ...r.snapshot, criteriaPack: phase1 };
+    for (const html of [printed(r, snapshot), details(r, snapshot)]) {
+      expect(html).not.toContain("Report unavailable");
+      expect(html).toContain("eu-ai-act-amended");
+      expect(html).not.toContain("Assessed against");
+    }
+  });
 });

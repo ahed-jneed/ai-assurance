@@ -1,7 +1,9 @@
 import { ApiError, bucket, id, now, sha256, type Context } from "./store";
+import type { CriteriaStamp } from "./criteria/types";
 import type { Engagement, Report, RulePackStamp } from "./domain";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
+import { exportedPapers } from "./papers/export";
 import { pinnedRecordFacts, storedBodies } from "./assurance-store";
 import {
   describeScope,
@@ -32,10 +34,10 @@ const escaped = (s: unknown) =>
  * whether its legal content was pending qualified legal review at capture.
  */
 function criteriaLine(snapshot: Record<string, unknown>) {
-  const c = snapshot.criteriaPack as
-    | { packId?: string; packVersion?: string; legalReviewPending?: boolean }
-    | undefined;
+  const c = snapshot.criteriaPack as Partial<CriteriaStamp> | undefined;
   if (!c?.packId) return "";
+  const frameworks = Array.isArray(c.frameworks) ? c.frameworks : [],
+    crosswalks = Array.isArray(c.crosswalks) ? c.crosswalks : [];
   return (
     "<small>Criteria pack " +
     escaped(c.packId) +
@@ -43,6 +45,26 @@ function criteriaLine(snapshot: Record<string, unknown>) {
     escaped(c.packVersion) +
     (c.legalReviewPending
       ? ": its legal content is pending qualified legal review"
+      : "") +
+    (frameworks.length
+      ? " · assessed against " +
+        frameworks
+          .map(
+            (f) =>
+              escaped(f.id) +
+              " " +
+              escaped(f.edition) +
+              " (data " +
+              escaped(f.version) +
+              ")",
+          )
+          .join("; ")
+      : "") +
+    (crosswalks.length
+      ? " · crosswalks " +
+        crosswalks
+          .map((x) => escaped(x.id) + " " + escaped(x.version))
+          .join("; ")
       : "") +
     "</small>"
   );
@@ -208,6 +230,11 @@ export async function buildDossier(
     sha256: string;
     status: string;
   }[];
+  // An internal dossier files each paper as its working-paper contract
+  // document (#51), and a released package's completion memo. A client
+  // dossier, and a package captured before the contract, keep the captured
+  // paper: a client paper is its conclusion only, without user ids.
+  const documents = client ? [] : await exportedPapers(ctx, e, r);
   // Select the pinned records and count the files before reading any record
   // body or evidence byte: a dossier the verifier would refuse is refused
   // here, within the Worker's memory and time limits (#83).
@@ -223,7 +250,8 @@ export async function buildDossier(
               !withheld.some((w) => w.id === c.id) &&
               e.artifacts.find((a) => a.id === c.id)?.custody !== "client",
           ).length,
-    plannedFiles = 3 + papers.length + selected.length + evidenceFiles;
+    plannedFiles =
+      3 + (documents.length || papers.length) + selected.length + evidenceFiles;
   if (plannedFiles > maxDossierFiles)
     throw new ApiError(
       413,
@@ -285,12 +313,20 @@ export async function buildDossier(
     escaped(snapshot.limitations) +
     "</pre></section></body></html>";
   await add("report.html", bytes(html), "text/html");
-  for (const p of papers)
-    await add(
-      "papers/" + p.id + "-r" + p.revision + ".json",
-      bytes(JSON.stringify(p)),
-      "application/json",
-    );
+  if (documents.length)
+    for (const d of documents)
+      await add(
+        "papers/" + d.id + "-r" + d.revision + ".json",
+        bytes(JSON.stringify(d)),
+        "application/json",
+      );
+  else
+    for (const p of papers)
+      await add(
+        "papers/" + p.id + "-r" + p.revision + ".json",
+        bytes(JSON.stringify(p)),
+        "application/json",
+      );
   // A hundred pinned records per query: a query per record would pass D1's
   // per-request query limit on a large engagement.
   for (let start = 0; start < selected.length; start += 100) {
@@ -386,7 +422,7 @@ export async function buildDossier(
     });
   }
   const instructions =
-    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions. The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. A scoped export (the manifest's scope, from manifest 1.2) holds only the pinned assurance records within its signed scope and states how many of the report's pinned records it includes; report.json lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The verifier reports the scope and states a scoped export as a limitation: it is not the complete audit file. The platform cannot certify the audit conclusion.\n";
+    "Verify with the separately reviewed engine.assurance CLI: python assurance-verifier.py verify --dossier dossier.json --trusted-keys trust.json --require-trusted-signature. Put the independently confirmed key ID and publicKeySPKI in trust.json as a key/value object. The signed manifest names the signing key (signingKeyId) and the captured rule-pack and methodology versions; report.json carries the criteria stamp (criteriaPack: the pack, framework data and crosswalk versions with their digests). The practice lists its active and retired verification keys to its members at /api/dossier/keys; pin the expected public key through an independent channel. Embedded public keys do not establish trusted origin. report.json is the exact captured report. report.html is a derived readable rendition. SHA-256 detects changed bytes; application Ed25519 signing establishes origin only under the selected trust policy. This is not a qualified signature or independent timestamp. Withheld evidence is listed explicitly. A scoped export (the manifest's scope, from manifest 1.2) holds only the pinned assurance records within its signed scope and states how many of the report's pinned records it includes; report.json lists every pinned record with its SHA-256, so the records outside the scope stay identifiable. The verifier reports the scope and states a scoped export as a limitation: it is not the complete audit file. The platform cannot certify the audit conclusion.\n";
   await add("README.txt", bytes(instructions), "text/plain");
   leaves.sort((a, b) => a.path.localeCompare(b.path));
   const manifest = {

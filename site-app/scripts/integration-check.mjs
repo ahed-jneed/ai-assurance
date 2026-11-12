@@ -387,7 +387,10 @@ try {
     const scope = new URLSearchParams({ tenantId, engagementId: legacyId });
     const legacy = await request("/api/workspace?" + scope);
     assert.equal(legacy.criteria.origin, "legacy");
-    assert.deepEqual(legacy.criteria.pin, workspace.criteria.pin);
+    // Every legacy class resolves to pack #1 2026.11.2; new engagements pin
+    // the current version (2026.11.3 since #61, the same programme).
+    assert.equal(legacy.criteria.pin.packId, workspace.criteria.pin.packId);
+    assert.equal(legacy.criteria.pin.packVersion, "2026.11.2");
     assert.equal(legacy.catalog.methodologyVersion, "2026.11.2");
     // Its template commands behave as before and write no pin.
     const created = await request("/api/workspace", {
@@ -408,6 +411,54 @@ try {
       .bind(tenantId, legacyId)
       .first();
     assert.equal(stored.criteria, null, "M0 writes nothing to the engagement");
+    // M1 (#61): the explicit legacy pin goes through the normal save, with
+    // an audit event and a version bump, and its reversal removes it.
+    const storedPin = async () =>
+      (await testDb
+        .prepare(
+          "SELECT json_extract(body,'$.criteria.origin') AS origin, json_extract(body,'$.criteria.pin.packVersion') AS version FROM engagements WHERE tenant_id=? AND id=?",
+        )
+        .bind(tenantId, legacyId)
+        .first()) ?? {};
+    const pinnedM1 = await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "pinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: created.engagement.version,
+      },
+    });
+    assert.equal(pinnedM1.engagement.version, created.engagement.version + 1);
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: "legacy", version: "2026.11.2" },
+    );
+    const afterPin = await request("/api/workspace?" + scope);
+    assert.equal(afterPin.criteria.origin, "legacy");
+    assert.deepEqual(afterPin.criteria.pin, legacy.criteria.pin);
+    const event = await testDb
+      .prepare(
+        "SELECT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY rowid DESC LIMIT 1",
+      )
+      .bind(tenantId, legacyId)
+      .first();
+    assert.equal(event?.action, "pinCriteria");
+    await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "unpinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: pinnedM1.engagement.version,
+      },
+    });
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: null, version: null },
+    );
     const views = await request("/api/coverage?" + scope);
     assert.deepEqual(
       views.views.map((v) => v.key),
@@ -433,7 +484,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
@@ -2726,10 +2777,64 @@ try {
     "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
   );
   await asRole("Reviewer");
+  // #127: an engagement grant held under another role is team membership,
+  // even without any recorded work and after a re-grant as reviewer.
+  const secondLead = "fixture-second-lead-" + stamp;
+  await management("grantMember", {
+    userId: secondLead,
+    displayName: "Fixture Second Lead",
+    role: "Lead Auditor",
+    engagementIds: [e.id],
+  });
+  await management("updateMember", {
+    userId: secondLead,
+    displayName: "Fixture Second Lead",
+    role: "Engagement Quality Reviewer",
+    clientId: null,
+    engagementIds: [e.id],
+  });
+  assert.equal(
+    (
+      await command(
+        "appointQualityReviewer",
+        { userId: secondLead, reason: "Held access as a Lead" },
+        owner,
+        409,
+      )
+    ).error,
+    "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
+  );
+  await management("revokeMember", { userId: secondLead });
+  // #127: the cooling-off period is a practice policy, set with a reason and
+  // recorded as a management event; an appointment records the period.
+  assert.equal(workspace.qualityReviewPolicy.coolingOffDays, 730);
+  await management("setQualityReviewPolicy", {
+    coolingOffDays: 1095,
+    reason: "Firm policy: three years for assurance clients",
+  });
+  assert.deepEqual(
+    [
+      workspace.managementEvents[0].action,
+      JSON.parse(workspace.managementEvents[0].details),
+    ],
+    [
+      "setQualityReviewPolicy",
+      {
+        coolingOffDays: 1095,
+        previousCoolingOffDays: 730,
+        reason: "Firm policy: three years for assurance clients",
+      },
+    ],
+  );
+  assert.deepEqual(workspace.qualityReviewPolicy, {
+    coolingOffDays: 1095,
+    practiceSet: true,
+  });
   await command("appointQualityReviewer", {
     userId: quality,
     reason: "Independent of the fixture engagement team",
   });
+  assert.equal(e.qualityReview.coolingOffDays, 1095);
   assert.equal(
     (
       await command(
@@ -2772,7 +2877,7 @@ try {
       quality,
     );
   console.log(
-    "PASS engagement quality reviewer: role grant, a former team member refused, eligible appointment, no paper edits, stand-back checklist",
+    "PASS engagement quality reviewer: role grant, a former team member and a former grant holder refused, practice cooling-off policy, eligible appointment, no paper edits, stand-back checklist",
   );
   // The practice's report settings (#111): a report that leaves the
   // signatory, location and quality statement blank states them.
@@ -2913,6 +3018,33 @@ try {
     "The engagement quality reviewer must sign off both exact packages before release",
   );
   await qualitySignOff(internalFinal);
+  // #127: at release the signer must still be an active Engagement Quality
+  // Reviewer; a revoked reviewer's sign-off releases nothing.
+  await management("revokeMember", { userId: quality });
+  assert.equal(
+    (
+      await command(
+        "releaseReport",
+        {
+          reportId: internalFinal.id,
+          recipientScope: "Fixture client members",
+          reason: "Must reject while the signer is revoked",
+        },
+        owner,
+        409,
+      )
+    ).error,
+    "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+  );
+  await management("grantMember", {
+    userId: quality,
+    displayName: "Fixture Quality Reviewer",
+    role: "Engagement Quality Reviewer",
+    engagementIds: [e.id],
+  });
+  console.log(
+    "PASS engagement quality reviewer: a revoked signer blocks release until restored",
+  );
   const releaseInbox = await request(inboxPath),
     approvalInbox = await request(inboxPath, { user: reviewer });
   const leadReleaseTask = releaseInbox.items.find(
@@ -3104,6 +3236,28 @@ try {
       ),
       "released report.html names the rule pack",
     );
+    // An internal dossier, full or scoped, files each paper as a
+    // working-paper contract document and adds the released package's
+    // completion memo (#51); check:fixtures validates them. The client
+    // dossier keeps conclusions.
+    const paperFiles = dossier.files
+      .filter((f) => f.path.startsWith("papers/"))
+      .map((f) => JSON.parse(dossierText(f.path)));
+    assert(paperFiles.length > 0);
+    if (audience === "internal") {
+      assert(paperFiles.every((d) => d.schemaVersion === "1.1.0"));
+      const memo = paperFiles.find((d) => d.catalogId === "MEM-SO-01");
+      assert.equal(memo.records.releaseCompletion.reportId, internalFinal.id);
+      assert.equal(
+        memo.records.releaseCompletion.internalHash,
+        internalFinal.sha256,
+      );
+      await fs.writeFile(
+        ".sites-runtime/dossier-papers.json",
+        JSON.stringify(paperFiles, null, 2),
+      );
+    } else
+      assert(paperFiles.every((d) => d.schemaVersion === undefined && !d.body));
     return {
       dossierText,
       dossierReport,

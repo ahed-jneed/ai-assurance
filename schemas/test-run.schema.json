@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:ai-assurance:test-run:1.2",
+  "$id": "urn:ai-assurance:test-run:2.0",
   "title": "AI Assurance common diagnostic run contract",
   "description": "Version-discriminated diagnostic contract: legacy 1.0, hosted 1.1, authenticated external audit projection 1.2, engine report 1.3, hosted run 1.4 and compiled external audit run 1.5 under statistics 1.0.0 (docs/design/audit-statistics.md). Schema validity is distinct from result origin, input custody, statistical suitability and legal sufficiency.",
   "oneOf": [
@@ -2793,8 +2793,7 @@
               "$ref": "#/$defs/sha256"
             },
             "card": {
-              "type": "object",
-              "description": "Frozen dataset governance card; application validation enforces its version, artifact hash, and engagement."
+              "$ref": "#/$defs/datasetCard"
             }
           }
         }
@@ -5163,6 +5162,11 @@
         "errorSd": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "targetSd": {
+          "description": "Optional, engine only until the hosted runner mirrors it: the assumed standard deviation of the targets, which adds the mean baseline gate to the pass probability (section 8).",
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
@@ -6100,11 +6104,12 @@
           "clustered_design_requires_engine",
           "bootstrap_insufficient_valid_replicates",
           "bootstrap_budget_exceeded",
-          "small_cell_clustered"
+          "small_cell_clustered",
+          "below_minimum_cluster_count"
         ]
       },
       "minItems": 0,
-      "maxItems": 26
+      "maxItems": 27
     },
     "statisticsMetricDetails": {
       "type": "object",
@@ -6206,6 +6211,40 @@
         },
         "reasons": {
           "$ref": "#/$defs/statisticsReasons"
+        },
+        "bootstrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "replicates": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 10000
+            },
+            "validReplicates": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "clusters": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "replicates",
+            "validReplicates",
+            "clusters"
+          ]
+        },
+        "sensitivityInterval": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/statisticsInterval"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -7695,6 +7734,175 @@
       ],
       "description": "Engine report under statistics 1.0.0: every performance, calibration and group criterion of the recorded plan is one result with a decision; drift, unavailable capabilities and model-backed procedures keep the 1.0 result shape without one."
     },
+    "datasetCard": {
+      "title": "Registered dataset card",
+      "description": "Frozen dataset governance card (dataset-card.schema.json, $defs/registeredCard). Application validation enforces that it describes the evaluated bytes and belongs to the engagement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "name",
+        "version",
+        "artifactId",
+        "owner",
+        "split",
+        "population",
+        "periodStart",
+        "periodEnd",
+        "collectionMethod",
+        "independence",
+        "sensitiveDataBasis",
+        "limitations",
+        "artifactSha256",
+        "artifactName",
+        "artifactSize"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "artifactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "split": {
+          "enum": [
+            "training",
+            "validation",
+            "test",
+            "reference",
+            "unknown"
+          ]
+        },
+        "population": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "periodStart": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "periodEnd": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "format": "date"
+        },
+        "collectionMethod": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "independence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "sensitiveDataBasis": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineDatasetRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+        },
+        "baselineRationale": {
+          "type": "string",
+          "maxLength": 5000,
+          "pattern": "^(?:\\S(?:[\\s\\S]*\\S)?)?$"
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "artifactName": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "artifactSize": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "baselinePin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "recordId",
+            "sha256",
+            "artifactSha256"
+          ],
+          "properties": {
+            "recordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "artifactSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "baselineDatasetRecordId"
+            ]
+          },
+          "then": {
+            "required": [
+              "baselineRationale"
+            ],
+            "properties": {
+              "baselineRationale": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
     "externalPredictionDataset": {
       "type": "object",
       "additionalProperties": false,
@@ -7747,8 +7955,7 @@
               "$ref": "#/$defs/sha256"
             },
             "card": {
-              "type": "object",
-              "description": "Frozen dataset governance card; application validation enforces its version, artifact hash, and engagement."
+              "$ref": "#/$defs/datasetCard"
             }
           }
         },

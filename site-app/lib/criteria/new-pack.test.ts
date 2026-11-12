@@ -3,6 +3,11 @@
 // loaded through an injected registry with no code change, run through
 // engagement creation, seeding, paper templates and report capture, without
 // any AI Act behaviour. Pack #1 keeps today's behaviour.
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { assessments } from "../commands/assurance/assessments";
 import { classification } from "../commands/classification";
@@ -10,6 +15,7 @@ import { reports } from "../commands/reports";
 import { caller } from "../commands/test-fixtures";
 import { completionGates, stageGates, type Engagement } from "../domain";
 import { freshEngagement, templatePaper } from "../factories";
+import { completionMemo } from "../papers/completion";
 import { withSamplePack } from "./test-bundles";
 import {
   criteriaView,
@@ -166,6 +172,76 @@ describe("the EN 18286 + ISO/IEC 42001 pack, from data alone", () => {
     expect(recordVersions(e)).toEqual({ methodologyVersion: "2027.1.0" });
   });
 
+  it("exports its papers as working-paper documents naming the pack (#51)", async () => {
+    const e = engagement();
+    e.papers.push(templatePaper(resolved(), "MEM-EX-01", "user-lead"));
+    const r = await capture(e);
+    const { documents } = r.snapshot.workingPapers as {
+      documents: {
+        catalogId: string;
+        templateVersion: string;
+        scope: { rulePackId: string; operatorRoles: string[] };
+        applicability: { sourceVersion: string };
+      }[];
+    };
+    expect(documents.map((d) => d.catalogId)).toEqual(["MEM-EX-01"]);
+    for (const d of documents) {
+      // No AI Act rule-pack stamp: the pack and its framework versions.
+      expect(d.templateVersion).toBe("2027.1.0");
+      expect(d.scope.rulePackId).toBe("en18286-iso42001@2027.1.0");
+      expect(d.applicability.sourceVersion).toBe(
+        "en-18286@2026#2027.1.0, iso-iec-42001@2023#2027.1.0",
+      );
+    }
+    // Released, the package gets its MEM-SO-01 completion memo even though
+    // the snapshot captured no AI Act classification.
+    r.release = {
+      state: "released",
+      completion: {
+        templateIds: ["WP-RP-02", "MEM-SO-01"],
+        internalHash: r.sha256,
+        clientHash: r.clientSha256!,
+        approvedBy: "user-reviewer",
+        approvedAt: "2027-02-01T10:00:00.000Z",
+        releasedBy: "user-lead",
+        releasedAt: "2027-02-01T11:00:00.000Z",
+      },
+      history: [],
+    };
+    const memo = await completionMemo(e, r, "tenant-1");
+    expect(memo).toMatchObject({
+      catalogId: "MEM-SO-01",
+      templateVersion: "2027.1.0",
+      scope: {
+        rulePackId: "en18286-iso42001@2027.1.0",
+        operatorRoles: documents[0].scope.operatorRoles,
+      },
+    });
+    const directory = mkdtempSync(path.join(tmpdir(), "new-pack-papers-"));
+    try {
+      const file = path.join(directory, "documents.json");
+      writeFileSync(file, JSON.stringify([...documents, memo]));
+      const result = spawnSync(
+        process.execPath,
+        [
+          fileURLToPath(
+            new URL(
+              "../../../schemas/validate-working-paper-schema.mjs",
+              import.meta.url,
+            ),
+          ),
+          "--documents",
+          file,
+        ],
+        { encoding: "utf8" },
+      );
+      expect(result.stderr).toBe("");
+      expect(result.status).toBe(0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("offers its requirements as assertion criteria", () => {
     const view = criteriaView(engagement());
     expect(view.features.obligationAssessments).toBe(false);
@@ -203,7 +279,7 @@ describe("pack #1 keeps today's behaviour", () => {
     expect(r.clientSnapshot!.engagement).toHaveProperty("classification");
     expect(r.snapshot.criteriaPack).toMatchObject({
       packId: "eu-ai-act-amended",
-      packVersion: "2026.11.2",
+      packVersion: "2026.11.3",
       legalReviewPending: true,
     });
     expect(String(r.snapshot.limitations)).toMatch(

@@ -972,13 +972,18 @@ class WorkerTests(unittest.TestCase):
         observations += [{"fields": {"eth": None, "sex": "F"}} for _ in range(27)]
         self.assertEqual(withheld_strata(observations, plan, {"columns": {}}), {("eth",): {"C", "D"}, ("sex",): {"X"}})
 
-    def client_held_pair(self, extra):
-        """A run on 200 rows (group A/B x sex F/M, 50 each) plus `extra` CSV rows, by the platform and client-held."""
+    def client_held_pair(self, extra, clustered=False):
+        """A run on 200 rows (group A/B x sex F/M, 50 each) plus `extra` CSV rows, by the platform and client-held.
+        clustered: the plan declares clusterField "person" (10 people per group and sex, section 5.11); every
+        `extra` row then needs its own person column."""
         def criterion(id, fields):
             return {"id": id, "role": "confirmatory", "kind": "group_comparison", "metric": "selection_rate_difference", "groupFields": fields, "comparison": {"mode": "all_pairs"}, "band": {"lower": -0.2, "upper": 0.2}, "minimumCoverage": 1.0}
         plan = {"criteria": [{"id": "acc", "role": "confirmatory", "kind": "performance", "members": [{"metric": "accuracy", "band": {"lower": 0.1, "upper": 0.99}}]}, criterion("par-g", ["group"]), criterion("par-s", ["sex"]), criterion("par-gs", ["group", "sex"])]}
         config = {"contractVersion": "1.3", "id": "run-two-columns", "engagementId": "eng", "modelId": "model", "datasetId": "data", "task": "binary_classification", "suite": ["performance", "fairness"], "seed": 1729, "columns": {"target": "actual", "prediction": "predicted", "protected": "group"}, "statistics": plan, "thresholds": {"policyId": "p", "policyVersion": "1", "source": "internal_policy", "values": {}}, "positiveLabel": "1", "negativeLabel": "0"}
-        lines = ["actual,predicted,group,sex"] + [f"{i % 2},{i // 2 % 2},{g},{s}" for g in "AB" for s in "FM" for i in range(50)] + list(extra)
+        if clustered:
+            plan.update(clusterField="person", bootstrap={"replicates": 1000})
+        person = (lambda g, s, i: f",{g}{s}{i % 10}") if clustered else (lambda g, s, i: "")
+        lines = ["actual,predicted,group,sex" + (",person" if clustered else "")] + [f"{i % 2},{i // 2 % 2},{g},{s}" + person(g, s, i) for g in "AB" for s in "FM" for i in range(50)] + list(extra)
         path = self.root/"two-columns.csv"
         path.write_text("\n".join(lines)+"\n", encoding="utf-8")
         return ({r["testId"]: r for r in run(path, config, withhold_small_groups=held)["results"]} for held in (False, True))
@@ -993,6 +998,19 @@ class WorkerTests(unittest.TestCase):
                 self.assertEqual(client[test_id]["outcome"], r["outcome"])
                 self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
         self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
+
+    def test_client_held_coverage_in_a_clustered_plan(self):
+        # Section 5.11 with #102: the cluster bootstrap decides, and rows a client-held run leaves out still
+        # count towards coverage once (not once per cluster), so both runs decide alike.
+        for extra in (["1,1,C,F,x0"], ["1,0,,F,x0"]):
+            platform, client = self.client_held_pair(extra, clustered=True)
+            for test_id, r in platform.items():
+                with self.subTest(extra=extra, test_id=test_id):
+                    self.assertEqual(client[test_id]["outcome"], r["outcome"])
+                    self.assertEqual(client[test_id]["decision"]["reasons"], r["decision"]["reasons"])
+            self.assertIn("cluster_percentile_bootstrap", {(m.get("confidenceInterval") or {}).get("method") for m in client["par-s"]["metrics"]})
+        # The row without a group is left out, yet the group comparison's coverage still counts it.
+        self.assertIn("insufficient_coverage", client["par-g"]["decision"]["reasons"])
 
     def test_client_held_runs_leave_out_a_few_rows_without_a_group_value(self):
         # One row without a group: kept, performance minus the group comparisons would give back its sex, label
