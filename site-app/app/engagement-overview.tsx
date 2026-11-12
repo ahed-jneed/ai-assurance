@@ -24,9 +24,6 @@ import {
 } from "@/lib/domain";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
-import { classificationRules } from "@/lib/classification-rules";
-import { reReviewTriggers } from "@/lib/domain/classification";
-import { asRulePack, isoToday } from "@/lib/rule-pack";
 
 export function EngagementOverview({
   data,
@@ -105,30 +102,12 @@ export function EngagementOverview({
   const outstandingRequests = (e.evidenceRequests ?? []).filter(
     (r) => !["accepted", "waived"].includes(r.status),
   );
-  // #19: final Art 6 guidelines, a due Code or interoperability milestone or
-  // a new rule pack call for a re-review of an approved classification.
+  // A due classification re-review (#19) is a work item since #104, in the
+  // work inbox and the task queue: personal for Auditors and Lead Auditors
+  // (who may reclassify); a Reviewer sees it waiting under "all".
   // Only packs with the AI Act classification (criteria model section 7.1).
   const classified = packFeatures(data).aiActClassification;
-  const reReview =
-    classified && e.classification.status === "approved"
-      ? reReviewTriggers(
-          e.classification,
-          classificationRules(asRulePack(data.catalog?.regulatorySnapshot)),
-          isoToday(),
-        ).filter((t) => t.state === "due")
-      : [];
   const checkpoints = [
-    ...(reReview.length
-      ? [
-          {
-            icon: BookOpen,
-            title: "Re-review classification",
-            detail: reReview.map((t) => t.title).join("; "),
-            view: "Regulatory mapping",
-            filter: "all",
-          },
-        ]
-      : []),
     ...(classified &&
     e.classification.status !== "approved" &&
     !gates.some((g) => g.kind === "classification")
