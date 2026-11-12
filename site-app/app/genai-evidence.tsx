@@ -323,13 +323,6 @@ function ResultCard({
               ))}
             </ul>
           )}
-          {run.claimScope.length > 0 && (
-            <ul className="genai-claim-scope">
-              {run.claimScope.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          )}
         </details>
       ))}
     </section>

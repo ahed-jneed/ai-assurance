@@ -326,7 +326,7 @@ describe("worker results", () => {
         auditor(),
       ),
       e.papers.at(-1)!);
-    const conclude = (evidenceIds: string[]) =>
+    const conclude = async (evidenceIds: string[]) =>
       papers.run(
         e,
         "editPaper",

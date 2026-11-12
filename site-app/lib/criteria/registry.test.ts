@@ -137,7 +137,7 @@ describe("registry", () => {
     expect(digest(pack1.pack)).toBe(PACK_SHA);
   });
 
-  it("offers pack #1 at engagement creation, with its legal review pending", () => {
+  it("offers pack #1 and the GenAI pack at engagement creation, with legal review pending", () => {
     expect(selectablePacks(r)).toEqual([
       expect.objectContaining({
         id: "eu-ai-act-amended",
@@ -147,6 +147,15 @@ describe("registry", () => {
         memos: 12,
         legalReviewPending: true,
         clauseNumbersOnly: false,
+      }),
+      expect.objectContaining({
+        id: "genai-evaluation",
+        version: "2026.11.0",
+        isDefault: false,
+        workingPapers: 7,
+        memos: 1,
+        legalReviewPending: true,
+        clauseNumbersOnly: true,
       }),
     ]);
   });
