@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 
 from . import statistics as st
 
@@ -180,6 +181,9 @@ EEO1_SEX = ["Male", "Female"]
 EEO1_RACE_ETHNICITY = ["Hispanic or Latino", "White", "Black or African American", "Native Hawaiian or Pacific Islander", "Asian", "Native American or Alaska Native", "Two or More Races"]
 
 
+_NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+
+
 def records_from_csv(text, *, rate, sex, race, outcome, selected=(), unknown=()):
     """The records of a CSV with one row per individual, mapped as the platform's LL144 audit maps a dataset.
 
@@ -210,10 +214,9 @@ def records_from_csv(text, *, rate, sex, race, outcome, selected=(), unknown=())
         if rate == "selection":
             record["selected"] = cell in chosen
         else:
-            try:
-                score = float(cell)
-            except ValueError:
-                score = math.nan
+            # The hosted runner's NUMBER pattern (lib/ll144-audit.ts): ASCII digits only, so float()'s
+            # extras ('1_000', non-ASCII digits, 'nan', 'inf') are refused here as there.
+            score = float(cell) if _NUMBER.fullmatch(cell) else math.nan
             _require(math.isfinite(score), f"row {index + 2} score is not a number")
             record["score"] = score
         records.append(record)

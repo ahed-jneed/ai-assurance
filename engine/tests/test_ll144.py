@@ -115,6 +115,16 @@ class GoldenCases(unittest.TestCase):
                 self.assertEqual(ll144.main([str(source), "--rate", "scoring", "--sex", "gender", "--race", "race", "--outcome", "score"]), 2)
             self.assertIn("row 2 score is not a number", err.getvalue())
 
+    def test_scores_parse_as_the_hosted_runner_parses_them(self):
+        def scores(*cells):
+            text = "sex,race,score\n" + "".join(f"Male,Asian,{c}\n" for c in cells)
+            return [r["score"] for r in ll144.records_from_csv(text, rate="scoring", sex="sex", race="race", outcome="score")]
+
+        self.assertEqual(scores("1", "-2.5", "+.5", "3.", "1e2"), [1.0, -2.5, 0.5, 3.0, 100.0])
+        for cell in ("1_000", "١٢","nan", "inf", "1e999", "0x10"):
+            with self.assertRaisesRegex(ll144.Ll144Error, "score is not a number"):
+                scores(cell)
+
     def test_the_statistics_table_keeps_its_selection_shape(self):
         table = st.evaluate_ll144({"categories": [{"name": "a", "n": 0, "selected": 0}, {"name": "b", "n": 4, "selected": 2}]})
         self.assertEqual(table["referenceCategory"], "b")
