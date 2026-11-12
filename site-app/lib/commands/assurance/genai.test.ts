@@ -16,6 +16,7 @@ import { member, practice, tenantId } from "../../test-storage";
 import type { Context } from "../../tenancy";
 import { substantivePlan } from "../../workflow/command";
 import type { Procedure } from "../../workflow-types";
+import { papers } from "../papers";
 import { dispatchAssurance } from "./index";
 import { assuranceTarget } from "./target";
 
@@ -285,6 +286,67 @@ describe("worker results", () => {
     );
     expect(error.status).toBe(409);
     expect(error.message).toContain("plan or scope changed");
+  });
+
+  it("end to end: blocks a conclusion without a validated judge and passes with one", async () => {
+    const { procedure } = await engagement();
+    // The same bundle judged against a label file that fails the D-10 floor.
+    const c = JSON.parse(example.computationJSON);
+    c.criteria[0].flags = [
+      {
+        flag: "judge_not_validated",
+        runKey: c.runs[0].runKey,
+        score: "model_graded_qa",
+        judgeRef: "J1",
+        reasons: ["kappa_lower_bound_below_floor"],
+      },
+    ];
+    const computationJSON = JSON.stringify(c),
+      failed = JSON.stringify({
+        ...example,
+        computationJSON,
+        computationSha256: await sha256(computationJSON),
+      });
+    const request = {
+      schemaVersion: "genai-1.0",
+      executionMode: "genai_ingest",
+      procedure: await pins(procedure),
+    };
+    await job("JOB-F", request, failed);
+    await job("JOB-G", request, exampleText);
+    await op("compileGenaiResult", { jobId: "JOB-F" }, auditor());
+    await op("compileGenaiResult", { jobId: "JOB-G" }, auditor());
+    const e = await getEngagement(auditor(), "ENG-G");
+    const paper =
+      e.papers.find((p) => p.templateId === "WP-GA-02") ??
+      (await papers.run(
+        e,
+        "createPaper",
+        { templateId: "WP-GA-02" },
+        auditor(),
+      ),
+      e.papers.at(-1)!);
+    const conclude = (evidenceIds: string[]) =>
+      papers.run(
+        e,
+        "editPaper",
+        {
+          paperId: paper.id,
+          body: { ...paper.body, conclusionStatus: "supported" },
+          evidenceIds,
+          required: paper.required,
+        },
+        auditor(),
+      );
+    const blocked = await refused(conclude(["JOB-F"]));
+    expect(blocked.status).toBe(400);
+    expect(blocked.message).toContain("genai_judge_not_validated");
+    const missing = await refused(conclude([]));
+    expect(missing.message).toContain("genai_result_missing");
+    await conclude(["JOB-G"]);
+    expect(e.papers.find((p) => p.id === paper.id)!.body).toMatchObject({
+      conclusionStatus: "supported",
+    });
   });
 });
 

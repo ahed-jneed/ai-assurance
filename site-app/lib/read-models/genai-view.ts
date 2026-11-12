@@ -22,19 +22,24 @@ export async function genaiView(ctx: Context, engagementId: string) {
   const records = await genaiRecords(ctx, e.id),
     of = (kind: string) => records.filter((r) => r.kind === kind);
   return {
-    results: of("genai_result").map((r) => ({
-      id: r.id,
-      createdAt: r.createdAt,
-      actor: r.actor,
-      sha256: r.sha256,
-      artifactId: r.body.artifactId as string,
-      custody: r.body.custody as string,
-      channel: r.body.channel as string,
-      jobId: (r.body.jobId as string | undefined) ?? null,
-      procedureId: (r.body.procedureId as string | undefined) ?? null,
-      summary: r.body.summary,
-      readiness: genaiReadiness(toContext(r, records)),
-    })),
+    results: of("genai_result").map((r) => {
+      const context = toContext(r, records);
+      return {
+        id: r.id,
+        createdAt: r.createdAt,
+        actor: r.actor,
+        sha256: r.sha256,
+        artifactId: context.artifactId,
+        custody: context.custody,
+        channel: r.body.channel as string,
+        jobId: (r.body.jobId as string | undefined) ?? null,
+        procedureId: (r.body.procedureId as string | undefined) ?? null,
+        authenticatedBy: context.authenticatedBy ?? null,
+        attested: context.attested,
+        summary: context.summary,
+        readiness: genaiReadiness(context),
+      };
+    }),
     plans: of("genai_plan").map((r) => ({
       id: r.id,
       createdAt: r.createdAt,
@@ -93,3 +98,6 @@ export async function genaiComputation(
     throw new ApiError(409, "The stored result differs from its record");
   return { computationSha256: envelope.computationSha256, computation };
 }
+
+/** The response of GET /api/assurance?view=genai. */
+export type GenaiView = Awaited<ReturnType<typeof genaiView>>;
