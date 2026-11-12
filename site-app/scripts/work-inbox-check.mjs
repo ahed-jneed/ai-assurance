@@ -470,8 +470,13 @@ const paperPresentationURL = asURL(
 const releaseTimeURL = await sourceURL("lib/domain/release-time.ts");
 const acceptanceURL = await sourceURL("lib/workflow/acceptance.ts");
 const qualityReviewURL = await sourceURL("lib/domain/quality-review.ts");
+const classificationURL = await sourceURL("lib/domain/classification.ts");
 const workItemsURL = asURL(
   (await compiled("lib/work-items.ts"))
+    .replace(
+      /from (['"])\.\/domain\/classification\1/,
+      "from " + JSON.stringify(classificationURL),
+    )
     .replace(
       /from (['"])\.\/workflow\/acceptance\1/,
       "from " + JSON.stringify(acceptanceURL),
@@ -569,3 +574,77 @@ assert.deepEqual(
 console.log(
   "PASS report approval/release independence, legacy snapshot exclusion and client-role queue restriction",
 );
+
+// #104: a classification migrated from the four flags is work until it is
+// recorded again, and a final package that captured the four flags must be
+// captured again.
+const migrated = {
+  ...engagement,
+  classification: {
+    status: "provisional",
+    model: 2,
+    legacy: { status: "approved", approvedBy: "reviewer" },
+    history: [{ action: "approved_v1", by: "reviewer" }],
+  },
+  reports: [
+    {
+      id: "pre-19",
+      kind: "final",
+      actor: "creator",
+      snapshot: {
+        workflow: {},
+        engagement: { classification: { status: "approved" } },
+      },
+    },
+  ],
+};
+assert.deepEqual(
+  engagementWork(migrated, "Lead Auditor", "lead")
+    .filter((i) => ["classification", "report"].includes(i.kind))
+    .map((i) => [i.kind, i.action, i.personal]),
+  [
+    ["classification", "Reclassify the system", true],
+    ["report", "Capture the package again", true],
+  ],
+);
+assert.equal(
+  engagementWork(
+    {
+      ...migrated,
+      classification: {
+        ...migrated.classification,
+        history: [...migrated.classification.history, { action: "classified" }],
+      },
+    },
+    "Lead Auditor",
+    "lead",
+  ).some((i) => i.kind === "classification"),
+  false,
+);
+// A later final package captured since the migration retires the old one.
+assert.deepEqual(
+  engagementWork(
+    {
+      ...migrated,
+      reports: [
+        { ...migrated.reports[0], createdAt: "2026-11-01T00:00:00.000Z" },
+        {
+          id: "post-19",
+          kind: "final",
+          actor: "creator",
+          createdAt: "2026-11-06T00:00:00.000Z",
+          snapshot: {
+            workflow: {},
+            engagement: { classification: { status: "approved", model: 2 } },
+          },
+        },
+      ],
+    },
+    "Lead Auditor",
+    "lead",
+  )
+    .filter((i) => i.kind === "report")
+    .map((i) => i.recordId),
+  ["post-19"],
+);
+console.log("PASS migrated classification and pre-migration package work");

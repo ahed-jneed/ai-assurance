@@ -15,6 +15,7 @@ import {
   structuredEngagement,
   workflowOf,
 } from "./workflow/test-fixtures";
+import { resolveNew } from "./criteria/pin";
 
 // The Art 50 working papers (#78; research A50-ED-20 to A50-ED-25): their
 // steps, evidence and criteria come from the procedures of the Art 50
@@ -200,7 +201,7 @@ describe("the Art 50 papers in a new engagement", () => {
   const ids = ["WP-XC-07", "WP-XC-10", "WP-XC-11", "WP-XC-12"];
 
   it("seed each paper into the program with its steps, evidence and criteria", () => {
-    const w = seedWorkflow("lead", "2026-11-06T09:00:00.000Z");
+    const w = seedWorkflow(resolveNew(), "lead", "2026-11-06T09:00:00.000Z");
     for (const id of ids) {
       const p = w.procedures.find((x) => x.templateId === id)!;
       expect(p, id).toBeDefined();
@@ -227,7 +228,12 @@ describe("the Art 50 papers in a new engagement", () => {
   });
 
   it("add the papers to a legacy engagement's working papers with the same criteria", () => {
-    const e = freshEngagement("CL-1", "Chatbot audit", "user-lead");
+    const e = freshEngagement(
+      resolveNew(),
+      "CL-1",
+      "Chatbot audit",
+      "user-lead",
+    );
     for (const id of ids) {
       const paper = e.papers.find((q) => q.templateId === id)!;
       expect(paper, id).toBeDefined();

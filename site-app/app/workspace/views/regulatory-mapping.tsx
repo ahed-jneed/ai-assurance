@@ -1,6 +1,6 @@
 "use client";
 import { BookOpen } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Engagement } from "@/lib/domain";
 import {
@@ -11,8 +11,7 @@ import {
   type RegulatorySnapshot,
 } from "@/lib/rule-pack";
 import type { WorkspaceData } from "../../workspace-types";
-import { articleCoverage } from "../coverage";
-import { Badge } from "../workspace-ui";
+import { panelFallback } from "../panels";
 import { ClassificationPanel } from "./classification-panel";
 import {
   ObligationsByDate,
@@ -21,19 +20,33 @@ import {
   StandardsRegister,
 } from "./rule-pack-views";
 
+// The heatmap is code-split (docs/design/criteria-model.md section 15.2).
+const CriteriaCoverage = lazy(() => import("./criteria-coverage"));
+type CoverageProps = {
+  tenantId: string;
+  engagementId: string;
+  version: number;
+};
+
 /**
- * The engagement's risk classification and article-to-evidence coverage,
+ * The engagement's risk classification and criteria coverage heatmap,
  * with the rule pack's obligations by date, standards register and sources.
  */
 export function RegulatoryMapping({
   engagement: e,
   catalog,
+  features,
+  coverage,
   reviewer,
   busy,
   onApprove,
 }: {
   engagement: Engagement;
   catalog: WorkspaceData["catalog"];
+  /** Where the heatmap loads from; absent for client roles (403 in phase 1). */
+  coverage?: CoverageProps;
+  /** What the engagement's criteria pack switches on. */
+  features: { aiActClassification: boolean };
   reviewer: boolean;
   busy: boolean;
   /** Independent approval of a provisional classification. */
@@ -56,6 +69,8 @@ export function RegulatoryMapping({
         <TabsContent value="classification">
           <Classification
             engagement={e}
+            classified={features.aiActClassification}
+            coverage={coverage}
             pack={pack}
             today={today}
             reviewer={reviewer}
@@ -83,6 +98,8 @@ export function RegulatoryMapping({
 
 function Classification({
   engagement: e,
+  classified,
+  coverage,
   pack,
   today,
   reviewer,
@@ -90,6 +107,9 @@ function Classification({
   onApprove,
 }: {
   engagement: Engagement;
+  /** The pack has the AI Act classification (criteria model section 7.1). */
+  classified: boolean;
+  coverage?: CoverageProps;
   pack: RegulatorySnapshot | null;
   today: string;
   reviewer: boolean;
@@ -98,51 +118,32 @@ function Classification({
 }) {
   return (
     <>
-      <ClassificationPanel
-        engagement={e}
-        pack={pack}
-        today={today}
-        reviewer={reviewer}
-        busy={busy}
-        onApprove={onApprove}
-      />
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Regulatory basis</h2>
-          <BookOpen size={20} />
-        </div>
-        <div className="content-pad body-copy">
-          {pack ? (
-            <RegulatoryBasis pack={pack} today={today} />
-          ) : (
-            <p className="subtle">
-              This engagement&apos;s criteria have no EU AI Act rule pack.
-            </p>
-          )}
-        </div>
-      </section>
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Article-to-evidence mapping</h2>
-        </div>
-        {articleCoverage(e).map((c) => (
-          <div className="control-row" key={c.article}>
-            <span className="article">{c.article}</span>
-            <div>
-              <b>{c.title}</b>
-              <p className="control-result">
-                {c.papers.map((p) => p.templateId).join(" · ") ||
-                  "No required papers"}
-              </p>
-              <Progress
-                value={c.coverage}
-                aria-label={c.title + " signed coverage"}
-              />
-            </div>
-            <Badge value={c.coverage === 100 ? "signed" : "not evaluated"} />
+      {classified && (
+        <ClassificationPanel
+          engagement={e}
+          pack={pack}
+          today={today}
+          reviewer={reviewer}
+          busy={busy}
+          onApprove={onApprove}
+        />
+      )}
+      {pack && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Regulatory basis</h2>
+            <BookOpen size={20} />
           </div>
-        ))}
-      </section>
+          <div className="content-pad body-copy">
+            <RegulatoryBasis pack={pack} today={today} />
+          </div>
+        </section>
+      )}
+      {coverage && (
+        <Suspense fallback={panelFallback}>
+          <CriteriaCoverage {...coverage} />
+        </Suspense>
+      )}
     </>
   );
 }

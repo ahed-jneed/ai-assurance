@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Issue | #26 (design). Phase 1 is implemented by #27. |
-| Status | Draft for review, 5 November 2026. Revised the same day after the independent review and re-review rounds 1 and 2 on PR #45, and to record the orchestrator's decisions on the open questions (comment on #27 of 5 November 2026; section 18) |
+| Status | Accepted; phase 1 implemented by #27 (6 November 2026, see "Phase 1 as built" at the end of section 17). Drafted 5 November 2026 and revised after the review rounds on PR #45 and the orchestrator's decisions (section 18) |
 | Deliverables | This document; `schemas/criteria-pack.schema.json` (draft); `schemas/fixtures/criteria-pack.eu-ai-act-amended.sample.json` (the EU AI Act pack in the new shape, three sample requirements) |
 | Coordinates with | #3 (methodology sync), #8 and #18 (rule pack 2026.11.1), #19 (classification facts), #20 (report model v2), #28, #29, #30 (next packs), #61 (phase 2), #57 (owner actions for Q1 to Q3 and Q8) |
 
@@ -1324,6 +1324,15 @@ Commit order for phase 1:
 5. pack features and `reporting` (section 7.1), with the pack #1 behaviour unchanged;
 6. pack selection;
 7. coverage engine and view.
+
+**Phase 1 as built (#27).** Where the build differs from the text above, and why:
+
+- **One pack #1 version, 2026.11.2.** By the time #27 started, #77 had released rule pack 2026.11.2 and the build served the 2026.11.2 catalogue to every engagement, stamped `2026.11.1`, `2026.11.2` or not at all. Every legacy class therefore resolves to pack #1 2026.11.2 (`legacy.fallbackVersion` 2026.11.2, `stamps` `{"2026.11.1": "2026.11.2", "2026.11.2": "2026.11.2"}`), and the 2026.10.1 and 2026.11.1 conversions, which no engagement would resolve to, are not released; the converter can reproduce them from Git history.
+- **Golden fixtures as digests.** The projection tests compare with the JCS digests of `templates/catalog.json` and `docs/obligation-subitems.json` at `main@f6d2a8e`, and the seeding and template tests with digests captured from that build (`site-app/lib/criteria/legacy-golden.json`), instead of committing copies of the files.
+- **Methodology drift is an error.** Because the build now serves the pinned pack, the validator fails when the catalogue or the obligation file differs from the default pack, so that an edit is never silently ignored; the remedy is a new methodology version.
+- **Snapshot stamp `criteriaPack`.** Report model v2 (#20) already uses `criteria` in snapshots for the results by criterion, so the pack stamp of section 10 is named `criteriaPack`.
+- **Article headings.** Only the four headings the design checked are marked verified; the other 34 are from the converter's table and marked unverified, legal review required.
+- **Not yet built:** heatmap filters by actor and date and their persistence in workspace preferences, the CSV export, and requirement-level `applicability` rows derived from #18's dated entries (follow-ups).
 
 The refactor commit uses the module layout that #4, #5 and #6 put on `main` (`lib/factories.ts`, `lib/commands/*`, `lib/domain/*`, `lib/workflow/*` and `app/workspace/**`).
 

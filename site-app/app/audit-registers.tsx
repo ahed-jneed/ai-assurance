@@ -128,22 +128,29 @@ export function EvidenceRegister({
                     Review
                   </Button>
                 )}
-                <a
-                  className="register-download"
-                  aria-label={"Download " + a.name}
-                  title={"Download " + a.name}
-                  href={
-                    "/api/evidence?" +
-                    new URLSearchParams({
-                      tenantId,
-                      engagementId,
-                      artifactId: a.id,
-                    })
-                  }
-                >
-                  <Download size={16} />
-                  <span className="sr-only">Download file</span>
-                </a>
+                {a.custody === "client" ? (
+                  // A client-held pin has no bytes on the platform (#102).
+                  <span className="subtle" title="Pinned by SHA-256 only">
+                    Held by client
+                  </span>
+                ) : (
+                  <a
+                    className="register-download"
+                    aria-label={"Download " + a.name}
+                    title={"Download " + a.name}
+                    href={
+                      "/api/evidence?" +
+                      new URLSearchParams({
+                        tenantId,
+                        engagementId,
+                        artifactId: a.id,
+                      })
+                    }
+                  >
+                    <Download size={16} />
+                    <span className="sr-only">Download file</span>
+                  </a>
+                )}
               </div>
             </TableCell>
           </TableRow>

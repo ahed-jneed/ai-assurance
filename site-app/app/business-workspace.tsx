@@ -15,10 +15,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { WorkspaceData } from "./workspace-types";
+import { packFeatures, type WorkspaceData } from "./workspace-types";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
 import { localWorkDay, workKindLabels } from "@/lib/work-inbox";
 import { linkQuery } from "@/lib/workspace-links";
+import { classificationRules } from "@/lib/classification-rules";
+import { asRulePack } from "@/lib/rule-pack";
 import {
   defaultPreferences,
   type PersonalPreferences,
@@ -188,7 +190,12 @@ export function TaskRows({
               })
             : "",
           until = reminders.get(i.id);
-        const kind = ["scope", "program", "monitoring"].includes(i.kind)
+        const kind = [
+          "scope",
+          "classification",
+          "program",
+          "monitoring",
+        ].includes(i.kind)
           ? ""
           : i.kind;
         const href =
@@ -333,7 +340,14 @@ export function EngagementTaskQueue({
         data.identity.id,
         data.clients.find((c) => c.id === e.clientId)?.name,
         undefined,
-        (id) => data.people.find((m) => m.user_id === id)?.display_name,
+        {
+          nameOf: (id) =>
+            data.people.find((m) => m.user_id === id)?.display_name,
+          rules: classificationRules(
+            asRulePack(data.catalog?.regulatorySnapshot),
+          ),
+          features: packFeatures(data),
+        },
       ),
     ).filter((i) => i.personal),
     [all, setAll] = useState(false);

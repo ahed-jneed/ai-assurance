@@ -2,12 +2,13 @@
 // schemas/working-paper.schema.json `paperRevision` document. Report capture
 // projects every captured paper (snapshot.workingPapers), and the dossier and
 // the report package export those documents.
-import catalog from "../catalog.json";
 import { paperAudience } from "../client-projection";
+import { pinned } from "../criteria/pin";
+import { packRulePack } from "../criteria/projection";
+import type { CatalogItem } from "../criteria/types";
 import type { Artifact, Engagement, Finding, Paper, Run } from "../domain";
 import type { QualityReview } from "../domain/quality-review";
 import { sha256 } from "../ids";
-import { currentRulePack, methodologyVersion } from "../rule-pack-current";
 import type { Acceptance, Declaration, Release } from "../workflow-types";
 
 /** The `$id` of the contract the documents follow. */
@@ -192,6 +193,11 @@ export type PaperContext = {
   operatorRole: string;
   rulePack: { version: string; legalVersion: string };
   templateVersion: string;
+  /** The pinned criteria pack's templates (#133). */
+  templates: Pick<
+    CatalogItem,
+    "id" | "regulatoryRefs" | "procedures" | "automationMode"
+  >[];
   artifacts: Pick<
     Artifact,
     "id" | "name" | "sha256" | "uploadedBy" | "status"
@@ -222,7 +228,7 @@ function citedAcceptance(a: Acceptance): MemoRecords["acceptance"] {
  */
 export type ScopeSource = Pick<
   Engagement,
-  "id" | "clientId" | "title" | "classification" | "rulePack"
+  "id" | "clientId" | "title" | "classification" | "rulePack" | "criteria"
 > & { workflow?: Engagement["workflow"] | null };
 export type ScopeContext = Omit<
   PaperContext,
@@ -233,7 +239,18 @@ export type ScopeContext = Omit<
 export function scopeContext(s: ScopeSource, tenantId: string): ScopeContext {
   const brief = s.workflow?.brief,
     acceptance = s.workflow?.acceptance,
-    pack = s.rulePack ?? currentRulePack;
+    // The engagement's criteria pin (#133) is fixed at creation, like its
+    // rule-pack stamp. A pack without an AI Act criteria set has no stamp:
+    // its documents name the pack and its frameworks (id@edition#version).
+    resolved = pinned(s),
+    pack = s.rulePack ??
+      packRulePack(resolved) ?? {
+        version: resolved.pin.packId + "@" + resolved.pin.packVersion,
+        legalVersion:
+          resolved.frameworks
+            .map((f) => f.id + "@" + f.edition + "#" + f.version)
+            .join(", ") || resolved.pin.packVersion,
+      };
   return {
     tenantId,
     clientId: s.clientId,
@@ -244,7 +261,8 @@ export function scopeContext(s: ScopeSource, tenantId: string): ScopeContext {
     boundary: brief?.boundary ?? acceptance?.systemBoundary ?? "",
     operatorRole: s.classification.operatorRole,
     rulePack: { version: pack.version, legalVersion: pack.legalVersion },
-    templateVersion: s.rulePack?.version ?? methodologyVersion,
+    templateVersion: s.rulePack?.version ?? resolved.pack.methodologyVersion,
+    templates: resolved.pack.items,
   };
 }
 
@@ -362,7 +380,7 @@ export async function paperRevision(
   p: Paper,
   c: PaperContext,
 ): Promise<PaperRevision> {
-  const template = catalog.items.find((t) => t.id === p.templateId),
+  const template = c.templates.find((t) => t.id === p.templateId),
     kind = (p.kind === "memo" ? "memo" : "working_paper") as
       "memo" | "working_paper",
     body = narrative(p.body),

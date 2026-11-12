@@ -17,6 +17,7 @@
 // as completed with the same approval, release and package hashes, which this
 // memo already carries.
 import catalog from "../catalog.json";
+import { packFeatures } from "../criteria/pin";
 import type { Engagement, Paper, Report } from "../domain";
 import {
   paperContentDigest,
@@ -56,14 +57,19 @@ function capturedScope(e: Engagement, r: Report): ScopeSource | null {
     workflow?: Engagement["workflow"] | null;
     engagement?: Partial<Pick<Engagement, "title" | "classification">>;
   };
+  // A pack without AI Act classification (#133) captures none; its
+  // engagement keeps the unused classification it was created with.
   const title = s.engagement?.title,
-    classification = s.engagement?.classification;
+    classification =
+      s.engagement?.classification ??
+      (packFeatures(e).aiActClassification ? undefined : e.classification);
   if (typeof title !== "string" || !classification) return null;
   return {
     // Written once at creation.
     id: e.id,
     clientId: e.clientId,
     rulePack: e.rulePack,
+    criteria: e.criteria,
     // As captured.
     title,
     classification,

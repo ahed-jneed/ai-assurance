@@ -6494,8 +6494,15 @@
                     "maxLength": 5000
                   },
                   "n": {
-                    "type": "integer",
-                    "minimum": 0
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -7911,6 +7918,10 @@
               "$ref": "#/$defs/datasetCard"
             }
           }
+        },
+        "custody": {
+          "const": "client",
+          "description": "The dataset stayed in the client's environment; the platform holds only its name, size and SHA-256."
         }
       },
       "required": [

@@ -197,6 +197,9 @@ describe("workflow command dispatch", () => {
         makePaper: () => {
           throw new Error("No paper expected");
         },
+        seedWorkflow: () => {
+          throw new Error("No workflow expected");
+        },
         member: async () => null,
       },
     ).catch((error: unknown) => error);

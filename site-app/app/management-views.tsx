@@ -4,6 +4,7 @@ import {
   Plus,
   Users,
   Copy,
+  FileSignature,
   FolderOpen,
   Settings2,
   ChevronLeft,
@@ -246,6 +247,13 @@ export function ManagementViews({
                 onClick={() => open("practiceRename", { name: practiceName })}
               >
                 <Settings2 size={15} /> Rename practice
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => open("reportSettings", {})}
+              >
+                <FileSignature size={15} /> Report settings
               </Button>
               <Button
                 variant="ghost"

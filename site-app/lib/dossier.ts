@@ -21,10 +21,35 @@ const escaped = (s: unknown) =>
         c
       ]!,
   );
+/**
+ * The captured criteria pack (docs/design/criteria-model.md section 10) and
+ * whether its legal content was pending qualified legal review at capture.
+ */
+function criteriaLine(snapshot: Record<string, unknown>) {
+  const c = snapshot.criteriaPack as
+    | { packId?: string; packVersion?: string; legalReviewPending?: boolean }
+    | undefined;
+  if (!c?.packId) return "";
+  return (
+    "<small>Criteria pack " +
+    escaped(c.packId) +
+    " " +
+    escaped(c.packVersion) +
+    (c.legalReviewPending
+      ? ": its legal content is pending qualified legal review"
+      : "") +
+    "</small>"
+  );
+}
 /** The captured rule-pack and methodology versions, for the readable rendition. */
 function rulePackLine(snapshot: Record<string, unknown>) {
   const pack = snapshot.rulePack as Partial<RulePackStamp> | undefined;
-  if (!pack?.version) return "";
+  if (!pack?.version)
+    return snapshot.methodologyVersion
+      ? "<small>Methodology " +
+          escaped(snapshot.methodologyVersion) +
+          "</small>"
+      : "";
   return (
     "<small>Rule pack " +
     escaped(pack.version) +
@@ -138,6 +163,7 @@ export async function buildDossier(
     escaped(opinionLabel(snapshot)) +
     "</h2>" +
     rulePackLine(snapshot) +
+    criteriaLine(snapshot) +
     "<pre>" +
     escaped(snapshot.summary) +
     "</pre>" +
@@ -250,6 +276,17 @@ export async function buildDossier(
         409,
         "Captured source is no longer available for this audience",
       );
+    // A client-held pin (#102) has no bytes here: the dossier lists it with
+    // its SHA-256, which the client's own copy can be checked against.
+    if (artifact.custody === "client") {
+      excluded.push({
+        id: captured.id,
+        reason:
+          "Held by the client; the platform holds only its SHA-256 " +
+          artifact.sha256,
+      });
+      continue;
+    }
     const object = await bucket().get(artifact.key);
     if (!object)
       throw new ApiError(

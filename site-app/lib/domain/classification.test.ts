@@ -10,6 +10,9 @@ import {
   approvalBlockers,
   approveClassification,
   art50Assessment,
+  awaitsReclassification,
+  awaitsRecapture,
+  capturedBeforeMigration,
   classificationFacts,
   ClassificationError,
   classificationFactValues,
@@ -19,18 +22,22 @@ import {
   factDefinitions,
   factDerivations,
   migrateClassification,
+  obligationSuggestions,
   practiceKey,
   recordClassification,
+  lastReviewedOn,
   reReviewTriggers,
   type Classification,
   type ClassificationInput,
 } from "./classification";
+import { resolveNew } from "../criteria/pin";
 
 const pack = asRulePack(catalog.regulatorySnapshot)!;
 const rules = classificationRules(pack);
 const at = "2026-11-06T10:00:00.000Z";
 const fresh = () =>
-  freshEngagement("CLIENT-1", "Classification", "auditor").classification;
+  freshEngagement(resolveNew(), "CLIENT-1", "Classification", "auditor")
+    .classification;
 
 /**
  * Answers every required fact the form asks "no" (SME status "neither"),
@@ -1024,6 +1031,185 @@ describe("answers, history and migration", () => {
       "art6-guidelines-final": "due",
       "rule-pack": "due",
     });
+  });
+
+  it("clears a dated trigger once the system is approved or classified again on or after its date", () => {
+    const c = record({ facts: { generatesSyntheticText: "unknown" } });
+    const state = (x: Classification, today: string) =>
+      reReviewTriggers(x, rules, today).find(
+        (t) => t.id === "interoperability-2027",
+      );
+    // Approved before the milestone: due once it passes.
+    const before = { ...c, approvedAt: "2027-01-15T09:00:00.000Z" };
+    expect(state(before, "2027-03-02")).toMatchObject({ state: "due" });
+    // Approved again after the milestone: reviewed, not due.
+    const after = { ...c, approvedAt: "2027-03-01T09:00:00.000Z" };
+    expect(lastReviewedOn(after)).toBe("2027-03-01");
+    expect(state(after, "2027-03-02")).toMatchObject({
+      state: "reviewed",
+      reviewedOn: "2027-03-01",
+    });
+    // A reclassification recorded on the milestone day counts as well.
+    const reclassified = {
+      ...before,
+      history: [
+        ...(before.history ?? []),
+        {
+          action: "classified",
+          at: "2027-02-02T08:00:00.000Z",
+          label: "Minimal risk",
+          legalVersion: c.version,
+        },
+      ],
+    } satisfies Classification;
+    expect(state(reclassified, "2027-03-02")?.state).toBe("reviewed");
+    // The later Code review date is still ahead, then due again.
+    const code = (x: Classification, today: string) =>
+      reReviewTriggers(x, rules, today).find((t) => t.id === "code-update")
+        ?.state;
+    expect(code(after, "2027-03-02")).toBe("scheduled");
+    expect(code(after, "2028-06-10")).toBe("due");
+  });
+
+  it("knows when a migrated classification still awaits its new answers", () => {
+    const old = {
+      ...fresh(),
+      model: undefined,
+      status: "approved",
+      approvedBy: "reviewer-1",
+    } satisfies Classification;
+    const migrated = migrateClassification(old);
+    expect(awaitsReclassification(migrated)).toBe(true);
+    expect(awaitsReclassification(record({}, migrated))).toBe(false);
+    expect(awaitsReclassification(record({}))).toBe(false);
+  });
+
+  it("recognises a report snapshot captured before the migration", () => {
+    const engagement = (classification: unknown) => ({
+      engagement: { id: "E-1", classification },
+    });
+    expect(
+      capturedBeforeMigration(
+        engagement({ status: "approved", highRisk: true }),
+      ),
+    ).toBe(true);
+    expect(capturedBeforeMigration(engagement(record({})))).toBe(false);
+    // An unloaded snapshot (an empty object) is never flagged.
+    expect(capturedBeforeMigration({})).toBe(false);
+  });
+
+  it("retires a pre-migration package once a later package is captured", () => {
+    const final = (createdAt: string, classification: unknown) => ({
+      kind: "final",
+      createdAt,
+      snapshot: { engagement: { id: "E-1", classification } },
+    });
+    const old = final("2026-10-01T00:00:00.000Z", { status: "approved" });
+    expect(awaitsRecapture(old, [old])).toBe(true);
+    // An earlier package of the new model does not retire it.
+    const earlier = final("2026-09-01T00:00:00.000Z", record({}));
+    expect(awaitsRecapture(old, [earlier, old])).toBe(true);
+    // Another pre-migration package does not either.
+    const again = final("2026-10-02T00:00:00.000Z", { status: "approved" });
+    expect(awaitsRecapture(old, [old, again])).toBe(true);
+    // A later package captured since the migration does.
+    const later = final("2026-11-06T00:00:00.000Z", record({}));
+    expect(awaitsRecapture(old, [old, later])).toBe(false);
+    // A later draft does not.
+    expect(awaitsRecapture(old, [old, { ...later, kind: "draft" }])).toBe(true);
+  });
+});
+
+describe("Art 9 to 26 obligation suggestions", () => {
+  const items = obligations.items as unknown as Parameters<
+    typeof obligationSuggestions
+  >[2];
+  const byStatus = (c: Classification) => {
+    const out: Record<string, string[]> = {};
+    for (const s of obligationSuggestions(c, rules, items))
+      (out[s.status] ??= []).push(s.code);
+    return out;
+  };
+  const annexIII = "Annex III — sensitive use case";
+  const approve = (c: Classification) =>
+    approveClassification(c, { rules, user: "reviewer", at });
+
+  it("covers Articles 9 to 26 only", () => {
+    const codes = obligationSuggestions(fresh(), rules, items).map(
+      (s) => s.article,
+    );
+    expect(codes.length).toBeGreaterThan(50);
+    for (const a of codes) {
+      const n = Number(/^\d+/.exec(a)?.[0]);
+      expect(n >= 9 && n <= 26).toBe(true);
+    }
+    expect(codes.some((a) => a.startsWith("50"))).toBe(false);
+    expect(codes.some((a) => a.startsWith("Annex"))).toBe(false);
+  });
+
+  it("waits for an approved high-risk classification", () => {
+    const provisional = byStatus(record({ annexRoute: annexIII }));
+    expect(provisional.candidate).toBeUndefined();
+    const open = obligationSuggestions(
+      record({ annexRoute: annexIII }),
+      rules,
+      items,
+    ).find((s) => s.code === "AIA-9-1")!;
+    expect(open).toMatchObject({
+      status: "needs_information",
+      missingFacts: ["highRiskConfirmed"],
+      actor: ["Provider"],
+    });
+  });
+
+  it("suggests the provider subitems of an approved high-risk provider", () => {
+    const s = byStatus(approve(record({ annexRoute: annexIII })));
+    expect(s.candidate).toEqual(
+      expect.arrayContaining(["AIA-9-1", "AIA-13-3A", "AIA-15-1"]),
+    );
+    // Trigger facts the classification does not record stay open, never false.
+    expect(s.needs_information).toEqual(
+      expect.arrayContaining(["AIA-10-2A", "AIA-13-3C", "AIA-12-3A"]),
+    );
+    // Deployer, importer and distributor duties are for roles not held.
+    expect(s.role_not_held).toEqual(
+      expect.arrayContaining(["AIA-26-1", "AIA-23-1B", "AIA-24-1"]),
+    );
+    // Annex I Section A is decided by the route: not a product here.
+    expect(s.candidate).not.toContain("AIA-11-2");
+  });
+
+  it("suggests the deployer duties of an approved high-risk deployer", () => {
+    const s = byStatus(
+      approve(record({ annexRoute: annexIII, operatorRole: "Deployer" })),
+    );
+    expect(s.candidate).toEqual(
+      expect.arrayContaining(["AIA-26-1", "AIA-26-2", "AIA-26-5"]),
+    );
+    expect(s.needs_information).toEqual(
+      expect.arrayContaining(["AIA-26-4", "AIA-26-6", "AIA-25-1"]),
+    );
+    expect(s.candidate).not.toContain("AIA-9-1");
+  });
+
+  it("suggests importer and distributor duties for that operator role", () => {
+    const s = byStatus(
+      approve(
+        record({
+          annexRoute: annexIII,
+          operatorRole: "Importer / distributor",
+        }),
+      ),
+    );
+    expect(s.candidate).toEqual(
+      expect.arrayContaining(["AIA-23-1B", "AIA-24-1"]),
+    );
+  });
+
+  it("suggests nothing once an approved route is outside high risk", () => {
+    const s = byStatus(approve(record({})));
+    expect(s.candidate).toBeUndefined();
+    expect(s.needs_information).toBeUndefined();
   });
 });
 

@@ -20,3 +20,6 @@ lib/*.json
 
 # Markdown is outside the formatting baseline
 *.md
+
+# Generated criteria bundle (scripts/sync-generated.mjs), serialised in JCS order
+lib/criteria/*.json

@@ -30,6 +30,7 @@ const particulars: ReportParticulars = {
   location: "Vienna, Austria",
   signatory: "Fixture Assurance GmbH",
   basisForModification: "",
+  qualityStatement,
 };
 const terms = (
   conclusion: ReportTerms["conclusion"],
@@ -100,6 +101,65 @@ describe("conclusion types and assurance levels at final issuance", () => {
     expect(kinds(e, terms("unmodified", "reasonable"))).toEqual(["REQ-9"]);
     expect(kinds(e, terms("disclaimer", "reasonable"), withBasis)).toEqual([]);
     expect(kinds(e, terms("qualified", "limited"), withBasis)).toEqual([]);
+  });
+
+  it("issues a readiness assessment with gaps where strict readiness is blocked (#111)", async () => {
+    const e = await issuable();
+    e.findings.push(finding({ id: "F-1", severity: "High" }));
+    e.evidenceRequests = [
+      evidenceRequest({
+        id: "REQ-9",
+        required: false,
+        disposition: "unobtainable",
+      }),
+    ];
+    e.classification.prohibited = true;
+    const gaps = terms("readiness_gaps", null, "readiness");
+    expect(kinds(e, terms("readiness", null, "readiness"))).toEqual([
+      "prohibited",
+      "F-1",
+      "REQ-9",
+    ]);
+    // The gaps must be described; then nothing blocks the output.
+    const gates = finalReportGates(e, { ...gaps, particulars });
+    expect(gates.map((g) => g.id)).toEqual(["report:conclusion"]);
+    expect(gates[0].message).toBe(
+      "Describe the gaps identified against the criteria and what remains to be addressed",
+    );
+    expect(
+      kinds(e, gaps, {
+        ...particulars,
+        basisForModification: "F-1: logging is not in place for the scorer.",
+      }),
+    ).toEqual([]);
+    // The output is labelled as not assurance and never states readiness.
+    const conclusion = reportElements(e, gaps, particulars).find(
+      (el) => el.id === "conclusion",
+    )!;
+    expect(conclusion.label).toBe(
+      "Readiness assessment, gaps identified — not an assurance engagement",
+    );
+    expect(conclusion.value).toContain("It is not an assurance engagement");
+    expect(conclusion.value).toContain(
+      "does not state that the subject matter is ready",
+    );
+    // Assurance engagements cannot express it.
+    expect(kinds(e, terms("readiness_gaps"))[0]).toBe("report:title");
+  });
+
+  it("prints the report's quality statement, else the default", async () => {
+    const e = await issuable();
+    const independence = (p?: ReportParticulars) =>
+      reportElements(e, terms("unmodified"), p).find(
+        (el) => el.id === "independence",
+      )!.value;
+    const own =
+      "We complied with the Austrian professional code and apply ISQM 1.";
+    expect(independence({ ...particulars, qualityStatement: own })).toBe(own);
+    expect(independence({ ...particulars, qualityStatement: " " })).toBe(
+      qualityStatement,
+    );
+    expect(independence()).toBe(qualityStatement);
   });
 
   it("keeps a prohibited practice from an unmodified conclusion only", async () => {

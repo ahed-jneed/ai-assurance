@@ -21,6 +21,7 @@ import {
 import { seedWorkflow } from "../workflow-seed";
 import { WorkflowError, workflowCommand } from "../workflow-service";
 import type { Procedure, ProcedureChange, Workflow } from "../workflow-types";
+import { resolveNew } from "../criteria/pin";
 
 export type WorkflowContext = Parameters<typeof workflowCommand>[3];
 type Member = NonNullable<Awaited<ReturnType<WorkflowContext["member"]>>>;
@@ -76,6 +77,7 @@ export function context(userId: string): WorkflowContext {
     id: nextId,
     sha256,
     makePaper: (templateId) => templatePaper(templateId, userId),
+    seedWorkflow: (at) => seedWorkflow(resolveNew(), userId, at),
     member: async (id) => people[id] ?? null,
   };
 }
@@ -374,7 +376,10 @@ export function completedQualityReview(
 export function structuredEngagement(
   overrides: Partial<Engagement> = {},
 ): Engagement {
-  return engagement({ workflow: seedWorkflow("lead", at), ...overrides });
+  return engagement({
+    workflow: seedWorkflow(resolveNew(), "lead", at),
+    ...overrides,
+  });
 }
 
 export function workflowOf(e: Engagement): Workflow {
@@ -410,7 +415,7 @@ export function procedureEntries(
 
 /** A workflow whose brief (revision 1) and program (bound to it) are approved. */
 export function approvedWorkflow(procedures: Procedure[] = []): Workflow {
-  const w = seedWorkflow("lead", at);
+  const w = seedWorkflow(resolveNew(), "lead", at);
   w.brief = {
     ...briefInput,
     revision: 1,

@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { CriteriaView } from "@/lib/criteria/types";
 import { classify, type Engagement } from "@/lib/domain";
 import { SavedViews } from "../../business-workspace";
 import { navigation } from "../modules";
@@ -39,7 +40,10 @@ export function PageHead({
   action,
   procedureContext,
   onClearProcedure,
+  criteria,
 }: {
+  /** The engagement's criteria pack (GET /api/workspace). */
+  criteria?: CriteriaView | null;
   view: string;
   engagement: Engagement;
   tenantId: string;
@@ -120,7 +124,10 @@ export function PageHead({
       </div>
       {view === "Overview" && (
         <div className="context-strip">
-          <Badge value={classify(e.classification)} />
+          {(criteria?.features.aiActClassification ?? true) && (
+            <Badge value={classify(e.classification)} />
+          )}
+          {criteria && <PackBadge criteria={criteria} />}
           <span>{e.stage}</span>
           {e.dueDate && <span>Due {e.dueDate}</span>}
         </div>
@@ -158,5 +165,34 @@ export function PageHead({
           </div>
         )}
     </>
+  );
+}
+
+/**
+ * The pinned criteria pack (docs/design/criteria-model.md section 15.1),
+ * with the framework editions, the pin digest prefix and, while it lasts,
+ * the pending legal review of each legislation framework.
+ */
+export function PackBadge({ criteria }: { criteria: CriteriaView }) {
+  const pending = criteria.frameworks.filter((f) => f.legalReviewPending);
+  const tooltip = [
+    ...criteria.frameworks.map(
+      (f) =>
+        f.shortTitle +
+        " " +
+        f.edition +
+        " (data " +
+        f.version +
+        (f.legalReviewPending ? ", legal review pending" : "") +
+        ")",
+    ),
+    "Pin " + criteria.pin.packSha256.slice(0, 12),
+  ].join("; ");
+  return (
+    <span className="pack-badge" title={tooltip}>
+      {criteria.title} {criteria.pin.packVersion}
+      {pending.length ? " · legal review pending" : ""}
+      {criteria.withdrawn ? " · withdrawn" : ""}
+    </span>
   );
 }

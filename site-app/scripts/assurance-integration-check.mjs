@@ -46,10 +46,19 @@ for (const file of (await fs.readdir("drizzle"))
     .split("--> statement-breakpoint")
     .filter((s) => s.trim()))
     await testDb.prepare(sql).run();
+// Every request the platform receives while `traffic.on` is set, recorded to
+// prove what a client-local worker sends (#102).
+const traffic = { on: false, requests: [] };
 const server = http.createServer(async (req, res) => {
   try {
     const chunks = [];
     for await (const c of req) chunks.push(c);
+    if (traffic.on)
+      traffic.requests.push({
+        method: req.method,
+        url: req.url,
+        body: Buffer.concat(chunks),
+      });
     const r = await mf.dispatchFetch(origin + req.url, {
       method: req.method,
       headers: req.headers,
@@ -781,6 +790,14 @@ try {
     population: "Fixture",
     sampling: "Full fixture",
   });
+  // A procedure that samples the population fixture.
+  const sampledProcedure = e.workflow.procedures.find(
+    (p) => !["WP-A15-01", "WP-A15-02", "WP-A15-03"].includes(p.templateId),
+  );
+  Object.assign(sampledProcedure, {
+    datasetId: sampleId,
+    planHash: digest("sampled plan fixture"),
+  });
   // Writes the fixture engagement as edited here, bypassing the commands.
   const writeEngagement = async () => {
     await testDb
@@ -790,6 +807,20 @@ try {
     await refresh();
   };
   await writeEngagement();
+  // A procedure-bound sample pins the plan content it was drawn for (#105).
+  const boundSample = (
+    await assurance("sample", {
+      ...sampleInput,
+      procedureId: sampledProcedure.id,
+    })
+  ).record;
+  const sampled = e.workflow.procedures.find(
+    (p) => p.id === sampledProcedure.id,
+  );
+  assert.equal(boundSample.body.planHash, digest("sampled plan fixture"));
+  assert.equal(sampled.planHash, boundSample.body.planHash);
+  assert.equal(boundSample.body.procedureRevision, sampled.revision);
+  console.log("PASS a procedure-bound sample pins the procedure's plan hash");
   const datasetCard = (
     await assurance("registerDataset", {
       schemaVersion: "1.0",
@@ -984,6 +1015,13 @@ try {
     .bind(job.jobId)
     .first();
   assert.equal(jobRow.state, "succeeded");
+  // The request binds the plan content (#105).
+  const jobPlanHash = JSON.parse(jobRow.request).procedure.planHash;
+  assert.match(jobPlanHash, /^[a-f0-9]{64}$/);
+  assert.equal(
+    jobPlanHash,
+    e.workflow.procedures.find((p) => p.id === procedure.id).planHash,
+  );
   const envelope = JSON.parse(
     await (await testBucket.get(jobRow.result_key)).text(),
   );
@@ -1023,9 +1061,33 @@ try {
     },
   });
   assert(repeat.duplicate);
+  // A content change to the procedure's plan after the job was queued refuses
+  // the import, even with the plan revision unchanged (#105).
+  {
+    const { body: queued } = await testDb
+      .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")
+      .bind(tenantId, e.id)
+      .first();
+    const changed = JSON.parse(queued);
+    changed.workflow.procedures.find((p) => p.id === procedure.id).planHash =
+      "f".repeat(64);
+    const write = (b) =>
+      testDb
+        .prepare("UPDATE engagements SET body=? WHERE tenant_id=? AND id=?")
+        .bind(b, tenantId, e.id)
+        .run();
+    await write(JSON.stringify(changed));
+    assert.match(
+      (await assurance("importJob", { jobId: job.jobId }, owner, 409)).error,
+      /plan or scope changed after this job was queued/,
+    );
+    await write(queued);
+    await refresh();
+  }
   await assurance("importJob", { jobId: job.jobId });
   const run = e.runs.find((r) => r.externalJobId === job.jobId);
   assert(run && run.procedureBinding.procedureId === procedure.id);
+  assert.equal(run.procedureBinding.planHash, jobPlanHash);
   assert.equal(run.results.length, 4);
   assert.equal(run.manifest.dataset.cardPin.recordId, datasetCard.id);
   assert.equal(run.manifest.dataset.cardPin.sha256, datasetCard.sha256);
@@ -1090,6 +1152,393 @@ try {
   );
   console.log(
     "PASS non-numeric binary labels: derived other class, accepted and run by the worker",
+  );
+  // #102: a special-category fairness protocol on a dataset the client keeps.
+  // The platform records only the file's SHA-256 pin; the client's own worker
+  // reads the file in the client's environment and returns aggregates.
+  const baseCsv = csv
+      .replace(
+        /^actual,predicted,score,group,/,
+        "actual,predicted,score,ethnicity,",
+      )
+      .replace(/,A,/g, ",group-alpha,")
+      .replace(/,B,/g, ",group-beta,"),
+    [clientHeader, firstRow] = baseCsv.split("\n"),
+    // One person in group-gamma: below the minimum group size, so the
+    // client's worker withholds that group's counts and rates.
+    clientCsv = baseCsv.replace(
+      clientHeader + "\n",
+      clientHeader +
+        "\n" +
+        firstRow.replace("group-alpha", "group-gamma") +
+        "\n",
+    ),
+    clientRows = clientCsv.trim().split("\n").slice(1),
+    clientBytes = Buffer.from(clientCsv);
+  assert(clientRows.length >= 60 && clientRows[1].includes("group-alpha"));
+  assert(clientRows[0].includes("group-gamma"));
+  // Uploading the file is refused: its ethnicity column has no basis.
+  const refusedUpload = new FormData();
+  for (const [key, val] of Object.entries({
+    tenantId,
+    engagementId: e.id,
+    expectedVersion: String(e.version),
+    category: "Dataset",
+    visibility: "internal",
+    handlingBasis: "synthetic",
+  }))
+    refusedUpload.set(key, val);
+  refusedUpload.set("file", new File([clientBytes], "client-applicants.csv"));
+  assert.match(
+    (await api("/api/evidence", { body: refusedUpload, status: 409 })).error,
+    /needs the client's recorded basis before upload: ethnicity/,
+  );
+  await cmd("pinClientDataset", {
+    name: "client-applicants.csv",
+    sha256: digest(clientBytes),
+    size: clientBytes.length,
+    confirmedBy: "Client data steward",
+    confirmedOn: new Date().toISOString().slice(0, 10),
+    custodyNote: "Kept on the client's analysis host; its own worker reads it",
+  });
+  const pinnedId = e.artifacts.at(-1).id;
+  assert.equal(e.artifacts.at(-1).custody, "client");
+  await cmd("acceptEvidence", { artifactId: pinnedId });
+  assert.match(
+    (
+      await api(
+        "/api/evidence?" +
+          new URLSearchParams({
+            tenantId,
+            engagementId: e.id,
+            artifactId: pinnedId,
+          }),
+        { status: 409 },
+      )
+    ).error,
+    /is held by the client/,
+  );
+  await cmd("createModel", {
+    name: "Client-local fixture predictor",
+    version: "1",
+    task: "Binary classification",
+    format: "Prediction file",
+    intendedPurpose: "Synthetic tests only",
+    artifactId: pinnedId,
+  });
+  const clientModelId = e.models.at(-1).id;
+  await cmd("createEvaluationProfile", {
+    name: "Client-local fairness",
+    version: "1",
+    task: "Binary classification",
+    suite: ["performance", "demographic_parity"],
+    config: { ...config, groupColumn: "ethnicity" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+    // Special-category, client-side route, no basis recorded (D-11).
+    specialCategory: { specialCategory: true, route: "client_side" },
+  });
+  const clientProfileId = e.evaluationProfiles.at(-1).id;
+  assert.equal(
+    e.evaluationProfiles.at(-1).specialCategory.route,
+    "client_side",
+  );
+  const clientSystem = (
+    await assurance("registerSystem", {
+      ...system.body,
+      modelPins: undefined,
+      artifactPins: undefined,
+      name: "Client-local fixture system",
+      modelIds: [clientModelId],
+    })
+  ).record;
+  const clientPrediction = (
+    await assurance("registerPrediction", {
+      modelId: clientModelId,
+      systemId: clientSystem.id,
+      datasetId: pinnedId,
+      sourceDatasetId: pinnedId,
+      producedAt: new Date().toISOString(),
+      producingRun: "client-generation",
+      inferenceConfiguration: "Fixture deterministic predictions",
+      mode: "client_local",
+      limitations: "Declared lineage only",
+    })
+  ).record;
+  const clientProcedure = e.workflow.procedures.find(
+    (p) => p.templateId === "WP-A10-02",
+  );
+  assert(clientProcedure, "fixture procedure WP-A10-02");
+  Object.assign(clientProcedure, {
+    selected: true,
+    applicability: "readiness",
+    ownerId: owner,
+    reviewerId: reviewer,
+    method: "automated",
+    modelId: clientModelId,
+    datasetId: pinnedId,
+    profileId: clientProfileId,
+    rationale: "Synthetic",
+    population: "Fixture",
+    sampling: "Full fixture",
+  });
+  await writeEngagement();
+  const clientQueue = {
+    systemId: clientSystem.id,
+    modelId: clientModelId,
+    datasetId: pinnedId,
+    profileId: clientProfileId,
+    procedureId: clientProcedure.id,
+    mode: "client_local",
+    predictionId: clientPrediction.id,
+  };
+  // The pin has no bytes: no other mode, and no hosted run, can use it.
+  assert.match(
+    (
+      await assurance(
+        "queueExternal",
+        { ...clientQueue, mode: "provided_predictions" },
+        owner,
+        409,
+      )
+    ).error,
+    /held by the client: queue it in client-local mode/,
+  );
+  const firstClientJob = await assurance("queueExternal", clientQueue);
+  const frozenClient = JSON.parse(
+    (
+      await testDb
+        .prepare("SELECT request FROM execution_jobs WHERE id=?")
+        .bind(firstClientJob.jobId)
+        .first()
+    ).request,
+  );
+  assert.equal(frozenClient.dataset.custody, "client");
+  assert.equal(frozenClient.inputHashes.dataset, digest(clientBytes));
+  // The auditor's worker does not offer client_local, so it is not served.
+  assert.deepEqual(await runWorker(), { state: "idle" });
+  const clientWorker = await assurance("enrollWorker", {
+    name: "Client's own fixture runner",
+    imageDigest: "sha256:" + "4".repeat(64),
+    formats: ["client_local"],
+    securityReview: "Synthetic client-side fixture process",
+  });
+  // A leased client-local attempt still gets no dataset bytes from the route.
+  const clientClaim = await api("/api/runner", {
+    body: {
+      op: "claim",
+      workerId: clientWorker.workerId,
+      imageDigest: "sha256:" + "4".repeat(64),
+      formats: ["client_local"],
+    },
+    headers: { Authorization: "Bearer " + clientWorker.token },
+  });
+  assert.equal(clientClaim.jobId, firstClientJob.jobId);
+  assert.match(
+    (
+      await api(
+        "/api/runner?" +
+          new URLSearchParams({
+            jobId: clientClaim.jobId,
+            attemptId: clientClaim.attemptId,
+            fence: String(clientClaim.fence),
+            input: "dataset",
+          }),
+        {
+          headers: { Authorization: "Bearer " + clientWorker.token },
+          status: 403,
+        },
+      )
+    ).error,
+    /stays in the client's environment/,
+  );
+  await assurance("cancelJob", {
+    jobId: firstClientJob.jobId,
+    reason: "Download refusal fixture",
+  });
+  const clientData = path.resolve("../tmp/client-data-fixture");
+  await fs.rm(clientData, { recursive: true, force: true });
+  await fs.rm(path.resolve("../tmp/assurance-client-worker-fixture"), {
+    recursive: true,
+    force: true,
+  });
+  await fs.mkdir(clientData, { recursive: true });
+  const runClientWorker = async () => {
+    const runtime = await processRun(
+      [
+        "-c",
+        "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-client-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'4'*64,heartbeat=1,client_data=os.environ['ASSURANCE_CLIENT_DATA_DIR']); print(json.dumps(w.once()))",
+      ],
+      {
+        ASSURANCE_WORKER_TOKEN: clientWorker.token,
+        ASSURANCE_TEST_ORIGIN: origin,
+        ASSURANCE_TEST_WORKER: clientWorker.workerId,
+        ASSURANCE_CLIENT_DATA_DIR: clientData,
+      },
+    );
+    assert.equal(runtime.code, 0, runtime.out + runtime.error);
+    return JSON.parse(runtime.out.trim());
+  };
+  // A file changed after it was pinned (same size, one label flipped) is
+  // refused before anything is computed.
+  const lastRow = clientRows.at(-1),
+    flipped = (lastRow[0] === "1" ? "0" : "1") + lastRow.slice(1),
+    changedCsv =
+      clientCsv.slice(0, clientCsv.lastIndexOf(lastRow)) + flipped + "\n";
+  assert.equal(Buffer.byteLength(changedCsv), clientBytes.length);
+  await fs.writeFile(path.join(clientData, "applicants.csv"), changedCsv);
+  traffic.on = true;
+  const changedJob = await assurance("queueExternal", clientQueue);
+  assert.deepEqual(await runClientWorker(), {
+    state: "failed",
+    jobId: changedJob.jobId,
+    attemptId: (
+      await testDb
+        .prepare("SELECT attempt_id FROM execution_jobs WHERE id=?")
+        .bind(changedJob.jobId)
+        .first()
+    ).attempt_id,
+    error: "dataset_input_pin_mismatch",
+  });
+  const changedRow = await testDb
+    .prepare("SELECT state,error,result_key FROM execution_jobs WHERE id=?")
+    .bind(changedJob.jobId)
+    .first();
+  assert.deepEqual(
+    [changedRow.state, changedRow.error, changedRow.result_key],
+    ["failed", "dataset_input_pin_mismatch", null],
+  );
+  // The client restores the pinned file; a new job runs on it.
+  await fs.writeFile(path.join(clientData, "applicants.csv"), clientBytes);
+  const clientJob = await assurance("queueExternal", clientQueue);
+  assert.equal((await runClientWorker()).state, "completed");
+  traffic.on = false;
+  const clientRow = await testDb
+    .prepare("SELECT * FROM execution_jobs WHERE id=?")
+    .bind(clientJob.jobId)
+    .first();
+  assert.equal(clientRow.state, "succeeded");
+  // What reached the platform: no input download, and no body carrying the
+  // file, any of its rows or the special-category column beside its values.
+  const runnerCalls = traffic.requests.filter((r) =>
+    r.url.startsWith("/api/runner"),
+  );
+  assert(runnerCalls.some((r) => r.body.includes('"op":"complete"')));
+  assert.deepEqual(
+    runnerCalls.filter((r) => r.method !== "POST"),
+    [],
+    "the client-local worker downloaded nothing",
+  );
+  for (const request of traffic.requests) {
+    assert(!request.body.includes(clientBytes), request.url);
+    for (const row of clientRows)
+      assert(!request.body.includes(row), request.url + " carries a row");
+  }
+  // Nor is it stored anywhere: no R2 object and no D1 row holds the bytes.
+  for (const listed of (await testBucket.list()).objects) {
+    const stored = Buffer.from(
+      await (await testBucket.get(listed.key)).arrayBuffer(),
+    );
+    assert.notEqual(digest(stored), digest(clientBytes), listed.key);
+    for (const row of clientRows)
+      assert(!stored.includes(row), listed.key + " holds a row");
+  }
+  for (const table of [
+    "engagements",
+    "execution_jobs",
+    "execution_attempts",
+    "audit_events",
+  ])
+    for (const row of (await testDb.prepare("SELECT * FROM " + table).all())
+      .results)
+      for (const data of clientRows)
+        assert(!JSON.stringify(row).includes(data), table + " holds a row");
+  const clientEnvelope = JSON.parse(
+    await (await testBucket.get(clientRow.result_key)).text(),
+  );
+  assert.equal(
+    clientEnvelope.provenance.inputHashes.dataset,
+    digest(clientBytes),
+  );
+  assert.deepEqual(
+    [
+      clientEnvelope.provenance.execution.controller,
+      clientEnvelope.provenance.execution.datasetCustody,
+    ],
+    ["client_local_worker", "client"],
+  );
+  // Aggregates only: the parity result names each group with its counts.
+  const parity = JSON.stringify(
+    clientEnvelope.hostedResults.find((r) => r.testId === "demographic_parity"),
+  );
+  assert(parity.includes("group-alpha") && parity.includes("group-beta"));
+  // The one-row group is withheld: its label only, no n, rates or counts.
+  const parityResult = JSON.parse(parity);
+  assert.deepEqual(parityResult.decision.suppressedGroups, [
+    { group: "group-gamma", n: null },
+  ]);
+  assert.deepEqual(
+    parityResult.metrics[0].slices.find((s) => s.slice === "group-gamma"),
+    {
+      slice: "group-gamma",
+      n: null,
+      declared: false,
+      suppressed: true,
+      withheld: true,
+    },
+  );
+  const gammaPairs = parityResult.metrics.filter((m) =>
+    [m.details.subject, m.details.comparator].includes("group-gamma"),
+  );
+  assert(gammaPairs.length > 0);
+  for (const m of gammaPairs)
+    assert.deepEqual(
+      [m.value, m.details.counts, m.confidenceInterval],
+      [null, null, null],
+    );
+  // The person's row is left out of every total too, so no total minus the
+  // eligible groups gives back group-gamma's size, label or prediction.
+  const withoutGamma = clientRows.length - 1;
+  assert.equal(
+    clientEnvelope.externalReport.provenance.inputs.data.rowCount,
+    withoutGamma,
+  );
+  for (const r of clientEnvelope.hostedResults) {
+    assert.equal(r.decision.sampleSize, withoutGamma, r.testId);
+    for (const m of r.metrics)
+      assert(m.sampleSize === null || m.sampleSize <= withoutGamma, r.testId);
+    if (r.decision.kind === "group_comparison") {
+      assert.equal(r.decision.coverage, null, r.testId);
+      assert.equal(
+        r.metrics[0].slices
+          .filter((s) => s.n !== null)
+          .reduce((sum, s) => sum + s.n, 0),
+        withoutGamma,
+        r.testId,
+      );
+    } else
+      assert(
+        r.limitations.some((note) => note.includes("are left out of every")),
+        r.testId,
+      );
+  }
+  await assurance("importJob", { jobId: clientJob.jobId });
+  const clientRun = e.runs.find((r) => r.externalJobId === clientJob.jobId);
+  assert.equal(clientRun.manifest.executionMode, "client_local");
+  assert.equal(clientRun.manifest.dataset.custody, "client");
+  assert(
+    clientRun.manifest.limitations.some((note) =>
+      note.includes("The dataset stays in the client's environment"),
+    ),
+  );
+  await fs.writeFile(
+    path.resolve(
+      "../tmp/assurance-worker-fixture/hosted-external-run-client-local.json",
+    ),
+    JSON.stringify(clientRun, null, 2),
+  );
+  console.log(
+    "PASS client-local special-category job: pinned by SHA-256, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
   );
   // A schemaVersion 1.1 protocol pre-registers an explicit plan whose
   // criterion ids differ from the suite names: queueExternal freezes
@@ -1390,9 +1839,10 @@ try {
       headers: { Authorization: "Bearer " + worker.token },
     });
   assert.equal(claim.jobId, next.jobId);
-  // The job guard binds the procedure's plan revision and the scope, not the
-  // program revision (#69): another procedure's approved change keeps this
-  // job running; a change to its own plan or to the scope stops it.
+  // The job guard binds the procedure's plan and the scope, not the program
+  // revision (#69): another procedure's approved change keeps this job
+  // running; a change to its own plan content (its plan hash, #105) or to
+  // the scope stops it, and a plan restored to the queued content does not.
   const heartbeat = (status = 200) =>
     api("/api/runner", {
       body: {
@@ -1424,10 +1874,15 @@ try {
   });
   await heartbeat();
   await replanned((wf, p) => {
-    p(procedure.id).revision++;
+    p(procedure.id).planHash = "f".repeat(64);
     wf.program.revision++;
   });
   await heartbeat(409);
+  await replanned((wf, p) => {
+    p(procedure.id).revision += 2;
+    wf.program.revision += 2;
+  });
+  await heartbeat();
   await replanned((wf) => wf.brief.revision++);
   await heartbeat(409);
   await replanned(() => {});
