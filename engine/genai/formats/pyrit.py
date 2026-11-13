@@ -132,6 +132,7 @@ def parse(files, plan, manifest_inputs=None):
         if isinstance(target, dict):
             targets.append(target)
         ctx = {"error": result.get("error_type") not in (None, ""), "outcome": result.get("outcome")}
+        common.keep_excerpt(ctx, plan, users[0].get("converted_value") if users else None, assistants[-1].get("converted_value") if assistants else None, run.warnings, locator)
         status, reason, value, rule = outcome(item, ctx, plan.get("primaryScore"), plan["successRule"])
         common.set_outcome(item, status, reason, value, rule, plan["scorePolicy"])
         run.add(item, ctx)

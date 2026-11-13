@@ -35,7 +35,7 @@ import { coverageFor } from "./views";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -299,6 +299,7 @@ describe("the pack as the release would serve it", () => {
       statementOfApplicability: true,
       nonconformityGrading: true,
       certificationRecommendation: true,
+      ll144BiasAudit: false,
     });
     const view = managementSystemView(pinned(e))!;
     expect(view.phases).toEqual([

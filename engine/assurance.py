@@ -21,7 +21,8 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-TOOL_VERSION = "1.3.0"
+# 1.4.0: decided intersectional strata accept a cluster field and use the cluster bootstrap (#136).
+TOOL_VERSION = "1.4.0"
 MAX_RECORDS = 100_000
 MAX_INPUT_BYTES = 32 * 1024 * 1024
 MAX_CONTAINER_BYTES = 64 * 1024 * 1024
@@ -427,25 +428,38 @@ def intersectional_slices(records, *, protected_fields, target_field="actual", p
         eligible = support and value is not None and len(resampled[name]) >= math.ceil(0.9 * replicates)
         metrics.append({"name": name, "value": value, "outcome": "pass" if eligible else "inconclusive", "validReplicates": len(resampled[name]), "undefinedReplicates": replicates - len(resampled[name]) if sufficient else 0, "confidenceInterval": _interval(resampled[name], confidence, math.ceil(0.9 * replicates)) if eligible else None, "limitations": ["No acceptance threshold applied; pass means estimation support only."] if eligible else ["Insufficient group/class/cluster support, undefined denominator, or more than 10% undefined bootstrap replicates."]})
     slices = [{"stratum": key, "values": group_values[key], **original[key], "clusterCount": len(group_clusters[key]) if clusters is not None else None} for key in sorted(original)]
-    decided = _slice_statistics(original, len(exclusions), bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field)
+    decided = _slice_statistics(original, len(exclusions), bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field, observations, seed, replicates)
     return {"schemaVersion": "1.0", "type": "intersectional_slices", "statistics": decided, "toolVersion": TOOL_VERSION, "outcome": "pass" if all(metric["outcome"] == "pass" for metric in metrics) and not exclusions else "inconclusive", "scope": "binary saved-label/prediction intersectional contrasts", "populationSha256": _population_hash(index), "populationCount": len(index), "includedCount": len(observations), "exclusions": exclusions, "protectedFields": list(protected_fields), "slices": slices, "metrics": metrics, "bootstrap": {"method": "cluster" if clusters is not None else "iid", "seed": seed, "replicates": replicates, "confidence": confidence, "clusterField": cluster_field, "clusterCount": cluster_count}, "assumptions": ["The mapped binary favourable label and protected attributes have been reviewed for this use.", "Whole-population resampling preserves cross-slice dependence; iid observations are assumed unless independent clusters are declared.", "Percentile intervals require representative observations/clusters and are descriptive; no multiple-comparison correction."], "limitations": ["Exclusions and source-population completeness require human assessment.", "Confidence intervals are conditional on defined contrasts; undefined-replicate counts are retained.", "Metrics and support flags do not determine legal conformity or an approved audit conclusion."]}
 
 
-def _slice_statistics(counts, unknown, bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field):
-    """Exploratory statistics 1.0.0 group criteria over the strata (E3); None without bands."""
+def _slice_statistics(counts, unknown, bands, confidence, min_support, min_class_count, minimum_coverage, cluster_field, observations=(), seed=1729, replicates=500):
+    """Exploratory statistics 1.0.0 group criteria over the strata (E3); None without bands. With a cluster
+    field the strata are decided by the cluster bootstrap (section 5.11, #136): one count vector per cluster,
+    the run seed, and the decision replicates (`replicates` when it lies in 1000-10000, otherwise 2000)."""
     if bands is None:
         return None
     from . import statistics as stats
     _expect(isinstance(bands, dict) and bands and set(bands) <= {"selection_rate_difference", "selection_rate_ratio", "equalized_odds"}, "bands names selection_rate_difference, selection_rate_ratio or equalized_odds")
-    _expect(cluster_field is None, "Decided strata need independent rows; clustered strata require the cluster bootstrap")
     _expect(confidence in (0.9, 0.95, 0.99), "Decided strata use a confidence level of 0.90, 0.95 or 0.99")
-    plan = {"confidenceLevel": confidence, "minimums": {"sampleSize": max(30, min_support), "groupSize": max(30, min_support), "classCount": max(10, min_class_count)},
+    plan = {"confidenceLevel": confidence, **({"clusterField": cluster_field, "bootstrap": {"replicates": replicates if 1000 <= replicates <= 10000 else 2000}} if cluster_field else {}), "minimums": {"sampleSize": max(30, min_support), "groupSize": max(30, min_support), "classCount": max(10, min_class_count)},
         "criteria": [{"id": "intersectional-" + metric.replace("_", "-"), "kind": "group_comparison", "role": "exploratory", "metric": metric, "band": band, "minimumCoverage": minimum_coverage} for metric, band in sorted(bands.items())]}
     try:
         plan = stats.validate_plan(plan)
     except stats.StatisticsError as exc:
         raise ValueError(str(exc)) from exc
     data = {"groups": [{"group": key, **{cell: row[cell] for cell in ("tp", "fp", "fn", "tn")}} for key, row in sorted(counts.items())], "unknownGroupRows": unknown}
+    if cluster_field:
+        # Excluded rows carry no usable cluster id; they count once, as unknown-group rows, in coverage.
+        ids, parts = {}, defaultdict(dict)
+        for group, actual, predicted, cluster in observations:
+            key = canonical_bytes(cluster)
+            ids.setdefault(key, cluster)
+            cells = parts[key].setdefault(group, {"tp": 0, "fp": 0, "fn": 0, "tn": 0})
+            cells["tp" if actual and predicted else "fn" if actual else "fp" if predicted else "tn"] += 1
+        clusters = [{"cluster": ids[key], "groups": [{"group": group, **cells} for group, cells in sorted(groups.items())]} for key, groups in parts.items()]
+        if clusters:
+            clusters[0]["unknownGroupRows"] = unknown
+        data = {"seed": seed, "clusters": clusters}
     evaluation = stats.evaluate_plan(plan, data)
 
     def public(value):

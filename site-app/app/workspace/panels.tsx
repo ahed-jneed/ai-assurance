@@ -66,6 +66,14 @@ export const panelFallback = (
     <Skeleton className="h-80" />
   </div>
 );
+/** The workspace shell's placeholder while the engagement loads (#135). */
+export const workspaceFallback = (
+  <div className="loading-grid" role="status" aria-label="Loading workspace">
+    <Skeleton className="h-16" />
+    <Skeleton className="h-32" />
+    <Skeleton className="h-80" />
+  </div>
+);
 /** Prefetches the code-split panels in the background once the workspace is up. */
 export function usePanelPrefetch(bootstrapping: boolean) {
   useEffect(() => {

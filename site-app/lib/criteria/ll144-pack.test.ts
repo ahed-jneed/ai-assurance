@@ -11,7 +11,7 @@ import { criteriaView, packFeatures, resolveNew } from "./pin";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -38,7 +38,7 @@ describe("the NYC Local Law 144 pack", () => {
     const e = engagement();
     expect(e.criteria?.pin).toMatchObject({
       packId: "nyc-ll144-bias-audit",
-      packVersion: "2026.11.0",
+      packVersion: "2026.11.1",
     });
     expect(e.rulePack).toBeUndefined();
     expect(packFeatures(e)).toEqual({
@@ -48,6 +48,7 @@ describe("the NYC Local Law 144 pack", () => {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: true,
     });
     expect(
       stageGates(e, "Fieldwork", packFeatures(e)).some(

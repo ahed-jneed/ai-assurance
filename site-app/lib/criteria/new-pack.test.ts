@@ -29,7 +29,7 @@ import { registry, selectablePacks } from "./registry";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -120,6 +120,7 @@ describe("the EN 18286 + ISO/IEC 42001 pack, from data alone", () => {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     expect(
       completionGates(e, "readiness", undefined, features).filter(

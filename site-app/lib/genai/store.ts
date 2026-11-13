@@ -7,6 +7,7 @@ import { parsed, type RecordRow } from "../assurance-store";
 import { db } from "../bindings";
 import type { Engagement } from "../domain";
 import type { Context } from "../tenancy";
+import { GENAI_RESULT_CATEGORIES } from "./evidence-levels";
 import { genaiCoverageCandidates } from "./limitation";
 import {
   genaiReadiness,
@@ -124,11 +125,9 @@ export function toContext(
   };
 }
 
-/**
- * Evidence categories that can hold a GenAI result: compiled worker results
- * and envelopes uploaded with the logs. Only these ids are looked up.
- */
-export const GENAI_RESULT_CATEGORIES = ["GenAI result", "GenAI log"];
+// Evidence categories that can hold a GenAI result (only these ids are looked
+// up); shared with the Evidence vault.
+export { GENAI_RESULT_CATEGORIES };
 
 /** The readiness of every GenAI result linked through these evidence ids. */
 export async function linkedReadiness(

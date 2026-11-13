@@ -52,6 +52,18 @@ const reportParticulars = {
   basisForModification:
     "Synthetic unresolved nonconformity whose effects are material and pervasive.",
 };
+// The MEM-SO-01 completion checklist the approver answers (#94).
+const releaseChecklist = {
+  checklist: {
+    independence: "confirmed",
+    subsequentEvents: "confirmed",
+    representations: "not_applicable",
+    limitations: "confirmed",
+    distribution: "confirmed",
+  },
+  checklistNote:
+    "Synthetic fixture: the engaging party is the responsible party",
+};
 assert(
   ["127.0.0.1", "localhost", "::1"].includes(new URL(base).hostname),
   "This fixture identity test may run only against loopback development",
@@ -356,6 +368,7 @@ try {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     assert.equal(workspace.criteria.draft, false);
     assert.equal(workspace.criteria.managementSystem, undefined);
@@ -486,6 +499,26 @@ try {
       status: 404,
     });
     await request("/api/coverage?" + scope, { user: viewer, status: 403 });
+    // #135: derived applicability dates and the internal-only CSV export.
+    assert(coverage.banners.some((b) => b.id === "derived-applicability"));
+    const exportPath =
+      "/api/coverage?" +
+      scope +
+      "&" +
+      new URLSearchParams({
+        framework: packKey,
+        format: "csv",
+        actor: "Provider",
+      });
+    const csv = await transport(base + exportPath, { headers: h(owner) });
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers.get("content-type"), /^text\/csv/);
+    assert.match(csv.headers.get("content-disposition"), /attachment/);
+    const csvLines = (await csv.text()).trimEnd().split("\r\n");
+    assert(csvLines[0].startsWith("view,framework_data_version,pack"));
+    assert(csvLines.length > 1 && csvLines.length < coverage.summary.total);
+    assert(csvLines.slice(1).every((l) => l.includes("Provider")));
+    await request(exportPath, { user: viewer, status: 403 });
     // A rule-pack stamp the index does not know fails closed.
     await testDb
       .prepare(
@@ -495,7 +528,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, derived applicability, the CSV export, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
@@ -2987,6 +3020,7 @@ try {
       internalHash: internalFinal.sha256,
       clientHash: internalFinal.clientSha256,
       reason: "Creator cannot approve",
+      ...releaseChecklist,
     },
     owner,
     403,
@@ -2998,9 +3032,22 @@ try {
       internalHash: "incorrect",
       clientHash: internalFinal.clientSha256,
       reason: "Reject wrong pin",
+      ...releaseChecklist,
     },
     reviewer,
     409,
+  );
+  // The completion checklist is part of the approval (#94).
+  await command(
+    "approveReportPackage",
+    {
+      reportId: internalFinal.id,
+      internalHash: internalFinal.sha256,
+      clientHash: internalFinal.clientSha256,
+      reason: "Approval without the completion checklist",
+    },
+    reviewer,
+    400,
   );
   await command(
     "approveReportPackage",
@@ -3009,6 +3056,7 @@ try {
       internalHash: internalFinal.sha256,
       clientHash: internalFinal.clientSha256,
       reason: "Both captured packages and projection independently reviewed",
+      ...releaseChecklist,
     },
     reviewer,
   );
@@ -3693,6 +3741,21 @@ try {
   ]);
   assert.equal(firstRelease.completion.internalHash, internalFinal.sha256);
   assert.equal(firstRelease.completion.clientHash, internalFinal.clientSha256);
+  // The approver's completion checklist travels into the completion record.
+  assert.deepEqual(
+    firstRelease.completion.checklist,
+    firstRelease.approval.checklist,
+  );
+  assert.deepEqual(
+    firstRelease.completion.checklist.items.find(
+      (i) => i.id === "representations",
+    ),
+    { id: "representations", answer: "not_applicable" },
+  );
+  assert.equal(
+    firstRelease.completion.checklist.note,
+    releaseChecklist.checklistNote,
+  );
   assert.deepEqual(firstRelease.history.map((h) => h.action).slice(-2), [
     "release",
     "notify_client",
@@ -3714,6 +3777,7 @@ try {
       internalHash: replacement.sha256,
       clientHash: replacement.clientSha256,
       reason: "Amended packages independently reviewed",
+      ...releaseChecklist,
     },
     reviewer,
   );
@@ -3759,6 +3823,18 @@ try {
   assert.deepEqual(clientReports.engagement.reports[1].replaces, [
     internalFinal.id,
   ]);
+  // ... and when each release notified it, without the internal note (#94).
+  assert.deepEqual(clientReports.engagement.reports[1].notification, {
+    at: e.reports
+      .at(-1)
+      .release.history.findLast((h) => h.action === "notify_client").at,
+    recipients: "Authorized fixture client members",
+  });
+  assert(
+    !JSON.stringify(clientReports.engagement.reports).includes(
+      "Notify the recipients",
+    ),
+  );
   // The release-time records are recorded by the release, never prepared.
   await command("createPaper", { templateId: "WP-RP-02" }, undefined, 409);
   console.log(

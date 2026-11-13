@@ -69,6 +69,75 @@ export const WORKER_FAILURE_GUIDANCE: Record<string, string> = {
     "The computation ran out of memory. Reduce the dataset or ask the operator for more memory.",
   compute_internal_error:
     "An unexpected engine error. Report it to the worker operator as a defect, with the job ID.",
+  // GenAI ingest jobs (engine/WORKER.md, "GenAI ingest jobs"; #128).
+  evidence_input_pin_mismatch:
+    "An evidence file the worker received differs from its pinned size or SHA-256. Treat this as an integrity exception and investigate before re-running.",
+  input_too_large:
+    "A tool log exceeds 50 MiB. Split the evidence into smaller files and declare a new bundle.",
+  bundle_too_large:
+    "The bundle has more than 64 files or more than 200 MiB in all. Declare smaller bundles.",
+  line_too_long:
+    "A JSON Lines log has a line over 16 MiB. Check the file, or split long outputs before export.",
+  too_many_items:
+    "The bundle yields more than 50,000 items. Declare smaller bundles.",
+  too_many_scores:
+    "One item in a log carries more than 50 scores. Reduce the scorers or split the run.",
+  nesting_too_deep:
+    "A log nests JSON deeper than 64 levels. Check the file; it may be malformed or crafted.",
+  invalid_utf8:
+    "A log is not UTF-8 without a byte-order mark. Export it again as plain UTF-8.",
+  invalid_json:
+    "A log is not valid JSON, or its structure is not that of the declared format. Check the file and its declared format.",
+  duplicate_key:
+    "A log repeats a key in one JSON object, which the engine refuses as ambiguous. Check the file.",
+  number_out_of_range:
+    "A log contains a number that overflows (for example 1e999). Check the file.",
+  unknown_format:
+    "A file matches none of the supported tool formats. Check that the bundle holds the tools' own output files.",
+  format_mismatch:
+    "A file's content is not the format or role its manifest entry declares. Correct the manifest and declare a new bundle.",
+  unsupported_format:
+    "The declared format is not supported by this worker's engine. Ask the operator about the engine version.",
+  unsupported_format_version:
+    "The tool or format version is outside the verified versions. Use a verified version or allow unverified versions in the plan (the run is then capped at L1).",
+  zip_invalid:
+    "An Inspect .eval archive is malformed or inconsistent. Export the log again.",
+  zip_entry_unsafe_name:
+    "An Inspect .eval archive has an unsafe entry name, a sign of tampering. Investigate before re-running.",
+  zip_entry_too_large:
+    "An Inspect .eval archive expands beyond the decompression limits. Split the run into smaller logs.",
+  zip_entry_size_mismatch:
+    "An entry of an Inspect .eval archive decompresses to another size than declared. Export the log again.",
+  zip_ratio_exceeded:
+    "An Inspect .eval entry has a compression ratio above 500:1, the pattern of a zip bomb. Investigate the file.",
+  zip_method_unsupported:
+    "An Inspect .eval entry uses an unsupported compression method. Export the log with the current Inspect.",
+  zip_encrypted:
+    "An Inspect .eval archive is encrypted. Supply the unencrypted log.",
+  zip_crc_mismatch:
+    "An entry of an Inspect .eval archive fails its checksum: the file is damaged or was altered.",
+  zstd_unavailable:
+    "The worker's runtime cannot read zstd-compressed Inspect logs. Ask the operator to use the compute image.",
+  missing_required_entry:
+    "An Inspect .eval archive lacks an entry the format requires. Export the log again.",
+  lm_eval_bundle_mismatch:
+    "lm-evaluation-harness results and samples files do not pair up. Declare each results file with its own samples files.",
+  duplicate_item_key:
+    "Two items or runs in the bundle share a key, for example the same log declared twice. Correct the bundle.",
+  manifest_invalid:
+    "The frozen bundle manifest breaks its schema. Declare a corrected bundle and queue again.",
+  plan_invalid:
+    "The frozen GenAI plan breaks its schema or lowers a floor. Freeze a corrected plan and queue again.",
+  input_hash_mismatch:
+    "A file's bytes differ from the SHA-256 or size the manifest declares. Treat this as an integrity exception.",
+  signature_invalid:
+    "A signed detection result fails its signature check by a pinned key: it was altered or forged. Investigate before re-running.",
+  signature_untrusted:
+    "A signed detection result was not signed by a key the plan pins for its detection solution. Pin the solution's key in the plan, or investigate the result.",
+  detection_content_mismatch:
+    "A signed detection result is for other content than the sampled output it is listed with. Check the detection results file.",
+  signature_backend_unavailable:
+    "The worker's runtime cannot verify signatures. Ask the operator to use the compute image.",
   compute_unavailable:
     "The worker could not start its compute process or container. Ask the operator.",
   compute_rejected:

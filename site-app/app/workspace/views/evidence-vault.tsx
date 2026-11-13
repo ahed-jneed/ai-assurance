@@ -11,6 +11,7 @@ import { EvidenceReviewQueue } from "../../evidence-workspace";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
 import type { EditingReporter } from "../navigation-guards";
+import { useGenaiLevels } from "../use-genai-levels";
 import {
   ClientPortal,
   EvidenceRequests,
@@ -67,6 +68,7 @@ export function EvidenceVault({
   } = url;
   const { search, setSearch, filter, setFilter, setFacet, setSort } = register;
   const evidenceRows = selectEvidence(e.artifacts, register.query);
+  const genaiLevels = useGenaiLevels(data.tenantId, e, role);
   return (
     <>
       {role === "Client Contributor" && (
@@ -166,6 +168,7 @@ export function EvidenceVault({
                 role={role}
                 resolve={resolve}
                 onOpen={onOpenArtifact}
+                genaiLevels={genaiLevels}
               />
             ) : (
               <div className="empty-state">

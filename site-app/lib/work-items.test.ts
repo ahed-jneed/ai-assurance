@@ -54,11 +54,23 @@ describe("release-time records in the work inbox", () => {
     expect(x.corrections).toBe(false);
   });
 
-  it("still asks for the assignment program submission requires", () => {
-    const e = withProcedures(planned("WP-RP-02", { reviewerId: "" }));
-    expect(
-      procedureTasks(e, "Lead Auditor", "lead").map((i) => i.action),
-    ).toEqual(["Complete procedure plan"]);
+  it("asks for no assignment or deadline, which program submission no longer requires (#94)", () => {
+    const e = withProcedures(
+      planned("WP-RP-02", { ownerId: "", reviewerId: "", dueDate: "" }),
+    );
+    expect(procedureTasks(e, "Lead Auditor", "lead")).toEqual([]);
+    expect(procedureTasks(e, "Auditor", "auditor")).toEqual([]);
+  });
+
+  it("still asks the Lead to resolve a pending applicability", () => {
+    const e = withProcedures(
+      planned("WP-RP-02", { reviewerId: "", applicability: "pending" }),
+    );
+    const tasks = procedureTasks(e, "Lead Auditor", "lead");
+    expect(tasks.map((i) => i.action)).toEqual(["Complete procedure plan"]);
+    expect(tasks[0].reason).toBe(
+      "Resolve applicability; the release records it.",
+    );
   });
 
   it("keeps the execution task for an ordinary overdue procedure", () => {

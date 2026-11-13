@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AssuranceRecord } from "../../assurance-core";
-import { jobs, recordStatement } from "../../assurance-store";
+import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Artifact, Engagement } from "../../domain";
 import { save } from "../../engagement-repo";
@@ -309,11 +309,8 @@ export const genai: AssuranceModule = defineCommands({
           format: spec.format,
         };
       });
-      const pending = await jobs(ctx, e.id);
-      if (
-        pending.filter((j) => ["queued", "running"].includes(String(j.state)))
-          .length >= 10
-      )
+      // Counted over every job, not the 100 most recent (#151).
+      if ((await pendingJobCount(ctx, e.id)) >= 10)
         throw new ApiError(429, "Finish or cancel pending external work");
       const jobId = id("JOB"),
         request = {

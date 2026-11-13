@@ -5,7 +5,10 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import { getEngagement, loadEngagement, save } from "../engagement-repo";
-import { IntegrityError } from "../engagement-storage";
+import {
+  IntegrityError,
+  integrityIncidentThrottleSeconds,
+} from "../engagement-storage";
 import {
   engagementWithParts,
   member,
@@ -33,6 +36,20 @@ const incidents = (sqlite: Awaited<ReturnType<typeof practice>>["sqlite"]) =>
       "SELECT engagement_id,object_key,kind,status,occurrences FROM integrity_incidents ORDER BY engagement_id",
     )
     .all();
+/**
+ * Moves every recorded incident's last sighting back past the throttle
+ * window, so the next sighting is recorded again.
+ */
+const beyondThrottle = (
+  sqlite: Awaited<ReturnType<typeof practice>>["sqlite"],
+) =>
+  sqlite
+    .prepare("UPDATE integrity_incidents SET last_seen=?")
+    .run(
+      new Date(
+        Date.now() - (integrityIncidentThrottleSeconds + 1) * 1000,
+      ).toISOString(),
+    );
 
 describe("workspaceView", () => {
   it("lists the engagements by grant and reads R2 for the selected one only", async () => {
@@ -118,8 +135,70 @@ describe("workspaceView", () => {
     // The other engagements still open, and the default selection is intact.
     expect((await workspaceView(lead(), "ENG-C")).engagement?.id).toBe("ENG-C");
     expect((await workspaceView(lead(), null)).engagement?.id).toBe("ENG-A");
+    beyondThrottle(sqlite);
     await workspaceView(lead(), "ENG-B");
     expect(incidents(sqlite)).toMatchObject([{ occurrences: 2 }]);
+  });
+
+  it("names the invitation emails each revocation cancelled, for administrators (#151)", async () => {
+    const { sqlite } = await practice(three());
+    const run = (sql: string, ...args: string[]) =>
+      sqlite.prepare(sql).run(...args);
+    run(
+      "INSERT INTO invitations(tenant_id,id,email,role,invited_by,created_at,expires_at,status) VALUES(?,'INV-1','nia@example.test','Auditor','lead','2026-11-01T00:00:00.000Z','2026-12-01T00:00:00.000Z','cancelled')",
+      tenantId,
+    );
+    const event = (id: string, details: object, at: string) =>
+      run(
+        "INSERT INTO management_events(tenant_id,id,actor,action,details,hash,created_at) VALUES(?,?,'lead',?,?,'h',?)",
+        tenantId,
+        id,
+        "revokeMember",
+        JSON.stringify(details),
+        at,
+      );
+    event(
+      "ME-1",
+      { userId: "user-nia", cancelledInvitations: ["INV-1"] },
+      "2026-11-02T00:00:00.000Z",
+    );
+    // Neither a revocation that cancelled nothing nor one recorded before
+    // #148 listed cancellations is shown.
+    event(
+      "ME-2",
+      { userId: "user-ada", cancelledInvitations: [] },
+      "2026-11-03T00:00:00.000Z",
+    );
+    event("ME-3", { userId: "user-bo" }, "2026-11-04T00:00:00.000Z");
+    const admin = { ...lead(), practiceAdmin: true };
+    expect((await workspaceView(admin, null)).revocationCancellations).toEqual([
+      {
+        eventId: "ME-1",
+        createdAt: "2026-11-02T00:00:00.000Z",
+        userId: "user-nia",
+        displayName: null,
+        revokedBy: "lead",
+        invitations: [{ id: "INV-1", email: "nia@example.test" }],
+      },
+    ]);
+    expect((await workspaceView(lead(), null)).revocationCancellations).toEqual(
+      [],
+    );
+  });
+
+  it("marks a platform operator, so the account menu links the console (#151)", async () => {
+    await practice(three());
+    expect((await workspaceView(lead(), null)).identity.operator).toBe(false);
+    (env as { PLATFORM_OPERATORS?: string }).PLATFORM_OPERATORS =
+      "lead@fixture.invalid";
+    try {
+      expect((await workspaceView(lead(), null)).identity.operator).toBe(true);
+      expect((await workspaceView(auditor(), null)).identity.operator).toBe(
+        false,
+      );
+    } finally {
+      delete (env as { PLATFORM_OPERATORS?: string }).PLATFORM_OPERATORS;
+    }
   });
 
   it("shows internal members the practice's quality review policy", async () => {
@@ -204,7 +283,7 @@ describe("workspaceView", () => {
       .run();
     // The auditor meets both; the lead meets the missing part again later.
     await workspaceView(auditor(), "ENG-C");
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    beyondThrottle(sqlite);
     await workspaceView(lead(), "ENG-C");
     expect((await workspaceView(lead(), null)).integrityIncidents).toBeNull();
     expect(
@@ -214,8 +293,10 @@ describe("workspaceView", () => {
       view = await workspaceView(admin, "ENG-B");
     expect(view.integrityIncidents).toEqual({
       count: 2,
+      open: 2,
       recent: 2,
-      incidents: [
+      // Both met in the lead's request: newest first, in either order.
+      incidents: expect.arrayContaining([
         expect.objectContaining({
           engagementId: "ENG-A",
           title: "Alpha audit",
@@ -223,6 +304,9 @@ describe("workspaceView", () => {
           kind: "unreadable",
           status: 409,
           lastSeenBy: "lead",
+          handling: "open",
+          handledAt: null,
+          handledBy: null,
         }),
         expect.objectContaining({
           engagementId: "ENG-C",
@@ -233,10 +317,11 @@ describe("workspaceView", () => {
           occurrences: 2,
           lastSeenBy: "lead",
         }),
-      ],
+      ]),
     });
-    const [body, part] = view.integrityIncidents!.incidents;
-    expect(body.lastSeen >= part.lastSeen).toBe(true);
+    const [newest, next] = view.integrityIncidents!.incidents;
+    expect(newest.lastSeen >= next.lastSeen).toBe(true);
+    const part = [newest, next].find((i) => i.engagementId === "ENG-C")!;
     expect(part.firstSeen < part.lastSeen).toBe(true);
     // An incident nobody has met for over a week (ENG-C stays unopened; the
     // directory listing meets ENG-A's body again) leaves the badge count but
@@ -252,6 +337,72 @@ describe("workspaceView", () => {
       "ENG-A",
       "ENG-C",
     ]);
+  });
+
+  it("records repeats at most once per throttle window, and handling quiets the badge until a resolved incident recurs (#151)", async () => {
+    const { objects, sqlite } = await practice(three());
+    const [missing] = partsOf(objects.keys(), "ENG-C");
+    objects.delete(missing);
+    const admin = { ...lead(), practiceAdmin: true };
+    const row = () =>
+      sqlite
+        .prepare(
+          "SELECT occurrences,last_seen,handling,handled_at,handled_by FROM integrity_incidents",
+        )
+        .get() as Record<string, unknown>;
+    await workspaceView(auditor(), "ENG-C");
+    const first = row();
+    // Every page load meets it; inside the window no row changes.
+    await workspaceView(auditor(), "ENG-C");
+    await workspaceView(lead(), "ENG-C");
+    expect(row()).toEqual(first);
+    beyondThrottle(sqlite);
+    await workspaceView(lead(), "ENG-C");
+    expect(row()).toMatchObject({ occurrences: 2, handling: "open" });
+    expect(
+      (await workspaceView(admin, "ENG-B")).integrityIncidents,
+    ).toMatchObject({
+      count: 1,
+      open: 1,
+      recent: 1,
+    });
+    // Acknowledged: still listed, no longer counted by the badge, and a
+    // repeat keeps the acknowledgement.
+    sqlite
+      .prepare(
+        "UPDATE integrity_incidents SET handling='acknowledged',handled_at='2026-11-13T00:00:00.000Z',handled_by='lead'",
+      )
+      .run();
+    beyondThrottle(sqlite);
+    await workspaceView(auditor(), "ENG-C");
+    const acknowledged = (await workspaceView(admin, "ENG-B"))
+      .integrityIncidents!;
+    expect(acknowledged).toMatchObject({ count: 1, open: 0, recent: 0 });
+    expect(acknowledged.incidents[0]).toMatchObject({
+      handling: "acknowledged",
+      handledAt: "2026-11-13T00:00:00.000Z",
+      handledBy: "lead",
+      occurrences: 3,
+    });
+    // Resolved, then met again inside the window: it reopens at once.
+    sqlite
+      .prepare("UPDATE integrity_incidents SET handling='resolved',last_seen=?")
+      .run(new Date().toISOString());
+    await workspaceView(auditor(), "ENG-C");
+    expect(row()).toMatchObject({
+      occurrences: 4,
+      handling: "open",
+      handled_at: null,
+      handled_by: null,
+    });
+    expect(() =>
+      sqlite.exec("UPDATE integrity_incidents SET handling='ignored'"),
+    ).toThrow(/Unknown incident handling/);
+    expect(() =>
+      sqlite.exec(
+        "INSERT INTO integrity_incidents(tenant_id,engagement_id,object_key,kind,status,first_seen,last_seen,last_user_id,occurrences,handling) VALUES('T','E','k','missing',404,'x','x','u',1,'ignored')",
+      ),
+    ).toThrow(/Unknown incident handling/);
   });
 
   it("lists a record whose body is not JSON with an integrity error and opens the next one", async () => {

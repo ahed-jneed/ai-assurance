@@ -57,8 +57,8 @@ class MulticlassPowerTests(unittest.TestCase):
         self.assertEqual(power["members"][1]["denominator"], {"perClass": {"a": 150.0, "b": 90.0, "c": 60.0}})
 
     def test_macro_members_are_computed_under_the_even_spread_assumption(self):
-        # The testing lab's multiclass plan also has macro F1; since #152 it has a formula (section 8, GC-43, GC-59,
-        # GC-60). site-app/app/power-assumptions.test.ts expects the same numbers from the hosted runner.
+        # The testing lab's multiclass plan also has macro F1; since #152 it has a formula (section 8, GC-43, GC-61,
+        # GC-62). site-app/app/power-assumptions.test.ts expects the same numbers from the hosted runner.
         case = with_assumptions()
         case["criterion"]["members"] = [*case["criterion"]["members"], {"metric": "macro_f1", "band": {"lower": 0.7, "upper": None}}, {"metric": "macro_precision", "band": {"lower": 0.7, "upper": None}}]
         power = st.evaluate_power(case)

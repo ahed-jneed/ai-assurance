@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { canWrite, type Artifact, type Finding, type Role } from "@/lib/domain";
-import { humanLabel } from "@/lib/presentation";
+import {
+  genaiLevelBadge,
+  type GenaiArtifactLevel,
+} from "@/lib/genai/evidence-levels";
+import { findingReference, humanLabel } from "@/lib/presentation";
 import { FindingActions } from "./finding-actions";
 
 export const evidenceSize = (bytes: number) =>
@@ -58,6 +62,21 @@ function Status({ value }: { value: string }) {
   );
 }
 
+function GenaiLevel({ level }: { level?: GenaiArtifactLevel }) {
+  if (!level) return null;
+  const badge = genaiLevelBadge(level);
+  return (
+    <span
+      className={"badge " + badge.tone + " register-genai-level"}
+      title={badge.title}
+      data-genai-file-level={level.level}
+      data-genai-file-role={level.role}
+    >
+      {badge.text}
+    </span>
+  );
+}
+
 export function EvidenceRegister({
   artifacts,
   tenantId,
@@ -65,6 +84,7 @@ export function EvidenceRegister({
   role,
   resolve,
   onOpen,
+  genaiLevels,
 }: {
   artifacts: Artifact[];
   tenantId: string;
@@ -72,6 +92,8 @@ export function EvidenceRegister({
   role: Role;
   resolve: (id: string) => string;
   onOpen: (artifact: Artifact) => void;
+  /** The GenAI evidence level of each GenAI file, by artifact id (#145). */
+  genaiLevels?: ReadonlyMap<string, GenaiArtifactLevel>;
 }) {
   return (
     <Table className="audit-register evidence-register">
@@ -112,6 +134,7 @@ export function EvidenceRegister({
             <TableCell className="register-category">
               {a.category}
               <small className="register-meta">{evidenceVisibility(a)}</small>
+              <GenaiLevel level={genaiLevels?.get(a.id)} />
             </TableCell>
             <TableCell className="register-status">
               <Status value={a.status} />
@@ -199,7 +222,9 @@ export function FindingRegister({
                 <button className="paper-link" onClick={() => onOpen(f)}>
                   {f.title}
                 </button>
-                <small className="register-meta">Article {f.article}</small>
+                <small className="register-meta">
+                  {findingReference(f.article)}
+                </small>
               </TableCell>
               <TableCell className="register-risk">
                 <Status value={f.severity} />

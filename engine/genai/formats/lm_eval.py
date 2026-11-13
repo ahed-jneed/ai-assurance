@@ -220,7 +220,8 @@ def parse(files, plan, manifest_inputs=None):
             item["categories"] = plan_categories(plan, None)
             repeats = tconfig.get("repeats")
             item["labels"] = {"filters": ",".join(filters), "outputType": common.label_value(output_type) if isinstance(output_type, str) else None, "repeats": repeats if isinstance(repeats, int) and not isinstance(repeats, bool) else None}
-            pending.append((item, {"error": False, "nullReasons": null_reasons}))
+            response = resps[0][0] if output_type == "generate_until" and isinstance(resps, list) and resps and isinstance(resps[0], list) and resps[0] and isinstance(resps[0][0], str) else None
+            pending.append((item, common.keep_excerpt({"error": False, "nullReasons": null_reasons}, plan, arg0 if isinstance(arg0, str) else None, response, run.warnings, locator)))
         for name, values in value_sets.items():
             if not values <= {0.0, 1.0}:
                 for item, _ in pending:

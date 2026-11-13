@@ -9,6 +9,7 @@ import type { Metric, Result } from "./domain";
 import {
   LIBRARY,
   StatisticsError,
+  clusterKey,
   codePointCompare,
   deriveHosted,
   evaluateCriteria,
@@ -17,6 +18,7 @@ import {
   type Band,
   type Confusion,
   type CriterionData,
+  type Clustered,
   type CriterionResult,
   type GroupView,
   type Member,
@@ -51,6 +53,7 @@ const UNITS: Record<string, string> = {
   rmse: "target units",
   r2: "score",
   baseline_rmse: "target units",
+  mse_reduction: "target units squared",
 };
 /** The hosted suite family of each criterion (section 11.2). */
 export function criterionFamily(c: Pick<PlanCriterion, "kind" | "metric">) {
@@ -126,7 +129,28 @@ export const REASON_TEXT: Record<string, string> = {
     "The plan depends on a metric that statistics 1.0.0 cannot decide by an interval, so a pass is not possible.",
   invalid_band:
     "The configured acceptance band is not a valid band for this metric, so the criterion cannot decide.",
+  // Clustered designs (section 5.11): both runners decide them by the cluster bootstrap (#136).
+  bootstrap_budget_exceeded:
+    "The cluster bootstrap would exceed its budget of 50,000,000 cluster draws (replicates times clusters), so no bootstrap interval is reported and no member can decide.",
+  bootstrap_insufficient_valid_replicates:
+    "Fewer than 90% of the bootstrap replicates define the metric, so no bootstrap interval is reported and it cannot decide.",
+  small_cell_clustered:
+    "A comparison has a cell under 5 in a clustered design. Fisher's exact test assumes independent rows, so that comparison supports no claim.",
+  below_minimum_cluster_count:
+    "A metric or compared group has fewer than 10 independent clusters, so it cannot support a pass.",
+  clustered_design_requires_engine:
+    "The plan declares a cluster design that this runner cannot evaluate, so the criterion is inconclusive; the engine decides it by the cluster bootstrap.",
+  interval_requires_engine:
+    "The required interval needs score columns that this runner does not evaluate, so the criterion is inconclusive; the engine computes it.",
 };
+/** Section 5.11: the limitation every result of a clustered plan carries (engine/criteria.py CLUSTER_NOTE, without the engine-only supplementary entries). */
+const clusterNote = (
+  field: string,
+  clusters: number,
+  replicates: number,
+  seed: number,
+) =>
+  `Rows are clustered by '${field}': every member and descriptive interval is a cluster percentile bootstrap over ${clusters} clusters (${replicates} replicates, seed ${seed}). The per-group rates are cluster percentile intervals too.`;
 const BASE_NOTES: Record<string, string> = {
   performance:
     "Saved-prediction evaluation; no independent model inference, cross-validation or holdout verification. Performance is measured on supplied labels and predictions; independence, representativeness and target leakage require review.",
@@ -135,7 +159,7 @@ const BASE_NOTES: Record<string, string> = {
   regression_performance:
     "Saved-prediction evaluation; saved predictions do not establish cross-validation, dataset independence or freedom from leakage. R² is descriptive and has no interval in the hosted runner. A pass also needs the model to beat the mean-prediction baseline (baseline_rmse).",
   group_comparison:
-    "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations. Protected-data processing requires a separately reviewed basis.",
+    "Group comparisons are not a causal finding of discrimination or a legal compliance verdict; intervals assume independent observations unless the plan declares a cluster design. Protected-data processing requires a separately reviewed basis.",
 };
 
 // ------------------------------------------------------------ plans
@@ -176,9 +200,10 @@ export function resolvePlan(
 
 /**
  * Validates the explicit plan of a new (schemaVersion 1.1) hosted profile:
- * the section 9.1 rules, the hosted limits of section 12 (no score columns
- * or cluster designs; a group criterion may compare the intersectional
- * strata of up to five group columns, #30), the task's criterion kinds,
+ * the section 9.1 rules, the hosted limits of section 12 (no score columns;
+ * a group criterion may compare the intersectional strata of up to five
+ * group columns, #30; a cluster design is decided by the cluster bootstrap,
+ * as in the engine, #136), the task's criterion kinds,
  * and the chance baseline of the 6 November 2026 decision: an explicit
  * performance criterion carries balanced accuracy at or above chance unless
  * its rationale records why it is left out. A binary criterion without one
@@ -209,10 +234,6 @@ export function validateHostedPlan(task: string, input: unknown): Plan {
       );
   }
   const plan = validatePlan(written);
-  if (plan.clusterField !== null)
-    throw new StatisticsError(
-      "statistics.clusterField needs the engine's cluster bootstrap; the hosted runner assumes independent rows",
-    );
   for (const c of plan.criteria) {
     if (!(TASK_KINDS[task] ?? []).includes(c.kind))
       throw new StatisticsError(
@@ -370,6 +391,7 @@ function entryMetric(
       fisherExactP: m.fisherExactP,
       chanceExactP: m.chanceExactP,
       reasons: [...m.reasons],
+      ...(m.bootstrap ? { bootstrap: { ...m.bootstrap } } : {}),
     },
     pValue: m.pValue,
   };
@@ -412,6 +434,41 @@ export function baselineNote(outcome: CriterionResult): string[] {
   return [
     `RMSE ${short(rmse.estimate, 4)} does not beat the mean-prediction baseline RMSE ${short(base.estimate, 4)} (gate p ${short(gate, 3)}): the model is not shown to predict better than the mean of the reference values.`,
   ];
+}
+
+/**
+ * Section 5.11: a clustered plan's data, one object per cluster in clusterKey
+ * order. Every evaluated row needs a cluster id (trimmed, as the engine reads
+ * cells); a blank one rejects the run.
+ */
+export function clusteredData(
+  field: string,
+  rows: Rows,
+  c: HostedColumns,
+  seed: number,
+): Clustered {
+  if (rows.length && !(field in rows[0]))
+    throw Error("Required column missing: " + field);
+  const byCluster = new Map<string, Rows>();
+  for (const r of rows) {
+    const id = (r[field] ?? "").trim();
+    if (!id)
+      throw Error(
+        `Every evaluated row needs a cluster id in column '${field}' (statistics.clusterField)`,
+      );
+    const members = byCluster.get(id);
+    if (members) members.push(r);
+    else byCluster.set(id, [r]);
+  }
+  const ids = [...byCluster.keys()].sort((a, b) =>
+    codePointCompare(clusterKey(a), clusterKey(b)),
+  );
+  const readers = ids.map((id) => dataFor(byCluster.get(id)!, c));
+  return {
+    ids,
+    partsFor: (criterion) => readers.map((read) => read(criterion)),
+    seed,
+  };
 }
 
 /** Maps one evaluated criterion to a hosted 1.4 result (section 11.4). */
@@ -516,9 +573,14 @@ export function evaluateHostedPlan(
   rows: Rows,
   c: HostedColumns,
   task: string,
+  seed = 42,
 ): HostedEvaluation {
   assertGroupFields(plan, rows);
-  const evaluation = evaluateCriteria(plan, dataFor(rows, c));
+  const clustered =
+    plan.clusterField === null
+      ? undefined
+      : clusteredData(plan.clusterField, rows, c, seed);
+  const evaluation = evaluateCriteria(plan, dataFor(rows, c), clustered);
   const unexpected =
     task === "Multiclass classification" ? unexpectedPredictions(rows, c) : [];
   const results = plan.criteria.map((spec, i) => {
@@ -534,6 +596,15 @@ export function evaluateHostedPlan(
         );
     }
     if (spec.kind === "multiclass_performance") notes.push(...unexpected);
+    if (clustered)
+      notes.push(
+        clusterNote(
+          plan.clusterField!,
+          clustered.ids.length,
+          plan.bootstrap.replicates,
+          seed,
+        ),
+      );
     return criterionResult(spec, evaluation.criteria[i], notes);
   });
   return { results, evaluation };
@@ -623,6 +694,7 @@ const METRIC_NAMES: Record<string, string> = {
   mae: "MAE",
   rmse: "RMSE",
   baseline_rmse: "mean-prediction baseline RMSE",
+  mse_reduction: "MSE reduction over the mean-prediction baseline",
   selection_rate_difference: "selection-rate difference",
   selection_rate_ratio: "selection-rate ratio",
   equalized_odds: "TPR and FPR differences",

@@ -35,6 +35,7 @@ import type { Engagement, Paper, Role, EvidenceRequest } from "@/lib/domain";
 import { canWrite } from "@/lib/domain";
 import {
   paperChecklist,
+  paperHistoryNotice,
   paperNextAction,
   type PaperTarget,
 } from "@/lib/paper-workflow";
@@ -248,10 +249,12 @@ export function PaperEditor({
     (p) => p.paperId === draft?.id,
   );
   const bound = source?.paperRevision !== undefined ? source : undefined;
+  // Superseded, retired and release-time papers never change (#94).
+  const historyNotice = saved ? paperHistoryNotice(saved) : null;
   const writer = canWrite(role),
     lead = role === "Lead Auditor",
     reviewer = ["Reviewer", "Lead Auditor"].includes(role),
-    editable = writer && draft?.status !== "signed" && !bound;
+    editable = writer && draft?.status !== "signed" && !bound && !historyNotice;
   const recovery = useRecoverableDraft(
     draft && saved && engagement
       ? {
@@ -420,6 +423,16 @@ export function PaperEditor({
                 aria-hidden="true"
               />
               <SheetTitle className="document-title">{draft.title}</SheetTitle>
+              {historyNotice && (
+                <div
+                  className="paper-history-notice"
+                  role="note"
+                  data-kind={historyNotice.kind}
+                >
+                  <b>{historyNotice.title}</b>
+                  <p>{historyNotice.text}</p>
+                </div>
+              )}
               <details className="paper-properties-details" key={draft.id}>
                 <summary>
                   <span

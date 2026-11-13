@@ -9,9 +9,15 @@ import { resolveNew } from "../../criteria/pin";
 import type { Artifact, Engagement } from "../../domain";
 import { getEngagement } from "../../engagement-repo";
 import { freshEngagement } from "../../factories";
+import {
+  RERUN_STATEMENT,
+  attestationPayload,
+  genaiArtifactLevels,
+} from "../../genai/evidence-levels";
 import { linkedReadiness } from "../../genai/store";
 import { ApiError } from "../../http";
 import { sha256 } from "../../ids";
+import { genaiView } from "../../read-models/genai-view";
 import { member, practice, tenantId } from "../../test-storage";
 import type { Context } from "../../tenancy";
 import { substantivePlan } from "../../workflow/command";
@@ -421,6 +427,56 @@ describe("plans, bundles and the queue", () => {
     ).toEqual(["EV-LOG", "EV-LABELS"]);
   });
 
+  it("refuses queueing at 10 pending jobs counted beyond the 100 most recent (#151)", async () => {
+    const { procedure } = await engagement();
+    const frozen = (await op(
+      "freezeGenaiPlan",
+      { procedureId: procedure.id, plan },
+      auditor(),
+    )) as { record: { id: string } };
+    const bundle = (await op(
+      "declareGenaiBundle",
+      { manifest, inputArtifactIds: ["EV-LOG", "EV-LABELS"] },
+      auditor(),
+    )) as unknown as { record: { id: string } };
+    const insert = store.sqlite.prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at) VALUES(?,?,'ENG-G',?,'{}',?,'auditor',?)",
+    );
+    // Ten pending jobs older than a hundred newer finished ones.
+    for (let i = 0; i < 10; i++)
+      insert.run(
+        "JOB-OLD-" + i,
+        tenantId,
+        "queued",
+        "0".repeat(64),
+        "2026-10-01T00:00:0" + i + ".000Z",
+      );
+    for (let i = 0; i < 100; i++)
+      insert.run(
+        "JOB-NEW-" + i,
+        tenantId,
+        "failed",
+        "0".repeat(64),
+        "2026-11-0" + (1 + (i % 4)) + "T00:00:00.000Z",
+      );
+    const queue = () =>
+      op(
+        "queueGenaiIngest",
+        {
+          procedureId: procedure.id,
+          bundleRecordId: bundle.record.id,
+          planRecordId: frozen.record.id,
+        },
+        auditor(),
+      );
+    const error = await refused(queue());
+    expect(error.status).toBe(429);
+    store.sqlite
+      .prepare("UPDATE execution_jobs SET state='cancelled' WHERE id=?")
+      .run("JOB-OLD-0");
+    expect(((await queue()) as Response).status).toBe(200);
+  });
+
   it("refuses a plan that lowers the judge floor and a manifest with other bytes", async () => {
     const { procedure } = await engagement();
     await expect(
@@ -597,5 +653,92 @@ describe("acknowledgeGenaiFlag", () => {
     expect(
       (await refused(acknowledge(compiled.record.id, lead()))).status,
     ).toBe(409);
+  });
+});
+
+describe("the results view (#145)", () => {
+  const enrol = (id: string, capabilities: string[], active = 1) =>
+    store.sqlite
+      .prepare(
+        "INSERT INTO runner_workers(id,tenant_id,engagement_id,name,token_hash,image_digest,capabilities,active,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,'lead','2026-11-05T00:00:00.000Z')",
+      )
+      .run(
+        id,
+        tenantId,
+        "ENG-G",
+        id,
+        "hash-" + id,
+        "sha256:" + "0".repeat(64),
+        JSON.stringify(capabilities),
+        active,
+      );
+
+  it("counts only active workers of the engagement enrolled with genai_ingest", async () => {
+    await engagement();
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
+    enrol("W-TABULAR", ["provided_predictions", "ONNX"]);
+    enrol("W-REVOKED", ["genai_ingest"], 0);
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
+    enrol("W-GENAI", ["provided_predictions", "genai_ingest"]);
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(1);
+    // A worker whose sponsor lost engagement access does not count, as the
+    // runner route would not serve it a job either.
+    store.sqlite
+      .prepare(
+        "UPDATE engagement_access SET active=0 WHERE engagement_id='ENG-G' AND user_id='lead'",
+      )
+      .run();
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
+    store.sqlite
+      .prepare(
+        "UPDATE engagement_access SET active=1 WHERE engagement_id='ENG-G' AND user_id='lead'",
+      )
+      .run();
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(1);
+    // Another engagement's worker does not count.
+    store.sqlite
+      .prepare("UPDATE runner_workers SET engagement_id='ENG-X' WHERE id=?")
+      .run("W-GENAI");
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
+  });
+
+  it("records the attestation form's payload and gives each vault file its level", async () => {
+    await engagement();
+    await op("importGenaiEnvelope", { artifactId: "EV-ENV" }, auditor());
+    const before = await genaiView(auditor(), "ENG-G");
+    let e = await getEngagement(auditor(), "ENG-G");
+    const levels = genaiArtifactLevels(before.results, e.artifacts);
+    expect(levels.get("EV-ENV")).toMatchObject({ level: "L1", role: "result" });
+    expect(levels.get("EV-LOG")).toMatchObject({ level: "L1", role: "input" });
+    expect(levels.get("EV-LABELS")).toMatchObject({ role: "input" });
+
+    const payload = attestationPayload(
+      {
+        artifactIds: ["EV-LOG", "EV-LABELS"],
+        harnessName: "inspect_ai",
+        harnessVersion: "0.3.90",
+        imageDigest: "",
+        endpointHost: "api.example.com",
+        snapshot: "fixture-2026-10",
+        start: "2026-11-05T09:00",
+        end: "2026-11-05T10:00",
+        environment: "",
+        statement: RERUN_STATEMENT,
+      },
+      e.artifacts,
+    );
+    await op("attestGenaiRerun", payload, auditor());
+    const after = await genaiView(auditor(), "ENG-G");
+    expect(after.attestations).toHaveLength(1);
+    expect(after.attestations[0].bundleSha256s).toEqual([
+      logInput.sha256,
+      labelInput.sha256,
+    ]);
+    // Every input is pinned, but an uploaded envelope stays at L1 at most.
+    expect(after.results[0].attested).toBe(true);
+    e = await getEngagement(auditor(), "ENG-G");
+    expect(
+      genaiArtifactLevels(after.results, e.artifacts).get("EV-ENV"),
+    ).toMatchObject({ level: "L1" });
   });
 });

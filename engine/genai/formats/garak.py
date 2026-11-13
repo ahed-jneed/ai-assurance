@@ -165,6 +165,7 @@ def parse(files, plan, manifest_inputs=None, declared=None):
             cluster_key = plan.get("clusterKey")
             item["clusterId"] = common.string_value(common.dot_path(row, cluster_key)) if isinstance(cluster_key, str) else None
             ctx = {"error": status == 0, "unsent": status == 0, "unevaluated": status == 1, "threshold": threshold, "nullOutput": not isinstance(text, str)}
+            common.keep_excerpt(ctx, plan, normalized, text, run.warnings, locator)
             st, reason, value, rule = outcome(item, ctx, plan.get("primaryScore"), plan["successRule"])
             common.set_outcome(item, st, reason, value, rule, plan["scorePolicy"])
             run.add(item, ctx)

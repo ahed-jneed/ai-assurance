@@ -741,6 +741,18 @@ def regression_stat(metric, data, mins):
     errors = data["errors"]
     n = len(errors)
     status = support(n, mins["sampleSize"], "below_minimum_sample_size")
+    if metric == "mse_reduction":
+        # The "beats the mean baseline" member (#136): SST/n - MSE = -mean(d), normal approximation on mean(d).
+        targets = data.get("targets")
+        mean_t = math.fsum(targets) / n
+        residuals = [mean_t - t for t in targets]
+        sst = math.fsum(r * r for r in residuals)
+        if sst == 0.0:
+            return Stat(None, "normal_approximation", None, None, {"n": n}, "undefined", ["undefined_zero_denominator"])
+        mean_d, sd_d = mean_sd([e * e - r * r for e, r in zip(errors, residuals)])
+        reduction, se = 0.0 - mean_d, sd_d / math.sqrt(n)
+        counts = {"n": n, "meanSquaredError": math.fsum(e * e for e in errors) / n, "baselineMeanSquaredError": sst / n, "sdSquaredErrorDifference": sd_d}
+        return Stat(reduction, "normal_approximation", lambda z: (reduction - z * se, reduction + z * se), lambda band: (lambda d: normal_zstar(reduction, se, band, d)), counts, *status)
     if metric == "r2":
         targets = data.get("targets", [0.0] * n)
         mean_t = math.fsum(targets) / n
@@ -1265,6 +1277,8 @@ def cluster_estimator(layout, entry, mins):
     if layout.kind == "regression_performance":
         if metric == "mae":
             return lambda rep: rep[1] / rep[0] if rep[0] else None
+        if metric == "mse_reduction":
+            return lambda rep: None if rep[0] == 0 else 0.0 - mean_difference(rep)
         return lambda rep: math.sqrt(rep[2] / rep[0]) if rep[0] else None
     if layout.kind == "group_comparison":
         key, subject, comparator = RATE_KEYS[metric], entry["subject"], entry["comparator"]
@@ -1322,6 +1336,29 @@ def bootstrap_p(ordered, holds):
     """p = max(2u*, 2/(B_valid + 1)), and 1 when no u decides."""
     u = bootstrap_u_star(ordered, holds)
     return 1.0 if u is None else max(2.0 * u, 2.0 / (len(ordered) + 1))
+
+
+def rate_estimators(layout, state):
+    """Section 5.11 (#136): one (rate entry, estimator, values) per group view and rate of a clustered group criterion."""
+    out = []
+    for view in state["groups"] or []:
+        for key in ("selection", "tpr", "fpr"):
+            if key in view:
+                def rate(rep, key=key, group=view["group"]):
+                    x, n = rate_counts(key, rep.get(group))
+                    return x / n if n else None
+                out.append((view[key], rate, []))
+    return out
+
+
+def apply_rate_bootstrap(entry, values, replicates, level, within):
+    """A per-group rate's cluster percentile interval; null beyond the budget, when undefined or below 0.9 B valid."""
+    entry["interval"] = None
+    if not within or entry["estimate"] is None or len(values) < VALID_REPLICATE_SHARE * replicates:
+        return
+    ordered = sorted(values)
+    tail = (1.0 - level) / 2.0
+    entry["interval"] = {"lower": quantile(ordered, tail), "upper": quantile(ordered, 1.0 - tail), "level": level, "method": "cluster_percentile_bootstrap"}
 
 
 def apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within):
@@ -1416,7 +1453,8 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
                     entry["_decide"] = not state["invalidBand"]
                     entries.append((entry, estimator, min(clusters_in.get(unit, 0) for unit in layout.units_of(entry)), descriptive, []))
         gate = [] if spec["kind"] == "regression_performance" else None
-        states.append({"state": state, "layout": layout, "cells": [cells for cells, _ in vectors], "offset": width, "entries": entries, "gate": gate, "clusters": clusters_in.get(None, 0)})
+        rates = rate_estimators(layout, state) if spec["kind"] == "group_comparison" else []
+        states.append({"state": state, "layout": layout, "cells": [cells for cells, _ in vectors], "offset": width, "entries": entries, "rates": rates, "gate": gate, "clusters": clusters_in.get(None, 0)})
         width += layout.size
     if within:
         # Each cell's nonzero clusters and values: a replicate's cell is sum(multiplicity x value) over them,
@@ -1442,6 +1480,10 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
                     value = estimator(rep)
                     if value is not None:
                         values.append(value)
+                for _, estimator, values in s["rates"]:
+                    value = estimator(rep)
+                    if value is not None:
+                        values.append(value)
                 if s["gate"] is not None:
                     value = mean_difference(rep)
                     if value is not None:
@@ -1451,6 +1493,8 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
         for entry, _, clusters, descriptive, values in s["entries"]:
             apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within)
             del entry["_decide"]
+        for entry, _, values in s["rates"]:
+            apply_rate_bootstrap(entry, values, replicates, level, within)
         if s["gate"] is not None:
             cluster_gate(s["state"], s["gate"], s["clusters"], replicates, within)
         results.append(decide_criterion(s["state"], level, mins))
@@ -1620,10 +1664,18 @@ def performance_models(crit, a, n, mins):
             if metric == "mae":
                 theta, se = sigma * math.sqrt(2.0 / math.pi), sigma * math.sqrt(1.0 - 2.0 / math.pi) / math.sqrt(n)
                 models.append(power_model(metric, metric, theta, n, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), n >= mins["sampleSize"]))
+            elif metric == "mse_reduction":
+                target_sd = a.get("targetSd")
+                if target_sd is None or target_sd <= sigma:
+                    models.append(power_model(metric, metric, None, None, None, False, computed=False))
+                else:
+                    theta, se = target_sd ** 2 - sigma ** 2, math.sqrt(2.0 * (target_sd ** 4 - sigma ** 4)) / math.sqrt(n)
+                    models.append(power_model(metric, metric, theta, n, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), n >= mins["sampleSize"]))
             else:
                 q, se = sigma * sigma, math.sqrt(2.0) * sigma * sigma / math.sqrt(n)
                 models.append(power_model(metric, metric, sigma, n, lambda z, t=q, s=se, b=square_band(band): normal_probs(t, s, b, z), n >= mins["sampleSize"]))
-        if a.get("targetSd") is not None:
+        # An mse_reduction member (#136) passes only where the gate does, so the gate adds no condition then.
+        if a.get("targetSd") is not None and all(item["metric"] != "mse_reduction" for item in crit["members"]):
             models.append(baseline_gate_model(sigma, a["targetSd"], n, mins))
     return models
 
@@ -1932,6 +1984,11 @@ def engine_legacy(task, values):
     return {"source": "engine_thresholds", "config": config}
 
 
+# GC-59 (#136): a model that meets an absolute RMSE band but predicts worse than the mean of the targets.
+WORSE_THAN_MEAN_TARGETS = [10.0 + 0.5 * ((i % 5) - 2) for i in range(60)]
+WORSE_THAN_MEAN_ERRORS = [(-1.0) ** i * (0.8 + 0.1 * (i % 4)) for i in range(60)]
+
+
 # GC-54 to GC-57: clustered designs (section 5.11). Each cluster carries its own data in the shape of the kind.
 def clustered_applicants():
     """40 applicants with 6 applications each (3 positive, 3 negative); every fifth applicant's positives are
@@ -2114,9 +2171,14 @@ CASES = [
     {"id": "GC-57", "category": "clustered", "title": "45 clusters over three classes with the errors concentrated in every fourth cluster: accuracy >= 0.6 and macro recall >= 0.35 pass on cluster-bootstrap intervals, the chance gate still applied", "type": "plan",
      "data": clustered_classes(),
      "plan": {"clusterField": "cluster", "criteria": [{"id": "multiclass-performance", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": band(0.6)}, {"metric": "balanced_accuracy", "band": band(0.35)}]}]}},
-    {"id": "GC-59", "category": "power", "title": "Four imbalanced classes in a family of two: macro precision within [0.70, 0.90] and macro F1 at least 0.72, both bounds of the two-sided band binding, with the errors of each class spread evenly over the others", "type": "power",
+    {"id": "GC-59", "category": "mean_baseline", "title": "A model meets RMSE <= 1.2 (RMSE 0.957) but its MSE 0.915 is above the mean predictor's 0.5: the optional mse_reduction member shows the reduction -0.415 [-0.535, -0.295] below 0, so the criterion fails, where the mean baseline gate alone would leave it inconclusive", "type": "plan",
+     "data": {"kind": "regression", "targets": WORSE_THAN_MEAN_TARGETS, "errors": WORSE_THAN_MEAN_ERRORS},
+     "plan": {"criteria": [{"id": "regression-performance", "role": "confirmatory", "kind": "regression_performance", "members": [{"metric": "rmse", "band": band(None, 1.2)}, {"metric": "mse_reduction", "band": band(0.0)}]}]}},
+    {"id": "GC-60", "category": "power_mean_baseline", "title": "GC-58 with an mse_reduction member (lower bound 0): the member has the gate's pass probability 0.666 and also a fail direction; the gate adds no condition beside it, so the pass range and the required size are those of GC-58", "type": "power",
+     "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "regression-performance", "role": "confirmatory", "kind": "regression_performance", "members": [{"metric": "mae", "band": band(None, 0.9)}, {"metric": "rmse", "band": band(None, 1.15)}, {"metric": "mse_reduction", "band": band(0.0)}], "powerAssumptions": {"n": 120, "errorSd": 1.0, "targetSd": 1.1}}}},
+    {"id": "GC-61", "category": "power", "title": "Four imbalanced classes in a family of two: macro precision within [0.70, 0.90] and macro F1 at least 0.72, both bounds of the two-sided band binding, with the errors of each class spread evenly over the others", "type": "power",
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 2, "criterion": {"id": "multiclass-macro", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "macro_precision", "band": band(0.70, 0.90)}, {"metric": "macro_f1", "band": band(0.72)}], "powerAssumptions": {"n": 1000, "classShares": {"a": 0.6, "b": 0.25, "c": 0.1, "d": 0.05}, "perClassRecall": {"a": 0.95, "b": 0.85, "c": 0.8, "d": 0.75}}}}},
-    {"id": "GC-60", "category": "power", "title": "Two classes, macro F1 truly 0.806 under a 0.85 minimum: the member fails with probability 0.754 at 800 rows and no size reaches the target (target_unreachable)", "type": "power",
+    {"id": "GC-62", "category": "power", "title": "Two classes, macro F1 truly 0.806 under a 0.85 minimum: the member fails with probability 0.754 at 800 rows and no size reaches the target (target_unreachable)", "type": "power",
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "multiclass-macro-f1", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "macro_f1", "band": band(0.85)}], "powerAssumptions": {"n": 800, "classShares": {"a": 0.7, "b": 0.3}, "perClassRecall": {"a": 0.9, "b": 0.7}}}}},
 ]
 
@@ -2163,8 +2225,8 @@ def end_to_end(case):
     if case["type"] != "plan":
         return {"engine": False, "hosted": False}
     data, criteria = case["data"], plan_for(case)["criteria"]
-    if "clusters" in data:  # the cluster bootstrap is engine-only (section 5.11)
-        return {"engine": True, "hosted": False}
+    if "clusters" in data:  # both runners decide clustered plans by the cluster bootstrap (section 5.11, #136)
+        return {"engine": True, "hosted": all(c["kind"] != "calibration" for c in criteria)}
     engine_policy = case.get("legacy", {}).get("source") == "engine_thresholds"  # an engine configuration has no hosted form
     if "groups" in data:
         rows = sum(group_rows(g) for g in data["groups"]) + data.get("unknownGroupRows", 0)
@@ -2179,7 +2241,7 @@ def build():
     cases = []
     for case in sorted(CASES, key=lambda c: int(c["id"].split("-")[1])):
         out = {k: v for k, v in case.items()}
-        out["runners"] = ["engine"] if case["category"] in ("calibration", "clustered", "power_mean_baseline") else ["engine", "hosted"]
+        out["runners"] = ["engine"] if case["category"] == "calibration" else ["engine", "hosted"]
         out["endToEnd"] = end_to_end(case)
         out["expected"] = compute(case)
         cases.append(out)
@@ -2189,7 +2251,7 @@ def build():
         "specificationVersion": SPEC_VERSION,
         "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
         "howToUse": {
-            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (engine only, section 5.11) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, and every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}.",
+            "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (section 5.11; both runners since #136) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}, and the per-group rates take cluster percentile intervals.",
             "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
             "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
             "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine. Clustered data (GC-54 to GC-57) expands each cluster in the same way and adds its id in a column cluster, which the plan names as clusterField; the run seed is data.seed.",
@@ -2333,6 +2395,10 @@ def cross_check(fixture):
             k = len(c["perClass"])
             bounds = [sm_wilson(p["tp"], p["predicted"], alpha / k) for p in c["perClass"]]
             return np.mean([lo for lo, _ in bounds]), np.mean([hi for _, hi in bounds])
+        if metric == "mse_reduction":
+            # SST/n - MSE with the sample SD of d = e^2 - r^2 (the counts are rechecked from the raw data below)
+            est, zc = c["baselineMeanSquaredError"] - c["meanSquaredError"], norm.isf(alpha / 2)
+            return est - zc * c["sdSquaredErrorDifference"] / math.sqrt(c["n"]), est + zc * c["sdSquaredErrorDifference"] / math.sqrt(c["n"])
         if method in ("normal_approximation", "normal_approximation_mse"):
             mean = c["meanAbsoluteError"] if method == "normal_approximation" else c["meanSquaredError"]
             sd = c["sdAbsoluteError"] if method == "normal_approximation" else c["sdSquaredError"]
@@ -2496,7 +2562,7 @@ def cross_check(fixture):
             elif kind == "regression_performance":
                 x = np.array([[len(c["errors"]), np.abs(c["errors"]).sum(), np.square(c["errors"]).sum(), np.sum(c["targets"]), np.square(c["targets"]).sum()] for c in ordered], float)
                 n, sa, se2, st1, st2 = (weights @ x).T
-                est = {"mae": sa / n, "rmse": np.sqrt(se2 / n)}
+                est = {"mae": sa / n, "rmse": np.sqrt(se2 / n), "mse_reduction": (st2 / n - (st1 / n) ** 2) - se2 / n}
                 values = {m["memberId"]: est[m["metric"]] for m, _ in entries}
                 clusters = {m["memberId"]: count for m, _ in entries}
                 gate_d = np.sort(se2 / n - (st2 / n - (st1 / n) ** 2))
@@ -2530,6 +2596,24 @@ def cross_check(fixture):
                         values[m["memberId"]] = np.where((ns > 0) & (nc > 0) & (xc > 0 if m["metric"] == "selection_rate_ratio" else True), (xs / ns) / (xc / nc) if m["metric"] == "selection_rate_ratio" else xs / ns - xc / nc, np.nan)
                     present = x.sum(axis=2) > 0
                     clusters[m["memberId"]] = int(min(present[:, s_].sum(), present[:, c_].sum()))
+                # the per-group rates (#136): cluster percentile intervals on the same replicates, never deciding
+                for g in crit["groups"]:
+                    r = rep[:, names.index(g["group"])] if g["group"] in names else np.zeros((replicates, len(cells)))
+                    for key in ("selection", "tpr", "fpr"):
+                        if key not in g:
+                            continue
+                        if cells[0] == "selected":
+                            xr, nr = r[:, 0], r[:, 1]
+                        else:
+                            tp_, fp_, fn_, tn_ = r.T
+                            xr, nr = {"selection": (tp_ + fp_, tp_ + fp_ + fn_ + tn_), "tpr": (tp_, tp_ + fn_), "fpr": (fp_, fp_ + tn_)}[key]
+                        v = np.sort((xr / np.where(nr > 0, nr, 1))[nr > 0])
+                        if g[key]["estimate"] is None or len(v) < valid_needed:
+                            expect(g[key]["interval"] is None, "cluster_bootstrap", f"{cid} {g['group']} {key} rate interval without support")
+                            continue
+                        lo, hi = np.quantile(v, [alpha / 2, 1 - alpha / 2], method="linear")
+                        got = g[key]["interval"]
+                        expect(got is not None and near(lo, got["lower"], 1e-9) and near(hi, got["upper"], 1e-9) and got["method"] == "cluster_percentile_bootstrap", "cluster_bootstrap", f"{cid} {g['group']} {key} rate interval {lo, hi} vs {got}")
             else:
                 raise ValueError("no independent clustered check for " + kind)
             for m, descriptive in entries:
@@ -2678,6 +2762,11 @@ def cross_check(fixture):
                 got_gate = base["counts"]["gatePValue"]
                 expect(near(math.sqrt(base_mse), base["estimate"], 1e-9) and near(base_mse, base["counts"]["meanSquaredError"], 1e-9) and near(reduction, base["counts"]["meanSquaredErrorReduction"], 1e-9), "mean_baseline", f"{case['id']} baseline RMSE {math.sqrt(base_mse)} vs {base['estimate']}")
                 expect(abs(got_gate - want_gate) <= 1e-9 + 1e-6 * want_gate, "mean_baseline", f"{case['id']} gate p {got_gate} vs {want_gate}")
+                # the optional mse_reduction member (#136): its estimate and counts from the raw data
+                for m in crit["members"]:
+                    if m["metric"] == "mse_reduction":
+                        c = m["counts"]
+                        expect(near(reduction, m["estimate"], 1e-9) and near(float(np.mean(e * e)), c["meanSquaredError"], 1e-9) and near(base_mse, c["baselineMeanSquaredError"], 1e-9) and near(se_d * math.sqrt(sample), c["sdSquaredErrorDifference"], 1e-9), "mean_baseline", f"{case['id']} mse_reduction {m['estimate']} vs {reduction}")
             expect(d["sampleSize"] == sample, "sample_sizes", f"{case['id']} {crit['id']} sampleSize {d['sampleSize']} vs {sample}")
             # an undecidable metric that today's rule needs (R2, ECE) blocks a pass and is flagged on its descriptive entry
             undecidable = spec.get("passBlockedBy") or []
@@ -2898,11 +2987,20 @@ def cross_check(fixture):
                 if metric == "mae":
                     theta, se = sigma * math.sqrt(2 / math.pi), sigma * math.sqrt(1 - 2 / math.pi) / math.sqrt(n)
                     out.append((ind_norm(theta, se, b, z_pass)[0], ind_norm(theta, se, b, z_fail)[1], n >= mins["sampleSize"], True))
+                elif metric == "mse_reduction":
+                    # mean d under the conditional-mean model, Var d by Isserlis' theorem (as for the gate below)
+                    if a.get("targetSd") is None or a["targetSd"] <= sigma:
+                        out.append((None, None, False, False))
+                        continue
+                    cov = np.array([[sigma ** 2, sigma ** 2], [sigma ** 2, a["targetSd"] ** 2]])
+                    theta = float(cov[1, 1] - cov[0, 0])
+                    se = math.sqrt((2 * cov[0, 0] ** 2 + 2 * cov[1, 1] ** 2 - 4 * cov[0, 1] ** 2) / n)
+                    out.append((ind_norm(theta, se, b, z_pass)[0], ind_norm(theta, se, b, z_fail)[1], n >= mins["sampleSize"], True))
                 else:
                     sb = {k: (None if v is None else v * v) for k, v in b.items()}
                     theta, se = sigma ** 2, math.sqrt(2) * sigma ** 2 / math.sqrt(n)
                     out.append((ind_norm(theta, se, sb, z_pass)[0], ind_norm(theta, se, sb, z_fail)[1], n >= mins["sampleSize"], True))
-        if kind == "regression_performance" and a.get("targetSd") is not None:
+        if kind == "regression_performance" and a.get("targetSd") is not None and all(item["metric"] != "mse_reduction" for item in crit["members"]):
             # The mean baseline gate: e and r = mean - y jointly normal with Cov(e, r) = Var e (a conditional-mean
             # model); Var(e^2 - r^2) by Isserlis' theorem from the covariance matrix, a one-sided z-test on mean d < 0.
             cov = np.array([[a["errorSd"] ** 2, a["errorSd"] ** 2], [a["errorSd"] ** 2, a["targetSd"] ** 2]])
@@ -3266,9 +3364,13 @@ def mutation_test(fixture):
         "clustered small cell decided as if rows were independent": lambda f: crit(f, "GC-56")["members"][1].update(pValue=0.0031, reasons=[]),
         "cluster-bootstrap mean baseline gate p-value": lambda f: next(m for m in crit(f, "GC-55")["descriptive"] if m["metric"] == "baseline_rmse")["counts"].__setitem__("gatePValue", 0.2),
         "mean baseline gate pass probability at plan approval": lambda f: case(f, "GC-58")["expected"]["members"][2].__setitem__("passProbability", 0.9),
-        "macro precision pass probability at plan approval": lambda f: bump(case(f, "GC-59")["expected"]["members"][0], "passProbability", 1e-4),
-        "macro F1 fail probability at plan approval": lambda f: bump(case(f, "GC-60")["expected"]["members"][0], "failProbability", 1e-4),
-        "macro F1 required n": lambda f: bump(case(f, "GC-59")["expected"], "requiredNForPass", 1),
+        "clustered per-group rate interval": lambda f: bump(crit(f, "GC-56")["groups"][2]["selection"]["interval"], "upper", 0.01),
+        "mse_reduction estimate": lambda f: bump(crit(f, "GC-59")["members"][1], "estimate", 0.01),
+        "mse_reduction fail p-value": lambda f: crit(f, "GC-59")["members"][1].__setitem__("pValue", 0.2),
+        "mse_reduction pass probability at plan approval": lambda f: case(f, "GC-60")["expected"]["members"][2].__setitem__("passProbability", 0.5),
+        "macro precision pass probability at plan approval": lambda f: bump(case(f, "GC-61")["expected"]["members"][0], "passProbability", 1e-4),
+        "macro F1 fail probability at plan approval": lambda f: bump(case(f, "GC-62")["expected"]["members"][0], "failProbability", 1e-4),
+        "macro F1 required n": lambda f: bump(case(f, "GC-61")["expected"], "requiredNForPass", 1),
     }
     missed = []
     for name, mutate in mutations.items():
@@ -3550,13 +3652,14 @@ def simulate(fixture, sims=20000):
             draws = np.random.default_rng(20261106) if "targetSd" in a else rng
             for errors, signals in zip(draws.normal(0.0, a["errorSd"], (sims, a["n"])), draws.normal(0.0, signal, (sims, a["n"])) if "targetSd" in a else [None] * sims):
                 data = {"errors": [float(e) for e in errors]}
+                if signals is not None:
+                    data["targets"] = [float(f - e) for f, e in zip(signals, errors)]
                 ok = True
                 for item in crit["members"]:
                     passed = interval_pass(*regression_stat(item["metric"], data, FLOORS).ci_at(z), item["band"])
                     member_hits[item["metric"]] += passed
                     ok = ok and passed
-                if signals is not None:
-                    data["targets"] = [float(f - e) for f, e in zip(signals, errors)]
+                if signals is not None and "mean_baseline_gate" in [m["memberId"] for m in case["expected"]["members"]]:
                     passed = mean_baseline(data, FLOORS)[1] <= (1 - inp["confidenceLevel"]) / inp["familySize"] + EPS
                     member_hits["mean_baseline_gate"] += passed
                     ok = ok and passed
@@ -3598,12 +3701,13 @@ def simulate(fixture, sims=20000):
         assert len(member_hits) == len(exp["members"])
         rate = hits / sims
         gaps = {m["memberId"]: abs(m["passProbability"] - count / sims) for m, count in zip(exp["members"], member_hits.values())}
-        gate_gap = gaps.pop("mean_baseline_gate", 0.0)
+        # The mse_reduction member (#136) is the gate's statistic, so the gate's skew error applies to it too.
+        gate_gap = max(gaps.pop("mean_baseline_gate", 0.0), gaps.pop("mse_reduction", 0.0))
         member_gap = max(gaps.values())
         range_gap = max(0.0, exp["passProbability"] - rate, rate - exp["passProbabilityUpperBound"])
         worst_member, worst_range, worst_gate = max(worst_member, member_gap), max(worst_range, range_gap), max(worst_gate, gate_gap)
         where = "inside the range" if range_gap == 0.0 else f"outside the range by {range_gap:.4f}"
-        gate_text = f"; mean baseline gate gap {gate_gap:.4f}" if "mean_baseline_gate" in member_hits else ""
+        gate_text = f"; mean baseline gate or mse_reduction gap {gate_gap:.4f}" if {"mean_baseline_gate", "mse_reduction"} & set(member_hits) else ""
         report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {rate:.4f} ({where}); members formula ({formula_members}), simulated ({simulated_members}), largest member gap {member_gap:.4f}{gate_text}")
     ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR and worst_gate <= GATE_ERROR and worst_fail <= FORMULA_ERROR
     report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}; largest mean baseline gate gap {worst_gate:.4f}, against its error of {GATE_ERROR}; largest macro fail-probability gap {worst_fail:.4f}, against {FORMULA_ERROR}: {'within' if ok else 'EXCEEDED'}")

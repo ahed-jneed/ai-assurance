@@ -1,3 +1,4 @@
+import type { ReleaseChecklistRecord } from "./domain/release-time";
 export type Approval = {
   userId: string;
   at: string;
@@ -321,6 +322,11 @@ export type Release = {
     internalHash: string;
     clientHash: string;
     reason: string;
+    /**
+     * The MEM-SO-01 completion checklist the approver answered with this
+     * approval. Absent on approvals recorded before the checklist.
+     */
+    checklist?: ReleaseChecklistRecord;
   };
   recipientScope?: string;
   releasedBy?: string;
@@ -341,6 +347,8 @@ export type Release = {
     approvedAt: string;
     releasedBy: string;
     releasedAt: string;
+    /** The approval's completion checklist, when it recorded one. */
+    checklist?: ReleaseChecklistRecord;
   };
   history: {
     actor: string;

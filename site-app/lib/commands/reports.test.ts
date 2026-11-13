@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sanitize } from "../client-projection";
-import type { Engagement, Report } from "../domain";
+import type { Engagement, Paper, Report } from "../domain";
 import { ApiError } from "../http";
 import {
   artifact,
@@ -13,8 +13,14 @@ import {
   recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
-import { qualityStatement } from "../domain/report-model";
+import { draftCaveat, qualityStatement } from "../domain/report-model";
+import {
+  computeClassificationAudits,
+  incompleteLl144Runs,
+  ll144InputSchema,
+} from "../ll144-audit";
 import { practiceReportSettings } from "../report-settings";
+import { pendingJobCount } from "../assurance-store";
 import { assertReleasable, reports } from "./reports";
 import { caller } from "./test-fixtures";
 
@@ -22,7 +28,7 @@ import { caller } from "./test-fixtures";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -220,6 +226,17 @@ describe("report model v2 snapshots", () => {
     await assertReleasable(e, { reportId: r.id }, caller());
   });
 
+  it("refuses release while any external job is pending, counted over every job", async () => {
+    const e = await issuable();
+    const r = await capture(e, qualified);
+    // An older job beyond the 100 most recent ones still counts (#151).
+    vi.mocked(pendingJobCount).mockResolvedValueOnce(1);
+    await expect(
+      assertReleasable(e, { reportId: r.id }, caller()),
+    ).rejects.toThrow("Complete or cancel external execution before release");
+    await assertReleasable(e, { reportId: r.id }, caller());
+  });
+
   it("keeps internal memos and internal user ids out of the client snapshot", async () => {
     const e = await issuable();
     const r = await capture(e, qualified);
@@ -374,6 +391,89 @@ describe("report model v2 snapshots", () => {
     expect(counts(r.clientSnapshot!)).toEqual([1]);
   });
 
+  it("references retired limitation memos and superseded papers, not as current papers (#94)", async () => {
+    const e = await issuable();
+    const retired = {
+      requestId: "REQ-1",
+      actor: "lead",
+      at: "2026-11-04T10:00:00.000Z",
+      reason: "The client sent a new extract",
+    };
+    const signature = {
+      userId: "lead",
+      at: "2026-11-03T10:00:00.000Z",
+      revision: 2,
+    } as unknown as Paper["signatures"][number];
+    e.papers.push(
+      paper({
+        id: "memo-retired",
+        templateId: "MEM-LS-01",
+        kind: "memo",
+        required: false,
+        revision: 2,
+        status: "signed",
+        retired,
+        signatures: [signature],
+      }),
+      paper({
+        id: "paper-old",
+        templateId: "WP-A10-01",
+        status: "signed",
+        supersededBy: "paper-new",
+        supersededAt: "2026-11-02T10:00:00.000Z",
+      }),
+      // Retired, then superseded: listed once, as superseded.
+      paper({
+        id: "memo-both",
+        templateId: "MEM-LS-01",
+        kind: "memo",
+        required: false,
+        retired,
+        supersededBy: "memo-retired",
+      }),
+    );
+    e.evidenceRequests = [
+      {
+        ...(e.evidenceRequests?.[0] ?? {}),
+        id: "REQ-1",
+        limitationPaperId: "memo-retired",
+      } as NonNullable<Engagement["evidenceRequests"]>[number],
+    ];
+    const r = await capture(e, qualified);
+    const s = r.snapshot as {
+      papers: { id: string }[];
+      workingPapers: { documents: { id: string }[] };
+      retiredPapers: Record<string, unknown>[];
+      supersededPapers: { id: string }[];
+      evidenceRequests: { limitationPaperId?: string }[];
+    };
+    expect(s.retiredPapers).toEqual([
+      {
+        id: "memo-retired",
+        templateId: "MEM-LS-01",
+        revision: 2,
+        retired,
+        signatures: [signature],
+      },
+    ]);
+    expect(s.supersededPapers.map((p) => p.id)).toEqual([
+      "paper-old",
+      "memo-both",
+    ]);
+    for (const id of ["memo-retired", "paper-old", "memo-both"]) {
+      expect(s.papers.map((p) => p.id)).not.toContain(id);
+      expect(s.workingPapers.documents.map((p) => p.id)).not.toContain(id);
+    }
+    // The request's limitation memo resolves in the snapshot.
+    const limitation = s.evidenceRequests.find(
+      (q) => q.limitationPaperId,
+    )!.limitationPaperId;
+    expect(s.retiredPapers.map((p) => p.id)).toContain(limitation);
+    // Neither list reaches the client.
+    expect(r.clientSnapshot).not.toHaveProperty("retiredPapers");
+    expect(JSON.stringify(r.clientSnapshot)).not.toContain("memo-retired");
+  });
+
   it("states the firm's independence statement, not the internal planning note", async () => {
     const e = await issuable();
     e.workflow!.brief!.independence = "Internal: partner X declared a conflict";
@@ -492,5 +592,147 @@ describe("readiness assessment with gaps (#111)", () => {
     ).toBe(
       "Describe the gaps identified against the criteria and what remains to be addressed",
     );
+  });
+});
+
+describe("the draft caveat (#144)", () => {
+  type Statement = { heading: string; text: string; draftCaveat?: string };
+  const statementOf = (s: Record<string, unknown>) =>
+    s.conclusionStatement as Statement;
+
+  it("marks an ISAE 3000 draft captured while gates are open, in both snapshots", async () => {
+    const e = await issuable();
+    // Without the engagement quality review a completion requirement is open.
+    delete e.qualityReview;
+    const r = await capture(e, { ...qualified, kind: "draft" });
+    for (const s of [r.snapshot, r.clientSnapshot!]) {
+      const c = statementOf(s);
+      expect(c.heading).toBe("Qualified conclusion");
+      expect(c.draftCaveat).toMatch(
+        /^Draft, gates open: \d+ completion requirements? (was|were) open when this draft was captured\. The wording below is the proposed conclusion/,
+      );
+    }
+  });
+
+  it("counts the open gates, singular and plural", () => {
+    expect(draftCaveat(1)).toMatch(
+      /^Draft, gates open: 1 completion requirement was open/,
+    );
+    expect(draftCaveat(3)).toMatch(
+      /^Draft, gates open: 3 completion requirements were open/,
+    );
+  });
+
+  it("states no caveat on a draft with every gate closed, nor on a final report", async () => {
+    const e = await issuable();
+    const draft = await capture(e, { ...qualified, kind: "draft" });
+    expect(statementOf(draft.snapshot)).not.toHaveProperty("draftCaveat");
+    const final = await capture(e, qualified);
+    for (const s of [final.snapshot, final.clientSnapshot!])
+      expect(statementOf(s)).not.toHaveProperty("draftCaveat");
+  });
+});
+
+describe("per-group LL144 runs in a report (#144)", () => {
+  // A small per-group run: two groups, each its own audit.
+  function perGroupRun(e: Engagement) {
+    const rows = [
+      ...Array.from(
+        { length: 6 },
+        (_, i) => `Female,Asian,${i < 3 ? "A" : "B"}`,
+      ),
+      ...Array.from({ length: 6 }, (_, i) => `Male,Asian,${i < 2 ? "A" : "B"}`),
+    ];
+    const input = ll144InputSchema.parse({
+      datasetId: "EV-1",
+      toolName: "Style classifier",
+      distributionDate: "2025-03-01",
+      auditDate: "2026-11-01",
+      rate: "selection",
+      sexColumn: "s",
+      raceEthnicityColumn: "e",
+      outcomeColumn: "o",
+      classificationGroups: ["A", "B"],
+      unknownValues: [],
+      dataSource: {
+        kind: "historical",
+        source: "Candidates the tool classified, 2025-03 to 2026-09.",
+        explanation:
+          "Every candidate the tool assessed; categories self-identified.",
+      },
+      demographicsNotInferred: true,
+      demographicsStatement:
+        "Sex and race/ethnicity are the candidates' own answers; none was inferred.",
+      acknowledgeHostedProcessing: true,
+    });
+    let n = 0;
+    const audits = computeClassificationAudits(
+      e,
+      { ...input, classificationGroups: input.classificationGroups! },
+      { id: "EV-1", name: "candidates.csv", sha256: "0".repeat(64) },
+      ["s,e,o", ...rows, ""].join("\n"),
+      {
+        id: () => "LL144-" + ++n,
+        runId: "LL144RUN-1",
+        actor: "user-auditor",
+        at: "2026-11-02T10:00:00.000Z",
+      },
+    );
+    e.ll144Audits = audits;
+    return audits;
+  }
+  const approve = (a: { status: string; approvedBy?: string }) => {
+    a.status = "approved";
+    a.approvedBy = "user-reviewer";
+  };
+
+  it("lists the runs with some groups approved and others not", () => {
+    const run = (status: string, runId?: string) => ({
+      status: status as "draft" | "approved",
+      ...(runId
+        ? { classification: { runId, group: "g", groups: ["g", "h"] } }
+        : {}),
+    });
+    expect(
+      incompleteLl144Runs([
+        run("approved", "R1"),
+        run("draft", "R1"),
+        run("draft", "R2"),
+        run("draft", "R2"),
+        run("approved", "R3"),
+        run("approved", "R3"),
+        run("approved"),
+      ]),
+    ).toEqual([{ runId: "R1", approved: 1, groups: 2 }]);
+  });
+
+  it("refuses final capture while a run is partly approved, and counts it in a draft's caveat", async () => {
+    const e = await issuable();
+    const [first, second] = perGroupRun(e);
+    approve(first);
+    const error = await refusal(e, qualified);
+    expect(error.status).toBe(409);
+    expect(error.message).toMatch(
+      /^Approve every group of LL144 run LL144RUN-1 before final capture \(1 of 2 approved\)/,
+    );
+    const draft = await capture(e, { ...qualified, kind: "draft" });
+    expect(
+      (draft.snapshot.conclusionStatement as { draftCaveat?: string })
+        .draftCaveat,
+    ).toMatch(/^Draft, gates open: 1 completion requirement was open/);
+    approve(second);
+    const final = await capture(e, qualified);
+    expect(
+      (
+        final.snapshot.ll144Summaries as { classification: { group: string } }[]
+      ).map((x) => x.classification.group),
+    ).toEqual(["A", "B"]);
+  });
+
+  it("captures a run none of whose groups is approved without its summaries", async () => {
+    const e = await issuable();
+    perGroupRun(e);
+    const final = await capture(e, qualified);
+    expect(final.snapshot).not.toHaveProperty("ll144Summaries");
   });
 });
