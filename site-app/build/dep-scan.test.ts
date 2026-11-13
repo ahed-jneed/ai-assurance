@@ -42,5 +42,8 @@ describe("the dependency-scan entries", () => {
         readFileSync(root + file, "utf8").includes('validate-criteria.mjs"'),
         file,
       ).toBe(false);
-  });
+    // Reading every file under app/ takes 0.03 to 0.9 s on an idle machine,
+    // but passed the default 5 s timeout with three suites running at once
+    // (#174). The timeout only ends a run that never finishes.
+  }, 60_000);
 });
