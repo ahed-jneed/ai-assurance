@@ -1,3 +1,4 @@
+import type { CriteriaTemplate } from "@/lib/catalog-criteria";
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
@@ -12,6 +13,8 @@ export type CatalogItem = {
   regulatoryRefs: string[];
   evidenceRequired: string[];
   automationMode: string;
+  /** The research procedures an item's steps come from (Art 50 papers). */
+  researchProcedures?: CriteriaTemplate["researchProcedures"];
 };
 export type Client = { id: string; name: string; sector: string };
 export type Member = {

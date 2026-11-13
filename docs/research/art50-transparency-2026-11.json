@@ -1,5 +1,5 @@
 {
- "schemaVersion": "1.0.0",
+ "schemaVersion": "1.1.0",
  "kind": "art50-transparency-research",
  "id": "art50-transparency-2026-11",
  "title": "Article 50 transparency obligations: what an auditor tests, November 2026",
@@ -2785,7 +2785,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per language stratum",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-disclosure-probe@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-disclosure-probe",
+      "version": 1,
+      "parameters": {
+       "lower": 0.98
+      }
+     },
      "minimumN": 30
     }
    ],
@@ -3239,7 +3245,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per stratum (modality x format x marking path)",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-marking-presence@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-marking-presence",
+      "version": 1,
+      "parameters": {
+       "lower": 0.95
+      }
+     },
      "minimumN": 30
     }
    ],
@@ -4105,7 +4117,14 @@
      "bandBasis": "provider_declared_else_default",
      "members": "one member per stratum; band = declared rate minus 0.02 when declared, else the default shown",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-declared-detection@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-declared-detection",
+      "version": 1,
+      "parameters": {
+       "declaredValue": 0.97,
+       "tolerance": 0.02
+      }
+     },
      "minimumN": 30
     },
     {
@@ -4117,7 +4136,14 @@
      "bandBasis": "provider_declared_else_default",
      "members": "one member per negative class (human-made, other AI); band = declared rate plus 0.005 when declared, else the default shown",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-false-positive@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-false-positive",
+      "version": 1,
+      "parameters": {
+       "declaredValue": 0.005,
+       "tolerance": 0.005
+      }
+     },
      "minimumN": 30
     },
     {
@@ -4127,7 +4153,7 @@
      "bandBasis": "descriptive",
      "members": "one member per transformation; decides only where a declared figure gives a band",
      "role": "descriptive",
-     "libraryEntry": "none",
+     "libraryEntry": null,
      "minimumN": 30
     }
    ],
@@ -5089,7 +5115,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per claimed feature",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-disclosure-compliance@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-disclosure-compliance",
+      "version": 1,
+      "parameters": {
+       "lower": 0.95
+      }
+     },
      "minimumN": 30
     }
    ],
@@ -5627,7 +5659,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per distribution-channel stratum",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-disclosure-compliance@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-disclosure-compliance",
+      "version": 1,
+      "parameters": {
+       "lower": 0.95
+      }
+     },
      "minimumN": 30
     },
     {
@@ -5639,7 +5677,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per channel: unflagged items found not to be AI content",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-disclosure-compliance@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-disclosure-compliance",
+      "version": 1,
+      "parameters": {
+       "lower": 0.95
+      }
+     },
      "minimumN": 30
     }
    ],
@@ -5945,7 +5989,13 @@
      "bandBasis": "methodology_default",
      "members": "one member per publication channel: label present or exception supported",
      "role": "confirmatory",
-     "libraryEntry": "policy.eu-aia.art50-disclosure-compliance@1 (proposed)",
+     "libraryEntry": {
+      "id": "policy.eu-aia.art50-disclosure-compliance",
+      "version": 1,
+      "parameters": {
+       "lower": 0.95
+      }
+     },
      "minimumN": 30
     }
    ],
