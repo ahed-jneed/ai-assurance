@@ -127,6 +127,12 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 - the report creator cannot approve the package, and the approver cannot release it;
 - contributors to the brief or program cannot approve it.
 
+**One permission map (#35).** `lib/permissions.ts` lists the roles every POST `/api/workspace` and `/api/assurance` op admits, plus route actions such as sealing a dossier. `can(role, action)`, `roleReason()` and `decisionState()` (role plus the separation-of-duties rules above) drive the workspace's buttons: a control is hidden from roles the server never admits and shown disabled, with the server's reason, to someone an independence rule bars. The server keeps its own guards (each `defineCommands` handler's `roles`, the workflow and evidence-request services' checks); the workspace route checks workflow roles from the map before a command validates its data, and `lib/permissions.test.ts` compares the map with every dispatcher's declared roles and probes the services' own checks. Management ops need the practice-admin flag (`manageState()`), and two of them a Lead Auditor.
+
+**Attested decisions (#35).** `signPaper`, `approveClassification`, `setStage`, `acceptEvidence` and `closeFinding` open the attestation dialog (`app/workspace/attestation-dialog.tsx`) instead of firing on one click. It shows the record, its revision, the change and a SHA-256 of the content the decision binds (`lib/attestation.ts`; for a paper, the hash its signature records; for evidence, the file's hash) and the statement the person makes, and requires a rationale. The command requires `data.attestation` (`rationale`, optional `revision` and `digest`, refused with 409 when stale), and its audit event records `{ statement, record, revision, digest, rationale }` next to the op's own details.
+
+**Errors in the browser (#35).** `lib/fetch-json.ts` checks the status before parsing, so a non-JSON 413 or 502 reads as a message, and maps statuses to failure kinds. A failed command reports once: in its form or dialog, or else in one toast whose action retries a transient failure or reloads after a conflict. The banner above the views is for load failures only, and its Retry retries the load. `app/error.tsx` and per-pane `ViewBoundary`s (view, paper editor, dialog, record sheet; `app/workspace/view-boundary.tsx`) replace a render exception with a "Reload view" notice instead of a blank page.
+
 **Request hardening.** Every POST passes `checkOrigin` (exact Origin match), size caps, and zod validation per op. All SQL is parameterized and R2 keys are generated on the server.
 
 **Runner.** Workers authenticate with a 72-character bearer token whose SHA-256 is stored. Completions carry an HMAC keyed by that hash. Leases are fenced (120 s, at most 5 attempts).
@@ -237,12 +243,12 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    1. Regulatory mapping → Assess classification → answer the facts in each section (yes, no or "needs information") → Save classification (`classify`). Status shows "provisional".
    2. While a required fact is unknown the label reads "Needs information" and "Approve independently" stays disabled, listing what the approval waits for (#19).
    3. qa-auditor clicks "Approve independently" and gets a 403 toast (expected; see F-45).
-   4. qa-reviewer approves (`approveClassification`). Status becomes "approved".
+   4. qa-reviewer approves through the attestation dialog (`approveClassification`). Status becomes "approved".
    - **F-31 (fixed in #19):** an "Unassessed" route reads "Unassessed" and blocks approval; contradictory route and fact combinations are rejected.
 
 7. **Evidence custody** (qa-auditor)
    1. Evidence vault → Files → Upload evidence, using `public/example-predictions.csv`, category Dataset, and a handling basis → Upload for acceptance. The row shows "Awaiting acceptance" and the response contains the SHA-256.
-   2. Open the record → Accept evidence (`acceptEvidence`).
+   2. Open the record → Accept evidence, then give a rationale in the attestation dialog (`acceptEvidence`).
    3. Preview file (UTF-8 text up to 256 KB) and Download file. The `X-Evidence-SHA256` header must equal the upload hash.
    - **Negative:** a stale `expectedVersion` returns 409; a file over 50 MB is rejected.
 
@@ -250,7 +256,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
    1. Open the procedure sheet. Execute: Record work performed (`recordProcedureExecution`).
    2. Evaluate: Evaluate evidence (`evaluateProcedure`) → Compile paper & send for review (`submitProcedure`).
    3. qa-reviewer returns it with a question (`returnProcedure`). qa-auditor responds and resubmits. qa-reviewer: Approve reviewed work (`reviewProcedure`).
-   4. qa-lead: Sign working paper (`signPaper`).
+   4. qa-lead: Sign working paper and attest in the dialog (`signPaper`).
    - **Negative:** the preparer reviewing gets 403; qa-reviewer signing gets 403; editing a signed paper gets 409.
    - **Legacy variant (ENG-default):** editPaper → submitPaper → the author's own review gets 403 → the reviewer comments, the author uses `respondComment`, the reviewer uses `resolveComment` → `reviewPaper` → a different Lead runs `signPaper` → `reopenPaper` clears the approvals.
    - **Watch F-05:** recompiling after sign-off leaves the old signed paper required and published.
