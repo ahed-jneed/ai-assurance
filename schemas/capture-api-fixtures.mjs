@@ -1,6 +1,6 @@
 /**
  * Writes fixtures/hosted-api-runs.v1.4.json from the runs a Site integration
- * harness made through the real API (site-app/scripts/integration-check.mjs
+ * harness made through the real API (site-app/scripts/engagement-lifecycle-check.mjs
  * writes them to site-app/.sites-runtime/run-schema-fixtures.json): every run
  * that pins a registered dataset card, which the engine job then validates
  * without running the harness. The capture is frozen like hosted-runs.v1.1.json;
