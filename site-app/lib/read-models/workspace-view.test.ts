@@ -195,6 +195,65 @@ describe("workspaceView", () => {
     expect((await workspaceView(lead(), "ENG-B")).engagement?.id).toBe("ENG-B");
   });
 
+  it("lists the practice's integrity incidents for administrators only (#121)", async () => {
+    const { objects, sqlite } = await practice(three());
+    const [missing] = partsOf(objects.keys(), "ENG-C");
+    objects.delete(missing);
+    sqlite
+      .prepare("UPDATE engagements SET body='{not json' WHERE id='ENG-A'")
+      .run();
+    // The auditor meets both; the lead meets the missing part again later.
+    await workspaceView(auditor(), "ENG-C");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await workspaceView(lead(), "ENG-C");
+    expect((await workspaceView(lead(), null)).integrityIncidents).toBeNull();
+    expect(
+      (await workspaceView(auditor(), null)).integrityIncidents,
+    ).toBeNull();
+    const admin = { ...lead(), practiceAdmin: true },
+      view = await workspaceView(admin, "ENG-B");
+    expect(view.integrityIncidents).toEqual({
+      count: 2,
+      recent: 2,
+      incidents: [
+        expect.objectContaining({
+          engagementId: "ENG-A",
+          title: "Alpha audit",
+          objectKey: "body",
+          kind: "unreadable",
+          status: 409,
+          lastSeenBy: "lead",
+        }),
+        expect.objectContaining({
+          engagementId: "ENG-C",
+          title: "Gamma audit",
+          objectKey: missing,
+          kind: "missing",
+          status: 503,
+          occurrences: 2,
+          lastSeenBy: "lead",
+        }),
+      ],
+    });
+    const [body, part] = view.integrityIncidents!.incidents;
+    expect(body.lastSeen >= part.lastSeen).toBe(true);
+    expect(part.firstSeen < part.lastSeen).toBe(true);
+    // An incident nobody has met for over a week (ENG-C stays unopened; the
+    // directory listing meets ENG-A's body again) leaves the badge count but
+    // stays in the history.
+    sqlite
+      .prepare(
+        "UPDATE integrity_incidents SET last_seen='2026-01-01T00:00:00.000Z' WHERE engagement_id='ENG-C'",
+      )
+      .run();
+    const later = (await workspaceView(admin, "ENG-B")).integrityIncidents!;
+    expect(later).toMatchObject({ count: 2, recent: 1 });
+    expect(later.incidents.map((i) => i.engagementId)).toEqual([
+      "ENG-A",
+      "ENG-C",
+    ]);
+  });
+
   it("lists a record whose body is not JSON with an integrity error and opens the next one", async () => {
     const { sqlite, reads } = await practice(three());
     sqlite

@@ -2,6 +2,7 @@ import type { CriteriaTemplate } from "@/lib/catalog-criteria";
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
+import type { IntegrityIncidents } from "@/lib/engagement-storage";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -97,6 +98,11 @@ export type WorkspaceData = {
     hash: string;
     details: string;
   }[];
+  /**
+   * The practice's recorded engagement integrity incidents (damaged records
+   * members met), for practice administrators; null for everyone else.
+   */
+  integrityIncidents?: IntegrityIncidents | null;
   events: {
     id: string;
     action: string;

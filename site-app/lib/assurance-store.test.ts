@@ -7,12 +7,15 @@ import {
   assurancePageSize,
   assurancePins,
   briefingExport,
+  compiledJobIds,
   currentObligations,
   datasetVersions,
   dossierSeal,
   hasSuccessor,
+  jobTelemetry,
   pinnedRecordFacts,
   recordCount,
+  recordKindCounts,
   recordPage,
   recordsById,
   storedBodies,
@@ -849,6 +852,16 @@ describe("assurance record pages", () => {
     expect(await recordCount(ctx, "ENG-2")).toBe(30);
   });
 
+  it("counts records by kind within the engagement", async () => {
+    await many();
+    expect(await recordKindCounts(ctx, "ENG-1")).toEqual({
+      location: 300,
+      sample: 150,
+    });
+    expect(await recordKindCounts(ctx, "ENG-2")).toEqual({ location: 30 });
+    expect(await recordKindCounts(ctx, "ENG-3")).toEqual({});
+  });
+
   it.each([
     "not a cursor",
     btoa("{}"),
@@ -865,6 +878,77 @@ describe("assurance record pages", () => {
       status: 400,
       message: "Invalid page cursor",
     });
+  });
+});
+
+describe("external queue telemetry", () => {
+  function job(
+    id: string,
+    state: string,
+    leaseUntil: string | null = null,
+    engagement = "ENG-1",
+  ) {
+    sqlite
+      .prepare(
+        "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at,lease_until) VALUES(?,?,?,?,'{}','x','user-lead',?,?)",
+      )
+      .run(
+        id,
+        "tenant-1",
+        engagement,
+        state,
+        at(Number(id.slice(4)) % 60),
+        leaseUntil,
+      );
+  }
+
+  it("counts every job, not only the 100 most recent", async () => {
+    const past = new Date(Date.now() - 60_000).toISOString(),
+      future = new Date(Date.now() + 60_000).toISOString();
+    // 150 queued jobs, older than the 100 most recent ones below.
+    for (let i = 0; i < 150; i++) job("JOB-" + i, "queued");
+    for (let i = 150; i < 250; i++) job("JOB-" + i, "succeeded");
+    job("JOB-250", "running", past);
+    job("JOB-251", "running", future);
+    job("JOB-252", "running", null);
+    job("JOB-253", "queued", null, "ENG-2");
+    expect(await jobTelemetry(ctx, "ENG-1")).toEqual({
+      total: 253,
+      queued: 150,
+      running: 3,
+      stalled: 1,
+    });
+    expect(await jobTelemetry(ctx, "ENG-3")).toEqual({
+      total: 0,
+      queued: 0,
+      running: 0,
+      stalled: 0,
+    });
+  });
+
+  it("names the jobs already compiled into a draft paper", async () => {
+    await insert([
+      {
+        id: "AS-1",
+        kind: "execution_compilation",
+        body: { jobId: "JOB-1" },
+        at: at(1),
+      },
+      {
+        id: "AS-2",
+        kind: "execution_compilation",
+        body: { jobId: "JOB-1" },
+        at: at(2),
+      },
+      {
+        id: "AS-3",
+        kind: "execution_compilation",
+        body: { jobId: "JOB-2" },
+        at: at(2),
+        engagement: "ENG-2",
+      },
+    ]);
+    expect(await compiledJobIds(ctx, "ENG-1")).toEqual(["JOB-1"]);
   });
 });
 

@@ -9,7 +9,11 @@ import { selectablePacks } from "../criteria/registry";
 import type { Engagement } from "../domain";
 import { parseReportSettings } from "../domain/report-model";
 import { db, getEngagement, storedSize } from "../engagement-repo";
-import { IntegrityError, recordIntegrityIncident } from "../engagement-storage";
+import {
+  IntegrityError,
+  integrityIncidents,
+  recordIntegrityIncident,
+} from "../engagement-storage";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import {
@@ -284,6 +288,9 @@ export async function workspaceView(
           .all()
       ).results
     : [];
+  // Damaged engagement records found by any member (#16), for the practice's
+  // administrators; read after this request recorded its own.
+  const incidents = ctx.practiceAdmin ? await integrityIncidents(ctx) : null;
   const trail = e ? await engagementTrail(ctx, e) : null;
   return {
     identity: {
@@ -306,6 +313,7 @@ export async function workspaceView(
     managementVersion,
     qualityReviewPolicy,
     managementEvents,
+    integrityIncidents: incidents,
     reportSettings,
     events: trail?.events ?? [],
     // The catalogue projection of the engagement's pinned pack (or the
