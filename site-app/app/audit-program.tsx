@@ -27,7 +27,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Engagement, Paper, Report, Role, Finding } from "@/lib/domain";
-import { isReleaseTimeRecord } from "@/lib/domain";
+import {
+  isReleaseTimeRecord,
+  releaseChecklist,
+  releaseChecklistLines,
+  releaseTimeAssignmentNote,
+} from "@/lib/domain";
 import { opinionLabel } from "@/lib/domain/report-model";
 import type {
   BriefFields,
@@ -377,6 +382,10 @@ const choice = (
   optional,
 });
 const reason = () => [area("reason", "Review decision and rationale")];
+const checklistOptions: Option[] = [
+  { value: "confirmed", label: "Confirmed" },
+  { value: "not_applicable", label: "Not applicable" },
+];
 const evidence = (e: Engagement, ids: string[] = []): Field => ({
   name: "evidenceIds",
   label: "Accepted supporting evidence",
@@ -592,6 +601,9 @@ export function AuditProgram({
     });
   }
   function planForm(p: Procedure, suggestion?: PaperSuggestion) {
+    // A release-time record needs no assignment, deadline, population or
+    // sampling: the release records it against the final package.
+    const releaseTime = isReleaseTimeRecord(p.templateId);
     const fields: Field[] = [
       choice(
         "selected",
@@ -623,13 +635,19 @@ export function AuditProgram({
         "Applicability during this audit period",
         p.periodAnalysis,
       ),
-      area("population", "Population and scope", p.population),
-      area("sampling", "Sampling approach and rationale", p.sampling),
+      area("population", "Population and scope", p.population, releaseTime),
+      area(
+        "sampling",
+        "Sampling approach and rationale",
+        p.sampling,
+        releaseTime,
+      ),
       choice(
         "ownerId",
         "Preparer",
         people(["Auditor", "Lead Auditor"]),
         p.ownerId,
+        releaseTime,
       ),
       choice(
         "reviewerId",
@@ -642,8 +660,15 @@ export function AuditProgram({
             !p.contributors.includes(x.value),
         ),
         p.reviewerId,
+        releaseTime,
       ),
-      { name: "dueDate", label: "Due date", type: "date", value: p.dueDate },
+      {
+        name: "dueDate",
+        label: "Due date",
+        type: "date",
+        value: p.dueDate,
+        optional: releaseTime,
+      },
       choice(
         "method",
         "Execution method",
@@ -688,6 +713,7 @@ export function AuditProgram({
         (suggestion
           ? "The applicability and a rationale are filled in from the classification's suggestion; review them, then save or cancel. "
           : "") +
+        (releaseTime ? releaseTimeAssignmentNote + ". " : "") +
         "Changing what this procedure tests or how returns an approved program to draft and requires this procedure's work to be performed again. Preparer, reviewer and due-date changes keep the program approval and recorded work.",
       fields,
       save: (v) =>
@@ -1420,7 +1446,10 @@ export function AuditProgram({
                       <td data-label="Owner & due date">
                         {name(p.ownerId)}
                         <small className="subtle block">
-                          {p.dueDate || "Deadline needed"}
+                          {p.dueDate ||
+                            (isReleaseTimeRecord(p.templateId)
+                              ? "Recorded at release"
+                              : "Deadline needed")}
                         </small>
                       </td>
                       <td data-label="Next step">
@@ -2337,15 +2366,40 @@ export function ReportRelease({
                 setForm({
                   title: "Approve both exact packages",
                   action: "Approve package",
-                  fields: reason(),
+                  fields: [
+                    ...releaseChecklist.map((item) =>
+                      choice(
+                        "checklist." + item.id,
+                        item.label,
+                        checklistOptions,
+                        r.release?.approval?.checklist?.items.find(
+                          (i) => i.id === item.id,
+                        )?.answer,
+                      ),
+                    ),
+                    area(
+                      "checklistNote",
+                      "Why any item marked not applicable does not apply",
+                      r.release?.approval?.checklist?.note,
+                      true,
+                    ),
+                    ...reason(),
+                  ],
                   description:
-                    "Review the internal report and client preview before approving their captured digests.",
-                  save: (v) =>
+                    "Review the internal report and client preview before approving their captured digests. Your completion checklist answers are recorded with the approval and in the completion and issue memo (MEM-SO-01).",
+                  save: ({ reason, checklistNote, ...answers }) =>
                     act("approveReportPackage", {
                       reportId: r.id,
                       internalHash: r.sha256,
                       clientHash: r.clientSha256,
-                      ...v,
+                      reason,
+                      checklistNote,
+                      checklist: Object.fromEntries(
+                        Object.entries(answers).map(([name, answer]) => [
+                          name.slice("checklist.".length),
+                          answer,
+                        ]),
+                      ),
                     }),
                 })
               }
@@ -2416,6 +2470,16 @@ export function ReportRelease({
           Approved {new Date(r.release.approval.at).toLocaleString()} ·{" "}
           {r.release.approval.reason}
         </p>
+      )}
+      {r.release?.approval?.checklist && (
+        <details className="provenance">
+          <summary>Completion checklist (MEM-SO-01)</summary>
+          <ul className="record-list">
+            {releaseChecklistLines(r.release.approval.checklist).map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </details>
       )}
       {r.release?.releasedAt && (
         <p className="subtle">

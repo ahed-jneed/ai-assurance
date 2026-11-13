@@ -380,7 +380,12 @@ export function engagementWork(
         !!x.paper &&
         (x.paper.authorId === p.reviewerId ||
           x.paper.contributors.includes(p.reviewerId));
-      if (
+      if (x.releaseTime && p.applicability !== "pending") {
+        // Approving and releasing the final package records it, so it needs
+        // no assignment or deadline, the server refuses execution and no task
+        // is due once its applicability is decided.
+        continue;
+      } else if (
         !p.ownerId ||
         !p.reviewerId ||
         p.ownerId === p.reviewerId ||
@@ -389,15 +394,12 @@ export function engagementWork(
         p.applicability === "pending"
       ) {
         action = "Complete procedure plan";
-        reason = "Assign eligible preparer/reviewer and resolve applicability.";
+        reason = x.releaseTime
+          ? "Resolve applicability; the release records it."
+          : "Assign eligible preparer/reviewer and resolve applicability.";
         section = "plan";
         state = "planning";
         personal = writer && lead;
-      } else if (x.releaseTime) {
-        // Program submission still asks for its assignment and deadline
-        // (above); once planned, approving and releasing the final package
-        // records it, so the server refuses execution and no task is due.
-        continue;
       } else if (!x.approved) {
         action = "Open procedure plan";
         reason =
