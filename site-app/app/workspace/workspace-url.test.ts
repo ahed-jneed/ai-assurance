@@ -175,6 +175,9 @@ describe("workspaceParams", () => {
 });
 
 describe("historyMethod", () => {
+  /** The URL the workspace wrote for a location. */
+  const previousOf = (next: Partial<WorkspaceLocation>) =>
+    "/?" + query(next);
   const change = (
     previousUrl: string,
     next: Partial<WorkspaceLocation>,
@@ -212,25 +215,54 @@ describe("historyMethod", () => {
 
   it("replaces while typing a search in a searchable view", () => {
     expect(
-      change("/?view=Working+papers&q=da", {
+      change("/?practice=t1&engagement=e1&view=Working+papers&q=da", {
         view: "Working papers",
         search: "dat",
       }),
     ).toBe("replaceState");
     expect(
-      change("/?view=My+work", {
+      change("/?practice=t1&engagement=e1&view=Evidence+vault&q=da", {
+        view: "Evidence vault",
+        search: "dat",
+      }),
+    ).toBe("replaceState");
+    expect(
+      change(previousOf({ view: "My work" }), {
         view: "My work",
         inboxQuery: { ...defaultInboxQuery, search: "d" },
       }),
     ).toBe("replaceState");
     // Findings keeps its search out of the URL, so a change there is new.
     expect(
-      change("/?view=Findings&q=da", { view: "Findings", search: "dat" }),
+      change("/?practice=t1&engagement=e1&view=Findings&q=da", {
+        view: "Findings",
+        search: "dat",
+      }),
     ).toBe("pushState");
     // Arriving from another view is a new entry even with a search.
     expect(
-      change("/?view=Overview", { view: "Working papers", search: "dat" }),
+      change("/?practice=t1&engagement=e1&view=Overview", {
+        view: "Working papers",
+        search: "dat",
+      }),
     ).toBe("pushState");
+  });
+
+  it("pushes when the engagement or practice changes during a search", () => {
+    const other = { ...engagement, id: "e2" } as Engagement;
+    for (const view of ["Evidence vault", "Working papers"]) {
+      const previous = previousOf({ view, search: "da" });
+      // The same search in another engagement, or cleared on the switch.
+      expect(change(previous, { view, search: "da", engagement: other })).toBe(
+        "pushState",
+      );
+      expect(change(previous, { view, engagement: other })).toBe("pushState");
+      expect(change(previous, { view, search: "da", tenantId: "t2" })).toBe(
+        "pushState",
+      );
+      // Typing on in the same engagement still replaces.
+      expect(change(previous, { view, search: "dat" })).toBe("replaceState");
+    }
   });
 
   it("replaces when moving between sections of the same paper", () => {

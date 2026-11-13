@@ -149,7 +149,8 @@ const searchableViews = [
 
 /**
  * Whether a location change replaces the current history entry or pushes a
- * new one. Typing a search, switching sections of the same open paper,
+ * new one. Typing a search (in the same view of the same practice and
+ * engagement), switching sections of the same open paper,
  * restoring a link from back/forward and the first write replace; every
  * other change is a new entry.
  */
@@ -171,9 +172,12 @@ export function historyMethod({
   restoring: boolean;
 }): "replaceState" | "pushState" {
   const previousParams = new URLSearchParams(previousUrl.split("?")[1] ?? ""),
+    sameScope = ["practice", "engagement", "view"].every(
+      (name) => previousParams.get(name) === params.get(name),
+    ),
     searchChanged =
       searchableViews.includes(view) &&
-      previousParams.get("view") === view &&
+      sameScope &&
       (previousParams.get("q") ?? "") !== searchTerm;
   const paperSectionChanged =
     kind === "paper" &&
