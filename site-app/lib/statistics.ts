@@ -936,6 +936,21 @@ function normalizeAssumptions(criterion: any, assumptions: any) {
         1e-9,
       "class shares must sum to 1",
     );
+    // Section 8: each class's expected support n*share is a denominator, and
+    // every class needs its recall (#113).
+    require_(
+      Object.values(assumptions.classShares as Record<string, number>).every(
+        (share) => share > 0,
+      ),
+      "every class share must be above 0",
+    );
+    const classes = Object.keys(assumptions.classShares),
+      recalls = Object.keys(assumptions.perClassRecall ?? {});
+    require_(
+      recalls.length === classes.length &&
+        recalls.every((label) => Object.hasOwn(assumptions.classShares, label)),
+      "perClassRecall must name exactly the classes of classShares",
+    );
     return pick(["n", "classShares", "perClassRecall"]);
   }
   if (kind === "regression_performance") return pick(["n", "errorSd"]);

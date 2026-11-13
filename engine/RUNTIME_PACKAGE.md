@@ -1,7 +1,10 @@
 # Source runtime distribution
 
 `assurance-runtime.zip` contains the Python source modules, documentation,
-Dockerfile, dependency baselines, synthetic examples and common schemas.
+Dockerfile, dependency baselines, synthetic examples and common schemas, plus
+`engine/threshold-library.json`, the copy of `schemas/threshold-library.json`
+that `engine/statistics.py` loads (so the compute image built from `engine/`
+carries it).
 It contains no engine tests, test fixtures or fixture generators (they stay in
 the repository's `engine/tests/`), no Site application, installed packages,
 compiled runtimes, retained worker jobs, caches, credentials or production data. Extract it into a dedicated
