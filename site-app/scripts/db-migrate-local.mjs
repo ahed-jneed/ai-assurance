@@ -18,7 +18,11 @@
 //
 // A table recorded before content hashes (names only) gets them once, from
 // the files as they are at that run: an edit made before that run cannot be
-// detected. A database that predates this script (migrations applied by hand
+// detected, and a record whose file was renamed before that run gets no hash,
+// so the renamed file matches no record and is applied again (which usually
+// fails on an object that already exists). That run names such records; give
+// the file its old name back for that run, or delete the local database and
+// migrate again. A database that predates this script (migrations applied by hand
 // with `wrangler d1 execute`) is adopted once: a migration counts as applied
 // when every table, index, trigger and added column it creates already exists,
 // and a migration that only changes data counts as applied when a later one
@@ -163,9 +167,9 @@ try {
         (r) => r.name === "sha256",
       )
     ) {
-      const known = query(`SELECT name FROM ${TABLE}`)
-        .map((r) => r.name)
-        .filter((name) => hashes.has(name));
+      const names = query(`SELECT name FROM ${TABLE}`).map((r) => r.name);
+      const known = names.filter((name) => hashes.has(name));
+      const orphaned = names.filter((name) => !hashes.has(name));
       query(
         `ALTER TABLE ${TABLE} ADD COLUMN sha256 TEXT;` +
           known
@@ -178,6 +182,10 @@ try {
       console.log(
         `Recorded the content hashes of ${known.length} applied migration(s); an edit made before this run cannot be detected.`,
       );
+      if (orphaned.length)
+        console.warn(
+          `No file in drizzle/ has the recorded name of ${orphaned.join(", ")}, so it gets no hash. If it was renamed, the renamed file counts as pending and is applied again: give it its old name back for this run, or delete ${persistTo} and migrate again.`,
+        );
     }
     const records = query(`SELECT name, sha256 FROM ${TABLE}`);
     const found = reconcile(records);
