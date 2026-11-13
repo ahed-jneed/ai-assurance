@@ -43,7 +43,11 @@ import { PaperEvidence } from "./paper-evidence";
 import { PaperComparison } from "./revision-comparison";
 import { DraftRecovery, useRecoverableDraft } from "./recoverable-draft";
 import type { PaperSuggestion } from "@/lib/domain/art50-papers";
-import { Art50Suggestion } from "./audit-program/art50-plan";
+import {
+  Art50Suggestion,
+  canAddToScope,
+  scopeWithRationale,
+} from "./audit-program/art50-plan";
 
 const sections = {
   objective: "Objective",
@@ -566,11 +570,12 @@ export function PaperEditor({
                       <Art50Suggestion
                         suggestion={art50}
                         current=""
-                        canUse={
-                          !!editable &&
-                          !locked &&
-                          !(draft.body.scope ?? "").includes(art50.rationale)
-                        }
+                        canUse={canAddToScope(
+                          draft.body.scope,
+                          art50.rationale,
+                          !!editable,
+                          !!locked,
+                        )}
                         useLabel="Add to scope"
                         decision="in the paper's scope for review"
                         onUse={(s) =>
@@ -580,9 +585,10 @@ export function PaperEditor({
                                   ...p,
                                   body: {
                                     ...p.body,
-                                    scope: [p.body.scope, s.rationale]
-                                      .filter(Boolean)
-                                      .join("\n\n"),
+                                    scope: scopeWithRationale(
+                                      p.body.scope,
+                                      s.rationale,
+                                    ),
                                   },
                                 }
                               : p,

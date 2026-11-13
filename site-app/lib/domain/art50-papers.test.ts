@@ -236,6 +236,7 @@ describe("Art 50 paper suggestions by engagement period", () => {
         code,
         date: "2026-08-02",
         transition: null,
+        alternativeDate: null,
         period: "readiness",
         missingFacts: [],
       })),
@@ -277,6 +278,7 @@ describe("Art 50 paper suggestions by engagement period", () => {
         code: "AIA-50-2",
         date: "2026-12-02",
         transition: "Art 111(4)",
+        alternativeDate: null,
         period: "readiness",
         missingFacts: [],
       },
@@ -315,8 +317,31 @@ describe("Art 50 paper suggestions by engagement period", () => {
     expect(early.timing?.items[0]).toMatchObject({
       date: "2026-08-02",
       transition: "Art 111(4)",
+      alternativeDate: "2026-12-02",
       period: "readiness",
     });
+    // The rationale names both dates: Art 111(4) gives 2026-12-02, not the
+    // general 2026-08-02.
+    expect(early.rationale).toContain(
+      "AIA-50-2 applies from 2026-08-02, or from 2026-12-02 under the Art 111(4) transition (its facts are not recorded), after the period ends.",
+    );
+    expect(early.rationale).not.toContain("2026-08-02 (Art 111(4) transition)");
+    // Starting after 2 December 2026, both dates give applicable.
+    const late = dated(generator("unknown"), "WP-XC-10", {
+      start: "2027-01-01",
+      end: "2027-06-30",
+    });
+    expect(late.applicability).toBe("applicable");
+    expect(late.timing?.items[0]).toMatchObject({
+      date: "2026-08-02",
+      transition: "Art 111(4)",
+      alternativeDate: "2026-12-02",
+      period: "applicable",
+      missingFacts: [],
+    });
+    expect(late.rationale).toContain(
+      "AIA-50-2 applies from 2026-08-02, or from 2026-12-02 under the Art 111(4) transition (its facts are not recorded), before the period starts.",
+    );
   });
 
   it("say so when the engagement period is not set, and change nothing else", () => {

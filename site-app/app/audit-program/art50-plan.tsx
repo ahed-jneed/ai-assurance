@@ -13,7 +13,7 @@ import {
   art50CriteriaSource,
   libraryRef,
 } from "@/lib/art50-criteria";
-import type { PaperSuggestion } from "@/lib/domain/art50-papers";
+import { itemDateText, type PaperSuggestion } from "@/lib/domain/art50-papers";
 
 const suggestionLabels: Record<
   PaperSuggestion["applicability"],
@@ -55,6 +55,28 @@ const legalStatusLabels: Record<string, string> = {
 };
 
 /** The applicability the classification suggests for an Art 50 paper. */
+/**
+ * Whether a paper without a program can take the suggestion into its scope:
+ * the paper is editable and not locked, and the scope does not hold the
+ * rationale yet.
+ */
+export function canAddToScope(
+  scope: string | undefined,
+  rationale: string,
+  editable: boolean,
+  locked: boolean,
+): boolean {
+  return editable && !locked && !(scope ?? "").includes(rationale);
+}
+
+/** The scope with the rationale appended after a blank line. */
+export function scopeWithRationale(
+  scope: string | undefined,
+  rationale: string,
+): string {
+  return [scope, rationale].filter(Boolean).join("\n\n");
+}
+
 export function Art50Suggestion({
   suggestion: s,
   current,
@@ -135,13 +157,7 @@ export function Art50Suggestion({
           <ul className="record-list">
             {s.timing.items.map((t) => (
               <li key={t.code}>
-                <b>{t.code}</b> ·{" "}
-                {t.date
-                  ? "applies from " +
-                    t.date +
-                    (t.transition ? " (" + t.transition + " transition)" : "")
-                  : "the " + t.transition + " transition may apply"}{" "}
-                · {periodLabels[t.period]}
+                <b>{t.code}</b> · {itemDateText(t)} · {periodLabels[t.period]}
               </li>
             ))}
           </ul>

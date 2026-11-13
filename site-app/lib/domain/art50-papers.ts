@@ -111,8 +111,13 @@ export type ItemTiming = {
   code: string;
   /** null while the transition's facts are unknown. */
   date: string | null;
-  /** The transition the date comes from, when one applies or may apply. */
+  /** The transition that applies or may apply to the item. */
   transition: string | null;
+  /**
+   * The transition's date when its facts are unknown but the period does not
+   * depend on them: `date` is then the general date and this the other one.
+   */
+  alternativeDate: string | null;
   period: ItemPeriod;
   missingFacts: string[];
 };
@@ -194,6 +199,7 @@ function itemTiming(
     code: item.code,
     date: dating.appliesFrom.date,
     transition: null,
+    alternativeDate: null,
     period: periodOf(dating.appliesFrom.date, period),
     missingFacts: [],
     pendingReview: dating.appliesFrom.pendingReview,
@@ -216,9 +222,16 @@ function itemTiming(
       period: deferred,
       pendingReview,
     };
-  // The transition's facts are unknown: both dates are possible.
+  // The transition's facts are unknown: both dates are possible. When both
+  // fall the same way against the period, keep the general date and name the
+  // transition's date beside it (the transition is not its source).
   return deferred === general.period
-    ? { ...general, transition: transition.reference, pendingReview }
+    ? {
+        ...general,
+        transition: transition.reference,
+        alternativeDate: transition.date,
+        pendingReview,
+      }
     : {
         ...general,
         date: null,
@@ -227,6 +240,35 @@ function itemTiming(
         missingFacts: chosen.missingFacts,
         pendingReview,
       };
+}
+
+/**
+ * When an item applies, in words: its date and the transition it comes from,
+ * both dates when the transition's facts are unknown, or the open question.
+ * Shared by the rationale and the plan view.
+ */
+export function itemDateText(
+  t: Pick<ItemTiming, "date" | "transition" | "alternativeDate">,
+): string {
+  if (t.date === null)
+    return (
+      "applies from a date that depends on the " + t.transition + " transition"
+    );
+  if (t.alternativeDate !== null)
+    return (
+      "applies from " +
+      t.date +
+      ", or from " +
+      t.alternativeDate +
+      " under the " +
+      t.transition +
+      " transition (its facts are not recorded)"
+    );
+  return (
+    "applies from " +
+    t.date +
+    (t.transition ? " (" + t.transition + " transition)" : "")
+  );
 }
 
 const itemStatusText: Record<Art50Status, string> = {
@@ -431,17 +473,7 @@ function suggestionRationale(
         ": " +
         timing.items
           .map(
-            (t) =>
-              t.code +
-              (t.date
-                ? " applies from " +
-                  t.date +
-                  (t.transition ? " (" + t.transition + " transition)" : "")
-                : " applies from a date that depends on the " +
-                  t.transition +
-                  " transition") +
-              ", " +
-              periodText[t.period],
+            (t) => t.code + " " + itemDateText(t) + ", " + periodText[t.period],
           )
           .join("; ") +
         "." +

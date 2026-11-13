@@ -5,7 +5,12 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { PaperSuggestion } from "@/lib/domain/art50-papers";
-import { Art50StatisticalCriteria, Art50Suggestion } from "./art50-plan";
+import {
+  Art50StatisticalCriteria,
+  Art50Suggestion,
+  canAddToScope,
+  scopeWithRationale,
+} from "./art50-plan";
 
 const suggestion: PaperSuggestion = {
   templateId: "WP-XC-10",
@@ -36,6 +41,7 @@ const suggestion: PaperSuggestion = {
         code: "AIA-50-2",
         date: "2026-12-02",
         transition: "Art 111(4)",
+        alternativeDate: null,
         period: "readiness",
         missingFacts: [],
       },
@@ -43,6 +49,26 @@ const suggestion: PaperSuggestion = {
     pendingReview: ["LR-03", "LR-04"],
   },
 };
+
+describe("adding the suggestion to a paper's scope", () => {
+  const rationale = suggestion.rationale;
+  it("appends the rationale after a blank line, or starts the scope", () => {
+    expect(scopeWithRationale("Population: all users.", rationale)).toBe(
+      "Population: all users.\n\n" + rationale,
+    );
+    expect(scopeWithRationale(undefined, rationale)).toBe(rationale);
+    expect(scopeWithRationale("", rationale)).toBe(rationale);
+  });
+
+  it("offers it only on an editable, unlocked paper without the rationale", () => {
+    expect(canAddToScope("Population.", rationale, true, false)).toBe(true);
+    expect(canAddToScope(undefined, rationale, true, false)).toBe(true);
+    expect(canAddToScope("Population.", rationale, false, false)).toBe(false);
+    expect(canAddToScope("Population.", rationale, true, true)).toBe(false);
+    const added = scopeWithRationale("Population.", rationale);
+    expect(canAddToScope(added, rationale, true, false)).toBe(false);
+  });
+});
 
 describe("the Art 50 suggestion panel", () => {
   it("shows a readiness suggestion with its timing and open legal review", () => {
@@ -64,6 +90,31 @@ describe("the Art 50 suggestion panel", () => {
     expect(html).toContain("Pending legal review: LR-03, LR-04");
     expect(html).toContain("in the plan for independent review");
     expect(html).toContain("Use in plan");
+    // With the placing date unknown, both dates are named (#164 review).
+    const both = renderToStaticMarkup(
+      <Art50Suggestion
+        suggestion={{
+          ...suggestion,
+          timing: {
+            ...suggestion.timing!,
+            period: { start: "2026-01-01", end: "2026-06-30" },
+            items: [
+              {
+                ...suggestion.timing!.items[0],
+                date: "2026-08-02",
+                alternativeDate: "2026-12-02",
+              },
+            ],
+          },
+        }}
+        current="pending"
+        canUse
+        onUse={() => {}}
+      />,
+    );
+    expect(both).toContain(
+      "<b>AIA-50-2</b> · applies from 2026-08-02, or from 2026-12-02 under the Art 111(4) transition (its facts are not recorded) · starts after the period ends",
+    );
   });
 
   it("offers to add the rationale to a paper's scope when there is no program", () => {
