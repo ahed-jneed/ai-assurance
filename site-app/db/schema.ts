@@ -23,6 +23,12 @@ export const tenants = sqliteTable("tenants", {
   // The practice's report settings as JSON (lib/report-settings.ts): the
   // signatory, location and quality-management statement new reports state.
   reportSettings: text("report_settings").notNull().default("{}"),
+  // When the platform operator archived the practice (#151): an abandoned
+  // practice that issued work is archived instead of deleted. Its members
+  // lose access and its records stay retained (lib/operator.ts); triggers of
+  // migration 0015 keep it archived and refuse new memberships and
+  // invitations.
+  archivedAt: text("archived_at"),
 });
 export const memberships = sqliteTable(
   "memberships",

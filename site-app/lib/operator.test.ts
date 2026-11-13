@@ -1,15 +1,20 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import type { Report } from "./domain";
 import { ApiError } from "./http";
 import type { Identity } from "./identity";
 import {
   abandonedAfterDays,
+  archivePractice,
   deletePractice,
   isOperator,
+  issuedWork,
   listPractices,
   operatorEvents,
   requireOperator,
 } from "./operator";
 import { sqliteD1 } from "./test-d1";
+import type { Release } from "./workflow-types";
 
 const operator: Identity = {
   userId: "user-ops",
@@ -20,6 +25,25 @@ const operator: Identity = {
 const at = "2026-11-12T00:00:00.000Z";
 const old = "2026-01-05T00:00:00.000Z";
 const recent = "2026-11-01T00:00:00.000Z";
+
+const hex = (text: string) => createHash("sha256").update(text).digest("hex");
+const dossierBody = '{"reportId":"RPT-1","audience":"client"}';
+/** A final report in the given release state with a consistent package. */
+function reportIn(state: Release["state"], when: string): Report {
+  const snapshot = { conclusion: "Unmodified", papers: [], evidence: [] };
+  const clientSnapshot = { conclusion: "Unmodified" };
+  return {
+    id: "RPT-1",
+    kind: "final",
+    createdAt: when,
+    actor: "user-lead",
+    sha256: hex(JSON.stringify(snapshot)),
+    snapshot,
+    clientSnapshot,
+    clientSha256: hex(JSON.stringify(clientSnapshot)),
+    release: { state, releasedAt: when, history: [] },
+  };
+}
 
 /** An R2 stand-in with the list and delete calls purgeObjects makes. */
 function fakeBucket(keys: string[]) {
@@ -43,15 +67,21 @@ function fakeBucket(keys: string[]) {
 
 /**
  * A practice with a row in every table it owns, last active at `when`;
- * `dossier` adds a signed dossier, which must be retained.
+ * `issued` adds work it must retain: a signed dossier, or a report in the
+ * given release state as the engagement's only report.
  */
 function seed(
   sqlite: ReturnType<typeof sqliteD1>["sqlite"],
   tenant: string,
   name: string,
   when: string,
-  dossier = false,
+  issued?: "dossier" | Release["state"],
 ) {
+  const dossier = issued === "dossier";
+  const body =
+    issued && !dossier
+      ? JSON.stringify({ reports: [reportIn(issued, when)] })
+      : '{"reports":[]}';
   const run = (sql: string, ...args: (string | number | null)[]) =>
     sqlite.prepare(sql).run(...args);
   run(
@@ -89,7 +119,7 @@ function seed(
     "CL-1",
     "Audit",
     1,
-    '{"reports":[]}',
+    body,
     "init",
   );
   run(
@@ -129,8 +159,8 @@ function seed(
     "ENG-1",
     "REC-1",
     dossier ? "dossier" : "observation",
-    "{}",
-    "h",
+    dossierBody,
+    hex(dossierBody),
     when,
     "user-" + tenant,
   );
@@ -238,9 +268,14 @@ describe("abandoned practices", () => {
     const { db, sqlite } = sqliteD1();
     seed(sqlite, "t-old", "Old practice", old);
     seed(sqlite, "t-new", "Busy practice", recent);
-    seed(sqlite, "t-kept", "Kept practice", old, true);
-    const abandoned = await listPractices(db, at);
-    expect(abandoned.map((p) => p.id)).toEqual(["t-old"]);
+    seed(sqlite, "t-kept", "Kept practice", old, "dossier");
+    const listed = await listPractices(db, at);
+    // The retained practice is listed too: it may be archived, not deleted.
+    expect(listed.map((p) => [p.id, p.abandoned, p.archivable])).toEqual([
+      ["t-kept", false, true],
+      ["t-old", true, false],
+    ]);
+    const abandoned = listed.slice(1);
     expect(abandoned[0]).toMatchObject({
       name: "Old practice",
       lastActivity: old,
@@ -252,6 +287,8 @@ describe("abandoned practices", () => {
       records: 1,
       retained: false,
       abandoned: true,
+      archivable: false,
+      archivedAt: null,
     });
     const all = await listPractices(db, at, { all: true });
     expect(all.map((p) => [p.id, p.abandoned, p.retained])).toEqual([
@@ -265,7 +302,7 @@ describe("abandoned practices", () => {
         "INSERT INTO invitations(tenant_id,id,email,role,invited_by,created_at,expires_at) VALUES('t-old','INV-2','x@example.test','Auditor','u',?,?)",
       )
       .run(recent, recent);
-    expect(await listPractices(db, at)).toEqual([]);
+    expect((await listPractices(db, at)).map((p) => p.id)).toEqual(["t-kept"]);
     expect(abandonedAfterDays).toBe(90);
   });
 
@@ -354,7 +391,7 @@ describe("abandoned practices", () => {
     const { db, sqlite } = sqliteD1();
     seed(sqlite, "t-old", "Old practice", old);
     seed(sqlite, "t-new", "Busy practice", recent);
-    seed(sqlite, "t-kept", "Kept practice", old, true);
+    seed(sqlite, "t-kept", "Kept practice", old, "dossier");
     const { bucket } = fakeBucket([]);
     const refusal = (tenantId: string, confirmName: string) =>
       deletePractice(
@@ -410,6 +447,312 @@ describe("abandoned practices", () => {
     expect((error as ApiError).status).toBe(409);
     for (const table of tables)
       expect(count(sqlite, table, "t-old"), table).toBeGreaterThan(0);
+    expect(await operatorEvents(db)).toEqual([]);
+  });
+});
+
+// The retention decision of 13 Nov 2026 (#151): a practice with issued work
+// is never hard-deleted; it is archived instead.
+describe("practices with issued work", () => {
+  const request = (tenantId: string, confirmName: string) => ({
+    tenantId,
+    confirmName,
+    reason: "Abandoned after its engagement closed",
+  });
+  const failure = (run: Promise<unknown>) =>
+    run.then(
+      () => null,
+      (error: ApiError) => [error.status, error.message],
+    );
+
+  it.each(["released", "superseded", "withdrawn"] as const)(
+    "never deletes a practice whose only issued work is a %s report",
+    async (state) => {
+      const { db, sqlite } = sqliteD1();
+      seed(sqlite, "t-report", "Report practice", old, state);
+      const [practice] = await listPractices(db, at);
+      expect(practice).toMatchObject({
+        id: "t-report",
+        retained: true,
+        abandoned: false,
+        archivable: true,
+      });
+      const { bucket, objects } = fakeBucket([
+        "t-report/ENG-1/immutable/report/abc",
+      ]);
+      expect(
+        await failure(
+          deletePractice(
+            db,
+            bucket,
+            operator,
+            request("t-report", "Report practice"),
+            at,
+          ),
+        ),
+      ).toEqual([
+        409,
+        "This practice released a report or signed a dossier, which must be retained. It cannot be deleted; archive it instead.",
+      ]);
+      for (const table of tables)
+        expect(count(sqlite, table, "t-report"), table).toBeGreaterThan(0);
+      expect(objects.size).toBe(1);
+      expect(await operatorEvents(db)).toEqual([]);
+    },
+  );
+
+  it("counts neither an internal nor an approved report as issued", async () => {
+    const { db, sqlite } = sqliteD1();
+    seed(sqlite, "t-internal", "Internal practice", old, "internal");
+    seed(sqlite, "t-approved", "Approved practice", old, "approved");
+    expect(
+      (await listPractices(db, at)).map((p) => [p.id, p.retained, p.abandoned]),
+    ).toEqual([
+      ["t-approved", false, true],
+      ["t-internal", false, true],
+    ]);
+  });
+
+  it("archives one: its members lose access and its issued records stay retained and verifiable", async () => {
+    const { db, sqlite } = sqliteD1();
+    seed(sqlite, "t-report", "Report practice", old, "released");
+    seed(sqlite, "t-new", "Busy practice", recent);
+    sqlite
+      .prepare(
+        "INSERT INTO runner_workers(id,tenant_id,engagement_id,name,token_hash,image_digest,capabilities,created_by,created_at) VALUES('W-1','t-report','ENG-1','Runner','th','sha256:x','[]','user-t-report',?)",
+      )
+      .run(old);
+    sqlite
+      .prepare(
+        "INSERT INTO dossier_keys(tenant_id,id,public_key,active,created_at) VALUES('t-report','KEY-1','MCowBQYDK2VwAyEA',1,?)",
+      )
+      .run(old);
+    const before = Object.fromEntries(
+      tables.map((table) => [table, count(sqlite, table, "t-report")]),
+    );
+    const result = await archivePractice(
+      db,
+      operator,
+      request("t-report", "Report practice"),
+      at,
+    );
+    expect(result).toMatchObject({
+      tenantId: "t-report",
+      archivedAt: at,
+      members: 1,
+      invitations: 1,
+      workers: 1,
+    });
+    // Access is gone: no active membership, invitation or runner worker.
+    expect(
+      sqlite
+        .prepare("SELECT status FROM memberships WHERE tenant_id='t-report'")
+        .all(),
+    ).toEqual([{ status: "archived" }]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT status,closed_at FROM invitations WHERE tenant_id='t-report'",
+        )
+        .all(),
+    ).toEqual([{ status: "cancelled", closed_at: at }]);
+    expect(
+      sqlite.prepare("SELECT active FROM runner_workers WHERE id='W-1'").get(),
+    ).toEqual({ active: 0 });
+    // Every row is retained; the other practice is untouched.
+    for (const table of tables)
+      expect(count(sqlite, table, "t-report"), table).toBe(before[table]);
+    expect(
+      sqlite
+        .prepare("SELECT status FROM memberships WHERE tenant_id='t-new'")
+        .get(),
+    ).toEqual({ status: "active" });
+    // It is no longer offered for deletion or archive, and stays undeletable.
+    expect((await listPractices(db, at)).map((p) => p.id)).toEqual([]);
+    const [archived] = (await listPractices(db, at, { all: true })).filter(
+      (p) => p.id === "t-report",
+    );
+    expect(archived).toMatchObject({
+      archivedAt: at,
+      archivable: false,
+      abandoned: false,
+      activeMembers: 0,
+    });
+    const { bucket, objects } = fakeBucket([
+      "t-report/ENG-1/immutable/report/abc",
+    ]);
+    expect(
+      (
+        await failure(
+          deletePractice(
+            db,
+            bucket,
+            operator,
+            request("t-report", "Report practice"),
+            at,
+          ),
+        )
+      )?.[0],
+    ).toBe(409);
+    expect(objects.size).toBe(1);
+    expect(
+      await failure(
+        archivePractice(
+          db,
+          operator,
+          request("t-report", "Report practice"),
+          at,
+        ),
+      ),
+    ).toEqual([409, "This practice was archived on 2026-11-12."]);
+    // The database keeps it archived and closed to new members.
+    expect(() =>
+      sqlite.exec("UPDATE tenants SET archived_at=NULL WHERE id='t-report'"),
+    ).toThrow(/stays archived/);
+    expect(() =>
+      sqlite.exec(
+        "UPDATE memberships SET status='active' WHERE tenant_id='t-report'",
+      ),
+    ).toThrow(/archived/);
+    expect(() =>
+      sqlite.exec(
+        "INSERT INTO memberships(tenant_id,user_id,role,display_name) VALUES('t-report','user-new','Auditor','New')",
+      ),
+    ).toThrow(/archived/);
+    expect(() =>
+      sqlite.exec(
+        "INSERT INTO invitations(tenant_id,id,email,role,invited_by,created_at,expires_at) VALUES('t-report','INV-9','n@example.test','Auditor','u','x','x')",
+      ),
+    ).toThrow(/archived/);
+    expect(() =>
+      sqlite.exec(
+        "DELETE FROM engagement_snapshots WHERE tenant_id='t-report'",
+      ),
+    ).toThrow(/append-only/);
+    // Its issued work is still verifiable.
+    const issued = await issuedWork(db, "t-report");
+    expect(issued).toMatchObject({
+      name: "Report practice",
+      archivedAt: at,
+      reports: [
+        {
+          engagementId: "ENG-1",
+          reportId: "RPT-1",
+          kind: "final",
+          state: "released",
+          releasedAt: old,
+          sha256: reportIn("released", old).sha256,
+          valid: true,
+        },
+      ],
+      dossiers: [],
+      keys: [
+        { keyId: "KEY-1", publicKeySPKI: "MCowBQYDK2VwAyEA", status: "active" },
+      ],
+    });
+    const events = await operatorEvents(db);
+    expect(events.map((e) => [e.action, e.tenantId])).toEqual([
+      ["archivePractice", "t-report"],
+    ]);
+    expect(events[0].details).toMatchObject({
+      name: "Report practice",
+      reason: "Abandoned after its engagement closed",
+      members: 1,
+      invitations: 1,
+      workers: 1,
+    });
+  });
+
+  it("rechecks a dossier's digest and reports a changed package", async () => {
+    const { db, sqlite } = sqliteD1();
+    seed(sqlite, "t-kept", "Kept practice", old, "dossier");
+    await archivePractice(db, operator, request("t-kept", "Kept practice"), at);
+    expect((await issuedWork(db, "t-kept")).dossiers).toEqual([
+      {
+        engagementId: "ENG-1",
+        recordId: "REC-1",
+        reportId: "RPT-1",
+        audience: "client",
+        createdAt: old,
+        sha256: hex(dossierBody),
+        valid: true,
+      },
+    ]);
+    // A report whose captured snapshot no longer matches its digest.
+    const tampered = reportIn("released", old);
+    tampered.snapshot = { conclusion: "Changed" };
+    sqlite
+      .prepare("UPDATE engagements SET body=? WHERE tenant_id='t-kept'")
+      .run(JSON.stringify({ reports: [tampered] }));
+    expect((await issuedWork(db, "t-kept")).reports).toMatchObject([
+      { reportId: "RPT-1", valid: false },
+    ]);
+  });
+
+  it("refuses to archive a practice without issued work, an active one, a wrong name and an unknown one", async () => {
+    const { db, sqlite } = sqliteD1();
+    seed(sqlite, "t-old", "Old practice", old);
+    seed(sqlite, "t-busy", "Busy practice", recent, "released");
+    const archive = (tenantId: string, name: string) =>
+      failure(archivePractice(db, operator, request(tenantId, name), at));
+    expect(await archive("t-old", "Old practice")).toEqual([
+      409,
+      "This practice released no report and signed no dossier. Only a practice with issued work is archived; delete it instead.",
+    ]);
+    expect(await archive("t-busy", "Busy practice")).toEqual([
+      409,
+      "This practice recorded activity on 2026-11-01. Only a practice without activity for 90 days can be archived.",
+    ]);
+    expect(await archive("t-busy", "busy practice")).toEqual([
+      400,
+      "Type the practice name exactly to confirm the archive",
+    ]);
+    expect(await archive("t-none", "x")).toEqual([404, "Practice not found"]);
+    expect(await failure(issuedWork(db, "t-busy"))).toEqual([
+      409,
+      "Only an archived practice's issued work is shown here",
+    ]);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM tenants WHERE archived_at IS NOT NULL",
+        )
+        .get(),
+    ).toEqual({ n: 0 });
+    expect(await operatorEvents(db)).toEqual([]);
+  });
+
+  it("changes nothing when the practice became active before the batch ran", async () => {
+    const { db, sqlite } = sqliteD1();
+    seed(sqlite, "t-report", "Report practice", old, "released");
+    const batch = db.batch.bind(db);
+    db.batch = (async (statements: D1PreparedStatement[]) => {
+      sqlite
+        .prepare(
+          "INSERT INTO management_events(tenant_id,id,actor,action,details,hash,created_at) VALUES('t-report','ME-2','u','renamePractice','{}','h',?)",
+        )
+        .run(recent);
+      return batch(statements);
+    }) as typeof db.batch;
+    expect(
+      (
+        await failure(
+          archivePractice(
+            db,
+            operator,
+            request("t-report", "Report practice"),
+            at,
+          ),
+        )
+      )?.[0],
+    ).toBe(409);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT t.archived_at,m.status FROM tenants t JOIN memberships m ON m.tenant_id=t.id WHERE t.id='t-report'",
+        )
+        .get(),
+    ).toEqual({ archived_at: null, status: "active" });
     expect(await operatorEvents(db)).toEqual([]);
   });
 });

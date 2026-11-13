@@ -1,14 +1,19 @@
 // The platform operator (#95, F-09 storage): the people named in the
 // PLATFORM_OPERATORS Worker variable may list every practice with what it
 // stores and delete an abandoned one with its snapshots, records and R2
-// objects. Nobody else can, practice administrators included. Every deletion
-// is recorded in operator_events, which is immutable and outlives the
-// practice (docs/security/identity.md).
+// objects. An abandoned practice that released a report or signed a dossier
+// is never deleted; it is archived instead (#151): its members lose access
+// and its issued records stay retained and verifiable. Nobody else can do
+// either, practice administrators included. Every deletion and archive is
+// recorded in operator_events, which is immutable and outlives the practice
+// (docs/security/identity.md).
 import { env } from "cloudflare:workers";
+import type { Report } from "./domain";
 import { ApiError } from "./http";
 import type { Identity } from "./identity";
 import { normalizeEmail } from "./invitations";
 import { id, sha256 } from "./ids";
+import { verifyPackage } from "./report-package";
 
 /** The Worker variable read here (cloudflare-env.d.ts). */
 export type OperatorSettings = { PLATFORM_OPERATORS?: string };
@@ -83,6 +88,12 @@ const retainedSql =
 /** Binds the cutoff: true when the practice may be deleted now. */
 const abandonedSql = `(${lastActivitySql}<? AND NOT ${retainedSql})`;
 
+/**
+ * Binds the cutoff: true when the practice is inactive for the period but
+ * holds issued work, so it may be archived now instead (#151).
+ */
+const archivableSql = `(t.archived_at IS NULL AND ${lastActivitySql}<? AND ${retainedSql})`;
+
 /** A practice as the operator console lists it. */
 export type PracticeSummary = {
   id: string;
@@ -96,22 +107,32 @@ export type PracticeSummary = {
   snapshotBytes: number;
   records: number;
   retained: boolean;
+  /** Inactive for the period and holding no issued work: may be deleted. */
   abandoned: boolean;
+  /** Inactive for the period, holding issued work: may be archived. */
+  archivable: boolean;
+  /** When the practice was archived, or null. */
+  archivedAt: string | null;
 };
-type SummaryRow = Omit<PracticeSummary, "retained" | "abandoned"> & {
+type SummaryRow = Omit<
+  PracticeSummary,
+  "retained" | "abandoned" | "archivable"
+> & {
   retained: number;
   abandoned: number;
+  archivable: number;
 };
-const summarySql = `SELECT t.id,t.name,t.created_at AS createdAt,${lastActivitySql} AS lastActivity,(SELECT COUNT(*) FROM memberships WHERE tenant_id=t.id) AS members,(SELECT COUNT(*) FROM memberships WHERE tenant_id=t.id AND status='active') AS activeMembers,(SELECT COUNT(*) FROM engagements WHERE tenant_id=t.id) AS engagements,(SELECT COUNT(*) FROM engagement_snapshots WHERE tenant_id=t.id) AS snapshots,(SELECT COALESCE(SUM(LENGTH(body)),0) FROM engagement_snapshots WHERE tenant_id=t.id) AS snapshotBytes,(SELECT COUNT(*) FROM assurance_records WHERE tenant_id=t.id) AS records,${retainedSql} AS retained,${abandonedSql} AS abandoned FROM tenants t`;
+const summarySql = `SELECT t.id,t.name,t.created_at AS createdAt,${lastActivitySql} AS lastActivity,(SELECT COUNT(*) FROM memberships WHERE tenant_id=t.id) AS members,(SELECT COUNT(*) FROM memberships WHERE tenant_id=t.id AND status='active') AS activeMembers,(SELECT COUNT(*) FROM engagements WHERE tenant_id=t.id) AS engagements,(SELECT COUNT(*) FROM engagement_snapshots WHERE tenant_id=t.id) AS snapshots,(SELECT COALESCE(SUM(LENGTH(body)),0) FROM engagement_snapshots WHERE tenant_id=t.id) AS snapshotBytes,(SELECT COUNT(*) FROM assurance_records WHERE tenant_id=t.id) AS records,${retainedSql} AS retained,${abandonedSql} AS abandoned,${archivableSql} AS archivable,t.archived_at AS archivedAt FROM tenants t`;
 const summary = (row: SummaryRow): PracticeSummary => ({
   ...row,
   retained: !!row.retained,
   abandoned: !!row.abandoned,
+  archivable: !!row.archivable,
 });
 
 /**
- * The practices, the longest inactive first: only the abandoned ones unless
- * `all` is set. At most `limit` of them.
+ * The practices, the longest inactive first: only those the operator may
+ * delete or archive now unless `all` is set. At most `limit` of them.
  */
 export async function listPractices(
   db: D1Database,
@@ -123,10 +144,10 @@ export async function listPractices(
     await db
       .prepare(
         summarySql +
-          (all ? "" : ` WHERE ${abandonedSql}`) +
+          (all ? "" : ` WHERE (${abandonedSql} OR ${archivableSql})`) +
           " ORDER BY lastActivity,t.id LIMIT ?",
       )
-      .bind(cutoff, ...(all ? [] : [cutoff]), limit)
+      .bind(cutoff, cutoff, ...(all ? [] : [cutoff, cutoff]), limit)
       .all<SummaryRow>()
   ).results;
   return rows.map(summary);
@@ -140,7 +161,7 @@ export async function practiceSummary(
 ): Promise<PracticeSummary | null> {
   const row = await db
     .prepare(summarySql + " WHERE t.id=?")
-    .bind(abandonedBefore(at), tenantId)
+    .bind(abandonedBefore(at), abandonedBefore(at), tenantId)
     .first<SummaryRow>();
   return row ? summary(row) : null;
 }
@@ -315,7 +336,7 @@ export async function deletePractice(
   if (practice.retained)
     throw new ApiError(
       409,
-      "This practice released a report or signed a dossier, which must be retained. It cannot be deleted here.",
+      "This practice released a report or signed a dossier, which must be retained. It cannot be deleted; archive it instead.",
     );
   if (!practice.abandoned)
     throw new ApiError(
@@ -421,4 +442,261 @@ async function purgeObjects(
   );
   await event.statement.run();
   return { objects, bytes, purgeEventId: event.id };
+}
+
+/** What an archive changed: who lost access and what it cancelled. */
+export type ArchiveResult = {
+  tenantId: string;
+  eventId: string;
+  archivedAt: string;
+  members: number;
+  invitations: number;
+  workers: number;
+};
+
+/**
+ * Archives an abandoned practice that holds issued work (#151, decision of
+ * 13 Nov 2026): no recorded activity for abandonedAfterDays and a released
+ * report or a signed dossier, so it may not be deleted. In one D1 batch the
+ * `archivePractice` operator event is written first, under the same guard in
+ * SQL, then the practice is marked archived, its active memberships become
+ * 'archived' (every access check requires 'active'), its pending invitations
+ * are cancelled and its runner workers deactivated. Nothing else changes:
+ * its engagements, snapshots, records, audit trails and stored objects stay,
+ * and migration 0015 keeps it archived and closed to new members.
+ */
+export async function archivePractice(
+  db: D1Database,
+  operator: Identity,
+  request: DeletionRequest,
+  at: string,
+): Promise<ArchiveResult> {
+  const practice = await practiceSummary(db, request.tenantId, at);
+  if (!practice) throw new ApiError(404, "Practice not found");
+  if (request.confirmName.trim() !== practice.name)
+    throw new ApiError(
+      400,
+      "Type the practice name exactly to confirm the archive",
+    );
+  if (practice.archivedAt)
+    throw new ApiError(
+      409,
+      "This practice was archived on " + practice.archivedAt.slice(0, 10) + ".",
+    );
+  if (!practice.retained)
+    throw new ApiError(
+      409,
+      "This practice released no report and signed no dossier. Only a practice with issued work is archived; delete it instead.",
+    );
+  if (!practice.archivable)
+    throw new ApiError(
+      409,
+      "This practice recorded activity on " +
+        practice.lastActivity.slice(0, 10) +
+        ". Only a practice without activity for " +
+        abandonedAfterDays +
+        " days can be archived.",
+    );
+  const count = async (sql: string) =>
+    (await db.prepare(sql).bind(request.tenantId).first<{ n: number }>())?.n ??
+    0;
+  const members = await count(
+    "SELECT COUNT(*) AS n FROM memberships WHERE tenant_id=? AND status='active'",
+  );
+  const invitations = await count(
+    "SELECT COUNT(*) AS n FROM invitations WHERE tenant_id=? AND status='pending'",
+  );
+  const workers = await count(
+    "SELECT COUNT(*) AS n FROM runner_workers WHERE tenant_id=? AND active=1",
+  );
+  const event = await recordStatement(
+    db,
+    operator,
+    "archivePractice",
+    request.tenantId,
+    {
+      name: practice.name,
+      createdAt: practice.createdAt,
+      lastActivity: practice.lastActivity,
+      reason: request.reason,
+      members,
+      invitations,
+      workers,
+      engagements: practice.engagements,
+      snapshots: practice.snapshots,
+      records: practice.records,
+    },
+    at,
+    `EXISTS(SELECT 1 FROM tenants t WHERE t.id=? AND t.name=? AND ${archivableSql})`,
+    [request.tenantId, practice.name, abandonedBefore(at)],
+  );
+  const recorded = "EXISTS(SELECT 1 FROM operator_events WHERE id=?)";
+  const results = await db.batch([
+    event.statement,
+    db
+      .prepare(
+        `UPDATE tenants SET archived_at=? WHERE id=? AND archived_at IS NULL AND ${recorded}`,
+      )
+      .bind(at, request.tenantId, event.id),
+    db
+      .prepare(
+        `UPDATE memberships SET status='archived' WHERE tenant_id=? AND status='active' AND ${recorded}`,
+      )
+      .bind(request.tenantId, event.id),
+    db
+      .prepare(
+        `UPDATE invitations SET status='cancelled',closed_at=? WHERE tenant_id=? AND status='pending' AND ${recorded}`,
+      )
+      .bind(at, request.tenantId, event.id),
+    db
+      .prepare(
+        `UPDATE runner_workers SET active=0 WHERE tenant_id=? AND active=1 AND ${recorded}`,
+      )
+      .bind(request.tenantId, event.id),
+  ]);
+  if (!results[0]?.meta.changes)
+    throw new ApiError(
+      409,
+      "The practice changed while it was being archived. Nothing was changed; reload and check it again.",
+    );
+  return {
+    tenantId: request.tenantId,
+    eventId: event.id,
+    archivedAt: at,
+    members: results[2]?.meta.changes ?? members,
+    invitations: results[3]?.meta.changes ?? invitations,
+    workers: results[4]?.meta.changes ?? workers,
+  };
+}
+
+/** A released report of an archived practice, with its package check. */
+export type IssuedReport = {
+  engagementId: string;
+  reportId: string;
+  kind: string;
+  state: string;
+  releasedAt: string | null;
+  sha256: string;
+  clientSha256: string | null;
+  /** Whether the captured snapshots still hash to the recorded digests. */
+  valid: boolean;
+};
+/** A signed dossier of an archived practice, with its record check. */
+export type IssuedDossier = {
+  engagementId: string;
+  recordId: string;
+  reportId: string | null;
+  audience: string | null;
+  createdAt: string;
+  sha256: string;
+  /** Whether the stored record still hashes to its recorded digest. */
+  valid: boolean;
+};
+/** What an archived practice issued, for answering verification requests. */
+export type IssuedWork = {
+  tenantId: string;
+  name: string;
+  archivedAt: string;
+  reports: IssuedReport[];
+  dossiers: IssuedDossier[];
+  /**
+   * The practice's verification keys, active and retired, for the
+   * --trusted-keys file of `python -m engine.assurance verify`. Members read
+   * them at /api/dossier/keys, which an archived practice's members no
+   * longer can.
+   */
+  keys: {
+    keyId: string;
+    publicKeySPKI: string;
+    status: "active" | "retired";
+  }[];
+};
+
+/**
+ * The issued work of an archived practice (#151): each released (or since
+ * superseded or withdrawn) report with its package digests rechecked, each
+ * signed dossier with its record digest rechecked, and the practice's
+ * verification keys. Identifiers and digests only, never the content. Only
+ * archived practices are answered, so the operator reads nothing of a
+ * practice its members still run.
+ */
+export async function issuedWork(
+  db: D1Database,
+  tenantId: string,
+): Promise<IssuedWork> {
+  const practice = await db
+    .prepare("SELECT name,archived_at FROM tenants WHERE id=?")
+    .bind(tenantId)
+    .first<{ name: string; archived_at: string | null }>();
+  if (!practice) throw new ApiError(404, "Practice not found");
+  if (!practice.archived_at)
+    throw new ApiError(
+      409,
+      "Only an archived practice's issued work is shown here",
+    );
+  const released = (
+    await db
+      .prepare(
+        "SELECT e.id AS engagementId,r.value AS report FROM engagements e, json_each(CASE WHEN json_valid(e.body) THEN e.body ELSE '{}' END,'$.reports') r WHERE e.tenant_id=? AND json_extract(r.value,'$.release.state') IN ('released','superseded','withdrawn') ORDER BY e.id,json_extract(r.value,'$.createdAt')",
+      )
+      .bind(tenantId)
+      .all<{ engagementId: string; report: string }>()
+  ).results;
+  const reports: IssuedReport[] = [];
+  for (const row of released) {
+    const report = JSON.parse(row.report) as Report;
+    const internal = await packageValid(report, false);
+    const client = report.clientSnapshot
+      ? await packageValid(report, true)
+      : true;
+    reports.push({
+      engagementId: row.engagementId,
+      reportId: report.id,
+      kind: report.kind,
+      state: report.release?.state ?? "released",
+      releasedAt: report.release?.releasedAt ?? null,
+      sha256: report.sha256,
+      clientSha256: report.clientSha256 ?? null,
+      valid: internal && client,
+    });
+  }
+  const dossierRows = (
+    await db
+      .prepare(
+        "SELECT engagement_id AS engagementId,id AS recordId,json_extract(body,'$.reportId') AS reportId,json_extract(body,'$.audience') AS audience,created_at AS createdAt,sha256,body FROM assurance_records WHERE tenant_id=? AND kind='dossier' ORDER BY created_at,id",
+      )
+      .bind(tenantId)
+      .all<Omit<IssuedDossier, "valid"> & { body: string }>()
+  ).results;
+  const dossiers: IssuedDossier[] = [];
+  for (const { body, ...row } of dossierRows)
+    dossiers.push({ ...row, valid: (await sha256(body)) === row.sha256 });
+  const keys = (
+    await db
+      .prepare(
+        "SELECT id AS keyId,public_key AS publicKeySPKI,active FROM dossier_keys WHERE tenant_id=? ORDER BY created_at,id",
+      )
+      .bind(tenantId)
+      .all<{ keyId: string; publicKeySPKI: string; active: number }>()
+  ).results.map(({ active, ...k }) => ({
+    ...k,
+    status: active ? ("active" as const) : ("retired" as const),
+  }));
+  return {
+    tenantId,
+    name: practice.name,
+    archivedAt: practice.archived_at,
+    reports,
+    dossiers,
+    keys,
+  };
+}
+
+/** Whether a report's captured package still matches its digest. */
+async function packageValid(report: Report, client: boolean) {
+  try {
+    return (await verifyPackage(report, sha256, client)).valid;
+  } catch {
+    return false;
+  }
 }
