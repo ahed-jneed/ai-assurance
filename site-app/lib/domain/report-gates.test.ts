@@ -399,5 +399,8 @@ describe("independence element", () => {
     e.workflow!.acceptance = approved.workflow!.acceptance;
     e.workflow!.declarations = approved.workflow!.declarations;
     expect(element(e).problem).toBe("");
-  });
+    // Two engagements taken to sign-off: about 0.1 s on an idle machine,
+    // but up to 3.8 s with three suites running at once (#174). The timeout
+    // only ends a run that never finishes.
+  }, 60_000);
 });
