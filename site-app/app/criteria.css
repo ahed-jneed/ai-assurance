@@ -86,6 +86,23 @@
   align-items: center;
   font-size: 14px;
 }
+.coverage-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.coverage-filter select {
+  min-height: 24px;
+}
+.coverage-export {
+  margin-left: auto;
+  font-size: 14px;
+}
+.coverage-filter-status {
+  margin: 0;
+  font-size: 13px;
+}
 .coverage-legend {
   display: flex;
   flex-wrap: wrap;
@@ -109,6 +126,7 @@
   margin-top: 4px;
 }
 .coverage-tile {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   min-width: 24px;
