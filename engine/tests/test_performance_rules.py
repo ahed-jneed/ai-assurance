@@ -56,6 +56,9 @@ class PerformanceRuleTests(unittest.TestCase):
         # Both runners decide by statistics 1.0.0, so a case has one outcome and one decision.
         golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
         self.assertEqual({case["outcome"] for case in golden["cases"]}, {"pass", "fail", "inconclusive"})
+        # One outcome and one decision per case, never one per runner (#113).
+        shape = {"id", "description", "config", "negativeLabel", "rows", "outcome", "decision", "metrics", "engineMetrics"}
+        self.assertEqual([set(case) for case in golden["cases"]], [shape]*len(golden["cases"]))
         for case in golden["cases"]:
             with self.subTest(case=case["id"]):
                 _, report, results = self.evaluate(csv_bytes(case["rows"], golden["columns"]), case["config"], case["negativeLabel"])

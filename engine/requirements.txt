@@ -1,3 +1,9 @@
-# Core runner: Python 3.12+ standard library only; no pip packages required.
-# Validated bundled runtime: CPython 3.12.14.
+# Supported interpreter: CPython 3.12, one version for CI, the compute image
+# (engine/Dockerfile, python:3.12.14-slim) and the docs (engine/README.md).
+# Core runner: standard library only; no pip packages required for the default
+# CSV path.
+# Signature verification and Inspect .eval (zstd) reading need cryptography and
+# zstandard: the compute image installs them hash-locked from
+# requirements-image.txt, and a source install that verifies signatures or
+# reads .eval logs installs that file too.
 # Optional adapter implementations must pin their own reviewed dependencies.

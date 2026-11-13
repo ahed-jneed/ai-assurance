@@ -11,6 +11,7 @@ import {
   decodeCursor,
   encodeCursor,
   parsed,
+  recordsById,
   type RecordRow,
 } from "./assurance-store";
 import { db } from "./bindings";
@@ -52,27 +53,26 @@ export const searchPageSize = 50,
   searchPageLimit = 200;
 const kindPattern = /^[a-z_]{1,40}$/;
 
-// The latest review of each (review kind, subject), as reviewFor's `.at(-1)`
-// in (created_at, id) order; the subject is assertionId ?? impactId ??
-// obligationId, as in memory.
-const latestReviews = `latest AS (
-  SELECT kind,subject,decision FROM (
-    SELECT kind,
-      COALESCE(json_extract(body,'$.assertionId'),json_extract(body,'$.impactId'),json_extract(body,'$.obligationId')) AS subject,
-      json_extract(body,'$.decision') AS decision,
-      ROW_NUMBER() OVER (PARTITION BY kind,COALESCE(json_extract(body,'$.assertionId'),json_extract(body,'$.impactId'),json_extract(body,'$.obligationId')) ORDER BY created_at DESC,id DESC) AS n
-    FROM assurance_records
-    WHERE tenant_id=? AND engagement_id=? AND kind IN ('assertion_review','impact_review','obligation_review')
-  ) WHERE n=1 AND subject IS NOT NULL
-)`;
+// The latest review of the assessment `r`, as reviewFor's `.at(-1)` in
+// (created_at, id) order: the review of its kind whose subject
+// (assertionId ?? impactId ?? obligationId, as in memory) is `r.id`. The
+// subject expression and the kind list repeat idx_review_subject's
+// (migration 0014) exactly, so this is one index lookup per assessment;
+// `+r.id` drops the column's text affinity, which the index expression does
+// not have and which would otherwise keep the subject out of the lookup.
+const latestReview = `(SELECT CASE WHEN json_extract(v.body,'$.decision') IN ('approve','confirmed') THEN 'Confirmed' ELSE 'Returned' END
+    FROM assurance_records v
+    WHERE v.tenant_id=r.tenant_id AND v.engagement_id=r.engagement_id
+      AND v.kind IN ('assertion_review','impact_review','obligation_review')
+      AND v.kind=r.kind||'_review'
+      AND COALESCE(json_extract(v.body,'$.assertionId'),json_extract(v.body,'$.impactId'),json_extract(v.body,'$.obligationId'))=+r.id
+    ORDER BY v.created_at DESC,v.id DESC LIMIT 1)`;
 // Superseded first, then the latest matching review decides. `+r.id` keeps the
 // supersession check on idx_assessment_successor.
 const stateSQL = `CASE
   WHEN r.kind NOT IN ${assessmentKinds} THEN NULL
   WHEN EXISTS(SELECT 1 FROM assurance_records s WHERE s.tenant_id=r.tenant_id AND s.engagement_id=r.engagement_id AND s.kind IN ${assessmentKinds} AND json_extract(s.body,'$.supersedesId')=+r.id) THEN 'Superseded'
-  WHEN l.kind IS NULL THEN 'Awaiting review'
-  WHEN l.decision IN ('approve','confirmed') THEN 'Confirmed'
-  ELSE 'Returned'
+  ELSE COALESCE(${latestReview},'Awaiting review')
 END`;
 // What a search term is matched against: the record's id and kind, every
 // field a register shows as its title or context, and the name of the member
@@ -100,8 +100,8 @@ const haystack = [
 
 /**
  * How many case forms the haystack replaces for one term: two bound values
- * each. With the other values of a search (at most 31) a query binds at most
- * 91, under D1's limit of 100.
+ * each. With the other values of a search (at most 29) a query binds at most
+ * 89, under D1's limit of 100.
  */
 const foldedFormLimit = 30;
 /**
@@ -223,12 +223,7 @@ export async function searchRecords(
   if (review && !reviewStates.includes(review as ReviewState))
     throw new ApiError(400, "Invalid review state");
   const filters = ["r.tenant_id=?", "r.engagement_id=?"],
-    values: (string | number)[] = [
-      ctx.tenantId,
-      engagementId,
-      ctx.tenantId,
-      engagementId,
-    ];
+    values: (string | number)[] = [ctx.tenantId, engagementId];
   if (kinds.length) {
     filters.push("r.kind IN (" + kinds.map(() => "?").join(",") + ")");
     values.push(...kinds);
@@ -250,10 +245,9 @@ export async function searchRecords(
     pageValues.push(createdAt, createdAt, recordId);
   }
   const query = (where: string[]) =>
-    `WITH ${latestReviews}, matched AS (
+    `WITH matched AS (
   SELECT r.id,r.kind,r.body,r.sha256,r.created_at,r.actor,${stateSQL} AS review_state
   FROM assurance_records r
-  LEFT JOIN latest l ON l.kind=r.kind||'_review' AND l.subject=r.id
   LEFT JOIN memberships m ON m.tenant_id=r.tenant_id AND m.user_id=r.actor
   WHERE ${where.join(" AND ")}
 )`;
@@ -365,3 +359,120 @@ export async function reviewQueueSummary(ctx: Context, engagementId: string) {
   };
 }
 export type ReviewQueueSummary = Awaited<ReturnType<typeof reviewQueueSummary>>;
+
+/**
+ * Body fields that name other assurance records of the engagement; the record
+ * details link them (app/assurance-record-details.tsx).
+ */
+export const recordReferenceFields = [
+  "systemId",
+  "predictionId",
+  "datasetCardRecordId",
+  "sourceIds",
+  "affectedIds",
+  "supersedesId",
+  "assertionId",
+  "impactId",
+  "obligationId",
+  "assistantId",
+  "locationId",
+  "recordId",
+  "citationIds",
+  "previousId",
+  "newId",
+] as const;
+/** At most this many referenced records are loaded with a record. */
+export const recordReferenceLimit = 500;
+/**
+ * The ids a record's body names in its reference fields, at the top level or
+ * in a list of entries (such as an assertion's source relationships).
+ */
+export function referencedIds(record: AssuranceRecord) {
+  const ids: string[] = [],
+    collect = (body: unknown) => {
+      if (!body || typeof body !== "object" || Array.isArray(body)) return;
+      for (const field of recordReferenceFields)
+        for (const value of [(body as Record<string, unknown>)[field]].flat())
+          if (typeof value === "string" && value !== record.id) ids.push(value);
+    };
+  collect(record.body);
+  for (const value of Object.values(record.body ?? {}))
+    if (Array.isArray(value)) value.forEach(collect);
+  return [...new Set(ids)].slice(0, recordReferenceLimit);
+}
+export type RecordContext = {
+  record: AssuranceRecord;
+  /** The record's review state; `null` for a record that is not an assessment. */
+  reviewState: ReviewState | null;
+  /**
+   * The records its details read: its reviews, the assessments that supersede
+   * it and the records its body names, in (created_at, id) order.
+   */
+  related: AssuranceRecord[];
+};
+/**
+ * One record of the engagement with what its details need, read by id rather
+ * than from a load of every record: its reviews (through idx_review_subject),
+ * its successors (through idx_assessment_successor) and the records it names.
+ */
+export async function recordContext(
+  ctx: Context,
+  engagementId: string,
+  recordId: string,
+): Promise<RecordContext> {
+  const [record] = await recordsById(ctx, engagementId, [recordId]);
+  if (!record) throw new ApiError(404, "Assurance record not found");
+  const assessment = ["assertion", "impact", "obligation"].includes(
+    record.kind,
+  );
+  const [reviews, successors, named] = await Promise.all([
+    assessment
+      ? db()
+          .prepare(
+            "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records v WHERE v.tenant_id=? AND v.engagement_id=? AND v.kind IN ('assertion_review','impact_review','obligation_review') AND v.kind=? AND COALESCE(json_extract(v.body,'$.assertionId'),json_extract(v.body,'$.impactId'),json_extract(v.body,'$.obligationId'))=? ORDER BY v.created_at,v.id",
+          )
+          .bind(ctx.tenantId, engagementId, record.kind + "_review", record.id)
+          .all<RecordRow>()
+          .then((r) => r.results.map(parsed))
+      : [],
+    assessment
+      ? db()
+          .prepare(
+            "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind IN " +
+              assessmentKinds +
+              " AND json_extract(body,'$.supersedesId')=? ORDER BY created_at,id",
+          )
+          .bind(ctx.tenantId, engagementId, record.id)
+          .all<RecordRow>()
+          .then((r) => r.results.map(parsed))
+      : [],
+    recordsById(ctx, engagementId, referencedIds(record)),
+  ]);
+  const related = new Map<string, AssuranceRecord>();
+  for (const r of [...reviews, ...successors, ...named]) related.set(r.id, r);
+  const ordered = [...related.values()].sort((a, b) =>
+    a.createdAt === b.createdAt
+      ? a.id < b.id
+        ? -1
+        : a.id > b.id
+          ? 1
+          : 0
+      : a.createdAt < b.createdAt
+        ? -1
+        : 1,
+  );
+  const latest = reviews.at(-1);
+  return {
+    record,
+    reviewState: !assessment
+      ? null
+      : successors.length
+        ? "Superseded"
+        : !latest
+          ? "Awaiting review"
+          : ["approve", "confirmed"].includes(latest.body.decision)
+            ? "Confirmed"
+            : "Returned",
+    related: ordered,
+  };
+}
