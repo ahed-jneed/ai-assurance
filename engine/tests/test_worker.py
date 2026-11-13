@@ -418,6 +418,8 @@ class WorkerTests(unittest.TestCase):
         return report, hosted_results(report, request)
 
     def worker(self, transport, workspace="jobs", **kwargs):
+        # Tabular-path tests; GenAI ingest (claimed whenever a zstd back-end imports) has its own tests in test_genai_worker.py.
+        kwargs.setdefault("genai_ingest", False)
         return Worker(transport, ProcessExecutor(), self.root/workspace, worker_id=WORKER_ID, image_digest=IMAGE, heartbeat=1, **kwargs)
 
     def test_exact_request_bytes_and_duplicate_nonfinite_json_rejected(self):

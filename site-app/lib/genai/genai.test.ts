@@ -76,8 +76,9 @@ describe("the genai-result/0.1 envelope", () => {
   it("accepts the engine's envelope by its exact strings", async () => {
     const { envelope, computation } = await readGenaiEnvelope(exampleText);
     expect(envelope.computationSha256).toBe(
-      // The committed example envelope; it changes with the engine version (runner 1.6.0, #136).
-      "db4255de73addc096df5b62bd2d1cc15816b757fcb69384b3320b5bdd4cb5545",
+      // The committed example envelope; it changes with the engine version (runner 1.6.0, #136)
+      // and the genai version (0.2.0, #128).
+      "a24df93b8a80c6c8f626994aaa3b9e323ee9c0d5b38fa4a3c5c8fcf4b25715b9",
     );
     expect(computation.runs.map((r) => r.runKey)).toEqual([RUN]);
   });
@@ -378,9 +379,29 @@ describe("plans and manifests the workspace freezes", () => {
     expect(
       genaiPlan.safeParse({ ...plan, minimums: { sampleSize: 10 } }).success,
     ).toBe(false);
-    expect(genaiPlan.safeParse({ ...plan, excerpts: "all" }).success).toBe(
+    for (const excerpts of ["none", "failures", "all"])
+      expect(genaiPlan.safeParse({ ...plan, excerpts }).success).toBe(true);
+    expect(genaiPlan.safeParse({ ...plan, excerpts: "some" }).success).toBe(
       false,
     );
+    const key = {
+      keyId: "test-detector-key-1",
+      solutionId: "example-detector",
+      algorithm: "Ed25519",
+      publicKeySPKI:
+        "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=",
+    };
+    expect(genaiPlan.safeParse({ ...plan, detectionKeys: [key] }).success).toBe(
+      true,
+    );
+    for (const bad of [
+      { ...key, algorithm: "RSA" },
+      { ...key, publicKeySPKI: "AAAA" },
+      { ...key, extra: 1 },
+    ])
+      expect(
+        genaiPlan.safeParse({ ...plan, detectionKeys: [bad] }).success,
+      ).toBe(false);
   });
   it("pins each manifest input once by SHA-256", () => {
     const input = {

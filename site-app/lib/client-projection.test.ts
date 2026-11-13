@@ -124,6 +124,44 @@ describe("client projection of released reports", () => {
     expect(only.supersededBy).toBeUndefined();
   });
 
+  it("shows the client when a release notified it, without the internal note (#94)", () => {
+    const e = stored();
+    const later = "2026-11-06T09:00:00.000Z";
+    e.reports = [
+      report("REPORT-1", {
+        state: "released",
+        releasedAt: later,
+        recipientScope: "Authorized members of Fixture Bank AG",
+        releasedBy: "user-lead",
+        history: [
+          { actor: "user-lead", at: later, action: "release", reason: "Go" },
+          {
+            actor: "user-lead",
+            at: later,
+            action: "notify_client",
+            reason:
+              "Released to Authorized members of Fixture Bank AG. Notify the recipients that this report is available.",
+          },
+        ],
+      }),
+      // Released before releases recorded a notification.
+      report("REPORT-0", { state: "superseded", releasedAt: at, history: [] }),
+    ];
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(client.reports.map((r) => [r.id, r.notification])).toEqual([
+      [
+        "REPORT-1",
+        { at: later, recipients: "Authorized members of Fixture Bank AG" },
+      ],
+      ["REPORT-0", undefined],
+    ]);
+    const json = JSON.stringify(client.reports);
+    expect(json).not.toContain("user-lead");
+    expect(json).not.toContain("Notify the recipients");
+    // The audit team keeps the full record.
+    expect(sanitize(e, caller()).reports[0].notification).toBeUndefined();
+  });
+
   it("shows clients no internal, approved or withdrawn package", () => {
     const e = stored();
     e.reports = [

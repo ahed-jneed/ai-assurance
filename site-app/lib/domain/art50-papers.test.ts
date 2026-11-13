@@ -6,6 +6,7 @@ import { resolveNew } from "../criteria/pin";
 import { freshEngagement } from "../factories";
 import { asRulePack } from "../rule-pack";
 import {
+  art50Dating,
   art50PaperSuggestion,
   isArt50Paper,
   type PaperSuggestion,
@@ -181,5 +182,183 @@ describe("Art 50 paper suggestions", () => {
   it("suggest nothing for a classification recorded before the tri-state model", () => {
     const legacy: Classification = { ...fresh(), model: undefined };
     expect(art50PaperSuggestion(legacy, rules, item("WP-XC-07"))).toBeNull();
+  });
+});
+
+// #152: an applicable paper is dated against the engagement period with the
+// rule pack's Art 50 dates (2 August 2026; Art 50(2) on 2 December 2026 for
+// generators placed on the market before 2 August 2026, Art 111(4)).
+describe("Art 50 paper suggestions by engagement period", () => {
+  const dating = art50Dating(asRulePack(catalog.regulatorySnapshot));
+  const generator = (placedOnMarketDate: string) =>
+    classified("Provider", {
+      interactsDirectlyWithNaturalPersons: "no",
+      generatesSyntheticImage: "yes",
+      placedOnMarketDate,
+      ...providerExclusionsNo,
+      ...art50_2No,
+    });
+  const chatbot = classified("Provider", {
+    interactsDirectlyWithNaturalPersons: "yes",
+    obviousToReasonablyWellInformedPerson: "no",
+    ...providerExclusionsNo,
+  });
+  const dated = (
+    c: Classification,
+    id: string,
+    period: { start: string; end: string } | null,
+  ) => art50PaperSuggestion(c, rules, item(id), { period, dating })!;
+
+  it("read the Art 50 dates and the Art 111(4) transition from the pack", () => {
+    expect(dating?.appliesFrom).toMatchObject({
+      entryId: "aia-2026-08-02-art50-transparency",
+      date: "2026-08-02",
+    });
+    expect(dating?.transitions).toEqual([
+      expect.objectContaining({
+        entryId: "aia-2026-12-02-art50-2-legacy-transition",
+        reference: "Art 111(4)",
+        date: "2026-12-02",
+      }),
+    ]);
+    expect(art50Dating(null)).toBeNull();
+  });
+
+  it("suggest readiness when the period ends before Art 50 applies", () => {
+    const s = dated(chatbot, "WP-XC-07", {
+      start: "2026-01-01",
+      end: "2026-06-30",
+    });
+    expect(s.applicability).toBe("readiness");
+    // Art 50(1) and the Art 50(5) manner of informing that follows it.
+    expect(s.timing?.items).toEqual(
+      ["AIA-50-1", "AIA-50-5"].map((code) => ({
+        code,
+        date: "2026-08-02",
+        transition: null,
+        alternativeDate: null,
+        period: "readiness",
+        missingFacts: [],
+      })),
+    );
+    // D-02: the dates carry their open legal-review items.
+    expect(s.timing?.pendingReview).toEqual(
+      expect.arrayContaining(["LR-03", "LR-04"]),
+    );
+    expect(s.rationale).toContain(
+      "Suggested from the provisional classification (rule pack " +
+        rules.rulePackVersion +
+        "): readiness: the obligations start applying after the engagement period.",
+    );
+    expect(s.rationale).toContain(
+      "Timing for the period 2026-01-01 to 2026-06-30: AIA-50-1 applies from 2026-08-02, after the period ends; AIA-50-5 applies from 2026-08-02, after the period ends.",
+    );
+    expect(s.rationale).toMatch(/The dates are pending legal review \(LR-/);
+  });
+
+  it("keep a paper applicable when the period reaches the date", () => {
+    for (const [start, end] of [
+      ["2026-09-01", "2026-11-30"],
+      ["2026-07-01", "2026-09-30"],
+    ]) {
+      const s = dated(chatbot, "WP-XC-07", { start, end });
+      expect(s.applicability).toBe("applicable");
+      expect(s.timing?.items[0].period).toBe(
+        start === "2026-09-01" ? "applicable" : "starts_in_period",
+      );
+    }
+  });
+
+  it("date Art 50(2) by the Art 111(4) transition for a generator already on the market", () => {
+    const period = { start: "2026-09-01", end: "2026-11-30" };
+    const before = dated(generator("2026-03-01"), "WP-XC-10", period);
+    expect(before.applicability).toBe("readiness");
+    expect(before.timing?.items).toEqual([
+      {
+        code: "AIA-50-2",
+        date: "2026-12-02",
+        transition: "Art 111(4)",
+        alternativeDate: null,
+        period: "readiness",
+        missingFacts: [],
+      },
+    ]);
+    expect(before.rationale).toContain(
+      "AIA-50-2 applies from 2026-12-02 (Art 111(4) transition), after the period ends.",
+    );
+    // A system placed on the market after 2 August 2026 has no transition.
+    const after = dated(generator("2026-09-15"), "WP-XC-10", period);
+    expect(after.applicability).toBe("applicable");
+    expect(after.timing?.items[0]).toMatchObject({
+      date: "2026-08-02",
+      transition: null,
+      period: "applicable",
+    });
+  });
+
+  it("wait for the placing date when the transition alone decides", () => {
+    const s = dated(generator("unknown"), "WP-XC-10", {
+      start: "2026-09-01",
+      end: "2026-11-30",
+    });
+    expect(s.applicability).toBe("pending");
+    expect(s.timing?.items[0]).toMatchObject({
+      date: null,
+      period: "undetermined",
+      missingFacts: ["placedOnMarketDate"],
+    });
+    expect(s.missingFacts).toEqual(["Date first placed on the Union market"]);
+    // Ending before 2 August 2026, both dates give readiness.
+    const early = dated(generator("unknown"), "WP-XC-10", {
+      start: "2026-01-01",
+      end: "2026-06-30",
+    });
+    expect(early.applicability).toBe("readiness");
+    expect(early.timing?.items[0]).toMatchObject({
+      date: "2026-08-02",
+      transition: "Art 111(4)",
+      alternativeDate: "2026-12-02",
+      period: "readiness",
+    });
+    // The rationale names both dates: Art 111(4) gives 2026-12-02, not the
+    // general 2026-08-02.
+    expect(early.rationale).toContain(
+      "AIA-50-2 applies from 2026-08-02, or from 2026-12-02 under the Art 111(4) transition (its facts are not recorded), after the period ends.",
+    );
+    expect(early.rationale).not.toContain("2026-08-02 (Art 111(4) transition)");
+    // Starting after 2 December 2026, both dates give applicable.
+    const late = dated(generator("unknown"), "WP-XC-10", {
+      start: "2027-01-01",
+      end: "2027-06-30",
+    });
+    expect(late.applicability).toBe("applicable");
+    expect(late.timing?.items[0]).toMatchObject({
+      date: "2026-08-02",
+      transition: "Art 111(4)",
+      alternativeDate: "2026-12-02",
+      period: "applicable",
+      missingFacts: [],
+    });
+    expect(late.rationale).toContain(
+      "AIA-50-2 applies from 2026-08-02, or from 2026-12-02 under the Art 111(4) transition (its facts are not recorded), before the period starts.",
+    );
+  });
+
+  it("say so when the engagement period is not set, and change nothing else", () => {
+    const s = dated(chatbot, "WP-XC-07", null);
+    expect(s.applicability).toBe("applicable");
+    expect(s.timing).toBeNull();
+    expect(s.rationale).toContain(
+      "Timing not considered: the engagement period is not set in the brief.",
+    );
+    // Without timing, as before #152.
+    const plain = art50PaperSuggestion(chatbot, rules, item("WP-XC-07"))!;
+    expect(plain.timing).toBeUndefined();
+    expect(plain.rationale).not.toContain("Timing");
+    // Papers that are not applicable are not dated.
+    expect(
+      dated(chatbot, "WP-XC-11", { start: "2026-01-01", end: "2026-06-30" })
+        .applicability,
+    ).toBe("not_applicable");
   });
 });

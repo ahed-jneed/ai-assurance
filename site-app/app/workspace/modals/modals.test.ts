@@ -9,6 +9,7 @@ vi.mock("@/lib/domain", async (original) => ({
   finalReportGates: () => gates.open,
 }));
 
+import { incidentChoices } from "../../integrity-incidents";
 import { classificationDefaults } from "./classification";
 import { classificationPayload, formRules } from "./classification-form";
 import { requestFormDefaults } from "./evidence-request";
@@ -111,6 +112,7 @@ describe("modal definitions", () => {
       memberRevoke: ["Revoke practice access", "Revoke access"],
       invite: ["Invite by email", "Save invitation"],
       invitationCancel: ["Cancel invitation", "Cancel invitation"],
+      incidentHandle: ["Handle integrity incident", "Record handling"],
       practiceRename: ["Rename practice", "Save name"],
       qualityReviewPolicy: ["Quality review policy", "Save policy"],
       reportSettings: ["Report settings", "Save report settings"],
@@ -560,6 +562,38 @@ describe("form defaults", () => {
         execution: undefined,
       } as unknown as Procedure),
     ).toMatchObject({ article: "10", condition: "" });
+  });
+});
+
+describe("integrity incident handling (#151)", () => {
+  it("acknowledges or resolves the incident the panel names, and nothing else", async () => {
+    for (const handling of ["acknowledged", "resolved"] as const) {
+      const choices = incidentChoices(
+        {
+          engagementId: "ENG-C",
+          title: "Gamma audit",
+          objectKey: "t/ENG-C/immutable/report/abc",
+          kind: "missing",
+          status: 503,
+          firstSeen: "2026-11-12T00:00:00.000Z",
+          lastSeen: "2026-11-13T00:00:00.000Z",
+          occurrences: 3,
+          lastSeenBy: "Lea",
+          handling: "open",
+          handledAt: null,
+          handledBy: null,
+        },
+        handling,
+      );
+      const ctx = context("incidentHandle", { choices });
+      await submit("incidentHandle", ctx);
+      expect(ctx.manage).toHaveBeenCalledWith("handleIntegrityIncident", {
+        engagementId: "ENG-C",
+        objectKey: "t/ENG-C/immutable/report/abc",
+        kind: "missing",
+        handling,
+      });
+    }
   });
 });
 

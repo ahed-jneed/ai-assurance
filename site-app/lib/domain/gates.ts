@@ -66,8 +66,13 @@ export type GateFeatures = {
 const aiActFeatures: GateFeatures = { aiActClassification: true };
 export {
   isReleaseTimeRecord,
+  releaseChecklist,
+  releaseChecklistAnswers,
+  releaseChecklistLines,
+  releaseTimeAssignmentNote,
   releaseTimeMessage,
   releaseTimeTemplates,
+  type ReleaseChecklistRecord,
 } from "./release-time";
 /**
  * The index in `stages` of the lifecycle stage a paper's or procedure's

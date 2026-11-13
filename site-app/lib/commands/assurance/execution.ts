@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jobs, recordStatement } from "../../assurance-store";
+import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Outcome, Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
@@ -228,11 +228,7 @@ export const execution: AssuranceModule = defineCommands({
           outputLabels,
         });
       }
-      const pending = await jobs(ctx, e.id);
-      if (
-        pending.filter((j) => ["queued", "running"].includes(String(j.state)))
-          .length >= 10
-      )
+      if ((await pendingJobCount(ctx, e.id)) >= 10)
         throw new ApiError(429, "Finish or cancel pending external work");
       const jobId = id("JOB"),
         modelArtifact = e.artifacts.find((x) => x.id === m.artifactId)!,

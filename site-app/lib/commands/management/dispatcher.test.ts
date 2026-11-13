@@ -48,6 +48,7 @@ const ops = [
   "setQualityReviewPolicy",
   "setReportSettings",
   "rotateSigningKey",
+  "handleIntegrityIncident",
 ];
 // Valid data for each op, against the practice below.
 const valid: Record<string, Record<string, unknown>> = {
@@ -66,6 +67,12 @@ const valid: Record<string, Record<string, unknown>> = {
   setQualityReviewPolicy: { coolingOffDays: 365, reason: "Firm policy review" },
   setReportSettings: { signatory: "Lea & Partners", location: "Vienna" },
   rotateSigningKey: { reason: "Scheduled annual rotation" },
+  handleIntegrityIncident: {
+    engagementId: "ENG-1",
+    objectKey: "tenant-1/ENG-1/immutable/report/abc",
+    kind: "missing",
+    handling: "acknowledged",
+  },
 };
 // The members of the fixture practice besides the caller (user-lead).
 const people: Record<string, Record<string, unknown>> = {
@@ -99,6 +106,7 @@ function practice(
     grants = [] as string[],
     workers = [] as string[],
     pendingInvitations = [] as string[],
+    incidentHandling = "open",
   } = {},
 ) {
   const d1 = fakeD1((sql, args) => {
@@ -123,6 +131,8 @@ function practice(
       sql.startsWith("SELECT id FROM invitations WHERE tenant_id=? AND email")
     )
       return pendingInvitations.map((id) => ({ id }));
+    if (sql.startsWith("SELECT handling FROM integrity_incidents"))
+      return args[1] === "ENG-1" ? { handling: incidentHandling } : null;
     return null;
   }, changes);
   env.DB = d1.db;
@@ -277,6 +287,7 @@ describe("POST /api/management", () => {
           setQualityReviewPolicy: ["tenants"],
           setReportSettings: ["tenants"],
           rotateSigningKey: ["dossier_keys", "dossier_keys"],
+          handleIntegrityIncident: ["integrity_incidents"],
         }[op],
       );
     },
@@ -860,6 +871,77 @@ describe("invitations and practice settings (F-44)", () => {
     const event = d1.batches[0].at(-1)!;
     expect(event.args[4]).toBe(JSON.stringify(details));
     expect(String(event.args[4])).not.toContain("A256GCM");
+  });
+
+  it("acknowledges or resolves an integrity incident and records it (#151)", async () => {
+    const incident = valid.handleIntegrityIncident;
+    let d1 = practice();
+    signIn(caller());
+    const response = await post("handleIntegrityIncident", incident);
+    const { details } = (await response.json()) as {
+      details: Record<string, string>;
+    };
+    expect(details).toEqual({
+      engagementId: "ENG-1",
+      objectKey: incident.objectKey,
+      kind: "missing",
+      handling: "acknowledged",
+      previous: "open",
+    });
+    const [update] = own(d1);
+    expect(update.sql).toMatch(
+      /^UPDATE integrity_incidents SET handling=\?,handled_at=\?,handled_by=\? WHERE tenant_id=\? AND engagement_id=\? AND object_key=\? AND kind=\? AND handling=\? AND /,
+    );
+    expect(update.args.slice(0, 8)).toEqual([
+      "acknowledged",
+      expect.any(String),
+      "user-lead",
+      "tenant-1",
+      "ENG-1",
+      incident.objectKey,
+      "missing",
+      "open",
+    ]);
+    expect(d1.batches[0].at(-1)!.args[4]).toBe(JSON.stringify(details));
+    // An acknowledged incident may be resolved, not acknowledged again.
+    d1 = practice(1, { incidentHandling: "acknowledged" });
+    expect(
+      await refusal(await post("handleIntegrityIncident", incident)),
+    ).toEqual({ status: 409, error: "This incident is already acknowledged" });
+    expect(
+      (
+        await post("handleIntegrityIncident", {
+          ...incident,
+          handling: "resolved",
+        })
+      ).status,
+    ).toBe(200);
+    // A resolved one reopens only when it recurs.
+    d1 = practice(1, { incidentHandling: "resolved" });
+    expect(
+      await refusal(await post("handleIntegrityIncident", incident)),
+    ).toEqual({
+      status: 409,
+      error:
+        "This incident is resolved. It reopens if a member meets the damaged record again.",
+    });
+    expect(
+      await refusal(
+        await post("handleIntegrityIncident", {
+          ...incident,
+          engagementId: "ENG-9",
+        }),
+      ),
+    ).toEqual({ status: 404, error: "Integrity incident not found" });
+    expect(
+      (
+        await post("handleIntegrityIncident", {
+          ...incident,
+          handling: "open",
+        })
+      ).status,
+    ).toBe(400);
+    expect(d1.batches).toEqual([]);
   });
 
   it("refuses a signing key rotation without DOSSIER_KEK", async () => {

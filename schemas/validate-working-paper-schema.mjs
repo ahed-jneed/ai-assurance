@@ -94,6 +94,12 @@ if (withTemplates) {
   negative('memo record with an unknown kind', memo, paper => { paper.records.minutes = {}; });
   negative('sign-off without its package hash', memo, paper => { delete paper.records.qualityReview.signOffs[0].internalHash; });
   negative('release completion with a malformed hash', memo, paper => { paper.records.releaseCompletion.clientHash = 'x'; });
+  // The approver's completion checklist, recorded with the approval (#94).
+  const answered = structuredClone(memo);
+  answered.records.releaseCompletion.checklist = { items: [{ id: 'independence', answer: 'confirmed' }, { id: 'representations', answer: 'not_applicable' }], note: 'No responsible party distinct from the engaging party.' };
+  positive('Sealed memo with the completion checklist', answered);
+  negative('completion checklist with an unknown answer', answered, paper => { paper.records.releaseCompletion.checklist.items[0].answer = 'no'; });
+  negative('completion checklist without its note', answered, paper => { delete paper.records.releaseCompletion.checklist.note; });
 }
 // Documents a paper export wrote, for example the papers/*.json files of a
 // dossier or the workingPapers of a report package: a JSON array, or an

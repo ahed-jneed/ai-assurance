@@ -167,6 +167,7 @@ def parse(files, plan, manifest_inputs=None):
         item["usage"] = {"inputTokens": common._int(usage.get("prompt")), "outputTokens": common._int(usage.get("completion")),
                          "latencyMs": latency if isinstance(latency, (int, float)) and not isinstance(latency, bool) and latency >= 0 else None}
         ctx = {"error": error, "success": result.get("success") is True, "failureReason": failure, "attack": is_attack}
+        common.keep_excerpt(ctx, plan, chat if chat is not None else raw_prompt, None if error else response.get("output"), run.warnings, locator)
         status, reason, value, rule = outcome(item, ctx, primary_plan or "overall", plan["successRule"])
         common.set_outcome(item, status, reason, value, rule, plan["scorePolicy"])
         run.add(item, ctx)

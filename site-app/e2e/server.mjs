@@ -11,6 +11,7 @@
 //
 //   npm run build && node e2e/server.mjs [port]
 import { spawn, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +57,11 @@ const worker = spawn(
     "IDENTITY_TRUSTED_HEADERS:loopback-tests",
     "--var",
     "SELF_SIGNUP:@personas.test",
+    // A throwaway key-encryption key for this run's practice signing keys,
+    // so the dossier specs can seal (docs/security/signing-keys.md). The
+    // database it wraps keys in is deleted at the next start.
+    "--var",
+    "DOSSIER_KEK:" + randomBytes(32).toString("base64"),
   ],
   { cwd: projectRoot, stdio: "inherit" },
 );

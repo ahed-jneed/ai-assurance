@@ -119,6 +119,19 @@ export class Api {
     return (await response.json()).details as Record<string, any>;
   }
 
+  /** Runs a practice management command at the current version. */
+  async manage(tenantId: string, op: string, data: Record<string, unknown>) {
+    const w = await this.workspace(tenantId);
+    const response = await this.post("/api/management", {
+      tenantId,
+      expectedVersion: w.managementVersion,
+      op,
+      data,
+    });
+    expect(response.status(), `${op}: ${await response.text()}`).toBe(200);
+    return (await response.json()).details as Record<string, any>;
+  }
+
   /** Uploads a small evidence file through /api/evidence. */
   async uploadEvidence(
     tenantId: string,
@@ -140,7 +153,7 @@ export class Api {
         visibility,
         file: {
           name,
-          mimeType: "text/plain",
+          mimeType: name.endsWith(".csv") ? "text/csv" : "text/plain",
           buffer: typeof content === "string" ? Buffer.from(content) : content,
         },
       },
@@ -228,8 +241,11 @@ export const test = base.extend<Fixtures>({
   },
 });
 
-/** The workspace URL of a view of the demo engagement. */
-export function workspacePath(demo: Demo, view: string) {
+/** The ids that address an engagement: the demo one or one a spec created. */
+export type EngagementRef = Pick<Demo, "tenantId" | "engagementId">;
+
+/** The workspace URL of a view of an engagement. */
+export function workspacePath(demo: EngagementRef, view: string) {
   return (
     "/?" +
     new URLSearchParams({
@@ -241,11 +257,21 @@ export function workspacePath(demo: Demo, view: string) {
 }
 
 /** The deep link that opens a working paper (lib/workspace-links.ts). */
-export function paperPath(demo: Demo, paperId: string) {
+export function paperPath(demo: EngagementRef, paperId: string) {
+  return recordPath(demo, "Working papers", "paper", paperId);
+}
+
+/** The deep link that opens a record of a view (lib/workspace-links.ts). */
+export function recordPath(
+  e: EngagementRef,
+  view: string,
+  kind: string,
+  recordId: string,
+) {
   return (
-    workspacePath(demo, "Working papers") +
+    workspacePath(e, view) +
     "&" +
-    new URLSearchParams({ kind: "paper", record: paperId })
+    new URLSearchParams({ kind, record: recordId })
   );
 }
 
@@ -253,19 +279,19 @@ export function paperPath(demo: Demo, paperId: string) {
  * Runs `action` (a click that sends one workspace command) and waits for the
  * Worker's answer to that command, so the spec reads the result only after
  * the save is complete. Never read through the API while the UI's command is
- * still in flight: that is the read that hung in #119.
+ * still in flight: that is the read that hung in #119. `status` is the answer
+ * expected, 200 unless the spec checks a refusal; `path` is the command
+ * route, /api/management for practice administration.
  */
 export async function runCommand(
   page: Page,
   op: string,
   action: () => Promise<unknown>,
+  { status = 200, path = "/api/workspace" } = {},
 ) {
   const answered = page.waitForResponse((response) => {
     const request = response.request();
-    if (
-      request.method() !== "POST" ||
-      new URL(request.url()).pathname !== "/api/workspace"
-    )
+    if (request.method() !== "POST" || new URL(request.url()).pathname !== path)
       return false;
     try {
       return (request.postDataJSON() as { op?: unknown } | null)?.op === op;
@@ -275,7 +301,7 @@ export async function runCommand(
   });
   await action();
   const response = await answered;
-  expect(response.status(), `${op}: ${await response.text()}`).toBe(200);
+  expect(response.status(), `${op}: ${await response.text()}`).toBe(status);
   return response;
 }
 

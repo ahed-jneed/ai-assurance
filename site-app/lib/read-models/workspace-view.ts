@@ -14,6 +14,7 @@ import {
   integrityIncidents,
   recordIntegrityIncident,
 } from "../engagement-storage";
+import { isOperator } from "../operator";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import {
@@ -134,6 +135,55 @@ export async function lapsedGrants(
   return grants
     .filter((g) => clientGrantLapsed(g, holders.get(g.userId)))
     .map((g) => g.id);
+}
+/** A revocation that cancelled pending invitations, as Members & access lists it. */
+export type RevocationCancellation = {
+  eventId: string;
+  createdAt: string;
+  userId: string;
+  /** The revoked member's display name, or null when no membership row is left. */
+  displayName: string | null;
+  /** Who revoked: a display name, or the user id without a membership. */
+  revokedBy: string;
+  /** The cancelled invitations with the email each was sent to. */
+  invitations: { id: string; email: string }[];
+};
+/** How many such revocations Members & access lists, newest first. */
+export const revocationCancellationLimit = 20;
+/**
+ * The practice's latest revocations that cancelled pending invitations
+ * (#151): revokeMember records the cancelled invitation ids in its
+ * management event, and the emails come from the invitation rows, which stay
+ * after cancellation. For practice administrators.
+ */
+export async function revocationCancellations(
+  ctx: Context,
+): Promise<RevocationCancellation[]> {
+  return (
+    await db()
+      .prepare(
+        "SELECT e.id,e.created_at,json_extract(e.details,'$.userId') AS user_id,(SELECT m.display_name FROM memberships m WHERE m.tenant_id=e.tenant_id AND m.user_id=json_extract(e.details,'$.userId')) AS display_name,COALESCE((SELECT a.display_name FROM memberships a WHERE a.tenant_id=e.tenant_id AND a.user_id=e.actor),e.actor) AS revoked_by,(SELECT json_group_array(json_object('id',i.id,'email',i.email)) FROM json_each(e.details,'$.cancelledInvitations') c JOIN invitations i ON i.tenant_id=e.tenant_id AND i.id=c.value) AS invitations FROM management_events e WHERE e.tenant_id=? AND e.action='revokeMember' AND json_valid(e.details) AND json_array_length(e.details,'$.cancelledInvitations')>0 ORDER BY e.created_at DESC,e.id LIMIT ?",
+      )
+      .bind(ctx.tenantId, revocationCancellationLimit)
+      .all<{
+        id: string;
+        created_at: string;
+        user_id: string;
+        display_name: string | null;
+        revoked_by: string;
+        invitations: string | null;
+      }>()
+  ).results.map((r) => ({
+    eventId: r.id,
+    createdAt: r.created_at,
+    userId: r.user_id,
+    displayName: r.display_name,
+    revokedBy: r.revoked_by,
+    invitations: JSON.parse(r.invitations ?? "[]") as {
+      id: string;
+      email: string;
+    }[],
+  }));
 }
 /** How many engagements the default selection tries before giving up. */
 const defaultAttempts = 3;
@@ -291,6 +341,9 @@ export async function workspaceView(
   // Damaged engagement records found by any member (#16), for the practice's
   // administrators; read after this request recorded its own.
   const incidents = ctx.practiceAdmin ? await integrityIncidents(ctx) : null;
+  const revocations = ctx.practiceAdmin
+    ? await revocationCancellations(ctx)
+    : [];
   const trail = e ? await engagementTrail(ctx, e) : null;
   return {
     identity: {
@@ -298,6 +351,9 @@ export async function workspaceView(
       name: ctx.user.displayName,
       role: ctx.role,
       practiceAdmin: ctx.practiceAdmin,
+      // A platform operator (PLATFORM_OPERATORS) gets a link to /operator in
+      // the account menu (#151); the console checks the list again itself.
+      operator: isOperator(ctx.user.email),
     },
     tenantId: ctx.tenantId,
     memberships,
@@ -313,6 +369,7 @@ export async function workspaceView(
     managementVersion,
     qualityReviewPolicy,
     managementEvents,
+    revocationCancellations: revocations,
     integrityIncidents: incidents,
     reportSettings,
     events: trail?.events ?? [],

@@ -35,6 +35,7 @@ import type { Engagement, Paper, Role, EvidenceRequest } from "@/lib/domain";
 import { canWrite } from "@/lib/domain";
 import {
   paperChecklist,
+  paperHistoryNotice,
   paperNextAction,
   type PaperTarget,
 } from "@/lib/paper-workflow";
@@ -42,6 +43,12 @@ import { paperRegisterRow } from "@/lib/paper-presentation";
 import { PaperEvidence } from "./paper-evidence";
 import { PaperComparison } from "./revision-comparison";
 import { DraftRecovery, useRecoverableDraft } from "./recoverable-draft";
+import type { PaperSuggestion } from "@/lib/domain/art50-papers";
+import {
+  Art50Suggestion,
+  canAddToScope,
+  scopeWithRationale,
+} from "./audit-program/art50-plan";
 
 const sections = {
   objective: "Objective",
@@ -141,6 +148,11 @@ type PaperEditorProps = {
   onDetail: (title: string, value: unknown) => void;
   onExport: () => void;
   resolve: (id: string) => string;
+  /**
+   * The Art 50 applicability suggestion for this paper's template (#152),
+   * shown when no program procedure holds the paper's plan.
+   */
+  art50?: PaperSuggestion | null;
 };
 
 export function PaperEditor({
@@ -174,6 +186,7 @@ export function PaperEditor({
   onDetail,
   onExport,
   resolve,
+  art50,
 }: PaperEditorProps) {
   const [reply, setReply] = useState({ id: "", text: "" });
   const [expanded, setExpanded] = useState(false),
@@ -236,10 +249,12 @@ export function PaperEditor({
     (p) => p.paperId === draft?.id,
   );
   const bound = source?.paperRevision !== undefined ? source : undefined;
+  // Superseded, retired and release-time papers never change (#94).
+  const historyNotice = saved ? paperHistoryNotice(saved) : null;
   const writer = canWrite(role),
     lead = role === "Lead Auditor",
     reviewer = ["Reviewer", "Lead Auditor"].includes(role),
-    editable = writer && draft?.status !== "signed" && !bound;
+    editable = writer && draft?.status !== "signed" && !bound && !historyNotice;
   const recovery = useRecoverableDraft(
     draft && saved && engagement
       ? {
@@ -408,6 +423,16 @@ export function PaperEditor({
                 aria-hidden="true"
               />
               <SheetTitle className="document-title">{draft.title}</SheetTitle>
+              {historyNotice && (
+                <div
+                  className="paper-history-notice"
+                  role="note"
+                  data-kind={historyNotice.kind}
+                >
+                  <b>{historyNotice.title}</b>
+                  <p>{historyNotice.text}</p>
+                </div>
+              )}
               <details className="paper-properties-details" key={draft.id}>
                 <summary>
                   <span
@@ -551,6 +576,39 @@ export function PaperEditor({
                         )
                       }
                     />
+                    {art50 && !source && (
+                      // A paper of an engagement without a program (#152):
+                      // the suggestion goes into the scope section only
+                      // when the auditor adds it and saves the paper.
+                      <Art50Suggestion
+                        suggestion={art50}
+                        current=""
+                        canUse={canAddToScope(
+                          draft.body.scope,
+                          art50.rationale,
+                          !!editable,
+                          !!locked,
+                        )}
+                        useLabel="Add to scope"
+                        decision="in the paper's scope for review"
+                        onUse={(s) =>
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  body: {
+                                    ...p.body,
+                                    scope: scopeWithRationale(
+                                      p.body.scope,
+                                      s.rationale,
+                                    ),
+                                  },
+                                }
+                              : p,
+                          )
+                        }
+                      />
+                    )}
                     <section className="paper-readiness">
                       <h3>
                         {draft.status === "draft"

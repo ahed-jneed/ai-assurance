@@ -33,7 +33,7 @@ from pathlib import Path
 from .contract import validate_report
 from .diagnostics import MAX_BYTES, read_csv, run, sha256
 from .errors import EngineError
-from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, claim_pins, client_held, completion_body, evidence_envelope, failure_code, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id
+from .worker_contract import COMPUTE_FAILURE_CODES, Claim, FORMAT_ALIASES, MAX_ENVELOPE_BYTES, MAX_RESULT_BYTES, WORKER_VERSION, claim_pins, client_held, completion_body, evidence_envelope, failure_code, genai_input_name, genai_request, json_bytes, result_signature, strict_json, timestamp, translate_config, valid_hash, valid_id, verify_genai_result_bytes
 
 # Compute writes the sanitized code to ERROR_FILE and a local-only message to
 # DETAIL_FILE; the control plane appends every job outcome to OPERATOR_LOG.
@@ -51,6 +51,8 @@ MAX_TRANSPORT_TIMEOUT = 120
 # entries; only regular files of the pinned size are read.
 MAX_CLIENT_DATA_ENTRIES = 10000
 CLIENT_COPY_CHUNK = 1024 * 1024
+# envelope.json holds the claim (at most MAX_ENVELOPE_BYTES) plus the worker's execution block.
+COMPUTE_ENVELOPE_BYTES = MAX_ENVELOPE_BYTES + 64 * 1024
 
 
 class ProtocolError(Exception):
@@ -270,15 +272,18 @@ class Transport:
         raw, clock = self._request("POST", self.endpoint, body=payload, retry=retry, sign=True)
         return (strict_json(raw) if raw else None), clock
 
-    def download(self, claim, purpose, destination, *, maximum, check_active=None):
+    def download(self, claim, purpose, destination, *, maximum, check_active=None, index=None):
         """Stream one pinned input to `destination` + ".partial" while hashing.
 
         Returns (partial path, byte count, SHA-256). The caller verifies the
-        pins before giving the bytes their final name.
+        pins before giving the bytes their final name. A GenAI evidence input
+        is addressed by its index in the frozen request.
         """
-        if purpose not in {"dataset", "model"}:
+        if purpose not in {"dataset", "model", "evidence"} or (purpose == "evidence") != (index is not None):
             raise ValueError("Unsupported input purpose")
-        query = urllib.parse.urlencode({"jobId": claim.job_id, "attemptId": claim.attempt_id, "fence": claim.fence, "input": purpose})
+        if index is not None and (isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < 64):
+            raise ValueError("Invalid evidence input index")
+        query = urllib.parse.urlencode({"jobId": claim.job_id, "attemptId": claim.attempt_id, "fence": claim.fence, "input": purpose, **({"index": index} if index is not None else {})})
         return self._request("GET", self.endpoint+"?"+query, maximum=maximum, retry=True, check_active=check_active, sink=StreamedFile(destination.with_name(destination.name+".partial")))[0]
 
 
@@ -350,7 +355,31 @@ def runtime_readiness():
         if format_name == "pmml" and not shutil.which("java"):
             errors.append("runtime_unavailable:java")
         formats[format_name] = {"runtimePresent": not errors, "packages": packages, "limitations": errors or ["Runtime import availability does not validate native inference or model safety; golden model fixtures are required before enrollment."]}
-    return {"schemaVersion": "1.0", "workerVersion": WORKER_VERSION, "provided_predictions": {"runtimePresent": True, "packages": {}}, "modelFormats": formats}
+    return {"schemaVersion": "1.0", "workerVersion": WORKER_VERSION, "provided_predictions": {"runtimePresent": True, "packages": {}}, "modelFormats": formats, "genaiIngest": genai_readiness()}
+
+
+def genai_readiness():
+    """GenAI ingest readiness (design section 10.2).
+
+    runtimePresent is true only when a zstd back-end imports: Inspect .eval logs need one, and a
+    worker without it would end every .eval job in zstd_unavailable, so it does not claim
+    genai_ingest. cryptography verifies signed detection results; without it such a bundle fails
+    with signature_backend_unavailable.
+    """
+    from .genai.readers import zstd_backend
+    packages = {}
+    for name in ("zstandard", "cryptography"):
+        try:
+            packages[name] = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            packages[name] = None
+    try:
+        importlib.import_module("cryptography.hazmat.primitives.asymmetric.ed25519")
+        signatures = True
+    except ImportError:
+        signatures = False
+    backend = zstd_backend()
+    return {"runtimePresent": backend is not None, "zstdBackend": backend, "signatureVerification": signatures, "packages": packages}
 
 
 def stripped_compute_env():
@@ -496,9 +525,12 @@ def compute_job(inputs, outputs):
     # The control plane wrote the envelope and verified the dataset, so a
     # failure in these first steps is a worker defect, not a client problem.
     with failure_stage("compute_internal_error"):
-        envelope = strict_json(bound_bytes(inputs/"envelope.json", MAX_ENVELOPE_BYTES))
+        envelope = strict_json(bound_bytes(inputs/"envelope.json", COMPUTE_ENVELOPE_BYTES), maximum=COMPUTE_ENVELOPE_BYTES)
         claim = Claim.parse(envelope["claim"])
         request = claim.request
+    if genai_request(request):
+        return compute_genai_job(inputs, outputs, envelope, claim)
+    with failure_stage("compute_internal_error"):
         data_path = inputs/"dataset.csv"
         data = bound_bytes(data_path, request["dataset"]["size"])
     if len(data) != request["dataset"]["size"] or sha256(data) != request["inputHashes"]["dataset"]:
@@ -534,6 +566,34 @@ def compute_job(inputs, outputs):
         validate_report(report)
         result = evidence_envelope(report, claim, image_digest=envelope["imageDigest"], execution=envelope["execution"])
     payload = json_bytes(result)+b"\n"
+    if len(payload) > MAX_RESULT_BYTES:
+        raise EngineError("evidence_too_large", "Completed evidence exceeds result byte bounds")
+    create_once(outputs/"result.json", payload)
+    return result
+
+
+def compute_genai_job(inputs, outputs, envelope, claim):
+    """The GenAI branch of compute (design section 10.2): verify every pinned input again, then run_bundle.
+
+    The parsers take the bytes only; nothing an input names is imported, executed or opened. A coded
+    GenaiInputError (an EngineError) reaches the platform as its code; anything else is an engine defect.
+    """
+    from .genai.envelope import envelope_json
+    from .genai.ingest import run_bundle
+    request = claim.request
+    data = {}
+    for entry in request["inputs"]:
+        with failure_stage("compute_internal_error"):
+            raw = bound_bytes(inputs/genai_input_name(entry["index"]), entry["size"])
+        if len(raw) != entry["size"] or sha256(raw) != entry["sha256"]:
+            raise EngineError("input_hash_mismatch", "Evidence input byte/hash mismatch")
+        data[entry["sha256"]] = raw
+    provenance = {"channel": "runner", "producedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                  "requestSha256": claim.request_sha256, "workerVersion": WORKER_VERSION, "imageDigest": envelope["imageDigest"]}
+    with failure_stage("compute_internal_error"):
+        result = run_bundle(data, request["manifest"], request["plan"], provenance=provenance)
+    # The exact resultJSON string, never re-serialised by the control plane.
+    payload = envelope_json(result).encode("utf-8")
     if len(payload) > MAX_RESULT_BYTES:
         raise EngineError("evidence_too_large", "Completed evidence exceeds result byte bounds")
     create_once(outputs/"result.json", payload)
@@ -600,7 +660,7 @@ def compute_failure_detail(outputs):
 
 
 class Worker:
-    def __init__(self, transport, executor, workspace, *, worker_id, image_digest, formats=(), approved_hashes=(), heartbeat=10, compute_timeout=300, maximum_jobs=100, client_data=None):
+    def __init__(self, transport, executor, workspace, *, worker_id, image_digest, formats=(), approved_hashes=(), heartbeat=10, compute_timeout=300, maximum_jobs=100, client_data=None, genai_ingest=True):
         valid_id(worker_id, "workerId")
         if not IMAGE_DIGEST.fullmatch(image_digest):
             raise ValueError("Worker image identity must be sha256:<64 lowercase hex>")
@@ -627,9 +687,12 @@ class Worker:
             raise ValueError("Selected model runtimes are unavailable: "+", ".join(sorted(unavailable)))
         self.client_data = client_data_directory(client_data, self.workspace) if client_data is not None else None
         self.formats = ["provided_predictions", *sorted(requested)]
+        # GenAI ingest (#128) parses hostile tool logs without executing anything they name; the worker
+        # claims it only when the executor's runtime can read every format (a zstd back-end for .eval).
+        self.genai_ingest = bool(genai_ingest) and bool(readiness.get("genaiIngest", {}).get("runtimePresent"))
         # "client_local" asks for jobs whose dataset stays with the client;
         # only a worker that can read the client's files offers it.
-        self.wire_formats = ["provided_predictions", *(WIRE_FORMATS[name] for name in sorted(requested)), *(["client_local"] if self.client_data else [])]
+        self.wire_formats = ["provided_predictions", *(WIRE_FORMATS[name] for name in sorted(requested)), *(["client_local"] if self.client_data else []), *(["genai_ingest"] if self.genai_ingest else [])]
         self.heartbeat, self.compute_timeout, self.maximum_jobs = heartbeat, compute_timeout, maximum_jobs
 
     def request_claim(self):
@@ -666,6 +729,9 @@ class Worker:
             os.chmod(inputs, 0o755)
             os.chmod(directory, 0o755)
         request = claim.request
+        # A GenAI request has no model or dataset: branch before touching them (design section 10.2).
+        if genai_request(request):
+            return self.execute_genai(claim, deadline, directory, inputs, outputs)
         format_name = FORMAT_ALIASES.get(request["model"].get("format")) if request["executionMode"] == "auditor_model" else None
         inference = format_name is not None
         if inference and (format_name not in self.formats or request["inputHashes"]["modelArtifact"] not in self.approved_hashes or not self.executor.permits_models):
@@ -687,29 +753,53 @@ class Worker:
                 self.fetch(claim, "model", inputs/("model"+MODEL_SUFFIXES[format_name]), lease, digest=request["inputHashes"]["modelArtifact"], size=request["model"].get("size"), digest_code="model_input_pin_mismatch", size_code="model_input_size_mismatch")
             envelope = {"claim": claim.transport_dict(), "imageDigest": self.image_digest, "execution": execution, "approvedModelSha256": request["inputHashes"].get("modelArtifact") if inference else None}
             create_once(inputs/"envelope.json", json_bytes(envelope))
-            lease.valid()
-            self.executor.execute(inputs, outputs, lease, self.compute_timeout)
-            try:
-                result = bound_bytes(outputs/"result.json", MAX_RESULT_BYTES)
-                verify_result_bytes(result, claim, self.image_digest)
-            except (ValueError, KeyError, TypeError, AttributeError) as exc:
-                raise ProtocolError("result_verification_failed") from exc
-            lease.valid()
-            body = completion_body(claim, result)
-            create_once(directory/"completion.json", body)
-            try:
-                response = self.transport.post(body, retry=True)
-            except ProtocolError as error:
-                # Completion may already have committed. Never overwrite it
-                # with fail on an ambiguous timeout or retryable server error.
-                if error.retryable:
-                    raise CompletionUncertain("completion_uncertain") from error
-                raise
-            return {"jobId": claim.job_id, "attemptId": claim.attempt_id, "resultSha256": sha256(result), "resultFile": str((outputs/"result.json").resolve()), "response": response}
+            return self.compute_and_complete(claim, directory, inputs, outputs, lease, verify_result_bytes)
 
-    def fetch(self, claim, purpose, destination, lease, *, digest, size, digest_code, size_code):
+    def compute_and_complete(self, claim, directory, inputs, outputs, lease, verify):
+        """Run compute on the staged inputs, verify its result independently and post the exact bytes."""
+        lease.valid()
+        self.executor.execute(inputs, outputs, lease, self.compute_timeout)
+        try:
+            result = bound_bytes(outputs/"result.json", MAX_RESULT_BYTES)
+            verify(result, claim, self.image_digest)
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise ProtocolError("result_verification_failed") from exc
+        lease.valid()
+        body = completion_body(claim, result)
+        create_once(directory/"completion.json", body)
+        try:
+            response = self.transport.post(body, retry=True)
+        except ProtocolError as error:
+            # Completion may already have committed. Never overwrite it
+            # with fail on an ambiguous timeout or retryable server error.
+            if error.retryable:
+                raise CompletionUncertain("completion_uncertain") from error
+            raise
+        return {"jobId": claim.job_id, "attemptId": claim.attempt_id, "resultSha256": sha256(result), "resultFile": str((outputs/"result.json").resolve()), "response": response}
+
+    def execute_genai(self, claim, deadline, directory, inputs, outputs):
+        """A `genai_ingest` attempt: download each pinned evidence input by index, then compute and complete.
+
+        Inputs get application-owned names (genai-<index>.bin); only bytes whose size and SHA-256 equal
+        the pin are promoted. Downloads run here in the control process, outside the compute limits.
+        """
+        if not self.genai_ingest:
+            raise ProtocolError("request_contract_rejected")
+        request = claim.request
+        execution = {"kind": "genai_ingest", "networkIsolation": self.executor.network_isolation, "controller": "external_auditor_worker",
+                     "limitations": ["The engine parsed the pinned tool logs as data and recomputed the statistics; it ran no harness and executed nothing the logs name."]}
+        with LeaseKeeper(self.transport, claim, deadline, interval=self.heartbeat) as lease:
+            lease.valid()
+            for entry in request["inputs"]:
+                self.fetch(claim, "evidence", inputs/genai_input_name(entry["index"]), lease, digest=entry["sha256"], size=entry["size"],
+                           digest_code="evidence_input_pin_mismatch", size_code="evidence_input_pin_mismatch", index=entry["index"])
+            envelope = {"claim": claim.transport_dict(), "imageDigest": self.image_digest, "execution": execution}
+            create_once(inputs/"envelope.json", json_bytes(envelope))
+            return self.compute_and_complete(claim, directory, inputs, outputs, lease, verify_genai_result_bytes)
+
+    def fetch(self, claim, purpose, destination, lease, *, digest, size, digest_code, size_code, index=None):
         """Download one pinned input; only verified bytes get the final name."""
-        partial, received, received_digest = self.transport.download(claim, purpose, destination, maximum=size or MAX_BYTES, check_active=lease.valid)
+        partial, received, received_digest = self.transport.download(claim, purpose, destination, maximum=size or MAX_BYTES, check_active=lease.valid, **({"index": index} if index is not None else {}))
         failure = digest_code if received_digest != digest else size_code if size is not None and received != size else None
         if failure:
             try:
@@ -927,6 +1017,7 @@ def main(argv=None):
     parser.add_argument("--formats", default="", help="Explicit reviewed native formats, e.g. onnx,xgboost_json; default provided predictions only")
     parser.add_argument("--approved-model-hashes", default=os.environ.get("ASSURANCE_APPROVED_MODEL_HASHES", ""), help="Local reviewed SHA-256 allowlist; never take this from claimed jobs")
     parser.add_argument("--client-data-dir", default=os.environ.get("ASSURANCE_CLIENT_DATA_DIR"), help="The client's own worker: directory of client-held datasets, read locally by SHA-256 pin for client-local jobs")
+    parser.add_argument("--no-genai-ingest", action="store_true", help="Do not claim GenAI ingest jobs even when the runtime can read every format")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=5)
     parser.add_argument("--heartbeat-seconds", type=float, default=10)
@@ -947,7 +1038,7 @@ def main(argv=None):
             raise ValueError("ASSURANCE_WORKER_TOKEN must be provided through the environment/secret manager")
         transport = Transport(args.site, token, os.environ.get("ASSURANCE_SITE_SERVICE_TOKEN"), timeout=args.transport_timeout)
         executor = DockerExecutor(args.compute_image) if args.executor == "docker" else ProcessExecutor()
-        worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs, client_data=args.client_data_dir or None)
+        worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs, client_data=args.client_data_dir or None, genai_ingest=not args.no_genai_ingest)
         while True:
             try:
                 result = worker.once()
