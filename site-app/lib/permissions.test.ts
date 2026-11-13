@@ -42,12 +42,15 @@ const roleRefusals = new Set([
 ]);
 
 /**
- * An engagement with an approved scope and program, so each workflow command
- * reaches its role check before it asks for missing state.
+ * An engagement with an approved scope, so each workflow command reaches its
+ * role check before it asks for missing state. With `program`, the program
+ * is in that status: planning a draft program is the engagement team's,
+ * while changing a submitted or approved one needs a Lead Auditor.
  */
-function probed(): Engagement {
+function probed(program: "draft" | "approved" = "draft"): Engagement {
   const e = stored();
   e.workflow = approvedWorkflow();
+  if (program === "draft") e.workflow.program.status = "draft";
   return e;
 }
 
@@ -165,6 +168,22 @@ describe("client permissions match the server's role checks", () => {
           mismatches.push(`${op}: guard admits ${role}`);
       }
     expect(mismatches).toEqual([]);
+  });
+
+  // The map holds each op's base role check. Some commands narrow it by
+  // state: changing the plans of a submitted or approved program, like
+  // saving an approved scope, needs a Lead Auditor.
+  it("leaves state-dependent narrowing to the commands", async () => {
+    for (const op of ["bulkPlanProcedures", "scopeProgramCandidates"]) {
+      expect(can("Auditor", op as Action), op).toBe(true);
+      await expect(
+        dispatch(probed("approved"), op, {}, caller("Auditor")),
+        op,
+      ).rejects.toMatchObject({
+        status: 403,
+        message: "A Lead Auditor must authorize this decision",
+      });
+    }
   });
 
   it("refuses the ops referred to management for every role that writes", async () => {
