@@ -5,6 +5,7 @@ import { access } from "./access";
 import { assessments } from "./assessments";
 import { assistant } from "./assistant";
 import { execution } from "./execution";
+import { genai } from "./genai";
 import { sources } from "./sources";
 import { systems } from "./systems";
 import type {
@@ -23,6 +24,7 @@ export const assuranceModules: readonly AssuranceModule[] = [
   assessments,
   assistant,
   execution,
+  genai,
 ];
 export async function dispatchAssurance(
   target: AssuranceTarget,

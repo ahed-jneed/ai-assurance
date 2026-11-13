@@ -423,6 +423,12 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "An authenticated completed result is required",
         );
+      // Checked before reading R2: a GenAI envelope has no hosted results.
+      if (JSON.parse(job.request).executionMode === "genai_ingest")
+        throw new ApiError(
+          409,
+          "This job is a GenAI ingest; use compileGenaiResult",
+        );
       if (e.artifacts.some((a) => a.id === v.jobId))
         throw new ApiError(409, "This result was already compiled");
       const o = await bucket().get(job.result_key);

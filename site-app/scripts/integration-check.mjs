@@ -1,9 +1,49 @@
 import assert from "node:assert/strict";
-import { randomBytes } from "node:crypto";
+import { spawn } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
 const base = process.argv[2] ?? "http://127.0.0.1:5173";
+// Scoped dossiers are checked with the separately reviewed verifier
+// (`python -m engine.assurance verify`); ASSURANCE_TEST_PYTHON names the Python.
+const python = process.env.ASSURANCE_TEST_PYTHON ?? "python";
+// lib/assurance-core.ts canonical(): sorted keys, no whitespace.
+const canonicalJson = (value) =>
+  value === null || typeof value !== "object"
+    ? JSON.stringify(value)
+    : Array.isArray(value)
+      ? "[" + value.map(canonicalJson).join(",") + "]"
+      : "{" +
+        Object.keys(value)
+          .sort()
+          .map((k) => JSON.stringify(k) + ":" + canonicalJson(value[k]))
+          .join(",") +
+        "}";
+const manifestDigest = (manifest) =>
+  createHash("sha256").update(canonicalJson(manifest)).digest("hex");
+const verifyDossier = (dossierPath, trustPath) =>
+  new Promise((resolve, reject) => {
+    const child = spawn(
+      python,
+      [
+        "-m",
+        "engine.assurance",
+        "verify",
+        "--dossier",
+        dossierPath,
+        "--trusted-keys",
+        trustPath,
+        "--require-trusted-signature",
+      ],
+      { cwd: path.resolve(".."), windowsHide: true },
+    );
+    let out = "";
+    child.stdout.on("data", (x) => (out += x));
+    child.stderr.on("data", (x) => (out += x));
+    child.on("error", reject);
+    child.on("exit", (code) => resolve({ code, out }));
+  });
 // The report elements a final report states at capture (report model v2).
 const reportParticulars = {
   addressee: "Fixture client board",
@@ -313,7 +353,12 @@ try {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
+    assert.equal(workspace.criteria.draft, false);
+    assert.equal(workspace.criteria.managementSystem, undefined);
     assert.equal(workspace.criteria.frameworks[0].legalReviewPending, true);
     assert.equal(
       e.criteria.pin.packVersion,
@@ -321,7 +366,7 @@ try {
     );
     assert.equal(
       workspace.selectablePacks.map((p) => p.id).join(),
-      "eu-ai-act-amended",
+      "eu-ai-act-amended,genai-evaluation,nyc-ll144-bias-audit",
     );
     const chosen = await management("createEngagement", {
       clientId: e.clientId,
@@ -347,7 +392,10 @@ try {
     const scope = new URLSearchParams({ tenantId, engagementId: legacyId });
     const legacy = await request("/api/workspace?" + scope);
     assert.equal(legacy.criteria.origin, "legacy");
-    assert.deepEqual(legacy.criteria.pin, workspace.criteria.pin);
+    // Every legacy class resolves to pack #1 2026.11.2; new engagements pin
+    // the current version (2026.11.3 since #61, the same programme).
+    assert.equal(legacy.criteria.pin.packId, workspace.criteria.pin.packId);
+    assert.equal(legacy.criteria.pin.packVersion, "2026.11.2");
     assert.equal(legacy.catalog.methodologyVersion, "2026.11.2");
     // Its template commands behave as before and write no pin.
     const created = await request("/api/workspace", {
@@ -368,6 +416,54 @@ try {
       .bind(tenantId, legacyId)
       .first();
     assert.equal(stored.criteria, null, "M0 writes nothing to the engagement");
+    // M1 (#61): the explicit legacy pin goes through the normal save, with
+    // an audit event and a version bump, and its reversal removes it.
+    const storedPin = async () =>
+      (await testDb
+        .prepare(
+          "SELECT json_extract(body,'$.criteria.origin') AS origin, json_extract(body,'$.criteria.pin.packVersion') AS version FROM engagements WHERE tenant_id=? AND id=?",
+        )
+        .bind(tenantId, legacyId)
+        .first()) ?? {};
+    const pinnedM1 = await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "pinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: created.engagement.version,
+      },
+    });
+    assert.equal(pinnedM1.engagement.version, created.engagement.version + 1);
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: "legacy", version: "2026.11.2" },
+    );
+    const afterPin = await request("/api/workspace?" + scope);
+    assert.equal(afterPin.criteria.origin, "legacy");
+    assert.deepEqual(afterPin.criteria.pin, legacy.criteria.pin);
+    const event = await testDb
+      .prepare(
+        "SELECT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY rowid DESC LIMIT 1",
+      )
+      .bind(tenantId, legacyId)
+      .first();
+    assert.equal(event?.action, "pinCriteria");
+    await request("/api/workspace", {
+      method: "POST",
+      body: {
+        op: "unpinCriteria",
+        data: {},
+        tenantId,
+        engagementId: legacyId,
+        expectedVersion: pinnedM1.engagement.version,
+      },
+    });
+    assert.deepEqual(
+      { ...(await storedPin()) },
+      { origin: null, version: null },
+    );
     const views = await request("/api/coverage?" + scope);
     assert.deepEqual(
       views.views.map((v) => v.key),
@@ -393,7 +489,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
@@ -2432,6 +2528,8 @@ try {
       ...(i === 0 ? { supersedesId: superseded.id } : {}),
       statement: "Scale assertion " + i,
       criterion: "AIA-15-1",
+      // What a scoped dossier selects by procedure (#83).
+      procedureId: proc.id,
       relations: [],
       missingEvidence: "",
       assessment: "Synthetic assessment",
@@ -3050,32 +3148,47 @@ try {
   );
   assert.deepEqual(e.reports.at(-1).snapshot.rulePack, e.rulePack);
   assert.deepEqual(e.reports.at(-1).clientSnapshot.rulePack, e.rulePack);
-  // The released package seals into both audiences' dossiers; the internal
-  // one carries every pinned assurance record byte for byte.
-  const seals = {};
-  for (const audience of ["internal", "client"])
-    seals[audience] = (
+  // The released package seals into both audiences' dossiers. Past the
+  // verifier's 500 files the full internal dossier is refused before any
+  // record body is read; scoped internal exports (#83) by record type,
+  // procedure and period carry the pinned records within their scope byte for
+  // byte, sign the scope in manifest 1.2 and verify offline.
+  const sealBody = (audience, extra = {}) => ({
+    tenantId,
+    engagementId: e.id,
+    reportId: internalFinal.id,
+    audience,
+    withheld: [],
+    ...extra,
+  });
+  const seals = {
+    client: (
       await request("/api/dossier", {
         method: "POST",
-        body: {
-          tenantId,
-          engagementId: e.id,
-          reportId: internalFinal.id,
-          audience,
-          withheld: [],
-        },
+        body: sealBody("client"),
       })
-    ).record;
-  const resealed = await request("/api/dossier", {
+    ).record,
+  };
+  const refused = await request("/api/dossier", {
     method: "POST",
-    body: { tenantId, engagementId: e.id, reportId: internalFinal.id },
+    body: sealBody("internal"),
+    status: 413,
   });
-  assert.equal(resealed.existing, true);
-  assert.equal(resealed.record.id, seals.internal.id);
-  for (const [audience, user] of [
-    ["internal", owner],
-    ["client", viewer],
-  ]) {
+  assert.match(
+    refused.error,
+    new RegExp(
+      "^This dossier would hold \\d+ files \\(" +
+        pinnedIds.length +
+        " pinned assurance records\\); the verifier accepts at most 500\\. Seal scoped exports by procedure, period or record type instead\\.$",
+    ),
+  );
+  const clientResealed = await request("/api/dossier", {
+    method: "POST",
+    body: sealBody("client"),
+  });
+  assert.equal(clientResealed.existing, true);
+  assert.equal(clientResealed.record.id, seals.client.id);
+  const downloadDossier = async (audience, user, scope) => {
     const download = await transport(
       base +
         "/api/dossier?" +
@@ -3084,16 +3197,23 @@ try {
           engagementId: e.id,
           reportId: internalFinal.id,
           audience,
+          ...(scope ? { scope } : {}),
         }),
       { headers: h(user) },
     );
     assert.equal(download.status, 200);
     const bytes = new Uint8Array(await download.arrayBuffer()),
-      hash = await hex(bytes),
-      dossier = JSON.parse(new TextDecoder().decode(bytes));
+      hash = await hex(bytes);
     assert.equal(download.headers.get("X-Dossier-SHA256"), hash);
-    assert.equal(hash, seals[audience].body.sha256);
+    return {
+      bytes,
+      hash,
+      dossier: JSON.parse(new TextDecoder().decode(bytes)),
+    };
+  };
+  const checkDossier = async (dossier, audience) => {
     assert.equal(dossier.manifest.audience, audience);
+    assert.equal(dossier.manifest.schemaVersion, "1.2");
     for (const file of dossier.files)
       assert.equal(
         await hex(Buffer.from(file.contentBase64, "base64")),
@@ -3121,25 +3241,10 @@ try {
       ),
       "released report.html names the rule pack",
     );
-    const pinnedFiles = dossier.files.filter((f) =>
-      f.path.startsWith("assurance/"),
-    );
-    if (audience === "internal") {
-      assert.deepEqual(
-        pinnedFiles.map((f) => f.path),
-        pinnedIds.map((id) => "assurance/" + id + ".json"),
-      );
-      const newest = pinnedFiles.find(
-        (f) => f.path === "assurance/" + bulkLocations.at(-1).id + ".json",
-      );
-      assert.equal(
-        Buffer.from(newest.contentBase64, "base64").toString(),
-        bulkLocations.at(-1).body,
-      );
-    } else assert.equal(pinnedFiles.length, 0);
-    // The internal dossier files each paper as a working-paper contract
-    // document and adds the released package's completion memo (#51);
-    // check:fixtures validates them. The client dossier keeps conclusions.
+    // An internal dossier, full or scoped, files each paper as a
+    // working-paper contract document and adds the released package's
+    // completion memo (#51); check:fixtures validates them. The client
+    // dossier keeps conclusions.
     const paperFiles = dossier.files
       .filter((f) => f.path.startsWith("papers/"))
       .map((f) => JSON.parse(dossierText(f.path)));
@@ -3158,13 +3263,262 @@ try {
       );
     } else
       assert(paperFiles.every((d) => d.schemaVersion === undefined && !d.body));
+    return {
+      dossierText,
+      dossierReport,
+      pinnedFiles: dossier.files.filter((f) => f.path.startsWith("assurance/")),
+    };
+  };
+  {
+    const { hash, dossier } = await downloadDossier("client", viewer);
+    assert.equal(hash, seals.client.body.sha256);
+    const { pinnedFiles } = await checkDossier(dossier, "client");
+    assert.equal(pinnedFiles.length, 0);
+    assert.equal(dossier.manifest.scope, null);
+  }
+  const pins = internalFinal.snapshot.assurancePins,
+    assessmentKinds = [
+      "assertion",
+      "assertion_review",
+      "impact",
+      "impact_review",
+      "obligation",
+      "obligation_review",
+    ],
+    procedurePinned = new Set(
+      (
+        await testDb
+          .prepare(
+            "SELECT id FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND json_extract(body,'$.procedureId')=?",
+          )
+          .bind(tenantId, e.id, proc.id)
+          .all()
+      ).results.map((r) => r.id),
+    ),
+    day = (offset) =>
+      new Date(Date.now() + offset * 86400000).toISOString().slice(0, 10);
+  const scopes = [
+    {
+      name: "record types",
+      scope: { recordKinds: [...assessmentKinds].reverse() },
+      ids: pins
+        .filter((p) => assessmentKinds.includes(p.kind))
+        .map((p) => p.id),
+      evidence: true,
+    },
+    {
+      name: "procedure",
+      scope: { procedureIds: [proc.id] },
+      ids: pins.filter((p) => procedurePinned.has(p.id)).map((p) => p.id),
+      evidence: true,
+    },
+    {
+      name: "period and record types, evidence withheld",
+      scope: {
+        recordKinds: ["assertion"],
+        period: { from: day(-2), to: day(1) },
+        evidence: "withheld",
+      },
+      ids: pins.filter((p) => p.kind === "assertion").map((p) => p.id),
+      evidence: false,
+    },
+  ];
+  assert(scopes[0].ids.length > 100 && scopes[0].ids.length < 490);
+  assert(scopes[1].ids.length > 0 && scopes[1].ids.length < pins.length);
+  // A scope that selects nothing, a client scope and a scope that still
+  // passes the file bound are refused; nothing is sealed.
+  const nothing = await request("/api/dossier", {
+    method: "POST",
+    body: sealBody("internal", {
+      scope: { period: { from: "2020-01-01", to: "2020-12-31" } },
+    }),
+    status: 409,
+  });
+  assert.equal(
+    nothing.error,
+    "The scope selects none of the report's " +
+      pins.length +
+      " pinned assurance records",
+  );
+  await request("/api/dossier", {
+    method: "POST",
+    body: sealBody("client", { scope: { recordKinds: ["assertion"] } }),
+    status: 400,
+  });
+  await request("/api/dossier", {
+    method: "POST",
+    body: sealBody("internal", {
+      scope: {
+        recordKinds: ["location"],
+        period: { from: day(-2), to: day(1) },
+      },
+    }),
+    status: 413,
+  });
+  await request("/api/dossier", {
+    method: "POST",
+    body: sealBody("internal", { scope: { procedureIds: ["PROC-missing"] } }),
+    status: 400,
+  });
+  const temp = path.resolve("../tmp/scoped-dossier-fixture");
+  await fs.mkdir(temp, { recursive: true });
+  try {
+    for (const s of scopes) {
+      const sealed = (
+        await request("/api/dossier", {
+          method: "POST",
+          body: sealBody("internal", { scope: s.scope }),
+        })
+      ).record;
+      assert.match(sealed.body.scopeSha256, /^[a-f0-9]{64}$/);
+      assert.equal(sealed.body.scope.includedRecords, s.ids.length, s.name);
+      // The same scope, listed in another order, finds the same seal.
+      const again = await request("/api/dossier", {
+        method: "POST",
+        body: sealBody("internal", {
+          scope: {
+            ...s.scope,
+            ...(s.scope.recordKinds
+              ? { recordKinds: [...s.scope.recordKinds].reverse() }
+              : {}),
+          },
+        }),
+      });
+      assert.equal(again.existing, true);
+      assert.equal(again.record.id, sealed.id);
+      const { hash, dossier, bytes } = await downloadDossier(
+        "internal",
+        owner,
+        sealed.body.scopeSha256,
+      );
+      assert.equal(hash, sealed.body.sha256);
+      const { pinnedFiles, dossierText, dossierReport } = await checkDossier(
+        dossier,
+        "internal",
+      );
+      assert.deepEqual(dossier.manifest.scope, sealed.body.scope);
+      assert.deepEqual(dossier.manifest.scope, {
+        procedureIds: s.scope.procedureIds ?? null,
+        recordKinds: s.scope.recordKinds
+          ? [...s.scope.recordKinds].sort()
+          : null,
+        period: s.scope.period ?? null,
+        evidence: s.evidence ? "included" : "withheld",
+        pinnedRecords: pins.length,
+        includedRecords: s.ids.length,
+      });
+      // Exactly the pinned records in scope, byte for byte; report.json still
+      // lists every pin, so the records outside the scope stay identifiable.
+      assert.deepEqual(
+        pinnedFiles.map((f) => f.path),
+        s.ids.map((id) => "assurance/" + id + ".json"),
+      );
+      const stored = new Map(
+        (
+          await testDb
+            .prepare(
+              "SELECT r.id,r.body FROM json_each(?) j JOIN assurance_records r ON r.id=j.value",
+            )
+            .bind(JSON.stringify(s.ids))
+            .all()
+        ).results.map((r) => [r.id, r.body]),
+      );
+      for (const f of pinnedFiles)
+        assert.equal(
+          Buffer.from(f.contentBase64, "base64").toString(),
+          stored.get(f.path.slice("assurance/".length, -".json".length)),
+        );
+      assert.deepEqual(dossierReport.assurancePins, pins);
+      assert(
+        dossierText("report.html").includes(
+          "Includes " +
+            s.ids.length +
+            " of " +
+            pins.length +
+            " pinned assurance records",
+        ),
+      );
+      assert.equal(
+        dossier.files.some((f) => f.path.startsWith("evidence/")),
+        s.evidence,
+      );
+      if (!s.evidence)
+        assert(
+          dossier.manifest.withheld.some(
+            (w) =>
+              w.id === uploaded.artifactId &&
+              w.reason.startsWith("Outside this scoped export"),
+          ),
+        );
+      // The separately reviewed verifier accepts it under a pinned key.
+      const dossierPath = path.join(temp, "dossier.json"),
+        trustPath = path.join(temp, "trust.json");
+      await fs.writeFile(dossierPath, bytes);
+      await fs.writeFile(
+        trustPath,
+        JSON.stringify({
+          [dossier.signature.keyId]: dossier.signature.publicKeySPKI,
+        }),
+      );
+      const verified = await verifyDossier(dossierPath, trustPath);
+      assert.equal(verified.code, 0, s.name + ": " + verified.out);
+      const proof = JSON.parse(verified.out);
+      assert.equal(proof.outcome, "pass");
+      // The verifier states the scope, so a part never reads as the whole file.
+      assert.deepEqual(proof.scope, dossier.manifest.scope);
+      assert(
+        proof.limitations.some((l) =>
+          l.startsWith(
+            "Scoped export: includes " +
+              s.ids.length +
+              " of " +
+              pins.length +
+              " pinned assurance records",
+          ),
+        ),
+        verified.out,
+      );
+      // Presenting it as a wider scope, with a consistent manifest digest,
+      // breaks the signature itself.
+      assert.equal(manifestDigest(dossier.manifest), dossier.manifestSha256);
+      dossier.manifest.scope.period = { from: "2000-01-01", to: day(1) };
+      dossier.manifestSha256 = manifestDigest(dossier.manifest);
+      await fs.writeFile(dossierPath, JSON.stringify(dossier));
+      const widened = await verifyDossier(dossierPath, trustPath);
+      assert.notEqual(widened.code, 0);
+      assert.deepEqual(JSON.parse(widened.out).errors, [
+        "Ed25519 signature verification failed",
+      ]);
+    }
+  } finally {
+    await fs.rm(temp, { recursive: true, force: true });
+  }
+  // A scoped export is named by its scope digest, for the internal audience.
+  for (const [query, status] of [
+    [{ audience: "internal", scope: "0".repeat(64) }, 409],
+    [{ audience: "internal", scope: "not-a-digest" }, 400],
+    [{ audience: "client", scope: "0".repeat(64) }, 404],
+    [{ audience: "internal" }, 409],
+  ]) {
+    const r = await transport(
+      base +
+        "/api/dossier?" +
+        new URLSearchParams({
+          tenantId,
+          engagementId: e.id,
+          reportId: internalFinal.id,
+          ...query,
+        }),
+      { headers: h(owner) },
+    );
+    assert.equal(r.status, status, JSON.stringify(query));
   }
   // Each seal is a saved engagement change.
   await refresh();
   console.log(
     "PASS " +
       pinnedIds.length +
-      " pinned records captured, released and sealed into verified internal and client dossiers",
+      " pinned records captured and released; the full internal dossier is refused past 500 files, and scoped exports by record type, procedure and period sign their scope (manifest 1.2) and verify offline",
   );
   const released = await request(
       "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),

@@ -7,6 +7,7 @@ import {
   engagementTypes,
   legacyConclusion,
   normalizeTerms,
+  offeredEngagementTypes,
   opinionLabel,
   parseReportSettings,
   qualityStatement,
@@ -33,7 +34,7 @@ const statement = (t: ReportTerms) =>
 
 describe("report terms", () => {
   it("requires a level for assurance engagements and none for the others", () => {
-    for (const type of ["attestation", "direct", "certification"] as const) {
+    for (const type of ["attestation", "direct"] as const) {
       expect(termsProblem(assurance("unmodified", "limited", type))).toBe("");
       expect(termsProblem(assurance("unmodified", "reasonable", type))).toBe(
         "",
@@ -213,9 +214,44 @@ describe("ISAE 3000 conclusion wording", () => {
     expect(reportTitle(assurance("unmodified", "limited"))).toBe(
       "Independent limited assurance report",
     );
+  });
+
+  it("ends a certification audit in a recommendation, not an assurance conclusion", () => {
+    const t = (conclusion: ReportTerms["conclusion"]): ReportTerms => ({
+      engagementType: "certification",
+      assuranceLevel: null,
+      conclusion,
+    });
+    expect(engagementTypes.certification.assurance).toBe(false);
+    expect(engagementTypes.certification.conclusions).toEqual([
+      "certification_recommended",
+      "certification_deferred",
+      "certification_not_recommended",
+    ]);
+    expect(termsProblem(t("certification_recommended"))).toBe("");
     expect(
-      reportTitle(assurance("unmodified", "reasonable", "certification")),
-    ).toBe("Independent certification audit report (reasonable assurance)");
+      termsProblem(assurance("unmodified", "reasonable", "certification")),
+    ).toMatch(/provides no assurance/);
+    expect(termsProblem(t("unmodified"))).toMatch(/cannot express/);
+    expect(reportTitle(t("certification_recommended"))).toBe(
+      "AI management system certification audit report",
+    );
+    const recommended = statement(t("certification_recommended"));
+    expect(recommended.heading).toBe(
+      "Audit recommendation: certification recommended",
+    );
+    expect(recommended.text).toContain("not a certificate");
+    expect(recommended.basisHeading).toBe("");
+    expect(statement(t("certification_deferred")).basisHeading).toBe(
+      "Basis for deferral",
+    );
+    expect(termsLabel(t("certification_not_recommended"))).toBe(
+      "Certification not recommended",
+    );
+    expect(conclusionTypes.certification_deferred.modified).toBe(true);
+    expect(requiresSupport("certification_recommended")).toBe(false);
+    expect(offeredEngagementTypes(false)).not.toContain("certification");
+    expect(offeredEngagementTypes(true)).toContain("certification");
   });
 
   it("labels each conclusion and level", () => {

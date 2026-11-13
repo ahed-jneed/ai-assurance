@@ -16,17 +16,19 @@ dependency lock or approval of a native runtime. The Dockerfile's default base
 tag is for development; production requires an operator-reviewed immutable
 base/image digest and golden native inference qualification.
 
-From the extracted directory, using Python 3.12+:
+From the extracted directory, using Python 3.12 (the one supported version;
+`engine/README.md`, section Packaging):
 
 ```powershell
 python -m engine.worker --readiness
 python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-example-report.json
 ```
 
-The core CSV computation path needs only Python's standard library. Optional
-native model/Parquet/cryptographic provider capabilities need separately reviewed
-runtimes. `requirements-optional.txt` is a baseline, not a resolved transitive
-lock. No native runtime or Docker execution was qualified in this distribution's
+The core CSV computation path needs only Python's standard library. Signature
+verification and Inspect `.eval` reading need `cryptography` and `zstandard`,
+hash-locked in `requirements-image.txt`, which the Dockerfile installs. Optional
+native model and Parquet capabilities need separately reviewed runtimes.
+`requirements-optional.txt` is a baseline, not a resolved transitive lock. No native runtime or Docker execution was qualified in this distribution's
 local checks. The repository's engine tests use synthetic fixtures,
 application-owned test predictors, dummy credentials and loopback/mocked
 transports.

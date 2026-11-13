@@ -8,7 +8,7 @@ import {
   conclusionTypes,
   engagementTypes,
   practitionerResponsibility,
-  qualityStatement,
+  qualityStatementFor,
   reportTitle,
   statesBasis,
   termsProblem,
@@ -77,10 +77,20 @@ export const criteriaPhrase = "the criteria set out in this report";
  * report counts only client-visible findings, so its counts match the
  * findings it lists. The result still reflects every open High or Critical
  * finding, because it states the practitioner's view of the criterion.
+ *
+ * With `lookup` (the pinned criteria, docs/design/criteria-model.md section 7,
+ * phase 2), an open finding linked to no selected procedure is rolled up
+ * through its `criteriaRefs`: into every criterion whose procedures' items
+ * link one of those requirements or an ancestor group of one, or, when none
+ * does, into a criterion of its own named by the reference's citation, which
+ * no procedure evaluated. Such a criterion of its own is opened only for a
+ * finding that `counted` includes or that is High or Critical, so a Low or
+ * Medium finding left out of the client report adds no row to it.
  */
 export function criterionRollup(
   e: Engagement,
   counted: (f: Finding) => boolean = () => true,
+  lookup?: CriteriaLookup,
 ) {
   const groups = new Map<
     string,
@@ -95,10 +105,8 @@ export function criterionRollup(
     }
   >();
   const highCriteria = new Set<string>();
-  for (const p of e.workflow?.procedures ?? []) {
-    if (!p.selected || p.applicability === "not_applicable") continue;
-    const criterion = p.criterion.trim() || p.templateId;
-    const g = groups.get(criterion) ?? {
+  const group = (criterion: string) =>
+    groups.get(criterion) ?? {
       criterion,
       procedures: 0,
       supported: 0,
@@ -107,6 +115,28 @@ export function criterionRollup(
       openFindings: 0,
       openHighFindings: 0,
     };
+  // The requirement references each criterion's procedures link.
+  const linked = new Map<string, Set<string>>();
+  const rolledUp = new Set<string>();
+  const addFinding = (criterion: string, f: Finding) => {
+    const g = group(criterion);
+    const high = ["High", "Critical"].includes(f.severity);
+    if (high) highCriteria.add(criterion);
+    if (counted(f)) {
+      g.openFindings++;
+      if (high) g.openHighFindings++;
+    }
+    groups.set(criterion, g);
+  };
+  for (const p of e.workflow?.procedures ?? []) {
+    if (!p.selected || p.applicability === "not_applicable") continue;
+    const criterion = p.criterion.trim() || p.templateId;
+    const g = group(criterion);
+    if (lookup) {
+      const refs = linked.get(criterion) ?? new Set<string>();
+      for (const ref of lookup.refsOf(p.templateId)) refs.add(ref);
+      linked.set(criterion, refs);
+    }
     const paper = e.papers.find((q) => q.id === p.paperId);
     const outcome =
       p.execution?.assessment?.outcome ??
@@ -116,27 +146,50 @@ export function criterionRollup(
     if (["supported", "not_applicable"].includes(outcome)) g.supported++;
     else if (["qualified", "not_supported"].includes(outcome)) g.exceptions++;
     else g.notEvaluated++;
+    groups.set(criterion, g);
     for (const f of e.findings)
       if (f.status !== "closed" && f.support?.procedureId === p.id) {
-        const high = ["High", "Critical"].includes(f.severity);
-        if (high) highCriteria.add(criterion);
-        if (!counted(f)) continue;
-        g.openFindings++;
-        if (high) g.openHighFindings++;
+        rolledUp.add(f.id);
+        addFinding(criterion, f);
       }
-    groups.set(criterion, g);
   }
+  if (lookup)
+    for (const f of e.findings) {
+      if (f.status === "closed" || rolledUp.has(f.id)) continue;
+      const refs = f.criteriaRefs ?? [];
+      const related = new Set(refs.flatMap((ref) => lookup.ancestorsOf(ref)));
+      const matching = [...linked].filter(([, set]) =>
+        [...set].some((ref) => related.has(ref)),
+      );
+      if (matching.length)
+        for (const [criterion] of matching) addFinding(criterion, f);
+      // A criterion of its own only for a finding this report counts, or one
+      // that is High or Critical: otherwise a finding the reader cannot see
+      // would add a row nothing in the report supports.
+      else if (counted(f) || ["High", "Critical"].includes(f.severity))
+        for (const ref of refs) addFinding(lookup.citation(ref), f);
+    }
   return [...groups.values()].map((g) => ({
     ...g,
     result:
       g.exceptions || highCriteria.has(g.criterion)
         ? ("exceptions" as const)
-        : g.notEvaluated
+        : g.notEvaluated || !g.procedures
           ? ("not_evaluated" as const)
           : ("no_exceptions" as const),
   }));
 }
 export type CriterionResult = ReturnType<typeof criterionRollup>[number];
+/**
+ * What the criterion roll-up needs of the pinned criteria: the requirement
+ * references an item links, a reference with its ancestor groups, and the
+ * citation of a reference.
+ */
+export type CriteriaLookup = {
+  refsOf(templateId: string): string[];
+  ancestorsOf(reference: string): string[];
+  citation(reference: string): string;
+};
 
 /**
  * The report elements for these terms. Without `particulars` (the completion
@@ -229,7 +282,10 @@ export function reportElements(
       // assessment; an older workflow keeps its brief's free-text note.
       // Briefs no longer ask for that note, so an older workflow without
       // one is pointed to the acceptance record, which then applies.
-      value: particulars?.qualityStatement?.trim() || qualityStatement,
+      value: qualityStatementFor(
+        t.engagementType,
+        particulars?.qualityStatement,
+      ),
       problem: acceptanceApplies(e.workflow)
         ? acceptanceGates(e).length
           ? independenceProblem

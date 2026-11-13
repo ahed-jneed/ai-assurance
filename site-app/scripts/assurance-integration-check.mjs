@@ -2051,8 +2051,10 @@ try {
     "--require-trusted-signature",
   ]);
   assert.equal(verified.code, 0, verified.out + verified.error);
-  // Manifest 1.1 signs the key ID and the captured versions (#25).
-  assert.equal(dossier.manifest.schemaVersion, "1.1");
+  // Manifest 1.1 signs the key ID and the captured versions (#25); 1.2 also
+  // signs the export scope, null for the full dossier (#83).
+  assert.equal(dossier.manifest.schemaVersion, "1.2");
+  assert.equal(dossier.manifest.scope, null);
   assert.equal(dossier.manifest.signingKeyId, dossier.signature.keyId);
   assert.deepEqual(dossier.manifest.rulePack, {
     version: e.rulePack.version,
@@ -2175,7 +2177,7 @@ try {
   ]);
   assert.equal(afterRotation.code, 0, afterRotation.out + afterRotation.error);
   console.log(
-    "PASS wrapped signing key, manifest 1.1, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
+    "PASS wrapped signing key, manifest 1.2, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
   );
   const stored = await testDb
     .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")

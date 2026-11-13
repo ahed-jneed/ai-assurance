@@ -176,8 +176,9 @@ export function resolvePlan(
 
 /**
  * Validates the explicit plan of a new (schemaVersion 1.1) hosted profile:
- * the section 9.1 rules, the hosted limits of section 12 (no score columns,
- * cluster designs or several group columns), the task's criterion kinds,
+ * the section 9.1 rules, the hosted limits of section 12 (no score columns
+ * or cluster designs; a group criterion may compare the intersectional
+ * strata of up to five group columns, #30), the task's criterion kinds,
  * and the chance baseline of the 6 November 2026 decision: an explicit
  * performance criterion carries balanced accuracy at or above chance unless
  * its rationale records why it is left out. A binary criterion without one
@@ -217,15 +218,57 @@ export function validateHostedPlan(task: string, input: unknown): Plan {
       throw new StatisticsError(
         `criterion ${c.id}: ${c.kind} criteria are not available for ${task}`,
       );
-    if (c.kind === "group_comparison" && c.groupFields !== null)
-      throw new StatisticsError(
-        `criterion ${c.id}: hosted profiles compare one protected-group column; several group columns arrive with #30`,
-      );
   }
   return plan;
 }
 
 // ------------------------------------------------------------ counts
+/** Intersectional strata above this many distinct labels are refused, as in the engine (MAX_GROUP_LABELS). */
+export const MAX_STRATA = 1000;
+/**
+ * A row's stratum in `fields`, as engine/criteria.py `stratum`: one column
+ * gives its value, several a compact JSON array of the values; null when a
+ * value is blank (the row then counts in `unknownGroupRows`).
+ */
+export function stratumOf(row: Record<string, string>, fields: string[]) {
+  const values = fields.map((f) => (row[f] ?? "").trim());
+  if (values.some((v) => !v)) return null;
+  return values.length === 1 ? values[0] : JSON.stringify(values);
+}
+/** Every column the plan's intersectional strata compare, in first-use order. */
+export function planGroupFields(
+  plan:
+    | { criteria: Pick<PlanCriterion, "kind" | "groupFields">[] }
+    | null
+    | undefined,
+) {
+  return [
+    ...new Set(
+      (plan?.criteria ?? []).flatMap((c) =>
+        c.kind === "group_comparison" ? (c.groupFields ?? []) : [],
+      ),
+    ),
+  ];
+}
+/**
+ * Checks the intersectional group columns of a plan against the rows: each
+ * column exists, and each criterion has at most MAX_STRATA strata.
+ */
+export function assertGroupFields(plan: Plan, rows: Rows) {
+  for (const criterion of plan.criteria) {
+    const fields = criterion.groupFields;
+    if (criterion.kind !== "group_comparison" || !fields) continue;
+    for (const f of fields)
+      if (rows.length && !(f in rows[0]))
+        throw Error("Required column missing: " + f);
+    const strata = new Set(rows.map((r) => stratumOf(r, fields)));
+    strata.delete(null);
+    if (strata.size > MAX_STRATA)
+      throw Error(
+        `Group comparisons are limited to ${MAX_STRATA} strata per criterion; revise the grouping protocol`,
+      );
+  }
+}
 const positiveOf = (c: HostedColumns) =>
   c.performancePositiveLabel || c.positiveLabel;
 
@@ -268,18 +311,27 @@ function dataFor(rows: Rows, c: HostedColumns) {
         targets,
       };
     }
+    // One group column keeps today's grouping by the validated cell; the
+    // strata of several columns follow the engine, blank values unknown.
+    const fields = criterion.groupFields;
     const byGroup = new Map<string, Rows>();
-    for (const r of rows)
-      byGroup.set(r[c.groupColumn], [
-        ...(byGroup.get(r[c.groupColumn]) ?? []),
-        r,
-      ]);
+    let unknown = 0;
+    for (const r of rows) {
+      const group = fields ? stratumOf(r, fields) : r[c.groupColumn];
+      if (group === null) {
+        unknown++;
+        continue;
+      }
+      const members = byGroup.get(group);
+      if (members) members.push(r);
+      else byGroup.set(group, [r]);
+    }
     return {
       groups: [...byGroup.keys()].sort(codePointCompare).map((group) => ({
         group,
         ...confusion(byGroup.get(group)!, c, c.positiveLabel),
       })),
-      unknownGroupRows: 0,
+      unknownGroupRows: unknown,
     };
   };
 }
@@ -465,6 +517,7 @@ export function evaluateHostedPlan(
   c: HostedColumns,
   task: string,
 ): HostedEvaluation {
+  assertGroupFields(plan, rows);
   const evaluation = evaluateCriteria(plan, dataFor(rows, c));
   const unexpected =
     task === "Multiclass classification" ? unexpectedPredictions(rows, c) : [];

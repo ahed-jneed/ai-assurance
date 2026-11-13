@@ -39,7 +39,7 @@ Every report is a fixed snapshot. Final issuance requires signed required/exclud
 
 ## Run locally
 
-Node >=22.13.0 (CI uses Node 22) and Python 3.11. Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations with `npm run db:migrate:local` (idempotent; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. To exercise several roles, run `npm run seed:demo` while the dev server is up and sign in as a test persona with `/signin-with-chatgpt?as=<persona>` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`); the account menu switches persona and signs out. Hosting uses dispatch-owned identity, not the local mock. The Worker trusts only the identity source that `IDENTITY_MODE` names (Sites dispatch, Cloudflare Access, or the loopback test and dev modes) and answers 401 when none is configured; see [`docs/security/identity.md`](docs/security/identity.md). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
+Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging). Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations with `npm run db:migrate:local` (idempotent; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. To exercise several roles, run `npm run seed:demo` while the dev server is up and sign in as a test persona with `/signin-with-chatgpt?as=<persona>` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`); the account menu switches persona and signs out. Hosting uses dispatch-owned identity, not the local mock. The Worker trusts only the identity source that `IDENTITY_MODE` names (Sites dispatch, Cloudflare Access, or the loopback test and dev modes) and answers 401 when none is configured; see [`docs/security/identity.md`](docs/security/identity.md). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
 
 ```powershell
 cd site-app
@@ -92,6 +92,8 @@ The root `docs/`, `engine/`, `schemas/` and `templates/` folders are canonical. 
 |---|---|
 | `site-app/lib/catalog.json`, `site-app/lib/annex-iv-map.json` | `templates/` (byte copies) |
 | `site-app/lib/obligation-subitems.json` | `docs/obligation-subitems.json` |
+| `docs/obligation-subitems.json`, `templates/annex-iv-map.json` | the default criteria pack in `templates/criteria/` (its AI Act framework's obligation subitems and its Annex IV map) |
+| `site-app/lib/criteria/bundle.generated.json` | `templates/criteria/` |
 | `site-app/public/tools/assurance-verifier.py` | `engine/assurance.py` |
 | `site-app/public/tools/assurance-runtime.zip` | `engine/` (without `engine/tests/`) and `schemas/`, via `python -m engine.package_runtime` (see `engine/RUNTIME_PACKAGE.md`) |
 | `schemas/test-run.schema.json` | `schemas/test-run.base.json` (hand-maintained legacy run body and shared definitions), `schemas/.build-run-schema.py` and `.extend-assurance-schema.py` |

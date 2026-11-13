@@ -1,5 +1,7 @@
 // Regenerates the committed files that are derived from canonical sources in
 // the repository's root folders, or with --check fails when any has drifted.
+// docs/obligation-subitems.json and templates/annex-iv-map.json are among
+// them: projections of the default criteria pack (templates/criteria).
 //
 //   npm run sync         rewrite the generated files after changing a source
 //   npm run check:sync   verify only (npm run check and CI)
@@ -26,7 +28,12 @@ import {
   canonicalize,
   checkCriteria,
   readCriteria,
+  servedAnnexMap,
 } from "../../schemas/validate-criteria.mjs";
+import {
+  obligationCatalog,
+  serialise,
+} from "../../templates/criteria/tools/convert-catalog.mjs";
 
 const repo = fileURLToPath(new URL("../../", import.meta.url));
 const check = process.argv.includes("--check");
@@ -164,6 +171,55 @@ else console.log(schema.stdout.trim());
         mkdirSync(path.dirname(absolute(target)), { recursive: true });
         writeFileSync(absolute(target), text);
         console.log(`Updated ${target} from templates/criteria`);
+      }
+    }
+    // The obligation file and the Annex IV map are projections of the
+    // default pack (design section 17, phase 2): its AI Act framework's
+    // obligation subitems (section 11.3) and its Annex IV map. They are
+    // written before the plain copies below, which copy them into site-app.
+    const { index, documents } = criteria;
+    const d = index.defaults.pack;
+    const packEntry = index.documents.find(
+      (e) =>
+        e.documentType === "pack" && e.id === d.id && e.version === d.version,
+    );
+    const pack = documents.get(packEntry.path);
+    const set = pack.criteria.find((s) => s.framework === "eu-ai-act");
+    const fwEntry =
+      set &&
+      index.documents.find(
+        (e) =>
+          e.documentType === "framework" &&
+          e.id === set.framework &&
+          e.edition === set.edition &&
+          e.version === set.version,
+      );
+    const generatedFiles = [
+      [
+        "docs/obligation-subitems.json",
+        fwEntry && obligationCatalog(documents.get(fwEntry.path)),
+      ],
+      [
+        "templates/annex-iv-map.json",
+        pack.features?.annexIvIndex && servedAnnexMap(criteria, pack),
+      ],
+    ];
+    for (const [file, value] of generatedFiles) {
+      // A default pack without the AI Act leaves the files as they are.
+      if (!value) continue;
+      const text = serialise(value);
+      if (
+        existsSync(absolute(file)) &&
+        readFileSync(absolute(file), "utf8") === text
+      )
+        continue;
+      if (check)
+        drift.push(
+          `${file} differs from the default criteria pack ${d.id} ${d.version}`,
+        );
+      else {
+        writeFileSync(absolute(file), text);
+        console.log(`Updated ${file} from templates/criteria`);
       }
     }
   }

@@ -1060,8 +1060,8 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`; without it, the other label derived from the data, or in `auditor_model` mode from `modelSpec.outputLabels` (E4) |
 | Power and MDE at plan approval | **mirror** (approval UI), except the mean baseline gate of `targetSd`: the hosted plan normaliser drops `targetSd` and the approval UI does not ask for it (a follow-up of #93) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
-| LL144 computations | via #30 (same arithmetic) | via #30 | – |
-| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns, which #30 adds (section 15); until then one column | yes (`intersectional_slices`) | – |
+| LL144 computations | **mirror** (`lib/ll144.ts`, #30; same arithmetic, `schemas/fixtures/ll144-golden.json`) | yes (`engine/ll144.py`) | – |
+| Intersectional strata (several protected columns) | **mirror** (#30): a hosted plan criterion may set `groupFields` (1–5 columns); strata labels, blank values as `unknownGroupRows` and the 1,000-strata limit follow `engine/criteria.py`. A special-category declaration and its basis cover every grouped column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
 | Cluster bootstrap, descriptive bootstrap (ECE, R²) and the MAE/RMSE sensitivity interval | not available: a plan with a `clusterField` is rejected (section 5.11) | engine-only (#93) | copied; a hosted `engineConfig` 1.4 plan with a cluster design is rejected |
 | Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |
@@ -1413,6 +1413,7 @@ Regulation and guidance:
 - NYC:
   - [DCWP Notice of Adoption, Local Law 144 rules (6 RCNY §§ 5-300–5-304)](https://www.sidley.com/-/media/resource-pages/ai-monitor/laws-and-regulations/20230406-nyc-dcwp-notice-of-adoption-of-final-rule-for-local-law-144.pdf?la=en) and the [NYC rules page](https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/), effective 5 July 2023. No later amendment was found; this was not re-verified beyond these pages.
   - The § 5-300 definitions and § 5-301(b)(5), (c)(1), (c)(5) and (d) were checked against the unofficial reproduction at [AGORA](https://agora.eto.tech/instrument/2002).
+  - #30 re-checked §§ 5-300 to 5-304 against the DCWP notice of adoption on the City's rules site (12 November 2026); the legal-review items are in `docs/research/ll144-2026-11.md` (LR-LL144-01 to LR-LL144-08).
 
 Statistics:
 - [Wilson 1927](https://doi.org/10.1080/01621459.1927.10502953); [Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286); [Newcombe 1998](https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8%3C873::AID-SIM779%3E3.0.CO;2-I).

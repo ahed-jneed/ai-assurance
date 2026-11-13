@@ -14,6 +14,7 @@ import {
 } from "./evaluation";
 import { inspectCSV, validateEvaluation } from "./diagnostics";
 import {
+  planGroupFields,
   planSuite,
   resolvePlan,
   validateHostedPlan,
@@ -263,12 +264,22 @@ function registerPlanProfile(
         400,
         "Fairness procedures require a protected-group mapping and a reviewed data-handling basis",
       );
+    // Intersectional strata (#30): their columns are group columns too.
+    if (
+      planGroupFields(statistics).some((f) =>
+        [c.labelColumn, c.predictionColumn].includes(f),
+      )
+    )
+      throw new ApiError(
+        400,
+        "Intersectional group columns must differ from the target and prediction columns",
+      );
   } else c.groupColumn = "";
   assertNewVersion(e, a);
   const createdAt = now(),
     specialCategory = declareProtocol(
       e,
-      { suite, config: c },
+      { suite, config: c, statistics },
       declaration,
       actor,
       createdAt,

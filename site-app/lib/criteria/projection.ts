@@ -32,6 +32,10 @@ export function features(pack: PackDocument): PackFeatures {
     annexIvIndex: pack.features?.annexIvIndex === true,
     aiActClassification: pack.features?.aiActClassification === true,
     obligationAssessments: pack.features?.obligationAssessments === true,
+    statementOfApplicability: pack.features?.statementOfApplicability === true,
+    nonconformityGrading: pack.features?.nonconformityGrading === true,
+    certificationRecommendation:
+      pack.features?.certificationRecommendation === true,
   };
 }
 export const item = (
@@ -66,8 +70,31 @@ export function legacyCatalog(pack: PackDocument): Catalog {
     ),
   };
 }
+/** One item of the obligation catalogue, with the node's extensions. */
+export type ObligationItem = {
+  code: string;
+  article: string;
+  title: string;
+  actor: string[];
+  trigger: unknown;
+  evidenceCategories: string[];
+  reviewNote?: string;
+  /** The consolidated version the item reads (extensions.version). */
+  version?: string;
+  legalReview?: { required: boolean; itemIds: string[] };
+} & Record<string, unknown>;
+/** The docs/obligation-subitems.json shape; the fields the app reads are typed. */
+export type ObligationCatalog = Record<string, unknown> & {
+  catalogVersion: string;
+  scope: string;
+  source: { url: string; version: string } & Record<string, unknown>;
+  decisionPolicy: { providerResponsibility: string } & Record<string, unknown>;
+  items: ObligationItem[];
+};
 /** The obligation catalogue (docs/obligation-subitems.json shape) of a framework. */
-export function obligationCatalog(framework: FrameworkDocument) {
+export function obligationCatalog(
+  framework: FrameworkDocument,
+): ObligationCatalog | null {
   const compat = framework.compat?.obligations;
   if (!compat) return null;
   const { order, ...fields } = compat;
@@ -87,9 +114,9 @@ export function obligationCatalog(framework: FrameworkDocument) {
         evidenceCategories: n.evidenceCategories,
         ...(n.reviewNote !== undefined ? { reviewNote: n.reviewNote } : {}),
         ...n.extensions,
-      };
+      } as ObligationItem;
     }),
-  };
+  } as unknown as ObligationCatalog;
 }
 
 /** The requirement links of an item, through its control objectives (section 7). */
@@ -122,11 +149,14 @@ export function displayRefs(
   });
 }
 
+/** Whether a framework is legislation (it records a qualified legal review). */
+export const legislation = (frameworkDoc: FrameworkDocument) =>
+  LEGISLATION.has(frameworkDoc.kind);
 /** Whether a framework is legislation with its qualified legal review pending. */
 export const legalReviewPending = (
   frameworkDoc: FrameworkDocument,
   e: IndexEntry | undefined,
-) => LEGISLATION.has(frameworkDoc.kind) && e?.legalReview !== "completed";
+) => legislation(frameworkDoc) && e?.legalReview !== "completed";
 
 /** The pack's AI Act framework, when it has an eu-ai-act criteria set. */
 export const aiActFramework = (resolved: Pick<Resolved, "frameworks">) =>
