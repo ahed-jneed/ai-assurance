@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Result } from "./domain";
 import {
@@ -15,6 +16,27 @@ import {
   validateHostedPlan,
 } from "./hosted-statistics";
 import { criterionPower } from "./statistics";
+
+/** The reason codes in the first column of docs/design/audit-statistics.md section 4.4. */
+function reasonCodeTable(): string[] {
+  const doc = readFileSync(
+    new URL("../../docs/design/audit-statistics.md", import.meta.url),
+    "utf8",
+  );
+  const start = doc.indexOf("### 4.4 Gates and reason codes");
+  const section = doc.slice(start, doc.indexOf("
+### ", start + 1));
+  const codes = section
+    .split(/?
+/)
+    .filter((line) => line.startsWith("| `"))
+    .flatMap((line) =>
+      [...line.split("|")[1].matchAll(/`([a-z0-9_]+)`/g)].map((m) => m[1]),
+    );
+  expect(start).toBeGreaterThan(-1);
+  expect(codes.length).toBeGreaterThan(20);
+  return codes;
+}
 
 const thresholds = {
   minimumSampleSize: 40,
@@ -262,15 +284,11 @@ describe("the protocol form's plan", () => {
     ).toThrow(/Required column missing: person/);
   });
 
-  it("explains the clustered and bootstrap reason codes in plain language", () => {
-    for (const code of [
-      "small_cell_clustered",
-      "below_minimum_cluster_count",
-      "bootstrap_insufficient_valid_replicates",
-      "bootstrap_budget_exceeded",
-      "clustered_design_requires_engine",
-      "interval_requires_engine",
-    ])
+  it("explains every reason code of the section 4.4 table in plain language", () => {
+    const codes = reasonCodeTable();
+    expect(codes).toContain("clustered_design_requires_engine");
+    expect(codes).toContain("bootstrap_budget_exceeded");
+    for (const code of codes)
       expect(REASON_TEXT[code], code).toMatch(/\w{4}.*\./);
   });
 

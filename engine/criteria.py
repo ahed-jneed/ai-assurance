@@ -49,6 +49,9 @@ REASON_TEXT = {
     "bootstrap_insufficient_valid_replicates": "Too few bootstrap replicates are defined, so no bootstrap interval is reported.",
     "small_cell_clustered": "A comparison has a cell under 5 in a clustered design. Fisher's exact test assumes independent rows, so that comparison supports no claim.",
     "below_minimum_cluster_count": "A metric or compared group has fewer than 10 independent clusters, so it cannot support a pass.",
+    # Hosted-runner codes (section 4.4): the engine never emits them; the text matches site-app/lib/hosted-statistics.ts.
+    "clustered_design_requires_engine": "The plan declares a cluster design that this runner cannot evaluate, so the criterion is inconclusive; the engine decides it by the cluster bootstrap.",
+    "interval_requires_engine": "The required interval needs score columns that this runner does not evaluate, so the criterion is inconclusive; the engine computes it.",
 }
 CLUSTER_NOTE = "Rows are clustered by '{field}': every member and descriptive interval is a cluster percentile bootstrap over {clusters} clusters ({replicates} replicates, seed {seed}). The per-group rates are cluster percentile intervals too; the prevalence and majority-class baseline intervals still assume independent rows."
 BASE_NOTES = {
