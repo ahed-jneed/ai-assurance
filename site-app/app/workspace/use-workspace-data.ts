@@ -1,7 +1,14 @@
 // Workspace data: fetching and reloading GET /api/workspace, running
 // engagement and management commands, applying their responses, and the
 // first load that restores a deep link or the last engagement.
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import { readWorkspaceLink, type WorkspaceLink } from "@/lib/workspace-links";
@@ -121,9 +128,11 @@ export function useWorkspaceData() {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [bootstrapping, setBootstrapping] = useState(true);
+  // The committed data, for callbacks and async handlers.
   const dataRef = useRef(data);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by callbacks and async handlers; writing it during render is the current behaviour
-  dataRef.current = data;
+  useLayoutEffect(() => {
+    dataRef.current = data;
+  });
   const listener = useRef<WorkspaceDataListener | null>(null),
     loadFailure = useRef<LoadFailure>(null),
     restoreRequest = useRef<RestoreRequest | null>(null),
@@ -391,6 +400,9 @@ export function useWorkspaceBootstrap(
     lastFailure,
     abortLoad,
   } = workspace;
+  // The bootstrap applies a link and the view with the latest handlers.
+  const applyLink = useEffectEvent(applyWorkspaceLink),
+    showView = useEffectEvent(setView);
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -408,7 +420,7 @@ export function useWorkspaceBootstrap(
             linked.engagementId === first.engagement?.id
               ? first
               : await load(linked.tenantId, linked.engagementId || undefined);
-          if (target) applyWorkspaceLink(target, linked);
+          if (target) applyLink(target, linked);
           return;
         }
         let preference;
@@ -452,7 +464,7 @@ export function useWorkspaceBootstrap(
               }
               restored = result;
             }
-            setView(
+            showView(
               restored.engagement
                 ? permittedAuditView(preference.view, restored.identity.role)
                 : "Engagements",
@@ -463,7 +475,7 @@ export function useWorkspaceBootstrap(
             localStorage.removeItem(resumeKey(first.identity.id));
           } catch {}
         }
-        setView(first.engagement ? "Overview" : "Engagements");
+        showView(first.engagement ? "Overview" : "Engagements");
       } finally {
         if (active) setBootstrapping(false);
       }
@@ -472,8 +484,18 @@ export function useWorkspaceBootstrap(
       active = false;
       abortLoad();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- bootstraps once per load(); applyWorkspaceLink is a plain function recreated on every render, and the other members are stable
-  }, [load]);
+    // Bootstraps once per load(); the other members are stable callbacks and
+    // state setters.
+  }, [
+    load,
+    setData,
+    setError,
+    setLoading,
+    setBootstrapping,
+    requestRestore,
+    lastFailure,
+    abortLoad,
+  ]);
 }
 
 /** Remembers the engagement and view to resume on the next visit. */
@@ -483,9 +505,18 @@ export function useResumePreference(
   loading: boolean,
   bootstrapping: boolean,
 ) {
+  // Persists only when the engagement id, view or role changes, not on every
+  // engagement refresh.
+  const userId = data?.identity.id,
+    tenantId = data?.tenantId,
+    engagementId = data?.engagement?.id,
+    role = data?.identity.role;
   useEffect(() => {
     if (
-      !data?.engagement ||
+      !userId ||
+      !tenantId ||
+      !engagementId ||
+      !role ||
       loading ||
       bootstrapping ||
       !auditViews.includes(view as (typeof auditViews)[number])
@@ -493,22 +524,13 @@ export function useResumePreference(
       return;
     try {
       localStorage.setItem(
-        resumeKey(data.identity.id),
+        resumeKey(userId),
         JSON.stringify({
-          tenantId: data.tenantId,
-          engagementId: data.engagement.id,
-          view: permittedAuditView(view, data.identity.role),
+          tenantId,
+          engagementId,
+          view: permittedAuditView(view, role),
         }),
       );
     } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- persists only when the engagement id, view or role changes, not on every engagement refresh
-  }, [
-    data?.identity.id,
-    data?.tenantId,
-    data?.engagement?.id,
-    data?.identity.role,
-    view,
-    loading,
-    bootstrapping,
-  ]);
+  }, [userId, tenantId, engagementId, role, view, loading, bootstrapping]);
 }

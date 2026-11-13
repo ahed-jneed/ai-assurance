@@ -1,5 +1,11 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   CheckCircle2,
   Inbox,
@@ -18,6 +24,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { WorkspaceData } from "./workspace-types";
+import { useNow } from "./use-now";
 import type { WorkItem } from "@/lib/work-items";
 import {
   activeReminders,
@@ -70,29 +77,44 @@ export function WorkInbox({
     [updated, setUpdated] = useState<Date | null>(null),
     [reminderBusy, setReminderBusy] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false),
-    [limit, setLimit] = useState(40),
-    [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const tick = () => setNow(Date.now());
-    const timer = window.setInterval(tick, 60000);
-    window.addEventListener("focus", tick);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", tick);
-    };
-  }, []);
+    [limit, setLimit] = useState(40);
+  const now = useNow();
   const request = useRef<{
     generation: number;
     controller: AbortController | null;
   }>({ generation: 0, controller: null });
   const pref = usePersonalPreferences(data.tenantId),
     prefRef = useRef(pref);
-  prefRef.current = pref;
+  // The committed preferences, for the snooze and reminder handlers.
+  useLayoutEffect(() => {
+    prefRef.current = pref;
+  });
   const operation = useRef(false);
   const q =
     query.scope === "team" && data.identity.role !== "Lead Auditor"
       ? { ...query, scope: "mine" as const }
       : query;
+  const account = JSON.stringify([
+      data.tenantId,
+      data.identity.id,
+      data.identity.role,
+    ]),
+    pagingScope = JSON.stringify([
+      account,
+      q.view,
+      q.scope,
+      q.search,
+      q.kind,
+      q.due,
+      q.engagementId,
+      q.sort,
+    ]);
+  // Other filters or another account show the first 40 items again.
+  const [pagedScope, setPagedScope] = useState(pagingScope);
+  if (pagedScope !== pagingScope) {
+    setPagedScope(pagingScope);
+    setLimit(40);
+  }
   const change = (patch: Partial<InboxQuery>) => {
     setLimit(40);
     onQueryChange({ ...q, ...patch });
@@ -101,6 +123,15 @@ export function WorkInbox({
     setLimit(40);
     onQueryChange({ ...defaultInboxQuery, scope: q.scope, view: q.view });
   };
+  // Another account starts from an empty list, in the render that switches.
+  const [listedFor, setListedFor] = useState(account);
+  if (listedFor !== account) {
+    setListedFor(account);
+    setItems([]);
+    setLoaded(0);
+    setPage(0);
+    setUpdated(null);
+  }
   const load = useCallback(
     async (p = 0) => {
       request.current.controller?.abort();
@@ -160,28 +191,20 @@ export function WorkInbox({
         if (generation === request.current.generation) setBusy(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- an identity change must re-create load so that the inbox reloads for the new account
-    [data.tenantId, data.identity.id, data.identity.role],
+    [data.tenantId],
   );
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the list and reloads it whenever load is re-created
-    setItems([]);
-    setLoaded(0);
-    setPage(0);
-    setUpdated(null);
-    setLimit(40);
+    // The request state is one object for the component's lifetime; the
+    // cleanup aborts whichever request is in flight by then.
+    const current = request.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching the inbox is the external sync; load() marks the list busy before the request starts
     void load();
     return () => {
-      request.current.generation++;
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
-      request.current.controller?.abort();
+      current.generation++;
+      current.controller?.abort();
     };
-  }, [load]);
-  useEffect(
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets paging after the filters change (post-commit reset is the current behaviour)
-    () => setLimit(40),
-    [q.view, q.scope, q.search, q.kind, q.due, q.engagementId, q.sort],
-  );
+    // Reloads for another account as well as another practice.
+  }, [load, account]);
   const today = localWorkDay(new Date(now)),
     reminders = activeReminders(pref.value.snoozed, now);
   const visible = selectWork(

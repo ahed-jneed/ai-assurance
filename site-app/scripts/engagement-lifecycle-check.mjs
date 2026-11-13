@@ -1,13 +1,29 @@
+// One engagement through its lifecycle over the API, against the built
+// Worker in Miniflare: evidence custody and runs, classification, evidence
+// requests, the structured workflow from adoption to procedure review,
+// client requests, planning exit, scale past 1,000 assurance records, the
+// engagement quality review, report capture, release and dossiers,
+// remediation and withdrawal. Each part builds on the state the earlier ones
+// leave, so they stay one scenario. Split out of the former
+// scripts/integration-check.mjs (#52), whose access, criteria, inbox and
+// practice-management checks are now workspace-access-check.mjs,
+// criteria-pins-check.mjs, work-inbox-api-check.mjs and
+// practice-management-check.mjs.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Miniflare } from "miniflare";
-const base = process.argv[2] ?? "http://127.0.0.1:5173";
+import { python } from "./harness/env.mjs";
+import {
+  apiClient,
+  base,
+  fixtureUsers,
+  identity,
+  startWorker,
+} from "./harness/worker.mjs";
 // Scoped dossiers are checked with the separately reviewed verifier
 // (`python -m engine.assurance verify`); ASSURANCE_TEST_PYTHON names the Python.
-const python = process.env.ASSURANCE_TEST_PYTHON ?? "python";
 // lib/assurance-core.ts canonical(): sorted keys, no whitespace.
 const canonicalJson = (value) =>
   value === null || typeof value !== "object"
@@ -64,266 +80,36 @@ const releaseChecklist = {
   checklistNote:
     "Synthetic fixture: the engaging party is the responsible party",
 };
-assert(
-  ["127.0.0.1", "localhost", "::1"].includes(new URL(base).hostname),
-  "This fixture identity test may run only against loopback development",
-);
-const moduleFiles = [
-  "index.js",
-  ...(await fs.readdir("dist/server", { recursive: true })).filter(
-    (p) => p !== "index.js" && (p.endsWith(".js") || p.endsWith(".mjs")),
-  ),
-];
-const mf = new Miniflare({
-  modules: moduleFiles.map((p) => ({
-    type: "ESModule",
-    path: path.resolve("dist/server", p),
-  })),
-  modulesRoot: path.resolve("dist/server"),
-  compatibilityDate: "2026-05-15",
-  compatibilityFlags: ["nodejs_compat"],
-  // The fixture identity headers below are trusted only because this opts in
-  // to the loopback-only test mode (docs/security/identity.md).
-  bindings: {
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-    // First sign-ins provision the fixture practices (lib/access-policy.ts).
-    SELF_SIGNUP: "open",
-    // A key-encryption key generated for this run (docs/security/signing-keys.md).
-    DOSSIER_KEK: randomBytes(32).toString("base64"),
-  },
-  d1Databases: { DB: "audit-integration" },
-  r2Buckets: { BUCKET: "audit-integration-evidence" },
-  d1Persist: false,
-  r2Persist: false,
-});
-const testDb = await mf.getD1Database("DB");
-for (const file of (await fs.readdir("drizzle"))
-  .filter((f) => f.endsWith(".sql"))
-  .sort())
-  for (const statement of (await fs.readFile("drizzle/" + file, "utf8"))
-    .split("--> statement-breakpoint")
-    .filter((x) => x.trim()))
-    await testDb.prepare(statement.trim()).run();
-const transport = async (url, options) => {
-  const request = new Request(url, options);
-  return mf.dispatchFetch(url, {
-    method: request.method,
-    headers: Object.fromEntries(request.headers),
-    body: request.body ? await request.arrayBuffer() : undefined,
-  });
-};
+const { mf, testDb, transport } = await startWorker("audit-integration");
 try {
-  const stamp = Date.now(),
-    owner = "fixture-owner-" + stamp,
-    reviewer = "fixture-reviewer-" + stamp,
-    viewer = "fixture-viewer-" + stamp,
-    other = "fixture-other-" + stamp;
-  const h = (user) => ({
-    "oai-authenticated-user-id": user,
-    "oai-authenticated-user-email": user + "@fixture.invalid",
-    Origin: base,
-  });
-  const request = async (
-    path,
-    { user = owner, body, method = "GET", status = 200 } = {},
-  ) => {
-    const r = await transport(base + path, {
-      method,
-      headers: {
-        ...h(user),
-        ...(body && !(body instanceof FormData)
-          ? { "Content-Type": "application/json" }
-          : {}),
+  const { stamp, owner, reviewer, viewer, other } = fixtureUsers();
+  const h = identity;
+  let workspace, e, tenantId;
+  const { request, refresh, management, command } = apiClient(
+    transport,
+    owner,
+    {
+      get tenantId() {
+        return tenantId;
       },
-      body: body
-        ? body instanceof FormData
-          ? body
-          : JSON.stringify(body)
-        : undefined,
-    });
-    const value = await r.json();
-    assert.equal(r.status, status, JSON.stringify(value));
-    return value;
-  };
-  let workspace = await request("/api/workspace");
-  let e = workspace.engagement;
-  const tenantId = workspace.tenantId;
-  // #18: a new engagement carries the stamp of the rule pack the catalog serves.
-  const rulePack = workspace.catalog.regulatorySnapshot;
-  assert.deepEqual(e.rulePack, {
-    version: workspace.catalog.methodologyVersion,
-    legalVersion: rulePack.celex,
-    researchedAsOf: rulePack.researchedAsOf,
-    legalReview: "pending",
-  });
-  assert.equal(e.classification.version, rulePack.celex);
-  assert.equal(e.classification.asOf, rulePack.researchedAsOf);
-  async function refresh(user = owner) {
-    workspace = await request(
-      "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
-      { user },
-    );
-    e = workspace.engagement;
-    return workspace;
-  }
-  async function management(
-    op,
-    data,
-    user = owner,
-    status = 200,
-    version = workspace.managementVersion,
-  ) {
-    const result = await request("/api/management", {
-      method: "POST",
-      user,
-      status,
-      body: { op, data, tenantId, expectedVersion: version },
-    });
-    if (status === 200) await refresh();
-    return result;
-  }
-  async function command(
-    op,
-    data,
-    user = owner,
-    status = 200,
-    version = e.version,
-  ) {
-    if (["grantMember", "createClient", "createEngagement"].includes(op))
-      return management(op, data, user, status);
-    const result = await request("/api/workspace", {
-      method: "POST",
-      user,
-      status,
-      body: {
-        op,
-        data,
-        tenantId,
-        engagementId: e.id,
-        expectedVersion: version,
+      get workspace() {
+        return workspace;
       },
-    });
-    if (status === 200) e = result.engagement;
-    return result;
-  }
+      set workspace(value) {
+        workspace = value;
+      },
+      get e() {
+        return e;
+      },
+      set e(value) {
+        e = value;
+      },
+    },
+  );
+  workspace = await request("/api/workspace");
+  e = workspace.engagement;
+  tenantId = workspace.tenantId;
   await request("/api/workspace", { status: 200, user: other });
-  await request("/api/workspace?tenantId=" + tenantId, {
-    user: other,
-    status: 403,
-  });
-  const unauth = await transport(base + "/api/workspace");
-  assert.equal(unauth.status, 401);
-  const csrf = await transport(base + "/api/workspace", {
-    method: "POST",
-    headers: {
-      ...h(owner),
-      Origin: "https://untrusted.invalid",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-  assert.equal(csrf.status, 403);
-  console.log(
-    "PASS authentication, tenant isolation and same-origin mutations",
-  );
-  const stateQ = new URLSearchParams({ tenantId, kind: "preferences" });
-  let prefs = await request("/api/workspace-state?" + stateQ);
-  assert.equal(prefs.version, 0);
-  const prefBody = {
-    tenantId,
-    kind: "preferences",
-    expectedVersion: 0,
-    preferences: {
-      views: [
-        {
-          id: "view1",
-          name: "My findings",
-          module: "Findings",
-          search: "risk",
-          filter: "open",
-          facet: "all",
-          sort: "risk",
-        },
-      ],
-      reminderDays: 3,
-      snoozed: [],
-    },
-  };
-  await request("/api/workspace-state", { method: "POST", body: prefBody });
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: prefBody,
-    status: 409,
-  });
-  prefs = await request("/api/workspace-state?" + stateQ);
-  assert.equal(prefs.version, 1);
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: {
-      ...prefBody,
-      expectedVersion: 1,
-      preferences: { ...prefBody.preferences, reminderDays: 7 },
-    },
-  });
-  assert.equal((await request("/api/workspace-state?" + stateQ)).version, 2);
-  const recoveryPaper = e.papers[0],
-    draftScope = {
-      tenantId,
-      engagementId: e.id,
-      kind: "paper",
-      recordId: recoveryPaper.id,
-      baseRevision: recoveryPaper.revision + ":" + recoveryPaper.updatedAt,
-    };
-  const recoveryContent = {
-      body: { ...recoveryPaper.body, results: "Unsubmitted recovery draft" },
-      evidenceIds: [],
-      required: true,
-    },
-    savedRevision = e.version;
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: { ...draftScope, expectedVersion: 0, content: recoveryContent },
-  });
-  await refresh();
-  assert.equal(e.version, savedRevision);
-  assert.notEqual(e.papers[0].body.results, recoveryContent.body.results);
-  const ownDraft = await request(
-    "/api/workspace-state?" + new URLSearchParams(draftScope),
-  );
-  assert.equal(ownDraft.draft.current, true);
-  assert.equal(
-    ownDraft.draft.content.body.results,
-    recoveryContent.body.results,
-  );
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: { ...draftScope, expectedVersion: 0, content: recoveryContent },
-    status: 409,
-  });
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: {
-      ...draftScope,
-      baseRevision: "stale",
-      expectedVersion: 1,
-      content: recoveryContent,
-    },
-    status: 409,
-  });
-  await request("/api/workspace-state", {
-    method: "POST",
-    body: { ...draftScope, expectedVersion: 1, content: { body: 7 } },
-    status: 400,
-  });
-  await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
-    user: other,
-    status: 403,
-  });
-  console.log(
-    "PASS private preferences CAS and recoverable drafts without audit mutation",
-  );
-
   await command("grantMember", {
     userId: reviewer,
     displayName: "Independent Reviewer",
@@ -350,412 +136,17 @@ try {
     role: "Client Viewer",
     clientId: e.clientId,
   });
-  await request("/api/work-inbox?" + new URLSearchParams({ tenantId }), {
-    user: viewer,
-    status: 403,
-  });
-
-  // #27: criteria pins, the read-time legacy pin and GET /api/coverage
-  // (docs/design/criteria-model.md section 16, integration harness).
-  {
-    const packKey = "eu-ai-act@02024R1689-20260727";
-    assert.equal(workspace.criteria.pin.packId, "eu-ai-act-amended");
-    assert.equal(workspace.criteria.origin, "created");
-    assert.deepEqual(workspace.criteria.features, {
-      annexIvIndex: true,
-      aiActClassification: true,
-      obligationAssessments: true,
-      statementOfApplicability: false,
-      nonconformityGrading: false,
-      certificationRecommendation: false,
-      ll144BiasAudit: false,
-    });
-    assert.equal(workspace.criteria.draft, false);
-    assert.equal(workspace.criteria.managementSystem, undefined);
-    assert.equal(workspace.criteria.frameworks[0].legalReviewPending, true);
-    assert.equal(
-      e.criteria.pin.packVersion,
-      workspace.criteria.pin.packVersion,
-    );
-    assert.equal(
-      workspace.selectablePacks.map((p) => p.id).join(),
-      "eu-ai-act-amended,genai-evaluation,nyc-ll144-bias-audit",
-    );
-    const chosen = await management("createEngagement", {
-      clientId: e.clientId,
-      title: "Criteria pack fixture",
-      packId: "eu-ai-act-amended",
-      packVersion: workspace.criteria.pin.packVersion,
-    });
-    assert.equal(chosen.details.pack.id, "eu-ai-act-amended");
-    await management(
-      "createEngagement",
-      { clientId: e.clientId, title: "Unknown pack", packId: "no-such-pack" },
-      owner,
-      400,
-    );
-    // An engagement stored before pins: no criteria and no #18 stamp.
-    const legacyId = chosen.details.engagementId;
-    await testDb
-      .prepare(
-        "UPDATE engagements SET body=json_remove(body,'$.criteria','$.rulePack') WHERE tenant_id=? AND id=?",
-      )
-      .bind(tenantId, legacyId)
-      .run();
-    const scope = new URLSearchParams({ tenantId, engagementId: legacyId });
-    const legacy = await request("/api/workspace?" + scope);
-    assert.equal(legacy.criteria.origin, "legacy");
-    // Every legacy class resolves to pack #1 2026.11.2; new engagements pin
-    // the current version (2026.11.3 since #61, the same programme).
-    assert.equal(legacy.criteria.pin.packId, workspace.criteria.pin.packId);
-    assert.equal(legacy.criteria.pin.packVersion, "2026.11.2");
-    assert.equal(legacy.catalog.methodologyVersion, "2026.11.2");
-    // Its template commands behave as before and write no pin.
-    const created = await request("/api/workspace", {
-      method: "POST",
-      body: {
-        op: "createPaper",
-        data: { templateId: "WP-A09-01" },
-        tenantId,
-        engagementId: legacyId,
-        expectedVersion: legacy.engagement.version,
-      },
-    });
-    assert(created.engagement.papers.some((p) => p.templateId === "WP-A09-01"));
-    const stored = await testDb
-      .prepare(
-        "SELECT json_type(body,'$.criteria') AS criteria FROM engagements WHERE tenant_id=? AND id=?",
-      )
-      .bind(tenantId, legacyId)
-      .first();
-    assert.equal(stored.criteria, null, "M0 writes nothing to the engagement");
-    // M1 (#61): the explicit legacy pin goes through the normal save, with
-    // an audit event and a version bump, and its reversal removes it.
-    const storedPin = async () =>
-      (await testDb
-        .prepare(
-          "SELECT json_extract(body,'$.criteria.origin') AS origin, json_extract(body,'$.criteria.pin.packVersion') AS version FROM engagements WHERE tenant_id=? AND id=?",
-        )
-        .bind(tenantId, legacyId)
-        .first()) ?? {};
-    const pinnedM1 = await request("/api/workspace", {
-      method: "POST",
-      body: {
-        op: "pinCriteria",
-        data: {},
-        tenantId,
-        engagementId: legacyId,
-        expectedVersion: created.engagement.version,
-      },
-    });
-    assert.equal(pinnedM1.engagement.version, created.engagement.version + 1);
-    assert.deepEqual(
-      { ...(await storedPin()) },
-      { origin: "legacy", version: "2026.11.2" },
-    );
-    const afterPin = await request("/api/workspace?" + scope);
-    assert.equal(afterPin.criteria.origin, "legacy");
-    assert.deepEqual(afterPin.criteria.pin, legacy.criteria.pin);
-    const event = await testDb
-      .prepare(
-        "SELECT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY rowid DESC LIMIT 1",
-      )
-      .bind(tenantId, legacyId)
-      .first();
-    assert.equal(event?.action, "pinCriteria");
-    await request("/api/workspace", {
-      method: "POST",
-      body: {
-        op: "unpinCriteria",
-        data: {},
-        tenantId,
-        engagementId: legacyId,
-        expectedVersion: pinnedM1.engagement.version,
-      },
-    });
-    assert.deepEqual(
-      { ...(await storedPin()) },
-      { origin: null, version: null },
-    );
-    const views = await request("/api/coverage?" + scope);
-    // The AI Act criteria view, then the NIST crosswalk views (#29).
-    assert.deepEqual(
-      views.views.map((v) => v.key),
-      [packKey, "nist-ai-rmf@1.0", "nist-ai-600-1@2024-07"],
-    );
-    const nist = await request(
-      "/api/coverage?" + scope + "&framework=nist-ai-rmf%401.0",
-    );
-    assert.equal(nist.view.kind, "crosswalk");
-    assert.equal(nist.summary.full, 0, "NIST is never fully covered");
-    const coverage = await request(
-      "/api/coverage?" + scope + "&framework=" + encodeURIComponent(packKey),
-    );
-    assert.equal(coverage.summary.full, 0, "Migrated links are partial");
-    assert(coverage.summary.total > 90);
-    assert(coverage.banners.some((b) => b.id === "migration"));
-    assert(coverage.banners.some((b) => b.id === "legal-review"));
-    await request("/api/coverage?" + scope + "&framework=iso-iec-42001@2023", {
-      status: 404,
-    });
-    await request("/api/coverage?" + scope, { user: viewer, status: 403 });
-    // #135: derived applicability dates and the internal-only CSV export.
-    assert(coverage.banners.some((b) => b.id === "derived-applicability"));
-    const exportPath =
-      "/api/coverage?" +
-      scope +
-      "&" +
-      new URLSearchParams({
-        framework: packKey,
-        format: "csv",
-        actor: "Provider",
-      });
-    const csv = await transport(base + exportPath, { headers: h(owner) });
-    assert.equal(csv.status, 200);
-    assert.match(csv.headers.get("content-type"), /^text\/csv/);
-    assert.match(csv.headers.get("content-disposition"), /attachment/);
-    const csvLines = (await csv.text()).trimEnd().split("\r\n");
-    assert(csvLines[0].startsWith("view,framework_data_version,pack"));
-    assert(csvLines.length > 1 && csvLines.length < coverage.summary.total);
-    assert(csvLines.slice(1).every((l) => l.includes("Provider")));
-    await request(exportPath, { user: viewer, status: 403 });
-    // A rule-pack stamp the index does not know fails closed.
-    await testDb
-      .prepare(
-        'UPDATE engagements SET body=json_set(body,\'$.rulePack\',json(\'{"version":"2026.12.9","legalVersion":"x","researchedAsOf":"2026-12-01","legalReview":"pending"}\')) WHERE tenant_id=? AND id=?',
-      )
-      .bind(tenantId, legacyId)
-      .run();
-    await request("/api/coverage?" + scope, { status: 500 });
-    console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, derived applicability, the CSV export, client 403 and unknown stamps fail closed",
-    );
-  }
-  await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
-    user: reviewer,
-    status: 200,
-  }).then((v) => assert.equal(v.draft, null));
-  await request("/api/workspace-state", {
-    method: "POST",
-    user: reviewer,
-    body: { ...draftScope, expectedVersion: 0, content: recoveryContent },
-    status: 403,
-  });
-  const onboarded = "onboarded-" + stamp;
-  await management("grantMember", {
-    userId: onboarded,
-    displayName: "Guided auditor fixture",
-    role: "Auditor",
-    clientId: null,
-    engagementIds: [e.id],
-  });
-  await request(
-    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
-    { user: onboarded },
-  );
-  await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
-    user: onboarded,
-  }).then((v) => assert.equal(v.draft, null));
-  const inboxPath = "/api/work-inbox?" + new URLSearchParams({ tenantId });
-  const ownerInboxBefore = await request(inboxPath),
-    reviewerInboxBefore = await request(inboxPath, { user: reviewer });
-  assert.equal(
-    ownerInboxBefore.loadedEngagements,
-    workspace.engagements.length,
-    "Inbox counts accessible engagements, independently of work-item count",
-  );
-  assert.equal(
-    reviewerInboxBefore.loadedEngagements,
-    1,
-    "Reviewer has only the explicitly assigned engagement",
-  );
-  const privateInboxEngagement = await management("createEngagement", {
-    clientId: e.clientId,
-    title: "Owner-only work inbox fixture",
-  });
-  const ownerInboxAfter = await request(inboxPath),
-    reviewerInboxAfter = await request(inboxPath, { user: reviewer });
-  assert.equal(
-    ownerInboxAfter.loadedEngagements,
-    ownerInboxBefore.loadedEngagements + 1,
-  );
-  assert(
-    ownerInboxAfter.items.some(
-      (i) => i.engagementId === privateInboxEngagement.details.engagementId,
-    ),
-    "Accessible newly created engagement contributes planning work",
-  );
-  assert.equal(
-    reviewerInboxAfter.loadedEngagements,
-    reviewerInboxBefore.loadedEngagements,
-    "Inaccessible engagements do not enter the loaded-engagement count",
-  );
-  assert(
-    reviewerInboxAfter.items.every((i) => i.engagementId === e.id),
-    "Inbox never exposes another user’s inaccessible engagement IDs",
-  );
-  await request(
-    "/api/workspace?" +
-      new URLSearchParams({
-        tenantId,
-        engagementId: privateInboxEngagement.details.engagementId,
-      }),
-    { user: reviewer, status: 404 },
-  );
-  for (const page of ["-1", "1.5", "invalid", "10001"])
-    await request(
-      "/api/work-inbox?" + new URLSearchParams({ tenantId, page }),
-      { status: 400 },
-    );
-  const emptyInboxPage = await request(
-    "/api/work-inbox?" + new URLSearchParams({ tenantId, page: "1" }),
-  );
-  assert.equal(emptyInboxPage.loadedEngagements, 0);
-  assert.deepEqual(emptyInboxPage.items, []);
-  assert.equal(emptyInboxPage.nextPage, null);
-  console.log(
-    "PASS inbox accessible-engagement counts, engagement isolation, invalid pages and exhausted pagination",
-  );
-
-  await command(
-    "createClient",
-    { name: "Unauthorized client", sector: "Test" },
-    viewer,
-    403,
-  );
-  const before = workspace.clients.length,
-    version = workspace.managementVersion;
-  const races = await Promise.all(
-    ["Concurrent A", "Concurrent B"].map((name) =>
-      transport(base + "/api/management", {
-        method: "POST",
-        headers: { ...h(owner), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          op: "createClient",
-          data: { name, sector: "Test" },
-          tenantId,
-          expectedVersion: version,
-        }),
-      }),
-    ),
-  );
-  for (const r of races) {
-    if (![200, 409].includes(r.status))
-      console.log(
-        "Unexpected concurrency response:",
-        r.status,
-        await r.clone().text(),
-      );
-  }
-  assert.deepEqual(races.map((r) => r.status).sort(), [200, 409]);
-  await refresh();
-  assert.equal(workspace.clients.length, before + 1);
-  console.log("PASS RBAC and atomic concurrent command guard");
-  const auditVersion = e.version,
-    managedClient = workspace.clients.find((c) =>
-      c.name.startsWith("Concurrent"),
-    );
-  await management("updateClient", {
-    clientId: managedClient.id,
+  // The rule pack the catalog serves, which classification records cite.
+  const rulePack = workspace.catalog.regulatorySnapshot;
+  // A second client of the practice, for cross-client isolation checks.
+  await management("createClient", {
     name: "Edited fixture client",
     sector: "Manufacturing",
   });
-  assert.equal(e.version, auditVersion);
-  await management(
-    "updateClient",
-    { clientId: "CL-other-tenant", name: "Invalid", sector: "Test" },
-    owner,
-    404,
+  const managedClient = workspace.clients.find(
+    (c) => c.name === "Edited fixture client",
   );
-  await management(
-    "grantMember",
-    { userId: owner, displayName: "Self", role: "Auditor", clientId: null },
-    owner,
-    400,
-  );
-  await management(
-    "updateMember",
-    {
-      userId: "nonexistent",
-      displayName: "Nobody",
-      role: "Reviewer",
-      clientId: null,
-    },
-    owner,
-    404,
-  );
-  await management("updateMember", {
-    userId: reviewer,
-    displayName: "Independent Reviewer",
-    role: "Auditor",
-    clientId: null,
-    // A role change withdraws earlier grants; the engagement is kept by
-    // listing it (F-24).
-    engagementIds: [e.id],
-  });
-  await command("reviewPaper", { paperId: e.papers[0].id }, reviewer, 403);
-  await management("updateMember", {
-    userId: reviewer,
-    displayName: "Independent Reviewer",
-    role: "Reviewer",
-    clientId: null,
-    // A role change withdraws earlier grants; the engagement is kept by
-    // listing it (F-24).
-    engagementIds: [e.id],
-  });
-  await management("revokeMember", { userId: viewer });
-  await request("/api/workspace?tenantId=" + tenantId, {
-    user: viewer,
-    status: 403,
-  });
-  assert.equal(
-    workspace.members.find((m) => m.user_id === viewer).status,
-    "revoked",
-  );
-  await management(
-    "updateMember",
-    {
-      userId: viewer,
-      displayName: "Client Viewer",
-      role: "Client Viewer",
-      clientId: e.clientId,
-    },
-    owner,
-    409,
-  );
-  await management("grantMember", {
-    userId: viewer,
-    displayName: "Client Viewer",
-    role: "Client Viewer",
-    clientId: e.clientId,
-  });
-  await request("/api/workspace", {
-    method: "POST",
-    status: 400,
-    body: {
-      op: "grantMember",
-      data: {},
-      tenantId,
-      engagementId: e.id,
-      expectedVersion: e.version,
-    },
-  });
-  await testDb
-    .prepare("UPDATE memberships SET status='revoked' WHERE user_id=?")
-    .bind(other)
-    .run();
-  await request("/api/workspace", { user: other, status: 403 });
-  await assert.rejects(
-    () =>
-      testDb
-        .prepare("DELETE FROM management_events WHERE tenant_id=?")
-        .bind(tenantId)
-        .run(),
-    /immutable/,
-  );
-  console.log(
-    "PASS independent client management, role edits, revocation, safe restoration and immutable access history",
-  );
+  const inboxPath = "/api/work-inbox?" + new URLSearchParams({ tenantId });
   const form = new FormData();
   form.set("tenantId", tenantId);
   form.set("engagementId", e.id);

@@ -62,13 +62,13 @@ CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushe
 | `npm run format:check` | Verify Prettier formatting (`npm run format` applies it) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint; any warning fails |
-| `npm test` | Vitest unit tests (`lib/**/*.test.ts`, `app/**/*.test.ts`) |
+| `npm test` | Vitest unit tests (`lib/**/*.test.ts`, `app/**/*.test.ts`); `*.local-calendar.test.ts` files run in a project of their own with `TZ=Europe/Vienna` (`vitest.config.ts`) |
 | `npm run check:sync` | Generated files match their canonical sources (see below) |
 | `npm run check:build` | Production Worker build (`npm run build`), failing if the output reports any warning |
-| `npm run check:harnesses` | Every `scripts/*-check.mjs` harness; needs a build first |
+| `npm run check:harnesses` | Every `scripts/*-check.mjs` harness against the built Worker in Miniflare; needs a build first. A harness never loads TypeScript sources or rewrites import paths: a check of a pure module is a Vitest test |
 | `npm run check:fixtures` | Validate the run, external-run and procedure records the harnesses just produced against `schemas/` |
 
-The assurance harness starts Python: set `ASSURANCE_TEST_PYTHON` to the interpreter to use, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, default `python` on Windows and `python3` elsewhere). The integration harnesses provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `integration-check.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
+The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
 The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`.
 

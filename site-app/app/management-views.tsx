@@ -122,7 +122,10 @@ export function ManagementViews({
       (memberView === "all" || m.status === memberView) &&
       matches(m.display_name + " " + m.role + " " + (m.email ?? "")),
   );
-  function EngagementTable() {
+  // Called, not rendered as <EngagementTable />: a component declared in
+  // render is a new type each render, so React remounted the whole table
+  // (losing focus on the clicked button) on every update.
+  function engagementTable() {
     return engagements.length ? (
       <Table className="compact-register management-table">
         <TableHeader>
@@ -788,8 +791,7 @@ export function ManagementViews({
             </Button>
           )}
         </DatabaseToolbar>
-        {/* eslint-disable-next-line react-hooks/static-components -- EngagementTable closes over this render's filters; hoisting it would also end its per-render remount, a behaviour change */}
-        <EngagementTable />
+        {engagementTable()}
       </section>
     </>
   );

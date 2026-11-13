@@ -1,5 +1,12 @@
 "use client";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   FileText,
   Maximize2,
@@ -199,13 +206,13 @@ export function PaperEditor({
     errorRef = useRef<HTMLDivElement>(null),
     targetChangeRef = useRef(onTargetChange),
     jumpFrame = useRef<number | undefined>(undefined);
-  // eslint-disable-next-line react-hooks/refs -- latest-callback ref that keeps jump() stable; writing it during render is the current behaviour
-  targetChangeRef.current = onTargetChange;
+  // The latest onTargetChange, so that jump() stays stable.
+  useLayoutEffect(() => {
+    targetChangeRef.current = onTargetChange;
+  });
   const sectionSelectId = useId();
-  const jump = useCallback((target: PaperTarget) => {
-    setSectionTarget(target);
-    setTab(target === "review" ? "review" : "paper");
-    targetChangeRef.current?.(target);
+  /** Scrolls to a section on the next frame and focuses its first control. */
+  const scrollToTarget = useCallback((target: PaperTarget) => {
     if (jumpFrame.current !== undefined)
       cancelAnimationFrame(jumpFrame.current);
     jumpFrame.current = requestAnimationFrame(() => {
@@ -219,6 +226,15 @@ export function PaperEditor({
       (control ?? section)?.focus({ preventScroll: true });
     });
   }, []);
+  const jump = useCallback(
+    (target: PaperTarget) => {
+      setSectionTarget(target);
+      setTab(target === "review" ? "review" : "paper");
+      targetChangeRef.current?.(target);
+      scrollToTarget(target);
+    },
+    [scrollToTarget],
+  );
   useEffect(
     () => () => {
       if (jumpFrame.current !== undefined)
@@ -226,20 +242,34 @@ export function PaperEditor({
     },
     [],
   );
+  // Another paper, or a sent comment, resets the review panel; a paper that
+  // opens at a requested section shows it. Both are keyed by the paper id, so
+  // editing the draft neither resets nor jumps again.
+  const draftId = draft?.id,
+    resetKey = (draftId ?? "") + "|" + commentReset,
+    jumpKey = draftId && initialTarget ? draftId + "|" + initialTarget : "",
+    [applied, setApplied] = useState({ reset: "", jump: "" });
+  if (applied.reset !== resetKey || applied.jump !== jumpKey) {
+    setApplied({ reset: resetKey, jump: jumpKey });
+    if (applied.reset !== resetKey) {
+      setExpanded(false);
+      setComment("");
+      setReply({ id: "", text: "" });
+      setCommentError("");
+      setTab("paper");
+      setSectionTarget("objective");
+    }
+    if (jumpKey && applied.jump !== jumpKey && initialTarget) {
+      setSectionTarget(initialTarget);
+      setTab(initialTarget === "review" ? "review" : "paper");
+    }
+  }
+  // ... and, once shown, scrolls to that section and reports it.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the review panel after another paper opens or a comment is sent
-    setExpanded(false);
-    setComment("");
-    setReply({ id: "", text: "" });
-    setCommentError("");
-    setTab("paper");
-    setSectionTarget("objective");
-  }, [draft?.id, commentReset]);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- jumps to the requested section when a paper opens
-    if (draft && initialTarget) jump(initialTarget);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by the paper id so that editing the draft does not jump again
-  }, [draft?.id, initialTarget, jump]);
+    if (!draftId || !initialTarget) return;
+    targetChangeRef.current?.(initialTarget);
+    scrollToTarget(initialTarget);
+  }, [draftId, initialTarget, scrollToTarget]);
   const pendingComment = !!comment.trim() || !!reply.text.trim(),
     locked = busy || sending !== null;
   useEffect(() => {

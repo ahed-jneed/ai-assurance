@@ -22,7 +22,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
 
-const python = process.env.ASSURANCE_TEST_PYTHON ?? "python";
+import { python } from "./harness/env.mjs";
 const local = "http://127.0.0.1:5173";
 const modules = [
   "index.js",

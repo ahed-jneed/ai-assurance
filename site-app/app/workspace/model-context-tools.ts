@@ -1,6 +1,6 @@
 // Read-only tools the workspace registers with navigator.modelContext (the
 // WebMCP proposal) when the browser provides it.
-import { useEffect, useRef } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { finalReportGates } from "@/lib/domain";
 import { packFeatures, type WorkspaceData } from "../workspace-types";
 import { managementNavigation, navigation } from "./modules";
@@ -13,9 +13,8 @@ export function useModelContextTools(
   getData: () => WorkspaceData | null,
   navigate: (module: string) => string,
 ) {
-  const navigateRef = useRef(navigate);
-  // eslint-disable-next-line react-hooks/refs -- latest-function ref read by the navigation tool registered with navigator.modelContext; writing it during render is the current behaviour
-  navigateRef.current = navigate;
+  // The registered tool always navigates with the latest navigate().
+  const navigateTo = useEffectEvent((module: string) => navigate(module));
   useEffect(() => {
     const registry = (
       document as unknown as {
@@ -83,7 +82,7 @@ export function useModelContextTools(
             throw Error("Unknown audit module");
           return {
             module: value.module,
-            status: navigateRef.current(value.module!),
+            status: navigateTo(value.module!),
           };
         },
       },

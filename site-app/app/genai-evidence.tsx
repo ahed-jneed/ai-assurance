@@ -67,6 +67,8 @@ async function post(
   return v;
 }
 
+const genaiError = (err: unknown) =>
+  err instanceof Error ? err.message : "GenAI evidence unavailable";
 function parseJson(text: string, what: string) {
   try {
     return JSON.parse(text) as Record<string, unknown>;
@@ -423,33 +425,49 @@ export function GenaiEvidence({
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState<Form | null>(null);
-  const load = useCallback(async () => {
-    try {
-      const r = await fetch(
-        "/api/assurance?" +
-          new URLSearchParams({
-            tenantId,
-            engagementId: e.id,
-            view: "genai",
-          }),
-        { headers: { accept: "application/json" } },
-      );
-      const body = (await r.json().catch(() => ({}))) as GenaiView & {
-        error?: string;
-      };
-      if (!r.ok) throw new Error(body.error ?? "GenAI evidence unavailable");
-      setView(body);
-      setError("");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "GenAI evidence unavailable",
-      );
-    }
+  const read = useCallback(async () => {
+    const r = await fetch(
+      "/api/assurance?" +
+        new URLSearchParams({
+          tenantId,
+          engagementId: e.id,
+          view: "genai",
+        }),
+      { headers: { accept: "application/json" } },
+    );
+    const body = (await r.json().catch(() => ({}))) as GenaiView & {
+      error?: string;
+    };
+    if (!r.ok) throw new Error(body.error ?? "GenAI evidence unavailable");
+    return body;
   }, [tenantId, e.id]);
+  const show = useCallback((body: GenaiView) => {
+    setView(body);
+    setError("");
+  }, []);
+  async function load() {
+    try {
+      show(await read());
+    } catch (err) {
+      setError(genaiError(err));
+    }
+  }
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the view when the engagement changes
-    void load();
-  }, [load, e.version]);
+    // Reread for each engagement version; a response for an engagement or
+    // version that has since changed is dropped.
+    let active = true;
+    read().then(
+      (body) => {
+        if (active) show(body);
+      },
+      (err: unknown) => {
+        if (active) setError(genaiError(err));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [read, show, e.version]);
   const run = async (op: string, data: Record<string, unknown>) => {
     setBusy(true);
     try {

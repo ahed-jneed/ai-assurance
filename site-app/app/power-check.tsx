@@ -5,7 +5,7 @@
 // row count, the rows of each group in the protected-group column, and the
 // classes of the target column (power-assumptions.ts). A shortfall needs a
 // recorded acknowledgement, not a block.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { criterionPower, type Plan } from "@/lib/statistics";
@@ -48,6 +48,21 @@ type Inspection = {
   counts?: Record<string, { value: string; count: number }[] | null>;
   error?: string;
 };
+
+/** Sends the assumptions the inputs and planned sizes give per criterion. */
+function emit(
+  next: Record<string, Record<string, string>>,
+  sizes: Planned,
+  criteria: Plan["criteria"],
+  send: (value: Record<string, unknown>) => void,
+) {
+  const out: Record<string, unknown> = {};
+  for (const c of criteria) {
+    const a = assumptionsFor(c, next[c.id] ?? {}, sizes).value;
+    if (a) out[c.id] = a;
+  }
+  send(out);
+}
 
 export function PowerCheck({
   plan,
@@ -98,32 +113,19 @@ export function PowerCheck({
       : { rows, groupSizes: null, classes: null };
   const family = plan.criteria.filter((c) => c.role === "confirmatory").length;
   const shortfalls = powerShortfalls(plan);
-  // The latest inputs and plan, for recomputing the assumptions once the
+  // Recomputes the assumptions from the latest inputs and plan once the
   // dataset's group sizes and classes arrive.
-  const latest = useRef({ inputs, plan, onAssumptions });
-  useEffect(() => {
-    latest.current = { inputs, plan, onAssumptions };
+  const applySizes = useEffectEvent((next: NonNullable<typeof read>) => {
+    setRead(next);
+    emit(inputs, { rows, ...next }, plan.criteria, onAssumptions);
   });
-
-  function emit(
-    next: Record<string, Record<string, string>>,
-    sizes: Planned,
-    criteria: Plan["criteria"],
-    send: (value: Record<string, unknown>) => void,
-  ) {
-    const out: Record<string, unknown> = {};
-    for (const c of criteria) {
-      const a = assumptionsFor(c, next[c.id] ?? {}, sizes).value;
-      if (a) out[c.id] = a;
-    }
-    send(out);
-  }
+  const { tenantId, engagementId, artifactId } = dataset;
 
   useEffect(() => {
     if (!groupColumn && !labelColumn) return;
     let active = true;
     const controller = new AbortController();
-    const query = new URLSearchParams(dataset);
+    const query = new URLSearchParams({ tenantId, engagementId, artifactId });
     if (groupColumn) query.append("counts", groupColumn);
     if (labelColumn) query.append("values", labelColumn);
     fetch("/api/evaluation/dataset?" + query, { signal: controller.signal })
@@ -147,9 +149,7 @@ export function PowerCheck({
               ? "The dataset has more than 50 groups or classes in the mapped column, so the planned sizes cannot be listed."
               : undefined,
         };
-        setRead(next);
-        const { inputs, plan, onAssumptions } = latest.current;
-        emit(inputs, { rows, ...next }, plan.criteria, onAssumptions);
+        applySizes(next);
       })
       .catch((err: Error) => {
         if (!active || err.name === "AbortError") return;
@@ -164,8 +164,7 @@ export function PowerCheck({
       active = false;
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- key identifies the dataset and mapped columns
-  }, [key]);
+  }, [key, tenantId, engagementId, artifactId, groupColumn, labelColumn]);
 
   function change(id: string, field: string, value: string) {
     const next = { ...inputs, [id]: { ...inputs[id], [field]: value } };

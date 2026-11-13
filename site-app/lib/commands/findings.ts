@@ -7,7 +7,7 @@ import {
   primaryReferenceOf,
 } from "../criteria/pin";
 import { risk, type Finding } from "../domain";
-import { id, now } from "../engagement-repo";
+import { id, now } from "../ids";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";

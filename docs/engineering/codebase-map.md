@@ -179,7 +179,7 @@ A second identity is impossible in this mode: the mock strips inbound `oai-*` he
 
    Note that `local_seedy` is an ordinary user id in this mode.
 
-**C. API-level regression (no server needed).** `node scripts/integration-check.mjs`, run after a build, drives owner, reviewer, viewer and outsider personas through Miniflare.
+**C. API-level regression (no server needed).** `node scripts/engagement-lifecycle-check.mjs` (and the other API harnesses split out of the former `integration-check.mjs` by [#52](https://github.com/ahed-jneed/ai-assurance/issues/52): `workspace-access`, `criteria-pins`, `work-inbox-api` and `practice-management`), run after a build, drives owner, reviewer, viewer and outsider personas through Miniflare.
 
 > **Caveat.** Once the identity adapter from F-02 strips untrusted headers, modes B and C need an explicit local/test "trusted-headers" setting. [#11](https://github.com/ahed-jneed/ai-assurance/issues/11) builds that adapter with a loopback-only `trusted-headers` mode for this purpose.
 
@@ -360,7 +360,7 @@ Paths are relative to `site-app/` unless they start with a root folder name.
 | `app/globals.css`, the sibling stylesheets, the import order in `app/layout.tsx` | Order-dependent cascade | A6 owns tokens and base styles. Feature styles live in per-area files |
 | `app/workspace-types.ts` | Hand-written API contract | Replace with `lib/api-types.ts`; changes go with the op that needs them |
 | `package.json`, `package-lock.json` | Every dependency change | A0 batches dependency changes. On rebase, regenerate the lock with `npm install --package-lock-only` rather than merging it by hand |
-| `scripts/integration-check.mjs` | 53 KB holding every API assertion | Split into per-area specs (A0) by [#52](https://github.com/ahed-jneed/ai-assurance/issues/52) |
+| `scripts/engagement-lifecycle-check.mjs` | The one API scenario whose parts build on each other | Split by area by [#52](https://github.com/ahed-jneed/ai-assurance/issues/52): access, criteria, inbox and practice management are their own harnesses; add a new area as its own harness on `scripts/harness/worker.mjs` |
 | `db/schema.ts`, `drizzle/meta/*` | Migration numbers and snapshots | One migration PR at a time (A2) |
 | `tsconfig.tsbuildinfo` | Rewritten by every `tsc` run | Untracked by [#1](https://github.com/ahed-jneed/ai-assurance/issues/1) ([PR #2](https://github.com/ahed-jneed/ai-assurance/pull/2)) |
 | `lib/catalog.json` and its root copies | Methodology changes | A9 only; the copies are generated |

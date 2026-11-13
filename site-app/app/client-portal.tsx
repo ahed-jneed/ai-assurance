@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkflowDialog, type WorkflowAct } from "./audit-program";
 import type { WorkspaceData } from "./workspace-types";
+import { useNow } from "./use-now";
 import { requestLabel } from "@/lib/evidence-requests";
 export function ClientPortal({
   data,
@@ -369,11 +370,11 @@ export function RequestAccess({
 }) {
   const e = data.engagement!,
     [form, setForm] =
-      useState<Parameters<typeof WorkflowDialog>[0]["form"]>(null);
+      useState<Parameters<typeof WorkflowDialog>[0]["form"]>(null),
+    now = useNow();
   if (data.identity.role !== "Lead Auditor" || !e.workflow) return null;
   const lapsed = new Set(data.lapsedClientGrants ?? []),
-    // eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render
-    at = Date.now(),
+    at = now,
     lapsedCount = e.workflow.clientGrants.filter(
       (g) => requestGrantStatus(g, lapsed, at) === "Lapsed",
     ).length;
@@ -551,8 +552,7 @@ export function RequestAccess({
               ))}
             </div>
           )}
-          {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
-          {g.active && Date.parse(g.expiresAt) > Date.now() && (
+          {g.active && Date.parse(g.expiresAt) > now && (
             <Button
               variant="outline"
               size="sm"

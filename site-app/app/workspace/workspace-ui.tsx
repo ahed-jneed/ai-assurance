@@ -48,11 +48,10 @@ export function Choice({
   disabled?: boolean;
 }) {
   return (
-    <Select
-      disabled={disabled}
-      value={value || undefined}
-      onValueChange={onChange}
-    >
+    // Always controlled: "" shows the placeholder, and passing undefined for
+    // an empty value would switch the Select from uncontrolled to controlled
+    // when the first value is chosen.
+    <Select disabled={disabled} value={value} onValueChange={onChange}>
       <SelectTrigger aria-label={label} className="w-full">
         <SelectValue placeholder={"Choose " + label.toLowerCase()} />
       </SelectTrigger>

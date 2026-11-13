@@ -1,16 +1,9 @@
 import { z } from "zod";
-import {
-  ApiError,
-  bucket,
-  checkOrigin,
-  context,
-  getEngagement,
-  now,
-  readJson,
-  requireRole,
-  responseError,
-  sha256,
-} from "@/lib/store";
+import { bucket } from "@/lib/bindings";
+import { getEngagement } from "@/lib/engagement-repo";
+import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
+import { now, sha256 } from "@/lib/ids";
+import { context, requireRole } from "@/lib/tenancy";
 import { buildDossier, scopeSha256, signDossier } from "@/lib/dossier";
 import { dossierScopeRequest, scopeDefinition } from "@/lib/dossier-scope";
 import { activeSigningKey } from "@/lib/signing-keys";

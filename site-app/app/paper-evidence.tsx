@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,14 +39,16 @@ export function PaperEvidence({
 }) {
   const [query, setQuery] = useState(""),
     [category, setCategory] = useState("all"),
-    [view, setView] = useState("all");
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the filters after another paper opens (post-commit reset is the current behaviour)
+    [view, setView] = useState(paper.evidenceIds.length ? "linked" : "all"),
+    [shownPaper, setShownPaper] = useState(paper.id);
+  // Another paper opens with fresh filters; the initial view is chosen only
+  // then, not when the open paper's evidence links change.
+  if (shownPaper !== paper.id) {
+    setShownPaper(paper.id);
     setQuery("");
     setCategory("all");
     setView(paper.evidenceIds.length ? "linked" : "all");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the initial view is chosen only when another paper opens, not when its evidence links change
-  }, [paper.id]);
+  }
   const accepted = artifacts.filter((a) => a.status === "accepted"),
     linked = paperEvidenceReferences(paper, artifacts),
     blocked = linked.filter((r) => r.artifact?.status !== "accepted");

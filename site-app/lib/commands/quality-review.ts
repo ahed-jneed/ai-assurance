@@ -6,7 +6,8 @@ import {
   qualityReviewerRole,
   type QualityReview,
 } from "../domain/quality-review";
-import { db, now } from "../engagement-repo";
+import { db } from "../bindings";
+import { now } from "../ids";
 import { ApiError } from "../http";
 import {
   onRecordedTeam,
