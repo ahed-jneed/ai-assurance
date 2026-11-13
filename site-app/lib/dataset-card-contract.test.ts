@@ -9,9 +9,12 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   datasetCardFields,
+  datasetCardSchema,
+  registeredCard,
   registeredDatasetCardFields,
   registeredDatasetCardSchema,
 } from "./dataset-card";
+import { ApiError } from "./http";
 
 type JsonSchema = {
   type?: string;
@@ -242,5 +245,96 @@ describe("the dataset card contract", () => {
     const reversed = { ...card, periodStart: "2026-10-01" };
     expect(registeredDatasetCardSchema.safeParse(reversed).success).toBe(false);
     expect(validate(reversed)).toBe(true);
+  });
+});
+
+describe("the card body registerDataset stores", () => {
+  const declared = datasetCardSchema.parse({
+      schemaVersion: "1.0",
+      name: "Applicant holdout",
+      version: "2026-Q3",
+      artifactId: "EV-holdout",
+      owner: "Credit risk analytics",
+      split: "test",
+      population: "Consumer credit applications, Q3 2026",
+      periodStart: "2026-07-01",
+      periodEnd: "2026-09-30",
+      collectionMethod: "Exported from the decision log",
+      independence: "Held out from training and tuning",
+      sensitiveDataBasis: "",
+      limitations: "Online channel only",
+    }),
+    artifact = { sha256: "a".repeat(64), name: "holdout.csv", size: 4096 },
+    baseline = {
+      id: "AS-baseline",
+      sha256: "b".repeat(64),
+      body: { artifactSha256: "c".repeat(64) },
+    };
+  const refusal = (f: () => unknown) => {
+    try {
+      f();
+    } catch (error) {
+      return error;
+    }
+    throw Error("expected a refusal");
+  };
+
+  it("meets the registered card contract, with and without a baseline", () => {
+    const plain = registeredCard(declared, artifact);
+    expect(validate(plain)).toBe(true);
+    expect(registeredDatasetCardSchema.parse(plain)).toEqual(plain);
+    const withBaseline = registeredCard(
+      {
+        ...declared,
+        baselineDatasetRecordId: "AS-baseline",
+        baselineRationale: "The prior quarter in production",
+      },
+      artifact,
+      baseline,
+    );
+    expect(validate(withBaseline)).toBe(true);
+    expect(withBaseline.baselinePin).toEqual({
+      recordId: "AS-baseline",
+      sha256: "b".repeat(64),
+      artifactSha256: "c".repeat(64),
+    });
+    // The stored bytes keep the order the body was built in.
+    expect(Object.keys(plain).slice(-3)).toEqual([
+      "artifactSha256",
+      "artifactName",
+      "artifactSize",
+    ]);
+  });
+
+  it("refuses a body the contract rejects instead of storing it", () => {
+    for (const [why, f] of [
+      [
+        "artifactName",
+        () => registeredCard(declared, { ...artifact, name: "x".repeat(301) }),
+      ],
+      [
+        "artifactSha256",
+        () => registeredCard(declared, { ...artifact, sha256: "not-a-digest" }),
+      ],
+      [
+        "baselinePin.artifactSha256",
+        () =>
+          registeredCard(
+            {
+              ...declared,
+              baselineDatasetRecordId: "AS-baseline",
+              baselineRationale: "The prior quarter in production",
+            },
+            artifact,
+            // A baseline record stored without its bytes' digest.
+            { ...baseline, body: {} },
+          ),
+      ],
+    ] as const) {
+      const error = refusal(f);
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(409);
+      expect((error as ApiError).message).toContain(why);
+    }
   });
 });

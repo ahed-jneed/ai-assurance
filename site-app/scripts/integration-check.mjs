@@ -3218,6 +3218,9 @@ try {
       dossier: JSON.parse(new TextDecoder().decode(bytes)),
     };
   };
+  // The internal dossier's paper leaves, which the package proof's document
+  // leaves must match (#137).
+  let internalPaperLeaves;
   const checkDossier = async (dossier, audience) => {
     assert.equal(dossier.manifest.audience, audience);
     assert.equal(dossier.manifest.schemaVersion, "1.2");
@@ -3263,6 +3266,9 @@ try {
       assert.equal(
         memo.records.releaseCompletion.internalHash,
         internalFinal.sha256,
+      );
+      internalPaperLeaves = dossier.manifest.files.filter((f) =>
+        f.path.startsWith("papers/"),
       );
       await fs.writeFile(
         ".sites-runtime/dossier-papers.json",
@@ -3560,6 +3566,34 @@ try {
   );
   assert.equal(internalProof.valid, true);
   assert.equal(internalProof.expectedSha256, internalFinal.sha256);
+  // Proof 1.1 lists every exported working-paper document with the digest of
+  // the bytes the signed dossier files under papers/ (#137): the captured
+  // documents inside the snapshot digest, the completion memo bound to the
+  // package through the release record.
+  assert.equal(internalProof.schemaVersion, "1.1");
+  const documentLeaves = internalProof.items.filter(
+    (i) => i.kind === "working_paper_document",
+  );
+  assert.equal(documentLeaves.length, internalPaperLeaves.length);
+  for (const leaf of documentLeaves)
+    assert.equal(
+      internalPaperLeaves.find(
+        (f) => f.path === "papers/" + leaf.id + "-r" + leaf.revision + ".json",
+      )?.sha256,
+      leaf.sha256,
+      leaf.id,
+    );
+  assert.deepEqual(
+    documentLeaves
+      .filter((l) => l.basis === "release_record")
+      .map((l) => [l.catalogId, l.bindsPackage]),
+    [["MEM-SO-01", true]],
+  );
+  assert(
+    documentLeaves.every(
+      (l) => l.catalogId === "MEM-SO-01" || l.basis === "snapshot",
+    ),
+  );
   const clientProof = await request(
     "/api/report-package?" +
       new URLSearchParams({
@@ -3571,6 +3605,7 @@ try {
   );
   assert.equal(clientProof.valid, true);
   assert.equal(clientProof.expectedSha256, internalFinal.clientSha256);
+  assert(!clientProof.items.some((i) => i.kind === "working_paper_document"));
   assert(!JSON.stringify(clientProof).includes("INTERNAL_REQUEST_SECRET"));
   const clientBundle = await request(
     "/api/report-package?" +
