@@ -135,7 +135,7 @@ export function pinCrosswalks(
  * The views an engagement offers: one criteria view per criteria set,
  * primary first, then one crosswalk view per framework edition that is the
  * criteria of a current pack, not of this one, and connected to one of its
- * criteria editions by a current crosswalk.
+ * criteria editions by a current crosswalk, in the order of those crosswalks.
  */
 export function offeredViews(r: Registry, resolved: Resolved): ViewInfo[] {
   const sets = resolved.pack.criteria.map((s, i) => ({
@@ -156,31 +156,30 @@ export function offeredViews(r: Registry, resolved: Resolved): ViewInfo[] {
     role: s.role,
   }));
   const own = new Set(criteria.map((v) => v.key));
-  const crosswalks = currentCrosswalks(r);
+  const editions = currentPackEditions(r);
   const seen = new Set<string>();
   const crosswalkViews: ViewInfo[] = [];
-  for (const t of currentPackEditions(r)) {
-    const key = viewKey(t.framework, t.edition);
-    if (own.has(key) || seen.has(key)) continue;
-    if (
-      !crosswalks.some((c) =>
-        resolved.pack.criteria.some((a) => connects(c, a, t)),
-      )
-    )
-      continue;
-    const fw = latestFramework(r, t.framework, t.edition);
-    if (!fw) continue;
-    seen.add(key);
-    crosswalkViews.push({
-      key,
-      kind: "crosswalk",
-      framework: t.framework,
-      edition: t.edition,
-      version: fw.version,
-      shortTitle: fw.shortTitle,
-      title: fw.title,
-    });
-  }
+  // In the index order of the first crosswalk that reaches each edition, so
+  // that a new pack version listing a framework another pack already lists
+  // (#161) does not reorder the views of existing engagements.
+  for (const c of currentCrosswalks(r))
+    for (const t of editions) {
+      const key = viewKey(t.framework, t.edition);
+      if (own.has(key) || seen.has(key)) continue;
+      if (!resolved.pack.criteria.some((a) => connects(c, a, t))) continue;
+      const fw = latestFramework(r, t.framework, t.edition);
+      if (!fw) continue;
+      seen.add(key);
+      crosswalkViews.push({
+        key,
+        kind: "crosswalk",
+        framework: t.framework,
+        edition: t.edition,
+        version: fw.version,
+        shortTitle: fw.shortTitle,
+        title: fw.title,
+      });
+    }
   return [...criteria, ...crosswalkViews];
 }
 
