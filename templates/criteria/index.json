@@ -324,6 +324,23 @@
       "releasedAt": "2026-11-13",
       "selectable": true,
       "sha256": "6e03faa00e3ca7ba5afee6895f2554c4ca10c3b9ee372d57e02770f2b208f550"
+    },
+    {
+      "documentType": "pack",
+      "id": "genai-evaluation",
+      "version": "2026.11.2",
+      "path": "packs/genai-evaluation/2026.11.2.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #161)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "selectable": true,
+      "sha256": "1700fe34f92dd0cf8b955d69d417558d6e7253ed48c6edfb8e50b21751b530f0"
     }
   ],
   "defaults": {

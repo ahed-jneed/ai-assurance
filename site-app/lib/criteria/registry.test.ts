@@ -184,7 +184,7 @@ describe("registry", () => {
       }),
       expect.objectContaining({
         id: "genai-evaluation",
-        version: "2026.11.1",
+        version: "2026.11.2",
         isDefault: false,
         workingPapers: 7,
         memos: 1,
