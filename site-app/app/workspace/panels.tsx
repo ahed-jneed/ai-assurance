@@ -1,7 +1,8 @@
 "use client";
-import { lazy, useEffect } from "react";
+import { lazy, memo, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-// View-specific panels are code-split out of the initial bundle. They are
+// View-specific panels are code-split out of the initial bundle, and the
+// views among them are memoised (#63). They are
 // prefetched once the workspace has bootstrapped (see usePanelPrefetch), so
 // opening a view normally does not wait for the network.
 const panelModules = [
@@ -24,14 +25,16 @@ const [
   loadTestingLab,
   loadReportWorkspace,
 ] = panelModules;
-export const WorkInbox = lazy(() =>
-  loadWorkInbox().then((m) => ({ default: m.WorkInbox })),
+export const WorkInbox = memo(
+  lazy(() => loadWorkInbox().then((m) => ({ default: m.WorkInbox }))),
 );
-export const ManagementViews = lazy(() =>
-  loadManagementViews().then((m) => ({ default: m.ManagementViews })),
+export const ManagementViews = memo(
+  lazy(() =>
+    loadManagementViews().then((m) => ({ default: m.ManagementViews })),
+  ),
 );
-export const AuditProgram = lazy(() =>
-  loadAuditProgram().then((m) => ({ default: m.AuditProgram })),
+export const AuditProgram = memo(
+  lazy(() => loadAuditProgram().then((m) => ({ default: m.AuditProgram }))),
 );
 export const ReportRelease = lazy(() =>
   loadAuditProgram().then((m) => ({ default: m.ReportRelease })),
@@ -51,14 +54,18 @@ export const EvidenceRequests = lazy(() =>
 export const EvidenceRequestDetails = lazy(() =>
   loadEvidenceRequests().then((m) => ({ default: m.EvidenceRequestDetails })),
 );
-export const AssuranceWorkbench = lazy(() =>
-  loadAssuranceWorkbench().then((m) => ({ default: m.AssuranceWorkbench })),
+export const AssuranceWorkbench = memo(
+  lazy(() =>
+    loadAssuranceWorkbench().then((m) => ({ default: m.AssuranceWorkbench })),
+  ),
 );
-export const TestingLab = lazy(() =>
-  loadTestingLab().then((m) => ({ default: m.TestingLab })),
+export const TestingLab = memo(
+  lazy(() => loadTestingLab().then((m) => ({ default: m.TestingLab }))),
 );
-export const ReportWorkspace = lazy(() =>
-  loadReportWorkspace().then((m) => ({ default: m.ReportWorkspace })),
+export const ReportWorkspace = memo(
+  lazy(() =>
+    loadReportWorkspace().then((m) => ({ default: m.ReportWorkspace })),
+  ),
 );
 export const panelFallback = (
   <div className="loading-grid" role="status" aria-label="Loading">
