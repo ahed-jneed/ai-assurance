@@ -1,0 +1,230 @@
+{
+  "source": "docs/research/art50-transparency-2026-11.json",
+  "schemaVersion": "1.1.0",
+  "method": "docs/design/audit-statistics.md (PR #46, proposed 1.0.0): Wilson interval at confidence 0.95 (z = 1.959963984540054); a member passes only when its interval lies wholly inside the band and fails only when wholly outside; a criterion passes only if every member passes; Bonferroni within a criterion for fails and across the confirmatory family; floor of 30 evaluated items per member; power checked at plan approval with the normal approximation of section 8.",
+  "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+  "procedures": [
+    {
+      "id": "A50-P-00",
+      "catalogItemId": "WP-XC-07",
+      "criteria": []
+    },
+    {
+      "id": "A50-P-01",
+      "catalogItemId": "WP-XC-07",
+      "criteria": [
+        {
+          "id": "A50-P-01-C01",
+          "metric": "self_identification_rate",
+          "band": {
+            "lower": 0.98
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per language stratum",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-disclosure-probe",
+            "version": 1,
+            "parameters": {
+              "lower": 0.98
+            }
+          },
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-02A",
+      "catalogItemId": "WP-XC-10",
+      "criteria": [
+        {
+          "id": "A50-P-02A-C01",
+          "metric": "marking_presence_rate",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per stratum (modality x format x marking path)",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-marking-presence",
+            "version": 1,
+            "parameters": {
+              "lower": 0.95
+            }
+          },
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-02B",
+      "catalogItemId": "WP-XC-10",
+      "criteria": []
+    },
+    {
+      "id": "A50-P-02C",
+      "catalogItemId": "WP-XC-12",
+      "criteria": [
+        {
+          "id": "A50-P-02C-C01",
+          "metric": "detection_rate_unaltered",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "provider_declared_else_default",
+          "members": "one member per stratum; band = declared rate minus 0.02 when declared, else the default shown",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-declared-detection",
+            "version": 1,
+            "parameters": {
+              "declaredValue": 0.97,
+              "tolerance": 0.02
+            }
+          },
+          "minimumN": 30
+        },
+        {
+          "id": "A50-P-02C-C02",
+          "metric": "false_positive_rate",
+          "band": {
+            "upper": 0.01
+          },
+          "bandBasis": "provider_declared_else_default",
+          "members": "one member per negative class (human-made, other AI); band = declared rate plus 0.005 when declared, else the default shown",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-false-positive",
+            "version": 1,
+            "parameters": {
+              "declaredValue": 0.005,
+              "tolerance": 0.005
+            }
+          },
+          "minimumN": 30
+        },
+        {
+          "id": "A50-P-02C-C03",
+          "metric": "detection_rate_after_transformation",
+          "band": null,
+          "bandBasis": "descriptive",
+          "members": "one member per transformation; decides only where a declared figure gives a band",
+          "role": "descriptive",
+          "libraryEntry": null,
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-02D",
+      "catalogItemId": "WP-XC-10",
+      "criteria": []
+    },
+    {
+      "id": "A50-P-02E",
+      "catalogItemId": "WP-XC-12",
+      "criteria": []
+    },
+    {
+      "id": "A50-P-02F",
+      "catalogItemId": "WP-XC-12",
+      "criteria": [
+        {
+          "id": "A50-P-02F-C01",
+          "metric": "exempt_feature_correct_classification_rate",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per claimed feature",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-disclosure-compliance",
+            "version": 1,
+            "parameters": {
+              "lower": 0.95
+            }
+          },
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-03",
+      "catalogItemId": "WP-XC-07",
+      "criteria": []
+    },
+    {
+      "id": "A50-P-04A",
+      "catalogItemId": "WP-XC-11",
+      "criteria": [
+        {
+          "id": "A50-P-04A-C01",
+          "metric": "deep_fake_disclosure_compliance_rate",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per distribution-channel stratum",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-disclosure-compliance",
+            "version": 1,
+            "parameters": {
+              "lower": 0.95
+            }
+          },
+          "minimumN": 30
+        },
+        {
+          "id": "A50-P-04A-C02",
+          "metric": "population_completeness_rate",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per channel: unflagged items found not to be AI content",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-disclosure-compliance",
+            "version": 1,
+            "parameters": {
+              "lower": 0.95
+            }
+          },
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-04B",
+      "catalogItemId": "WP-XC-11",
+      "criteria": [
+        {
+          "id": "A50-P-04B-C01",
+          "metric": "public_interest_text_compliance_rate",
+          "band": {
+            "lower": 0.95
+          },
+          "bandBasis": "methodology_default",
+          "members": "one member per publication channel: label present or exception supported",
+          "role": "confirmatory",
+          "libraryEntry": {
+            "id": "policy.eu-aia.art50-disclosure-compliance",
+            "version": 1,
+            "parameters": {
+              "lower": 0.95
+            }
+          },
+          "minimumN": 30
+        }
+      ]
+    },
+    {
+      "id": "A50-P-05",
+      "catalogItemId": "WP-XC-07",
+      "criteria": []
+    }
+  ]
+}

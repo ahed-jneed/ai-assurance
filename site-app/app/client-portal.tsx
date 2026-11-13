@@ -343,6 +343,19 @@ export function ClientPortal({
     </section>
   );
 }
+/**
+ * How the Lead sees a client request grant: active, lapsed with the
+ * contributor's membership (revoked or re-granted since it was issued, so
+ * the contributor can no longer use it), or inactive once revoked or expired.
+ */
+export function requestGrantStatus(
+  g: { id: string; active: boolean; expiresAt: string },
+  lapsed: ReadonlySet<string>,
+  at: number,
+): "Active" | "Lapsed" | "Inactive" {
+  if (!g.active || Date.parse(g.expiresAt) <= at) return "Inactive";
+  return lapsed.has(g.id) ? "Lapsed" : "Active";
+}
 export function RequestAccess({
   data,
   busy,
@@ -358,6 +371,12 @@ export function RequestAccess({
     [form, setForm] =
       useState<Parameters<typeof WorkflowDialog>[0]["form"]>(null);
   if (data.identity.role !== "Lead Auditor" || !e.workflow) return null;
+  const lapsed = new Set(data.lapsedClientGrants ?? []),
+    // eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render
+    at = Date.now(),
+    lapsedCount = e.workflow.clientGrants.filter(
+      (g) => requestGrantStatus(g, lapsed, at) === "Lapsed",
+    ).length;
   const contributors = data.members.filter(
     (m) =>
       m.status === "active" &&
@@ -371,11 +390,11 @@ export function RequestAccess({
         <span className="subtle">
           {
             e.workflow.clientGrants.filter(
-              // eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render
-              (g) => g.active && Date.parse(g.expiresAt) > Date.now(),
+              (g) => requestGrantStatus(g, lapsed, at) === "Active",
             ).length
           }{" "}
           active grants
+          {lapsedCount ? " · " + lapsedCount + " lapsed" : ""}
         </span>
       </summary>
       <p className="subtle">
@@ -435,6 +454,7 @@ export function RequestAccess({
                   "Instructions",
                   "Oversight",
                   "Security",
+                  "GenAI log",
                   "Other",
                 ].map((value) => ({ value, label: value })),
               },
@@ -476,14 +496,17 @@ export function RequestAccess({
             · {g.prompt}
           </b>
           <p>
-            {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
-            {g.active && Date.parse(g.expiresAt) > Date.now()
-              ? "Active"
-              : "Inactive"}{" "}
-            · expires {new Date(g.expiresAt).toLocaleDateString()}
+            {requestGrantStatus(g, lapsed, at)} · expires{" "}
+            {new Date(g.expiresAt).toLocaleDateString()}
           </p>
-          {/* eslint-disable-next-line react-hooks/purity -- grant expiry is checked against the clock on each render */}
-          {g.active && Date.parse(g.expiresAt) > Date.now() && (
+          {requestGrantStatus(g, lapsed, at) === "Lapsed" && (
+            <p className="subtle">
+              The contributor&apos;s access was revoked or changed after this
+              grant, so they can no longer use it. Assign the request again if
+              they still need it.
+            </p>
+          )}
+          {requestGrantStatus(g, lapsed, at) === "Active" && (
             <Button
               variant="outline"
               size="sm"

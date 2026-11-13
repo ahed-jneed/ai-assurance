@@ -529,6 +529,37 @@ export const defaultTerms: ReportTerms = {
   conclusion: "unmodified",
 };
 /**
+ * The terms a report on a pack starts from (#144): a certification audit
+ * recommending certification on a pack with certification recommendations,
+ * otherwise `defaultTerms`.
+ */
+export const packDefaultTerms = (certification: boolean): ReportTerms =>
+  certification
+    ? {
+        engagementType: "certification",
+        assuranceLevel: null,
+        conclusion: "certification_recommended",
+      }
+    : defaultTerms;
+/** Terms the Lead Auditor picked on the Reports page, for one engagement. */
+export type TermsChoice = { engagementId: string; terms: ReportTerms };
+/**
+ * The terms the Reports page shows for an engagement: the ones picked for
+ * it, unless the pack does not offer their engagement type, otherwise the
+ * pack's defaults.
+ */
+export function reportTermsFor(
+  choice: TermsChoice | null,
+  engagementId: string,
+  certification: boolean,
+): ReportTerms {
+  const picked = choice?.engagementId === engagementId ? choice.terms : null;
+  return picked &&
+    offeredEngagementTypes(certification).includes(picked.engagementType)
+    ? picked
+    : packDefaultTerms(certification);
+}
+/**
  * Valid terms closest to a partial choice, for pickers: an unknown type falls
  * back to the default, a level is kept only where the type provides
  * assurance (limited when none was chosen), and a conclusion the type cannot
@@ -589,6 +620,24 @@ export function conclusionStatement(
       : "",
     notAssurance: !engagementTypes[t.engagementType].assurance,
   };
+}
+
+/**
+ * The caveat a draft states above its conclusion wording while completion
+ * gates are open (#144), for every engagement type: the wording is the one
+ * proposed, not yet supported by completed work. Our own drafting (D-03).
+ */
+export function draftCaveat(openGates: number) {
+  return (
+    "Draft, gates open: " +
+    openGates +
+    (openGates === 1
+      ? " completion requirement was"
+      : " completion requirements were") +
+    " open when this draft was captured. The wording below is the proposed " +
+    "conclusion; it is not supported until they are resolved, and this " +
+    "draft is not a report that may be relied on."
+  );
 }
 
 /** A short label for the terms, e.g. "Qualified conclusion · limited assurance". */

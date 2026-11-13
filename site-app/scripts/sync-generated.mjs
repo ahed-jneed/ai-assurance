@@ -31,6 +31,12 @@ import {
   servedAnnexMap,
 } from "../../schemas/validate-criteria.mjs";
 import {
+  checkResearch,
+  loadInputs as loadArt50Inputs,
+  loadValidator as loadArt50Validator,
+  researchPath as art50ResearchPath,
+} from "../../schemas/validate-art50-research.mjs";
+import {
   obligationCatalog,
   serialise,
 } from "../../templates/criteria/tools/convert-catalog.mjs";
@@ -47,6 +53,7 @@ const COPIES = [
   ["docs/obligation-subitems.json", "site-app/lib/obligation-subitems.json"],
   ["engine/assurance.py", "site-app/public/tools/assurance-verifier.py"],
   ["schemas/threshold-library.json", "site-app/lib/threshold-library.json"],
+  ["schemas/threshold-library.json", "engine/threshold-library.json"],
 ];
 const RUNTIME_ZIP = "site-app/public/tools/assurance-runtime.zip";
 
@@ -219,6 +226,49 @@ else console.log(schema.stdout.trim());
       else {
         writeFileSync(absolute(file), text);
         console.log(`Updated ${file} from templates/criteria`);
+      }
+    }
+  }
+}
+
+// 2b. The Art 50 statistical criteria the Site shows (#120): extracted from
+// the Art 50 research, validated first, with each criterion's threshold-library
+// reference (schemas/validate-art50-research.mjs).
+{
+  const target = "site-app/lib/art50-criteria.json";
+  const inputs = loadArt50Inputs();
+  const problems = checkResearch({ ...inputs, validate: loadArt50Validator() });
+  if (problems.length)
+    drift.push(
+      `${art50ResearchPath} is invalid (node schemas/validate-art50-research.mjs):\n    ` +
+        problems.join("\n    "),
+    );
+  else {
+    const r = inputs.research;
+    const text =
+      JSON.stringify(
+        {
+          source: art50ResearchPath,
+          schemaVersion: r.schemaVersion,
+          method: r.sampling.method,
+          caveat: r.sampling.caveat,
+          procedures: r.procedures.map((p) => ({
+            id: p.id,
+            catalogItemId: p.catalogItemId,
+            criteria: p.criteria,
+          })),
+        },
+        null,
+        2,
+      ) + "\n";
+    const current = existsSync(absolute(target))
+      ? readFileSync(absolute(target), "utf8")
+      : undefined;
+    if (current !== text) {
+      if (check) drift.push(`${target} differs from ${art50ResearchPath}`);
+      else {
+        writeFileSync(absolute(target), text);
+        console.log(`Updated ${target} from ${art50ResearchPath}`);
       }
     }
   }

@@ -3,7 +3,9 @@
 // record that is not on the first page, pages through a register without
 // repeating or skipping a record, filters by review state, and stays inside
 // the caller's tenant and engagement; view=queue answers each member's review
-// queue and pages through it. The records are inserted straight into D1 (the
+// queue and pages through it; the workbench view counts the records without
+// carrying them, and view=record opens one record with its reviews (#121).
+// The records are inserted straight into D1 (the
 // ops that create them are covered by assurance-integration-check.mjs);
 // everything else goes through the API.
 import assert from "node:assert/strict";
@@ -224,8 +226,16 @@ try {
   const view = await timed("workbench view", () => api(path_({})));
   // The setAccess op added one access event to the 4,999 seeded records.
   assert.equal(view.total, 5000);
-  assert.equal(view.records.length, 200);
-  assert(!view.records.some((r) => r.id === "AS-scale-04321"));
+  // The view counts records by kind and carries none of them (#121).
+  assert(!("records" in view));
+  assert.equal(
+    Object.values(view.kindCounts).reduce((sum, n) => sum + n, 0),
+    5000,
+  );
+  assert.equal(
+    view.kindCounts.assertion,
+    seeds.filter((r) => r.kind === "assertion").length,
+  );
 
   const found = await timed("search: one match", () =>
     api(path_({ view: "search", q: "quarantined HOLDOUT" })),
@@ -355,8 +365,44 @@ try {
     "PASS review states, review filter and each member's paged review queue over 5,000 records",
   );
 
+  // A record opens by id with its reviews, whatever its position.
+  const reviewed = assertions.findLast((a) =>
+    seeds.some(
+      (r) =>
+        r.kind === "assertion_review" &&
+        JSON.parse(r.body).assertionId === a.id,
+    ),
+  );
+  const opened = await timed("record details", () =>
+    api(path_({ view: "record", id: reviewed.id })),
+  );
+  assert.equal(opened.record.id, reviewed.id);
+  const itsReviews = seeds.filter(
+    (r) =>
+      r.kind === "assertion_review" &&
+      JSON.parse(r.body).assertionId === reviewed.id,
+  );
+  assert.deepEqual(
+    opened.related.map((r) => r.id),
+    itsReviews.map((r) => r.id),
+  );
+  assert.equal(
+    opened.reviewState,
+    JSON.parse(itsReviews.at(-1).body).decision === "approve"
+      ? "Confirmed"
+      : "Returned",
+  );
+  await api(path_({ view: "record", id: "AS-scale-other" }), {
+    status: 404,
+  });
+  console.log("PASS a record opens by id with its reviews and review state");
+
   // Scope and input checks.
   await api("/api/workspace", { user: outsider });
+  await api(path_({ view: "record", id: reviewed.id }), {
+    user: outsider,
+    status: 403,
+  });
   await api(path_({ view: "search", q: "holdout" }), {
     user: outsider,
     status: 403,

@@ -39,7 +39,8 @@ export const EEO1_RACE_ETHNICITY = [
 export const ll144LegalReview = "pending";
 export const LL144_LAW =
   "NYC Local Law 144 of 2021 (NYC Administrative Code §§ 20-870 to 20-874) and the DCWP rules, 6 RCNY §§ 5-300 to 5-304";
-export const ll144SummaryVersion = "1.0";
+/** 1.1 (#144): the classification group of a per-group run. */
+export const ll144SummaryVersion = "1.1";
 
 const dataSourceSchema = z
   .object({
@@ -92,6 +93,17 @@ export const ll144InputSchema = z
       .array(z.string().trim().min(1).max(300))
       .max(20)
       .optional(),
+    /**
+     * Selection by a tool that classifies individuals into several groups
+     * (6 RCNY 5-301(b)(4)): the outcome values that are its groups. Each
+     * group gets its own audit, in which "selected" means classified into
+     * that group (#144). Replaces selectedValues.
+     */
+    classificationGroups: z
+      .array(z.string().trim().min(1).max(300))
+      .min(2)
+      .max(20)
+      .optional(),
     /** Scoring: the score column. */
     scoreColumn: z.string().trim().max(300).optional(),
     /** Cell values that mean the individual's category is unknown. */
@@ -123,8 +135,41 @@ export const ll144InputSchema = z
     /** Required when a mapped column holds special-category data. */
     acknowledgeHostedProcessing: z.boolean().default(false),
   })
-  .strict();
+  .strict()
+  .superRefine((d, ctx) => {
+    const groups = d.classificationGroups;
+    if (!groups) return;
+    if (d.rate !== "selection")
+      ctx.addIssue({
+        code: "custom",
+        path: ["classificationGroups"],
+        message:
+          "Classification groups apply to selection rates: a tool that classifies individuals into groups is audited by the share classified into each group",
+      });
+    if (d.selectedValues?.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["selectedValues"],
+        message:
+          "List either the values meaning selected or the classification groups, not both",
+      });
+    if (new Set(groups).size !== groups.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["classificationGroups"],
+        message: "Each classification group is listed once",
+      });
+  });
 export type Ll144AuditInput = z.infer<typeof ll144InputSchema>;
+/** One group of a per-group run (6 RCNY 5-301(b)(4), #144). */
+export type Ll144Classification = {
+  /** Shared by the audits of one run. */
+  runId: string;
+  /** The group whose share this audit computes. */
+  group: string;
+  /** Every group of the run, in the order given. */
+  groups: string[];
+};
 
 export type Ll144Audit = {
   id: string;
@@ -149,6 +194,8 @@ export type Ll144Audit = {
     unknownValues: string[];
   };
   exclusions: Ll144Exclusion[];
+  /** Set on each audit of a per-group run (6 RCNY 5-301(b)(4)). */
+  classification?: Ll144Classification;
   /** Values that are not EEO-1 categories: the reviewer checks the mapping. */
   warnings: string[];
   /** The special-category processing the platform recorded, if any. */
@@ -249,7 +296,14 @@ export function computeAudit(
   dataset: { id: string; name: string; sha256: string },
   csv: string,
   ids: { id: string; actor: string; at: string },
+  classification?: Ll144Classification,
 ): Ll144Audit {
+  if (classification) a = { ...a, selectedValues: [classification.group] };
+  else if (a.classificationGroups)
+    throw new ApiError(
+      400,
+      "Compute a per-group run with computeClassificationAudits",
+    );
   if (a.auditDate > ids.at.slice(0, 10))
     throw new ApiError(400, "The audit date cannot be in the future");
   let rows: Record<string, string>[];
@@ -324,11 +378,78 @@ export function computeAudit(
       unknownValues: a.unknownValues,
     },
     exclusions: a.exclusions,
-    warnings: categoryWarnings(result),
+    ...(classification ? { classification } : {}),
+    warnings: [
+      ...(a.rate === "selection" && !records.some((r) => r.selected)
+        ? [
+            classification
+              ? `No individual was classified into group ${classification.group}: check the value against the ${a.outcomeColumn} column.`
+              : `No individual has an outcome value meaning selected: check the values against the ${a.outcomeColumn} column.`,
+          ]
+        : []),
+      ...categoryWarnings(result),
+    ],
     limitations,
     result,
   };
 }
+
+/**
+ * The audits of a tool that classifies individuals into several groups
+ * (6 RCNY 5-301(b)(4), #144): one per group, in the order given, each
+ * computing the share of every category classified into its group. They
+ * share a run id and are approved one by one, like any audit.
+ */
+export function computeClassificationAudits(
+  e: Engagement,
+  a: Ll144AuditInput & { classificationGroups: string[] },
+  dataset: { id: string; name: string; sha256: string },
+  csv: string,
+  ids: { id: () => string; runId: string; actor: string; at: string },
+): Ll144Audit[] {
+  const groups = a.classificationGroups;
+  return groups.map((group) =>
+    computeAudit(
+      e,
+      a,
+      dataset,
+      csv,
+      { id: ids.id(), actor: ids.actor, at: ids.at },
+      { runId: ids.runId, group, groups },
+    ),
+  );
+}
+
+/**
+ * The per-group runs some of whose audits are approved and others not
+ * (#144). A final report captures every approved audit, so it would carry
+ * the summaries of only some groups of such a run: an incomplete
+ * 6 RCNY 5-301(b)(4) bias audit. Runs with no approved audit are not
+ * captured at all and are not listed.
+ */
+export function incompleteLl144Runs(
+  audits: readonly Pick<Ll144Audit, "status" | "classification">[],
+): { runId: string; approved: number; groups: number }[] {
+  const runs = new Map<string, { approved: number; total: number }>();
+  for (const a of audits) {
+    if (!a.classification) continue;
+    const run = runs.get(a.classification.runId) ?? { approved: 0, total: 0 };
+    run.total += 1;
+    if (a.status === "approved") run.approved += 1;
+    runs.set(a.classification.runId, run);
+  }
+  return [...runs]
+    .filter(([, r]) => r.approved > 0 && r.approved < r.total)
+    .map(([runId, r]) => ({ runId, approved: r.approved, groups: r.total }));
+}
+
+/** Why final capture waits for an incomplete per-group run (#144). */
+export const incompleteRunMessage = (r: {
+  runId: string;
+  approved: number;
+  groups: number;
+}) =>
+  `Approve every group of LL144 run ${r.runId} before final capture (${r.approved} of ${r.groups} approved): a report carries the bias audit of every classification group (6 RCNY 5-301(b)(4))`;
 
 /** One year after the audit date: the tool may not be used after it without a new audit (5-301(a)). */
 export function oneYearAfter(auditDate: string) {
@@ -406,6 +527,15 @@ export function publishableSummary(audit: Ll144Audit) {
     auditDate: audit.auditDate,
     useAllowedUntil: until,
     rate: r.rate,
+    ...(audit.classification
+      ? {
+          classification: {
+            rule: "6 RCNY § 5-301(b)(4)",
+            group: audit.classification.group,
+            groups: audit.classification.groups,
+          },
+        }
+      : {}),
     medianScore: r.medianScore,
     numberOfApplicants: r.totalIndividuals,
     unknownCategoryCounts: unknown,
@@ -455,6 +585,15 @@ export function publishableSummary(audit: Ll144Audit) {
         element: "Number of individuals in an unknown category",
         value: `sex ${unknown.sex}; race/ethnicity ${unknown.raceEthnicity}; intersectional ${unknown.intersectional}`,
       },
+      ...(audit.classification
+        ? [
+            {
+              rule: "6 RCNY § 5-301(b)(4)",
+              element: "Classification group these rates are calculated for",
+              value: `${audit.classification.group} (one of ${audit.classification.groups.length} groups: ${audit.classification.groups.join(", ")})`,
+            },
+          ]
+        : []),
       {
         rule: "6 RCNY §§ 5-301, 5-303(a)(1)",
         element:
@@ -479,6 +618,11 @@ export function publishableSummary(audit: Ll144Audit) {
       },
     ],
     notes: [
+      ...(audit.classification
+        ? [
+            `The tool classifies individuals into ${audit.classification.groups.length} groups, so the rates are calculated for each group (6 RCNY § 5-301(b)(4)). In this summary a category's selection rate is the share of its individuals classified into ${audit.classification.group}; each other group has its own summary.`,
+          ]
+        : []),
       "Impact ratios compare each category's rate with the highest rate among the categories not excluded. NYC Local Law 144 requires these figures to be published; it sets no pass or fail threshold.",
       ...(r.rate === "scoring"
         ? [

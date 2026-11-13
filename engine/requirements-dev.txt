@@ -1,7 +1,9 @@
 # Test-only packages; the core runner stays standard-library only (see
 # requirements.txt). cryptography enables the Ed25519 signature tests in
-# engine/tests (skipped without it) and the trusted-signature verification in
-# site-app/scripts/assurance-integration-check.mjs. numpy is needed by the
+# engine/tests (skipped without it unless ENGINE_REQUIRE_CRYPTOGRAPHY=1, which
+# CI sets so they fail instead) and the trusted-signature verification in
+# site-app/scripts/assurance-integration-check.mjs; its pin and zstandard's
+# match requirements-image.txt (engine/tests/test_packaging.py). numpy is needed by the
 # native-adapter tests in engine/tests/test_connectors_adapters.py; its pin
 # matches requirements-optional.txt. jsonschema validates engine reports
 # against schemas/test-run.schema.json and GenAI envelopes against

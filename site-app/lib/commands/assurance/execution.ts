@@ -7,6 +7,7 @@ import {
   assertClaimFits,
   assertDeclaredLabel,
   assertModelSpecLimits,
+  assertPerformancePositiveLabel,
   frozenLabelPair,
 } from "../../external-worker-contract";
 import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
@@ -153,6 +154,14 @@ export const execution: AssuranceModule = defineCommands({
           requested: v.negativeLabel || undefined,
         });
       assertDeclaredLabel(plan, profile.config.negativeLabel, labels);
+      // The worker measures a performance positive class only when the
+      // protocol runs the performance test.
+      assertPerformancePositiveLabel(
+        profile.suite.includes("performance")
+          ? profile.config.performancePositiveLabel
+          : undefined,
+        labels,
+      );
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;
@@ -427,6 +436,12 @@ export const execution: AssuranceModule = defineCommands({
         throw new ApiError(
           409,
           "An authenticated completed result is required",
+        );
+      // Checked before reading R2: a GenAI envelope has no hosted results.
+      if (JSON.parse(job.request).executionMode === "genai_ingest")
+        throw new ApiError(
+          409,
+          "This job is a GenAI ingest; use compileGenaiResult",
         );
       if (e.artifacts.some((a) => a.id === v.jobId))
         throw new ApiError(409, "This result was already compiled");

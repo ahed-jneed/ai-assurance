@@ -633,13 +633,13 @@ Because the interval now decides, minimums are a safety net rather than the main
 ## 8. Power and minimum detectable effect (at plan approval)
 
 **Inputs.** Each confirmatory criterion carries `powerAssumptions` in the plan, in a shape that depends on its kind (section 9). The approval step also needs the target power (plan `power.targetPower`, default 0.80), the confidence level and the family size F.
-- Planned sizes may be pre-filled from the registered dataset's row and group counts.
+- Planned sizes may be pre-filled from the registered dataset's row and group counts. The testing lab does so (#113): `n` is the row count, `groupSizes` are the rows of each value of the protected-group column, and a multiclass criterion asks for a share and a recall for every class of the target column.
 - Outcome-derived quantities (prevalence, assumed rates, assumed metric values) are entered by the auditor, never read from the data being tested.
 
 | Kind | `powerAssumptions` | What follows from them |
 |---|---|---|
 | `performance` (binary) | `n`, `prevalence` π, `truePositiveRate`, `trueNegativeRate` | P = nπ, N = n(1 − π), and every binary metric's true value and denominator (table below) |
-| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1), `perClassRecall` {label: recall} | accuracy = Σ share·recall; balanced accuracy = mean recall |
+| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1, every share above 0), `perClassRecall` {label: recall} (the same labels; #113) | accuracy = Σ share·recall; balanced accuracy = mean recall |
 | `regression_performance` | `n`, `errorSd` σ, and optionally `targetSd` σ_y (#93, engine only until the hosted runner mirrors it) | Errors are assumed normal with mean 0: MAE = σ√(2/π), SD(\|e\|) = σ√(1 − 2/π), MSE = σ², SD(e²) = √2·σ². With σ_y, the mean baseline gate (section 5.9) becomes a pass condition (below) |
 | `group_comparison` | `groupSizes` {group: n}. Selection-rate metrics: `baselineRate` and optional `assumedRates` {group: rate} (default: every group at the baseline). Equalized odds: `prevalence`, `truePositiveRate`, `falsePositiveRate` (each a number or per group). | Members as they would be formed at evaluation; for equalized odds, the per-group positives n_g·π_g and negatives n_g·(1 − π_g) |
 | `calibration` | none | not computed (`power_not_specified_for_metric`) |
@@ -834,7 +834,7 @@ The derivation reads one fact from the data: for a multiclass task, k, the numbe
 
 ### 10.1 Library entries
 
-Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); the hosted runner reads its generated copy and `engine/statistics.py` mirrors the entries a criterion can reference, which `engine/tests/test_threshold_library.py` checks.
+Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); both runners read generated copies of it (`npm run sync`): the hosted runner `site-app/lib/threshold-library.json`, and `engine/statistics.py` `engine/threshold-library.json`, from which it loads the entries a criterion can reference (#113; the copy sits in `engine/` so that the compute image built from that folder carries it). `engine/tests/test_threshold_library.py` checks the copy and the loaded entries.
 - A plan references an entry by `id` and `version` and stores the parameter values (section 9.1).
 - Every result that uses an entry MUST show its `legalStatus` label and `caveat` text verbatim. `decision.libraryEntry` carries both.
 - The run schema's `threshold.source` stays `"internal_policy"`, because the auditor adopts every entry as an internal acceptance rule.

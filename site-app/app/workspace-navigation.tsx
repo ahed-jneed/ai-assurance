@@ -272,6 +272,20 @@ export function WorkspaceNavigation({
     );
   }
   function attention(route: NavigationRoute) {
+    // Damaged engagement records alert practice administrators wherever they
+    // are while members keep meeting them (last seen in the past week); the
+    // Engagements page lists the full history.
+    if (route === "Engagements")
+      return data?.integrityIncidents?.recent
+        ? {
+            count: data.integrityIncidents.recent,
+            label:
+              data.integrityIncidents.recent === 1
+                ? "recent integrity incident"
+                : "recent integrity incidents",
+            filter: "",
+          }
+        : null;
     if (
       !e ||
       !data ||

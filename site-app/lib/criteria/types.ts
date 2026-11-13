@@ -133,6 +133,8 @@ export type PackFeatures = {
   nonconformityGrading: boolean;
   /** Reports may state an audit recommendation to a certification decision (#28). */
   certificationRecommendation: boolean;
+  /** The Testing lab's NYC Local Law 144 bias audits (#30, #144). */
+  ll144BiasAudit: boolean;
 };
 export type CriteriaSet = {
   framework: string;
