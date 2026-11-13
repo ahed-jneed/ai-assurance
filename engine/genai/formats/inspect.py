@@ -302,6 +302,8 @@ def parse(files, plan, manifest_inputs=None):
         }
         ctx_item = {"error": bool(error), "invalidated": isinstance(invalidation, dict) and policy == "as_edited", "nullReasons": null_reasons,
                     "editedValues": edited_values, "invalidatedPostRun": isinstance(invalidation, dict)}
+        common.keep_excerpt(ctx_item, plan, sample_input if isinstance(sample_input, (str, list)) else None,
+                            output.get("completion") if isinstance(output.get("completion"), str) and not error else None, run.warnings, locator)
         status, reason, value, rule = common.value_outcome(item, ctx_item, primary, plan["successRule"], "inspect.value_to_float")
         common.set_outcome(item, status, reason, value, rule, policy)
         run.add(item, ctx_item)

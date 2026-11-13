@@ -96,7 +96,7 @@ def parse(files, plan, manifest_inputs=None):
         if isinstance(context, list):
             labels["retrievalContextSha256"] = hashing.sha256_canonical(context)
         item["labels"] = labels
-        ctx = {"error": False, "nullReasons": null_reasons}
+        ctx = common.keep_excerpt({"error": False, "nullReasons": null_reasons}, plan, case.get("input"), case.get("actualOutput"), run.warnings, locator)
         status, reason, value, rule = metric_outcome(item, ctx, primary, plan["successRule"], "deepeval.metric_score")
         common.set_outcome(item, status, reason, value, rule, plan["scorePolicy"])
         run.add(item, ctx)

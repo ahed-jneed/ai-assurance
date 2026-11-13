@@ -446,3 +446,77 @@ def require_unique_keys(items):
         if item["itemKey"] in seen:
             fail("duplicate_item_key", item["itemKey"])
         seen.add(item["itemKey"])
+
+
+# ---------------------------------------------------------------- excerpts (design Q12, #128)
+
+
+def keep_excerpt(ctx, plan, prompt, response, warnings=None, locator=None):
+    """Keep inert prompt and response text for an excerpt, only when the frozen plan enables excerpts.
+
+    Off by default: with `excerpts: "none"` nothing is kept and raw text never leaves the hashed logs.
+    The text is redacted and cut to `MAX_EXCERPT_CHARS` here, so a bundle never holds more than that
+    per item; ingest decides afterwards which items carry it (`attach_excerpts`).
+    """
+    if plan.get("excerpts", "none") != "none":
+        prompt_text, prompt_cut = excerpt_text(prompt, warnings, locator)
+        response_text, response_cut = excerpt_text(response, warnings, locator)
+        ctx["_excerpt"] = {"prompt": prompt_text, "response": response_text, "truncated": prompt_cut or response_cut}
+    return ctx
+
+
+def _message_text(value):
+    """Chat messages as `role: content` lines; other structures as canonical JSON. Never interpreted."""
+    if isinstance(value, list) and value and all(isinstance(m, dict) for m in value):
+        lines = []
+        for message in value:
+            role = message.get("role") if isinstance(message.get("role"), str) else "message"
+            content = message.get("content")
+            lines.append(f"{role}: " + (content if isinstance(content, str) else hashing.canonical_hash_bytes(content).decode("utf-8")))
+        return "\n".join(lines)
+    return hashing.canonical_hash_bytes(value).decode("utf-8")
+
+
+def excerpt_text(value, warnings=None, locator=None):
+    """(inert text of at most MAX_EXCERPT_CHARS, whether it was cut), with secret-like substrings redacted first."""
+    if value is None or isinstance(value, NonFinite):
+        return None, False
+    text = value if isinstance(value, str) else _message_text(value)
+    # Redact the whole text before cutting it, so a secret that straddles the cut is still replaced.
+    text = redact_substrings(hashing.clean(text), warnings, locator)
+    if len(text) > limits.MAX_EXCERPT_CHARS:
+        return text[: limits.MAX_EXCERPT_CHARS], True
+    return text, False
+
+
+def redact_substrings(text, warnings=None, locator=None):
+    """Replace each secret-like substring (section 11.4 patterns) by [redacted:<12 hex>], keeping the rest of the text."""
+    found = False
+
+    def marker(match):
+        nonlocal found
+        found = True
+        return "[redacted:" + hashing.sha256_text(match.group(0))[:12] + "]"
+    for pattern in hashing.SECRET_PATTERNS:
+        text = pattern.sub(marker, text)
+    if found and warnings is not None:
+        warnings.add("secret_like_value_redacted", locator)
+    return text
+
+
+def excerpt_selected(item, mode):
+    """`all`: every item; `failures`: scored items that failed, or attacks that succeeded (design section 8.1)."""
+    if mode == "all":
+        return True
+    value = item["outcome"]["value"]
+    if item["status"] != "scored" or value is None:
+        return False
+    return value > 0.0 if item["itemType"] == "attack" else value < 1.0
+
+
+def attach_excerpts(run, mode):
+    """Give the selected items of a parsed run their kept excerpt (`plan.excerpts` is `failures` or `all`)."""
+    for item, ctx in zip(run.items, run.contexts):
+        excerpt = ctx.get("_excerpt") if isinstance(ctx, dict) else None
+        if excerpt is not None and excerpt_selected(item, mode):
+            item["excerpt"] = dict(excerpt)

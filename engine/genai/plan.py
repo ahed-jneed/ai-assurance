@@ -16,7 +16,11 @@ from .families import valid_family
 
 PLAN_SCHEMA = "genai-plan/0.1"
 MANIFEST_SCHEMA = "genai-bundle/0.1"
-FORMATS = ("inspect_eval", "inspect_json", "lm_eval_samples", "promptfoo_results", "garak_report", "pyrit_export", "deepeval_test_run", "ragas_results", "judge_validation_jsonl", "marking_check_jsonl")
+FORMATS = ("inspect_eval", "inspect_json", "lm_eval_samples", "promptfoo_results", "garak_report", "pyrit_export", "deepeval_test_run", "ragas_results", "judge_validation_jsonl", "marking_check_jsonl",
+           "c2pa_validator_report", "signed_detection_jsonl")
+MARKING_FORMATS = ("marking_check_jsonl", "c2pa_validator_report", "signed_detection_jsonl")
+EXCERPTS = ("none", "failures", "all")
+MAX_DETECTION_KEYS = 20
 ROLES = ("log", "samples", "results", "hitlog", "judge_validation", "attack_set", "marking")
 ITEM_TYPES = ("qa", "attack", "rag", "agent_task")
 CRITERION_KINDS = ("genai_mean", "genai_attack_success", "genai_pass_k", "genai_paired_difference", "genai_marking")
@@ -46,6 +50,7 @@ DEFAULT_PLAN = {
     "criteria": [],
     "judgeValidation": {"minimumItems": 50, "minimumKappaLowerBound": 0.60, "requireDifferentFamily": True, "pairwiseMinimumConsistencyLowerBound": 0.80},
     "excerpts": "none",
+    "detectionKeys": [],
     "allowUnverifiedFormatVersion": False,
     "reconciliationTolerance": 1e-9,
 }
@@ -108,7 +113,7 @@ def _selector(sel, where):
 
 
 def _criterion(c, where):
-    allowed = ("id", "kind", "role", "metric", "band", "select", "primaryScore", "groupBy", "k", "candidate", "baseline", "epochReducer", "successRule", "stratum", "transformation")
+    allowed = ("id", "kind", "role", "metric", "band", "select", "primaryScore", "groupBy", "k", "candidate", "baseline", "epochReducer", "successRule", "stratum", "transformation", "requireTrustedSigner")
     _keys(c, allowed, where, ("id", "kind", "band"))
     require(isinstance(c["id"], str) and CRITERION_ID.match(c["id"]), "plan_invalid", f"{where}.id")
     kind = c["kind"]
@@ -153,8 +158,31 @@ def _criterion(c, where):
                 out[key] = c[key]
         if out["metric"] == "detection_rate_after_transformation":
             require("transformation" in out, "plan_invalid", f"{where}: detection_rate_after_transformation names a transformation")
+        if "requireTrustedSigner" in c:
+            # Metadata marks count only when a C2PA validator reported the signer as trusted (#128).
+            require(c["requireTrustedSigner"] is True and out["metric"] == "marking_presence", "plan_invalid", f"{where}.requireTrustedSigner is true, on marking_presence only")
+            out["requireTrustedSigner"] = True
         if out["metric"] in ("false_positive_rate",):
             require(out["band"]["lower"] is None, "plan_invalid", f"{where}: false-positive bands are {{upper: t}}")
+    if kind != "genai_marking":
+        require("requireTrustedSigner" not in c, "plan_invalid", f"{where}.requireTrustedSigner belongs to genai_marking")
+    return out
+
+
+def _detection_keys(keys):
+    """The public keys of detection solutions whose signed results count (#128): pinned before any result is read."""
+    from .formats.signed_detection import spki_key
+    require(isinstance(keys, list) and len(keys) <= MAX_DETECTION_KEYS, "plan_invalid", "plan.detectionKeys")
+    out, ids = [], set()
+    for i, key in enumerate(keys):
+        where = f"plan.detectionKeys[{i}]"
+        _keys(key, ("keyId", "solutionId", "algorithm", "publicKeySPKI"), where, ("keyId", "solutionId", "algorithm", "publicKeySPKI"))
+        require(isinstance(key["keyId"], str) and hashing.COMPONENT.match(key["keyId"]) and key["keyId"] not in ids, "plan_invalid", f"{where}.keyId must be a unique key component")
+        ids.add(key["keyId"])
+        require(isinstance(key["solutionId"], str) and 0 < len(key["solutionId"]) <= 100 and not hashing.has_lone_surrogate(key["solutionId"]), "plan_invalid", f"{where}.solutionId")
+        require(key["algorithm"] == "Ed25519", "plan_invalid", f"{where}.algorithm: Ed25519 only")
+        require(spki_key(key["publicKeySPKI"]) is not None, "plan_invalid", f"{where}.publicKeySPKI is not a base64 Ed25519 SubjectPublicKeyInfo")
+        out.append({"keyId": key["keyId"], "solutionId": key["solutionId"], "algorithm": "Ed25519", "publicKeySPKI": key["publicKeySPKI"]})
     return out
 
 
@@ -221,10 +249,12 @@ def normalize_plan(plan):
             require(jv["requireDifferentFamily"] is True, "plan_invalid", "judgeValidation.requireDifferentFamily cannot be switched off")
         out["judgeValidation"].update(jv)
     if "excerpts" in plan:
-        require(plan["excerpts"] in ("none", "failures", "all"), "plan_invalid", "plan.excerpts")
-        # Engine 0.1.0 produces no excerpts: raw text stays in the hashed source logs (design Q12).
-        require(plan["excerpts"] == "none", "plan_invalid", "plan.excerpts: engine 0.1.0 produces no excerpts")
+        # Off by default (design Q12): raw text stays in the hashed source logs unless the frozen plan asks
+        # for inert excerpts of failed or successful-attack items ("failures") or of every item ("all").
+        require(plan["excerpts"] in EXCERPTS, "plan_invalid", "plan.excerpts")
         out["excerpts"] = plan["excerpts"]
+    if "detectionKeys" in plan:
+        out["detectionKeys"] = _detection_keys(plan["detectionKeys"])
     if "allowUnverifiedFormatVersion" in plan:
         require(isinstance(plan["allowUnverifiedFormatVersion"], bool), "plan_invalid", "plan.allowUnverifiedFormatVersion")
         out["allowUnverifiedFormatVersion"] = plan["allowUnverifiedFormatVersion"]

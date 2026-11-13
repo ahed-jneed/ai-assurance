@@ -11,6 +11,9 @@ ERROR_CODES = frozenset({
     "zip_method_unsupported", "zip_encrypted", "zip_crc_mismatch", "zstd_unavailable",
     "missing_required_entry", "lm_eval_bundle_mismatch", "duplicate_item_key",
     "manifest_invalid", "plan_invalid", "input_hash_mismatch", "evidence_too_large",
+    # Signed detection results (#128): a pinned key's signature that does not verify, a result no pinned key
+    # of its solution signed, a result for other content, and no cryptography back-end to verify with.
+    "signature_invalid", "signature_untrusted", "detection_content_mismatch", "signature_backend_unavailable",
 })
 
 WARNING_CODES = frozenset({
