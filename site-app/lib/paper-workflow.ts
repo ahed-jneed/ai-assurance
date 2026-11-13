@@ -1,5 +1,5 @@
 import type { Artifact, Paper, Role } from "./domain";
-import { canWrite } from "./domain";
+import { canWrite, isReleaseTimeRecord } from "./domain";
 export type PaperTarget =
   | "objective"
   | "scope"
@@ -55,6 +55,51 @@ export function paperChecklist(p: Paper, artifacts: Artifact[]) {
     },
   ];
 }
+/**
+ * Why a paper is read only for good (#94): a superseded paper and a retired
+ * limitation memo are history, and a release-time record (WP-RP-02,
+ * MEM-SO-01) is recorded by the release. The paper editor shows it as a
+ * banner; null for every paper that can still change.
+ */
+export function paperHistoryNotice(p: Paper): {
+  kind: "superseded" | "retired" | "release_time";
+  title: string;
+  text: string;
+} | null {
+  const day = (iso?: string) => (iso ? " on " + iso.slice(0, 10) : "");
+  if (p.supersededBy)
+    return {
+      kind: "superseded",
+      title: "Superseded paper",
+      text:
+        "Superseded by " +
+        p.supersededBy +
+        day(p.supersededAt) +
+        ". This revision is kept as history and can no longer change; the paper that replaced it carries the current work.",
+    };
+  if (p.retired)
+    return {
+      kind: "retired",
+      title: "Retired memo",
+      text:
+        "Retired" +
+        day(p.retired.at) +
+        ": its evidence request " +
+        p.retired.requestId +
+        " was reopened (" +
+        p.retired.reason +
+        "). It is kept as history and can no longer change; closing the request again revises this memo.",
+    };
+  if (isReleaseTimeRecord(p.templateId))
+    return {
+      kind: "release_time",
+      title: "Recorded at release",
+      text:
+        p.templateId +
+        " is recorded when the final package is approved and released, against both package hashes. It is not prepared, submitted or signed here.",
+    };
+  return null;
+}
 export function paperNextAction({
   paper: p,
   saved = p,
@@ -75,6 +120,15 @@ export function paperNextAction({
   const writer = canWrite(role),
     lead = role === "Lead Auditor",
     reviewer = lead || role === "Reviewer";
+  // The server refuses every change to these papers, so none is offered.
+  const notice = paperHistoryNotice(saved);
+  if (notice)
+    return {
+      label: notice.title,
+      op: null,
+      enabled: false,
+      reason: notice.text,
+    };
   if (dirty && writer && p.status !== "signed") {
     const supplementary =
       !saved.required &&

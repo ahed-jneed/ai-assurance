@@ -378,6 +378,26 @@ select.paper-section-select {
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
+/* Superseded, retired and release-time papers are read only (#94). */
+.paper-history-notice {
+  margin: 12px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #dfc99c;
+  border-left-width: 3px;
+  border-radius: 5px;
+  background: #fbf6ec;
+  color: #6f5427;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.paper-history-notice[data-kind="release_time"] {
+  border-color: #c9d6e3;
+  background: #f4f7fa;
+  color: #37638d;
+}
+.paper-history-notice p {
+  margin: 4px 0 0;
+}
 .paper-comment-impact {
   margin: 8px 0;
   color: #6b7280;
