@@ -4,7 +4,7 @@
  "specificationVersion": "1.0.0",
  "generatedBy": "docs/design/audit-statistics-verify.py (stdlib reference; scipy/statsmodels/jsonschema/Node.js cross-check)",
  "howToUse": {
-  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (engine only, section 5.11) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, and every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}.",
+  "coreLevel": "Every case runs through the statistics core on the counts given in data (both runners unless runners says otherwise). A plan case first normalises its plan (or derives it from legacy, section 9; a multiclass derivation takes k, the number of labels that occur in the target column, from data) and must reproduce expected.normalizedPlan exactly and expected.planSha256, the SHA-256 of its RFC 8785 canonical JSON. A plan with a clusterField (section 5.11; both runners since #136) takes data {seed, clusters: [{cluster, ...that cluster's data}]}: the criterion data is the clusters' data summed, every member and descriptive entry is decided by the cluster bootstrap and carries bootstrap {replicates, validReplicates, clusters}, and the per-group rates take cluster percentile intervals.",
   "comparison": "Numbers: |actual - expected| <= tolerance (p-values: absolute + relative). Members and descriptive entries are matched by memberId, groups by group; reasons are compared as sets; all other fields exactly. The expected_calibration_error and r2 intervals are null at core level because the engine adds them by bootstrap end to end.",
   "outputMapping": "Section 11 of the specification maps every fixture field to the emitted result: headline, members and descriptive entries become metrics, groups become the headline's slices, decision becomes result.decision.",
   "rowExpansion": "For endToEnd cases, expand each group in order into rows (label, prediction, group): tp -> (1,1), fp -> (0,1), fn -> (1,0), tn -> (0,0); selection-only groups: selected -> (1,1), others -> (0,0). The binary labels are declared: positive '1', negative '0'; a runner must evaluate data in which only one of them occurs (GC-15, GC-37). Multiclass: matrix[i][j] rows with label labels[i] and prediction labels[j]. Regression: target = targets[i] (0 when absent) and prediction = target + errors[i]. Calibration bins: label 1 for positives, score = meanScore, prediction 1 when score >= 0.5. A legacy case runs with its legacy configuration: a hosted_config case directly in the hosted runner and through the worker translation in the engine; an engine_thresholds case directly in the engine. Clustered data (GC-54 to GC-57) expands each cluster in the same way and adds its id in a column cluster, which the plan names as clusterField; the run seed is data.seed."
@@ -18458,11 +18458,12 @@
     ]
    },
    "runners": [
-    "engine"
+    "engine",
+    "hosted"
    ],
    "endToEnd": {
     "engine": true,
-    "hosted": false
+    "hosted": true
    },
    "expected": {
     "planSha256": "6fd89afd4cebe9557d6308148eb82048f7aa4cc80da6e85e0445117ff90cf319",
@@ -18829,10 +18830,10 @@
          "n": 120,
          "estimate": 0.508333333333,
          "interval": {
-          "lower": 0.420025397837,
-          "upper": 0.596124282723,
+          "lower": 0.4,
+          "upper": 0.598039215686,
           "level": 0.95,
-          "method": "wilson"
+          "method": "cluster_percentile_bootstrap"
          }
         }
        },
@@ -18846,10 +18847,10 @@
          "n": 120,
          "estimate": 0.508333333333,
          "interval": {
-          "lower": 0.420025397837,
-          "upper": 0.596124282723,
+          "lower": 0.412698412698,
+          "upper": 0.596162280702,
           "level": 0.95,
-          "method": "wilson"
+          "method": "cluster_percentile_bootstrap"
          }
         }
        }
@@ -20002,11 +20003,12 @@
     ]
    },
    "runners": [
-    "engine"
+    "engine",
+    "hosted"
    ],
    "endToEnd": {
     "engine": true,
-    "hosted": false
+    "hosted": true
    },
    "expected": {
     "planSha256": "8af578863fe35e7be494197eb39f123cf39ff92806d65dc28e2a1d6764e1aed0",
@@ -21076,11 +21078,12 @@
     ]
    },
    "runners": [
-    "engine"
+    "engine",
+    "hosted"
    ],
    "endToEnd": {
     "engine": true,
-    "hosted": false
+    "hosted": true
    },
    "expected": {
     "planSha256": "08bdcc291aef7a2716581232a2d10610264a4b04bb2812eb2221e636d4b4e98c",
@@ -21288,10 +21291,10 @@
          "n": 72,
          "estimate": 0.5,
          "interval": {
-          "lower": 0.387470923095,
-          "upper": 0.612529076905,
+          "lower": 0.371428571429,
+          "upper": 0.636363636364,
           "level": 0.95,
-          "method": "wilson"
+          "method": "cluster_percentile_bootstrap"
          }
         }
        },
@@ -21305,10 +21308,10 @@
          "n": 40,
          "estimate": 0.5,
          "interval": {
-          "lower": 0.351995269335,
-          "upper": 0.648004730665,
+          "lower": 0.425,
+          "upper": 0.571428571429,
           "level": 0.95,
-          "method": "wilson"
+          "method": "cluster_percentile_bootstrap"
          }
         }
        },
@@ -21322,10 +21325,10 @@
          "n": 40,
          "estimate": 0.075,
          "interval": {
-          "lower": 0.0258360257746,
-          "upper": 0.198642335243,
+          "lower": 0.0,
+          "upper": 0.162790697674,
           "level": 0.95,
-          "method": "wilson"
+          "method": "cluster_percentile_bootstrap"
          }
         }
        }
@@ -22571,11 +22574,12 @@
     ]
    },
    "runners": [
-    "engine"
+    "engine",
+    "hosted"
    ],
    "endToEnd": {
     "engine": true,
-    "hosted": false
+    "hosted": true
    },
    "expected": {
     "planSha256": "b24115ad4962d4544f9aa37164482f0590aaf0253479aadbc68457380bf5a9d8",
@@ -22875,7 +22879,8 @@
     }
    },
    "runners": [
-    "engine"
+    "engine",
+    "hosted"
    ],
    "endToEnd": {
     "engine": false,
@@ -22916,6 +22921,478 @@
       "status": "computed",
       "passProbability": 0.665597104754,
       "failProbability": 0.0,
+      "reasons": []
+     }
+    ],
+    "reasons": []
+   }
+  },
+  {
+   "id": "GC-59",
+   "category": "mean_baseline",
+   "title": "A model meets RMSE <= 1.2 (RMSE 0.957) but its MSE 0.915 is above the mean predictor's 0.5: the optional mse_reduction member shows the reduction -0.415 [-0.535, -0.295] below 0, so the criterion fails, where the mean baseline gate alone would leave it inconclusive",
+   "type": "plan",
+   "data": {
+    "kind": "regression",
+    "targets": [
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0,
+     9.0,
+     9.5,
+     10.0,
+     10.5,
+     11.0
+    ],
+    "errors": [
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1,
+     0.8,
+     -0.9,
+     1.0,
+     -1.1
+    ]
+   },
+   "plan": {
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "role": "confirmatory",
+      "kind": "regression_performance",
+      "members": [
+       {
+        "metric": "rmse",
+        "band": {
+         "lower": null,
+         "upper": 1.2
+        }
+       },
+       {
+        "metric": "mse_reduction",
+        "band": {
+         "lower": 0.0,
+         "upper": null
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": true,
+    "hosted": true
+   },
+   "expected": {
+    "planSha256": "dc29f504670a38234e31b956482b1ed3fe0dfac9ffb9fa383b8394a042a9e4b2",
+    "normalizedPlan": {
+     "statisticsVersion": "1.0.0",
+     "confidenceLevel": 0.95,
+     "minimums": {
+      "sampleSize": 30,
+      "groupSize": 30,
+      "classCount": 10
+     },
+     "configuredMinimums": null,
+     "multiplicity": {
+      "confirmatory": "bonferroni",
+      "exploratory": "benjamini_hochberg"
+     },
+     "clusterField": null,
+     "bootstrap": {
+      "replicates": 2000
+     },
+     "calibrationBins": 10,
+     "power": {
+      "targetPower": 0.8,
+      "acknowledgement": null
+     },
+     "derivedFrom": null,
+     "criteria": [
+      {
+       "id": "regression-performance",
+       "kind": "regression_performance",
+       "role": "confirmatory",
+       "rationale": null,
+       "members": [
+        {
+         "metric": "rmse",
+         "band": {
+          "lower": null,
+          "upper": 1.2
+         }
+        },
+        {
+         "metric": "mse_reduction",
+         "band": {
+          "lower": 0.0,
+          "upper": null
+         }
+        }
+       ],
+       "passBlockedBy": [],
+       "libraryEntry": null,
+       "powerAssumptions": null
+      }
+     ]
+    },
+    "criteria": [
+     {
+      "id": "regression-performance",
+      "outcome": "fail",
+      "headline": null,
+      "members": [
+       {
+        "memberId": "rmse",
+        "metric": "rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 60,
+         "meanSquaredError": 0.915,
+         "sdSquaredError": 0.214456348527
+        },
+        "estimate": 0.956556323485,
+        "interval": {
+         "lower": 0.927758618318,
+         "upper": 0.984512034531,
+         "level": 0.95,
+         "method": "normal_approximation_mse"
+        },
+        "band": {
+         "lower": null,
+         "upper": 1.2
+        },
+        "status": "evaluated",
+        "direction": "pass",
+        "pValue": 3.480697046e-80,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "mse_reduction",
+        "metric": "mse_reduction",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 60,
+         "meanSquaredError": 0.915,
+         "baselineMeanSquaredError": 0.5,
+         "sdSquaredErrorDifference": 0.473241616005
+        },
+        "estimate": -0.415,
+        "interval": {
+         "lower": -0.534744450265,
+         "upper": -0.295255549735,
+         "level": 0.95,
+         "method": "normal_approximation"
+        },
+        "band": {
+         "lower": 0.0,
+         "upper": null
+        },
+        "status": "evaluated",
+        "direction": "fail",
+        "pValue": 1.10073676671e-11,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       }
+      ],
+      "descriptive": [
+       {
+        "memberId": "mae",
+        "metric": "mae",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 60,
+         "meanAbsoluteError": 0.95,
+         "sdAbsoluteError": 0.1127469042
+        },
+        "estimate": 0.95,
+        "interval": {
+         "lower": 0.921471621248,
+         "upper": 0.978528378752,
+         "level": 0.95,
+         "method": "normal_approximation"
+        },
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "r2",
+        "metric": "r2",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 60
+        },
+        "estimate": -0.83,
+        "interval": null,
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       },
+       {
+        "memberId": "baseline_rmse",
+        "metric": "baseline_rmse",
+        "subject": null,
+        "comparator": null,
+        "counts": {
+         "n": 60,
+         "meanSquaredError": 0.5,
+         "meanSquaredErrorReduction": -0.415,
+         "sdSquaredErrorDifference": 0.473241616005,
+         "gatePValue": 1.0
+        },
+        "estimate": 0.707106781187,
+        "interval": null,
+        "band": null,
+        "status": "evaluated",
+        "direction": "none",
+        "pValue": null,
+        "smallCell": false,
+        "fisherExactP": null,
+        "chanceExactP": null,
+        "reasons": []
+       }
+      ],
+      "groups": null,
+      "decision": {
+       "statisticsVersion": "1.0.0",
+       "confidenceLevel": 0.95,
+       "role": "confirmatory",
+       "kind": "regression_performance",
+       "direction": "fail",
+       "pValue": 2.20147353342e-11,
+       "adjustedPValue": 2.20147353342e-11,
+       "adjustment": "bonferroni",
+       "familySize": 1,
+       "unadjustedOutcome": "fail",
+       "decidingMemberId": "mse_reduction",
+       "sampleSize": 60,
+       "coverage": null,
+       "suppressedGroups": null,
+       "libraryEntry": null,
+       "reasons": []
+      }
+     }
+    ],
+    "overallOutcome": "fail",
+    "reviewFlags": []
+   }
+  },
+  {
+   "id": "GC-60",
+   "category": "power_mean_baseline",
+   "title": "GC-58 with an mse_reduction member (lower bound 0): the member has the gate's pass probability 0.666 and also a fail direction; the gate adds no condition beside it, so the pass range and the required size are those of GC-58",
+   "type": "power",
+   "input": {
+    "kind": "criterion",
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8,
+    "familySize": 1,
+    "criterion": {
+     "id": "regression-performance",
+     "role": "confirmatory",
+     "kind": "regression_performance",
+     "members": [
+      {
+       "metric": "mae",
+       "band": {
+        "lower": null,
+        "upper": 0.9
+       }
+      },
+      {
+       "metric": "rmse",
+       "band": {
+        "lower": null,
+        "upper": 1.15
+       }
+      },
+      {
+       "metric": "mse_reduction",
+       "band": {
+        "lower": 0.0,
+        "upper": null
+       }
+      }
+     ],
+     "powerAssumptions": {
+      "n": 120,
+      "errorSd": 1.0,
+      "targetSd": 1.1
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "status": "computed",
+    "passProbability": 0.0,
+    "passProbabilityUpperBound": 0.458469110083,
+    "failProbability": 1.07051186924e-05,
+    "requiredNForPass": 312,
+    "members": [
+     {
+      "memberId": "mae",
+      "metric": "mae",
+      "assumedValue": 0.797884560803,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.458469110083,
+      "failProbability": 1.07051186924e-05,
+      "reasons": []
+     },
+     {
+      "memberId": "rmse",
+      "metric": "rmse",
+      "assumedValue": 1.0,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.704749539966,
+      "failProbability": 4.98945129601e-07,
+      "reasons": []
+     },
+     {
+      "memberId": "mse_reduction",
+      "metric": "mse_reduction",
+      "assumedValue": 0.21,
+      "denominator": 120,
+      "status": "computed",
+      "passProbability": 0.665597104754,
+      "failProbability": 8.68959191935e-07,
       "reasons": []
      }
     ],

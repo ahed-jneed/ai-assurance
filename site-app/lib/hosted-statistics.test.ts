@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Result } from "./domain";
 import {
@@ -9,11 +10,31 @@ import {
   planFromForm,
   planGroupFields,
   planSuite,
+  REASON_TEXT,
   requestedCriteria,
   stratumOf,
   validateHostedPlan,
 } from "./hosted-statistics";
 import { criterionPower } from "./statistics";
+
+/** The reason codes in the first column of docs/design/audit-statistics.md section 4.4. */
+function reasonCodeTable(): string[] {
+  const doc = readFileSync(
+    new URL("../../docs/design/audit-statistics.md", import.meta.url),
+    "utf8",
+  );
+  const start = doc.indexOf("### 4.4 Gates and reason codes");
+  const section = doc.slice(start, doc.indexOf("\n### ", start + 1));
+  const codes = section
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("| `"))
+    .flatMap((line) =>
+      [...line.split("|")[1].matchAll(/`([a-z0-9_]+)`/g)].map((m) => m[1]),
+    );
+  expect(start).toBeGreaterThan(-1);
+  expect(codes.length).toBeGreaterThan(20);
+  return codes;
+}
 
 const thresholds = {
   minimumSampleSize: 40,
@@ -163,18 +184,6 @@ describe("the protocol form's plan", () => {
 
   it("rejects hosted plans the hosted runner cannot evaluate", () => {
     expect(() =>
-      validateHostedPlan("Binary classification", {
-        clusterField: "person",
-        criteria: [
-          {
-            id: "p",
-            kind: "performance",
-            members: [{ metric: "accuracy", band: { lower: 0.8 } }],
-          },
-        ],
-      }),
-    ).toThrow(/cluster/);
-    expect(() =>
       validateHostedPlan("Regression", {
         criteria: [
           {
@@ -185,6 +194,100 @@ describe("the protocol form's plan", () => {
         ],
       }),
     ).toThrow(/not available for Regression/);
+  });
+
+  it("decides a clustered plan by the cluster bootstrap, as the engine does (#136)", () => {
+    const plan = validateHostedPlan("Binary classification", {
+      clusterField: "person",
+      criteria: [
+        {
+          id: "recall-minimum",
+          kind: "performance",
+          members: [
+            { metric: "recall", band: { lower: 0.7 } },
+            { metric: "balanced_accuracy", band: { lower: 0.5 } },
+          ],
+        },
+        {
+          id: "parity",
+          kind: "group_comparison",
+          metric: "selection_rate_difference",
+          band: { lower: -0.2, upper: 0.2 },
+        },
+      ],
+    });
+    expect(plan.clusterField).toBe("person");
+    // 40 people with 3 positive and 3 negative rows; every fifth person's positives are all missed.
+    const rows: Record<string, string>[] = [];
+    for (let i = 0; i < 40; i++)
+      for (let r = 0; r < 6; r++)
+        rows.push({
+          label: r < 3 ? "1" : "0",
+          prediction: r < 3 && i % 5 !== 0 ? "1" : "0",
+          group: i < 20 ? "A" : "B",
+          person: ` p${String(i).padStart(2, "0")} `,
+        });
+    const columns = {
+      labelColumn: "label",
+      predictionColumn: "prediction",
+      groupColumn: "group",
+      positiveLabel: "1",
+      negativeLabel: "0",
+    };
+    const run = (seed: number) =>
+      evaluateHostedPlan(plan, rows, columns, "Binary classification", seed);
+    const { evaluation, results } = run(1729);
+    const recall = evaluation.criteria[0].members[0];
+    expect(recall.interval?.method).toBe("cluster_percentile_bootstrap");
+    expect(recall.bootstrap).toEqual({
+      replicates: 2000,
+      validReplicates: 2000,
+      clusters: 40,
+    });
+    // Recall 0.8 with independent rows would pass 0.70; with people as the unit it does not.
+    expect(evaluation.criteria[0].outcome).toBe("inconclusive");
+    expect(evaluation.criteria[0].decision.reasons).toContain(
+      "interval_straddles_band",
+    );
+    const metric = results[0].metrics.find((m) => m.name === "recall")!;
+    expect((metric.details as { bootstrap: unknown }).bootstrap).toEqual(
+      recall.bootstrap,
+    );
+    expect(results[0].limitations).toContain(
+      "Rows are clustered by 'person': every member and descriptive interval is a cluster percentile bootstrap over 40 clusters (2000 replicates, seed 1729). The per-group rates are cluster percentile intervals too.",
+    );
+    for (const view of evaluation.criteria[1].groups!)
+      expect(view.selection!.interval!.method).toBe(
+        "cluster_percentile_bootstrap",
+      );
+    // The run seed draws the replicates: the same seed repeats, another differs.
+    expect(run(1729).evaluation.criteria[0].members[0].interval).toEqual(
+      recall.interval,
+    );
+    expect(run(7).evaluation.criteria[0].members[0].interval).not.toEqual(
+      recall.interval,
+    );
+    // Every evaluated row needs a cluster id.
+    const blank = rows.map((r, i) => (i === 3 ? { ...r, person: " " } : r));
+    expect(() =>
+      evaluateHostedPlan(plan, blank, columns, "Binary classification"),
+    ).toThrow(/needs a cluster id in column 'person'/);
+    expect(() =>
+      evaluateHostedPlan(
+        plan,
+        rows.map(({ person: _, ...r }) => r),
+        columns,
+        "Binary classification",
+      ),
+    ).toThrow(/Required column missing: person/);
+  });
+
+  it("explains every reason code of the section 4.4 table in plain language", () => {
+    const codes = reasonCodeTable();
+    expect(codes).toContain("clustered_design_requires_engine");
+    expect(codes).toContain("bootstrap_budget_exceeded");
+    for (const code of codes)
+      expect(REASON_TEXT[code], code).toMatch(/\w{4}.*\./);
   });
 
   it("compares the intersectional strata of several group columns (#30)", () => {

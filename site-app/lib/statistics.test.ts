@@ -49,10 +49,10 @@ function compute(c: any): unknown {
 describe("statistics golden fixture (hosted runner, core level)", () => {
   it("has the fixture shape the specification fixes", () => {
     expect(GOLDEN.specificationVersion).toBe(st.SPEC_VERSION);
-    expect(GOLDEN.cases).toHaveLength(58);
+    expect(GOLDEN.cases).toHaveLength(60);
     expect(GOLDEN.defaults.minimums).toEqual(st.FLOORS);
-    // Every case except the engine-only calibration, clustered and mean-baseline power cases runs here.
-    expect(HOSTED).toHaveLength(52);
+    // Every case except the engine-only calibration case runs here, the clustered ones included (#136).
+    expect(HOSTED).toHaveLength(59);
   });
 
   it.each(HOSTED.map((c: any) => [c.id, c]))(
@@ -61,6 +61,15 @@ describe("statistics golden fixture (hosted runner, core level)", () => {
       expect(differences(publicView(compute(c)), c.expected)).toEqual([]);
     },
   );
+
+  it("refuses to decide a clustered plan without its cluster data", () => {
+    const c: any = GOLDEN.cases.find((x: any) => x.id === "GC-54");
+    const plan = st.planFor(c);
+    expect(plan.clusterField).not.toBeNull();
+    expect(() => st.evaluateCriteria(plan, () => c.data)).toThrow(
+      /cluster bootstrap/,
+    );
+  });
 
   it("notices a corrupted value, reason or plan field", () => {
     const c = structuredClone(GOLDEN.cases.find((x: any) => x.id === "GC-50"));
