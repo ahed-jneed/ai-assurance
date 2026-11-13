@@ -111,7 +111,10 @@ export default function Workspace() {
   const [switchOpen, setSwitchOpen] = useState(false),
     [searchOpen, setSearchOpen] = useState(false),
     [sidebarWidth, setSidebarWidth] = useState(272),
-    [onboarding, setOnboarding] = useState(false);
+    [onboarding, setOnboarding] = useState(false),
+    // Each opening of the onboarding wizard mounts it afresh, so it starts
+    // from step one with empty fields.
+    [onboardingRun, setOnboardingRun] = useState(0);
   // load() and act() call these before storing a response, so the updates
   // render together with the new data.
   useLayoutEffect(() => {
@@ -158,11 +161,8 @@ export default function Workspace() {
     displayedEvidenceTab,
     paper,
     sheet,
-    busy,
     loading,
     bootstrapping,
-    modal: modal.modal,
-    editorOpen: editing.editorOpen,
     guarded,
     load: workspace.load,
     getData: workspace.getData,
@@ -263,13 +263,17 @@ export default function Workspace() {
                   lab={lab}
                   onModal={modal.open}
                   onDetail={sheet.viewDetail}
-                  onOnboard={() => setOnboarding(true)}
+                  onOnboard={() => {
+                    setOnboardingRun((n) => n + 1);
+                    setOnboarding(true);
+                  }}
                 />
               )}
         </main>
       </SidebarInset>
       {data && (
         <MemberOnboarding
+          key={onboardingRun}
           open={onboarding}
           onClose={() => setOnboarding(false)}
           data={data}
