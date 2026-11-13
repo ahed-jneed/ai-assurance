@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
+import { art50Suggestions } from "../audit-program/art50-suggestion";
 import { PaperEditor } from "../paper-editor";
 import type { WorkspaceData } from "../workspace-types";
 import type { ViewDetail, WorkspaceAct } from "./types";
@@ -119,6 +120,11 @@ export function PaperEditorHost({
           )
         }
         resolve={resolve}
+        art50={
+          paperDraft
+            ? art50Suggestions(data, engagement)(paperDraft.templateId)
+            : null
+        }
       />
       {paper.paperConflict && (
         <Dialog open onOpenChange={() => {}}>

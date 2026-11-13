@@ -42,6 +42,8 @@ import { paperRegisterRow } from "@/lib/paper-presentation";
 import { PaperEvidence } from "./paper-evidence";
 import { PaperComparison } from "./revision-comparison";
 import { DraftRecovery, useRecoverableDraft } from "./recoverable-draft";
+import type { PaperSuggestion } from "@/lib/domain/art50-papers";
+import { Art50Suggestion } from "./audit-program/art50-plan";
 
 const sections = {
   objective: "Objective",
@@ -141,6 +143,11 @@ type PaperEditorProps = {
   onDetail: (title: string, value: unknown) => void;
   onExport: () => void;
   resolve: (id: string) => string;
+  /**
+   * The Art 50 applicability suggestion for this paper's template (#152),
+   * shown when no program procedure holds the paper's plan.
+   */
+  art50?: PaperSuggestion | null;
 };
 
 export function PaperEditor({
@@ -174,6 +181,7 @@ export function PaperEditor({
   onDetail,
   onExport,
   resolve,
+  art50,
 }: PaperEditorProps) {
   const [reply, setReply] = useState({ id: "", text: "" });
   const [expanded, setExpanded] = useState(false),
@@ -551,6 +559,37 @@ export function PaperEditor({
                         )
                       }
                     />
+                    {art50 && !source && (
+                      // A paper of an engagement without a program (#152):
+                      // the suggestion goes into the scope section only
+                      // when the auditor adds it and saves the paper.
+                      <Art50Suggestion
+                        suggestion={art50}
+                        current=""
+                        canUse={
+                          !!editable &&
+                          !locked &&
+                          !(draft.body.scope ?? "").includes(art50.rationale)
+                        }
+                        useLabel="Add to scope"
+                        decision="in the paper's scope for review"
+                        onUse={(s) =>
+                          setDraft((p) =>
+                            p
+                              ? {
+                                  ...p,
+                                  body: {
+                                    ...p.body,
+                                    scope: [p.body.scope, s.rationale]
+                                      .filter(Boolean)
+                                      .join("\n\n"),
+                                  },
+                                }
+                              : p,
+                          )
+                        }
+                      />
+                    )}
                     <section className="paper-readiness">
                       <h3>
                         {draft.status === "draft"

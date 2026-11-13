@@ -29,6 +29,11 @@ import {
 import type { GenaiAcknowledgement } from "@/lib/genai/readiness";
 import type { GenaiRunSummary } from "@/lib/genai/summary";
 import type { GenaiView } from "@/lib/read-models/genai-view";
+import {
+  art50BandText,
+  art50CriteriaSource,
+  art50GenaiPlan,
+} from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program";
 
 type Result = GenaiView["results"][number];
@@ -409,24 +414,51 @@ export function GenaiEvidence({
       (j) => j.state === "succeeded" && !imported.has(String(j.id)),
     );
 
-  const freezePlan = () =>
+  // #152: the Art 50 criteria GenAI marking evidence decides, pre-registered
+  // for review; nothing is frozen until the auditor freezes the plan.
+  const art50Plans = procedures.flatMap((p) => {
+    const g = art50GenaiPlan(p.templateId);
+    return g ? [{ procedure: p, genai: g }] : [];
+  });
+  const freezePlan = (art50?: (typeof art50Plans)[number]) =>
     setForm({
-      title: "Freeze a GenAI plan",
+      title: art50
+        ? "Pre-register the Art 50 criteria of " + art50.procedure.templateId
+        : "Freeze a GenAI plan",
       description:
-        "genai-plan/0.1 for one procedure. The judge floor (kappa lower bound at least 0.60 on at least 50 items, a judge of another model family) and the sample minimums may be raised, never lowered.",
+        "genai-plan/0.1 for one procedure. The judge floor (kappa lower bound at least 0.60 on at least 50 items, a judge of another model family) and the sample minimums may be raised, never lowered." +
+        (art50
+          ? " The plan holds the research's criteria that GenAI marking evidence decides, with their methodology bands: " +
+            art50.genai.preRegistered
+              .map((c) => c.id + " " + art50BandText(c))
+              .join("; ") +
+            ". Where the provider declares a rate, set the band from it before freezing." +
+            (art50.genai.notDecided.length
+              ? " Not pre-registered (descriptive or attribute sampling the auditor records): " +
+                art50.genai.notDecided.map((c) => c.id).join(", ") +
+                "."
+              : "") +
+            " " +
+            art50CriteriaSource.caveat
+          : ""),
       action: "Freeze plan",
       fields: [
         {
           name: "procedureId",
           label: "Procedure",
           type: "select",
-          options: procedureOptions,
+          options: art50
+            ? procedureOptions.filter((o) => o.value === art50.procedure.id)
+            : procedureOptions,
+          value: art50?.procedure.id,
         },
         {
           name: "plan",
           label: "Plan (JSON)",
           type: "area",
-          value: PLAN_TEMPLATE,
+          value: art50
+            ? JSON.stringify(art50.genai.plan, null, 2)
+            : PLAN_TEMPLATE,
         },
       ],
       save: (v) =>
@@ -550,7 +582,7 @@ export function GenaiEvidence({
               <Button
                 variant="outline"
                 disabled={busy || !procedureOptions.length}
-                onClick={freezePlan}
+                onClick={() => freezePlan()}
               >
                 Freeze plan
               </Button>
@@ -592,6 +624,31 @@ export function GenaiEvidence({
             bundles · {view.jobs.length} ingest jobs ·{" "}
             {view.acknowledgements.length} acknowledgements
           </p>
+        )}
+        {writer && art50Plans.length > 0 && (
+          <div data-testid="art50-genai-plans">
+            <p className="subtle">
+              Art 50 criteria that GenAI marking evidence decides can be
+              pre-registered in a plan for the procedure; review the bands, then
+              freeze it.
+            </p>
+            <ul>
+              {art50Plans.map((a) => (
+                <li key={a.procedure.id} className="row-actions">
+                  {a.procedure.templateId} ·{" "}
+                  {a.genai.preRegistered.map((c) => c.id).join(", ")}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => freezePlan(a)}
+                  >
+                    Pre-register in a plan
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         {writer && compilable.length > 0 && (
           <ul>

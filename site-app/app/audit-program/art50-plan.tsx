@@ -7,6 +7,7 @@
 // and rationale filled in, and the auditor saves, edits or discards it.
 import { Button } from "@/components/ui/button";
 import {
+  ART50_GENAI_METRICS,
   art50BandText,
   art50Criteria,
   art50CriteriaSource,
@@ -21,6 +22,16 @@ const suggestionLabels: Record<
   applicable: ["Suggested: applicable", "blue"],
   not_applicable: ["Suggested: not applicable", "neutral"],
   pending: ["Needs information", "amber"],
+  readiness: ["Suggested: readiness", "blue"],
+};
+const periodLabels: Record<
+  NonNullable<PaperSuggestion["timing"]>["items"][number]["period"],
+  string
+> = {
+  readiness: "starts after the period ends",
+  applicable: "applies for the whole period",
+  starts_in_period: "starts within the period",
+  undetermined: "date depends on facts not yet recorded",
 };
 const procedureLabels: Record<
   PaperSuggestion["procedures"][number]["status"],
@@ -49,12 +60,17 @@ export function Art50Suggestion({
   current,
   canUse,
   onUse,
+  useLabel = "Use in plan",
+  decision = "in the plan for independent review",
 }: {
   suggestion: PaperSuggestion;
-  /** The plan's recorded applicability. */
+  /** The plan's recorded applicability; "" when there is no plan. */
   current: string;
   canUse: boolean;
   onUse: (s: PaperSuggestion) => void;
+  useLabel?: string;
+  /** Where the auditor records the decision, in the explanation. */
+  decision?: string;
 }) {
   const [text, color] = suggestionLabels[s.applicability];
   const recorded = current === s.applicability;
@@ -82,8 +98,8 @@ export function Art50Suggestion({
           ? " (rule pack " + s.basis.rulePackVersion + ")"
           : ""}
         , through the Art 50 items each research procedure tests. A suggestion
-        is not an applicability decision: record the decision and its rationale
-        in the plan for independent review.
+        is not an applicability decision: record the decision and its rationale{" "}
+        {decision}.
         {s.basis.status !== "approved" &&
           " The classification is not approved yet, so the suggestion may change."}
       </p>
@@ -105,12 +121,43 @@ export function Art50Suggestion({
           </li>
         ))}
       </ul>
+      {s.timing === null && (
+        <p className="subtle" data-testid="art50-timing">
+          Timing not considered: the engagement period is not set in the brief.
+        </p>
+      )}
+      {s.timing && (
+        <div data-testid="art50-timing">
+          <p className="subtle">
+            Timing for the engagement period {s.timing.period.start} to{" "}
+            {s.timing.period.end}:
+          </p>
+          <ul className="record-list">
+            {s.timing.items.map((t) => (
+              <li key={t.code}>
+                <b>{t.code}</b> ·{" "}
+                {t.date
+                  ? "applies from " +
+                    t.date +
+                    (t.transition ? " (" + t.transition + " transition)" : "")
+                  : "the " + t.transition + " transition may apply"}{" "}
+                · {periodLabels[t.period]}
+              </li>
+            ))}
+          </ul>
+          {s.timing.pendingReview.length > 0 && (
+            <p className="subtle">
+              Pending legal review: {s.timing.pendingReview.join(", ")}
+            </p>
+          )}
+        </div>
+      )}
       {s.missingFacts.length > 0 && (
         <p className="subtle">Waits for: {s.missingFacts.join("; ")}</p>
       )}
       {canUse && !recorded && s.applicability !== "pending" && (
         <Button variant="outline" size="sm" onClick={() => onUse(s)}>
-          Use in plan
+          {useLabel}
         </Button>
       )}
     </section>
@@ -151,6 +198,15 @@ export function Art50StatisticalCriteria({
                   (legalStatusLabels[c.entry.legalStatus] ??
                     c.entry.legalStatus)}
             </small>
+            {c.band && c.role !== "descriptive" && (
+              <small className="block subtle">
+                {c.metric in ART50_GENAI_METRICS
+                  ? "Decided by GenAI marking evidence (" +
+                    ART50_GENAI_METRICS[c.metric] +
+                    "): pre-register it in a GenAI plan in the Testing lab."
+                  : "Attribute sampling: the auditor records the sample and its result."}
+              </small>
+            )}
           </li>
         ))}
       </ul>
