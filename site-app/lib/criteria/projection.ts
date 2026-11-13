@@ -36,6 +36,7 @@ export function features(pack: PackDocument): PackFeatures {
     nonconformityGrading: pack.features?.nonconformityGrading === true,
     certificationRecommendation:
       pack.features?.certificationRecommendation === true,
+    ll144BiasAudit: pack.features?.ll144BiasAudit === true,
   };
 }
 export const item = (
