@@ -1,0 +1,1398 @@
+{
+  "documentType": "pack",
+  "schemaVersion": "1.0.0",
+  "id": "genai-evaluation",
+  "version": "2026.11.2",
+  "title": "GenAI evaluation evidence",
+  "summary": "Audit programme for generative AI systems: tool logs ingested and recomputed by the engine, readiness-gated conclusions on accuracy, attacks, leakage, agents, harmful content and Art. 50 transparency, mapped to the OWASP LLM and Agentic Top 10, MITRE ATLAS, NIST AI 600-1 and the AI Act.",
+  "kind": "audit_programme",
+  "methodologyVersion": "2026.11.2",
+  "engagementTypes": [
+    "readiness_assessment",
+    "attestation"
+  ],
+  "criteria": [
+    {
+      "framework": "eu-ai-act",
+      "edition": "02024R1689-20260727",
+      "version": "2026.11.2",
+      "role": "primary",
+      "include": [
+        "AIA-ART-9",
+        "AIA-9-TEST",
+        "AIA-ART-10",
+        "AIA-10-2F",
+        "AIA-10-2G",
+        "AIA-ART-15",
+        "AIA-15-1",
+        "AIA-15-3",
+        "AIA-15-4",
+        "AIA-15-5",
+        "AIA-ART-50",
+        "AIA-50-1",
+        "AIA-50-2",
+        "AIA-50-4-DF",
+        "AIA-50-4-TXT"
+      ]
+    },
+    {
+      "framework": "owasp-llm-top-10",
+      "edition": "2026",
+      "version": "2026.11.0",
+      "role": "supporting"
+    },
+    {
+      "framework": "owasp-agentic-top-10",
+      "edition": "2025-12",
+      "version": "2026.11.0",
+      "role": "supporting"
+    },
+    {
+      "framework": "mitre-atlas",
+      "edition": "2026.10",
+      "version": "2026.11.0",
+      "role": "supporting"
+    },
+    {
+      "framework": "nist-ai-600-1",
+      "edition": "2024-07",
+      "version": "2026.11.0",
+      "role": "supporting"
+    }
+  ],
+  "controlObjectives": [
+    {
+      "id": "CO-GA-PLAN",
+      "statement": "Assess whether the GenAI test plan, the run metadata and the validation of model-graded judges were fixed before the evidence was ingested and are sufficient for the conclusions drawn.",
+      "addresses": [
+        {
+          "requirement": "eu-ai-act:AIA-9-TEST",
+          "relationship": "intersects_with",
+          "rationale": "functional",
+          "justification": "Art. 9(8) asks for testing against prior defined metrics and probabilistic thresholds; the frozen plan and its floors are that definition for GenAI tests. Testing covers more than GenAI evaluation.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-3",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Declared accuracy metrics need a documented method; the plan and metadata checklist document it for GenAI tests only.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-PROMPT-INJECTION-DIRECT",
+      "statement": "Test resistance to direct prompt injection by users of the system.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0051.000",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Direct prompt injection is an attack on the security of the generative system itself. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-PROMPT-INJECTION-INDIRECT",
+      "statement": "Test resistance to instructions injected through retrieved content, tool output or other data the system reads.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI06",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0051.001",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0093",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Indirect prompt injection through content the system reads is an attack on the security of the generative system itself. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-JAILBREAK",
+      "statement": "Test resistance to attempts to bypass the system's safety and policy constraints.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0054",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Bypassing the system's safety constraints is an attack on its integrity. A low success rate holds only for the attacks, configuration and judge tested. The harm a jailbreak elicits (for example risk 2.3) is not linked: the test measures the bypass, not the harm categories.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-GOAL-HIJACK",
+      "statement": "Test whether injected input can redirect the goals of the system or agent.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0051",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Redirecting the system's goals through injected input is an attack on its integrity. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-HIDDEN-CONTEXT-EXPOSURE",
+      "statement": "Test whether system prompts and other hidden context can be extracted.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM08",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0069.002",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0085.003",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Extracting system prompts and other hidden context is a confidentiality attack on the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-SENSITIVE-INFORMATION-DISCLOSURE",
+      "statement": "Test whether the system discloses personal or confidential information.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM02",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0137.003",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0085.002",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.4",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Disclosure of personal information, including memorised training data, is part of this risk; disclosure of confidential business information is not. A low disclosure rate holds only for the probes, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-VECTOR-EMBEDDING-WEAKNESS",
+      "statement": "Test retrieval and embedding stores for leakage and manipulation.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM09",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI06",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0070",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0085.000",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.4",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Leakage of personal information from retrieval and embedding stores is part of this risk. A low leakage rate holds only for the probes, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Manipulating retrieval and embedding stores is an attack on the integrity of the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-EXCESSIVE-AGENCY",
+      "statement": "Test that tools and actions available to the system stay within what the task needs.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM03",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI02",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0053",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Misusing tools beyond what the task needs is an attack on the system's integrity. A low success rate holds only for the attacks, configuration and judge tested. Risk 2.7 is not linked: the test checks tool permissions, not how people and the system work together.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-PRIVILEGE-ABUSE",
+      "statement": "Test that the system cannot act with identities or privileges beyond those granted for the task.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM03",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI03",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0098",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Acting with identities or privileges beyond those granted is a security failure of the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-UNEXPECTED-CODE-EXECUTION",
+      "statement": "Test that model output cannot cause unintended code execution.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM10",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI05",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0102",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Code execution caused by model output is a security failure of the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-IMPROPER-OUTPUT-HANDLING",
+      "statement": "Test that downstream components validate and encode model output.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM10",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI05",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0077",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Unvalidated model output reaching downstream components is a security failure of the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-MEMORY-CONTEXT-POISONING",
+      "statement": "Test persistent memory and context stores for poisoning across sessions.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM01",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-llm-top-10:LLM09",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI06",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0080.000",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0070",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Poisoning persistent memory and context is a data poisoning attack on the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-DATA-MODEL-POISONING",
+      "statement": "Assess evidence on poisoning of training, fine-tuning and model data.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM05",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0020",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the provenance and integrity of training, fine-tuning and model data, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0018.000",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the provenance and integrity of training, fine-tuning and model data, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this risk and does not establish that it is identified and managed for the system. No test emulates it; the auditor assesses the client's evidence on the provenance and integrity of training, fine-tuning and model data, which bears on data poisoning, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.12",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this risk and does not establish that it is identified and managed for the system. No test emulates it; the auditor assesses the client's evidence on third-party data and models integrated into the system, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-SUPPLY-CHAIN",
+      "statement": "Assess the integrity of models, packages and tools the system depends on.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM04",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI04",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0010",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the integrity and provenance of the models, packages and tools the system depends on, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.12",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this risk and does not establish that it is identified and managed for the system. No test emulates it; the auditor assesses the client's evidence on the integrity and provenance of the models, packages and tools the system depends on, and a favourable conclusion holds only for the evidence reviewed.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-UNBOUNDED-CONSUMPTION",
+      "statement": "Test resistance to resource exhaustion, denial of wallet and model extraction.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM06",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "owasp-agentic-top-10:ASI08",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0029",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "mitre-atlas:AML.T0034",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-INTER-AGENT-COMMUNICATION",
+      "statement": "Test the integrity and authentication of messages between agents.",
+      "addresses": [
+        {
+          "requirement": "owasp-agentic-top-10:ASI07",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-5",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.9",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Forged or tampered messages between agents are an attack on the integrity of the system. A low success rate holds only for the attacks, configuration and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-CASCADING-FAILURE",
+      "statement": "Test that a fault in one component or agent does not propagate unchecked.",
+      "addresses": [
+        {
+          "requirement": "owasp-agentic-top-10:ASI08",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-4",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-HUMAN-TRUST-EXPLOITATION",
+      "statement": "Test that the system cannot exploit the trust of the people who oversee it.",
+      "addresses": [
+        {
+          "requirement": "owasp-agentic-top-10:ASI09",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.7",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Exploiting the trust of the people who oversee the system bears on over-reliance and inappropriate trust between people and the system. A favourable result holds only for the scenarios and judge tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-ROGUE-AGENT",
+      "statement": "Test detection and containment of agents acting outside their mandate.",
+      "addresses": [
+        {
+          "requirement": "owasp-agentic-top-10:ASI10",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-4",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-MISINFORMATION",
+      "statement": "Test the rate of false or unsupported statements on a declared benchmark.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM07",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-1",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-3",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.2",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. The rate of false or unsupported statements is evidence on confabulation; it holds only for the declared benchmark, configuration and judge, not for the population of real inputs. Risk 2.8 is not linked: the test does not assess effects on the wider information ecosystem.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-CAPABILITY-ACCURACY",
+      "statement": "Test task accuracy on a declared benchmark against the declared accuracy levels.",
+      "addresses": [
+        {
+          "requirement": "owasp-llm-top-10:LLM07",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-1",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-15-3",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-HARMFUL-CONTENT",
+      "statement": "Test the rate of harmful content the system produces under adversarial and ordinary prompts.",
+      "addresses": [
+        {
+          "requirement": "eu-ai-act:AIA-9-TEST",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.3",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. The rate of dangerous, violent or hateful output is evidence on this risk; it holds only for the harm categories of the declared dataset, the configuration and the judge. Risk 2.1 is not linked: a general harmful-content test is not a CBRN capability evaluation.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.11",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. The rate of obscene, degrading or abusive output is evidence on this risk; it holds only for the harm categories of the declared dataset, the configuration and the judge.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-BIAS-FAIRNESS",
+      "statement": "Test differences in output quality and harm across groups.",
+      "addresses": [
+        {
+          "requirement": "eu-ai-act:AIA-10-2F",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-10-2G",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.6",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Differences in output quality and harm across groups are evidence on harmful bias; they hold only for the groups, dataset and judge tested, and homogenization is not tested.",
+          "origin": "authored"
+        }
+      ]
+    },
+    {
+      "id": "CO-GA-AI-INTERACTION-DISCLOSURE",
+      "statement": "Test that the system discloses to people that they interact with an AI system.",
+      "addresses": [
+        {
+          "requirement": "owasp-agentic-top-10:ASI09",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met.",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-50-1",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.7",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Telling people that they interact with an AI system bears on inappropriate anthropomorphism and over-reliance. A favourable result holds only for the interfaces and scenarios tested.",
+          "origin": "authored"
+        }
+      ],
+      "notes": "The Art. 50(1) conclusion belongs to WP-XC-07 of the AI Act pack (A50-ED-32); this objective supplies recomputed self-identification evidence to it."
+    },
+    {
+      "id": "CO-GA-SYNTHETIC-CONTENT-MARKING",
+      "statement": "Test machine-readable marking and detectability of synthetic outputs.",
+      "addresses": [
+        {
+          "requirement": "eu-ai-act:AIA-50-2",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-50-4-DF",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "eu-ai-act:AIA-50-4-TXT",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
+          "origin": "authored"
+        },
+        {
+          "requirement": "nist-ai-600-1:2.8",
+          "relationship": "intersects_with",
+          "rationale": "semantic",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this risk and does not establish that it is identified and managed for the system. Machine-readable marking and detectability of synthetic output support content provenance, part of this risk. A favourable result holds only for the output types, marking methods and detectors tested.",
+          "origin": "authored"
+        }
+      ],
+      "notes": "Marking conclusions under Art. 50(2) and 50(4) belong to WP-XC-10 and WP-XC-12 of the AI Act pack (A50-ED-32); this objective supplies recomputed marking-check evidence to them."
+    },
+    {
+      "id": "CO-GA-POLICY-VIOLATION",
+      "statement": "Test adherence to the client's own content and topic policy.",
+      "addresses": [],
+      "notes": "The criteria are the client's own policy, so the objective links no framework entry."
+    }
+  ],
+  "items": [
+    {
+      "id": "WP-GA-01",
+      "title": "GenAI test plan, metadata and judge validation",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.9",
+        "Art.15"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess whether the GenAI test plan, the required run metadata and the validation of model-graded judges are sufficient before any GenAI conclusion. Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-01-P01",
+          "text": "Approve the plan: criteria, bands, primary scores, minimums and judge-validation floors (kappa lower bound at least 0.60 on at least 50 items; plans may raise, never lower them, D-10 and D-16)."
+        },
+        {
+          "id": "WP-GA-01-P02",
+          "text": "Declare the bundle: system snapshot and developer-level family, decoding, tools with permissions, dataset and judges with their families."
+        },
+        {
+          "id": "WP-GA-01-P03",
+          "text": "Review the metadata checklist of every run and obtain missing fields before ingestion."
+        },
+        {
+          "id": "WP-GA-01-P04",
+          "text": "Validate each model-graded judge with a bound human-label file from a different model family than the system under test."
+        },
+        {
+          "id": "WP-GA-01-P05",
+          "text": "Have a reviewer acknowledge post-run edits, tool-aggregate mismatches, declaration and family conflicts and deterministic declarations."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Judge validation label files"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-PLAN"
+      ]
+    },
+    {
+      "id": "WP-GA-02",
+      "title": "Accuracy, hallucination and benchmark scope",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.15"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess task accuracy and the rate of unsupported statements on declared benchmarks. Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-02-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-02-P02",
+          "text": "Read the recomputed members (n, estimate, interval, p-value) per run and the reconciliation with the tool's own aggregates; never re-score or execute anything a log names."
+        },
+        {
+          "id": "WP-GA-02-P03",
+          "text": "Check the benchmark's relevance to the intended purpose and the declared accuracy levels; record contamination and saturation risks."
+        },
+        {
+          "id": "WP-GA-02-P04",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Benchmark description and version"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-CAPABILITY-ACCURACY",
+        "CO-GA-MISINFORMATION"
+      ]
+    },
+    {
+      "id": "WP-GA-03",
+      "title": "Prompt injection, jailbreaks and hidden context",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.15"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess resistance to direct and indirect prompt injection, jailbreaks, goal hijacking and extraction of hidden context. Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-03-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-03-P02",
+          "text": "Read the attack-success rate per technique with its Wilson interval; the worst member decides, pooled rates are descriptive only."
+        },
+        {
+          "id": "WP-GA-03-P03",
+          "text": "Check the attack set's version, coverage of the techniques in scope and the detectors or judges that scored it."
+        },
+        {
+          "id": "WP-GA-03-P04",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Attack set and version"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-PROMPT-INJECTION-DIRECT",
+        "CO-GA-PROMPT-INJECTION-INDIRECT",
+        "CO-GA-JAILBREAK",
+        "CO-GA-GOAL-HIJACK",
+        "CO-GA-HIDDEN-CONTEXT-EXPOSURE"
+      ]
+    },
+    {
+      "id": "WP-GA-04",
+      "title": "Data leakage and privacy",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.15"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess disclosure of personal and confidential information, including through retrieval and embedding stores. Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-04-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-04-P02",
+          "text": "Read the recomputed members (n, estimate, interval, p-value) per run and the reconciliation with the tool's own aggregates; never re-score or execute anything a log names."
+        },
+        {
+          "id": "WP-GA-04-P03",
+          "text": "Confirm that logs were reviewed for personal data before upload and that excerpts stay off."
+        },
+        {
+          "id": "WP-GA-04-P04",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Data handling basis for the logs"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-SENSITIVE-INFORMATION-DISCLOSURE",
+        "CO-GA-VECTOR-EMBEDDING-WEAKNESS"
+      ]
+    },
+    {
+      "id": "WP-GA-05",
+      "title": "Agent, tool and output safety",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.15"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess agent reliability (pass^k) and the safety of tools, privileges, code execution, output handling, memory and multi-agent interaction. Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-05-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-05-P02",
+          "text": "Read pass^k per task and attack-success rates per technique; tasks with fewer trials than k are excluded and counted."
+        },
+        {
+          "id": "WP-GA-05-P03",
+          "text": "Confirm the declared permission of every offered tool; an unknown permission blocks the conclusion."
+        },
+        {
+          "id": "WP-GA-05-P04",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Tool inventory with permissions"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-EXCESSIVE-AGENCY",
+        "CO-GA-PRIVILEGE-ABUSE",
+        "CO-GA-UNEXPECTED-CODE-EXECUTION",
+        "CO-GA-IMPROPER-OUTPUT-HANDLING",
+        "CO-GA-MEMORY-CONTEXT-POISONING",
+        "CO-GA-DATA-MODEL-POISONING",
+        "CO-GA-SUPPLY-CHAIN",
+        "CO-GA-UNBOUNDED-CONSUMPTION",
+        "CO-GA-INTER-AGENT-COMMUNICATION",
+        "CO-GA-CASCADING-FAILURE",
+        "CO-GA-HUMAN-TRUST-EXPLOITATION",
+        "CO-GA-ROGUE-AGENT"
+      ]
+    },
+    {
+      "id": "WP-GA-06",
+      "title": "Harmful content and bias",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.9",
+        "Art.10"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Assess the rate of harmful content and differences across groups, including adversarial testing of general-purpose AI models with systemic risk (Art. 55(1)(a)). Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-06-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-06-P02",
+          "text": "Read the recomputed members (n, estimate, interval, p-value) per run and the reconciliation with the tool's own aggregates; never re-score or execute anything a log names."
+        },
+        {
+          "id": "WP-GA-06-P03",
+          "text": "Check the content taxonomy, the client's policy and the groups compared."
+        },
+        {
+          "id": "WP-GA-06-P04",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Content policy and taxonomy"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-HARMFUL-CONTENT",
+        "CO-GA-BIAS-FAIRNESS",
+        "CO-GA-POLICY-VIOLATION"
+      ]
+    },
+    {
+      "id": "WP-GA-07",
+      "title": "Transparency to users (Art. 50)",
+      "kind": "working_paper",
+      "stage": "Fieldwork",
+      "folder": "03 Fieldwork / GenAI evaluation",
+      "templatePath": "templates/automation-evaluation.md",
+      "regulatoryRefs": [
+        "Art.50"
+      ],
+      "automationMode": "hybrid",
+      "objective": "Supply recomputed evidence on AI-interaction disclosure and on marking and detection of synthetic outputs to the Art. 50 papers WP-XC-07, WP-XC-10 and WP-XC-12 of the AI Act pack, which hold the Art. 50 conclusions (A50-ED-32). Supporting evidence; the auditor determines sufficiency. Claim scope: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for that attack set, configuration and judge.",
+      "procedures": [
+        {
+          "id": "WP-GA-07-P01",
+          "text": "Freeze the plan before ingestion, declare the bundle of accepted tool logs and ingest it through the enrolled worker; an uploaded envelope counts as L1 until a worker recomputation matches it."
+        },
+        {
+          "id": "WP-GA-07-P02",
+          "text": "Read the marking criteria (marking presence, detection rate, false-positive rate, detection after transformation, self-identification rate) with their Wilson intervals per pre-registered stratum."
+        },
+        {
+          "id": "WP-GA-07-P03",
+          "text": "Record that signature verdicts in marking records are as the provider's validator reported them; the platform does not verify signatures yet."
+        },
+        {
+          "id": "WP-GA-07-P04",
+          "text": "Cross-reference the result in the Art. 50 papers instead of concluding on Art. 50 here."
+        },
+        {
+          "id": "WP-GA-07-P05",
+          "text": "Record the engine's claim-scope statements in the results and state which population, attack set, configuration and judge the conclusion covers."
+        }
+      ],
+      "evidenceRequired": [
+        "Frozen GenAI plan (genai_plan record)",
+        "Declared bundle manifest",
+        "Hashed tool logs",
+        "GenAI result (L2 or L3)",
+        "Marking-check records (genai-marking-check/0.1)",
+        "Transformation battery and strata"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; the GenAI readiness gate (genai-evidence design section 12.3) must show no blockers before a supported or qualified conclusion.",
+      "objectiveIds": [
+        "CO-GA-AI-INTERACTION-DISCLOSURE",
+        "CO-GA-SYNTHETIC-CONTENT-MARKING"
+      ]
+    },
+    {
+      "id": "MEM-EX-01",
+      "title": "Exception, limitation and disagreement memo",
+      "kind": "memo",
+      "stage": "Evidence Evaluation",
+      "folder": "04 Evaluation",
+      "templatePath": "templates/memo-decision.md",
+      "regulatoryRefs": [],
+      "automationMode": "manual",
+      "objective": "Evaluate unresolved exceptions and their effect on conclusion.",
+      "procedures": [
+        {
+          "id": "MEM-EX-01-P01",
+          "text": "Describe criterion, missing/conflicting evidence and efforts to obtain it."
+        },
+        {
+          "id": "MEM-EX-01-P02",
+          "text": "Assess alternatives, severity and potential pervasive effects."
+        },
+        {
+          "id": "MEM-EX-01-P03",
+          "text": "Document management position and required report disclosure."
+        }
+      ],
+      "evidenceRequired": [
+        "Exception register",
+        "Evidence requests",
+        "Management correspondence",
+        "Follow-up papers"
+      ],
+      "signOffGate": "Independent reviewer clears blocking notes and approves the exact revision; lead approval where material.",
+      "objectiveIds": [],
+      "derivedFrom": {
+        "packId": "eu-ai-act-amended",
+        "version": "2026.11.2",
+        "itemId": "MEM-EX-01"
+      }
+    }
+  ],
+  "roles": {
+    "limitationMemo": "MEM-EX-01"
+  },
+  "defaults": {
+    "initialStatus": "draft",
+    "applicability": "pending",
+    "auditorConclusion": "not_assessed",
+    "diagnosticState": "pending",
+    "numericalThreshold": null,
+    "conclusionOwner": "human_auditor",
+    "approvalBindsTo": "revision_and_content_digest",
+    "independentReview": true,
+    "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
+    "statement": "GenAI evaluation evidence supports an audit assessment and does not constitute legal compliance, a conformity certificate or a security guarantee."
+  },
+  "reporting": {
+    "regulatorySource": "https://eur-lex.europa.eu/eli/reg/2024/1689",
+    "limitations": "Assurance conclusions do not constitute a notified-body conformity assessment, legal certification or a security guarantee. GenAI conclusions rest on tool logs recomputed by the platform's engine: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for the attack set, configuration and judge tested."
+  },
+  "notes": "Pack for #33 (docs/design/genai-evidence.md sections 9.4 and 12.4); 2026.11.1 (#145) adds MITRE ATLAS v2026.10 links, and 2026.11.2 (#161) adds NIST AI 600-1 (July 2024) links and changes nothing else. One control objective per GenAI risk category of section 9.2 plus the test-plan objective; links are authored analytical judgements, never official crosswalks, and all are intersects_with. The ATLAS links are a conservative subset of the design table: a weak or indirect mapping there (reconnaissance, discovery or attacker-side techniques such as AML.T0060, AML.T0062 and AML.T0088, parenthetical NIST risks) is left unmapped rather than linked. Each ATLAS justification states what the link rests on: a test that emulates the technique or, for supply chain and data or model poisoning, the client's evidence the auditor assesses. The NIST AI 600-1 links are also a conservative subset of the design table: an objective is linked to a risk only where its test or assessed evidence bears directly on that risk. Left unmapped: the parenthetical harm of a jailbreak (2.3), 2.7 for excessive agency, cascading failure and rogue agents, 2.12 for cascading failure, 2.8 for misinformation, 2.2 for capability accuracy and 2.1 for harmful content; the test-plan, unbounded-consumption and client-policy objectives map to no risk. Risks 2.1 CBRN Information or Capabilities, 2.5 Environmental Impacts and 2.10 Intellectual Property have no link and show as unmapped."
+}

@@ -1,6 +1,5 @@
 // Engagement persistence: loading and saving an engagement with its snapshot
-// and audit event. The D1 and R2 bindings (bindings.ts) and the identifiers
-// and hashes (ids.ts) are re-exported for the modules that import them here.
+// and audit event.
 import { db } from "./bindings";
 import type { Engagement } from "./domain";
 import { migrateClassification } from "./domain/classification";
@@ -22,8 +21,6 @@ import {
   metadataReserve,
   type ApprovalStatus,
 } from "./workflow-state";
-export { bucket, db } from "./bindings";
-export { id, now, sha256 } from "./ids";
 /**
  * The stored size and approval status of each engagement as getEngagement()
  * loaded it or save() last stored it: what the metadata limit checks a write
