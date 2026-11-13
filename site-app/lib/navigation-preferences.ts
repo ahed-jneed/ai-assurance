@@ -29,23 +29,33 @@ export const defaultNavigation: NavigationPreferences = {
 };
 export const navigationPreferenceKey = (userId: string, tenantId: string) =>
   "assurance.navigation.v2." + userId + "." + tenantId;
+/**
+ * The client portal's destinations (#36, F-72), with the portal's own names:
+ * a client reads what the audit team released and answers its requests, and
+ * never sees the practice's clients, engagements or members.
+ */
+export const clientPortalRoutes = [
+  ["Overview", "Overview"],
+  ["Evidence vault", "Shared evidence"],
+  ["Findings", "Findings"],
+  ["Reports & sign-off", "Reports"],
+] as const satisfies readonly (readonly [NavigationRoute, string])[];
+export const isClientRole = (role: string) =>
+  role === "Client Viewer" || role === "Client Contributor";
+/** The portal's name for a view, or the view itself outside the portal. */
+export const clientPortalTitle = (view: string) =>
+  clientPortalRoutes.find(([route]) => route === view)?.[1] ?? view;
 export const permittedNavigationRoutes = (
   role: string,
   hasEngagement: boolean,
 ): NavigationRoute[] => {
-  const client = ["Client Viewer", "Client Contributor"].includes(role);
-  return navigationRoutes.filter((route) =>
-    route === "My work"
-      ? !client
-      : ["Clients", "Engagements", "Users & access"].includes(route) ||
-        (hasEngagement &&
-          (!client ||
-            [
-              "Overview",
-              "Evidence vault",
-              "Findings",
-              "Reports & sign-off",
-            ].includes(route))),
+  if (isClientRole(role))
+    return hasEngagement ? clientPortalRoutes.map(([route]) => route) : [];
+  return navigationRoutes.filter(
+    (route) =>
+      route === "My work" ||
+      ["Clients", "Engagements", "Users & access"].includes(route) ||
+      hasEngagement,
   );
 };
 export function parseNavigationPreferences(

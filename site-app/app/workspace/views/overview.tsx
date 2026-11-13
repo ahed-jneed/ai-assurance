@@ -58,7 +58,7 @@ export function Overview({
         </Suspense>
       )}
       {viewer ? (
-        <ClientOverview engagement={e} onView={onNavigate} />
+        <ClientOverview engagement={e} role={role} onView={onNavigate} />
       ) : (
         <>
           <EngagementOverview

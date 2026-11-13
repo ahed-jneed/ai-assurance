@@ -13,6 +13,7 @@ import "./criteria.css";
 import "./management-system.css";
 import "./paper-workspace.css";
 import "./ll144.css";
+import "./client-portal.css";
 
 export const viewport: Viewport = {
   width: "device-width",

@@ -239,7 +239,8 @@ export const WorkspaceViews = memo(function WorkspaceViews({
         />
       </Suspense>
     );
-  if (isManagementView(view))
+  // The practice directories are not part of the client portal (#36).
+  if (isManagementView(view) && !viewer)
     return (
       <Suspense fallback={panelFallback}>
         <ManagementViews

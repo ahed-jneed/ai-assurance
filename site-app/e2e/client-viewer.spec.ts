@@ -65,10 +65,30 @@ test("the Client Viewer sees released content only", async ({
   ).toHaveCount(0);
   await expectAccessible(page, "Client viewer overview");
 
-  await page
-    .getByRole("navigation", { name: "Audit workspace navigation" })
-    .getByRole("button", { name: "Evidence vault" })
-    .click();
+  // The client portal shell (#36): its own navigation, no practice sidebar.
+  const portal = page.getByRole("navigation", {
+    name: "Client portal navigation",
+  });
+  await expect(
+    portal.getByRole("button", { name: "Overview" }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(
+    page.getByRole("navigation", { name: "Audit workspace navigation" }),
+  ).toHaveCount(0);
+  for (const practiceOnly of [
+    "Clients",
+    "Engagements",
+    "Members & access",
+    "Search workspace",
+  ])
+    await expect(
+      page.getByRole("button", { name: practiceOnly, exact: true }),
+    ).toHaveCount(0);
+  await expect(page.getByText("Switch practice")).toHaveCount(0);
+  await portal.getByRole("button", { name: "Shared evidence" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Shared evidence", level: 1 }),
+  ).toBeVisible();
   await expect(page.getByText(shared).first()).toBeVisible();
   await expect(page.getByText(pending)).toHaveCount(0);
   await expect(page.getByText(internal)).toHaveCount(0);

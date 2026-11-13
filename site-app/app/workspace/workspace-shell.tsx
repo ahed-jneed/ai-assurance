@@ -28,6 +28,7 @@ import { MemberOnboarding as MemberOnboardingView } from "../member-onboarding";
 import { WorkspaceNavigation as WorkspaceNavigationView } from "../workspace-navigation";
 import { WorkspaceSearch as WorkspaceSearchView } from "../workspace-search";
 import { AttestProvider, useAttestation } from "./attestation-dialog";
+import { ClientPortalHeader as ClientPortalHeaderView } from "./client-portal-shell";
 import { useLabIntent } from "./lab-intent";
 import { ModalHost } from "./modal-host";
 import { useModelContextTools } from "./model-context-tools";
@@ -61,7 +62,8 @@ const EngagementSwitcher = memo(EngagementSwitcherView),
   MemberOnboarding = memo(MemberOnboardingView),
   WorkspaceNavigation = memo(WorkspaceNavigationView),
   WorkspaceSearch = memo(WorkspaceSearchView),
-  WorkspaceTopbar = memo(WorkspaceTopbarView);
+  WorkspaceTopbar = memo(WorkspaceTopbarView),
+  ClientPortalHeader = memo(ClientPortalHeaderView);
 
 /** Ctrl/Cmd+K toggles workspace search unless it is disabled. */
 function useSearchShortcut(
@@ -116,7 +118,10 @@ export default function Workspace() {
     writer = can(role, "editPaper"),
     reviewer = can(role, "reviewPaper"),
     lead = can(role, "signPaper"),
-    viewer = ["Client Viewer", "Client Contributor"].includes(role);
+    viewer = ["Client Viewer", "Client Contributor"].includes(role),
+    // A loaded client account gets the client portal shell instead of the
+    // practice sidebar (#36, F-72).
+    portal = !!data && viewer;
   const editing = useEditingRegistry();
   const url = useUrlState(data);
   const modal = useModalState();
@@ -193,6 +198,7 @@ export default function Workspace() {
   usePanelPrefetch(bootstrapping);
   const searchDisabled =
     !data ||
+    portal ||
     busy ||
     loading ||
     bootstrapping ||
@@ -246,7 +252,10 @@ export default function Workspace() {
     );
   const openSearch = useCallback(() => setSearchOpen(true), []),
     closeOnboarding = useCallback(() => setOnboarding(false), []),
-    account = useMemo(() => <AccountMenu data={data} />, [data]);
+    account = useMemo(
+      () => <AccountMenu data={data} side={portal ? "bottom" : "right"} />,
+      [data, portal],
+    );
   const attest = handlers.attest;
   if (workspace.signedOut) return <SignedOut />;
   // Reloading a failed view reloads the open engagement, then renders it
@@ -263,35 +272,50 @@ export default function Workspace() {
         }
       >
         <a href="#audit-main-content" className="audit-skip-link">
-          Skip to audit content
+          {portal ? "Skip to main content" : "Skip to audit content"}
         </a>
         <Toaster richColors />
-        <WorkspaceNavigation
-          width={sidebarWidth}
-          onWidthChange={setSidebarWidth}
-          data={data}
-          view={url.view}
-          navigationDisabled={
-            !data || busy || loading || bootstrapping || switchOpen
-          }
-          onSearch={openSearch}
-          searchDisabled={searchDisabled}
-          onNavigate={viewNav.navigate}
-          onSwitch={viewNav.switchEngagement}
-          onPractice={viewNav.changePractice}
-          account={account}
-        />
-        <SidebarInset>
-          <WorkspaceTopbar
+        {!portal && (
+          <WorkspaceNavigation
+            width={sidebarWidth}
+            onWidthChange={setSidebarWidth}
             data={data}
             view={url.view}
-            clientId={url.clientId}
-            role={role}
-            searchDisabled={searchDisabled}
+            navigationDisabled={
+              !data || busy || loading || bootstrapping || switchOpen
+            }
             onSearch={openSearch}
+            searchDisabled={searchDisabled}
             onNavigate={viewNav.navigate}
-            onClient={viewNav.openClient}
+            onSwitch={viewNav.switchEngagement}
+            onPractice={viewNav.changePractice}
+            account={account}
           />
+        )}
+        <SidebarInset className={portal ? "client-portal-inset" : undefined}>
+          {portal ? (
+            <ClientPortalHeader
+              data={data}
+              view={url.view}
+              navigationDisabled={
+                busy || loading || bootstrapping || switchOpen
+              }
+              onNavigate={viewNav.navigate}
+              onSwitch={viewNav.switchEngagement}
+              account={account}
+            />
+          ) : (
+            <WorkspaceTopbar
+              data={data}
+              view={url.view}
+              clientId={url.clientId}
+              role={role}
+              searchDisabled={searchDisabled}
+              onSearch={openSearch}
+              onNavigate={viewNav.navigate}
+              onClient={viewNav.openClient}
+            />
+          )}
           <main id="audit-main-content" tabIndex={-1} className="audit-main">
             {workspace.error && (
               // Load failures only: a failed command reports in its own toast
@@ -414,7 +438,7 @@ export default function Workspace() {
             onSelect={viewNav.openEngagement}
           />
         )}
-        {data && (
+        {data && !portal && (
           <WorkspaceSearch
             data={data}
             open={searchOpen}

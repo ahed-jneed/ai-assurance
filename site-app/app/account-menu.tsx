@@ -77,7 +77,14 @@ export function DevPersonaSignIn() {
 }
 
 /** The account menu in the sidebar footer. */
-export function AccountMenu({ data }: { data: WorkspaceData | null }) {
+export function AccountMenu({
+  data,
+  side = "right",
+}: {
+  data: WorkspaceData | null;
+  /** Where the menu opens: beside the sidebar, or below the portal header. */
+  side?: "right" | "bottom";
+}) {
   if (!data) return null;
   return (
     <DropdownMenu>
@@ -93,7 +100,7 @@ export function AccountMenu({ data }: { data: WorkspaceData | null }) {
       <DropdownMenuContent
         className="nav-dark-menu"
         align="end"
-        side="right"
+        side={side}
         sideOffset={8}
       >
         <AccountMenuItems data={data} />

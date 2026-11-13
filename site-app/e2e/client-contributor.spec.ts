@@ -17,10 +17,20 @@ test("the Client Contributor answers an evidence request", async ({
   await expect(
     page.getByRole("heading", { name: "Your evidence requests" }),
   ).toBeVisible();
-  // Client navigation has no internal audit work.
+  // The client portal shell (#36) has no internal audit work and no
+  // practice navigation.
   const nav = page.getByRole("navigation", {
-    name: "Audit workspace navigation",
+    name: "Client portal navigation",
   });
+  await expect(
+    page.getByRole("navigation", { name: "Audit workspace navigation" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Engagements", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("Your submissions awaiting review"),
+  ).toBeVisible();
   await expect(nav.getByRole("button", { name: "Overview" })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Working papers" })).toHaveCount(
     0,

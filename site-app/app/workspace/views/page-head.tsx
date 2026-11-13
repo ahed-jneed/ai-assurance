@@ -1,6 +1,7 @@
 "use client";
 // Heading of an engagement view: title, link and saved-view utilities, view
 // actions, the overview context strip and the way back to a procedure.
+import { clientPortalTitle } from "@/lib/navigation-preferences";
 import {
   ChevronRight,
   FileText,
@@ -67,13 +68,15 @@ export function PageHead({
     <>
       <div className="page-head">
         <div className="page-heading">
-          <PageIcon size={22} />
+          <PageIcon size={22} aria-hidden="true" />
           <h1>
             {view === "Overview"
               ? e.title
               : view === "Methodology"
                 ? "Templates & history"
-                : view}
+                : viewer
+                  ? clientPortalTitle(view)
+                  : view}
           </h1>
         </div>
         <div className="row-actions page-head-actions">
