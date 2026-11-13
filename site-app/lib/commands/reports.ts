@@ -34,7 +34,11 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
-import { publishableSummary } from "../ll144-audit";
+import {
+  incompleteLl144Runs,
+  incompleteRunMessage,
+  publishableSummary,
+} from "../ll144-audit";
 import { paperContext, paperRevisions } from "../papers/revision";
 import {
   assertReviewerIndependent,
@@ -142,16 +146,18 @@ export const reports = defineCommands({
           400,
           "This criteria pack has no certification recommendation; choose another engagement type",
         );
+      const externalRunning = (await jobs(ctx, e.id)).some((j) =>
+          ["queued", "running"].includes(String(j.state)),
+        ),
+        incompleteRuns = incompleteLl144Runs(e.ll144Audits ?? []);
       if (a.kind === "final") {
-        if (
-          (await jobs(ctx, e.id)).some((j) =>
-            ["queued", "running"].includes(String(j.state)),
-          )
-        )
+        if (externalRunning)
           throw new ApiError(
             409,
             "Complete or cancel external execution before final capture",
           );
+        if (incompleteRuns.length)
+          throw new ApiError(409, incompleteRunMessage(incompleteRuns[0]));
         const assuranceBlockers = await assuranceGates(ctx, e.id, a.conclusion);
         if (assuranceBlockers.length)
           throw new ApiError(409, assuranceBlockers[0]);
@@ -184,10 +190,15 @@ export const reports = defineCommands({
         ({ id, label, value }) => ({ id, label, value }),
       );
       // A draft captured while completion gates are open says so above its
-      // conclusion wording (#144); a final report has none open.
+      // conclusion wording (#144); a final report has none open. It counts
+      // every blocker final capture enforces: queued or running external
+      // execution, incomplete per-group LL144 runs, assurance blockers and
+      // the final-report gates.
       const openGates =
         a.kind === "draft"
-          ? (await assuranceGates(ctx, e.id, a.conclusion)).length +
+          ? (externalRunning ? 1 : 0) +
+            incompleteRuns.length +
+            (await assuranceGates(ctx, e.id, a.conclusion)).length +
             finalReportGates(e, { ...terms, particulars }, gateFeatures(e))
               .length
           : 0;

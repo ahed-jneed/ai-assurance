@@ -420,6 +420,37 @@ export function computeClassificationAudits(
   );
 }
 
+/**
+ * The per-group runs some of whose audits are approved and others not
+ * (#144). A final report captures every approved audit, so it would carry
+ * the summaries of only some groups of such a run: an incomplete
+ * 6 RCNY 5-301(b)(4) bias audit. Runs with no approved audit are not
+ * captured at all and are not listed.
+ */
+export function incompleteLl144Runs(
+  audits: readonly Pick<Ll144Audit, "status" | "classification">[],
+): { runId: string; approved: number; groups: number }[] {
+  const runs = new Map<string, { approved: number; total: number }>();
+  for (const a of audits) {
+    if (!a.classification) continue;
+    const run = runs.get(a.classification.runId) ?? { approved: 0, total: 0 };
+    run.total += 1;
+    if (a.status === "approved") run.approved += 1;
+    runs.set(a.classification.runId, run);
+  }
+  return [...runs]
+    .filter(([, r]) => r.approved > 0 && r.approved < r.total)
+    .map(([runId, r]) => ({ runId, approved: r.approved, groups: r.total }));
+}
+
+/** Why final capture waits for an incomplete per-group run (#144). */
+export const incompleteRunMessage = (r: {
+  runId: string;
+  approved: number;
+  groups: number;
+}) =>
+  `Approve every group of LL144 run ${r.runId} before final capture (${r.approved} of ${r.groups} approved): a report carries the bias audit of every classification group (6 RCNY 5-301(b)(4))`;
+
 /** One year after the audit date: the tool may not be used after it without a new audit (5-301(a)). */
 export function oneYearAfter(auditDate: string) {
   const d = new Date(auditDate + "T00:00:00Z");

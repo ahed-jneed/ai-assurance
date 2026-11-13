@@ -14,6 +14,11 @@ import {
   submittedProcedure,
 } from "../workflow/test-fixtures";
 import { draftCaveat, qualityStatement } from "../domain/report-model";
+import {
+  computeClassificationAudits,
+  incompleteLl144Runs,
+  ll144InputSchema,
+} from "../ll144-audit";
 import { practiceReportSettings } from "../report-settings";
 import { assertReleasable, reports } from "./reports";
 import { caller } from "./test-fixtures";
@@ -530,5 +535,109 @@ describe("the draft caveat (#144)", () => {
     const final = await capture(e, qualified);
     for (const s of [final.snapshot, final.clientSnapshot!])
       expect(statementOf(s)).not.toHaveProperty("draftCaveat");
+  });
+});
+
+describe("per-group LL144 runs in a report (#144)", () => {
+  // A small per-group run: two groups, each its own audit.
+  function perGroupRun(e: Engagement) {
+    const rows = [
+      ...Array.from(
+        { length: 6 },
+        (_, i) => `Female,Asian,${i < 3 ? "A" : "B"}`,
+      ),
+      ...Array.from({ length: 6 }, (_, i) => `Male,Asian,${i < 2 ? "A" : "B"}`),
+    ];
+    const input = ll144InputSchema.parse({
+      datasetId: "EV-1",
+      toolName: "Style classifier",
+      distributionDate: "2025-03-01",
+      auditDate: "2026-11-01",
+      rate: "selection",
+      sexColumn: "s",
+      raceEthnicityColumn: "e",
+      outcomeColumn: "o",
+      classificationGroups: ["A", "B"],
+      unknownValues: [],
+      dataSource: {
+        kind: "historical",
+        source: "Candidates the tool classified, 2025-03 to 2026-09.",
+        explanation:
+          "Every candidate the tool assessed; categories self-identified.",
+      },
+      demographicsNotInferred: true,
+      demographicsStatement:
+        "Sex and race/ethnicity are the candidates' own answers; none was inferred.",
+      acknowledgeHostedProcessing: true,
+    });
+    let n = 0;
+    const audits = computeClassificationAudits(
+      e,
+      { ...input, classificationGroups: input.classificationGroups! },
+      { id: "EV-1", name: "candidates.csv", sha256: "0".repeat(64) },
+      ["s,e,o", ...rows, ""].join("\n"),
+      {
+        id: () => "LL144-" + ++n,
+        runId: "LL144RUN-1",
+        actor: "user-auditor",
+        at: "2026-11-02T10:00:00.000Z",
+      },
+    );
+    e.ll144Audits = audits;
+    return audits;
+  }
+  const approve = (a: { status: string; approvedBy?: string }) => {
+    a.status = "approved";
+    a.approvedBy = "user-reviewer";
+  };
+
+  it("lists the runs with some groups approved and others not", () => {
+    const run = (status: string, runId?: string) => ({
+      status: status as "draft" | "approved",
+      ...(runId
+        ? { classification: { runId, group: "g", groups: ["g", "h"] } }
+        : {}),
+    });
+    expect(
+      incompleteLl144Runs([
+        run("approved", "R1"),
+        run("draft", "R1"),
+        run("draft", "R2"),
+        run("draft", "R2"),
+        run("approved", "R3"),
+        run("approved", "R3"),
+        run("approved"),
+      ]),
+    ).toEqual([{ runId: "R1", approved: 1, groups: 2 }]);
+  });
+
+  it("refuses final capture while a run is partly approved, and counts it in a draft's caveat", async () => {
+    const e = await issuable();
+    const [first, second] = perGroupRun(e);
+    approve(first);
+    const error = await refusal(e, qualified);
+    expect(error.status).toBe(409);
+    expect(error.message).toMatch(
+      /^Approve every group of LL144 run LL144RUN-1 before final capture \(1 of 2 approved\)/,
+    );
+    const draft = await capture(e, { ...qualified, kind: "draft" });
+    expect(
+      (draft.snapshot.conclusionStatement as { draftCaveat?: string })
+        .draftCaveat,
+    ).toMatch(/^Draft, gates open: 1 completion requirement was open/);
+    approve(second);
+    const final = await capture(e, qualified);
+    expect(
+      (
+        final.snapshot.ll144Summaries as { classification: { group: string } }[]
+      ).map((x) => x.classification.group),
+    ).toEqual(["A", "B"]);
+  });
+
+  it("captures a run none of whose groups is approved without its summaries", async () => {
+    const e = await issuable();
+    perGroupRun(e);
+    const final = await capture(e, qualified);
+    expect(final.snapshot).not.toHaveProperty("ll144Summaries");
   });
 });

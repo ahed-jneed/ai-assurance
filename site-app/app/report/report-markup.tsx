@@ -503,7 +503,10 @@ export function reportMarkup(
           <ul>
             {s.ll144Summaries.map((x) => (
               <li key={x.auditId}>
-                {x.tool.name}: bias audit of {x.auditDate}, distribution date{" "}
+                {x.tool.name}
+                {x.classification &&
+                  `, group ${x.classification.group} (${x.classification.groups.indexOf(x.classification.group) + 1} of ${x.classification.groups.length})`}
+                : bias audit of {x.auditDate}, distribution date{" "}
                 {x.tool.distributionDate}, {x.numberOfApplicants} individuals
                 assessed.{" "}
                 <a

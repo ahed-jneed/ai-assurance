@@ -235,3 +235,72 @@ describe("the printed draft (#144)", () => {
     expect(caveat).toBeLessThan(html.indexOf("Based on the procedures"));
   });
 });
+
+describe("the printed LL144 summaries (#144)", () => {
+  it("names the group of each audit of a per-group run", () => {
+    const summary = (group: string, i: number) => ({
+      auditId: "LL144-" + i,
+      tool: { name: "Style classifier", distributionDate: "2026-01-15" },
+      auditDate: "2026-11-02",
+      numberOfApplicants: 40,
+      classification: {
+        rule: "6 RCNY § 5-301(b)(4)",
+        group,
+        groups: ["Leader", "Builder", "Helper"],
+      },
+    });
+    const html = renderToStaticMarkup(
+      reportMarkup(
+        {
+          id: "REPORT-1",
+          kind: "final",
+          createdAt: "2026-11-13T10:00:00.000Z",
+        } as never,
+        {
+          engagement: { id: "E-1", title: "Audit", stage: "Reporting" },
+          contractVersion: "2.0",
+          terms: {
+            engagementType: "attestation",
+            assuranceLevel: "limited",
+            conclusion: "unmodified",
+          },
+          reportTitle: "Independent limited assurance report",
+          opinion: "Unmodified conclusion · limited assurance",
+          summary: "Final",
+          particulars: {
+            addressee: "Board",
+            location: "Vienna",
+            signatory: "Firm",
+            basisForModification: "",
+            qualityStatement: "",
+          },
+          elements: [],
+          conclusionStatement: {
+            heading: "Unmodified conclusion",
+            basisHeading: "",
+            text: "Nothing has come to our attention.",
+            levelStatement: "",
+            notAssurance: false,
+          },
+          papers: [],
+          findings: [],
+          evidence: [],
+          ll144Summaries: [
+            summary("Leader", 1),
+            summary("Builder", 2),
+            summary("Helper", 3),
+          ],
+        } as unknown as ReportSnapshot,
+      ),
+    );
+    expect(html).toContain(
+      "Style classifier, group Leader (1 of 3): bias audit",
+    );
+    expect(html).toContain(
+      "Style classifier, group Builder (2 of 3): bias audit",
+    );
+    expect(html).toContain(
+      "Style classifier, group Helper (3 of 3): bias audit",
+    );
+  });
+});
