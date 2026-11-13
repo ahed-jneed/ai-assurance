@@ -1,13 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
-import type { AssuranceRecord } from "@/lib/assurance-core";
-import { assuranceRecords } from "@/lib/assurance-store-client";
+import { useMemo } from "react";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { recordsQuery } from "@/lib/assurance-query";
 import { CheckCircle2, Circle } from "lucide-react";
 import { procedureReadiness } from "@/lib/procedure-readiness";
 import { procedureWork } from "@/lib/work-items";
 import { planPinsCurrent } from "@/lib/workflow-state";
 import type { Engagement } from "@/lib/domain";
 import type { Procedure } from "@/lib/workflow-types";
+const sampleRecords = recordsQuery("sample");
+
 export function ProcedureContext({
   tenantId,
   engagement: e,
@@ -19,19 +21,16 @@ export function ProcedureContext({
   procedure: Procedure;
   onRecord: (title: string, value: unknown) => void;
 }) {
-  const [samples, setSamples] = useState<AssuranceRecord[]>([]);
-  useEffect(() => {
-    const controller = new AbortController();
-    void assuranceRecords(
-      { tenantId, engagementId: e.id, kind: "sample" },
-      { signal: controller.signal },
-    )
-      .then((samples) =>
-        setSamples(samples.filter((r) => r.body.procedureId === p.id)),
-      )
-      .catch(() => {});
-    return () => controller.abort();
-  }, [tenantId, e.id, p.id, e.version]);
+  // The engagement's samples, read once per engagement version and shared
+  // by every procedure (lib/assurance-query.ts); a failed read shows none.
+  const all = useAssuranceQuery(
+      { tenantId, engagementId: e.id, version: e.version },
+      sampleRecords,
+    ).data,
+    samples = useMemo(
+      () => (all ?? []).filter((r) => r.body.procedureId === p.id),
+      [all, p.id],
+    );
   const x = procedureWork(e, p.id)!,
     ids = new Set([
       ...(p.execution?.evidenceIds ?? []),

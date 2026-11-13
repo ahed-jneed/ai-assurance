@@ -1,15 +1,17 @@
 "use client";
 // The GenAI evidence level of each file in the Evidence vault (#145), from
-// the GenAI results view. Loaded only for internal roles (the view refuses
-// client roles) and only when the engagement holds GenAI files; reloaded
-// when the engagement changes. A failed load shows no levels.
-import { useEffect, useMemo, useState } from "react";
+// the GenAI results view, shared with the Testing lab's GenAI tab
+// (lib/assurance-query.ts). Read only for internal roles (the view refuses
+// client roles) and only when the engagement holds GenAI files; read again
+// for each engagement version. A failed read shows no levels.
+import { useMemo } from "react";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { genaiQuery } from "@/lib/assurance-query";
 import type { Engagement, Role } from "@/lib/domain";
 import {
   GENAI_RESULT_CATEGORIES,
   genaiArtifactLevels,
   type GenaiArtifactLevel,
-  type GenaiResultLevelSource,
 } from "@/lib/genai/evidence-levels";
 import { isClientRole } from "@/lib/workflow-state";
 
@@ -18,36 +20,19 @@ export function useGenaiLevels(
   e: Engagement,
   role: Role,
 ): Map<string, GenaiArtifactLevel> {
-  const [results, setResults] = useState<GenaiResultLevelSource[]>([]);
   const wanted =
     !isClientRole(role) &&
     e.artifacts.some((a) => GENAI_RESULT_CATEGORIES.includes(a.category));
-  useEffect(() => {
-    if (!wanted) return;
-    let live = true;
-    void fetch(
-      "/api/assurance?" +
-        new URLSearchParams({ tenantId, engagementId: e.id, view: "genai" }),
-      { headers: { accept: "application/json" } },
-    )
-      .then(
-        (r) =>
-          (r.ok ? r.json() : Promise.resolve({ results: [] })) as Promise<{
-            results?: GenaiResultLevelSource[];
-          }>,
-      )
-      .then((body) => {
-        if (live) setResults(body.results ?? []);
-      })
-      .catch(() => {
-        if (live) setResults([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [wanted, tenantId, e.id, e.version]);
+  const { data, error } = useAssuranceQuery(
+    wanted ? { tenantId, engagementId: e.id, version: e.version } : null,
+    genaiQuery,
+  );
+  const results = error ? undefined : data?.results;
   return useMemo(
-    () => (wanted ? genaiArtifactLevels(results, e.artifacts) : new Map()),
+    () =>
+      wanted && results
+        ? genaiArtifactLevels(results, e.artifacts)
+        : new Map<string, GenaiArtifactLevel>(),
     [wanted, results, e.artifacts],
   );
 }

@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useMemo, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -39,7 +33,12 @@ import type { WorkspaceData } from "./workspace-types";
 
 import type { AssuranceRecord } from "@/lib/assurance-core";
 
-import { assuranceRecords } from "@/lib/assurance-store-client";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import {
+  recordsQuery,
+  refreshAfterMutation,
+  viewQuery,
+} from "@/lib/assurance-query";
 
 import type { ObligationOptions } from "@/lib/criteria/types";
 import { classificationRules } from "@/lib/classification-rules";
@@ -102,7 +101,15 @@ type EngagementAccess = {
 // prediction sets and dataset versions, not with the evidence, so they stay
 // small; every other record is read by search (registers, pickers) or by id
 // (details).
-const formKinds = ["system", "prediction", "dataset"];
+const systemRecords = recordsQuery("system"),
+  predictionRecords = recordsQuery("prediction"),
+  datasetRecords = recordsQuery("dataset"),
+  obligationQuery = recordsQuery("obligation"),
+  workbenchView = viewQuery<Omit<Snapshot, "records">>(
+    "workbench",
+    {},
+    "Workbench unavailable",
+  );
 
 type Snapshot = {
   // Records of formKinds (and obligation assessments where the pack has
@@ -215,14 +222,9 @@ export function AssuranceWorkbench({
     ]),
     [exclusions, setExclusions] = useState([{ recordId: "", reason: "" }]);
 
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null),
-    [error, setError] = useState(""),
-    [loadError, setLoadError] = useState(""),
+  const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [refreshing, setRefreshing] = useState(true),
     [form, setForm] = useState(""),
-    // Bumped after each load, so the server-backed registers read again.
-    [loaded, setLoaded] = useState(0),
     // The record last opened from a register, until its context has loaded.
     [opened, setOpened] = useState<AssuranceRecord | null>(null),
     // Records seen in pickers and details, by id: the titles of selected
@@ -250,59 +252,56 @@ export function AssuranceWorkbench({
       },
     ]);
 
-  const requestRef = useRef<{
-    generation: number;
-    controller: AbortController | null;
-  }>({ generation: 0, controller: null });
-  const load = useCallback(async () => {
-    const generation = ++requestRef.current.generation;
-    requestRef.current.controller?.abort();
-    const controller = new AbortController();
-    requestRef.current.controller = controller;
-    setRefreshing(true);
-    try {
-      const scope = { tenantId: data.tenantId, engagementId: e.id },
-        view = fetch("/api/assurance?" + new URLSearchParams(scope), {
-          cache: "no-store",
-          signal: controller.signal,
-        }).then(async (response) => {
-          const value = (await response.json()) as Omit<Snapshot, "records"> & {
-            error?: string;
-          };
-          if (!response.ok) throw Error(value.error ?? "Workbench unavailable");
-          return value;
-        }),
-        // The form options and the execution planner read these kinds only;
-        // they load alongside the view, never every record.
-        kinds = [...formKinds, ...(obligationsOn ? ["obligation"] : [])],
-        pages = Promise.all(
-          kinds.map((kind) =>
-            assuranceRecords({ ...scope, kind }, { signal: controller.signal }),
-          ),
-        );
-      const [value, byKind] = await Promise.all([view, pages]);
-      if (generation !== requestRef.current.generation) return;
-      setSnapshot({ ...value, records: byKind.flat() });
-      setLoaded((n) => n + 1);
-      setLoadError("");
-    } catch (x) {
-      if (
-        !controller.signal.aborted &&
-        generation === requestRef.current.generation
-      )
-        setLoadError(x instanceof Error ? x.message : "Workbench unavailable");
-    } finally {
-      if (generation === requestRef.current.generation) setRefreshing(false);
-    }
-  }, [data.tenantId, e.id, obligationsOn]);
-  useEffect(() => {
-    // The request state is one object for the component's lifetime; the
-    // cleanup aborts whichever request is in flight by then.
-    const request = requestRef.current;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching the snapshot is the external sync; load() marks the view refreshing before the request starts
-    void load();
-    return () => request.controller?.abort();
-  }, [load]);
+  // The workbench view and the kinds its forms and execution planner read
+  // in full, each a shared query (lib/assurance-query.ts): read once per
+  // engagement version, kept while another view is open, and read again
+  // after each action. The dataset cards are the Testing lab's query too.
+  const atVersion = {
+      tenantId: data.tenantId,
+      engagementId: e.id,
+      version: e.version,
+    },
+    view = useAssuranceQuery(atVersion, workbenchView),
+    systems = useAssuranceQuery(atVersion, systemRecords),
+    predictions = useAssuranceQuery(atVersion, predictionRecords),
+    datasets = useAssuranceQuery(atVersion, datasetRecords),
+    obligationRecords = useAssuranceQuery(
+      obligationsOn ? atVersion : null,
+      obligationQuery,
+    ),
+    queries = [view, systems, predictions, datasets, obligationRecords];
+  const snapshot = useMemo<Snapshot | null>(
+    () =>
+      view.data &&
+      systems.data &&
+      predictions.data &&
+      datasets.data &&
+      (!obligationsOn || obligationRecords.data)
+        ? {
+            ...view.data,
+            records: [
+              ...systems.data,
+              ...predictions.data,
+              ...datasets.data,
+              ...(obligationRecords.data ?? []),
+            ],
+          }
+        : null,
+    [
+      view.data,
+      systems.data,
+      predictions.data,
+      datasets.data,
+      obligationRecords.data,
+      obligationsOn,
+    ],
+  );
+  const refreshing = queries.some((q) => q.fetching || q.loading),
+    loadError = queries.find((q) => q.error)?.error ?? "",
+    // Bumped by each answer of the view, so the server-backed registers and
+    // the open record read again after an action.
+    loaded = view.generation;
+  const load = () => Promise.all(queries.map((q) => q.reload()));
 
   useEffect(() => {
     const protect = (ev: BeforeUnloadEvent) => {
@@ -331,8 +330,10 @@ export function AssuranceWorkbench({
         }),
         v = (await r.json()) as ActResult;
       if (!r.ok) throw Error(v.error);
-      await load();
-      await onRefresh();
+      await refreshAfterMutation(
+        { tenantId: data.tenantId, engagementId: e.id },
+        onRefresh,
+      );
       return v;
     } catch (x) {
       setError(
