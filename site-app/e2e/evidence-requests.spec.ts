@@ -6,6 +6,7 @@ import { expectAccessible } from "./a11y";
 import { attempt, engagementOf, run } from "./engagement";
 import {
   DEMO,
+  attest,
   choose,
   expect,
   persona,
@@ -109,7 +110,7 @@ test("an evidence request goes from the Auditor to the client and back", async (
     "the portal submission reached the audit team",
   ).toBeTruthy();
   for (const artifactId of submission.evidenceIds)
-    await run(auditor, demo, "acceptEvidence", { artifactId });
+    await run(auditor, demo, "acceptEvidence", { artifactId, ...attest });
 
   // The Auditor assesses the request in its record sheet.
   await page.goto(recordPath(demo, "Evidence vault", "request", requestId));

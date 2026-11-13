@@ -2,6 +2,7 @@
 // review it, and the Lead Auditor signs the reviewed revision off.
 import { expectAccessible } from "./a11y";
 import {
+  attest,
   expect,
   paperPath,
   runCommand,
@@ -27,6 +28,7 @@ async function submittedPaper(author: Api, demo: Demo) {
   );
   await author.command(tenantId, engagementId, "acceptEvidence", {
     artifactId,
+    ...attest,
   });
   const { paperId } = await author.command(
     tenantId,

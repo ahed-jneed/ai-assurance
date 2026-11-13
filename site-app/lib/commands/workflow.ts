@@ -10,6 +10,7 @@ import {
   workflowOps,
   WorkflowError,
 } from "../workflow-service";
+import { workflowRoleRefusal } from "../permissions";
 import type { CommandModule } from "./command";
 import { assertReleasable } from "./reports";
 /**
@@ -19,6 +20,10 @@ import { assertReleasable } from "./reports";
 export const workflow: CommandModule = {
   ops: workflowOps,
   async run(e, op, d, ctx) {
+    // The role check comes first, as for every other op: some commands
+    // validate their data before their own role guard runs.
+    const refusal = workflowRoleRefusal(ctx.role, op);
+    if (refusal) throw new ApiError(403, refusal);
     if (op === "releaseReport") await assertReleasable(e, d, ctx);
     try {
       return {

@@ -2,7 +2,7 @@
 // classification and the engagement brief have separate independence guards
 // (lib/commands/classification.ts, lib/workflow/command.ts), so both are
 // checked; an independent Reviewer's approval of the same record succeeds.
-import { expect, test, type Api, type Demo } from "./fixtures";
+import { attest, expect, test, type Api, type Demo } from "./fixtures";
 
 async function engagement(api: Api, demo: Demo) {
   return (await api.workspace(demo.tenantId, demo.engagementId)).engagement;
@@ -49,7 +49,7 @@ test("the preparer of a classification cannot approve it", async ({
     },
   });
 
-  const own = await attempt(lead, demo, "approveClassification", {});
+  const own = await attempt(lead, demo, "approveClassification", attest);
   expect(own.status()).toBe(403);
   expect((await own.json()).error).toBe(
     "An independent reviewer must approve a completed classification",
@@ -62,6 +62,7 @@ test("the preparer of a classification cannot approve it", async ({
     demo.tenantId,
     demo.engagementId,
     "approveClassification",
+    attest,
   );
   const approved = (await engagement(lead, demo)).classification;
   expect(approved.status).toBe("approved");

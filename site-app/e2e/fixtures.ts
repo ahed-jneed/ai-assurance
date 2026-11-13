@@ -65,6 +65,14 @@ export function ownPractice(who: Persona): string {
   );
 }
 
+/**
+ * The attestation every sign-off, approval, stage change, evidence acceptance
+ * and finding closure carries (lib/attestation.ts).
+ */
+export const attest = {
+  attestation: { rationale: "Reviewed for the end-to-end check" },
+};
+
 export const DEMO = {
   client: "Acme",
   engagement: "Acme credit scoring model audit",

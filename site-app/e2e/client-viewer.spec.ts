@@ -2,7 +2,7 @@
 // shared with the client and accepted is listed; internal or unaccepted
 // evidence is neither listed nor downloadable, and nothing can be changed.
 import { expectAccessible } from "./a11y";
-import { DEMO, expect, test, unique } from "./fixtures";
+import { attest, DEMO, expect, test, unique } from "./fixtures";
 
 test("the Client Viewer sees released content only", async ({
   signIn,
@@ -27,6 +27,7 @@ test("the Client Viewer sees released content only", async ({
   ).artifactId;
   await auditor.command(tenantId, engagementId, "acceptEvidence", {
     artifactId: sharedId,
+    ...attest,
   });
   // Shared with the client but not accepted yet: not released.
   const pendingId = (
@@ -50,6 +51,7 @@ test("the Client Viewer sees released content only", async ({
   ).artifactId;
   await auditor.command(tenantId, engagementId, "acceptEvidence", {
     artifactId: internalId,
+    ...attest,
   });
 
   const page = await signIn("qa-viewer");

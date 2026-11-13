@@ -61,6 +61,9 @@ const verifyDossier = (dossierPath, trustPath) =>
     child.on("exit", (code) => resolve({ code, out }));
   });
 // The report elements a final report states at capture (report model v2).
+// Sign-offs, approvals, stage changes, acceptance and closure carry the
+// person's attestation (lib/attestation.ts).
+const attest = { attestation: { rationale: "Reviewed for the harness" } };
 const reportParticulars = {
   addressee: "Fixture client board",
   location: "Vienna, Austria",
@@ -167,7 +170,10 @@ try {
     body: form,
   });
   await refresh();
-  await command("acceptEvidence", { artifactId: uploaded.artifactId });
+  await command("acceptEvidence", {
+    artifactId: uploaded.artifactId,
+    ...attest,
+  });
   await request(
     "/api/evidence?" +
       new URLSearchParams({
@@ -466,7 +472,7 @@ try {
     f.set("file", new File([csv], name, { type: "text/csv" }));
     const u = await request("/api/evidence", { method: "POST", body: f });
     await refresh();
-    await command("acceptEvidence", { artifactId: u.artifactId });
+    await command("acceptEvidence", { artifactId: u.artifactId, ...attest });
     return u.artifactId;
   }
   // A dataset with a special-category column needs the client's recorded
@@ -841,7 +847,7 @@ try {
   await command("submitPaper", { paperId: p.id });
   await command("reviewPaper", { paperId: p.id }, owner, 403);
   await command("reviewPaper", { paperId: p.id }, reviewer);
-  await command("signPaper", { paperId: p.id });
+  await command("signPaper", { paperId: p.id, ...attest });
   assert.equal(e.papers.find((x) => x.id === p.id).status, "signed");
   await command(
     "editPaper",
@@ -960,7 +966,7 @@ try {
   assert.equal(e.classification.assessment.label, "Needs information");
   assert(
     JSON.stringify(
-      await command("approveClassification", {}, reviewer, 400),
+      await command("approveClassification", attest, reviewer, 400),
     ).includes("Integrates a general-purpose AI model"),
     "Unknown required facts block the approval",
   );
@@ -987,8 +993,8 @@ try {
     e.classification.answers.placedOnMarketDate.legalVersion,
     rulePack.celex,
   );
-  await command("approveClassification", {}, owner, 403);
-  await command("approveClassification", {}, reviewer);
+  await command("approveClassification", attest, owner, 403);
+  await command("approveClassification", attest, reviewer);
   assert.equal(e.classification.status, "approved");
   // An engagement whose classification predates #19 still loads: its facts
   // are unknown and its earlier approval stays readable.
@@ -1096,7 +1102,7 @@ try {
     });
     await command("submitPaper", { paperId: id });
     await command("reviewPaper", { paperId: id }, reviewer);
-    await command("signPaper", { paperId: id });
+    await command("signPaper", { paperId: id, ...attest });
   }
   await command("createFinding", {
     title: "Unresolved synthetic high-risk finding",
@@ -1536,7 +1542,7 @@ try {
     },
     reviewer,
   );
-  await command("signPaper", { paperId: procedurePaper });
+  await command("signPaper", { paperId: procedurePaper, ...attest });
   const compiled = e.papers.find((p) => p.id === procedurePaper);
   await command(
     "editPaper",
@@ -1601,7 +1607,7 @@ try {
     },
     reviewer,
   );
-  await command("signPaper", { paperId: recompiledPaper });
+  await command("signPaper", { paperId: recompiledPaper, ...attest });
   console.log(
     "PASS sign → recompile supersedes the signed paper, which stays immutable",
   );
@@ -1685,7 +1691,7 @@ try {
   assert(!JSON.stringify(portal).includes("INTERNAL_PROCEDURE_SECRET"));
   await command(
     "acceptEvidence",
-    { artifactId: uploaded.artifactId },
+    { artifactId: uploaded.artifactId, ...attest },
     contributor,
     403,
   );
@@ -1747,7 +1753,7 @@ try {
     "Receipt received; audit assessment pending",
   );
   for (const artifactId of delivered.evidenceIds)
-    await command("acceptEvidence", { artifactId });
+    await command("acceptEvidence", { artifactId, ...attest });
   await command(
     "assessEvidenceRequest",
     {
@@ -1760,7 +1766,7 @@ try {
   );
   const completeSubmission = await clientUpload("complete", "");
   for (const artifactId of e.workflow.submissions.at(-1).evidenceIds)
-    await command("acceptEvidence", { artifactId });
+    await command("acceptEvidence", { artifactId, ...attest });
   await command("assessEvidenceRequest", {
     requestId: portalRequest,
     decision: "accepted",
@@ -1805,7 +1811,7 @@ try {
     "PASS scoped client grants, safe request projection, own-file downloads, partial deliveries, client role isolation and revocation",
   );
   // Planning exit: acceptance, independence and competence (#23).
-  await command("setStage", { stage: "Fieldwork" }, owner, 400);
+  await command("setStage", { stage: "Fieldwork", ...attest }, owner, 400);
   const met = (basis) => ({ met: true, basis });
   await command("saveAcceptance", {
     decision: "acceptance",
@@ -1878,9 +1884,9 @@ try {
   console.log(
     "PASS acceptance record, per-person declarations and threat resolution gate Fieldwork",
   );
-  await command("setStage", { stage: "Fieldwork" });
-  await command("setStage", { stage: "Evidence evaluation" });
-  await command("setStage", { stage: "Reporting" }, owner, 400);
+  await command("setStage", { stage: "Fieldwork", ...attest });
+  await command("setStage", { stage: "Evidence evaluation", ...attest });
+  await command("setStage", { stage: "Reporting", ...attest }, owner, 400);
   await command("recordEvidenceResponse", {
     requestId: outstandingRequest,
     response: "Synthetic received support before reporting.",
@@ -1891,8 +1897,8 @@ try {
     decision: "accepted",
     assessment: "Synthetic requested support was assessed.",
   });
-  await command("setStage", { stage: "Reporting" });
-  await command("setStage", { stage: "Sign-off" });
+  await command("setStage", { stage: "Reporting", ...attest });
+  await command("setStage", { stage: "Sign-off", ...attest });
   await command(
     "createReport",
     {
@@ -3249,7 +3255,7 @@ try {
     remediation: "Synthetic control corrected and validation evidence supplied",
     retestEvidenceIds: [uploaded.artifactId],
   });
-  await command("closeFinding", { findingId }, reviewer, 400);
+  await command("closeFinding", { findingId, ...attest }, reviewer, 400);
   await command(
     "recordFindingRetest",
     {
@@ -3263,7 +3269,7 @@ try {
     },
     reviewer,
   );
-  await command("closeFinding", { findingId }, reviewer);
+  await command("closeFinding", { findingId, ...attest }, reviewer);
   assert.equal(e.findings.find((f) => f.id === findingId).status, "closed");
   await command("reopenFinding", {
     findingId,
@@ -3437,7 +3443,7 @@ try {
     facts: { ...providerFacts, annexIIIProfiling: "unknown", art5_1_c: "yes" },
   });
   assert.equal(e.classification.prohibited, true);
-  await command("approveClassification", {}, reviewer);
+  await command("approveClassification", attest, reviewer);
   const prohibitedReadiness = await command(
     "createReport",
     {

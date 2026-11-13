@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expectAccessible } from "./a11y";
-import { expect, test, unique, workspacePath } from "./fixtures";
+import { attest, expect, test, unique, workspacePath } from "./fixtures";
 
 const root = (path: string) =>
   readFileSync(fileURLToPath(new URL("../../" + path, import.meta.url)));
@@ -33,6 +33,7 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
     );
     await auditor.command(demo.tenantId, demo.engagementId, "acceptEvidence", {
       artifactId,
+      ...attest,
     });
     return artifactId;
   };

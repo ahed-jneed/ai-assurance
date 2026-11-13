@@ -81,6 +81,8 @@ const identity = (user) => ({
   Origin: origin,
 });
 const digest = (s) => createHash("sha256").update(s).digest("hex");
+// Evidence acceptance carries the person's attestation (lib/attestation.ts).
+const attest = { attestation: { rationale: "Reviewed for the harness" } };
 async function api(
   route,
   { user = owner, body, status = 200, headers = {}, raw = false } = {},
@@ -228,7 +230,7 @@ try {
     );
     const v = await api("/api/evidence", { body: f });
     await refresh();
-    await cmd("acceptEvidence", { artifactId: v.artifactId });
+    await cmd("acceptEvidence", { artifactId: v.artifactId, ...attest });
     return v.artifactId;
   }
   const csv = await fs.readFile("../engine/examples/predictions.csv", "utf8"),
@@ -1446,7 +1448,7 @@ try {
   assert.deepEqual(e.artifacts.at(-1).clientPin.columns, clientPin.columns);
   const pinnedId = e.artifacts.at(-1).id;
   assert.equal(e.artifacts.at(-1).custody, "client");
-  await cmd("acceptEvidence", { artifactId: pinnedId });
+  await cmd("acceptEvidence", { artifactId: pinnedId, ...attest });
   assert.match(
     (
       await api(
