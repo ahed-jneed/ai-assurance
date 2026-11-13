@@ -52,8 +52,9 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `lead-creates-engagement.spec.ts` | Lead Auditor creates an engagement for Acme; an Auditor's `createEngagement` is refused |
 | `auditor-prepares-paper.spec.ts` | Auditor creates a paper, records results and conclusion, links accepted evidence, saves and submits it |
 | `reviewer-reviews-paper.spec.ts` | Reviewer approves the review, the Lead Auditor signs the revision; the author's own review and an Auditor's review are refused |
-| `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the portal and the audit team sees it; internal commands are refused |
-| `client-viewer.spec.ts` | Client Viewer sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
+| `accessibility.spec.ts` | axe finds no serious or critical violation on any of the Lead Auditor's engagement and practice views or on any client portal view (Viewer and Contributor); keyboard-only use reaches the skip link, the content and the portal navigation |
+| `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the client portal shell (no practice navigation) and the audit team sees it; internal commands are refused |
+| `client-viewer.spec.ts` | Client Viewer gets the client portal shell without practice navigation or search, and sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
 | `self-approval.spec.ts` | The Lead Auditor who classified the system or prepared the engagement brief cannot approve it; the Reviewer's approval of the classification succeeds |
 | `quality-reviewer.spec.ts` | The Lead Auditor appoints `qa-eqr` as Engagement Quality Reviewer (an Auditor cannot be appointed); the reviewer records a stand-back checklist item in the Quality review tab; the reviewer's paper edits and the Lead's checklist save are refused |
 | `report-settings.spec.ts` | The Lead Auditor, a practice administrator, saves the practice's report settings; the report form shows them for blank fields, and a readiness draft with gaps asks for the gaps and is captured as not assurance with the settings; an Auditor's `setReportSettings` is refused |
