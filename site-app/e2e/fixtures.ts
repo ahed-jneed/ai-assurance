@@ -313,6 +313,25 @@ export async function runCommand(
   return response;
 }
 
+/**
+ * Completes the attestation dialog (app/workspace/attestation-dialog.tsx)
+ * that a sign-off or approval opens: checks that it shows the record and its
+ * SHA-256, gives the rationale and confirms. Returns the dialog.
+ */
+export async function attestInDialog(
+  page: Page,
+  title: string,
+  confirm: string,
+  rationale = "Reviewed for the end-to-end check",
+) {
+  const dialog = page.getByRole("dialog", { name: title });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/^[0-9a-f]{64}$/)).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Rationale" }).fill(rationale);
+  await dialog.getByRole("button", { name: confirm, exact: true }).click();
+  return dialog;
+}
+
 /** Picks an option of a Radix select (components/ui/select.tsx). */
 export async function choose(scope: Locator, label: string, option: string) {
   await scope.getByRole("combobox", { name: label }).click();

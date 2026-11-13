@@ -1,5 +1,6 @@
 "use client";
 import { Input } from "@/components/ui/input";
+import { canAssignEngagementAccess } from "@/lib/permissions";
 import { roles } from "@/lib/domain";
 import { Choice } from "../workspace-ui";
 import type {
@@ -37,16 +38,16 @@ export function EngagementChecks({
   data,
   checks,
   check,
-  role,
   legend,
-}: Pick<ModalFieldsProps, "data" | "checks" | "check" | "role"> & {
+}: Pick<ModalFieldsProps, "data" | "checks" | "check"> & {
   legend: string;
 }) {
-  const engagements = data?.engagements ?? [];
+  const engagements = data?.engagements ?? [],
+    assign = !!data && canAssignEngagementAccess(data.identity);
   return (
     <fieldset className="onboarding-options">
       <legend>{legend}</legend>
-      {role !== "Lead Auditor" && (
+      {!assign && (
         <p className="subtle">
           Only a Lead Auditor can assign engagements. A Lead can grant them in
           Assurance workbench → Team & runtime.
@@ -56,7 +57,7 @@ export function EngagementChecks({
         <label key={g.id}>
           <input
             type="checkbox"
-            disabled={role !== "Lead Auditor"}
+            disabled={!assign}
             checked={!!checks[engagementFlag + g.id]}
             onChange={(ev) => check(engagementFlag + g.id, ev.target.checked)}
           />

@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { assuranceRecords } from "@/lib/assurance-store-client";
+import { fetchJson } from "@/lib/fetch-json";
 import { describeScope, type DossierScope } from "@/lib/dossier-scope";
 type CapturedEvidence = { id: string; name: string; status: string };
 type SealedDossier = {
@@ -63,7 +64,9 @@ export function DossierControls({
     [choices, setChoices] = useState<ScopeChoices | null>(null),
     [draft, setDraft] = useState<ScopeDraft>(emptyDraft),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    // Whether the client dossier is sealed, as a client reader learns it.
+    [clientSealed, setClientSealed] = useState(false);
   const q = new URLSearchParams({ tenantId, engagementId, reportId });
   useEffect(() => {
     let active = true;
@@ -76,9 +79,19 @@ export function DossierControls({
         const v = (await r.json()) as { identity: { role: string } };
         if (!active) return;
         setRole(v.identity.role);
-        if (
-          !["Client Viewer", "Client Contributor"].includes(v.identity.role)
-        ) {
+        if (["Client Viewer", "Client Contributor"].includes(v.identity.role)) {
+          const status = await fetchJson<{ sealed: boolean }>(
+            "/api/dossier?" +
+              new URLSearchParams({
+                tenantId,
+                engagementId,
+                reportId,
+                sealed: "1",
+              }),
+            { cache: "no-store" },
+          );
+          if (active) setClientSealed(status.sealed);
+        } else {
           const dossiers = await assuranceRecords({
             tenantId,
             engagementId,
@@ -237,7 +250,7 @@ export function DossierControls({
               Seal {a} dossier
             </Button>
           )}
-          {(sealed[a] || client) && (
+          {(sealed[a] || (client && clientSealed)) && (
             <a
               className="download-link"
               href={"/api/dossier?" + q + "&audience=" + a}

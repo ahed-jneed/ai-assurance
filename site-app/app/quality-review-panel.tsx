@@ -4,6 +4,7 @@
 // exact final package (lib/domain/quality-review.ts). A Lead Auditor
 // appoints the reviewer; only the appointed reviewer records the review.
 import { useState } from "react";
+import { can } from "@/lib/permissions";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -48,7 +49,7 @@ export function QualityReviewPanel({
   onAct,
 }: Props) {
   const q = e.qualityReview,
-    lead = role === "Lead Auditor",
+    lead = can(role, "appointQualityReviewer"),
     team = engagementTeam(e),
     name = (id: string) =>
       people.find((p) => p.user_id === id)?.display_name || id,

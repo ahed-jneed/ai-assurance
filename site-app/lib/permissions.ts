@@ -142,6 +142,12 @@ export const assuranceActions = {
   attestGenaiRerun: writers,
 } as const satisfies Record<string, readonly Role[]>;
 
+/** Actions of routes outside the command buses, which guard with rolesFor(). */
+export const routeActions = {
+  /** POST /api/dossier: seal a portable audit dossier. */
+  sealDossier: lead,
+} as const satisfies Record<string, readonly Role[]>;
+
 /**
  * Workspace ops every role is referred elsewhere for: POST /api/workspace
  * answers them with "Use client and user management for this action".
@@ -154,11 +160,13 @@ export const managementReferrals = [
 
 export type WorkspaceAction = keyof typeof workspaceActions;
 export type AssuranceAction = keyof typeof assuranceActions;
-export type Action = WorkspaceAction | AssuranceAction;
+export type RouteAction = keyof typeof routeActions;
+export type Action = WorkspaceAction | AssuranceAction | RouteAction;
 
 const actions: Record<Action, readonly Role[]> = {
   ...workspaceActions,
   ...assuranceActions,
+  ...routeActions,
 };
 
 /** The roles that may take `action`. */
@@ -217,10 +225,28 @@ export function roleReason(role: Role, action: Action): string | null {
 }
 
 /** Whether a decision is open to this person, and if not, why. */
-export type ActionState = { allowed: boolean; reason?: string };
+export type ActionState = {
+  allowed: boolean;
+  reason?: string;
+  /**
+   * Why it is refused: the person's role never may (the control is hidden),
+   * or this record's independence rule bars them (it is shown disabled with
+   * the reason, so they know whom to ask).
+   */
+  refusal?: "role" | "independence";
+};
 const allowed: ActionState = { allowed: true };
-function refused(reason: string): ActionState {
-  return { allowed: false, reason };
+function refused(
+  reason: string,
+  refusal: ActionState["refusal"] = "independence",
+): ActionState {
+  return { allowed: false, reason, refusal };
+}
+
+/** The role check alone, for an action without an independence rule. */
+export function actionState(role: Role, action: Action): ActionState {
+  const reason = roleReason(role, action);
+  return reason ? refused(reason, "role") : allowed;
 }
 
 /**
@@ -244,7 +270,7 @@ export function decisionState(
       },
 ): ActionState {
   const reason = roleReason(role, decision.action);
-  if (reason) return refused(reason);
+  if (reason) return refused(reason, "role");
   switch (decision.action) {
     case "reviewPaper": {
       const p = decision.paper;
@@ -300,9 +326,12 @@ export function manageState(
   op?: "setQualityReviewPolicy",
 ): ActionState {
   if (!identity.practiceAdmin)
-    return refused("Practice administration permission is required");
+    return refused("Practice administration permission is required", "role");
   if (op === "setQualityReviewPolicy" && identity.role !== "Lead Auditor")
-    return refused("Only a Lead Auditor may set the quality review policy");
+    return refused(
+      "Only a Lead Auditor may set the quality review policy",
+      "role",
+    );
   return allowed;
 }
 

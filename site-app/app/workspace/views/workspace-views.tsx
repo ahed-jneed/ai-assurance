@@ -3,12 +3,14 @@
 import { Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
+import { decisionState } from "@/lib/permissions";
 import { reportTermsFor } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
 import { Ll144Panel, ll144PanelAccess } from "../../ll144-panel";
 import { WorkingPaperRegister } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
+import { useAttest } from "../attestation-dialog";
 import type { LabIntentState } from "../lab-intent";
 import { classificationDefaults } from "../modals/classification";
 import {
@@ -97,6 +99,7 @@ export function WorkspaceViews({
   onDetail: ViewDetail;
   onOnboard: () => void;
 }) {
+  const attest = useAttest();
   const { view } = url;
   const { role, writer, reviewer, lead, viewer } = access;
   const e = data.engagement;
@@ -234,7 +237,7 @@ export function WorkspaceViews({
           onPaper={nav.openPaper}
           onGate={nav.openGate}
           onRequests={nav.openRequests}
-          onAdvance={(stage) => safeAct("setStage", { stage })}
+          onAdvance={(stage) => attest("setStage", { stage })}
         />
       )}
       {view === "Working papers" && (
@@ -375,9 +378,12 @@ export function WorkspaceViews({
           }
           engagement={e}
           catalog={data.catalog}
-          reviewer={reviewer}
+          approval={decisionState(role, data.identity.id, {
+            action: "approveClassification",
+            engagement: e,
+          })}
           busy={busy}
-          onApprove={() => safeAct("approveClassification", {})}
+          onApprove={() => attest("approveClassification", {})}
         />
       )}
       {view === "Regulatory mapping" &&

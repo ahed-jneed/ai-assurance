@@ -2,6 +2,7 @@
 import { BookOpen } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { ActionState } from "@/lib/permissions";
 import type { Engagement } from "@/lib/domain";
 import {
   asRulePack,
@@ -37,7 +38,7 @@ export function RegulatoryMapping({
   catalog,
   features,
   coverage,
-  reviewer,
+  approval,
   busy,
   onApprove,
 }: {
@@ -47,7 +48,8 @@ export function RegulatoryMapping({
   coverage?: CoverageProps;
   /** What the engagement's criteria pack switches on. */
   features: { aiActClassification: boolean };
-  reviewer: boolean;
+  /** Whether this person may approve the classification, and if not, why. */
+  approval: ActionState;
   busy: boolean;
   /** Independent approval of a provisional classification. */
   onApprove: () => void;
@@ -73,7 +75,7 @@ export function RegulatoryMapping({
             coverage={coverage}
             pack={pack}
             today={today}
-            reviewer={reviewer}
+            approval={approval}
             busy={busy}
             onApprove={onApprove}
           />
@@ -102,7 +104,7 @@ function Classification({
   coverage,
   pack,
   today,
-  reviewer,
+  approval,
   busy,
   onApprove,
 }: {
@@ -112,7 +114,7 @@ function Classification({
   coverage?: CoverageProps;
   pack: RegulatorySnapshot | null;
   today: string;
-  reviewer: boolean;
+  approval: ActionState;
   busy: boolean;
   onApprove: () => void;
 }) {
@@ -123,7 +125,7 @@ function Classification({
           engagement={e}
           pack={pack}
           today={today}
-          reviewer={reviewer}
+          approval={approval}
           busy={busy}
           onApprove={onApprove}
         />

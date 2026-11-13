@@ -9,6 +9,7 @@ import {
   type SpecialColumn,
 } from "@/lib/special-category";
 import { endsParquet, isParquet, isZip } from "@/lib/dataset-header";
+import { fetchJson } from "@/lib/fetch-json";
 import { PendingLegalReview } from "../../special-category";
 import type { WorkspaceData } from "../../workspace-types";
 import { evidenceCategories } from "../modules";
@@ -216,7 +217,6 @@ export const uploadModal: ModalDefinition = {
   title: "Upload evidence",
   submitLabel: "Upload for acceptance",
   Fields: UploadFields,
-  reportsToWorkspace: true,
   submit: async ({
     form,
     data,
@@ -239,12 +239,11 @@ export const uploadModal: ModalDefinition = {
       "specialCategoryDeclaration",
       checks.specialCategoryNotPersonal ? "not_personal" : "",
     );
-    const response = await fetch("/api/evidence", {
-        method: "POST",
-        body: fd,
-      }),
-      body = (await response.json()) as WorkspaceData & { error?: string };
-    if (!response.ok) throw Error(body.error ?? "Request failed");
+    // A file over the edge limit answers 413 without JSON; fetchJson says so.
+    await fetchJson<WorkspaceData>("/api/evidence", {
+      method: "POST",
+      body: fd,
+    });
     await load(data!.tenantId, e!.id);
     toast.success("Evidence uploaded; acceptance review required");
     setBusy(false);

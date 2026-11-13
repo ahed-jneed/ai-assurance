@@ -23,6 +23,7 @@ import {
   paperRequired,
 } from "@/lib/domain";
 import type { Engagement, Paper, Role } from "@/lib/domain";
+import { roleReason } from "@/lib/permissions";
 import type { PaperTarget } from "@/lib/paper-workflow";
 
 export function EngagementOverview({
@@ -88,6 +89,8 @@ export function EngagementOverview({
   const reviewedProcedures = selectedProcedures.filter(
     (p) => p.state === "reviewed" && currentExecution(e, p),
   ).length;
+  // The server refuses a stage change to every role but a Lead Auditor.
+  const stageRefusal = roleReason(role, "setStage");
   const nextStage = stages[stages.indexOf(e.stage) + 1],
     gates = nextStage ? stageGates(e, nextStage, packFeatures(data)) : [];
   const waitingEvidence = e.artifacts.filter(
@@ -297,13 +300,13 @@ export function EngagementOverview({
               <Button
                 type="button"
                 variant="outline"
-                disabled={busy || role !== "Lead Auditor" || !!gates.length}
+                disabled={busy || !!stageRefusal || !!gates.length}
                 onClick={() => onAdvance(nextStage)}
               >
                 Move to {nextStage}
               </Button>
               <p className="stage-handoff-reason">
-                {role !== "Lead Auditor"
+                {stageRefusal
                   ? "A Lead Auditor advances the engagement."
                   : gates.length
                     ? "Resolve the requirements above to advance."

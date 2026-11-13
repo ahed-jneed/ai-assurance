@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { WorkflowDialog } from "./audit-program";
 import type { Engagement, Role } from "@/lib/domain";
@@ -184,7 +185,7 @@ export function DatasetRegistry({
         <h2>
           Dataset versions <span className="count-label">{cards.length}</span>
         </h2>
-        {["Auditor", "Lead Auditor"].includes(role) && (
+        {can(role, "registerDataset") && (
           <Button variant="outline" onClick={() => register()} disabled={busy}>
             Register dataset
           </Button>
@@ -233,7 +234,7 @@ export function DatasetRegistry({
                 </div>
               ))}
             </dl>
-            {["Auditor", "Lead Auditor"].includes(role) && (
+            {can(role, "registerDataset") && (
               <Button variant="ghost" size="sm" onClick={() => register(r)}>
                 Create corrected version
               </Button>

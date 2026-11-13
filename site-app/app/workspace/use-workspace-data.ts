@@ -11,6 +11,13 @@ import {
 } from "react";
 import { toast } from "sonner";
 import type { Engagement, Paper, Role } from "@/lib/domain";
+import {
+  FetchError,
+  errorMessage,
+  fetchJson,
+  postJson,
+  retryable,
+} from "@/lib/fetch-json";
 import { readWorkspaceLink, type WorkspaceLink } from "@/lib/workspace-links";
 import {
   auditViews,
@@ -19,6 +26,7 @@ import {
   resumeKey,
 } from "@/lib/workspace-preferences";
 import type { WorkspaceData } from "../workspace-types";
+import type { CommandOptions } from "./types";
 
 type LoadFailure = "access" | "missing" | "signed_out" | "transient" | null;
 type RestoreRequest = {
@@ -153,33 +161,39 @@ export function useWorkspaceData() {
       const qs = new URLSearchParams();
       if (tenantId) qs.set("tenantId", tenantId);
       if (engagementId) qs.set("engagementId", engagementId);
-      const response = await fetch("/api/workspace?" + qs, {
+      let body: WorkspaceData;
+      try {
+        body = await fetchJson<WorkspaceData>("/api/workspace?" + qs, {
           cache: "no-store",
           signal: controller.signal,
-        }),
-        body = (await response.json()) as WorkspaceData & { error?: string };
-      if (generation !== loadRequest.current.generation) return null;
-      if (!response.ok) {
+        });
+      } catch (failure) {
+        if (
+          !(failure instanceof FetchError) ||
+          generation !== loadRequest.current.generation
+        )
+          throw failure;
         loadFailure.current =
-          response.status === 401
+          failure.kind === "signed_out"
             ? "signed_out"
-            : response.status === 403
+            : failure.kind === "forbidden"
               ? "access"
-              : response.status === 404
+              : failure.kind === "missing"
                 ? "missing"
                 : "transient";
-        if (response.status === 401) {
+        if (failure.kind === "signed_out") {
           setSignedOut(true);
           setData(null);
           return null;
         }
-        if (response.status === 403) setData(null);
+        if (failure.kind === "forbidden") setData(null);
         else if (tenantId || engagementId)
           setData((previous) =>
             previous ? { ...previous, engagement: null } : null,
           );
-        throw Error(body.error ?? "Request failed");
+        throw failure;
       }
+      if (generation !== loadRequest.current.generation) return null;
       if (
         clientRoles.includes(body.identity.role) &&
         dataRef.current &&
@@ -214,82 +228,95 @@ export function useWorkspaceData() {
       setError(
         restoreRequest.current
           ? "Your last engagement could not be loaded. Retry, or choose an engagement from the directory."
-          : error instanceof Error
-            ? error.message
-            : "Workspace unavailable",
+          : errorMessage(error, "Workspace unavailable"),
       );
       return null;
     } finally {
       if (generation === loadRequest.current.generation) setLoading(false);
     }
   }, []);
+  /**
+   * The one error surface of a failed command (F-71): a toast whose action
+   * retries a transient failure or reloads after a conflict, unless the
+   * caller shows the error itself (a form or the attestation dialog).
+   */
+  const reportFailure = useCallback(
+    (error: unknown, fallback: string, again: () => void, quiet = false) => {
+      if (quiet) return;
+      const current = dataRef.current;
+      toast.error(errorMessage(error, fallback), {
+        action: retryable(error)
+          ? { label: "Retry", onClick: again }
+          : error instanceof FetchError && error.kind === "conflict"
+            ? {
+                label: "Reload",
+                onClick: () =>
+                  void load(current?.tenantId, current?.engagement?.id),
+              }
+            : undefined,
+      });
+    },
+    [load],
+  );
   const manage = useCallback(
-    async (op: string, values: Record<string, unknown>) => {
+    async function manage(
+      op: string,
+      values: Record<string, unknown>,
+      options: CommandOptions = {},
+    ): Promise<{ details: Record<string, string> }> {
       const current = dataRef.current;
       if (!current) throw Error("Workspace unavailable");
       setBusy(true);
-      setError("");
       try {
-        const response = await fetch("/api/management", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              tenantId: current.tenantId,
-              expectedVersion: current.managementVersion,
-              op,
-              data: values,
-            }),
-          }),
-          body = (await response.json()) as {
-            error?: string;
-            details: Record<string, string>;
-          };
-        if (!response.ok) throw Error(body.error ?? "Could not save");
+        const body = await postJson<{ details: Record<string, string> }>(
+          "/api/management",
+          {
+            tenantId: current.tenantId,
+            expectedVersion: current.managementVersion,
+            op,
+            data: values,
+          },
+        );
         await load(current.tenantId, current.engagement?.id);
         toast.success(manageMessages[op] ?? "Changes saved");
         return body;
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Could not save";
-        setError(message);
-        toast.error(message);
+        reportFailure(
+          error,
+          "Could not save",
+          () => void manage(op, values, options).catch(() => {}),
+          options.quiet,
+        );
         throw error;
       } finally {
         setBusy(false);
       }
     },
-    [load],
+    [load, reportFailure],
   );
   const act = useCallback(
-    async (
+    async function act(
       op: string,
       values: Record<string, unknown>,
       override?: Engagement,
-    ) => {
+      options: CommandOptions = {},
+    ): Promise<{ engagement: Engagement; details?: Record<string, string> }> {
       const current = dataRef.current;
       if (!current?.engagement) throw Error("Select an engagement");
       setBusy(true);
-      setError("");
       try {
-        const res = await fetch("/api/workspace", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              op,
-              data: values,
-              tenantId: current.tenantId,
-              engagementId: override?.id ?? current.engagement.id,
-              expectedVersion: override?.version ?? current.engagement.version,
-            }),
-          }),
-          body = (await res.json()) as {
-            error?: string;
-            engagement: Engagement;
-            details?: Record<string, string>;
-            events?: WorkspaceData["events"];
-            metadataBytes?: number | null;
-          };
-        if (!res.ok) throw Error(body.error ?? "Request failed");
+        const body = await postJson<{
+          engagement: Engagement;
+          details?: Record<string, string>;
+          events?: WorkspaceData["events"];
+          metadataBytes?: number | null;
+        }>("/api/workspace", {
+          op,
+          data: values,
+          tenantId: current.tenantId,
+          engagementId: override?.id ?? current.engagement.id,
+          expectedVersion: override?.version ?? current.engagement.version,
+        });
         if (op === "editPaper") {
           const saved = body.engagement.papers.find(
             (p) => p.id === values.paperId,
@@ -313,20 +340,21 @@ export function useWorkspaceData() {
         );
         if (reload) await load(current.tenantId, body.engagement.id);
         toast.success(actMessages[op] ?? "Changes saved");
-        return body as {
-          engagement: Engagement;
-          details?: Record<string, string>;
-        };
+        return body;
       } catch (e) {
-        const message = e instanceof Error ? e.message : "Save failed";
-        setError(message);
-        toast.error(message);
+        // A retry runs at the version the workspace then holds.
+        reportFailure(
+          e,
+          "Save failed",
+          () => void act(op, values, undefined, options).catch(() => {}),
+          options.quiet,
+        );
         throw e;
       } finally {
         setBusy(false);
       }
     },
-    [load],
+    [load, reportFailure],
   );
   /** Runs a command whose failure is already reported by act(). */
   const safeAct = useCallback(

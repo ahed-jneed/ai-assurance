@@ -3,6 +3,7 @@
 import { expectAccessible } from "./a11y";
 import {
   attest,
+  attestInDialog,
   expect,
   paperPath,
   runCommand,
@@ -121,8 +122,9 @@ test("the Reviewer reviews a paper and the Lead Auditor signs it off", async ({
   await lead.goto(paperPath(demo, paperId));
   const leadEditor = lead.getByRole("dialog", { name: new RegExp(TITLE) });
   await expect(leadEditor).toBeVisible();
+  await leadEditor.getByRole("button", { name: "Sign revision" }).click();
   await runCommand(lead, "signPaper", () =>
-    leadEditor.getByRole("button", { name: "Sign revision" }).click(),
+    attestInDialog(lead, "Sign working paper", "Sign revision"),
   );
   expect(await paperStatus(auditor, demo, paperId)).toBe("signed");
 });

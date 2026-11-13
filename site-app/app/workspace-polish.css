@@ -1140,3 +1140,63 @@ h1 {
   background: #c8cdc1;
   border-radius: 4px;
 }
+
+/* Attestation dialog (F-45): what the decision binds, then the statement. */
+.attestation-subject {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.35rem 1rem;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+.attestation-subject dt {
+  color: var(--muted-foreground);
+}
+.attestation-subject dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.attestation-digest {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.attestation-statement {
+  margin: 0;
+  font-weight: 500;
+}
+
+/* A permission-aware action and the reason it is disabled (F-74). */
+.decision-action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+.action-reason {
+  color: var(--muted-foreground);
+  max-width: 32rem;
+}
+
+/* A view whose render failed (F-70). */
+.view-failure {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  margin: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.view-failure h3,
+.view-failure p {
+  margin: 0;
+}
+.view-failure-message {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--destructive);
+}

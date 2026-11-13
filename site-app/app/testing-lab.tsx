@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useEffectEvent, useState } from "react";
+import { can } from "@/lib/permissions";
 import {
   Plus,
   Play,
@@ -350,7 +351,7 @@ export function TestingLab({
   resolve,
   act,
 }: Props) {
-  const writer = ["Auditor", "Lead Auditor"].includes(role),
+  const writer = can(role, "queueRun"),
     internal = !isClientRole(role),
     [register, setRegister] = useState<Partial<Model> | null>(null),
     [card, setCard] = useState<ModelCard>(structuredClone(emptyCard)),
@@ -1119,7 +1120,7 @@ export function TestingLab({
                                 </Button>
                               </>
                             )}
-                            {role === "Lead Auditor" &&
+                            {can(role, "recoverRun") &&
                               r.state === "running" && (
                                 <Button
                                   size="sm"

@@ -200,6 +200,7 @@ describe("client permissions match the server's role checks", () => {
     expect(manageState({ role: "Lead Auditor" })).toEqual({
       allowed: false,
       reason: "Practice administration permission is required",
+      refusal: "role",
     });
     expect(manageState({ role: "Reviewer", practiceAdmin: true })).toEqual({
       allowed: true,
@@ -249,6 +250,7 @@ describe("decisionState", () => {
       ).toEqual({
         allowed: false,
         reason: "The author cannot review their own paper",
+        refusal: "independence",
       });
     expect(
       decisionState("Reviewer", "other", { action: "reviewPaper", paper }),
@@ -274,7 +276,11 @@ describe("decisionState", () => {
     ).toBe(false);
     expect(
       decisionState("Auditor", "lead", { action: "signPaper", paper }),
-    ).toEqual({ allowed: false, reason: "Only Lead Auditors can do this" });
+    ).toEqual({
+      allowed: false,
+      reason: "Only Lead Auditors can do this",
+      refusal: "role",
+    });
   });
 
   it("closes a finding only for someone who did not raise or remediate it", () => {

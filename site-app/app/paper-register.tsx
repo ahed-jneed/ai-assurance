@@ -1,5 +1,6 @@
 "use client";
 import { FileText, ChevronRight } from "lucide-react";
+import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -61,7 +62,7 @@ export function WorkingPaperRegister({
     query.facet !== "all" ||
     query.sort !== "program";
   const views = paperViews.map(([value, label]) => ({ value, label }));
-  const canReview = ["Lead Auditor", "Reviewer"].includes(role);
+  const canReview = can(role, "reviewPaper");
   const context =
     query.view === "mine"
       ? "Your preparation, independent reviews, sign-offs and open questions."

@@ -2,13 +2,10 @@
 // practice, papers and records. Each change goes through `guarded` (see
 // navigation-guards.ts) so it cannot drop unsaved work.
 import { useRef } from "react";
+import { can } from "@/lib/permissions";
 import { toast } from "sonner";
-import {
-  canWrite,
-  type AuditGate,
-  type EvidenceRequest,
-  type Paper,
-} from "@/lib/domain";
+import { isAttestedOp } from "@/lib/attestation";
+import { type AuditGate, type EvidenceRequest, type Paper } from "@/lib/domain";
 import { normalizeEvidenceQuery } from "@/lib/evidence-presentation";
 import {
   paperProcedureSection,
@@ -20,6 +17,7 @@ import type { WorkItem } from "@/lib/work-items";
 import { defaultWorkbenchQuery } from "@/lib/workbench-presentation";
 import type { SearchItem } from "@/lib/workspace-search";
 import { auditViews, permittedAuditView } from "@/lib/workspace-preferences";
+import type { Attest } from "./attestation-dialog";
 import type { LabIntentState } from "./lab-intent";
 import { requestFormDefaults } from "./modals/evidence-request";
 import { remediationDefaults } from "./modals/finding-edit";
@@ -59,6 +57,7 @@ export function useWorkspaceNavigation({
   modal,
   lab,
   guarded,
+  attest,
   setSwitchOpen,
   setSearchOpen,
 }: {
@@ -69,6 +68,8 @@ export function useWorkspaceNavigation({
   modal: ModalState;
   lab: LabIntentState;
   guarded: Guarded;
+  /** Opens the attestation dialog for a sign-off or approval. */
+  attest: Attest;
   setSwitchOpen: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
 }) {
@@ -77,7 +78,7 @@ export function useWorkspaceNavigation({
   const { data, load, act } = workspace;
   const e = data?.engagement,
     role = data?.identity.role ?? "Client Viewer",
-    writer = canWrite(role);
+    writer = can(role, "updateFinding");
   const { view, setView, setSearch, setFilter, setFacet, setSort } = url;
 
   function openPaper(p: Paper, target?: PaperTarget) {
@@ -124,6 +125,10 @@ export function useWorkspaceNavigation({
     const p = e?.workflow?.procedures.find((p) => p.paperId === values.paperId);
     if (op === "reviewPaper" && p) {
       openPaperProcedure(p.id);
+      return;
+    }
+    if (isAttestedOp(op)) {
+      attest(op, values);
       return;
     }
     void act(op, values).catch(() => {});

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { can } from "@/lib/permissions";
 import {
   ClipboardList,
   Plus,
@@ -26,7 +27,6 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import {
-  canWrite,
   type Engagement,
   type EvidenceRequest,
   type Paper,
@@ -101,7 +101,7 @@ export function EvidenceRequests({
   const requests = e.evidenceRequests ?? [],
     day = localEvidenceDay(),
     rows = selectEvidenceRequests(requests, view, search, day),
-    writer = canWrite(role),
+    writer = can(role, "createEvidenceRequest"),
     filtered = view !== "all" || !!search.trim();
   function exportList() {
     const content =
@@ -354,9 +354,9 @@ export function EvidenceRequestDetails({
   onPaper: (p: Paper) => void;
   onArtifact: (id: string) => void;
 }) {
-  const writer = canWrite(role),
+  const writer = can(role, "assessEvidenceRequest"),
     closed = requestClosed(r),
-    lead = role === "Lead Auditor",
+    lead = can(role, "closeEvidenceRequest"),
     missing = filesNeedAcceptance(r, e),
     submissions =
       e.workflow?.submissions.filter((s) => s.requestId === r.id) ?? [];

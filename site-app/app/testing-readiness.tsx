@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { can } from "@/lib/permissions";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ export function ExecutionPlanner({
       datasetCardRecordId: "",
     }),
     r = testingReadiness(e, records, workers, role, selection),
-    writer = ["Auditor", "Lead Auditor"].includes(role);
+    writer = can(role, "queueRun");
   const remaining = r.checks.filter((c) => !c.done).length;
   const setupAction =
     e.workflow?.brief?.status !== "approved" ||

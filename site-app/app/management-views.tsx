@@ -13,6 +13,7 @@ import {
   KeyRound,
   Scale,
 } from "lucide-react";
+import { manageState } from "@/lib/permissions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,8 +113,10 @@ export function ManagementViews({
     data.memberships.find((m) => m.tenant_id === data.tenantId)?.name ?? "";
   const invitations = data.invitations ?? [];
   const coolingOffDays = data.qualityReviewPolicy?.coolingOffDays ?? 730;
-  // setQualityReviewPolicy is Lead-only; this view is shown only to admins.
-  const policyEditor = data.identity.role === "Lead Auditor";
+  const policyEditor = manageState(
+    data.identity,
+    "setQualityReviewPolicy",
+  ).allowed;
   const activeAdmins = data.members.filter(
     (m) => m.practice_admin && m.status === "active",
   ).length;

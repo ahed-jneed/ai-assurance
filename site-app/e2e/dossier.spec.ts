@@ -152,11 +152,27 @@ test("the Lead Auditor seals the dossiers of a released report", async ({
   expect(internalDossier.signature.keyId).toBe(internal.keyId);
   expect(internalDossier.manifest.files).toHaveLength(internal.files);
 
+  // A client reader's download link waits for the seal (F-71).
+  const clientSealed = async () => {
+    const response = await viewer.http.get(
+      "/api/dossier?" +
+        new URLSearchParams({
+          tenantId: e.tenantId,
+          engagementId: e.engagementId,
+          reportId: report.id,
+          sealed: "1",
+        }),
+    );
+    expect(response.status(), await response.text()).toBe(200);
+    return ((await response.json()) as { sealed: boolean }).sealed;
+  };
+  expect(await clientSealed()).toBe(false);
   const client = await sealInUi(
     page,
     "Seal client dossier",
     "Seal client dossier",
   );
+  expect(await clientSealed()).toBe(true);
   // A client reader asking for the internal dossier receives the client one.
   const clientDossier = await download(viewer, e, report.id, {
     audience: "internal",

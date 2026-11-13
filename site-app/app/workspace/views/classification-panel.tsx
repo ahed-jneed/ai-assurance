@@ -1,7 +1,7 @@
 "use client";
-import { Button } from "@/components/ui/button";
 import { classificationRules } from "@/lib/classification-rules";
 import type { Engagement } from "@/lib/domain";
+import type { ActionState } from "@/lib/permissions";
 import {
   aiOfficeCompetence,
   approvalBlockers,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/domain/classification";
 import type { Truth } from "@/lib/predicates";
 import { legalDate, type RegulatorySnapshot } from "@/lib/rule-pack";
+import { DecisionButton } from "../decision-button";
 import { Badge } from "../workspace-ui";
 import { LegalReviewLabel } from "./rule-pack-views";
 
@@ -122,14 +123,15 @@ export function ClassificationPanel({
   engagement: e,
   pack,
   today,
-  reviewer,
+  approval,
   busy,
   onApprove,
 }: {
   engagement: Engagement;
   pack: RegulatorySnapshot | null;
   today: string;
-  reviewer: boolean;
+  /** Whether this person may approve it independently, and if not, why. */
+  approval: ActionState;
   busy: boolean;
   onApprove: () => void;
 }) {
@@ -210,8 +212,9 @@ export function ClassificationPanel({
               </ul>
             </div>
           )}
-          {reviewer && c.status === "provisional" && (
-            <Button
+          {c.status === "provisional" && (
+            <DecisionButton
+              state={approval}
               disabled={busy || blockers.length > 0}
               title={
                 blockers.length ? "Resolve the listed items first" : undefined
@@ -219,7 +222,7 @@ export function ClassificationPanel({
               onClick={onApprove}
             >
               Approve independently
-            </Button>
+            </DecisionButton>
           )}
         </div>
       </section>
