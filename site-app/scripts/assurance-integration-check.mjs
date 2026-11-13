@@ -299,6 +299,23 @@ try {
     rationale: "Numerical integration fixture only",
   });
   const classProfileId = e.evaluationProfiles.at(-1).id;
+  // A legacy protocol whose performance positive class "2" is not one of
+  // the system's output classes: refused when queued (#113), not by the
+  // worker's protocol_config_invalid.
+  await cmd("createEvaluationProfile", {
+    name: "External acceptance",
+    version: "2-class-2",
+    task: "Binary classification",
+    suite: ["performance"],
+    config: { ...config, performancePositiveLabel: "2" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+  });
+  const strayClassProfileId = e.evaluationProfiles.at(-1).id;
+  assert.equal(
+    e.evaluationProfiles.at(-1).config.performancePositiveLabel,
+    "2",
+  );
   const system = (
     await assurance("registerSystem", {
       name: "Fixture AI system",
@@ -872,6 +889,28 @@ try {
     assert.equal(runtime.code, 0, runtime.out + runtime.error);
     return JSON.parse(runtime.out.trim());
   };
+  // A performance positive class outside the system's output classes is
+  // refused at queue time (#113); the worker would fail the job.
+  const pointClassProcedure = async (id) => {
+    e.workflow.procedures.find((p) => p.id === classProcedure.id).profileId =
+      id;
+    await writeEngagement();
+  };
+  await pointClassProcedure(strayClassProfileId);
+  const strayClass = await assurance(
+    "queueExternal",
+    { ...plan, profileId: strayClassProfileId, procedureId: classProcedure.id },
+    owner,
+    400,
+  );
+  assert.match(
+    strayClass.error,
+    /measures binary performance on the class '2', which is not one of the system revision's output classes \('1', '0'\)/,
+  );
+  await pointClassProcedure(classProfileId);
+  console.log(
+    "PASS a performance positive class outside the system's output classes is refused when queued",
+  );
   // The worker measures binary performance on the protocol's performance
   // positive class "0" (#65), and fairness would count the favourable "1".
   const classJob = await assurance("queueExternal", {
@@ -1156,13 +1195,16 @@ try {
   // #102: a special-category fairness protocol on a dataset the client keeps.
   // The platform records only the file's SHA-256 pin; the client's own worker
   // reads the file in the client's environment and returns aggregates.
-  const baseCsv = csv
+  const renamedCsv = csv
       .replace(
         /^actual,predicted,score,group,/,
         "actual,predicted,score,ethnicity,",
       )
       .replace(/,A,/g, ",group-alpha,")
       .replace(/,B,/g, ",group-beta,"),
+    // Every row twice (80 per group): at least the minimum group size of 50
+    // that a special-category protocol needs (#134).
+    baseCsv = renamedCsv + renamedCsv.slice(renamedCsv.indexOf("\n") + 1),
     [clientHeader, firstRow] = baseCsv.split("\n"),
     // One person in group-gamma: below the minimum group size, so the
     // client's worker withholds that group's counts and rates.
@@ -1175,7 +1217,7 @@ try {
     ),
     clientRows = clientCsv.trim().split("\n").slice(1),
     clientBytes = Buffer.from(clientCsv);
-  assert(clientRows.length >= 60 && clientRows[1].includes("group-alpha"));
+  assert(clientRows.length >= 160 && clientRows[1].includes("group-alpha"));
   assert(clientRows[0].includes("group-gamma"));
   // Uploading the file is refused: its ethnicity column has no basis.
   const refusedUpload = new FormData();
@@ -1193,14 +1235,43 @@ try {
     (await api("/api/evidence", { body: refusedUpload, status: 409 })).error,
     /needs the client's recorded basis before upload: ethnicity/,
   );
+  // The client pins its file with the runtime package's pin tool (#134): it
+  // reads the file locally and prints the pin form's fields, header included.
+  const pinSource = path.resolve("../tmp/client-pin-fixture");
+  await fs.rm(pinSource, { recursive: true, force: true });
+  await fs.mkdir(pinSource, { recursive: true });
+  await fs.writeFile(
+    path.join(pinSource, "client-applicants.csv"),
+    clientBytes,
+  );
+  const pinTool = await processRun([
+    "-m",
+    "engine.client_pin",
+    "pin",
+    "--file",
+    path.join(pinSource, "client-applicants.csv"),
+    "--confirmed-by",
+    "Client data steward",
+  ]);
+  await fs.rm(pinSource, { recursive: true, force: true });
+  assert.equal(pinTool.code, 0, pinTool.out + pinTool.error);
+  const clientPin = JSON.parse(pinTool.out);
+  assert.deepEqual(
+    [clientPin.name, clientPin.sha256, clientPin.size, clientPin.columns],
+    [
+      "client-applicants.csv",
+      digest(clientBytes),
+      clientBytes.length,
+      clientHeader.split(","),
+    ],
+  );
+  for (const row of clientRows)
+    assert(!pinTool.out.includes(row), "the pin carries a row");
   await cmd("pinClientDataset", {
-    name: "client-applicants.csv",
-    sha256: digest(clientBytes),
-    size: clientBytes.length,
-    confirmedBy: "Client data steward",
-    confirmedOn: new Date().toISOString().slice(0, 10),
+    ...clientPin,
     custodyNote: "Kept on the client's analysis host; its own worker reads it",
   });
+  assert.deepEqual(e.artifacts.at(-1).clientPin.columns, clientPin.columns);
   const pinnedId = e.artifacts.at(-1).id;
   assert.equal(e.artifacts.at(-1).custody, "client");
   await cmd("acceptEvidence", { artifactId: pinnedId });
@@ -1232,7 +1303,8 @@ try {
     version: "1",
     task: "Binary classification",
     suite: ["performance", "demographic_parity"],
-    config: { ...config, groupColumn: "ethnicity" },
+    // A special-category protocol needs a minimum group size of 50 (#134).
+    config: { ...config, groupColumn: "ethnicity", minimumGroupSize: 50 },
     datasetContext: e.evaluationProfiles.at(-1).datasetContext,
     rationale: "Numerical integration fixture only",
     // Special-category, client-side route, no basis recorded (D-11).
@@ -1538,7 +1610,7 @@ try {
     JSON.stringify(clientRun, null, 2),
   );
   console.log(
-    "PASS client-local special-category job: pinned by SHA-256, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
+    "PASS client-local special-category job: pinned by SHA-256 and declared header with the runtime pin tool, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
   );
   // A schemaVersion 1.1 protocol pre-registers an explicit plan whose
   // criterion ids differ from the suite names: queueExternal freezes

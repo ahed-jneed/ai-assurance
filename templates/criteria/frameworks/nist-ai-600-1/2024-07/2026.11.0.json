@@ -1,0 +1,131 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-600-1",
+  "edition": "2024-07",
+  "version": "2026.11.0",
+  "title": "NIST AI 600-1 Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile",
+  "shortTitle": "NIST AI 600-1",
+  "kind": "profile",
+  "publisher": "National Institute of Standards and Technology (NIST)",
+  "jurisdiction": "US",
+  "status": "published",
+  "researchedAsOf": "2026-11-13",
+  "sources": [
+    {
+      "role": "official_text",
+      "url": "https://doi.org/10.6028/NIST.AI.600-1",
+      "title": "NIST AI 600-1 (July 2024), section 2"
+    }
+  ],
+  "licence": {
+    "holder": "National Institute of Standards and Technology (NIST), U.S. Department of Commerce",
+    "textPolicy": "full_text",
+    "status": "confirmed",
+    "basis": "NIST-authored publication: except material marked as copyrighted, information on NIST sites is public information and may be distributed or copied, with credit requested (design section 13). We store identifiers and our own short titles only, not the publication text.",
+    "url": "https://www.nist.gov/oism/copyrights",
+    "attribution": "NIST AI 600-1, Artificial Intelligence Risk Management Framework: Generative Artificial Intelligence Profile, NIST, July 2024."
+  },
+  "defaultProvenance": {
+    "source": "https://doi.org/10.6028/NIST.AI.600-1",
+    "sourceKind": "authentic_text",
+    "verification": "verified",
+    "checkedAt": "2026-11-13",
+    "legalReview": "not_required",
+    "note": "Section numbers and risk names checked against section 2 of NIST AI 600-1 (July 2024). Titles are NIST's risk names."
+  },
+  "requirements": [
+    {
+      "id": "2",
+      "ref": "2",
+      "title": "Risks unique to or exacerbated by generative AI",
+      "type": "group",
+      "exhaustive": true
+    },
+    {
+      "id": "2.1",
+      "ref": "2.1",
+      "title": "CBRN Information or Capabilities",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.2",
+      "ref": "2.2",
+      "title": "Confabulation",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.3",
+      "ref": "2.3",
+      "title": "Dangerous, Violent, or Hateful Content",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.4",
+      "ref": "2.4",
+      "title": "Data Privacy",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.5",
+      "ref": "2.5",
+      "title": "Environmental Impacts",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.6",
+      "ref": "2.6",
+      "title": "Harmful Bias and Homogenization",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.7",
+      "ref": "2.7",
+      "title": "Human-AI Configuration",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.8",
+      "ref": "2.8",
+      "title": "Information Integrity",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.9",
+      "ref": "2.9",
+      "title": "Information Security",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.10",
+      "ref": "2.10",
+      "title": "Intellectual Property",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.11",
+      "ref": "2.11",
+      "title": "Obscene, Degrading, and/or Abusive Content",
+      "type": "requirement",
+      "parent": "2"
+    },
+    {
+      "id": "2.12",
+      "ref": "2.12",
+      "title": "Value Chain and Component Integration",
+      "type": "requirement",
+      "parent": "2"
+    }
+  ],
+  "notes": "This data version holds the twelve risks of section 2, each read as the outcome that the risk is identified and managed for the system. The suggested actions of section 3 (for example GV-1.1-001) are not included yet; a later data version may add them as new requirements. The profile is voluntary; a covered cell is never a statement of conformity."
+}

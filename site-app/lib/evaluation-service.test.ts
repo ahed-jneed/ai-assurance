@@ -505,7 +505,8 @@ describe("special-category fairness data (#60)", () => {
     binaryProtocol({
       version,
       suite: ["demographic_parity"],
-      config: { ...criteria, groupColumn: "group" },
+      // The special-category floor (#134).
+      config: { ...criteria, groupColumn: "group", minimumGroupSize: 50 },
       datasetContext: { ...context, sensitiveDataBasis: "Client DPIA" },
       specialCategory,
     });

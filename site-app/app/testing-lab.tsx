@@ -70,6 +70,7 @@ import {
 } from "./special-category";
 import {
   basisFor,
+  specialCategoryGroupFloor,
   type SpecialCategoryDeclarationInput,
 } from "@/lib/special-category";
 import {
@@ -133,7 +134,9 @@ const initialConfig: EvaluationConfig = {
   // The statistics 1.0.0 floors (section 7): a plan may raise them, never lower them.
   minimumSampleSize: 30,
   minimumClassCount: 10,
-  minimumGroupSize: 30,
+  // A fairness group column is special-category data unless declared
+  // otherwise, and such protocols need at least this many rows (#134).
+  minimumGroupSize: specialCategoryGroupFloor,
   maximumParityGap: 0.1,
   maximumOddsGap: 0.1,
   minimumImpactRatio: 0.8,
@@ -535,9 +538,6 @@ export function TestingLab({
   const classCount =
       inspect?.columns.find((c) => c.name === draft.config.labelColumn)
         ?.uniqueCount ?? null,
-    groupCount =
-      inspect?.columns.find((c) => c.name === draft.config.groupColumn)
-        ?.uniqueCount ?? 2,
     // A saved protocol keeps its frozen plan; a new one pre-registers the form's.
     lockedProfile = profiles.find((p) => p.id === profileId),
     planned = lockedProfile?.statistics
@@ -1876,7 +1876,9 @@ export function TestingLab({
                             "Minimum rows per group",
                             30,
                             1000,
-                            "Smaller groups are reported but never decide.",
+                            "Smaller groups are reported but never decide. A special-category group column needs at least " +
+                              specialCategoryGroupFloor +
+                              ".",
                           )}
                           <Field
                             label="Minimum coverage (0.5–1)"
@@ -2027,7 +2029,23 @@ export function TestingLab({
                       <PowerCheck
                         plan={planned.plan}
                         rows={inspect.rowCount}
-                        groups={fair ? groupCount : 1}
+                        dataset={{
+                          tenantId,
+                          engagementId: e.id,
+                          artifactId: inspect.artifactId,
+                        }}
+                        groupColumn={
+                          fair && draft.config.groupColumn
+                            ? draft.config.groupColumn
+                            : null
+                        }
+                        labelColumn={
+                          draft.task === "Multiclass classification" &&
+                          draft.suite.includes("performance") &&
+                          draft.config.labelColumn
+                            ? draft.config.labelColumn
+                            : null
+                        }
                         assumptions={draft.plan.powerAssumptions}
                         acknowledgement={draft.plan.acknowledgement}
                         disabled={busy}

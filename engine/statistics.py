@@ -19,6 +19,7 @@ import math
 import operator
 import random
 import re
+from pathlib import Path
 from statistics import NormalDist
 
 
@@ -59,15 +60,22 @@ HEADLINE_NAMES = {
     "equalized_odds": {"engine": "equalized_odds_difference", "hosted": "maximum_tpr_fpr_gap"},
     "calibration": {"engine": "maximum_calibration_gap", "hosted": None},
 }
-EU_CAVEAT = "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity."
-LIBRARY = {
-    "screen.us.four-fifths": {"version": 1, "kind": "group_comparison", "metric": "selection_rate_ratio", "parameters": {"tau": {"default": 0.8, "minimum": 0.5, "maximum": 0.95}}, "legalStatus": "screening_heuristic", "caveat": "Four-fifths screen: a rule of thumb from the US Uniform Guidelines (29 CFR 1607.4(D)), not a legal test of discrimination."},
-    "policy.eu-aia.selection-rate-difference": {"version": 1, "kind": "group_comparison", "metric": "selection_rate_difference", "parameters": {"delta": {"default": 0.10, "minimum": 0.01, "maximum": 0.30}}, "legalStatus": "no_legal_safe_harbour", "caveat": EU_CAVEAT},
-    "policy.eu-aia.impact-ratio": {"version": 1, "kind": "group_comparison", "metric": "selection_rate_ratio", "parameters": {"tau": {"default": 0.80, "minimum": 0.5, "maximum": 0.95}}, "legalStatus": "no_legal_safe_harbour", "caveat": EU_CAVEAT},
-    "policy.eu-aia.equalized-odds": {"version": 1, "kind": "group_comparison", "metric": "equalized_odds", "parameters": {"delta": {"default": 0.10, "minimum": 0.01, "maximum": 0.30}}, "legalStatus": "no_legal_safe_harbour", "caveat": EU_CAVEAT},
-    "policy.eu-aia.declared-performance": {"version": 1, "kind": "performance", "metric": None, "parameters": {"metric": {"default": None, "enum": list(BINARY_METRICS)}, "declaredValue": {"default": None, "minimum": 0.0, "maximum": 1.0}, "tolerance": {"default": None, "minimum": 0.0, "maximum": 0.2}}, "legalStatus": "no_legal_safe_harbour", "caveat": "Checks consistency with the accuracy level declared under Art. 15(3); not a conformity assessment."},
-    "policy.eu-aia.calibration": {"version": 1, "kind": "calibration", "metric": None, "parameters": {"delta": {"default": None, "minimum": 0.01, "maximum": 0.2}}, "legalStatus": "no_legal_safe_harbour", "caveat": EU_CAVEAT},
-}
+# Section 10.1: the threshold library is data. engine/threshold-library.json is the generated copy of
+# schemas/threshold-library.json (npm run sync in site-app/), kept beside this module so that the compute image,
+# whose build context is engine/, ships it; the hosted runner reads its own copy of the same file. A criterion can
+# reference the entries whose kind is a criterion kind; the attribute-sampling entries (Art 50) wait for M2.
+LIBRARY_FILE = Path(__file__).resolve().parent/"threshold-library.json"
+CRITERION_KINDS = PERFORMANCE_KINDS + ("group_comparison", "calibration")
+LIBRARY_FIELDS = ("version", "kind", "metric", "parameters", "legalStatus", "caveat")
+
+
+def load_library(path=LIBRARY_FILE):
+    """The entries of the threshold library a plan criterion can reference, keyed by id."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    return {entry["id"]: {key: entry[key] for key in LIBRARY_FIELDS} for entry in data["entries"] if entry["kind"] in CRITERION_KINDS}
+
+
+LIBRARY = load_library()
 
 
 # ---------------------------------------------------------------- numerics
@@ -449,6 +457,9 @@ def normalize_assumptions(criterion, assumptions):
         return {key: assumptions[key] for key in ("n", "prevalence", "truePositiveRate", "trueNegativeRate")}
     if kind == "multiclass_performance":
         _require(abs(math.fsum(assumptions["classShares"].values()) - 1.0) <= 1e-9, "class shares must sum to 1")
+        # Section 8: each class's expected support n*share is a denominator, and every class needs its recall (#113).
+        _require(all(share > 0 for share in assumptions["classShares"].values()), "every class share must be above 0")
+        _require(set(assumptions.get("perClassRecall") or {}) == set(assumptions["classShares"]), "perClassRecall must name exactly the classes of classShares")
         return {key: assumptions[key] for key in ("n", "classShares", "perClassRecall")}
     if kind == "regression_performance":
         out = {key: assumptions[key] for key in ("n", "errorSd")}

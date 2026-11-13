@@ -6,7 +6,7 @@ import {
   type HostedEvaluation,
   type Rows,
 } from "./hosted-statistics";
-import type { Plan } from "./statistics";
+import { codePointCompare, type Plan } from "./statistics";
 const numericCell = (v: string) =>
   /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(v) &&
   Number.isFinite(Number(v));
@@ -89,10 +89,51 @@ export function parseCSV(
     return Object.fromEntries(header.map((h, j) => [h, r[j].trim()]));
   });
 }
-export function inspectCSV(csv: string) {
+/** The most distinct values a column may have for inspectCSV to list them: the class and all-pairs group limits. */
+export const MAX_LISTED_VALUES = 50;
+/**
+ * The column profile of a dataset: row count, and per column its type,
+ * missing and distinct counts, never raw rows. On request it also lists the
+ * distinct values of the `values` columns, and each value's row count for
+ * the `counts` columns, when a column has at most MAX_LISTED_VALUES of them
+ * (otherwise null). The power check (docs/design/audit-statistics.md
+ * section 8) takes the planned group sizes from a group column's counts and
+ * the class names from a target column's values; it never reads outcome
+ * shares from the data.
+ */
+export function inspectCSV(
+  csv: string,
+  listed: { values?: string[]; counts?: string[] } = {},
+) {
   const data = parseCSV(csv, { blankRows: "reject" });
+  const tally = (name: string) => {
+    if (!Object.hasOwn(data[0], name)) return null;
+    const counts = new Map<string, number>();
+    for (const row of data)
+      if (row[name]) counts.set(row[name], (counts.get(row[name]) ?? 0) + 1);
+    return counts.size > MAX_LISTED_VALUES
+      ? null
+      : [...counts].sort(([a], [b]) => codePointCompare(a, b));
+  };
+  // Object.fromEntries defines own properties, so a column named __proto__
+  // stays an ordinary key.
+  const values: Record<string, string[] | null> = Object.fromEntries(
+      (listed.values ?? []).map((name) => [
+        name,
+        tally(name)?.map(([value]) => value) ?? null,
+      ]),
+    ),
+    counts: Record<string, { value: string; count: number }[] | null> =
+      Object.fromEntries(
+        (listed.counts ?? []).map((name) => [
+          name,
+          tally(name)?.map(([value, count]) => ({ value, count })) ?? null,
+        ]),
+      );
   return {
     rowCount: data.length,
+    ...(listed.values?.length ? { values } : {}),
+    ...(listed.counts?.length ? { counts } : {}),
     columns: Object.keys(data[0]).map((name) => {
       const values = data.map((r) => r[name]),
         present = values.filter(Boolean),
