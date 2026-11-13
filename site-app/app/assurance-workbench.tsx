@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, type ReactNode } from "react";
+import { can } from "@/lib/permissions";
 
 import { Button } from "@/components/ui/button";
 
@@ -193,9 +194,9 @@ export function AssuranceWorkbench({
   onEditing: (v: boolean) => void;
 }) {
   const e = data.engagement!,
-    writer = ["Auditor", "Lead Auditor"].includes(data.identity.role),
-    lead = data.identity.role === "Lead Auditor",
-    reviewer = ["Lead Auditor", "Reviewer"].includes(data.identity.role),
+    writer = can(data.identity.role, "registerSystem"),
+    lead = can(data.identity.role, "setAccess"),
+    reviewer = can(data.identity.role, "reviewAssertion"),
     // Obligation-subitem assessments exist only on packs that switch them on
     // (docs/design/criteria-model.md section 7.1); other packs take their
     // assertion criteria from the pack's requirements. The subitems are those

@@ -147,12 +147,6 @@ describe("modal definitions", () => {
     expect(modalDefinition("")).toBeUndefined();
     expect(modalDefinition("toString")).toBeUndefined();
   });
-
-  it("reports only upload failures to the workspace", () => {
-    expect(
-      modalKinds.filter((kind) => modalDefinition(kind)!.reportsToWorkspace),
-    ).toEqual(["upload"]);
-  });
 });
 
 describe("form validation", () => {

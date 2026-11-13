@@ -1,7 +1,6 @@
 "use client";
 // The form dialog every workspace form opens in (see modals/), with its
 // unsaved-entry tracking, error display and discard confirmation.
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +20,7 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import type { Engagement, Role } from "@/lib/domain";
+import { errorMessage } from "@/lib/fetch-json";
 import type { WorkspaceData } from "../workspace-types";
 import { modalDefinition } from "./modals";
 import type {
@@ -39,7 +39,6 @@ export function ModalHost({
   lead,
   busy,
   setBusy,
-  setError,
   act,
   manage,
   load,
@@ -52,7 +51,6 @@ export function ModalHost({
   lead: boolean;
   busy: boolean;
   setBusy: (busy: boolean) => void;
-  setError: (error: string) => void;
   act: WorkspaceAct;
   manage: WorkspaceManage;
   load: WorkspaceLoad;
@@ -104,8 +102,9 @@ export function ModalHost({
         finding,
         data,
         engagement,
-        act,
-        manage,
+        // The form shows a failure itself: its one error surface (F-71).
+        act: (op, v, override) => act(op, v, override, { quiet: true }),
+        manage: (op, v) => manage(op, v, { quiet: true }),
         load,
         setBusy,
         followUps,
@@ -118,12 +117,7 @@ export function ModalHost({
       state.setModal("");
     } catch (err) {
       setBusy(false);
-      const message = err instanceof Error ? err.message : "Could not save";
-      state.showError(message);
-      if (definition?.reportsToWorkspace) {
-        setError(message);
-        toast.error(message);
-      }
+      state.showError(errorMessage(err, "Could not save"));
     } finally {
       state.setSubmitting(false);
     }

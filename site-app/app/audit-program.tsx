@@ -51,6 +51,9 @@ import {
   runBindsProcedure,
 } from "@/lib/workflow-state";
 import type { WorkspaceData } from "./workspace-types";
+import { can, decisionState } from "@/lib/permissions";
+import { useAttest } from "./workspace/attestation-dialog";
+import { DecisionButton } from "./workspace/decision-button";
 import { FrozenReportDetails } from "./report-details";
 import { ProcedureContext } from "./procedure-context";
 import { ProcedureComparison } from "./revision-comparison";
@@ -439,9 +442,11 @@ export function AuditProgram({
     w = e.workflow,
     uid = data.identity.id,
     role = data.identity.role,
-    writer = ["Auditor", "Lead Auditor"].includes(role),
-    lead = role === "Lead Auditor",
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role);
+    // Coarse flags for the program's sections; decisions check their own op.
+    writer = can(role, "recordProcedureExecution"),
+    lead = can(role, "approveAcceptance"),
+    reviewer = can(role, "reviewProcedure");
+  const attest = useAttest();
   const memoryKey = data.tenantId + ":" + uid + ":" + e.id,
     memory = programViewMemory.get(memoryKey);
   const availableInitialProcedure =
@@ -2237,26 +2242,17 @@ export function AuditProgram({
                           </Button>
                         </>
                       )}
-                      {lead &&
-                        p.state === "reviewed" &&
-                        e.papers.find((q) => q.id === p.paperId)?.status ===
-                          "reviewed" && (
-                          <Button
-                            disabled={
-                              busy ||
-                              e.papers
-                                .find((q) => q.id === p.paperId)
-                                ?.reviews.some((r) => r.userId === uid)
-                            }
-                            onClick={() =>
-                              void act("signPaper", {
-                                paperId: p.paperId,
-                              }).catch(() => {})
-                            }
-                          >
-                            Sign working paper
-                          </Button>
-                        )}
+                      <SignBoundPaper
+                        paper={
+                          p.state === "reviewed"
+                            ? e.papers.find((q) => q.id === p.paperId)
+                            : undefined
+                        }
+                        role={role}
+                        userId={uid}
+                        busy={busy}
+                        onSign={(paperId) => attest("signPaper", { paperId })}
+                      />
                     </div>
                     <details className="provenance">
                       <summary>
@@ -2321,8 +2317,8 @@ export function ReportRelease({
   const [preview, setPreview] = useState(false),
     [form, setForm] = useState<Form | null>(null),
     state = releaseState(r),
-    lead = role === "Lead Auditor",
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role);
+    lead = can(role, "releaseReport"),
+    reviewer = can(role, "approveReportPackage");
   return (
     <section className="release-controls">
       <div className="panel-head">
@@ -2525,6 +2521,31 @@ export function ReportRelease({
     </section>
   );
 }
+/** Signs the reviewed paper a procedure compiled, once it is independently reviewed. */
+function SignBoundPaper({
+  paper,
+  role,
+  userId,
+  busy,
+  onSign,
+}: {
+  paper: Paper | undefined;
+  role: Role;
+  userId: string;
+  busy: boolean;
+  onSign: (paperId: string) => void;
+}) {
+  if (paper?.status !== "reviewed") return null;
+  return (
+    <DecisionButton
+      state={decisionState(role, userId, { action: "signPaper", paper })}
+      disabled={busy}
+      onClick={() => onSign(paper.id)}
+    >
+      Sign working paper
+    </DecisionButton>
+  );
+}
 export function FindingAssurance({
   finding: f,
   engagement: e,
@@ -2543,8 +2564,9 @@ export function FindingAssurance({
   onEditing: (v: boolean) => void;
 }) {
   const [form, setForm] = useState<Form | null>(null),
-    writer = ["Auditor", "Lead Auditor"].includes(role),
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role);
+    writer = can(role, "linkFindingSupport"),
+    reviewer = can(role, "recordFindingRetest");
+  const attest = useAttest();
   return (
     <section className="release-controls">
       <h3>Support and independent retest</h3>
@@ -2653,21 +2675,20 @@ export function FindingAssurance({
             Record independent retest
           </Button>
         )}
-        {reviewer &&
-          f.status === "ready_for_retest" &&
+        {f.status === "ready_for_retest" &&
           f.retest?.conclusion === "effective" && (
-            <Button
-              disabled={
-                busy || f.createdBy === userId || f.remediationBy === userId
-              }
-              onClick={() =>
-                void act("closeFinding", { findingId: f.id }).catch(() => {})
-              }
+            <DecisionButton
+              state={decisionState(role, userId, {
+                action: "closeFinding",
+                finding: f,
+              })}
+              disabled={busy}
+              onClick={() => attest("closeFinding", { findingId: f.id })}
             >
               Close verified finding
-            </Button>
+            </DecisionButton>
           )}
-        {role === "Lead Auditor" && f.status === "closed" && (
+        {can(role, "reopenFinding") && f.status === "closed" && (
           <Button
             variant="outline"
             onClick={() =>

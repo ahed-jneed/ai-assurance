@@ -3,6 +3,7 @@ import { bucket } from "@/lib/bindings";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import { now, sha256 } from "@/lib/ids";
+import { rolesFor } from "@/lib/permissions";
 import { context, requireRole } from "@/lib/tenancy";
 import { buildDossier, scopeSha256, signDossier } from "@/lib/dossier";
 import { dossierScopeRequest, scopeDefinition } from "@/lib/dossier-scope";
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
         .parse(await readJson(request, 20000)),
       ctx = await context(v.tenantId),
       e = await getEngagement(ctx, v.engagementId);
-    requireRole(ctx, ["Lead Auditor"]);
+    requireRole(ctx, rolesFor("sealDossier"));
     const r = e.reports.find((r) => r.id === v.reportId);
     if (!r || (v.audience === "client" && !isReleased(r)))
       throw new ApiError(
@@ -162,6 +163,10 @@ export async function GET(request: Request) {
     if (scopeKey !== null && audience !== "internal")
       throw new ApiError(404, "Dossier not available");
     const seal = await dossierSeal(ctx, e.id, r.id, audience, scopeKey);
+    // ?sealed=1 answers whether the dossier is sealed, so a client sees the
+    // download link only once there is something to download (F-71).
+    if (u.searchParams.get("sealed") === "1")
+      return Response.json({ sealed: !!seal });
     if (!seal)
       throw new ApiError(
         409,

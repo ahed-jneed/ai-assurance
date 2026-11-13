@@ -1,5 +1,6 @@
 "use client";
 import { Download, FileText } from "lucide-react";
+import { can } from "@/lib/permissions";
 import {
   Table,
   TableHeader,
@@ -9,7 +10,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { canWrite, type Artifact, type Finding, type Role } from "@/lib/domain";
+import type { Artifact, Finding, Role } from "@/lib/domain";
 import {
   genaiLevelBadge,
   type GenaiArtifactLevel,
@@ -141,7 +142,7 @@ export function EvidenceRegister({
             </TableCell>
             <TableCell className="register-actions">
               <div className="row-actions">
-                {canWrite(role) && a.status === "unverified" && (
+                {can(role, "acceptEvidence") && a.status === "unverified" && (
                   <Button
                     size="sm"
                     variant="ghost"

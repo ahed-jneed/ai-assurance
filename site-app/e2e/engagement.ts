@@ -6,7 +6,14 @@
 // an engagement's lifecycle works on its own engagement, so the shared demo
 // engagement keeps the state the other specs expect.
 import { releaseChecklist } from "../lib/domain/release-time";
-import { expect, persona, unique, type Api, type PersonaId } from "./fixtures";
+import {
+  attest,
+  expect,
+  persona,
+  unique,
+  type Api,
+  type PersonaId,
+} from "./fixtures";
 
 /** The ids of an engagement a spec created for itself. */
 export type Engagement = { tenantId: string; engagementId: string };
@@ -258,7 +265,7 @@ export async function completedProcedure(
   const paperId = (await engagementOf(lead, e)).workflow.procedures.find(
     (q: { id: string }) => q.id === procedureId,
   ).paperId;
-  await run(lead, e, "signPaper", { paperId });
+  await run(lead, e, "signPaper", { paperId, ...attest });
 }
 
 /** The procedure executed, evaluated and submitted for review by its preparer. */
@@ -274,7 +281,7 @@ export async function submittedProcedure(
     "Risk register extract: 12 risks, owners and treatments (synthetic).",
     "Governance",
   );
-  await run(auditor, e, "acceptEvidence", { artifactId });
+  await run(auditor, e, "acceptEvidence", { artifactId, ...attest });
   const p = (await engagementOf(auditor, e)).workflow.procedures.find(
     (q: { id: string }) => q.id === procedureId,
   );
@@ -320,10 +327,10 @@ export async function engagementInSignOff(
     clientId,
     title,
   );
-  await run(lead, e, "setStage", { stage: "Evidence evaluation" });
+  await run(lead, e, "setStage", { stage: "Evidence evaluation", ...attest });
   await completedProcedure([lead, auditor, reviewer], e, e.procedureId);
   for (const stage of ["Reporting", "Sign-off"])
-    await run(lead, e, "setStage", { stage });
+    await run(lead, e, "setStage", { stage, ...attest });
   expect((await engagementOf(lead, e)).stage).toBe("Sign-off");
   return e;
 }
@@ -347,11 +354,11 @@ export async function engagementInFieldwork(
       .filter((id) => id !== lead.who.id),
   );
   await run(lead, e, "classify", CLASSIFICATION);
-  await run(reviewer, e, "approveClassification");
+  await run(reviewer, e, "approveClassification", attest);
   await approvedScope(lead, reviewer, e);
   const procedureId = await approvedProgram(preparer, reviewer, e);
   await acceptedEngagement([lead, preparer, reviewer], e);
-  await run(lead, e, "setStage", { stage: "Fieldwork" });
+  await run(lead, e, "setStage", { stage: "Fieldwork", ...attest });
   return { ...e, procedureId };
 }
 

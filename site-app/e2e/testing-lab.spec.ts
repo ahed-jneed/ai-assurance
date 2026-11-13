@@ -6,7 +6,14 @@
 import { readFileSync } from "node:fs";
 import { expectAccessible } from "./a11y";
 import { engagementOf, joinTeam, newEngagement, run } from "./engagement";
-import { expect, runCommand, test, unique, workspacePath } from "./fixtures";
+import {
+  attest,
+  expect,
+  runCommand,
+  test,
+  unique,
+  workspacePath,
+} from "./fixtures";
 
 const predictions = readFileSync(
   new URL("../../engine/examples/predictions.csv", import.meta.url),
@@ -67,7 +74,7 @@ test("the Auditor registers a model and evaluates it in the testing lab", async 
     predictions,
     "Dataset",
   );
-  await run(auditor, e, "acceptEvidence", { artifactId });
+  await run(auditor, e, "acceptEvidence", { artifactId, ...attest });
 
   // The Auditor registers the saved predictions as a model version.
   const page = await signIn("qa-auditor");

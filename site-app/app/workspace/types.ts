@@ -20,11 +20,18 @@ export type WorkspaceLoad = (
   tenantId?: string,
   engagementId?: string,
 ) => Promise<WorkspaceData | null>;
+/**
+ * How a command reports its failure. By default a failed command shows one
+ * toast; `quiet` leaves the error to the caller, which shows it in its own
+ * form or dialog.
+ */
+export type CommandOptions = { quiet?: boolean };
 /** Runs an engagement command through POST /api/workspace. */
 export type WorkspaceAct = (
   op: string,
   values: Record<string, unknown>,
   override?: Engagement,
+  options?: CommandOptions,
 ) => Promise<{
   engagement: Engagement;
   details?: Record<string, string>;
@@ -33,8 +40,8 @@ export type WorkspaceAct = (
 export type WorkspaceManage = (
   op: string,
   values: Record<string, unknown>,
+  options?: CommandOptions,
 ) => Promise<{
-  error?: string;
   details: Record<string, string>;
 }>;
 export type OpenModal = (

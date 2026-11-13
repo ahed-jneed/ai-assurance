@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -372,7 +373,8 @@ export function RequestAccess({
     [form, setForm] =
       useState<Parameters<typeof WorkflowDialog>[0]["form"]>(null),
     now = useNow();
-  if (data.identity.role !== "Lead Auditor" || !e.workflow) return null;
+  if (!can(data.identity.role, "grantClientRequest") || !e.workflow)
+    return null;
   const lapsed = new Set(data.lapsedClientGrants ?? []),
     at = now,
     lapsedCount = e.workflow.clientGrants.filter(

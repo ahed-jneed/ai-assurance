@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expectAccessible } from "./a11y";
-import { expect, test, unique, workspacePath } from "./fixtures";
+import { attest, expect, test, unique, workspacePath } from "./fixtures";
 
 const root = (path: string) =>
   readFileSync(fileURLToPath(new URL("../../" + path, import.meta.url)));
@@ -33,6 +33,7 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
     );
     await auditor.command(demo.tenantId, demo.engagementId, "acceptEvidence", {
       artifactId,
+      ...attest,
     });
     return artifactId;
   };
@@ -83,28 +84,28 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
 
   // #145: the re-run attestation form pins both inputs of the envelope.
   await page.getByRole("button", { name: "Attest a re-run" }).click();
-  const attest = page.getByRole("dialog", { name: "Attest an auditor re-run" });
-  await attest
+  const rerun = page.getByRole("dialog", { name: "Attest an auditor re-run" });
+  await rerun
     .getByLabel(/^judged_qa_30\.eval/)
     .first()
     .check();
-  await attest
+  await rerun
     .getByLabel(/^judge_large_200\.jsonl/)
     .first()
     .check();
-  await attest.getByLabel("Harness name").fill("inspect_ai");
-  await attest.getByLabel("Harness version").fill("0.3.90");
-  await attest
+  await rerun.getByLabel("Harness name").fill("inspect_ai");
+  await rerun.getByLabel("Harness version").fill("0.3.90");
+  await rerun
     .getByLabel("System under test: endpoint host")
     .fill("api.example.com");
-  await attest
+  await rerun
     .getByLabel("System under test: model snapshot")
     .fill("fixture-2026-10");
-  await attest.getByLabel("Run started (UTC)").fill("2026-11-05T09:00");
-  await attest.getByLabel("Run ended (UTC)").fill("2026-11-05T10:00");
-  await attest.getByLabel("Statement").selectOption({ index: 1 });
-  await attest.getByRole("button", { name: "Record attestation" }).click();
-  await expect(attest).toBeHidden();
+  await rerun.getByLabel("Run started (UTC)").fill("2026-11-05T09:00");
+  await rerun.getByLabel("Run ended (UTC)").fill("2026-11-05T10:00");
+  await rerun.getByLabel("Statement").selectOption({ index: 1 });
+  await rerun.getByRole("button", { name: "Record attestation" }).click();
+  await expect(rerun).toBeHidden();
   await expect(card.getByText(/re-run attested/)).toBeVisible();
   // An uploaded envelope stays at L1 even when attested.
   await expect(card.getByText("L1 · hashed tool log").first()).toBeVisible();

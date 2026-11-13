@@ -12,7 +12,14 @@ import {
   engagementOf,
   submittedProcedure,
 } from "./engagement";
-import { expect, recordPath, runCommand, test, unique } from "./fixtures";
+import {
+  attest,
+  expect,
+  recordPath,
+  runCommand,
+  test,
+  unique,
+} from "./fixtures";
 
 test("the preparer of a procedure cannot review it", async ({
   signIn,
@@ -89,6 +96,7 @@ test("a Lead Auditor who edited a paper cannot review it", async ({
   );
   await auditor.command(demo.tenantId, demo.engagementId, "acceptEvidence", {
     artifactId,
+    ...attest,
   });
   const { paperId } = await auditor.command(
     demo.tenantId,

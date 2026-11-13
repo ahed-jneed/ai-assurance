@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { can } from "@/lib/permissions";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,7 @@ export function ExecutionPlanner({
       datasetCardRecordId: "",
     }),
     r = testingReadiness(e, records, workers, role, selection),
-    writer = ["Auditor", "Lead Auditor"].includes(role);
+    writer = can(role, "queueRun");
   const remaining = r.checks.filter((c) => !c.done).length;
   const setupAction =
     e.workflow?.brief?.status !== "approved" ||
@@ -142,6 +143,9 @@ export function ExecutionPlanner({
             label: "External supplied predictions",
           },
           { id: "client_local", label: "Client local predictions" },
+          // queueRun admits writers; the auditor_model mode alone narrows
+          // to the Lead Auditor (lib/commands/assurance/execution.ts), so
+          // the permission map has no op for it.
           ...(role === "Lead Auditor"
             ? [
                 {

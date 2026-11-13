@@ -2,6 +2,7 @@
 // conclusion, links accepted evidence and submits the paper for review.
 import { expectAccessible } from "./a11y";
 import {
+  attest,
   choose,
   expect,
   runCommand,
@@ -30,6 +31,7 @@ test("the Auditor prepares a working paper and submits it for review", async ({
   );
   await auditor.command(demo.tenantId, demo.engagementId, "acceptEvidence", {
     artifactId,
+    ...attest,
   });
   const before = (await auditor.workspace(demo.tenantId, demo.engagementId))
     .engagement.papers.length;

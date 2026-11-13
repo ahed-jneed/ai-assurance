@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { can } from "@/lib/permissions";
 import {
   FileText,
   Maximize2,
@@ -39,7 +40,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ApprovalTable } from "./record-details";
 import { humanLabel } from "@/lib/presentation";
 import type { Engagement, Paper, Role, EvidenceRequest } from "@/lib/domain";
-import { canWrite } from "@/lib/domain";
 import {
   paperChecklist,
   paperHistoryNotice,
@@ -281,9 +281,9 @@ export function PaperEditor({
   const bound = source?.paperRevision !== undefined ? source : undefined;
   // Superseded, retired and release-time papers never change (#94).
   const historyNotice = saved ? paperHistoryNotice(saved) : null;
-  const writer = canWrite(role),
-    lead = role === "Lead Auditor",
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role),
+  const writer = can(role, "editPaper"),
+    lead = can(role, "signPaper"),
+    reviewer = can(role, "reviewPaper"),
     editable = writer && draft?.status !== "signed" && !bound && !historyNotice;
   const recovery = useRecoverableDraft(
     draft && saved && engagement

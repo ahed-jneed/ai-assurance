@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 import {
@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
 import type { Engagement, Report, Role } from "@/lib/domain";
+import { fetchJson } from "@/lib/fetch-json";
+import { can } from "@/lib/permissions";
 import { isClientRole } from "@/lib/workflow-state";
 import { describeScope, type DossierScope } from "@/lib/dossier-scope";
 type CapturedEvidence = { id: string; name: string; status: string };
@@ -52,7 +54,7 @@ const dossierRecords = recordsQuery("dossier");
  * the report come from the workspace state; the sealed dossiers are the
  * engagement's dossier records, a shared query (lib/assurance-query.ts) read
  * once per engagement version and again after a seal. Client roles read no
- * records: they download the client dossier only.
+ * records: they download the client dossier only, once it is sealed.
  */
 export function DossierControls({
   tenantId,
@@ -69,14 +71,33 @@ export function DossierControls({
 }) {
   const reportId = report.id,
     engagementId = e.id,
-    client = isClientRole(role);
+    client = isClientRole(role),
+    sealer = can(role, "sealDossier");
   const [audience, setAudience] = useState(""),
     [captured, setCaptured] = useState<Record<string, CapturedEvidence[]>>({}),
     [withheld, setWithheld] = useState<Record<string, string>>({});
   const [choices, setChoices] = useState<ScopeChoices | null>(null),
     [draft, setDraft] = useState<ScopeDraft>(emptyDraft),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    // Whether the client dossier is sealed, as a client reader learns it.
+    [clientSealed, setClientSealed] = useState(false);
+  useEffect(() => {
+    if (!client) return;
+    let active = true;
+    fetchJson<{ sealed: boolean }>(
+      "/api/dossier?" +
+        new URLSearchParams({ tenantId, engagementId, reportId, sealed: "1" }),
+      { cache: "no-store" },
+    )
+      .then((status) => {
+        if (active) setClientSealed(status.sealed);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [client, tenantId, engagementId, reportId]);
   const dossiers = useAssuranceQuery(
     client ? null : { tenantId, engagementId, version: e.version },
     dossierRecords,
@@ -188,7 +209,7 @@ export function DossierControls({
       </p>
       {(client ? ["client"] : ["internal", "client"]).map((a) => (
         <div className="row-actions" key={a}>
-          {role === "Lead Auditor" && !sealed[a] && (
+          {sealer && !sealed[a] && (
             <Button
               disabled={busy}
               variant="outline"
@@ -198,7 +219,7 @@ export function DossierControls({
               Seal {a} dossier
             </Button>
           )}
-          {(sealed[a] || client) && (
+          {(sealed[a] || (client && clientSealed)) && (
             <a
               className="download-link"
               href={"/api/dossier?" + q + "&audience=" + a}
@@ -216,7 +237,7 @@ export function DossierControls({
       ))}
       {!client && (
         <div className="scoped-dossiers">
-          {role === "Lead Auditor" && (
+          {sealer && (
             <div className="row-actions">
               <Button
                 disabled={busy}

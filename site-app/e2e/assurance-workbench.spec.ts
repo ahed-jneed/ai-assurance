@@ -3,7 +3,7 @@
 // every record page. The Lead Auditor records an assertion whose precise
 // source is found by a server search in the source picker, and the record
 // opens by id with its review state; the Reviewer's review shows on reopening.
-import { expect, test, unique, workspacePath } from "./fixtures";
+import { attest, expect, test, unique, workspacePath } from "./fixtures";
 
 test("the Lead Auditor records an assertion from a searched source without loading every record", async ({
   signIn,
@@ -19,7 +19,10 @@ test("the Lead Auditor records an assertion from a searched source without loadi
     `workbench-source-${marker}.txt`,
     "Approval rule: score > 600",
   );
-  await lead.command(tenantId, engagementId, "acceptEvidence", { artifactId });
+  await lead.command(tenantId, engagementId, "acceptEvidence", {
+    artifactId,
+    ...attest,
+  });
   const assurance = async (
     who: typeof lead,
     op: string,

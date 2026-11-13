@@ -53,6 +53,4 @@ export type ModalDefinition = {
   validate?: (ctx: ModalSubmitContext) => void;
   /** Saves the form; "keep-open" leaves the dialog open without an error. */
   submit?: (ctx: ModalSubmitContext) => Promise<unknown> | "keep-open" | void;
-  /** Also reports a failure in the workspace error banner and a toast. */
-  reportsToWorkspace?: boolean;
 };

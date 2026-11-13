@@ -25,6 +25,12 @@ export type CommandResult =
  */
 export type CommandModule<Target = Engagement, Result = CommandResult> = {
   readonly ops: readonly string[];
+  /**
+   * The roles each op declares, for modules built with defineCommands. A
+   * module that checks roles inside its own service (the workflow and
+   * evidence requests) has none; lib/permissions.test.ts probes those.
+   */
+  readonly roles?: Readonly<Record<string, readonly Role[]>>;
   run(
     target: Target,
     op: string,
@@ -55,6 +61,9 @@ export function defineCommands<Target = Engagement, Result = CommandResult>(
   const table = new Map(Object.entries(handlers));
   return {
     ops: [...table.keys()],
+    roles: Object.fromEntries(
+      Object.entries(handlers).map(([op, h]) => [op, h.roles]),
+    ),
     run(target, op, data, ctx) {
       const handler = table.get(op);
       if (!handler) throw new ApiError(400, "Unknown command");

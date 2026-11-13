@@ -31,6 +31,7 @@ import {
   ReportRelease,
   panelFallback,
 } from "./panels";
+import { useAttest } from "./attestation-dialog";
 import { liveRecord } from "./records";
 import type { OpenModal, WorkspaceAct, WorkspaceLoad } from "./types";
 import type { RecordSheetState } from "./use-record-sheet";
@@ -46,7 +47,6 @@ export function RecordSheet({
   busy,
   resolve,
   act,
-  safeAct,
   load,
   reporters,
   onPaper,
@@ -64,7 +64,6 @@ export function RecordSheet({
   busy: boolean;
   resolve: (id: string) => string;
   act: WorkspaceAct;
-  safeAct: (op: string, values: Record<string, unknown>) => void;
   load: WorkspaceLoad;
   reporters: Record<EditingSource, EditingReporter>;
   onPaper: (paper: Paper) => void;
@@ -75,6 +74,7 @@ export function RecordSheet({
   const { detail, setDetail, detailExpanded, setDetailExpanded, viewDetail } =
     sheet;
   const liveDetail = liveRecord(detail?.value, e);
+  const attest = useAttest();
   const openPaper = (p: Paper) => {
     setDetail(null);
     onPaper(p);
@@ -124,7 +124,7 @@ export function RecordSheet({
                   busy={busy}
                   resolve={resolve}
                   onAccept={() =>
-                    safeAct("acceptEvidence", {
+                    attest("acceptEvidence", {
                       artifactId: (detail.value as Artifact).id,
                     })
                   }

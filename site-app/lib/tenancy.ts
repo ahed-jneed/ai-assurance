@@ -219,7 +219,7 @@ async function provisionPractice(user: Context["user"]) {
   ]);
   return tenantId;
 }
-export function requireRole(ctx: Context, allowed: Role[]) {
+export function requireRole(ctx: Context, allowed: readonly Role[]) {
   if (!allowed.includes(ctx.role))
     throw new ApiError(403, "Your role cannot perform this action");
 }

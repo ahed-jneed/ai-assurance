@@ -15,7 +15,7 @@ import { RefreshCw, ShieldCheck } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { canWrite } from "@/lib/domain";
+import { can } from "@/lib/permissions";
 import { selectPaperRegister } from "@/lib/paper-presentation";
 import {
   AccountMenu,
@@ -27,6 +27,7 @@ import { EngagementSwitcher as EngagementSwitcherView } from "../engagement-swit
 import { MemberOnboarding as MemberOnboardingView } from "../member-onboarding";
 import { WorkspaceNavigation as WorkspaceNavigationView } from "../workspace-navigation";
 import { WorkspaceSearch as WorkspaceSearchView } from "../workspace-search";
+import { AttestProvider, useAttestation } from "./attestation-dialog";
 import { useLabIntent } from "./lab-intent";
 import { ModalHost } from "./modal-host";
 import { useModelContextTools } from "./model-context-tools";
@@ -50,6 +51,7 @@ import {
   useWorkspaceData,
 } from "./use-workspace-data";
 import { useWorkspaceNavigation } from "./use-workspace-navigation";
+import { ViewBoundary } from "./view-boundary";
 import { WorkspaceViews } from "./views/workspace-views";
 import { WorkspaceTopbar as WorkspaceTopbarView } from "./workspace-topbar";
 
@@ -110,9 +112,10 @@ export default function Workspace() {
   const { data, busy, loading, bootstrapping, connect } = workspace;
   const e = data?.engagement,
     role = data?.identity.role ?? "Client Viewer",
-    writer = canWrite(role),
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role),
-    lead = role === "Lead Auditor",
+    // Coarse view flags; each action checks its own op with can().
+    writer = can(role, "editPaper"),
+    reviewer = can(role, "reviewPaper"),
+    lead = can(role, "signPaper"),
     viewer = ["Client Viewer", "Client Contributor"].includes(role);
   const editing = useEditingRegistry();
   const url = useUrlState(data);
@@ -120,6 +123,9 @@ export default function Workspace() {
   const sheet = useRecordSheet();
   const paper = usePaperEditor(e);
   const lab = useLabIntent(url.view);
+  const attestation = useAttestation(e, workspace.act, () =>
+    workspace.load(data?.tenantId, e?.id),
+  );
   const [switchOpen, setSwitchOpen] = useState(false),
     [searchOpen, setSearchOpen] = useState(false),
     [sidebarWidth, setSidebarWidth] = useState(272),
@@ -163,6 +169,7 @@ export default function Workspace() {
     modal,
     lab,
     guarded,
+    attest: attestation.attest,
     setSwitchOpen,
     setSearchOpen,
   });
@@ -191,6 +198,7 @@ export default function Workspace() {
     bootstrapping ||
     switchOpen ||
     !!modal.modal ||
+    attestation.open ||
     !!sheet.detail ||
     editing.editorOpen;
   useSearchShortcut(searchDisabled, setSearchOpen);
@@ -223,6 +231,8 @@ export default function Workspace() {
       [lab.intent, lab.consume],
     ),
     handlers = useStableShape({
+      // Stable, so the attestation context does not re-render memoised views.
+      attest: attestation.attest,
       openModal: modal.open,
       viewDetail: sheet.viewDetail,
       onboard: () => {
@@ -237,164 +247,183 @@ export default function Workspace() {
   const openSearch = useCallback(() => setSearchOpen(true), []),
     closeOnboarding = useCallback(() => setOnboarding(false), []),
     account = useMemo(() => <AccountMenu data={data} />, [data]);
+  const attest = handlers.attest;
   if (workspace.signedOut) return <SignedOut />;
+  // Reloading a failed view reloads the open engagement, then renders it
+  // again; the rest of the workspace and its unsaved entries are kept.
+  const reloadView = () => workspace.load(data?.tenantId, e?.id);
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": sidebarWidth + "px",
-          "--sidebar-width-icon": "4rem",
-        } as React.CSSProperties
-      }
-    >
-      <a href="#audit-main-content" className="audit-skip-link">
-        Skip to audit content
-      </a>
-      <Toaster richColors />
-      <WorkspaceNavigation
-        width={sidebarWidth}
-        onWidthChange={setSidebarWidth}
-        data={data}
-        view={url.view}
-        navigationDisabled={
-          !data || busy || loading || bootstrapping || switchOpen
+    <AttestProvider attest={attest}>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": sidebarWidth + "px",
+            "--sidebar-width-icon": "4rem",
+          } as React.CSSProperties
         }
-        onSearch={openSearch}
-        searchDisabled={searchDisabled}
-        onNavigate={viewNav.navigate}
-        onSwitch={viewNav.switchEngagement}
-        onPractice={viewNav.changePractice}
-        account={account}
-      />
-      <SidebarInset>
-        <WorkspaceTopbar
+      >
+        <a href="#audit-main-content" className="audit-skip-link">
+          Skip to audit content
+        </a>
+        <Toaster richColors />
+        <WorkspaceNavigation
+          width={sidebarWidth}
+          onWidthChange={setSidebarWidth}
           data={data}
           view={url.view}
-          clientId={url.clientId}
-          role={role}
-          searchDisabled={searchDisabled}
+          navigationDisabled={
+            !data || busy || loading || bootstrapping || switchOpen
+          }
           onSearch={openSearch}
+          searchDisabled={searchDisabled}
           onNavigate={viewNav.navigate}
-          onClient={viewNav.openClient}
+          onSwitch={viewNav.switchEngagement}
+          onPractice={viewNav.changePractice}
+          account={account}
         />
-        <main id="audit-main-content" tabIndex={-1} className="audit-main">
-          {workspace.error && (
-            <div className="error-banner" role="alert">
-              {workspace.error}
-              <Button variant="ghost" size="sm" onClick={workspace.retry}>
-                <RefreshCw size={14} /> Retry
-              </Button>
-            </div>
-          )}
-          {loading || bootstrapping
-            ? workspaceFallback
-            : data && (
-                <WorkspaceViews
-                  data={data}
-                  url={viewUrl}
-                  nav={viewNav}
-                  access={access}
-                  busy={busy}
-                  act={workspace.act}
-                  safeAct={workspace.safeAct}
-                  load={workspace.load}
-                  displayedEvidenceTab={displayedEvidenceTab}
-                  paperRows={paperRows}
-                  reporters={editing.reporters}
-                  resolve={resolveName}
-                  lab={viewLab}
-                  onModal={handlers.openModal}
-                  onDetail={handlers.viewDetail}
-                  onOnboard={handlers.onboard}
-                />
-              )}
-        </main>
-      </SidebarInset>
-      {data && (
-        <MemberOnboarding
-          key={onboardingRun}
-          open={onboarding}
-          onClose={closeOnboarding}
-          data={data}
-          busy={busy}
-          manage={workspace.manage}
-          act={workspace.act}
-          onEditing={editing.reporters["member-onboarding"]}
-        />
-      )}
-      <PaperEditorHost
-        paper={paper}
-        sequence={
-          url.view === "Working papers"
-            ? paperRows.map((r) => r.paper)
-            : (e?.papers ?? [])
-        }
-        engagement={e}
-        data={data}
-        role={role}
-        busy={busy}
-        error={workspace.error}
-        paperTarget={url.paperTarget}
-        setPaperTarget={url.setPaperTarget}
-        act={workspace.act}
-        resolve={resolveName}
-        onOpenPaper={nav.openPaper}
-        onOpenRecord={nav.openRecordInstead}
-        onVault={nav.openVaultFiles}
-        onRequest={nav.requestForPaper}
-        onClose={nav.closePaper}
-        onAction={nav.paperAction}
-        onProcedure={nav.openPaperProcedure}
-        onDetail={sheet.viewDetail}
-      />
-      <ModalHost
-        state={modal}
-        data={data}
-        engagement={e}
-        role={role}
-        lead={lead}
-        busy={busy}
-        setBusy={workspace.setBusy}
-        setError={workspace.setError}
-        act={workspace.act}
-        manage={workspace.manage}
-        load={workspace.load}
-        followUps={nav.modalFollowUps}
-      />
-      <RecordSheet
-        sheet={sheet}
-        editorOpen={editing.editorOpen}
-        data={data}
-        engagement={e}
-        role={role}
-        viewer={viewer}
-        busy={busy}
-        resolve={resolveName}
-        act={workspace.act}
-        safeAct={workspace.safeAct}
-        load={workspace.load}
-        reporters={editing.reporters}
-        onPaper={nav.openPaper}
-        onModal={modal.open}
-        onRequestForm={nav.requestForm}
-        onRemediate={nav.remediateFinding}
-      />
-      {data && (
-        <EngagementSwitcher
-          data={data}
-          open={switchOpen}
-          onOpenChange={setSwitchOpen}
-          onSelect={viewNav.openEngagement}
-        />
-      )}
-      {data && (
-        <WorkspaceSearch
-          data={data}
-          open={searchOpen}
-          onOpenChange={setSearchOpen}
-          onSelect={viewNav.searchSelect}
-        />
-      )}
-    </SidebarProvider>
+        <SidebarInset>
+          <WorkspaceTopbar
+            data={data}
+            view={url.view}
+            clientId={url.clientId}
+            role={role}
+            searchDisabled={searchDisabled}
+            onSearch={openSearch}
+            onNavigate={viewNav.navigate}
+            onClient={viewNav.openClient}
+          />
+          <main id="audit-main-content" tabIndex={-1} className="audit-main">
+            {workspace.error && (
+              // Load failures only: a failed command reports in its own toast
+              // or form, so Retry here always retries the load.
+              <div className="error-banner" role="alert">
+                {workspace.error}
+                <Button variant="ghost" size="sm" onClick={workspace.retry}>
+                  <RefreshCw size={14} /> Retry
+                </Button>
+              </div>
+            )}
+            {loading || bootstrapping
+              ? workspaceFallback
+              : data && (
+                  <ViewBoundary key={url.view} onReload={reloadView}>
+                    <WorkspaceViews
+                      data={data}
+                      url={viewUrl}
+                      nav={viewNav}
+                      access={access}
+                      busy={busy}
+                      act={workspace.act}
+                      safeAct={workspace.safeAct}
+                      load={workspace.load}
+                      displayedEvidenceTab={displayedEvidenceTab}
+                      paperRows={paperRows}
+                      reporters={editing.reporters}
+                      resolve={resolveName}
+                      lab={viewLab}
+                      onModal={handlers.openModal}
+                      onDetail={handlers.viewDetail}
+                      onOnboard={handlers.onboard}
+                    />
+                  </ViewBoundary>
+                )}
+          </main>
+        </SidebarInset>
+        {data && (
+          <MemberOnboarding
+            key={onboardingRun}
+            open={onboarding}
+            onClose={closeOnboarding}
+            data={data}
+            busy={busy}
+            manage={workspace.manage}
+            act={workspace.act}
+            onEditing={editing.reporters["member-onboarding"]}
+          />
+        )}
+        <ViewBoundary
+          key={paper.paperId ?? ""}
+          label="paper"
+          onReload={reloadView}
+        >
+          <PaperEditorHost
+            paper={paper}
+            sequence={
+              url.view === "Working papers"
+                ? paperRows.map((r) => r.paper)
+                : (e?.papers ?? [])
+            }
+            engagement={e}
+            data={data}
+            role={role}
+            busy={busy}
+            error={workspace.error}
+            paperTarget={url.paperTarget}
+            setPaperTarget={url.setPaperTarget}
+            act={workspace.act}
+            resolve={resolveName}
+            onOpenPaper={nav.openPaper}
+            onOpenRecord={nav.openRecordInstead}
+            onVault={nav.openVaultFiles}
+            onRequest={nav.requestForPaper}
+            onClose={nav.closePaper}
+            onAction={nav.paperAction}
+            onProcedure={nav.openPaperProcedure}
+            onDetail={sheet.viewDetail}
+          />
+        </ViewBoundary>
+        <ViewBoundary label="dialog">
+          <ModalHost
+            state={modal}
+            data={data}
+            engagement={e}
+            role={role}
+            lead={lead}
+            busy={busy}
+            setBusy={workspace.setBusy}
+            act={workspace.act}
+            manage={workspace.manage}
+            load={workspace.load}
+            followUps={nav.modalFollowUps}
+          />
+        </ViewBoundary>
+        <ViewBoundary label="record" onReload={reloadView}>
+          <RecordSheet
+            sheet={sheet}
+            editorOpen={editing.editorOpen}
+            data={data}
+            engagement={e}
+            role={role}
+            viewer={viewer}
+            busy={busy}
+            resolve={resolveName}
+            act={workspace.act}
+            load={workspace.load}
+            reporters={editing.reporters}
+            onPaper={nav.openPaper}
+            onModal={modal.open}
+            onRequestForm={nav.requestForm}
+            onRemediate={nav.remediateFinding}
+          />
+        </ViewBoundary>
+        {data && (
+          <EngagementSwitcher
+            data={data}
+            open={switchOpen}
+            onOpenChange={setSwitchOpen}
+            onSelect={viewNav.openEngagement}
+          />
+        )}
+        {data && (
+          <WorkspaceSearch
+            data={data}
+            open={searchOpen}
+            onOpenChange={setSearchOpen}
+            onSelect={viewNav.searchSelect}
+          />
+        )}
+        {attestation.dialog}
+      </SidebarProvider>
+    </AttestProvider>
   );
 }

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   UserCheck,
 } from "lucide-react";
+import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -88,8 +89,8 @@ export function ReportWorkspace({
   features,
 }: Props) {
   const clientView = ["Client Viewer", "Client Contributor"].includes(role),
-    lead = role === "Lead Auditor",
-    qualityReviewer = role === "Engagement Quality Reviewer";
+    lead = can(role, "createReport"),
+    qualityReviewer = can(role, "saveQualityReview");
   const gates = clientView ? [] : finalReportGates(e, terms, features);
   const next =
     gates.find((g) => g.kind === "workflow") ??

@@ -10,7 +10,14 @@ import {
   joinTeam,
   newEngagement,
 } from "./engagement";
-import { choose, expect, runCommand, test, workspacePath } from "./fixtures";
+import {
+  attestInDialog,
+  choose,
+  expect,
+  runCommand,
+  test,
+  workspacePath,
+} from "./fixtures";
 
 // The Risk classification panel, the first panel of the Classification tab.
 // The checks cover it only: the criteria coverage grid below it loads on its
@@ -101,20 +108,13 @@ test("the Lead classifies the system and the Reviewer approves it", async ({
     profiling: true,
   });
 
-  // The Lead prepared it, so their approval is refused.
-  await runCommand(
-    page,
-    "approveClassification",
-    () => page.getByRole("button", { name: "Approve independently" }).click(),
-    { status: 403 },
+  // The Lead prepared it, so their approval is disabled with the reason the
+  // server would refuse it with.
+  const own = page.getByRole("button", { name: "Approve independently" });
+  await expect(own).toBeDisabled();
+  await expect(own).toHaveAccessibleDescription(
+    "An independent reviewer must approve a completed classification",
   );
-  await expect(
-    page
-      .getByText(
-        "An independent reviewer must approve a completed classification",
-      )
-      .first(),
-  ).toBeVisible();
   expect((await engagementOf(lead, e)).classification.status).toBe(
     "provisional",
   );
@@ -126,8 +126,29 @@ test("the Lead classifies the system and the Reviewer approves it", async ({
   await expectAccessible(review, "Classification awaiting approval", {
     include: classificationPanel,
   });
-  await runCommand(review, "approveClassification", () => approve.click());
+  // Approval opens the attestation dialog; its statement and the reviewer's
+  // rationale are recorded in the audit event.
+  await approve.click();
+  await runCommand(review, "approveClassification", () =>
+    attestInDialog(
+      review,
+      "Approve classification",
+      "Approve classification",
+      "Answers checked against the intended purpose",
+    ),
+  );
+  await expect(
+    review.getByRole("dialog", { name: "Approve classification" }),
+  ).toBeHidden();
   const approved = (await engagementOf(lead, e)).classification;
   expect(approved.status).toBe("approved");
   expect(approved.approvedBy).toBe(reviewer.who.userId);
+  const event = (await lead.workspace(e.tenantId, e.engagementId)).events.find(
+    (x: { action: string }) => x.action === "approveClassification",
+  );
+  expect(JSON.parse(event.details).attestation).toMatchObject({
+    rationale: "Answers checked against the intended purpose",
+    record: e.engagementId + "/classification",
+    digest: expect.stringMatching(/^[0-9a-f]{64}$/),
+  });
 });

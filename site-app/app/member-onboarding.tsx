@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { canAssignEngagementAccess } from "@/lib/permissions";
 import {
   Dialog,
   DialogContent,
@@ -56,7 +57,7 @@ export function MemberOnboarding({
     return () => onEditing(false);
   }, [open, onEditing]);
   const client = ["Client Viewer", "Client Contributor"].includes(role),
-    canAssign = data.identity.role === "Lead Auditor",
+    canAssign = canAssignEngagementAccess(data.identity),
     e = data.engagement;
   function close() {
     if (saving || busy) return;

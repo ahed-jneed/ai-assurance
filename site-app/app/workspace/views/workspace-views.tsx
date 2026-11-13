@@ -6,6 +6,7 @@
 import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
+import { decisionState } from "@/lib/permissions";
 import { reportTermsFor, type ReportTerms } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
@@ -15,6 +16,7 @@ import {
 } from "../../ll144-panel";
 import { WorkingPaperRegister as PaperRegisterView } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
+import { useAttest } from "../attestation-dialog";
 import type { LabIntentState } from "../lab-intent";
 import { classificationDefaults } from "../modals/classification";
 import {
@@ -116,6 +118,7 @@ export const WorkspaceViews = memo(function WorkspaceViews({
   onDetail: ViewDetail;
   onOnboard: () => void;
 }) {
+  const attest = useAttest();
   const { view } = url;
   const { role, writer, reviewer, lead, viewer } = access;
   const e = data.engagement;
@@ -173,7 +176,7 @@ export const WorkspaceViews = memo(function WorkspaceViews({
     procedureFinding: (p: Parameters<typeof procedureFindingDefaults>[0]) =>
       onModal("finding", procedureFindingDefaults(p)),
     followup: (id: string) => nav.openEngagement(id),
-    advance: (stage: string) => safeAct("setStage", { stage }),
+    advance: (stage: string) => attest("setStage", { stage }),
     newPaper: writer ? () => onModal("paper") : undefined,
     vaultEditing: {
       clientPortal: reporters["client-portal"],
@@ -200,7 +203,13 @@ export const WorkspaceViews = memo(function WorkspaceViews({
       e && !viewer
         ? { tenantId: data.tenantId, engagementId: e.id, version: e.version }
         : undefined,
-    approveClassification: () => safeAct("approveClassification", {}),
+    approveClassification: () => attest("approveClassification", {}),
+    classificationApproval: e
+      ? decisionState(role, data.identity.id, {
+          action: "approveClassification",
+          engagement: e,
+        })
+      : undefined,
     reportTermsChange: (terms: ReportTerms) =>
       e && url.setReportTerms({ engagementId: e.id, terms }),
     paperAudience: (paperId: string, audience: "internal" | "client") =>
@@ -439,7 +448,7 @@ export const WorkspaceViews = memo(function WorkspaceViews({
           coverage={on.coverage}
           engagement={e}
           catalog={data.catalog}
-          reviewer={reviewer}
+          approval={on.classificationApproval!}
           busy={busy}
           onApprove={on.approveClassification}
         />

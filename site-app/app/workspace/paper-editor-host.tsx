@@ -104,9 +104,19 @@ export function PaperEditorHost({
         onCommentDraftChange={paper.setHasPendingComment}
         onClose={onClose}
         onAction={onAction}
-        onComment={(text) => act("comment", { paperId: paperId!, text })}
+        onComment={(text) =>
+          // The editor shows a failed comment beside it: its one error surface.
+          act("comment", { paperId: paperId!, text }, undefined, {
+            quiet: true,
+          })
+        }
         onResponse={(commentId, text) =>
-          act("respondComment", { paperId: paperId!, commentId, text })
+          act(
+            "respondComment",
+            { paperId: paperId!, commentId, text },
+            undefined,
+            { quiet: true },
+          )
         }
         onProcedure={onProcedure}
         onDetail={onDetail}

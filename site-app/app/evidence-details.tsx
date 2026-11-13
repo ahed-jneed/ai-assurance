@@ -13,9 +13,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { can } from "@/lib/permissions";
 
 import {
-  canWrite,
   type Artifact,
   type Engagement,
   type Paper,
@@ -140,13 +140,13 @@ export function EvidenceDetails({
       </div>
 
       <div className="record-primary-actions">
-        {canWrite(role) && current.status === "unverified" && (
+        {can(role, "acceptEvidence") && current.status === "unverified" && (
           <Button disabled={busy} onClick={onAccept}>
             <Check size={15} />
             Accept evidence
           </Button>
         )}
-        {canWrite(role) && current.status === "accepted" && (
+        {can(role, "editPaper") && current.status === "accepted" && (
           <Button
             disabled={busy || !canLink}
             title={
@@ -183,7 +183,7 @@ export function EvidenceDetails({
         )}
       </div>
 
-      {current.status === "unverified" && canWrite(role) && (
+      {current.status === "unverified" && can(role, "acceptEvidence") && (
         <p className="record-decision-note">
           Check the source, version and handling basis before accepting this
           file. Record its relevance and sufficiency in the working paper.
@@ -336,17 +336,19 @@ export function EvidenceDetails({
         {!linkedCount && (
           <div className="record-empty">
             <p>This file has no linked audit records.</p>
-            {canWrite(role) && current.status === "accepted" && canLink && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={onLink}
-              >
-                <Link2 size={14} />
-                Link to a working paper
-              </Button>
-            )}
+            {can(role, "editPaper") &&
+              current.status === "accepted" &&
+              canLink && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={onLink}
+                >
+                  <Link2 size={14} />
+                  Link to a working paper
+                </Button>
+              )}
           </div>
         )}
       </section>

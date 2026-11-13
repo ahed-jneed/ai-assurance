@@ -5,6 +5,7 @@
 // competence matrix. lib/workflow/acceptance.ts holds the rules the
 // Planning-exit gate applies.
 import { Button } from "@/components/ui/button";
+import { can } from "@/lib/permissions";
 import type { Engagement, Role } from "@/lib/domain";
 import {
   acceptancePrompt,
@@ -104,10 +105,10 @@ export function AcceptancePanel({
     a = w.acceptance,
     uid = data.identity.id,
     role: Role = data.identity.role,
-    writer = ["Auditor", "Lead Auditor"].includes(role),
-    lead = role === "Lead Auditor",
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role),
-    internal = writer || role === "Reviewer";
+    writer = can(role, "saveAcceptance"),
+    lead = can(role, "approveAcceptance"),
+    reviewer = can(role, "resolveDeclaredThreat"),
+    internal = can(role, "saveDeclaration");
   const name = (id: string) =>
     data.people.find((m) => m.user_id === id)?.display_name ?? id;
   const team = engagementTeam(w),
