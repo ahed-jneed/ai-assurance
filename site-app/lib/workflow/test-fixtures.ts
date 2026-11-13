@@ -54,7 +54,7 @@ export const people: Record<string, Member> = {
 let sequence = 0;
 const nextId = (prefix: string) => prefix + "-" + ++sequence;
 
-// The digest of sha256 in lib/store.ts, which the workspace route passes to
+// The digest of sha256 in lib/ids.ts, which the workspace route passes to
 // the commands. Like it, this rejects a value that is neither text nor bytes,
 // such as JSON.stringify(undefined), instead of hashing it as empty text.
 export async function sha256(value: string | ArrayBuffer) {

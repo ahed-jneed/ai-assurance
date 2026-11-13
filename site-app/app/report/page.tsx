@@ -1,5 +1,8 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
-import { ApiError, context, getEngagement, sanitize } from "@/lib/store";
+import { sanitize } from "@/lib/client-projection";
+import { getEngagement } from "@/lib/engagement-repo";
+import { ApiError } from "@/lib/http";
+import { context } from "@/lib/tenancy";
 import { reportMarkup, type ReportSnapshot } from "./report-markup";
 export const dynamic = "force-dynamic";
 export default async function ReportPage({

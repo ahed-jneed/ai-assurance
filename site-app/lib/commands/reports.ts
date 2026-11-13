@@ -36,7 +36,7 @@ import {
   termsLabel,
   termsProblem,
 } from "../domain/report-model";
-import { id, now, sha256 } from "../engagement-repo";
+import { id, now, sha256 } from "../ids";
 import { ApiError } from "../http";
 import {
   incompleteLl144Runs,

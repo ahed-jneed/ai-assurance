@@ -1,4 +1,5 @@
-import { context, responseError } from "@/lib/store";
+import { responseError } from "@/lib/http";
+import { context } from "@/lib/tenancy";
 import { verificationKeys } from "@/lib/signing-keys";
 export const dynamic = "force-dynamic";
 /**
