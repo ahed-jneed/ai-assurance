@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import type { CriterionOption } from "@/lib/criteria/types";
 import { risk, type Artifact, type Finding } from "@/lib/domain";
-import { humanLabel } from "@/lib/presentation";
+import { findingReference, humanLabel } from "@/lib/presentation";
 
 type Choices = Record<string, string>;
 type FieldProps = {
@@ -50,19 +50,47 @@ const numbers = ["1", "2", "3", "4", "5"].map((value) => ({
   value,
   label: value,
 }));
+/**
+ * Whether a finding on this pack names a clause of its primary criteria as
+ * its primary reference instead of an AI Act article (#144): a pack none of
+ * whose primary criteria sets is the AI Act, such as ISO/IEC 42001.
+ */
+export const citesPackClauses = (
+  primary: readonly { id: string }[],
+  criteria: CriterionOption[] | undefined,
+) =>
+  !!primary.length &&
+  !primary.some((f) => f.id === "eu-ai-act") &&
+  !!criteria?.length;
+
+/** The pack's criteria with those of its primary frameworks first. */
+export function primaryCriteriaFirst(
+  criteria: CriterionOption[],
+  primary: readonly { id: string }[],
+) {
+  const rank = (c: CriterionOption) =>
+    primary.some((f) => f.id === c.reference.split(":")[0]) ? 0 : 1;
+  return [...criteria].sort((a, b) => rank(a) - rank(b));
+}
+
 export function NewFindingForm({
   choices,
   onChoice,
   criteria,
+  primary,
 }: FieldProps & {
   /** The criteria of the engagement's pack a finding may reference. */
   criteria?: CriterionOption[];
+  /** The pack's primary criteria sets. */
+  primary?: readonly { id: string; shortTitle: string }[];
 }) {
   const rating = risk(
     Number(choices.likelihood || 3),
     Number(choices.impact || 3),
   );
   const criterion = criteria?.find((c) => c.reference === choices.criterion);
+  const primaries = primary ?? [],
+    clauses = citesPackClauses(primaries, criteria);
   return (
     <div className="finding-form">
       <section className="finding-form-section">
@@ -79,20 +107,29 @@ export function NewFindingForm({
         {!!criteria?.length && (
           <label>
             <span className="finding-field-label">
-              Criterion
-              <small>Optional; sets the article</small>
+              {clauses ? "Primary reference" : "Criterion"}
+              <small>
+                {clauses
+                  ? "A clause of " +
+                    primaries.map((f) => f.shortTitle).join(" or ")
+                  : "Optional; sets the article"}
+              </small>
             </span>
             <Choice
               name="criterion"
-              label="Criterion"
+              label={clauses ? "Primary reference" : "Criterion"}
               values={[
-                {
-                  value: "none",
-                  label: choices.procedureId
-                    ? "The criteria of the procedure's working paper"
-                    : "No criterion (article only)",
-                },
-                ...criteria.map((c) => ({
+                ...(clauses && !choices.procedureId
+                  ? [{ value: "none", label: "Choose a clause" }]
+                  : [
+                      {
+                        value: "none",
+                        label: choices.procedureId
+                          ? "The criteria of the procedure's working paper"
+                          : "No criterion (article only)",
+                      },
+                    ]),
+                ...primaryCriteriaFirst(criteria, primaries).map((c) => ({
                   value: c.reference,
                   label: c.citation + (c.title ? " · " + c.title : ""),
                 })),
@@ -104,8 +141,14 @@ export function NewFindingForm({
         )}
         {criterion ? (
           <p className="subtle">
-            Article {criterion.article ?? criterion.citation}, from the chosen
-            criterion
+            {findingReference(criterion.article ?? criterion.citation)}, from
+            the chosen criterion
+          </p>
+        ) : clauses ? (
+          <p className="subtle">
+            {choices.procedureId
+              ? "The finding cites the first criterion of the procedure's working paper."
+              : "Findings on this pack cite its clauses rather than AI Act articles."}
           </p>
         ) : (
           <label>
