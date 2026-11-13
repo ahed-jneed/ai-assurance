@@ -1,5 +1,6 @@
 import type { Engagement, Role } from "./domain";
 import type { AssuranceRecord } from "./assurance-core";
+import { undeclaredColumns } from "./special-category";
 export type ExecutionSelection = {
   procedureId: string;
   systemId: string;
@@ -76,11 +77,18 @@ export function testingReadiness(
     },
   ];
   // A client-held pin has no bytes on the platform (#102).
-  if (data?.custody === "client")
+  if (data?.custody === "client") {
     checks.push({
       label: "Client-held dataset runs only in client-local mode",
       done: s.mode === "client_local",
     });
+    // The pin's declared header holds the mapped columns (#134).
+    if (data.clientPin?.columns)
+      checks.push({
+        label: "Mapped columns are in the client's declared header",
+        done: !!profile && !undeclaredColumns(data, profile).length,
+      });
+  }
   if (hosted)
     checks.push({
       label: "Interactive saved predictions within the 1 MB limit",

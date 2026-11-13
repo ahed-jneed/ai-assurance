@@ -120,6 +120,7 @@ describe("the EN 18286 + ISO/IEC 42001 pack, from data alone", () => {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     expect(
       completionGates(e, "readiness", undefined, features).filter(

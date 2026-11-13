@@ -11,7 +11,6 @@ import {
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { canWrite } from "@/lib/domain";
 import { selectPaperRegister } from "@/lib/paper-presentation";
@@ -34,7 +33,7 @@ import {
   useLeaveGuard,
 } from "./navigation-guards";
 import { PaperEditorHost } from "./paper-editor-host";
-import { usePanelPrefetch } from "./panels";
+import { usePanelPrefetch, workspaceFallback } from "./panels";
 import { RecordSheet } from "./record-sheet";
 import { nameResolver } from "./records";
 import { useModalState } from "./use-modal-state";
@@ -245,34 +244,28 @@ export default function Workspace() {
               </Button>
             </div>
           )}
-          {loading || bootstrapping ? (
-            <div className="loading-grid" aria-label="Loading workspace">
-              <Skeleton className="h-16" />
-              <Skeleton className="h-32" />
-              <Skeleton className="h-80" />
-            </div>
-          ) : (
-            data && (
-              <WorkspaceViews
-                data={data}
-                url={url}
-                nav={nav}
-                access={{ role, writer, reviewer, lead, viewer }}
-                busy={busy}
-                act={workspace.act}
-                safeAct={workspace.safeAct}
-                load={workspace.load}
-                displayedEvidenceTab={displayedEvidenceTab}
-                paperRows={paperRows}
-                reporters={editing.reporters}
-                resolve={resolveName}
-                lab={lab}
-                onModal={modal.open}
-                onDetail={sheet.viewDetail}
-                onOnboard={() => setOnboarding(true)}
-              />
-            )
-          )}
+          {loading || bootstrapping
+            ? workspaceFallback
+            : data && (
+                <WorkspaceViews
+                  data={data}
+                  url={url}
+                  nav={nav}
+                  access={{ role, writer, reviewer, lead, viewer }}
+                  busy={busy}
+                  act={workspace.act}
+                  safeAct={workspace.safeAct}
+                  load={workspace.load}
+                  displayedEvidenceTab={displayedEvidenceTab}
+                  paperRows={paperRows}
+                  reporters={editing.reporters}
+                  resolve={resolveName}
+                  lab={lab}
+                  onModal={modal.open}
+                  onDetail={sheet.viewDetail}
+                  onOnboard={() => setOnboarding(true)}
+                />
+              )}
         </main>
       </SidebarInset>
       {data && (

@@ -356,6 +356,7 @@ try {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     assert.equal(workspace.criteria.draft, false);
     assert.equal(workspace.criteria.managementSystem, undefined);
@@ -486,6 +487,26 @@ try {
       status: 404,
     });
     await request("/api/coverage?" + scope, { user: viewer, status: 403 });
+    // #135: derived applicability dates and the internal-only CSV export.
+    assert(coverage.banners.some((b) => b.id === "derived-applicability"));
+    const exportPath =
+      "/api/coverage?" +
+      scope +
+      "&" +
+      new URLSearchParams({
+        framework: packKey,
+        format: "csv",
+        actor: "Provider",
+      });
+    const csv = await transport(base + exportPath, { headers: h(owner) });
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers.get("content-type"), /^text\/csv/);
+    assert.match(csv.headers.get("content-disposition"), /attachment/);
+    const csvLines = (await csv.text()).trimEnd().split("\r\n");
+    assert(csvLines[0].startsWith("view,framework_data_version,pack"));
+    assert(csvLines.length > 1 && csvLines.length < coverage.summary.total);
+    assert(csvLines.slice(1).every((l) => l.includes("Provider")));
+    await request(exportPath, { user: viewer, status: 403 });
     // A rule-pack stamp the index does not know fails closed.
     await testDb
       .prepare(
@@ -495,7 +516,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, derived applicability, the CSV export, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {

@@ -34,6 +34,7 @@ import { context, type Context } from "@/lib/tenancy";
 import { at, declaration } from "@/lib/workflow/test-fixtures";
 import { resolveNew } from "@/lib/criteria/pin";
 import { seedWorkflow } from "@/lib/workflow-seed";
+import { undeclaredColumns } from "@/lib/special-category";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -523,6 +524,57 @@ describe("POST /api/assurance", () => {
     expect(frozen.limitations.at(-1)).toContain(
       "The dataset stays in the client's environment",
     );
+  });
+
+  it("checks the mapped columns against the pin's declared header when queued (#134)", async () => {
+    const { e, queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+      clientPin: {
+        confirmedBy: "Client data steward",
+        confirmedOn: "2026-11-05",
+        custodyNote: "Kept on the client's analysis server",
+        columns: ["label", "prediction", "ethnicity"],
+      },
+    });
+    const profile = e.evaluationProfiles![0];
+    profile.config = {
+      ...profile.config,
+      labelColumn: "label",
+      predictionColumn: "score",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [
+        { kind: "group_comparison", groupFields: ["ethnicity", "sex"] },
+      ],
+    } as EvaluationProfile["statistics"];
+    const refused = await queue("client_local");
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe(
+      "The client-held dataset " +
+        dataset.name +
+        " does not declare the protocol's columns score, sex. Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+    );
+    expect(save).not.toHaveBeenCalled();
+    // Declared columns are matched exactly, as the worker reads the header.
+    profile.config = {
+      ...profile.config,
+      predictionColumn: "prediction",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["Ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect((await queue("client_local")).status).toBe(409);
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect(
+      undeclaredColumns(
+        e.artifacts.find((a) => a.id === dataset.id)!,
+        profile,
+      ),
+    ).toEqual([]);
   });
 
   it.each([

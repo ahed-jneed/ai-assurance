@@ -1,0 +1,171 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "mitre-atlas",
+  "edition": "2026.10",
+  "version": "2026.11.0",
+  "title": "MITRE ATLAS (Adversarial Threat Landscape for AI Systems), data release v2026.10",
+  "shortTitle": "MITRE ATLAS v2026.10",
+  "kind": "framework",
+  "publisher": "The MITRE Corporation",
+  "jurisdiction": "international",
+  "status": "published",
+  "editionDate": "2026-10-28",
+  "researchedAsOf": "2026-11-13",
+  "sources": [
+    {
+      "role": "publisher_page",
+      "url": "https://atlas.mitre.org/"
+    },
+    {
+      "role": "official_text",
+      "url": "https://github.com/mitre-atlas/atlas-data/releases/download/v2026.10/ATLAS-2026.10.yaml",
+      "title": "ATLAS data release v2026.10 (ATLAS-2026.10.yaml)"
+    }
+  ],
+  "licence": {
+    "holder": "The MITRE Corporation",
+    "textPolicy": "paraphrased_titles",
+    "status": "confirmed",
+    "basis": "The ATLAS data is licensed under the Apache License 2.0 (LICENSE of mitre-atlas/atlas-data). The platform stores the technique identifiers and names with attribution and no descriptions.",
+    "url": "https://www.apache.org/licenses/LICENSE-2.0",
+    "attribution": "MITRE ATLAS data release v2026.10, The MITRE Corporation, Apache-2.0"
+  },
+  "defaultProvenance": {
+    "source": "https://github.com/mitre-atlas/atlas-data/releases/download/v2026.10/ATLAS-2026.10.yaml",
+    "sourceKind": "repository",
+    "verification": "verified",
+    "checkedAt": "2026-11-13",
+    "legalReview": "not_required",
+    "note": "Identifiers and names read from ATLAS-2026.10.yaml of the v2026.10 release (28 October 2026) for #145. A sub-technique's title is its technique's name followed by its own."
+  },
+  "requirements": [
+    {
+      "id": "AML.T0010",
+      "ref": "AML.T0010",
+      "title": "Supply Chain Compromise",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0018.000",
+      "ref": "AML.T0018.000",
+      "title": "Manipulate AI Model: Poison AI Model",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0020",
+      "ref": "AML.T0020",
+      "title": "Training Data Poisoning",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0029",
+      "ref": "AML.T0029",
+      "title": "Denial of AI Service",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0034",
+      "ref": "AML.T0034",
+      "title": "Cost Harvesting",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0051",
+      "ref": "AML.T0051",
+      "title": "LLM Prompt Injection",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0051.000",
+      "ref": "AML.T0051.000",
+      "title": "LLM Prompt Injection: Direct",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0051.001",
+      "ref": "AML.T0051.001",
+      "title": "LLM Prompt Injection: Indirect",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0053",
+      "ref": "AML.T0053",
+      "title": "AI Agent Tool Invocation",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0054",
+      "ref": "AML.T0054",
+      "title": "LLM Jailbreak",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0069.002",
+      "ref": "AML.T0069.002",
+      "title": "Discover LLM System Information: System Prompt",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0070",
+      "ref": "AML.T0070",
+      "title": "RAG Poisoning",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0077",
+      "ref": "AML.T0077",
+      "title": "LLM Response Rendering",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0080.000",
+      "ref": "AML.T0080.000",
+      "title": "AI Agent Context Poisoning: Memory",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0085.000",
+      "ref": "AML.T0085.000",
+      "title": "Data from AI Services: RAG Databases",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0085.002",
+      "ref": "AML.T0085.002",
+      "title": "Data from AI Services: Conversation Context and Memory",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0085.003",
+      "ref": "AML.T0085.003",
+      "title": "Data from AI Services: System Instructions",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0093",
+      "ref": "AML.T0093",
+      "title": "Prompt Infiltration via Public-Facing Application",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0098",
+      "ref": "AML.T0098",
+      "title": "AI Agent Tool Credential Harvesting",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0102",
+      "ref": "AML.T0102",
+      "title": "Generate Malicious Commands",
+      "type": "requirement"
+    },
+    {
+      "id": "AML.T0137.003",
+      "ref": "AML.T0137.003",
+      "title": "Training Data Information from AI Models: Extract Memorized Data",
+      "type": "requirement"
+    }
+  ],
+  "notes": "Only the techniques the genai-evaluation pack links are listed, not the whole matrix: an unlisted technique is unmapped, never a gap. AML.T0056 and AML.T0057 no longer exist in v2026.10 (design section 9.1)."
+}

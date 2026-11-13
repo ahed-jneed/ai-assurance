@@ -38,7 +38,7 @@
     "nullableSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
     "key": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/key" },
     "format": {
-      "enum": ["inspect_eval", "inspect_json", "lm_eval_samples", "promptfoo_results", "garak_report", "pyrit_export", "deepeval_test_run", "ragas_results", "judge_validation_jsonl", "marking_check_jsonl"]
+      "enum": ["inspect_eval", "inspect_json", "lm_eval_samples", "promptfoo_results", "garak_report", "pyrit_export", "deepeval_test_run", "ragas_results", "judge_validation_jsonl", "marking_check_jsonl", "c2pa_validator_report", "signed_detection_jsonl"]
     },
     "family": { "$ref": "urn:ai-assurance:genai-evidence-item:0.1#/$defs/family" },
     "probability": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -98,7 +98,20 @@
         "epochReducer": { "enum": ["mean", "any", "all", "majority"] },
         "successRule": { "$ref": "#/$defs/successRule" },
         "stratum": { "type": "string", "minLength": 1, "maxLength": 300 },
-        "transformation": { "type": "string", "minLength": 1, "maxLength": 300 }
+        "transformation": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "requireTrustedSigner": { "const": true, "description": "marking_presence only: a metadata mark counts only when a C2PA validator reported the signer as trusted (#128)." }
+      }
+    },
+    "detectionKey": {
+      "title": "A detection solution's public key whose signed results count (#128), pinned in the frozen plan",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "solutionId", "algorithm", "publicKeySPKI"],
+      "properties": {
+        "keyId": { "type": "string", "pattern": "^[A-Za-z0-9._@+=/#-]{1,128}$" },
+        "solutionId": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "algorithm": { "const": "Ed25519" },
+        "publicKeySPKI": { "type": "string", "pattern": "^MCowBQYDK2VwAyEA[A-Za-z0-9+/]{43}=$", "description": "Base64 DER SubjectPublicKeyInfo of an Ed25519 key (RFC 8410)." }
       }
     },
     "plan": {
@@ -154,7 +167,8 @@
             "pairwiseMinimumConsistencyLowerBound": { "type": "number", "minimum": 0.8, "exclusiveMaximum": 1 }
           }
         },
-        "excerpts": { "const": "none", "description": "Engine 0.1.0 produces no excerpts; failures and all are reserved." },
+        "excerpts": { "enum": ["none", "failures", "all"], "description": "Inert excerpts of failed or successful-attack items (failures) or of every item (all); none by default (design Q12)." },
+        "detectionKeys": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/detectionKey" } },
         "allowUnverifiedFormatVersion": { "type": "boolean" },
         "reconciliationTolerance": { "type": "number", "minimum": 0, "maximum": 0.001 }
       }
@@ -537,7 +551,7 @@
             "validationStatus": { "type": "array", "maxItems": 50, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" } },
             "signer": { "type": ["string", "null"], "maxLength": 300 },
             "signatureClaimed": { "type": ["boolean", "null"] },
-            "signatureVerifiedByEngine": { "const": false, "description": "Engine 0.1.0 does not verify signatures; a claimed verification is the provider's or validator's statement." }
+            "signatureVerifiedByEngine": { "const": false, "description": "The engine does not verify metadata signatures: a claimed verification is the provider's or the named validator's statement." }
           }
         },
         "watermark": {
@@ -553,7 +567,42 @@
           }
         },
         "groundTruth": { "enum": ["marked", "human_made", "other_ai"] },
-        "selfIdentification": { "type": ["boolean", "null"] }
+        "selfIdentification": { "type": ["boolean", "null"] },
+        "c2pa": {
+          "title": "What a C2PA validator reported for the asset (genai-c2pa-report/0.1, #128)",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["validationState", "trusted", "failureCodes", "aiAssertion", "digitalSourceTypes", "claimGenerator", "signedAt", "validator"],
+          "properties": {
+            "validationState": { "enum": ["Invalid", "Valid", "Trusted", null] },
+            "trusted": { "type": "boolean" },
+            "failureCodes": { "type": "array", "maxItems": 50, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" } },
+            "aiAssertion": { "type": "boolean", "description": "An actions assertion of the active manifest names an IPTC digital source type of generation or manipulation by a trained model." },
+            "digitalSourceTypes": { "type": "array", "maxItems": 20, "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,100}$" } },
+            "claimGenerator": { "type": ["string", "null"], "maxLength": 300 },
+            "signedAt": { "type": ["string", "null"], "maxLength": 64 },
+            "validator": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "version"],
+              "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 100 }, "version": { "type": ["string", "null"], "maxLength": 100 } }
+            }
+          }
+        },
+        "signedResult": {
+          "title": "The verified signature of a signed detection result (genai-signed-detection/0.1, #128)",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["keyId", "algorithm", "signedAt", "basis", "payloadSha256", "verifiedByEngine"],
+          "properties": {
+            "keyId": { "type": "string", "pattern": "^[A-Za-z0-9._@+=/#-]{1,128}$" },
+            "algorithm": { "const": "Ed25519" },
+            "signedAt": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "basis": { "enum": ["metadata", "watermark", "fingerprint", "forensic"] },
+            "payloadSha256": { "$ref": "#/$defs/sha256" },
+            "verifiedByEngine": { "const": true, "description": "An Ed25519 signature by a key the frozen plan pins for this solution verified over the exact payload." }
+          }
+        }
       }
     },
     "computation": {
@@ -620,9 +669,10 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["runKey", "inputSha256", "evidenceLevel", "records", "count"],
+            "required": ["runKey", "format", "inputSha256", "evidenceLevel", "records", "count"],
             "properties": {
               "runKey": { "$ref": "#/$defs/key" },
+              "format": { "enum": ["marking_check_jsonl", "c2pa_validator_report", "signed_detection_jsonl"] },
               "inputSha256": { "$ref": "#/$defs/sha256" },
               "evidenceLevel": { "enum": ["L1", "L2"] },
               "records": { "type": "array", "items": { "$ref": "#/$defs/markingCheck" } },

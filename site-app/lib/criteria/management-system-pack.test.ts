@@ -299,6 +299,7 @@ describe("the pack as the release would serve it", () => {
       statementOfApplicability: true,
       nonconformityGrading: true,
       certificationRecommendation: true,
+      ll144BiasAudit: false,
     });
     const view = managementSystemView(pinned(e))!;
     expect(view.phases).toEqual([

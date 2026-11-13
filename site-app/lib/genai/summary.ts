@@ -76,7 +76,7 @@ export type GenaiCriterionSummary = {
 export type GenaiRunSummary = {
   runKey: string;
   format: string;
-  /** "marking" for a marking-check block (#59, A50-ED-30). */
+  /** "marking" for a marking block: marking checks (#59, A50-ED-30), C2PA validator reports or signed detection results (#128). */
   kind: "evaluation" | "marking";
   engineLevel: GenaiLevel;
   levelReasons: string[];
@@ -120,6 +120,8 @@ export type GenaiRunSummary = {
   claimScope: string[];
   warnings: string[];
   markingRecords?: number;
+  /** Signed detection results whose signature the engine verified (#128). */
+  signedResults?: number;
 };
 export type GenaiSummary = {
   schemaVersion: "genai-summary/1";
@@ -271,7 +273,8 @@ export function genaiSummary(
   for (const block of c.marking)
     runs.push({
       runKey: block.runKey,
-      format: "marking_check_jsonl",
+      // Engine 0.1 blocks carry no format: they are all marking checks.
+      format: block.format ?? "marking_check_jsonl",
       kind: "marking",
       engineLevel: block.evidenceLevel,
       levelReasons: [],
@@ -291,9 +294,10 @@ export function genaiSummary(
         logInvalidated: false,
       },
       reconciliation: [],
-      claimScope: [],
+      claimScope: markingScope(block.records),
       warnings: markingWarnings(block.records),
       markingRecords: block.count,
+      signedResults: verifiedSignatures(block.records),
     });
   const criteria: GenaiCriterionSummary[] = c.criteria.map((k) => ({
     id: k.id,
@@ -406,17 +410,38 @@ export function genaiSummary(
   };
 }
 
-// Marking records whose signature verdict is only claimed: the engine never
-// verifies signatures yet (engine/GENAI.md, follow-up #128).
+type MarkingRecord = {
+  metadata?: { signatureClaimed?: unknown } | null;
+  signedResult?: { verifiedByEngine?: unknown } | null;
+};
+const markingRecord = (r: unknown): MarkingRecord =>
+  typeof r === "object" && r !== null ? (r as MarkingRecord) : {};
+
+// Marking records whose metadata signature verdict is only claimed, by the
+// provider or a named C2PA validator: the engine does not verify metadata
+// signatures (engine/GENAI.md).
 function markingWarnings(records: unknown[]) {
   const claimed = records.some(
-    (r) =>
-      typeof r === "object" &&
-      r !== null &&
-      typeof (r as { metadata?: { signatureVerified?: unknown } }).metadata
-        ?.signatureVerified === "boolean",
+    (r) => typeof markingRecord(r).metadata?.signatureClaimed === "boolean",
   );
   return claimed ? ["marking_signature_unverified"] : [];
+}
+
+// Signed detection results whose Ed25519 signature the engine verified
+// against a key the frozen plan pins for the detection solution (#128).
+function verifiedSignatures(records: unknown[]) {
+  return records.filter(
+    (r) => markingRecord(r).signedResult?.verifiedByEngine === true,
+  ).length;
+}
+
+function markingScope(records: unknown[]) {
+  const signed = verifiedSignatures(records);
+  return signed
+    ? [
+        `${signed} signed detection results: each signature verified against a key the frozen plan pins for the detection solution, and each result bound to the sampled output's SHA-256.`,
+      ]
+    : [];
 }
 
 /** Bytes of a summary as the record stores it. */

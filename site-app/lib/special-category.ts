@@ -22,7 +22,7 @@ import type { Artifact, Engagement, EvaluationProfile, Run } from "./domain";
 import { fairnessSelected } from "./evaluation";
 import { planGroupFields } from "./hosted-statistics";
 import { ApiError } from "./http";
-import type { Plan } from "./statistics";
+import { FLOORS, type Plan } from "./statistics";
 
 /** The legal-review item the Art 4a reading waits on (#57). */
 export const art4aLegalReview = "LR-06";
@@ -545,13 +545,47 @@ export function uploadGate(
 }
 
 /**
+ * The smallest minimum group size a fairness protocol on special-category
+ * data may declare (#134). The statistics floor of 30 rows (FLOORS) is set
+ * for the reliability of intervals; this floor is set for disclosure. Every
+ * group at or above the minimum is reported exactly, its size and its rates
+ * included, and on the client-local route those figures are the only data
+ * that leave the client. At 50 rows one person moves a reported rate by at
+ * most 2 percentage points, and a group must hold 20 more rows than the
+ * statistics floor before its exact figures are reported.
+ */
+export const specialCategoryGroupFloor = 50;
+/**
+ * The minimum group size a protocol's tests apply: its plan's, or for a
+ * protocol without a plan its configured minimum raised to the statistics
+ * floor, as the derived plan does.
+ */
+export function protocolGroupMinimum(
+  profile: Pick<EvaluationProfile, "config"> & {
+    statistics?: Pick<Plan, "minimums">;
+  },
+) {
+  return (
+    profile.statistics?.minimums?.groupSize ??
+    Math.max(
+      FLOORS.groupSize,
+      "minimumGroupSize" in profile.config
+        ? profile.config.minimumGroupSize
+        : 0,
+    )
+  );
+}
+
+/**
  * The declaration a fairness protocol stores: the group column, whether it
- * is special-category, the route its tests take and a copy of the basis.
+ * is special-category, the route its tests take and a copy of the basis. A
+ * special-category protocol needs a minimum group size of at least
+ * `specialCategoryGroupFloor`.
  */
 export function declareProtocol(
   e: Pick<Engagement, "specialCategoryBases">,
   profile: Pick<EvaluationProfile, "suite" | "config"> & {
-    statistics?: Pick<Plan, "criteria">;
+    statistics?: Pick<Plan, "criteria" | "minimums">;
   },
   input: SpecialCategoryDeclarationInput | undefined,
   actor: string,
@@ -591,6 +625,18 @@ export function declareProtocol(
       );
     basis = structuredClone(found);
   }
+  const groupMinimum = protocolGroupMinimum(profile);
+  if (v.specialCategory && groupMinimum < specialCategoryGroupFloor)
+    throw new ApiError(
+      400,
+      "A fairness protocol on special-category column " +
+        columnList(profile) +
+        " needs a minimum group size of at least " +
+        specialCategoryGroupFloor +
+        " rows (this protocol's is " +
+        groupMinimum +
+        "): smaller groups would be reported exactly.",
+    );
   if (v.specialCategory && v.route === "hosted" && !basis)
     throw new ApiError(
       400,
@@ -710,9 +756,180 @@ export const clientPinInputSchema = z
     confirmedOn: calendarDate,
     /** Where the client keeps the file and who runs its worker. */
     custodyNote: statement,
+    /**
+     * The file's header columns, exactly as the worker reads them (#134), so
+     * a job's mapped columns are checked when it is queued.
+     */
+    columns: z
+      .array(
+        z
+          .string()
+          .min(1)
+          .max(300)
+          .refine((c) => !!c.trim(), "Column names cannot be blank"),
+      )
+      .min(1)
+      .max(1000)
+      .refine((c) => new Set(c).size === c.length, "List each column once"),
+    /** The client's signed statement of the pin (#134), when it signed one. */
+    attestation: z
+      .object({
+        algorithm: z.literal("Ed25519"),
+        statement: z.string().min(1).max(350_000),
+        signature: z.string().min(1).max(200),
+        publicKeySPKI: z.string().min(1).max(200),
+        /** The pin tool prints the fingerprint; the platform recomputes it. */
+        keySha256: z.string().max(64).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ClientPinInput = z.infer<typeof clientPinInputSchema>;
+
+/** The kind of the client's signed pin statement (engine/client_pin.py). */
+export const pinStatementKind = "assurance.client-dataset-pin";
+const statementFields = [
+  "columns",
+  "confirmedBy",
+  "confirmedOn",
+  "kind",
+  "name",
+  "schemaVersion",
+  "sha256",
+  "size",
+] as const;
+/** The fields of a pin that the client's statement must state exactly. */
+const attestedFields = [
+  "name",
+  "sha256",
+  "size",
+  "columns",
+  "confirmedBy",
+  "confirmedOn",
+] as const;
+function fromBase64(value: string, what: string) {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4)
+    throw new ApiError(400, "The attestation's " + what + " is not base64");
+  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+/** The DER prefix of an Ed25519 SubjectPublicKeyInfo (RFC 8410). */
+const ed25519Spki = [
+  0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
+];
+const hex = (bytes: ArrayBuffer) =>
+  [...new Uint8Array(bytes)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+/** A verified client attestation, as the pin keeps it. */
+export type ClientPinAttestation = {
+  algorithm: "Ed25519";
+  /** The exact signed statement bytes, base64, for re-verification. */
+  statement: string;
+  signature: string;
+  publicKeySPKI: string;
+  /** SHA-256 of the key's DER SubjectPublicKeyInfo, hex. */
+  keySha256: string;
+  verifiedAt: string;
+};
+/**
+ * Verifies the client's attestation of a pin (#134): an Ed25519 signature,
+ * by a key the client controls, over the exact bytes of a statement of the
+ * pin's name, size, SHA-256, columns and confirmation. The signature shows
+ * that the key's holder made the statement; that the holder is the client
+ * rests on the auditor confirming the key fingerprint with the client
+ * through an independent channel.
+ */
+export async function verifyPinAttestation(
+  pin: Pick<ClientPinInput, (typeof attestedFields)[number] | "attestation">,
+  at: string,
+): Promise<ClientPinAttestation | undefined> {
+  const a = pin.attestation;
+  if (!a) return undefined;
+  const statement = fromBase64(a.statement, "statement"),
+    signature = fromBase64(a.signature, "signature"),
+    spki = fromBase64(a.publicKeySPKI, "public key");
+  if (
+    spki.length !== 44 ||
+    ed25519Spki.some((b, i) => spki[i] !== b) ||
+    signature.length !== 64
+  )
+    throw new ApiError(
+      400,
+      "The attestation needs an Ed25519 public key and signature",
+    );
+  const key = await crypto.subtle.importKey(
+    "spki",
+    spki,
+    { name: "Ed25519" },
+    false,
+    ["verify"],
+  );
+  if (!(await crypto.subtle.verify("Ed25519", key, signature, statement)))
+    throw new ApiError(
+      400,
+      "The client's signature does not verify over its statement",
+    );
+  let stated: Record<string, unknown>;
+  try {
+    stated = JSON.parse(
+      new TextDecoder("utf-8", { fatal: true }).decode(statement),
+    );
+  } catch {
+    throw new ApiError(400, "The client's statement is not UTF-8 JSON");
+  }
+  if (
+    !stated ||
+    typeof stated !== "object" ||
+    Array.isArray(stated) ||
+    Object.keys(stated).sort().join() !== statementFields.join() ||
+    stated.kind !== pinStatementKind ||
+    stated.schemaVersion !== "1.0"
+  )
+    throw new ApiError(400, "This is not a client dataset pin statement");
+  const differs = attestedFields.filter(
+    (f) => JSON.stringify(stated[f]) !== JSON.stringify(pin[f]),
+  );
+  if (differs.length)
+    throw new ApiError(
+      400,
+      "The client's signed statement differs from this pin in: " +
+        differs.join(", "),
+    );
+  const keySha256 = hex(await crypto.subtle.digest("SHA-256", spki));
+  if (a.keySha256 !== undefined && a.keySha256 !== keySha256)
+    throw new ApiError(400, "keySha256 is not the fingerprint of this key");
+  return {
+    algorithm: "Ed25519",
+    statement: a.statement,
+    signature: a.signature,
+    publicKeySPKI: a.publicKeySPKI,
+    keySha256,
+    verifiedAt: at,
+  };
+}
+/**
+ * The mapped columns a job needs that the client's pin does not declare
+ * (#134): the target, prediction and group columns and the plan's other
+ * group fields. Empty for a pin recorded before declared columns, which the
+ * worker still checks when it reads the file.
+ */
+export function undeclaredColumns(
+  pin: Pick<Artifact, "clientPin">,
+  profile: GroupedProfile,
+) {
+  const declared = pin.clientPin?.columns;
+  if (!declared) return [];
+  return [
+    ...new Set(
+      [
+        profile.config.labelColumn,
+        profile.config.predictionColumn,
+        ...protocolGroupColumns(profile),
+      ].filter(Boolean),
+    ),
+  ].filter((c) => !declared.includes(c));
+}
 /** The dataset stays with the client; the platform holds only its pin. */
 export function heldByClient(a: Pick<Artifact, "custody">) {
   return a.custody === "client";
