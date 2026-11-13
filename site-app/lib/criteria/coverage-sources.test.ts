@@ -216,10 +216,10 @@ describe("truth-table cases about sources (section 9.8)", () => {
 
 describe("pack #1 on day one (section 9.9)", () => {
   const key = "eu-ai-act@02024R1689-20260727";
-  it("offers the AI Act criteria view only", () => {
+  it("offers the AI Act criteria view, then the NIST crosswalk views (#29)", () => {
     expect(
       offeredViews(criteriaRegistry(), resolveNew()).map((v) => v.key),
-    ).toEqual([key]);
+    ).toEqual([key, "nist-ai-rmf@1.0", "nist-ai-600-1@2024-07"]);
   });
 
   it("shows at most Partly covered, with the migration and legal review notes", () => {
