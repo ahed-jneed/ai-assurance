@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   conclusionStatement,
   conclusionTypes,
+  defaultTerms,
   emptyReportSettings,
   engagementTypeIds,
   engagementTypes,
@@ -9,8 +10,10 @@ import {
   normalizeTerms,
   offeredEngagementTypes,
   opinionLabel,
+  packDefaultTerms,
   parseReportSettings,
   qualityStatement,
+  reportTermsFor,
   reportTitle,
   requiresSupport,
   resolveParticulars,
@@ -252,6 +255,36 @@ describe("ISAE 3000 conclusion wording", () => {
     expect(requiresSupport("certification_recommended")).toBe(false);
     expect(offeredEngagementTypes(false)).not.toContain("certification");
     expect(offeredEngagementTypes(true)).toContain("certification");
+  });
+
+  it("defaults the report terms to a certification audit on a certification pack (#144)", () => {
+    const certification = {
+      engagementType: "certification",
+      assuranceLevel: null,
+      conclusion: "certification_recommended",
+    };
+    expect(packDefaultTerms(true)).toEqual(certification);
+    expect(packDefaultTerms(false)).toEqual(defaultTerms);
+    expect(termsProblem(packDefaultTerms(true))).toBe("");
+    // Nothing picked yet: the pack's defaults.
+    expect(reportTermsFor(null, "E-1", true)).toEqual(certification);
+    expect(reportTermsFor(null, "E-1", false)).toEqual(defaultTerms);
+    // Terms picked for this engagement stay; another engagement's do not.
+    const picked = assurance("qualified", "reasonable");
+    expect(
+      reportTermsFor({ engagementId: "E-1", terms: picked }, "E-1", true),
+    ).toEqual(picked);
+    expect(
+      reportTermsFor({ engagementId: "E-1", terms: picked }, "E-2", true),
+    ).toEqual(certification);
+    // A certification audit picked where the pack offers none falls back.
+    expect(
+      reportTermsFor(
+        { engagementId: "E-1", terms: packDefaultTerms(true) },
+        "E-1",
+        false,
+      ),
+    ).toEqual(defaultTerms);
   });
 
   it("labels each conclusion and level", () => {

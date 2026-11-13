@@ -390,7 +390,12 @@ export async function buildDossier(
         id: captured.id,
         reason:
           "Held by the client; the platform holds only its SHA-256 " +
-          artifact.sha256,
+          artifact.sha256 +
+          // The client's signed statement of the pin (#134).
+          (artifact.clientPin?.attestation
+            ? "; the client signed the pin with Ed25519 key " +
+              artifact.clientPin.attestation.keySha256
+            : ""),
       });
       continue;
     }

@@ -19,11 +19,12 @@ type Existing = {
   status: string;
   client_id: string | null;
   practice_admin: number;
+  email: string | null;
 };
 async function existingMember(tenantId: string, userId: string) {
   return db()
     .prepare(
-      "SELECT m.role,m.status,m.client_id,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin FROM memberships m WHERE m.tenant_id=? AND m.user_id=?",
+      "SELECT m.role,m.status,m.client_id,m.email,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin FROM memberships m WHERE m.tenant_id=? AND m.user_id=?",
     )
     .bind(tenantId, userId)
     .first<Existing>();
@@ -169,8 +170,9 @@ const saveMember: ManagementHandler = {
 };
 /**
  * Revoking a member withdraws, in the same batch, their engagement grants,
- * the runner workers they sponsored and their practice administration, and
- * lapses their client request grants. A later re-grant restores none of it.
+ * the runner workers they sponsored and their practice administration,
+ * lapses their client request grants and cancels the pending invitations for
+ * their recorded email. A later re-grant restores none of it.
  */
 const revokeMember: ManagementHandler = {
   roles,
@@ -188,6 +190,33 @@ const revokeMember: ManagementHandler = {
       ctx,
       a.userId,
     );
+    // Their pending invitations into this practice, found by the identity
+    // email recorded on the membership, are cancelled with the revocation.
+    const cancelledInvitations = existing.email
+      ? (
+          await db()
+            .prepare(
+              "SELECT id FROM invitations WHERE tenant_id=? AND email=? AND status='pending' ORDER BY created_at",
+            )
+            .bind(ctx.tenantId, existing.email)
+            .all<{ id: string }>()
+        ).results.map((r) => r.id)
+      : [];
+    if (cancelledInvitations.length)
+      statements.push(
+        db()
+          .prepare(
+            "UPDATE invitations SET status='cancelled',closed_at=? WHERE tenant_id=? AND email=? AND status='pending' AND " +
+              guard,
+          )
+          .bind(
+            timestamp,
+            ctx.tenantId,
+            existing.email,
+            ctx.tenantId,
+            commandId,
+          ),
+      );
     statements.push(
       db()
         .prepare(
@@ -215,6 +244,7 @@ const revokeMember: ManagementHandler = {
       status: "revoked",
       withdrawn,
       practiceAdminRemoved: !!existing.practice_admin,
+      cancelledInvitations,
     };
   },
 };

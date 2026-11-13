@@ -17,8 +17,10 @@ import { clientScope } from "./members";
 /**
  * Invitations by email into this practice (F-44): the invitee joins with the
  * invited role, client and engagements at their next sign-in
- * (lib/invitations.ts), whether or not self-signup is allowed. An
- * administrator may cancel a pending invitation.
+ * (lib/invitations.ts), whether or not self-signup is allowed. An email that
+ * belongs to an active member of this practice (memberships.email) is
+ * refused: their access is edited in Members & access. An administrator may
+ * cancel a pending invitation, and revoking a member cancels theirs.
  */
 export const invitations: ManagementModule = defineCommands({
   inviteMember: {
@@ -41,6 +43,18 @@ export const invitations: ManagementModule = defineCommands({
       const email = normalizeEmail(a.email);
       if (email === normalizeEmail(ctx.user.email))
         throw new ApiError(400, "You cannot invite yourself");
+      const member = await db()
+        .prepare(
+          "SELECT display_name FROM memberships WHERE tenant_id=? AND email=? AND status='active' LIMIT 1",
+        )
+        .bind(ctx.tenantId, email)
+        .first<{ display_name: string }>();
+      if (member)
+        throw new ApiError(
+          409,
+          member.display_name +
+            " is already an active member with this email. Change their role or engagements in Members & access instead.",
+        );
       const clientId = await clientScope(ctx.tenantId, a.role, a.clientId);
       const ids = isClientRole(a.role) ? [] : (a.engagementIds ?? []);
       await checkAssignable(ctx, a.role, a.engagementIds ?? []);

@@ -1,7 +1,10 @@
 # Source runtime distribution
 
 `assurance-runtime.zip` contains the Python source modules, documentation,
-Dockerfile, dependency baselines, synthetic examples and common schemas.
+Dockerfile, dependency baselines, synthetic examples and common schemas, plus
+`engine/threshold-library.json`, the copy of `schemas/threshold-library.json`
+that `engine/statistics.py` loads (so the compute image built from `engine/`
+carries it).
 It contains no engine tests, test fixtures or fixture generators (they stay in
 the repository's `engine/tests/`), no Site application, installed packages,
 compiled runtimes, retained worker jobs, caches, credentials or production data. Extract it into a dedicated
@@ -13,17 +16,19 @@ dependency lock or approval of a native runtime. The Dockerfile's default base
 tag is for development; production requires an operator-reviewed immutable
 base/image digest and golden native inference qualification.
 
-From the extracted directory, using Python 3.12+:
+From the extracted directory, using Python 3.12 (the one supported version;
+`engine/README.md`, section Packaging):
 
 ```powershell
 python -m engine.worker --readiness
 python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-example-report.json
 ```
 
-The core CSV computation path needs only Python's standard library. Optional
-native model/Parquet/cryptographic provider capabilities need separately reviewed
-runtimes. `requirements-optional.txt` is a baseline, not a resolved transitive
-lock. No native runtime or Docker execution was qualified in this distribution's
+The core CSV computation path needs only Python's standard library. Signature
+verification and Inspect `.eval` reading need `cryptography` and `zstandard`,
+hash-locked in `requirements-image.txt`, which the Dockerfile installs. Optional
+native model and Parquet capabilities need separately reviewed runtimes.
+`requirements-optional.txt` is a baseline, not a resolved transitive lock. No native runtime or Docker execution was qualified in this distribution's
 local checks. The repository's engine tests use synthetic fixtures,
 application-owned test predictors, dummy credentials and loopback/mocked
 transports.
@@ -38,6 +43,62 @@ The result envelope is retained byte for byte alongside its imported projection.
 Provided/client-local predictions never establish independent model scoring;
 native inference additionally requires approved artifact hashes, typed numeric
 features, installed adapters and the no-network container execution path.
+
+## Client dataset pins
+
+A client that keeps its dataset (client-held pin, `WORKER.md`) and has no
+enrolled worker computes the pin with the pin tool. It needs no token or
+worker, opens no network connection and uploads nothing: it reads the file in
+the client's environment and writes a small pin file (name, byte size,
+SHA-256, header columns, who confirmed it and when) that the auditor loads
+into the platform's "Pin client dataset" form. The header is read as the
+worker reads it (UTF-8 CSV, byte order mark allowed, names kept exactly).
+
+```powershell
+python -m engine.client_pin pin --file data.csv --confirmed-by "Name, role" --output pin.json
+```
+
+**Client attestation.** The client can sign the pin with an Ed25519 key it
+controls, so the custody record does not rest only on the auditor's entry.
+The tool builds a statement of the pin, canonical JSON (sorted keys, no
+spaces, UTF-8) with exactly the fields `columns`, `confirmedBy`,
+`confirmedOn`, `kind` (`assurance.client-dataset-pin`), `name`,
+`schemaVersion` (`1.0`), `sha256` and `size`, and a detached signature over
+those exact bytes. The pin file's `attestation` carries the statement,
+signature and DER public key (SubjectPublicKeyInfo), each base64, and
+`keySha256`, the SHA-256 of that DER key. With the optional `cryptography`
+package:
+
+```powershell
+python -m engine.client_pin keygen --output client-key.pem
+python -m engine.client_pin pin --file data.csv --confirmed-by "Name, role" --key client-key.pem --output pin.json
+```
+
+Without it, sign with OpenSSL 3 and attach the signature (standard library
+only):
+
+```powershell
+python -m engine.client_pin pin --file data.csv --confirmed-by "Name, role" --statement-out statement.json --output unsigned.json
+openssl pkeyutl -sign -rawin -inkey client-key.pem -in statement.json -out statement.sig
+openssl pkey -in client-key.pem -pubout -out client-key.pub.pem
+python -m engine.client_pin attach --statement statement.json --signature statement.sig --public-key client-key.pub.pem --output pin.json
+```
+
+The platform verifies the signature when it records the pin and refuses a
+pin whose fields differ from the signed statement; it keeps the statement,
+signature and key, and the dossier names the key fingerprint. Anyone can
+check a pin file again, and the file itself:
+
+```powershell
+python -m engine.client_pin verify --pin pin.json --file data.csv --key-sha256 <fingerprint>
+```
+
+A signature shows that the holder of the key made the statement. That the
+holder is the client rests on the auditor confirming the key fingerprint with
+the client through an independent channel (for example in the engagement
+letter or a call), not on the platform. The signature is not a qualified
+electronic signature or a timestamp, and the private key never leaves the
+client.
 
 The optional cited evidence assistant is a separate, permission-scoped draft
 service. No provider endpoint or production key is supplied; the repository's

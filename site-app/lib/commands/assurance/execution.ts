@@ -7,6 +7,7 @@ import {
   assertClaimFits,
   assertDeclaredLabel,
   assertModelSpecLimits,
+  assertPerformancePositiveLabel,
   frozenLabelPair,
 } from "../../external-worker-contract";
 import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
@@ -18,6 +19,7 @@ import {
   externalGate,
   heldByClient,
   specialCategoryLimitation,
+  undeclaredColumns,
 } from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
@@ -130,6 +132,19 @@ export const execution: AssuranceModule = defineCommands({
           "This dataset is held by the client: queue it in client-local mode for the client's own worker",
         );
       externalGate(profile, v.mode, clientHeld);
+      // The client declared the pinned file's columns (#134): a mapping the
+      // file cannot satisfy is refused now, not when the worker claims it.
+      const missing = clientHeld ? undeclaredColumns(dataset, profile) : [];
+      if (missing.length)
+        throw new ApiError(
+          409,
+          "The client-held dataset " +
+            dataset.name +
+            " does not declare the protocol's column" +
+            (missing.length > 1 ? "s " : " ") +
+            missing.join(", ") +
+            ". Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+        );
       const plan = profile.statistics,
         outputLabels: string[] = system.body.outputs.classOrder,
         labels = frozenLabelPair({
@@ -139,6 +154,14 @@ export const execution: AssuranceModule = defineCommands({
           requested: v.negativeLabel || undefined,
         });
       assertDeclaredLabel(plan, profile.config.negativeLabel, labels);
+      // The worker measures a performance positive class only when the
+      // protocol runs the performance test.
+      assertPerformancePositiveLabel(
+        profile.suite.includes("performance")
+          ? profile.config.performancePositiveLabel
+          : undefined,
+        labels,
+      );
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;

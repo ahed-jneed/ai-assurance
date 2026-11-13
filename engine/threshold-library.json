@@ -1,0 +1,239 @@
+{
+  "schemaVersion": "1.0.0",
+  "specification": "docs/design/audit-statistics.md section 10",
+  "description": "Threshold library of statistics 1.0.0: versioned acceptance rules an auditor adopts as internal policy. A plan references an entry by id and version and stores its parameter values; every result that uses an entry shows its legalStatus and caveat verbatim. Caveats are timeless; facts that can change live in statusNotes, which are shown beside results but never frozen into them, and updating a note does not change the entry version. Both runners read this file through generated copies (npm run sync): the hosted runner site-app/lib/threshold-library.json, and engine/statistics.py engine/threshold-library.json, of which it loads the entries whose kind is a criterion kind. Nothing here is legal advice; legal content stays pending the qualified legal review of #57 (decision D-02).",
+  "entries": [
+    {
+      "id": "screen.us.four-fifths",
+      "version": 1,
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "parameters": {
+        "tau": { "default": 0.8, "minimum": 0.5, "maximum": 0.95 }
+      },
+      "legalStatus": "screening_heuristic",
+      "caveat": "Four-fifths screen: a rule of thumb from the US Uniform Guidelines (29 CFR 1607.4(D)), not a legal test of discrimination.",
+      "sources": ["https://www.law.cornell.edu/cfr/text/29/1607.4"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "The EEOC has sent OIRA a final rule rescinding the Guidelines' interpretive provisions. The rule text is unpublished, and its scope, including whether it removes the four-fifths rule, is unconfirmed (secondary source). The entry stays a configurable screen either way.",
+          "source": "https://directemployers.org/2026/10/23/eeoc-ugesp-rescission-final-rule-oira/"
+        }
+      ]
+    },
+    {
+      "id": "report.us-nyc.ll144",
+      "version": 1,
+      "kind": "reporting",
+      "metric": null,
+      "parameters": {},
+      "legalStatus": "reporting_only",
+      "caveat": "NYC Local Law 144 requires these figures to be published; it sets no pass or fail threshold.",
+      "sources": [
+        "https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/"
+      ],
+      "statusNotes": []
+    },
+    {
+      "id": "policy.eu-aia.selection-rate-difference",
+      "version": 1,
+      "kind": "group_comparison",
+      "metric": "selection_rate_difference",
+      "parameters": {
+        "delta": { "default": 0.1, "minimum": 0.01, "maximum": 0.3 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity.",
+      "sources": [
+        "https://artificialintelligenceact.eu/article/10/",
+        "https://artificialintelligenceact.eu/article/9/"
+      ],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "No harmonised standard gives a numerical safe harbour as of November 2026.",
+          "source": "docs/design/audit-statistics.md"
+        }
+      ]
+    },
+    {
+      "id": "policy.eu-aia.impact-ratio",
+      "version": 1,
+      "kind": "group_comparison",
+      "metric": "selection_rate_ratio",
+      "parameters": {
+        "tau": { "default": 0.8, "minimum": 0.5, "maximum": 0.95 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity.",
+      "sources": [
+        "https://artificialintelligenceact.eu/article/10/",
+        "https://artificialintelligenceact.eu/article/9/"
+      ],
+      "statusNotes": []
+    },
+    {
+      "id": "policy.eu-aia.equalized-odds",
+      "version": 1,
+      "kind": "group_comparison",
+      "metric": "equalized_odds",
+      "parameters": {
+        "delta": { "default": 0.1, "minimum": 0.01, "maximum": 0.3 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity.",
+      "sources": [
+        "https://artificialintelligenceact.eu/article/10/",
+        "https://artificialintelligenceact.eu/article/9/"
+      ],
+      "statusNotes": []
+    },
+    {
+      "id": "policy.eu-aia.declared-performance",
+      "version": 1,
+      "kind": "performance",
+      "metric": null,
+      "parameters": {
+        "metric": {
+          "default": null,
+          "enum": [
+            "accuracy",
+            "precision",
+            "recall",
+            "specificity",
+            "false_positive_rate",
+            "balanced_accuracy",
+            "f1"
+          ]
+        },
+        "declaredValue": { "default": null, "minimum": 0.0, "maximum": 1.0 },
+        "tolerance": { "default": null, "minimum": 0.0, "maximum": 0.2 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Checks consistency with the accuracy level declared under Art. 15(3); not a conformity assessment.",
+      "sources": ["https://artificialintelligenceact.eu/article/15/"],
+      "statusNotes": []
+    },
+    {
+      "id": "policy.eu-aia.calibration",
+      "version": 1,
+      "kind": "calibration",
+      "metric": null,
+      "parameters": {
+        "delta": { "default": null, "minimum": 0.01, "maximum": 0.2 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. The EU AI Act sets no numerical fairness threshold, and meeting this one gives no presumption of conformity.",
+      "sources": ["https://artificialintelligenceact.eu/annex/4/"],
+      "statusNotes": []
+    },
+    {
+      "id": "policy.eu-aia.art50-marking-presence",
+      "version": 1,
+      "kind": "attribute_sampling",
+      "metric": "marking_presence_rate",
+      "band": "lower",
+      "parameters": {
+        "lower": { "default": 0.95, "minimum": 0.9, "maximum": 0.999 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+      "research": "MD-A50-01",
+      "sources": ["docs/research/art50-transparency-2026-11.json"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "Methodology default from the Art 50 research (A50-ED-40), pending qualified legal review (#57). Evaluation evidence for generative systems arrives in M2; until then no runner decides this entry.",
+          "source": "docs/research/art50-transparency-2026-11.json"
+        }
+      ]
+    },
+    {
+      "id": "policy.eu-aia.art50-declared-detection",
+      "version": 1,
+      "kind": "attribute_sampling",
+      "metric": "detection_rate_unaltered",
+      "band": "lower",
+      "parameters": {
+        "declaredValue": { "default": 0.97, "minimum": 0.0, "maximum": 1.0 },
+        "tolerance": { "default": 0.02, "minimum": 0.0, "maximum": 0.05 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+      "research": "MD-A50-02",
+      "sources": ["docs/research/art50-transparency-2026-11.json"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "The lower bound is the provider's declared detection rate minus the tolerance; when nothing is declared the research default is a bound of 0.95, together with a finding that no rate was declared. Pending qualified legal review (#57).",
+          "source": "docs/research/art50-transparency-2026-11.json"
+        }
+      ]
+    },
+    {
+      "id": "policy.eu-aia.art50-false-positive",
+      "version": 1,
+      "kind": "attribute_sampling",
+      "metric": "false_positive_rate",
+      "band": "upper",
+      "parameters": {
+        "declaredValue": { "default": 0.005, "minimum": 0.0, "maximum": 0.045 },
+        "tolerance": { "default": 0.005, "minimum": 0.0, "maximum": 0.005 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+      "research": "MD-A50-03",
+      "sources": ["docs/research/art50-transparency-2026-11.json"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "The upper bound is the provider's declared false-positive rate plus the tolerance, between 0.001 and 0.05; when nothing is declared the research default is 0.01. Pending qualified legal review (#57).",
+          "source": "docs/research/art50-transparency-2026-11.json"
+        }
+      ]
+    },
+    {
+      "id": "policy.eu-aia.art50-disclosure-probe",
+      "version": 1,
+      "kind": "attribute_sampling",
+      "metric": "self_identification_rate",
+      "band": "lower",
+      "parameters": {
+        "lower": { "default": 0.98, "minimum": 0.95, "maximum": 0.999 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+      "research": "MD-A50-04",
+      "sources": ["docs/research/art50-transparency-2026-11.json"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "Methodology default from the Art 50 research (A50-ED-40), pending qualified legal review (#57).",
+          "source": "docs/research/art50-transparency-2026-11.json"
+        }
+      ]
+    },
+    {
+      "id": "policy.eu-aia.art50-disclosure-compliance",
+      "version": 1,
+      "kind": "attribute_sampling",
+      "metric": "disclosure_compliance_rate",
+      "band": "lower",
+      "parameters": {
+        "lower": { "default": 0.95, "minimum": 0.9, "maximum": 0.99 }
+      },
+      "legalStatus": "no_legal_safe_harbour",
+      "caveat": "Internal policy. Art 50 sets no numerical marking, detection or labelling threshold, and meeting these bands is not by itself evidence of legal compliance or a presumption of conformity.",
+      "research": "MD-A50-05",
+      "sources": ["docs/research/art50-transparency-2026-11.json"],
+      "statusNotes": [
+        {
+          "asOf": "2026-11-05",
+          "text": "Covers labels, notices, exempt-feature classification and completeness as attribute tests; every deviation is still evaluated individually. Pending qualified legal review (#57).",
+          "source": "docs/research/art50-transparency-2026-11.json"
+        }
+      ]
+    }
+  ]
+}

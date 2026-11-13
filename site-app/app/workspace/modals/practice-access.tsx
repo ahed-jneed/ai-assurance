@@ -28,10 +28,10 @@ function InviteFields(props: ModalFieldsProps) {
         />
         <small className="subtle">
           They join this practice the next time they sign in with this email.
-          The invitation expires after 30 days. Inviting someone who is already
-          an active member keeps their role and only adds the engagements you
-          choose; a revocation or role change before they next sign in cancels
-          the invitation.
+          The invitation expires after 30 days. An active member&apos;s email is
+          refused: change their access in Members &amp; access instead. Revoking
+          a member cancels their pending invitations, and a role change before
+          they next sign in supersedes the invitation.
         </small>
       </label>
       <label>

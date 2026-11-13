@@ -39,8 +39,17 @@ export const memberships = sqliteTable(
     // re-grant, role change and revocation. Client request grants issued
     // before it no longer apply (activeGrant in lib/workflow-state.ts).
     accessSince: text("access_since"),
+    // The member's identity email, normalized (lib/invitations.ts): recorded
+    // when they provision a practice, accept an invitation or sign in. Null
+    // until then for members added by account ID. Revocation cancels the
+    // pending invitations for it, and inviteMember refuses it while the
+    // member is active (#95).
+    email: text("email"),
   },
-  (t) => [primaryKey({ columns: [t.tenantId, t.userId] })],
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.userId] }),
+    index("idx_memberships_email").on(t.tenantId, t.email),
+  ],
 );
 /**
  * Practice invitations keyed by email, consumed at the invitee's next sign-in
@@ -402,3 +411,34 @@ export const workspaceDrafts = sqliteTable(
     }),
   ],
 );
+/**
+ * The platform operator's audit trail (lib/operator.ts): every deletion of an
+ * abandoned practice, with what it removed. Not tied to a practice, so it
+ * outlives the practice it records, and never updated or deleted
+ * (migration 0013).
+ */
+export const operatorEvents = sqliteTable(
+  "operator_events",
+  {
+    id: text("id").primaryKey(),
+    actor: text("actor").notNull(),
+    actorEmail: text("actor_email").notNull(),
+    action: text("action").notNull(),
+    tenantId: text("tenant_id").notNull(),
+    details: text("details").notNull(),
+    hash: text("hash").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("idx_operator_events_tenant").on(t.tenantId, t.createdAt)],
+);
+/**
+ * A practice being erased by the operator: written and removed again inside
+ * the one D1 batch that deletes the practice (lib/operator.ts). While its row
+ * exists, and only then, the append-only triggers of migrations 0001 and 0011
+ * let that practice's rows be deleted (migration 0013).
+ */
+export const practiceErasures = sqliteTable("practice_erasures", {
+  tenantId: text("tenant_id").primaryKey(),
+  eventId: text("event_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});

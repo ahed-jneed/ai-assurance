@@ -177,6 +177,119 @@
       "releasedAt": "2026-11-12",
       "selectable": true,
       "sha256": "f6ede6d58353983d233c54cdd690a0cc8e3e9b4ee4ec5ec74d8c21d0e2af643c"
+    },
+    {
+      "documentType": "framework",
+      "id": "nist-ai-rmf",
+      "edition": "1.0",
+      "version": "2026.11.0",
+      "path": "frameworks/nist-ai-rmf/1.0/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #29)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "c54a6f9bfd75e941826800c294a9ea8d684bbcc076e88a87624c1749b08a98b2"
+    },
+    {
+      "documentType": "framework",
+      "id": "nist-ai-600-1",
+      "edition": "2024-07",
+      "version": "2026.11.0",
+      "path": "frameworks/nist-ai-600-1/2024-07/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #29)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "8b2bfa60a3a3fe5e358a999b19d774bbb86cc8ab46ff681264be24bcede5761c"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "nist-ai-rmf-to-eu-ai-act",
+      "version": "2026.11.0",
+      "path": "crosswalks/nist-ai-rmf-to-eu-ai-act/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #29)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "4487dde751b3d046483a08a918ff27571428a84bdd79e038fc9fc4cf883e6f6d"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "nist-ai-600-1-to-eu-ai-act",
+      "version": "2026.11.0",
+      "path": "crosswalks/nist-ai-600-1-to-eu-ai-act/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #29)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "1e8777147d24b5ef6859d3bca6db41e9f7868f952f4863403408baa2517f8489"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "nist-ai-rmf-to-iso-iec-42001",
+      "version": "2026.11.0",
+      "path": "crosswalks/nist-ai-rmf-to-iso-iec-42001/2026.11.0.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "nist-ai-rmf-to-en-18286",
+      "version": "2026.11.0",
+      "path": "crosswalks/nist-ai-rmf-to-en-18286/2026.11.0.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "pack",
+      "id": "nist-ai-rmf",
+      "version": "2026.11.0",
+      "path": "packs/nist-ai-rmf/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #29)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "0bf2f6b51f538aec396d2053a4ea9869b95e665009ab29da70b60baaaee83847"
+    },
+    {
+      "documentType": "pack",
+      "id": "nyc-ll144-bias-audit",
+      "version": "2026.11.1",
+      "path": "packs/nyc-ll144-bias-audit/2026.11.1.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #144)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "selectable": true,
+      "sha256": "cfdbf44c6302ae60527c32973deb80ee881998ae13441ecd7b93c5e75d66937a"
     }
   ],
   "defaults": {

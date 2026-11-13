@@ -264,7 +264,7 @@ describe("the pack as the release would serve it", () => {
       legalReviewPending: false,
       clauseNumbersOnly: true,
       phases: ["Stage 1", "Stage 2"],
-      crosswalksTo: ["EU AI Act (amended)"],
+      crosswalksTo: ["EU AI Act (amended)", "NIST AI RMF 1.0"],
     });
   });
 
@@ -299,6 +299,7 @@ describe("the pack as the release would serve it", () => {
       statementOfApplicability: true,
       nonconformityGrading: true,
       certificationRecommendation: true,
+      ll144BiasAudit: false,
     });
     const view = managementSystemView(pinned(e))!;
     expect(view.phases).toEqual([

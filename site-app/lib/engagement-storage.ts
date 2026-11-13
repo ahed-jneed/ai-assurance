@@ -44,17 +44,44 @@ export class IntegrityError extends ApiError {
   }
 }
 
+/**
+ * The R2 keys this request has verified (read back intact) or written, keyed
+ * by the request's Context. Parts are content-addressed, so such a key already
+ * holds exactly the bytes its name promises and dehydrate() does not put it
+ * again: a save after a load writes only the parts that changed.
+ */
+const present = new WeakMap<object, Set<string>>();
+const presentIn = (ctx: Context) =>
+  present.get(ctx) ?? present.set(ctx, new Set()).get(ctx)!;
+
+/**
+ * Moves the engagement's immutable parts to R2 and returns the record to
+ * store in D1, with storage references in their place. A part this request
+ * has already read back intact or written is not put again, and identical
+ * parts are put once.
+ */
 export async function dehydrate(ctx: Context, e: Engagement) {
   const copy = structuredClone(e) as Stored,
-    refs: StorageRefs = { reports: {}, histories: {}, results: {} };
+    refs: StorageRefs = { reports: {}, histories: {}, results: {} },
+    known = presentIn(ctx),
+    writes = new Map<string, Promise<void>>();
   async function put(type: string, value: unknown) {
     const body = JSON.stringify(value),
       hash = await sha256(body),
       key = ctx.tenantId + "/" + e.id + "/immutable/" + type + "/" + hash;
-    await bucket().put(key, body, {
-      httpMetadata: { contentType: "application/json" },
-      customMetadata: { sha256: hash },
-    });
+    if (!known.has(key)) {
+      let write = writes.get(key);
+      if (!write) {
+        write = bucket()
+          .put(key, body, {
+            httpMetadata: { contentType: "application/json" },
+            customMetadata: { sha256: hash },
+          })
+          .then(() => void known.add(key));
+        writes.set(key, write);
+      }
+      await write;
+    }
     return { key, sha256: hash };
   }
   // Written in parallel; the references are assigned in record order, so the
@@ -139,6 +166,7 @@ function read(ctx: Context | undefined, engagementId: string, ref: Ref) {
     const bytes = await o.arrayBuffer();
     if ((await sha256(bytes)) !== ref.sha256)
       throw new IntegrityError(engagementId, "mismatch", ref.key);
+    if (ctx) presentIn(ctx).add(ref.key);
     return new TextDecoder().decode(bytes);
   })();
   cache?.set(ref.key, pending);
@@ -193,6 +221,80 @@ export async function hydrate(
   delete copy.storageRefs;
   return e;
 }
+
+/** One recorded integrity incident, as practice administrators see it. */
+export type IntegrityIncident = {
+  engagementId: string;
+  /** The engagement's title; null when the engagement row is gone. */
+  title: string | null;
+  objectKey: string;
+  kind: IntegrityKind;
+  status: number;
+  firstSeen: string;
+  lastSeen: string;
+  occurrences: number;
+  /** Who last met it: a display name, or the user id without a membership. */
+  lastSeenBy: string;
+};
+/** How many incidents the practice view lists, most recently seen first. */
+export const integrityIncidentLimit = 50;
+/**
+ * How long an incident counts as recent: the navigation badge counts only
+ * incidents a member met in this window, so it clears once a restored record
+ * stops failing. Incidents cannot be acknowledged yet (#121 follow-up).
+ */
+export const integrityIncidentRecentDays = 7;
+/**
+ * The practice's recorded integrity incidents for its administrators: how
+ * many were ever recorded, how many were last seen in the past
+ * {@link integrityIncidentRecentDays} days, and the most recently seen ones,
+ * newest first. The rows are history: a record restored since stays listed.
+ */
+export async function integrityIncidents(ctx: Context) {
+  const since = new Date(
+    Date.now() - integrityIncidentRecentDays * 86_400_000,
+  ).toISOString();
+  const [count, rows] = await Promise.all([
+    db()
+      .prepare(
+        "SELECT COUNT(*) AS n,COALESCE(SUM(last_seen>=?),0) AS recent FROM integrity_incidents WHERE tenant_id=?",
+      )
+      .bind(since, ctx.tenantId)
+      .first<{ n: number; recent: number }>(),
+    db()
+      .prepare(
+        "SELECT i.engagement_id,e.title,i.object_key,i.kind,i.status,i.first_seen,i.last_seen,i.occurrences,COALESCE(m.display_name,i.last_user_id) AS last_seen_by FROM integrity_incidents i LEFT JOIN engagements e ON e.tenant_id=i.tenant_id AND e.id=i.engagement_id LEFT JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.last_user_id WHERE i.tenant_id=? ORDER BY i.last_seen DESC,i.engagement_id,i.object_key,i.kind LIMIT ?",
+      )
+      .bind(ctx.tenantId, integrityIncidentLimit)
+      .all<{
+        engagement_id: string;
+        title: string | null;
+        object_key: string;
+        kind: IntegrityKind;
+        status: number;
+        first_seen: string;
+        last_seen: string;
+        occurrences: number;
+        last_seen_by: string;
+      }>(),
+  ]);
+  return {
+    count: count?.n ?? 0,
+    recent: count?.recent ?? 0,
+    incidents: rows.results.map((r): IntegrityIncident => ({
+      engagementId: r.engagement_id,
+      title: r.title,
+      objectKey: r.object_key,
+      kind: r.kind,
+      status: r.status,
+      firstSeen: r.first_seen,
+      lastSeen: r.last_seen,
+      occurrences: r.occurrences,
+      lastSeenBy: r.last_seen_by,
+    })),
+  };
+}
+export type IntegrityIncidents = Awaited<ReturnType<typeof integrityIncidents>>;
 
 /**
  * Records that an engagement failed to load intact: one row per engagement,

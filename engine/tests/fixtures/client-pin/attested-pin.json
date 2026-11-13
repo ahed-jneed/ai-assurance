@@ -1,0 +1,19 @@
+{
+  "name": "client-data.csv",
+  "sha256": "f2eb2f9fc555e7856f5e9cddd657b280d9433e543afb17f42b74a5cd52996d65",
+  "size": 89,
+  "columns": [
+    "label",
+    "prediction",
+    "ethnicity"
+  ],
+  "confirmedBy": "Dana Müller (fictional), data protection officer",
+  "confirmedOn": "2026-11-05",
+  "attestation": {
+    "algorithm": "Ed25519",
+    "statement": "eyJjb2x1bW5zIjpbImxhYmVsIiwicHJlZGljdGlvbiIsImV0aG5pY2l0eSJdLCJjb25maXJtZWRCeSI6IkRhbmEgTcO8bGxlciAoZmljdGlvbmFsKSwgZGF0YSBwcm90ZWN0aW9uIG9mZmljZXIiLCJjb25maXJtZWRPbiI6IjIwMjYtMTEtMDUiLCJraW5kIjoiYXNzdXJhbmNlLmNsaWVudC1kYXRhc2V0LXBpbiIsIm5hbWUiOiJjbGllbnQtZGF0YS5jc3YiLCJzY2hlbWFWZXJzaW9uIjoiMS4wIiwic2hhMjU2IjoiZjJlYjJmOWZjNTU1ZTc4NTZmNWU5Y2RkZDY1N2IyODBkOTQzM2U1NDNhZmIxN2Y0MmI3NGE1Y2Q1Mjk5NmQ2NSIsInNpemUiOjg5fQ==",
+    "signature": "Ny0gqDUqkeafRbBydmzZMOMuGjTMz6ut2/lgnPb4lZ5VmMg/u4vwuMlsOv+r2t2UWu2XMV0Ku+nm5e2EGJQgCg==",
+    "publicKeySPKI": "MCowBQYDK2VwAyEAA6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+    "keySha256": "a050837d85070582ccf7394b0988847cc312cb88259b894899f6f239cf1791a5"
+  }
+}

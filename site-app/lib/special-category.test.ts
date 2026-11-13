@@ -3,6 +3,7 @@
 // the report limitation. Hosted and external runs are tested in
 // evaluation-service.test.ts.
 import { env } from "cloudflare:workers";
+import { readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as submit } from "@/app/api/client-submission/route";
@@ -21,6 +22,8 @@ import {
   namesSpecialCategory,
   normalizeColumn,
   protocolGroupColumns,
+  protocolGroupMinimum,
+  specialCategoryGroupFloor,
   specialCategoryLimitation,
   specialCategoryLimitations,
   specialColumns,
@@ -194,6 +197,7 @@ describe("column detection", () => {
   it("treats the columns of intersectional strata as group columns (#30)", () => {
     const statistics = {
       criteria: [{ kind: "group_comparison", groupFields: ["sex", "race"] }],
+      minimums: { sampleSize: 30, groupSize: 50, classCount: 10 },
     } as EvaluationProfile["statistics"];
     const profile = {
       suite: ["demographic_parity"],
@@ -787,6 +791,7 @@ describe("POST /api/evidence", () => {
           confirmedOn: "2026-11-05",
           custodyNote:
             "Kept on the client's analysis server; its worker reads it",
+          columns: ["label", "prediction", "ethnicity"],
           ...data,
         },
       }),
@@ -860,6 +865,174 @@ describe("POST /api/evidence", () => {
         .status,
     ).toBe(400);
     expect(pinnedEngagement().artifacts.filter(heldByClient)).toHaveLength(1);
+  });
+
+  it("requires the file's header columns, each once and not blank (#134)", async () => {
+    for (const columns of [undefined, [], ["label", "label"], ["label", " "]])
+      expect(
+        (await pin({ sha256: "d".repeat(64), columns })).status,
+        JSON.stringify(columns),
+      ).toBe(400);
+    expect((await pin()).status).toBe(200);
+    expect(pinnedEngagement().artifacts.at(-1)!.clientPin!.columns).toEqual([
+      "label",
+      "prediction",
+      "ethnicity",
+    ]);
+    expect(audit().at(-1)!.details).toMatchObject({
+      columnCount: 3,
+      attested: false,
+    });
+  });
+
+  // The pin file engine/client_pin.py wrote for a fictional client's test key;
+  // engine/tests/test_client_pin.py regenerates it byte for byte.
+  const attested = JSON.parse(
+    readFileSync(
+      new URL(
+        "../../engine/tests/fixtures/client-pin/attested-pin.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ) as Record<string, unknown> & {
+    confirmedBy: string;
+    attestation: Record<string, string>;
+  };
+  const custodyNote = "Kept on the client's analysis server";
+
+  it("verifies and keeps the client's signed statement of the pin (#134)", async () => {
+    const response = await pin({ ...attested, custodyNote });
+    expect(response.status).toBe(200);
+    const a = pinnedEngagement().artifacts.at(-1)!;
+    expect(a.clientPin).toMatchObject({
+      confirmedBy: attested.confirmedBy,
+      columns: ["label", "prediction", "ethnicity"],
+      attestation: {
+        algorithm: "Ed25519",
+        statement: attested.attestation.statement,
+        signature: attested.attestation.signature,
+        publicKeySPKI: attested.attestation.publicKeySPKI,
+        keySha256: attested.attestation.keySha256,
+      },
+    });
+    expect(audit().at(-1)!.details).toMatchObject({
+      attested: true,
+      clientKeySha256: attested.attestation.keySha256,
+    });
+  });
+
+  it("refuses an attestation that does not sign exactly this pin (#134)", async () => {
+    const refused = async (
+      data: Record<string, unknown>,
+      message: string | RegExp,
+    ) => {
+      const response = await pin({ ...attested, custodyNote, ...data });
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: string }).error).toMatch(
+        message,
+      );
+    };
+    // A pin field the client did not sign.
+    await refused(
+      { confirmedBy: "Someone else, auditor" },
+      "The client's signed statement differs from this pin in: confirmedBy",
+    );
+    await refused(
+      { columns: ["label", "prediction", "sex"] },
+      /differs from this pin in: columns$/,
+    );
+    // A statement changed after signing, or another key.
+    const statement = JSON.parse(atob(attested.attestation.statement));
+    await refused(
+      {
+        confirmedOn: "2026-11-04",
+        attestation: {
+          ...attested.attestation,
+          statement: btoa(
+            JSON.stringify({ ...statement, confirmedOn: "2026-11-04" }),
+          ),
+        },
+      },
+      "The client's signature does not verify over its statement",
+    );
+    const pair = (await crypto.subtle.generateKey("Ed25519", true, [
+      "sign",
+      "verify",
+    ])) as CryptoKeyPair;
+    const spki = new Uint8Array(
+      await crypto.subtle.exportKey("spki", pair.publicKey),
+    );
+    await refused(
+      {
+        attestation: {
+          ...attested.attestation,
+          publicKeySPKI: btoa(String.fromCharCode(...spki)),
+          keySha256: undefined,
+        },
+      },
+      "The client's signature does not verify over its statement",
+    );
+    await refused(
+      { attestation: { ...attested.attestation, keySha256: "0".repeat(64) } },
+      "keySha256 is not the fingerprint of this key",
+    );
+    await refused(
+      { attestation: { ...attested.attestation, publicKeySPKI: "AAAA" } },
+      "The attestation needs an Ed25519 public key and signature",
+    );
+    // A statement the client signed about something else.
+    const other = new TextEncoder().encode(
+      JSON.stringify({ ...statement, kind: "other" }),
+    );
+    const signature = new Uint8Array(
+      await crypto.subtle.sign("Ed25519", pair.privateKey, other),
+    );
+    await refused(
+      {
+        attestation: {
+          algorithm: "Ed25519",
+          statement: btoa(String.fromCharCode(...other)),
+          signature: btoa(String.fromCharCode(...signature)),
+          publicKeySPKI: btoa(String.fromCharCode(...spki)),
+        },
+      },
+      "This is not a client dataset pin statement",
+    );
+    expect(pinnedEngagement().artifacts.filter(heldByClient)).toHaveLength(0);
+  });
+});
+
+describe("the special-category group-size floor (#134)", () => {
+  const profile = (groupSize: number | undefined, configured = 5) =>
+    ({
+      suite: ["demographic_parity"],
+      config: { groupColumn: "ethnicity", minimumGroupSize: configured },
+      ...(groupSize === undefined
+        ? {}
+        : {
+            statistics: {
+              criteria: [],
+              minimums: { sampleSize: 30, groupSize, classCount: 10 },
+            },
+          }),
+    }) as unknown as EvaluationProfile;
+  const declare = (p: EvaluationProfile, specialCategory = true) =>
+    declareProtocol({}, p, { specialCategory }, "user-1", "2026-11-07");
+
+  it("refuses a special-category protocol whose groups may hold fewer than 50 rows", () => {
+    expect(specialCategoryGroupFloor).toBe(50);
+    expect(refusal(() => declare(profile(49))).message).toBe(
+      "A fairness protocol on special-category column ethnicity needs a minimum group size of at least 50 rows (this protocol's is 49): smaller groups would be reported exactly.",
+    );
+    expect(declare(profile(50))?.specialCategory).toBe(true);
+    // A protocol without a plan: its configured minimum, raised to the
+    // statistics floor of 30 as the derived plan raises it.
+    expect(protocolGroupMinimum(profile(undefined, 5))).toBe(30);
+    expect(refusal(() => declare(profile(undefined, 30))).status).toBe(400);
+    expect(declare(profile(undefined, 50))?.route).toBe("client_side");
+    // A column declared not to be special-category keeps the statistics floor.
+    expect(declare(profile(30), false)?.specialCategory).toBe(false);
   });
 });
 

@@ -16,6 +16,9 @@ class RuntimePackageTests(unittest.TestCase):
             for name, data in {
                 'engine/diagnostics.py': b'# source fixture\n',
                 'engine/README.md': b'Synthetic source documentation\n',
+                'engine/threshold-library.json': b'{"entries": []}\n',
+                'engine/genai/threshold-library.json': b'{}',
+                'engine/settings.json': b'{}',
                 'engine/examples/predictions.csv': b'actual,predicted\n1,1\n',
                 'engine/examples/client.csv': b'private fixture must be excluded',
                 'engine/.env': b'NEVER_PACKAGE=synthetic',
@@ -34,7 +37,7 @@ class RuntimePackageTests(unittest.TestCase):
                 path = root/name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
-            expected = {'engine/diagnostics.py', 'engine/README.md', 'engine/examples/predictions.csv',
+            expected = {'engine/diagnostics.py', 'engine/README.md', 'engine/threshold-library.json', 'engine/examples/predictions.csv',
                 'schemas/test-run.schema.json', 'schemas/test-run.base.json',
                 'schemas/fixtures/external-runs.v1.2.json'}
             self.assertEqual(set(sources(root)), expected)
@@ -55,6 +58,8 @@ class RuntimePackageTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         names = set(sources(root))
         self.assertIn('engine/assurance.py', names)
+        # engine/statistics.py loads the library copy beside it (#113).
+        self.assertIn('engine/threshold-library.json', names)
         self.assertFalse([name for name in names if name.startswith('engine/tests/')])
 
     def test_linked_source_is_rejected(self):

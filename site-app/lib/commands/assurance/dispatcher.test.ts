@@ -4,8 +4,10 @@ import { GET, POST } from "@/app/api/assurance/route";
 import { locationSchema, type AssuranceRecord } from "@/lib/assurance-core";
 import {
   addRecord,
+  compiledJobIds,
   jobs,
-  recordCount,
+  jobTelemetry,
+  recordKindCounts,
   recordPage,
   recordsById,
   recordStatement,
@@ -31,6 +33,7 @@ import { context, type Context } from "@/lib/tenancy";
 import { at, declaration } from "@/lib/workflow/test-fixtures";
 import { resolveNew } from "@/lib/criteria/pin";
 import { seedWorkflow } from "@/lib/workflow-seed";
+import { undeclaredColumns } from "@/lib/special-category";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -47,7 +50,9 @@ vi.mock("@/lib/engagement-repo", async (importOriginal) => ({
 vi.mock("@/lib/assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/assurance-store")>()),
   recordPage: vi.fn(),
-  recordCount: vi.fn(),
+  recordKindCounts: vi.fn(),
+  jobTelemetry: vi.fn(),
+  compiledJobIds: vi.fn(),
   recordsById: vi.fn(),
   addRecord: vi.fn(),
   recordStatement: vi.fn(),
@@ -95,7 +100,14 @@ function load(e: Engagement, ctx: Context = caller()) {
   vi.mocked(getEngagement).mockResolvedValue(e);
   vi.mocked(loadEngagement).mockResolvedValue(e);
   vi.mocked(recordPage).mockResolvedValue({ records: [], nextCursor: null });
-  vi.mocked(recordCount).mockResolvedValue(0);
+  vi.mocked(recordKindCounts).mockResolvedValue({});
+  vi.mocked(jobTelemetry).mockResolvedValue({
+    total: 0,
+    queued: 0,
+    running: 0,
+    stalled: 0,
+  });
+  vi.mocked(compiledJobIds).mockResolvedValue([]);
   vi.mocked(recordsById).mockResolvedValue([]);
   vi.mocked(jobs).mockResolvedValue([]);
 }
@@ -499,6 +511,57 @@ describe("POST /api/assurance", () => {
     );
   });
 
+  it("checks the mapped columns against the pin's declared header when queued (#134)", async () => {
+    const { e, queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+      clientPin: {
+        confirmedBy: "Client data steward",
+        confirmedOn: "2026-11-05",
+        custodyNote: "Kept on the client's analysis server",
+        columns: ["label", "prediction", "ethnicity"],
+      },
+    });
+    const profile = e.evaluationProfiles![0];
+    profile.config = {
+      ...profile.config,
+      labelColumn: "label",
+      predictionColumn: "score",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [
+        { kind: "group_comparison", groupFields: ["ethnicity", "sex"] },
+      ],
+    } as EvaluationProfile["statistics"];
+    const refused = await queue("client_local");
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe(
+      "The client-held dataset " +
+        dataset.name +
+        " does not declare the protocol's columns score, sex. Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+    );
+    expect(save).not.toHaveBeenCalled();
+    // Declared columns are matched exactly, as the worker reads the header.
+    profile.config = {
+      ...profile.config,
+      predictionColumn: "prediction",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["Ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect((await queue("client_local")).status).toBe(409);
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect(
+      undeclaredColumns(
+        e.artifacts.find((a) => a.id === dataset.id)!,
+        profile,
+      ),
+    ).toEqual([]);
+  });
+
   it.each([
     ["client", "platform"],
     ["platform", "client"],
@@ -588,6 +651,8 @@ describe("GET /api/assurance", () => {
         {},
         { cursor: "next" },
         { kind: "dossier" },
+        { view: "records" },
+        { view: "record", id: "AS-1" },
       ];
       for (const query of queries) {
         const response = await get(e, query);
@@ -595,7 +660,8 @@ describe("GET /api/assurance", () => {
         expect(await response.json()).toEqual(internalOnly);
       }
       expect(recordPage).not.toHaveBeenCalled();
-      expect(recordCount).not.toHaveBeenCalled();
+      expect(recordKindCounts).not.toHaveBeenCalled();
+      expect(recordsById).not.toHaveBeenCalled();
       expect(jobs).not.toHaveBeenCalled();
     },
   );
@@ -605,23 +671,22 @@ describe("GET /api/assurance", () => {
     ["Auditor", 0],
     ["Reviewer", 0],
   ] as [Role, number][])(
-    "loads the workbench with the first page of records for %s",
+    "loads the workbench with counts and no records for %s",
     async (role, eligible) => {
       const e = stored();
       const ctx = caller(role);
       load(e, ctx);
-      const record = written("location", location);
-      vi.mocked(recordPage).mockResolvedValue({
-        records: [record],
-        nextCursor: "page-2",
+      vi.mocked(recordKindCounts).mockResolvedValue({
+        location: 1200,
+        system: 1,
       });
-      vi.mocked(recordCount).mockResolvedValue(1201);
-      const past = new Date(Date.now() - 60_000).toISOString(),
-        future = new Date(Date.now() + 60_000).toISOString();
+      const telemetry = { total: 340, queued: 120, running: 7, stalled: 2 };
+      vi.mocked(jobTelemetry).mockResolvedValue(telemetry);
+      vi.mocked(compiledJobIds).mockResolvedValue(["JOB-4"]);
       vi.mocked(jobs).mockResolvedValue([
         { id: "JOB-1", state: "queued" },
-        { id: "JOB-2", state: "running", lease_until: past },
-        { id: "JOB-3", state: "running", lease_until: future },
+        { id: "JOB-3", state: "running" },
+        { id: "JOB-4", state: "succeeded" },
       ]);
       const rows: Record<string, unknown[]> = {
         runner_workers: [{ id: "WORKER-1", name: "Runner" }],
@@ -641,18 +706,21 @@ describe("GET /api/assurance", () => {
         ReturnType<typeof assuranceView>
       >;
       expect(view).toMatchObject({
-        records: [record],
-        nextCursor: "page-2",
         total: 1201,
+        kindCounts: { location: 1200, system: 1 },
         workers: rows.runner_workers,
         access: rows.engagement_access,
         practiceAdmin: true,
-        telemetry: { queued: 1, stalled: 1 },
+        // Counted over every job, not the 100 listed (#121).
+        telemetry,
       });
-      expect(recordPage).toHaveBeenCalledWith(ctx, e.id);
-      // One execution_jobs query serves the list and the telemetry (#16), and
-      // the workbench never loads the engagement's R2 parts.
+      expect(view).not.toHaveProperty("records");
+      expect(view).not.toHaveProperty("nextCursor");
+      expect(view.jobs.map((j) => j.compiled)).toEqual([false, false, true]);
+      // The view reads no record page, and never the engagement's R2 parts.
+      expect(recordPage).not.toHaveBeenCalled();
       expect(jobs).toHaveBeenCalledTimes(1);
+      expect(jobTelemetry).toHaveBeenCalledWith(ctx, e.id);
       expect(getEngagement).not.toHaveBeenCalled();
       expect(loadEngagement).toHaveBeenCalledWith(ctx, e.id);
       expect(view.jobs).toHaveLength(3);
@@ -668,6 +736,7 @@ describe("GET /api/assurance", () => {
   );
 
   it.each([
+    [{ view: "records" }, { kind: "", cursor: "" }],
     [{ cursor: "page-2" }, { kind: "", cursor: "page-2" }],
     [{ kind: "dataset" }, { kind: "dataset", cursor: "" }],
     [
@@ -688,7 +757,7 @@ describe("GET /api/assurance", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(await response.json()).toEqual(page);
     expect(recordPage).toHaveBeenCalledWith(ctx, e.id, options);
-    expect(recordCount).not.toHaveBeenCalled();
+    expect(recordKindCounts).not.toHaveBeenCalled();
     expect(jobs).not.toHaveBeenCalled();
   });
 });
