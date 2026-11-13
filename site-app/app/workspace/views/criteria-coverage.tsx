@@ -3,7 +3,7 @@
 // (docs/design/criteria-model.md sections 15.2 to 15.4), from
 // GET /api/coverage. Coverage is reviewed evidence per requirement: it never
 // shows partial coverage as full, and papers signed are progress, not coverage.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -11,22 +11,26 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import type { CellState, StateCounts } from "@/lib/criteria/coverage";
+import {
+  cellLabel,
+  coverageStates as order,
+  defaultCoverageFilters,
+  effectiveFilters,
+  filterOptions,
+  isFiltered,
+  matches,
+  NONE,
+  stateLabels,
+  type CoverageFilters,
+} from "@/lib/criteria/coverage-filters";
 import type {
   CellView,
   CoverageResponse,
   ViewInfo,
 } from "@/lib/criteria/views";
+import { usePersonalPreferences } from "../../business-workspace";
 
-export const stateLabels: Record<CellState, string> = {
-  full: "Covered",
-  partial: "Partly covered",
-  exception: "Exception in a related source",
-  open: "Open",
-  parent_only: "Mapped at a higher level only",
-  unmapped: "Not mapped",
-  excluded: "Excluded from scope",
-  not_applicable: "Not applicable",
-};
+export { cellLabel, stateLabels };
 const shortLabels: Record<CellState, string> = {
   full: "Covered",
   partial: "Partly",
@@ -37,22 +41,14 @@ const shortLabels: Record<CellState, string> = {
   excluded: "Excluded",
   not_applicable: "N/A",
 };
-const order: CellState[] = [
-  "full",
-  "partial",
-  "exception",
-  "open",
-  "parent_only",
-  "unmapped",
-  "excluded",
-  "not_applicable",
-];
-/** "Covered (readiness)": a readiness result is never shown as applicable law. */
-export const cellLabel = (c: { state: CellState; readiness: boolean }) =>
-  stateLabels[c.state] +
-  (c.readiness && (c.state === "full" || c.state === "partial")
-    ? " (readiness)"
-    : "");
+/** "2 Dec 2027" for an ISO date, without a time zone shift. */
+const dayLabel = (iso: string) =>
+  new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 async function fetchCoverage<T>(
   tenantId: string,
@@ -199,6 +195,56 @@ function tileText(c: CellView) {
   );
 }
 
+const sameFilters = (a?: CoverageFilters, b?: CoverageFilters) =>
+  !!a && !!b && a.state === b.state && a.actor === b.actor && a.date === b.date;
+/**
+ * The heatmap's filters, kept per user in the workspace preferences (section
+ * 15.2). A change applies at once and is saved in the background; a failed
+ * save reloads the preferences and tries once more, then says so.
+ */
+function useCoverageFilters(
+  tenantId: string,
+  view: Pick<CoverageResponse, "cells"> | undefined,
+) {
+  const pref = usePersonalPreferences(tenantId);
+  const [local, setLocal] = useState<CoverageFilters | null>(null);
+  const [saveError, setSaveError] = useState("");
+  const saving = useRef(false);
+  const attempts = useRef(new WeakMap<CoverageFilters, number>());
+  const { ready, value, save, load } = pref;
+  useEffect(() => {
+    if (!local || !ready || saving.current) return;
+    if (sameFilters(value.coverage, local)) return;
+    const tried = attempts.current.get(local) ?? 0;
+    if (tried >= 2) return;
+    attempts.current.set(local, tried + 1);
+    saving.current = true;
+    save({ ...value, coverage: local })
+      .then(() => setSaveError(""))
+      .catch(() => {
+        setSaveError(
+          tried
+            ? "Your filters apply here but could not be saved."
+            : "Saving your filters…",
+        );
+        void load();
+      })
+      .finally(() => {
+        saving.current = false;
+      });
+  }, [local, ready, value, save, load]);
+  const stored = local ?? value.coverage;
+  const filters = view
+    ? effectiveFilters(view, stored)
+    : { ...defaultCoverageFilters, ...stored };
+  return {
+    filters,
+    saveError,
+    change: (next: Partial<CoverageFilters>) =>
+      setLocal({ ...filters, ...next }),
+  };
+}
+
 /** The heatmap of section 15.2: rows by group, one tile per requirement. */
 export default function CriteriaCoverage({
   tenantId,
@@ -209,27 +255,28 @@ export default function CriteriaCoverage({
   engagementId: string;
   version: number;
 }) {
+  const ids = useId();
   const [framework, setFramework] = useState<string | null>(null);
-  const [filter, setFilter] = useState<CellState | "all">("all");
   const [open, setOpen] = useState<CellView | null>(null);
   const result = useCoverage(tenantId, engagementId, version, framework);
   const grid = useRef<HTMLDivElement>(null);
   const view = "loading" in result ? undefined : result.view;
+  const { filters, change, saveError } = useCoverageFilters(tenantId, view);
+  const options = useMemo(() => (view ? filterOptions(view) : null), [view]);
   const rows = useMemo(() => {
     if (!view) return [];
     const roots = view.cells.filter((c) => !c.parent);
-    return roots.map((root) => ({
-      root,
-      group: view.groups.find((g) => g.id === root.id),
-      tiles: (root.type === "group"
-        ? descendants(view.cells, root.id)
-        : [root]
-      ).filter(
-        (c) =>
-          c.type === "requirement" && (filter === "all" || c.state === filter),
-      ),
-    }));
-  }, [view, filter]);
+    return roots
+      .map((root) => ({
+        root,
+        group: view.groups.find((g) => g.id === root.id),
+        tiles: (root.type === "group"
+          ? descendants(view.cells, root.id)
+          : [root]
+        ).filter((c) => c.type === "requirement" && matches(c, filters)),
+      }))
+      .filter((r) => !isFiltered(filters) || r.tiles.length > 0);
+  }, [view, filters]);
   if ("loading" in result)
     return <p className="subtle content-pad">Loading coverage…</p>;
   if (result.error) return <p className="subtle content-pad">{result.error}</p>;
@@ -285,22 +332,90 @@ export default function CriteriaCoverage({
             {b.text}
           </p>
         ))}
-        <label className="coverage-filter">
-          Show
-          <select
-            value={filter}
-            onChange={(event) =>
-              setFilter(event.target.value as CellState | "all")
+        <div
+          className="coverage-filters"
+          role="group"
+          aria-label="Filter requirements"
+        >
+          <span className="coverage-filter">
+            <label htmlFor={ids + "-state"}>State</label>
+            <select
+              id={ids + "-state"}
+              value={filters.state}
+              onChange={(event) => change({ state: event.target.value })}
+            >
+              <option value="all">All states</option>
+              {order.map((s) => (
+                <option key={s} value={s}>
+                  {stateLabels[s]}
+                </option>
+              ))}
+            </select>
+          </span>
+          <span className="coverage-filter">
+            <label htmlFor={ids + "-actor"}>Actor</label>
+            <select
+              id={ids + "-actor"}
+              value={filters.actor}
+              onChange={(event) => change({ actor: event.target.value })}
+            >
+              <option value="all">All actors</option>
+              {options?.actors.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+              {options?.actorsMissing && (
+                <option value={NONE}>No actor recorded</option>
+              )}
+            </select>
+          </span>
+          <span className="coverage-filter">
+            <label htmlFor={ids + "-date"}>Applicability date</label>
+            <select
+              id={ids + "-date"}
+              value={filters.date}
+              onChange={(event) => change({ date: event.target.value })}
+            >
+              <option value="all">All dates</option>
+              {options?.dates.map((d) => (
+                <option key={d} value={d}>
+                  From {dayLabel(d)}
+                </option>
+              ))}
+              {options?.datesMissing && (
+                <option value={NONE}>No date recorded</option>
+              )}
+            </select>
+          </span>
+          <a
+            className="source-link coverage-export"
+            href={
+              "/api/coverage?" +
+              new URLSearchParams({
+                tenantId,
+                engagementId,
+                framework: view.view.key,
+                format: "csv",
+                ...(filters.state !== "all" ? { state: filters.state } : {}),
+                ...(filters.actor !== "all" ? { actor: filters.actor } : {}),
+                ...(filters.date !== "all" ? { date: filters.date } : {}),
+              })
             }
+            download
           >
-            <option value="all">All states</option>
-            {order.map((s) => (
-              <option key={s} value={s}>
-                {stateLabels[s]}
-              </option>
-            ))}
-          </select>
-        </label>
+            {isFiltered(filters) ? "Export filtered CSV" : "Export CSV"}
+          </a>
+        </div>
+        <p className="subtle coverage-filter-status" role="status">
+          {isFiltered(filters)
+            ? `Showing ${rows.reduce((n, r) => n + r.tiles.length, 0)} of ${view.summary.total} requirements.`
+            : `Showing all ${view.summary.total} requirements.`}{" "}
+          {options?.derived
+            ? "Dates derived from the rule pack are not reviewed."
+            : ""}
+          {saveError ? " " + saveError : ""}
+        </p>
         <p className="coverage-legend" aria-hidden="true">
           {order.map((s) => (
             <span key={s} className={"coverage-tile state-" + s}>
@@ -347,13 +462,20 @@ export default function CriteriaCoverage({
                       c.state +
                       (c.readiness ? " readiness" : "")
                     }
-                    aria-label={c.ref + ", " + cellLabel(c).toLowerCase()}
                     title={(c.title ?? "") + ": " + cellLabel(c)}
                     onKeyDown={move}
                     onClick={() => setOpen(c)}
                   >
-                    <span className="coverage-ref">{c.ref}</span>
-                    <span>{tileText(c)}</span>
+                    {/* Accessible name "Art. 9(1), mapped at a higher level
+                        only" (section 15.4) from the content, so the visible
+                        reference starts the name (WCAG 2.5.3). */}
+                    <span className="coverage-ref">
+                      {c.ref}
+                      <span className="sr-only">
+                        , {cellLabel(c).toLowerCase()}
+                      </span>
+                    </span>
+                    <span aria-hidden="true">{tileText(c)}</span>
                   </button>
                 ))}
               </div>
@@ -392,7 +514,13 @@ function CellDrawer({
 }) {
   const why = whyNot(c);
   return (
-    <div className="coverage-drawer-body">
+    // The body scrolls, so it takes focus for keyboard scrolling (WCAG 2.1.1).
+    <div
+      className="coverage-drawer-body"
+      role="region"
+      aria-label={c.ref + " details"}
+      tabIndex={0}
+    >
       <SheetTitle>
         {c.ref} {c.title}
       </SheetTitle>
@@ -475,11 +603,40 @@ function CellDrawer({
           Not an audit conclusion.
         </p>
       ))}
+      {c.actors?.length ? (
+        <p className="subtle">Actors: {c.actors.join(", ")}</p>
+      ) : null}
       {c.applicability?.map((a) => (
         <p key={a.from + a.condition} className="subtle">
           From {a.from}: {a.condition}
         </p>
       ))}
+      {c.derivedApplicability?.length ? (
+        <>
+          <h3>Applicability dates (derived, not reviewed)</h3>
+          <ul className="coverage-derived">
+            {c.derivedApplicability.map((a) => (
+              <li key={a.derived.entryId}>
+                From {dayLabel(a.from)}: {a.condition}
+                <small className="block">
+                  Rule pack {a.derived.rulePackVersion} entry{" "}
+                  {a.derived.entryId}, provision {a.derived.provision}
+                  {a.legalRef ? " (" + a.legalRef + ")" : ""}
+                  {a.inheritedFrom
+                    ? " · inherited from " + a.inheritedFrom
+                    : ""}
+                </small>
+              </li>
+            ))}
+          </ul>
+          <p className="subtle">
+            These dates come from the rule pack. Their mapping to this
+            requirement is automatic and has not been reviewed: they inform
+            review only, do not decide whether the requirement applies and do
+            not change its state.
+          </p>
+        </>
+      ) : null}
       {view.legalReviewPending && (
         <p>
           {view.view.shortTitle} data {view.versions.framework}: legal review

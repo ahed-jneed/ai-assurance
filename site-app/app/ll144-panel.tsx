@@ -21,6 +21,9 @@ const emptyForm = {
   raceEthnicityColumn: "",
   outcomeColumn: "",
   selectedValues: "",
+  /** The tool classifies into several groups (6 RCNY 5-301(b)(4), #144). */
+  perGroup: false,
+  classificationGroups: "",
   scoreColumn: "",
   unknownValues: "",
   kind: "historical" as "historical" | "test",
@@ -32,6 +35,16 @@ const emptyForm = {
   demographicsStatement: "",
   acknowledgeHostedProcessing: false,
 };
+/**
+ * Where the Testing lab shows the LL144 panel (#144): on engagements whose
+ * pack switches the feature on, and elsewhere only to show and approve the
+ * audits an engagement already holds, without computing new ones.
+ */
+export const ll144PanelAccess = (
+  feature: boolean,
+  e: Pick<Engagement, "ll144Audits">,
+) => ({ shown: feature || !!e.ll144Audits?.length, compute: feature });
+
 const list = (v: string) =>
   v
     .split(",")
@@ -88,7 +101,9 @@ export function Ll144Panel({
         ...(form.rate === "selection"
           ? {
               outcomeColumn: form.outcomeColumn,
-              selectedValues: list(form.selectedValues),
+              ...(form.perGroup
+                ? { classificationGroups: list(form.classificationGroups) }
+                : { selectedValues: list(form.selectedValues) }),
             }
           : { scoreColumn: form.scoreColumn }),
         unknownValues: list(form.unknownValues),
@@ -149,14 +164,19 @@ export function Ll144Panel({
       <p className="subtle">
         Selection or scoring rates and impact ratios for sex, race/ethnicity and
         intersectional categories (6 RCNY 5-301), with unknown counts and the
-        optional 2% exclusion. Intervals are supplementary.
+        optional 2% exclusion. A tool that classifies individuals into several
+        groups gets one audit per group. Intervals are supplementary.
       </p>
       {audits.length ? (
         <ul className="record-list">
           {audits.map((a) => (
             <li key={a.id}>
               <strong>{a.toolName}</strong> · audit {a.auditDate} ·{" "}
-              {a.mapping.rate} rates · {a.result.totalIndividuals} individuals ·{" "}
+              {a.mapping.rate} rates
+              {a.classification
+                ? ` · group ${a.classification.group} (${a.classification.groups.indexOf(a.classification.group) + 1} of ${a.classification.groups.length})`
+                : ""}{" "}
+              · {a.result.totalIndividuals} individuals ·{" "}
               <span className="badge">{a.status}</span>{" "}
               <a href={summaryHref(a.id)} target="_blank" rel="noreferrer">
                 Open summary
@@ -241,11 +261,28 @@ export function Ll144Panel({
                   {field("Outcome column", "outcomeColumn", {
                     required: true,
                   })}
-                  {field(
-                    "Values meaning selected (comma-separated)",
-                    "selectedValues",
-                    { required: true },
-                  )}
+                  {form.perGroup
+                    ? field(
+                        "Classification groups (comma-separated outcome values)",
+                        "classificationGroups",
+                        { required: true },
+                      )
+                    : field(
+                        "Values meaning selected (comma-separated)",
+                        "selectedValues",
+                        { required: true },
+                      )}
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      checked={form.perGroup}
+                      onChange={(ev) => set({ perGroup: ev.target.checked })}
+                    />
+                    <span>
+                      The tool classifies individuals into several groups:
+                      compute one audit per group (6 RCNY 5-301(b)(4)).
+                    </span>
+                  </label>
                 </>
               ) : (
                 field("Score column", "scoreColumn", { required: true })

@@ -287,6 +287,7 @@ export function requireFeature(
       nonconformityGrading: "This criteria pack has no nonconformity grading",
       certificationRecommendation:
         "This criteria pack has no certification recommendation",
+      ll144BiasAudit: "This criteria pack has no NYC Local Law 144 bias audit",
     }[feature],
   );
 }
@@ -453,6 +454,38 @@ export function defaultFindingCriteria(
         .map((l) => l.requirement),
     ),
   ];
+}
+
+/**
+ * The criterion a finding's primary reference comes from (#144): the first
+ * of `refs` from a primary criteria set, as the finding modal lists those
+ * first, or else the first of `refs`.
+ */
+export function primaryReferenceOf(
+  pack: { criteria: readonly { framework: string; role: string }[] },
+  refs: readonly string[],
+): string | undefined {
+  const primary = new Set(
+    pack.criteria.filter((s) => s.role === "primary").map((s) => s.framework),
+  );
+  return refs.find((r) => primary.has(r.split(":")[0])) ?? refs[0];
+}
+
+/**
+ * The `article` text a finding on `ref` records (see findingArticle): on a
+ * pack whose primary criteria are not the AI Act, a finding names its clause
+ * there rather than an article (#144). Undefined for a reference outside the
+ * pin.
+ */
+export function findingArticleOf(
+  e: Pick<Engagement, "criteria" | "rulePack">,
+  ref: string,
+): string | undefined {
+  const resolved = pinned(e);
+  const option = criterionOptions(resolved, ["group", "requirement"]).find(
+    (o) => o.reference === ref,
+  );
+  return option && findingArticle(resolved, option);
 }
 
 /** The pinned criteria as the report's criterion roll-up reads them. */

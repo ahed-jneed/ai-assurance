@@ -3,9 +3,10 @@
 import { Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
+import { reportTermsFor } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
-import { Ll144Panel } from "../../ll144-panel";
+import { Ll144Panel, ll144PanelAccess } from "../../ll144-panel";
 import { WorkingPaperRegister } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
 import type { LabIntentState } from "../lab-intent";
@@ -145,6 +146,12 @@ export function WorkspaceViews({
       />
     );
   const reload = () => load(data.tenantId, e.id);
+  const ll144 = ll144PanelAccess(packFeatures(data).ll144BiasAudit, e);
+  const reportTerms = reportTermsFor(
+    url.reportTerms,
+    e.id,
+    packFeatures(data).certificationRecommendation,
+  );
   return (
     <>
       <PageHead
@@ -314,12 +321,12 @@ export function WorkspaceViews({
             resolve={resolve}
             onEvidence={() => nav.navigate("Evidence vault")}
           />
-          {!viewer && (
+          {!viewer && ll144.shown && (
             <Ll144Panel
               key={"ll144:" + data.tenantId + ":" + e.id}
               engagement={e}
               tenantId={data.tenantId}
-              writer={writer}
+              writer={writer && ll144.compute}
               reviewer={reviewer || lead}
               userId={data.identity.id}
               busy={busy}
@@ -403,8 +410,10 @@ export function WorkspaceViews({
             userId={data.identity.id}
             people={data.people}
             busy={busy}
-            terms={url.reportTerms}
-            onTerms={url.setReportTerms}
+            terms={reportTerms}
+            onTerms={(terms) =>
+              url.setReportTerms({ engagementId: e.id, terms })
+            }
             onAudience={(paperId, audience) =>
               safeAct("setPaperAudience", { paperId, audience })
             }
@@ -412,9 +421,9 @@ export function WorkspaceViews({
             onCreate={(kind) =>
               onModal("report", {
                 kind,
-                engagementType: url.reportTerms.engagementType,
-                assuranceLevel: url.reportTerms.assuranceLevel ?? "",
-                conclusion: url.reportTerms.conclusion,
+                engagementType: reportTerms.engagementType,
+                assuranceLevel: reportTerms.assuranceLevel ?? "",
+                conclusion: reportTerms.conclusion,
                 addressee: e.workflow?.brief?.audience ?? "",
               })
             }

@@ -19,6 +19,23 @@ export const preferencesSchema = z
         z.object({ id: z.string().max(500), until: z.string().datetime() }),
       )
       .max(100),
+    /**
+     * The coverage heatmap's filters (docs/design/criteria-model.md section
+     * 15.2): a state, an actor and an applicability date, each "all", "none"
+     * or a value. Optional, so preferences saved before #135 still parse.
+     */
+    coverage: z
+      .object({
+        state: z.string().min(1).max(40),
+        actor: z.string().min(1).max(80),
+        date: z.union([
+          z.literal("all"),
+          z.literal("none"),
+          z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        ]),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type PersonalPreferences = z.infer<typeof preferencesSchema>;

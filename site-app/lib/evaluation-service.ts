@@ -229,6 +229,15 @@ function registerPlanProfile(
   const c = a.config;
   if (c.labelColumn === c.predictionColumn)
     throw new ApiError(400, "Target and prediction columns must be distinct");
+  // A cluster design (section 5.11, #136) names its own id column.
+  if (
+    statistics.clusterField !== null &&
+    [c.labelColumn, c.predictionColumn].includes(statistics.clusterField)
+  )
+    throw new ApiError(
+      400,
+      "The cluster column (statistics.clusterField) must differ from the target and prediction columns",
+    );
   if (a.task === "Binary classification") {
     if (
       !c.positiveLabel ||

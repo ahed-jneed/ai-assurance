@@ -38,12 +38,22 @@ const sampleIds = new Set<string>(
  * The committed criteria plus the section 12 documents as drafts. The
  * committed #28 drafts share the sample's ids, so they are left out here:
  * the rule cases mutate the sample, and the committed drafts have their own
- * test below.
+ * test below. So are the committed crosswalks into those frameworks (#29),
+ * whose targets the smaller sample frameworks lack.
  */
 function criteria() {
   const { index, documents } = readCriteria();
   const copy = structuredClone(index) as Json;
-  copy.documents = copy.documents.filter((e: Json) => !sampleIds.has(e.id));
+  const intoSample = (e: Json) => {
+    const d = documents.get(e.path);
+    return (
+      d?.documentType === "crosswalk" &&
+      (sampleIds.has(d.source.framework) || sampleIds.has(d.target.framework))
+    );
+  };
+  copy.documents = copy.documents.filter(
+    (e: Json) => !sampleIds.has(e.id) && !intoSample(e),
+  );
   const docs = new Map<string, Json>(
     [...documents]
       .filter(([k]) => copy.documents.some((e: Json) => e.path === k))

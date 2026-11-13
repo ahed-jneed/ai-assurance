@@ -25,28 +25,28 @@ export function reviewFor(all: AssuranceRecord[], source: AssuranceRecord) {
 }
 /**
  * Every assurance record of an engagement, or of one `kind`, in (created_at,
- * id) order, read page by page from GET /api/assurance. `from` is a first
- * page already fetched (the workbench view) to continue after; `onProgress`
- * hears how many records have loaded after each page.
+ * id) order, read page by page from GET /api/assurance?view=records. Meant for
+ * kinds that stay small (systems, predictions, dataset cards, dossiers); the
+ * workbench reads the rest by search and by id. `onProgress` hears how many
+ * records have loaded after each page.
  */
 export async function assuranceRecords(
   scope: { tenantId: string; engagementId: string; kind?: string },
   {
-    from,
     signal,
     onProgress,
   }: {
-    from?: AssuranceRecordPage;
     signal?: AbortSignal;
     onProgress?: (loaded: number) => void;
   } = {},
 ) {
-  const records = [...(from?.records ?? [])];
-  let cursor = from ? from.nextCursor : "";
+  const records: AssuranceRecord[] = [];
+  let cursor: string | null = "";
   while (cursor !== null) {
     const params = new URLSearchParams({
       tenantId: scope.tenantId,
       engagementId: scope.engagementId,
+      view: "records",
     });
     if (scope.kind) params.set("kind", scope.kind);
     if (cursor) params.set("cursor", cursor);

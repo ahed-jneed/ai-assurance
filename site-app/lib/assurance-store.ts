@@ -112,6 +112,25 @@ export async function recordPage(
       rows.length > limit ? encodeCursor(records[records.length - 1]) : null,
   };
 }
+/**
+ * How many records of each kind the engagement holds: one grouped read of
+ * idx_assurance_kind, which the workbench uses for its totals and empty
+ * states instead of loading the records.
+ */
+export async function recordKindCounts(ctx: Context, engagementId: string) {
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT kind,COUNT(*) AS n FROM assurance_records WHERE tenant_id=? AND engagement_id=? GROUP BY kind",
+      )
+      .bind(ctx.tenantId, engagementId)
+      .all<{ kind: string; n: number }>()
+  ).results;
+  return Object.fromEntries(rows.map((r) => [r.kind, r.n])) as Record<
+    string,
+    number
+  >;
+}
 export async function recordCount(ctx: Context, engagementId: string) {
   const row = await db()
     .prepare(
@@ -501,6 +520,45 @@ export async function jobs(ctx: Context, engagementId: string) {
   ).results;
 }
 /**
+ * The external queue of the engagement over every job, not only the 100 most
+ * recent that jobs() lists: how many there are, how many are queued or
+ * running, and how many running jobs have an expired lease (their worker
+ * stopped renewing it; another worker may claim them). Leases are ISO
+ * timestamps, as the runner writes them, so they compare as text.
+ */
+export async function jobTelemetry(ctx: Context, engagementId: string) {
+  const row = await db()
+    .prepare(
+      "SELECT COUNT(*) AS total,COALESCE(SUM(state='queued'),0) AS queued,COALESCE(SUM(state='running'),0) AS running,COALESCE(SUM(state='running' AND lease_until<?),0) AS stalled FROM execution_jobs WHERE tenant_id=? AND engagement_id=?",
+    )
+    .bind(new Date().toISOString(), ctx.tenantId, engagementId)
+    .first<{
+      total: number;
+      queued: number;
+      running: number;
+      stalled: number;
+    }>();
+  return {
+    total: row?.total ?? 0,
+    queued: row?.queued ?? 0,
+    running: row?.running ?? 0,
+    stalled: row?.stalled ?? 0,
+  };
+}
+/** The ids of the external jobs already compiled into a draft paper. */
+export async function compiledJobIds(ctx: Context, engagementId: string) {
+  return (
+    await db()
+      .prepare(
+        "SELECT DISTINCT json_extract(body,'$.jobId') AS job FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind='execution_compilation'",
+      )
+      .bind(ctx.tenantId, engagementId)
+      .all<{ job: string | null }>()
+  ).results
+    .map((r) => r.job)
+    .filter((j): j is string => typeof j === "string");
+}
+/**
  * SQL that keeps an external job alive: its creator still holds auditor
  * access, the scope and the program are approved, and the job's procedure is
  * selected with the plan and scope revision the job was queued for. The plan
@@ -511,3 +569,12 @@ export async function jobs(ctx: Context, engagementId: string) {
  */
 export const activeJobGuard =
   "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND (CASE WHEN json_extract(execution_jobs.request,'$.procedure.planHash') IS NOT NULL AND json_extract(p.value,'$.planHash') IS NOT NULL THEN json_extract(p.value,'$.planHash')=json_extract(execution_jobs.request,'$.procedure.planHash') ELSE json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') END) AND json_extract(p.value,'$.selected')=1)";
+
+/**
+ * SQL condition on a `runner_workers w` row: the worker is active and the
+ * Lead Auditor who enrolled it still holds an active membership and active
+ * access to its engagement. The runner route claims and completes jobs only
+ * for such a worker, and the GenAI view counts only such workers.
+ */
+export const workerSponsorGuard =
+  "w.active=1 AND EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=w.tenant_id AND m.user_id=w.created_by AND m.status='active' AND m.role='Lead Auditor' AND a.engagement_id=w.engagement_id AND a.active=1)";

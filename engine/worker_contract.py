@@ -35,7 +35,9 @@ GENAI_INPUT_KEYS = frozenset({"index", "artifactId", "name", "sha256", "size", "
 # on the frozen performancePositiveLabel while fairness counts the favourable label, and performance results
 # report prevalence, the majority-class baseline accuracy, a per-class table and predicted labels absent
 # from the reference column.
-TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.1.0"
+# 2.2.0: an engineConfig 1.4 plan may declare a cluster design (statistics.clusterField, #136), which the engine
+# decides by the cluster bootstrap exactly as the hosted runner does (section 5.11).
+TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.2.0"
 ENGINE_CONFIG_VERSIONS = {"1.1", "1.4"}
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
@@ -360,12 +362,14 @@ def plan_families(plan):
 
 def validate_plan_request(config):
     """engineConfig 1.4 (section 11.1): an explicit plan, the profile's declared label pair, and a suite
-    that is exactly the families of the plan's criteria. Hosted plans have no calibration criteria."""
+    that is exactly the families of the plan's criteria. Hosted plans have no calibration criteria; since #136
+    they may declare a cluster design, which both runners decide by the cluster bootstrap (section 5.11)."""
     plan = stats.validate_plan(config.get("statistics"))
     if any(c["kind"] == "calibration" for c in plan["criteria"]):
         raise ValueError("A hosted plan cannot contain calibration criteria")
-    if plan["clusterField"] is not None:
-        raise ValueError("A hosted plan cannot declare a cluster design")
+    mapped = {config["config"].get(key) for key in ("labelColumn", "predictionColumn")}
+    if plan["clusterField"] is not None and plan["clusterField"] in mapped:
+        raise ValueError("statistics.clusterField must differ from the target and prediction columns")
     if plan_families(plan) != set(config["suite"]):
         raise ValueError("engineConfig suite must equal the families of the plan's criteria")
     allowed = {"labelColumn", "predictionColumn", "groupColumn", "positiveLabel", "negativeLabel", "performancePositiveLabel"}

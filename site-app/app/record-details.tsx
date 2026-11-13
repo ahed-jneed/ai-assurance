@@ -19,7 +19,11 @@ import {
   performancePositiveLabel,
   protocolConfigKeys,
 } from "@/lib/evaluation";
-import { humanLabel, readableResults } from "@/lib/presentation";
+import {
+  findingReference,
+  humanLabel,
+  readableResults,
+} from "@/lib/presentation";
 import { describePlan } from "@/lib/hosted-statistics";
 import { StatisticsResult } from "./statistics-result";
 import { legacyConfig } from "@/lib/domain";
@@ -711,7 +715,7 @@ function FindingDetails({
       <div className="detail-status">
         <State value={finding.severity} />
         <State value={finding.status} />
-        <span className="subtle">Article {finding.article}</span>
+        <span className="subtle">{findingReference(finding.article)}</span>
       </div>
       <dl className="record-summary-grid">
         <div>

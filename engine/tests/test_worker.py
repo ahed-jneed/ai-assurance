@@ -592,6 +592,31 @@ class WorkerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "1.4"):
             validate_request(legacy)
 
+    def test_engine_config_1_4_decides_a_clustered_plan_by_the_cluster_bootstrap(self):
+        # #136: a hosted plan may declare a cluster design; the worker runs it like the hosted runner does.
+        # 40 people with 3 positive and 3 negative rows each; every fifth person's positives are all missed.
+        rows = [(a, p, "A" if i < 20 else "B", f"p{i:02d}") for i in range(40) for a, p in [("1", "0" if i % 5 == 0 else "1")] * 3 + [("0", "0")] * 3]
+        data = ("actual,predicted,group,person\n" + "".join(",".join(row) + "\n" for row in rows)).encode()
+        request = hosted_request(data, suite=["performance", "demographic_parity"])
+        engine_config = request["engineConfig"]
+        engine_config["contractVersion"] = "1.4"
+        engine_config["config"] = {"labelColumn": "actual", "predictionColumn": "predicted", "groupColumn": "group", "positiveLabel": "1", "negativeLabel": "0"}
+        engine_config["statistics"] = {"clusterField": "person", "criteria": [
+            {"id": "recall-minimum", "kind": "performance", "members": [{"metric": "recall", "band": {"lower": .7}}, {"metric": "balanced_accuracy", "band": {"lower": .5}}]},
+            {"id": "parity-screen", "kind": "group_comparison", "metric": "selection_rate_difference", "band": {"lower": -.2, "upper": .2}},
+        ]}
+        report, results = self.evaluate(request, data)
+        recall = next(m for m in results[0]["metrics"] if m["name"] == "recall")
+        self.assertEqual(recall["confidenceInterval"]["method"], "cluster_percentile_bootstrap")
+        self.assertEqual(recall["details"]["bootstrap"]["clusters"], 40)
+        self.assertEqual(report["configuration"]["statistics"]["clusterField"], "person")
+        for s_ in results[1]["metrics"][0]["slices"]:
+            self.assertEqual(s_["selectionConfidenceInterval"]["method"], "cluster_percentile_bootstrap")
+        changed = copy.deepcopy(request)
+        changed["engineConfig"]["statistics"]["clusterField"] = "actual"
+        with self.assertRaisesRegex(ValueError, "clusterField"):
+            validate_request(changed)
+
     def test_single_observed_label_is_inconclusive_not_rejected(self):
         data = b"actual,predicted,group\n1,1,A\n1,1,A\n1,1,B\n1,1,B\n"
         request = hosted_request(data, suite=["performance", "equalized_odds"])

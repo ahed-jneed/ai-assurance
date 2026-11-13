@@ -6,7 +6,12 @@
 // different label file would.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { packDocument, registry, selectablePacks } from "../criteria/registry";
+import {
+  frameworkDocument,
+  packDocument,
+  registry,
+  selectablePacks,
+} from "../criteria/registry";
 import { sha256 } from "../ids";
 import {
   readGenaiEnvelope,
@@ -71,7 +76,9 @@ describe("the genai-result/0.1 envelope", () => {
   it("accepts the engine's envelope by its exact strings", async () => {
     const { envelope, computation } = await readGenaiEnvelope(exampleText);
     expect(envelope.computationSha256).toBe(
-      "1ed5c4ba51fd2ff0e4e06c25c097a007cc28863890347258a25834c271f663ed",
+      // The committed example envelope; it changes with the engine version (runner 1.6.0, #136)
+      // and the genai version (0.2.0, #128).
+      "a24df93b8a80c6c8f626994aaa3b9e323ee9c0d5b38fa4a3c5c8fcf4b25715b9",
     );
     expect(computation.runs.map((r) => r.runKey)).toEqual([RUN]);
   });
@@ -429,16 +436,135 @@ describe("the genai-evaluation pack", () => {
       pack.items.filter((i) => i.kind === "working_paper").map((i) => i.id),
     ).toEqual([...GENAI_PROGRAMME_ITEMS]);
   });
-  it("is offered at engagement creation with the OWASP lists as supporting criteria", () => {
+  it("is offered at engagement creation with the OWASP lists and MITRE ATLAS as supporting criteria", () => {
     expect(
       selectablePacks(registry()).find((p) => p.id === "genai-evaluation"),
-    ).toMatchObject({ version: "2026.11.0", workingPapers: 7, memos: 1 });
-    const pack = packDocument(registry(), "genai-evaluation", "2026.11.0")!;
-    expect(pack.criteria.map((s) => [s.framework, s.role])).toEqual([
+    ).toMatchObject({ version: "2026.11.1", workingPapers: 7, memos: 1 });
+    expect(
+      packDocument(registry(), "genai-evaluation", "2026.11.0")!.criteria.map(
+        (s) => [s.framework, s.role],
+      ),
+    ).toEqual([
       ["eu-ai-act", "primary"],
       ["owasp-llm-top-10", "supporting"],
       ["owasp-agentic-top-10", "supporting"],
     ]);
+    const pack = packDocument(registry(), "genai-evaluation", "2026.11.1")!;
+    expect(pack.criteria.map((s) => [s.framework, s.role])).toEqual([
+      ["eu-ai-act", "primary"],
+      ["owasp-llm-top-10", "supporting"],
+      ["owasp-agentic-top-10", "supporting"],
+      ["mitre-atlas", "supporting"],
+    ]);
+  });
+});
+
+describe("the genai-evaluation pack's crosswalk links (#145)", () => {
+  const r = registry();
+  const before = packDocument(r, "genai-evaluation", "2026.11.0")!,
+    after = packDocument(r, "genai-evaluation", "2026.11.1")!;
+  const added = (framework: string) =>
+    after.controlObjectives.flatMap((o) =>
+      o.addresses
+        .filter((l) => l.requirement.startsWith(framework + ":"))
+        .map((l) => ({ objective: o.id, ...l })),
+    );
+
+  it("changes nothing of 2026.11.0 but adds links, criteria sets and notes", () => {
+    const strip = (p: typeof before) => ({
+      ...p,
+      version: undefined,
+      methodologyVersion: undefined,
+      summary: undefined,
+      notes: undefined,
+      criteria: p.criteria.filter((s) =>
+        ["eu-ai-act", "owasp-llm-top-10", "owasp-agentic-top-10"].includes(
+          s.framework,
+        ),
+      ),
+      controlObjectives: p.controlObjectives.map((o) => ({
+        ...o,
+        addresses: o.addresses.filter(
+          (l) => !/^(mitre-atlas|nist-ai-600-1):/.test(l.requirement),
+        ),
+      })),
+    });
+    expect(strip(after)).toEqual(strip(before));
+  });
+
+  it("links MITRE ATLAS conservatively: intersects_with, justified, to techniques that exist", () => {
+    const set = after.criteria.find((s) => s.framework === "mitre-atlas")!;
+    const atlas = frameworkDocument(
+      r,
+      "mitre-atlas",
+      set.edition,
+      set.version,
+    )!;
+    expect([atlas.edition, atlas.licence.status]).toEqual([
+      "2026.10",
+      "confirmed",
+    ]);
+    const techniques = new Map(atlas.requirements.map((n) => [n.id, n]));
+    const links = added("mitre-atlas");
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) {
+      expect(l.relationship).toBe("intersects_with");
+      expect(l.origin).toBe("authored");
+      expect(l.justification).toContain("not an official crosswalk");
+      const node = techniques.get(l.requirement.split(":")[1]);
+      expect(node?.type, l.requirement).toBe("requirement");
+    }
+    // Every listed technique is linked, and each title is ours to show.
+    expect(new Set(links.map((l) => l.requirement.split(":")[1])).size).toBe(
+      techniques.size,
+    );
+    for (const n of atlas.requirements) {
+      expect(n.title!.length).toBeLessThanOrEqual(80);
+      expect(n).not.toHaveProperty("text");
+    }
+    // Retired identifiers (design section 9.1) and reconnaissance, discovery
+    // or attacker-side techniques the tests do not emulate stay unmapped.
+    for (const id of [
+      "AML.T0056",
+      "AML.T0057",
+      "AML.T0064",
+      "AML.T0060",
+      "AML.T0062",
+      "AML.T0088",
+    ])
+      expect(techniques.has(id)).toBe(false);
+    // Each justification says what the link rests on: objectives that assess
+    // the client's evidence never claim a test emulates the technique.
+    const evidenceAssessed = [
+      "CO-GA-SUPPLY-CHAIN",
+      "CO-GA-DATA-MODEL-POISONING",
+    ];
+    for (const l of links) {
+      if (evidenceAssessed.includes(l.objective)) {
+        expect(l.justification).toContain("No test emulates this technique");
+        expect(l.justification).not.toContain("success rate");
+      } else {
+        expect(l.justification).toContain(
+          "The test emulates this technique against the system under test",
+        );
+      }
+    }
+    expect(
+      new Set(
+        links
+          .filter((l) => evidenceAssessed.includes(l.objective))
+          .map((l) => l.requirement),
+      ),
+    ).toEqual(
+      new Set([
+        "mitre-atlas:AML.T0010",
+        "mitre-atlas:AML.T0020",
+        "mitre-atlas:AML.T0018.000",
+      ]),
+    );
+    // The test-plan and client-policy objectives map to no technique.
+    for (const id of ["CO-GA-PLAN", "CO-GA-POLICY-VIOLATION"])
+      expect(links.some((l) => l.objective === id)).toBe(false);
   });
 });
 

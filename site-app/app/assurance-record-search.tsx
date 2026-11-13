@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type {
   QueueState,
+  RecordContext,
   RecordSearchPage,
   SearchedRecord,
 } from "@/lib/assurance-search";
@@ -168,6 +169,71 @@ export function useRecordSearch(
   };
 }
 
+type ContextState = {
+  key: string;
+  context: RecordContext | null;
+  error: string;
+};
+/**
+ * One record with its review state and the records its details read
+ * (GET /api/assurance?view=record), for `recordId`; nothing without one. A
+ * changed `refreshKey` reads it again (after an action adds a review or a
+ * successor), keeping the last answer on screen meanwhile.
+ */
+export function useRecordContext(
+  scope: SearchScope,
+  recordId: string,
+  refreshKey: unknown,
+) {
+  const key = recordId ? JSON.stringify([scope, recordId, refreshKey]) : "";
+  const [state, setState] = useState<ContextState>({
+    key: "",
+    context: null,
+    error: "",
+  });
+  useEffect(() => {
+    if (!key) return;
+    const abort = new AbortController(),
+      [s, id] = JSON.parse(key) as [SearchScope, string];
+    const params = new URLSearchParams({
+      tenantId: s.tenantId,
+      engagementId: s.engagementId,
+      view: "record",
+      id,
+    });
+    fetch("/api/assurance?" + params, {
+      cache: "no-store",
+      signal: abort.signal,
+    })
+      .then(async (response) => {
+        const value = (await response.json()) as RecordContext & {
+          error?: string;
+        };
+        if (!response.ok)
+          throw Error(value.error ?? "Assurance record unavailable");
+        setState({ key, context: value, error: "" });
+      })
+      .catch((x: unknown) => {
+        if (!abort.signal.aborted)
+          setState({
+            key,
+            context: null,
+            error:
+              x instanceof Error ? x.message : "Assurance record unavailable",
+          });
+      });
+    return () => abort.abort();
+  }, [key]);
+  const same = state.context?.record.id === recordId;
+  return {
+    /** The record's context; the last one for this record while it reloads. */
+    context: recordId && same ? state.context : null,
+    /** Why the record could not be read, once its read has answered. */
+    error: recordId && state.key === key ? state.error : "",
+    loading: !!recordId && state.key !== key,
+  };
+}
+
 function PageFooter({
   shown,
   total,
@@ -285,6 +351,8 @@ export function RecordPicker({
   describe,
   label,
   empty,
+  single,
+  onPick,
 }: {
   scope: SearchScope;
   kinds: readonly string[];
@@ -299,6 +367,10 @@ export function RecordPicker({
   describe: (id: string) => string;
   label: string;
   empty: string;
+  /** Picking a record replaces the selection (at most one is selected). */
+  single?: boolean;
+  /** Hears each record as it is picked, for callers that need more than its id. */
+  onPick?: (r: SearchedRecord) => void;
 }) {
   const [term, setTerm] = useState(""),
     result = useRecordSearch(
@@ -306,9 +378,18 @@ export function RecordPicker({
       { kinds, q: term, pageSize: 25 },
       refreshKey,
     ),
-    full = max !== undefined && selected.length >= max,
-    toggle = (id: string, on: boolean) =>
-      onChange(on ? [...selected, id] : selected.filter((x) => x !== id));
+    full = !single && max !== undefined && selected.length >= max,
+    toggle = (record: SearchedRecord | string, on: boolean) => {
+      const id = typeof record === "string" ? record : record.id;
+      if (on && typeof record !== "string") onPick?.(record);
+      onChange(
+        on
+          ? single
+            ? [id]
+            : [...selected, id]
+          : selected.filter((x) => x !== id),
+      );
+    };
   return (
     <div className="record-picker" role="group" aria-label={label}>
       {selected.length > 0 && (
@@ -364,7 +445,7 @@ export function RecordPicker({
                   type="checkbox"
                   checked={checked}
                   disabled={disabled || (!checked && full)}
-                  onChange={(ev) => toggle(r.id, ev.target.checked)}
+                  onChange={(ev) => toggle(r, ev.target.checked)}
                 />
                 <span>
                   {title(r)}

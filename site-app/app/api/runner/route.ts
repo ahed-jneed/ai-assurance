@@ -9,7 +9,7 @@ import {
   sha256,
   responseError,
 } from "@/lib/store";
-import { activeJobGuard } from "@/lib/assurance-store";
+import { activeJobGuard, workerSponsorGuard } from "@/lib/assurance-store";
 import { resultEnvelope } from "@/lib/assurance-core";
 import { GenaiEnvelopeError, readGenaiEnvelope } from "@/lib/genai/envelope";
 import { claimResponse } from "@/lib/external-worker-contract";
@@ -47,7 +47,9 @@ const short = z.string().min(1).max(300),
     requestSha256: z.string().regex(/^[a-f0-9]{64}$/),
   });
 const workerGuard =
-  "EXISTS(SELECT 1 FROM runner_workers w JOIN memberships m ON m.tenant_id=w.tenant_id AND m.user_id=w.created_by JOIN engagement_access a ON a.tenant_id=w.tenant_id AND a.engagement_id=w.engagement_id AND a.user_id=w.created_by WHERE w.id=? AND w.active=1 AND m.status='active' AND m.role='Lead Auditor' AND a.active=1)";
+  "EXISTS(SELECT 1 FROM runner_workers w WHERE w.id=? AND " +
+  workerSponsorGuard +
+  ")";
 async function worker(request: Request) {
   const token = request.headers
     .get("authorization")
