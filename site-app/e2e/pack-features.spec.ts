@@ -4,7 +4,7 @@
 // reference instead of an AI Act article, and a draft captured while gates
 // are open says so above its conclusion.
 import { expectAccessible } from "./a11y";
-import { DEMO, choose, expect, test, unique, workspacePath } from "./fixtures";
+import { choose, expect, test, unique, workspacePath } from "./fixtures";
 
 test("an LL144 engagement offers its panel, cites its clauses and caveats its draft", async ({
   signIn,
@@ -34,7 +34,7 @@ test("an LL144 engagement offers its panel, cites its clauses and caveats its dr
   ).toBeVisible();
   await page.goto(workspacePath(demo, "Testing lab"));
   await expect(
-    page.getByRole("heading", { name: DEMO.engagement, level: 1 }),
+    page.getByRole("heading", { name: "Model versions", level: 2 }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "NYC Local Law 144 bias audits" }),
