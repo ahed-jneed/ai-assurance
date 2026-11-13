@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { can } from "@/lib/permissions";
+import { can, canQueueAuditorModel } from "@/lib/permissions";
 import { CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,10 +143,9 @@ export function ExecutionPlanner({
             label: "External supplied predictions",
           },
           { id: "client_local", label: "Client local predictions" },
-          // queueRun admits writers; the auditor_model mode alone narrows
-          // to the Lead Auditor (lib/commands/assurance/execution.ts), so
-          // the permission map has no op for it.
-          ...(role === "Lead Auditor"
+          // queueExternal admits writers; the auditor_model mode alone
+          // narrows to the Lead Auditor (lib/commands/assurance/execution.ts).
+          ...(canQueueAuditorModel(role)
             ? [
                 {
                   id: "auditor_model",

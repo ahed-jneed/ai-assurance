@@ -4,6 +4,7 @@ import {
   type NavigationRoute,
 } from "./navigation-preferences";
 import type { Role } from "./domain";
+import { isClientRole } from "./permissions";
 export type WorkspaceLink = {
   tenantId: string;
   engagementId: string;
@@ -51,7 +52,7 @@ export function authorizedLink(
     permittedNavigationRoutes(role, hasEngagement).includes(
       link.module as NavigationRoute,
     ) &&
-    (!["Client Viewer", "Client Contributor"].includes(role) ||
+    (!isClientRole(role) ||
       !["paper", "procedure", "model", "run"].includes(link.kind))
   );
 }

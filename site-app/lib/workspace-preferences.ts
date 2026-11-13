@@ -1,3 +1,5 @@
+import { isClientRole } from "./permissions";
+
 export const auditViews = [
   "My work",
   "Overview",
@@ -41,7 +43,7 @@ export function parseResume(raw: string | null): ResumePreference | null {
 }
 export function permittedAuditView(view: string, role: string) {
   return auditViews.includes(view as (typeof auditViews)[number]) &&
-    (!["Client Viewer", "Client Contributor"].includes(role) ||
+    (!isClientRole(role) ||
       ["Overview", "Evidence vault", "Findings", "Reports & sign-off"].includes(
         view,
       ))

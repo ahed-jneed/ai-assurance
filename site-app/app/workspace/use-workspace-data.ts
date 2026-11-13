@@ -18,6 +18,7 @@ import {
   postJson,
   retryable,
 } from "@/lib/fetch-json";
+import { isClientRole } from "@/lib/permissions";
 import { readWorkspaceLink, type WorkspaceLink } from "@/lib/workspace-links";
 import {
   auditViews,
@@ -47,7 +48,6 @@ export type WorkspaceDataListener = {
   /** An editPaper save returned this revision. */
   onPaperSaved: (paper: Paper) => void;
 };
-const clientRoles = ["Client Viewer", "Client Contributor"];
 const manageMessages: Record<string, string> = {
   createClient: "Client created",
   createEngagement: "Engagement created",
@@ -195,9 +195,9 @@ export function useWorkspaceData() {
       }
       if (generation !== loadRequest.current.generation) return null;
       if (
-        clientRoles.includes(body.identity.role) &&
+        isClientRole(body.identity.role) &&
         dataRef.current &&
-        !clientRoles.includes(dataRef.current.identity.role)
+        !isClientRole(dataRef.current.identity.role)
       )
         listener.current?.onClientAudience(body.identity.role);
       setData(body);

@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { roles } from "@/lib/domain";
 import { qualityStatement } from "@/lib/domain/report-model";
+import { isClientRole } from "@/lib/permissions";
 import { Choice } from "../workspace-ui";
 import { checkedEngagements, EngagementChecks } from "./member";
 import type { ModalDefinition, ModalFieldsProps } from "./types";
@@ -10,8 +11,7 @@ import type { ModalDefinition, ModalFieldsProps } from "./types";
 // Practice administration, invitations by email, the practice's name and its
 // signing key.
 
-const clientRole = (role: string) =>
-  ["Client Viewer", "Client Contributor"].includes(role);
+const clientRole = isClientRole;
 
 function InviteFields(props: ModalFieldsProps) {
   const { choices, choice, data } = props;

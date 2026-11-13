@@ -6,6 +6,7 @@ import {
   evidenceRequestCounts,
   localEvidenceDay,
 } from "@/lib/evidence-presentation";
+import { canSee } from "@/lib/permissions";
 
 export function EvidenceReviewQueue({
   engagement,
@@ -24,7 +25,7 @@ export function EvidenceReviewQueue({
     engagement.evidenceRequests ?? [],
     localEvidenceDay(),
   );
-  const internal = role !== "Client Viewer" && role !== "Client Contributor";
+  const requests = canSee(role, "evidenceRequests");
   const items = [
     {
       tab: "files" as const,
@@ -34,7 +35,7 @@ export function EvidenceReviewQueue({
         .length,
       icon: FileCheck2,
     },
-    ...(internal
+    ...(requests
       ? [
           {
             tab: "requests" as const,
@@ -60,7 +61,7 @@ export function EvidenceReviewQueue({
         ]
       : []),
   ];
-  if (!internal) return null;
+  if (!requests) return null;
   return (
     <nav className="evidence-review-queue" aria-label="Evidence review queues">
       {items.map(({ icon: Icon, ...item }) => (

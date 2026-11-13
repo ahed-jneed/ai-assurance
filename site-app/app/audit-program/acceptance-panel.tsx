@@ -5,7 +5,7 @@
 // competence matrix. lib/workflow/acceptance.ts holds the rules the
 // Planning-exit gate applies.
 import { Button } from "@/components/ui/button";
-import { can, decisionState } from "@/lib/permissions";
+import { can, canBeAssigned, decisionState } from "@/lib/permissions";
 import { DecisionButton } from "../workspace/decision-button";
 import type { Engagement, Role } from "@/lib/domain";
 import {
@@ -120,11 +120,7 @@ export function AcceptancePanel({
   function acceptanceForm() {
     const b = w.brief,
       people = data.people
-        .filter(
-          (m) =>
-            m.status === "active" &&
-            ["Auditor", "Lead Auditor", "Reviewer"].includes(m.role),
-        )
+        .filter((m) => m.status === "active" && canBeAssigned(m.role, "team"))
         .map((m) => ({
           value: m.user_id,
           label: m.display_name + " · " + m.role,

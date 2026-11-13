@@ -1,5 +1,6 @@
 import type { Engagement, Role } from "./domain";
 import type { AssuranceRecord } from "./assurance-core";
+import { canQueueAuditorModel } from "./permissions";
 import { undeclaredColumns } from "./special-category";
 export type ExecutionSelection = {
   procedureId: string;
@@ -122,7 +123,7 @@ export function testingReadiness(
         {
           label: "Lead authorization and accepted security review",
           done:
-            role === "Lead Auditor" &&
+            canQueueAuditorModel(role) &&
             e.artifacts.some(
               (a) =>
                 a.id === s.securityReviewId &&

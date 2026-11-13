@@ -1,5 +1,6 @@
 import type { AssuranceRecord } from "./assurance-core";
 import type { Role } from "./domain";
+import { can } from "./permissions";
 import { currentAssessments, reviewFor } from "./assurance-store-client";
 
 export const workbenchSections = [
@@ -101,8 +102,8 @@ export function workbenchReviewQueue(
     returned = current.filter(
       (r) => workbenchReviewState(r, all) === "Returned",
     );
-  const canReview = ["Lead Auditor", "Reviewer"].includes(role),
-    canRevise = ["Lead Auditor", "Auditor"].includes(role);
+  const canReview = can(role, "reviewAssertion"),
+    canRevise = can(role, "addAssertion");
   return {
     awaiting,
     returned,

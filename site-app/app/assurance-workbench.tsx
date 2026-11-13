@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, type ReactNode } from "react";
-import { can } from "@/lib/permissions";
+import { can, canBeAssigned } from "@/lib/permissions";
 import { errorMessage, postJson } from "@/lib/fetch-json";
 
 import { Button } from "@/components/ui/button";
@@ -909,9 +909,7 @@ export function AssuranceWorkbench({
         name: "userId",
         label: "Internal practice member",
         options: (snapshot?.eligibleMembers ?? data.people)
-          .filter((p) =>
-            ["Auditor", "Lead Auditor", "Reviewer"].includes(p.role),
-          )
+          .filter((p) => canBeAssigned(p.role, "engagementAccess"))
           .map((p) => ({
             value: p.user_id,
             label: p.display_name + " · " + p.role,
