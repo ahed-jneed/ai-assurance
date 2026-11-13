@@ -188,7 +188,10 @@ describe("the committed #29 documents", () => {
     ]);
     for (const c of crosswalks) {
       expect(c.method).toBe("human");
-      expect(c.useCase.assumptions).toMatch(/intersects_with/);
+      expect(
+        (c as unknown as { useCase: { assumptions: string } }).useCase
+          .assumptions,
+      ).toMatch(/intersects_with/);
       for (const x of c.entries) {
         // Single-source, so each entry can be read in both directions.
         expect(x.sources).toHaveLength(1);
