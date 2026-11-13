@@ -29,12 +29,18 @@ import {
   type AttestedOp,
 } from "@/lib/attestation";
 import type { Engagement } from "@/lib/domain";
-import { errorMessage } from "@/lib/fetch-json";
+import { errorMessage, FetchError } from "@/lib/fetch-json";
 import type { WorkspaceAct } from "./types";
 
 /** Opens the attestation dialog for an attested command and its data. */
 export type Attest = (op: AttestedOp, values: Record<string, unknown>) => void;
-type Request = { op: AttestedOp; values: Record<string, unknown>; run: number };
+type Request = {
+  op: AttestedOp;
+  values: Record<string, unknown>;
+  run: number;
+  /** The rationale carried over when the dialog reopens after a reload. */
+  rationale?: string;
+};
 
 const AttestContext = createContext<Attest | null>(null);
 
@@ -59,11 +65,15 @@ export function AttestProvider({
 /**
  * The workspace's attestation state: `attest` opens the dialog, and `dialog`
  * renders it. The command runs through `act` with the attestation added; the
- * dialog shows its failure, so the command reports nowhere else.
+ * dialog shows its failure, so the command reports nowhere else. When the
+ * engagement changed behind the dialog (a 409), its Reload action calls
+ * `reload` and reopens the dialog on the fresh engagement, keeping the
+ * rationale, so the person reviews the new revision and attests again.
  */
 export function useAttestation(
   engagement: Engagement | null | undefined,
   act: WorkspaceAct,
+  reload: () => Promise<unknown>,
 ) {
   const [request, setRequest] = useState<Request | null>(null);
   const attest: Attest = (op, values) =>
@@ -74,7 +84,16 @@ export function useAttestation(
       engagement={engagement}
       op={request.op}
       values={request.values}
+      initialRationale={request.rationale ?? ""}
       onClose={() => setRequest(null)}
+      onReload={async (rationale) => {
+        await reload();
+        setRequest((previous) =>
+          previous
+            ? { ...previous, rationale, run: previous.run + 1 }
+            : previous,
+        );
+      }}
       onConfirm={(attestation) =>
         act(request.op, { ...request.values, attestation }, undefined, {
           quiet: true,
@@ -96,21 +115,28 @@ function AttestationDialog({
   engagement,
   op,
   values,
+  initialRationale,
   onClose,
+  onReload,
   onConfirm,
 }: {
   engagement: Engagement;
   op: AttestedOp;
   values: Record<string, unknown>;
+  initialRationale: string;
   onClose: () => void;
+  /** Reloads the engagement and reopens the dialog on it. */
+  onReload: (rationale: string) => Promise<void>;
   onConfirm: (attestation: AttestationPayload) => Promise<unknown>;
 }) {
   // The subject as the dialog opened: a refresh behind it does not change
   // what the person reviews; the server refuses it if it went stale.
   const [subject] = useState(() => attestationSubject(engagement, op, values));
   const [digest, setDigest] = useState(""),
-    [rationale, setRationale] = useState(""),
+    [rationale, setRationale] = useState(initialRationale),
     [error, setError] = useState(""),
+    // The engagement changed behind the dialog: only a reload can help.
+    [stale, setStale] = useState(false),
     [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
@@ -129,6 +155,7 @@ function AttestationDialog({
       return;
     }
     setError("");
+    setStale(false);
     setBusy(true);
     try {
       await onConfirm({
@@ -139,7 +166,18 @@ function AttestationDialog({
       onClose();
     } catch (failure) {
       setError(errorMessage(failure, "The decision was not recorded"));
+      setStale(isConflict(failure));
     } finally {
+      setBusy(false);
+    }
+  };
+  const reloadSubject = async () => {
+    setBusy(true);
+    try {
+      // Reopens the dialog on success, so this one unmounts.
+      await onReload(rationale);
+    } catch (failure) {
+      setError(errorMessage(failure, "The engagement could not be reloaded"));
       setBusy(false);
     }
   };
@@ -167,6 +205,7 @@ function AttestationDialog({
           error={error}
           busy={busy}
           onConfirm={() => void confirm()}
+          onReload={stale ? () => void reloadSubject() : undefined}
           onCancel={onClose}
         />
       </DialogContent>
@@ -174,7 +213,15 @@ function AttestationDialog({
   );
 }
 
-/** The dialog's body: the subject, the statement, the rationale and actions. */
+/** Whether a failed command was refused because the record changed (409). */
+export function isConflict(failure: unknown) {
+  return failure instanceof FetchError && failure.kind === "conflict";
+}
+
+/**
+ * The dialog's body: the subject, the statement, the rationale and actions.
+ * `onReload`, given after a conflict, replaces confirming with reloading.
+ */
 export function AttestationForm({
   op,
   subject,
@@ -184,6 +231,7 @@ export function AttestationForm({
   error,
   busy,
   onConfirm,
+  onReload,
   onCancel,
 }: {
   op: AttestedOp;
@@ -194,6 +242,7 @@ export function AttestationForm({
   error: string;
   busy: boolean;
   onConfirm: () => void;
+  onReload?: () => void;
   onCancel: () => void;
 }) {
   const id = useId(),
@@ -259,9 +308,15 @@ export function AttestationForm({
             Recorded with your name and the time in the audit trail.
           </span>
           <div className="row-actions">
-            <Button type="submit" disabled={busy || !digest}>
-              {busy ? "Recording…" : definition.action}
-            </Button>
+            {onReload ? (
+              <Button type="button" onClick={onReload}>
+                Reload and review again
+              </Button>
+            ) : (
+              <Button type="submit" disabled={busy || !digest}>
+                {busy ? "Recording…" : definition.action}
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
             </Button>

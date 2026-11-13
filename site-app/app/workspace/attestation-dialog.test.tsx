@@ -3,7 +3,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { attestedOps } from "@/lib/attestation";
-import { AttestationForm } from "./attestation-dialog";
+import { FetchError } from "@/lib/fetch-json";
+import { AttestationForm, isConflict } from "./attestation-dialog";
 import { DecisionButton } from "./decision-button";
 import { ViewBoundary } from "./view-boundary";
 
@@ -60,6 +61,28 @@ describe("AttestationForm", () => {
     });
     expect(html).toContain('role="alert"');
     expect(html).toContain("The record changed after you reviewed it.");
+  });
+
+  it("offers a reload instead of confirming after a conflict", () => {
+    const html = form({
+      error: "The engagement changed. Reload before saving.",
+      rationale: "Checked the file hash",
+      onReload: noop,
+    });
+    expect(html).toContain("The engagement changed. Reload before saving.");
+    expect(html).toContain(">Reload and review again</button>");
+    // Confirming the stale revision is not offered; the rationale is kept.
+    expect(html).not.toContain('type="submit"');
+    expect(html).not.toContain(">Sign revision</button>");
+    expect(html).toContain("Checked the file hash");
+    expect(html).toContain(">Cancel</button>");
+  });
+
+  it("treats only a 409 as needing a reload", () => {
+    expect(isConflict(new FetchError("changed", 409, "conflict"))).toBe(true);
+    expect(isConflict(new FetchError("no", 403, "forbidden"))).toBe(false);
+    expect(isConflict(new FetchError("bad", 400, "invalid"))).toBe(false);
+    expect(isConflict(new Error("changed"))).toBe(false);
   });
 
   it("says when the record is gone", () => {
