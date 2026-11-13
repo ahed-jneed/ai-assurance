@@ -533,14 +533,14 @@
           "requirement": "mitre-atlas:AML.T0020",
           "relationship": "intersects_with",
           "rationale": "semantic",
-          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the provenance and integrity of training, fine-tuning and model data, and a favourable conclusion holds only for the evidence reviewed.",
           "origin": "authored"
         },
         {
           "requirement": "mitre-atlas:AML.T0018.000",
           "relationship": "intersects_with",
           "rationale": "semantic",
-          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the provenance and integrity of training, fine-tuning and model data, and a favourable conclusion holds only for the evidence reviewed.",
           "origin": "authored"
         }
       ]
@@ -574,7 +574,7 @@
           "requirement": "mitre-atlas:AML.T0010",
           "relationship": "intersects_with",
           "rationale": "semantic",
-          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
+          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the objective assesses evidence relevant to this entry and does not establish that it is met. No test emulates this technique; the auditor assesses the client's evidence on the integrity and provenance of the models, packages and tools the system depends on, and a favourable conclusion holds only for the evidence reviewed.",
           "origin": "authored"
         }
       ]
@@ -717,13 +717,6 @@
           "rationale": "semantic",
           "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
           "origin": "authored"
-        },
-        {
-          "requirement": "mitre-atlas:AML.T0062",
-          "relationship": "intersects_with",
-          "rationale": "semantic",
-          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
-          "origin": "authored"
         }
       ]
     },
@@ -831,13 +824,6 @@
           "relationship": "intersects_with",
           "rationale": "semantic",
           "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. Legal applicability stays pending the qualified legal review (D-02).",
-          "origin": "authored"
-        },
-        {
-          "requirement": "mitre-atlas:AML.T0088",
-          "relationship": "intersects_with",
-          "rationale": "semantic",
-          "justification": "Our analytical judgement (docs/design/genai-evidence.md section 9.2), not an official crosswalk: the test produces evidence relevant to this entry and does not establish that it is met. The test emulates this technique against the system under test; a low success rate holds only for the attacks, configuration and judge tested.",
           "origin": "authored"
         }
       ],
@@ -1234,5 +1220,5 @@
     "regulatorySource": "https://eur-lex.europa.eu/eli/reg/2024/1689",
     "limitations": "Assurance conclusions do not constitute a notified-body conformity assessment, legal certification or a security guarantee. GenAI conclusions rest on tool logs recomputed by the platform's engine: benchmark accuracy is not accuracy on the population of real inputs, and a low attack-success rate holds only for the attack set, configuration and judge tested."
   },
-  "notes": "Pack for #33 (docs/design/genai-evidence.md sections 9.4 and 12.4); 2026.11.1 (#145) adds MITRE ATLAS v2026.10 links and changes nothing else. One control objective per GenAI risk category of section 9.2 plus the test-plan objective; links are authored analytical judgements, never official crosswalks, and all are intersects_with. The ATLAS links are a conservative subset of the design table: a weak or indirect mapping there (reconnaissance or attacker-side techniques, parenthetical NIST risks) is left unmapped rather than linked."
+  "notes": "Pack for #33 (docs/design/genai-evidence.md sections 9.4 and 12.4); 2026.11.1 (#145) adds MITRE ATLAS v2026.10 links and changes nothing else. One control objective per GenAI risk category of section 9.2 plus the test-plan objective; links are authored analytical judgements, never official crosswalks, and all are intersects_with. The ATLAS links are a conservative subset of the design table: a weak or indirect mapping there (reconnaissance, discovery or attacker-side techniques such as AML.T0060, AML.T0062 and AML.T0088, parenthetical NIST risks) is left unmapped rather than linked. Each ATLAS justification states what the link rests on: a test that emulates the technique or, for supply chain and data or model poisoning, the client's evidence the auditor assesses."
 }

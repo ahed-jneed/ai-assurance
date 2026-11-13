@@ -101,12 +101,6 @@
       "type": "requirement"
     },
     {
-      "id": "AML.T0062",
-      "ref": "AML.T0062",
-      "title": "Discover LLM Hallucinations",
-      "type": "requirement"
-    },
-    {
       "id": "AML.T0069.002",
       "ref": "AML.T0069.002",
       "title": "Discover LLM System Information: System Prompt",
@@ -146,12 +140,6 @@
       "id": "AML.T0085.003",
       "ref": "AML.T0085.003",
       "title": "Data from AI Services: System Instructions",
-      "type": "requirement"
-    },
-    {
-      "id": "AML.T0088",
-      "ref": "AML.T0088",
-      "title": "Generate Deepfakes",
       "type": "requirement"
     },
     {

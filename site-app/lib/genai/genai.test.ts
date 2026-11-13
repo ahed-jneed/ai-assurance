@@ -500,10 +500,46 @@ describe("the genai-evaluation pack's crosswalk links (#145)", () => {
       expect(n.title!.length).toBeLessThanOrEqual(80);
       expect(n).not.toHaveProperty("text");
     }
-    // Retired identifiers (design section 9.1) and attacker-side techniques
-    // the tests do not emulate stay unmapped.
-    for (const id of ["AML.T0056", "AML.T0057", "AML.T0064", "AML.T0060"])
+    // Retired identifiers (design section 9.1) and reconnaissance, discovery
+    // or attacker-side techniques the tests do not emulate stay unmapped.
+    for (const id of [
+      "AML.T0056",
+      "AML.T0057",
+      "AML.T0064",
+      "AML.T0060",
+      "AML.T0062",
+      "AML.T0088",
+    ])
       expect(techniques.has(id)).toBe(false);
+    // Each justification says what the link rests on: objectives that assess
+    // the client's evidence never claim a test emulates the technique.
+    const evidenceAssessed = [
+      "CO-GA-SUPPLY-CHAIN",
+      "CO-GA-DATA-MODEL-POISONING",
+    ];
+    for (const l of links) {
+      if (evidenceAssessed.includes(l.objective)) {
+        expect(l.justification).toContain("No test emulates this technique");
+        expect(l.justification).not.toContain("success rate");
+      } else {
+        expect(l.justification).toContain(
+          "The test emulates this technique against the system under test",
+        );
+      }
+    }
+    expect(
+      new Set(
+        links
+          .filter((l) => evidenceAssessed.includes(l.objective))
+          .map((l) => l.requirement),
+      ),
+    ).toEqual(
+      new Set([
+        "mitre-atlas:AML.T0010",
+        "mitre-atlas:AML.T0020",
+        "mitre-atlas:AML.T0018.000",
+      ]),
+    );
     // The test-plan and client-policy objectives map to no technique.
     for (const id of ["CO-GA-PLAN", "CO-GA-POLICY-VIOLATION"])
       expect(links.some((l) => l.objective === id)).toBe(false);

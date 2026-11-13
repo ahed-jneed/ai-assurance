@@ -193,7 +193,7 @@
         }
       ],
       "releasedAt": "2026-11-13",
-      "sha256": "a7be202b2082ecfacecb5da08d91c3011778fbf07a7ab3a4dab098fe90337f2a"
+      "sha256": "1632c73704d388d47f3457b174947728c3c3b5cbbed16d30c3919b361426cba5"
     },
     {
       "documentType": "pack",
@@ -210,7 +210,7 @@
       ],
       "releasedAt": "2026-11-13",
       "selectable": true,
-      "sha256": "3bc875c18b87fea637bf91fd7239255d7ec0fefaf32e44a9e176b6e12bd5bcae"
+      "sha256": "6e03faa00e3ca7ba5afee6895f2554c4ca10c3b9ee372d57e02770f2b208f550"
     }
   ],
   "defaults": {
