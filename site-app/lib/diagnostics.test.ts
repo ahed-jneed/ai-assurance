@@ -18,8 +18,17 @@ const TASKS: Record<string, string> = {
 };
 const repr = (v: number) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
 
-/** Rows from the case data, exactly as howToUse.rowExpansion states. */
-function expand(data: any) {
+/** Rows from the case data, exactly as howToUse.rowExpansion states; clustered data adds each cluster's id in a column cluster. */
+function expand(data: any): string {
+  if (data.clusters) {
+    const lines = data.clusters.flatMap((part: any) =>
+      expand({ kind: data.kind, ...part })
+        .split("\n")
+        .slice(1)
+        .map((line) => `${line},${part.cluster}`),
+    );
+    return "actual,predicted,group,cluster\n" + lines.join("\n");
+  }
   const rows: string[][] = [];
   if (data.groups)
     for (const g of data.groups) {
@@ -67,10 +76,11 @@ function goldenRun(c: any) {
     } as Run;
   const plan = planFor(c);
   const task = TASKS[c.data.kind] ?? "Binary classification";
+  const grouped = c.data.groups ?? c.data.clusters?.[0]?.groups;
   const config: PlanConfig = {
     labelColumn: "actual",
     predictionColumn: "predicted",
-    groupColumn: c.data.groups ? "group" : "",
+    groupColumn: grouped ? "group" : "",
     positiveLabel: task === "Binary classification" ? "1" : "",
     negativeLabel: task === "Binary classification" ? "0" : "",
   };
@@ -78,6 +88,8 @@ function goldenRun(c: any) {
     task,
     suite: planSuite(plan),
     config,
+    // A clustered case's run seed is data.seed (section 5.11).
+    ...(c.data.seed !== undefined ? { seed: c.data.seed } : {}),
     manifest: { statistics: plan },
   } as unknown as Run;
 }
@@ -135,6 +147,7 @@ function fixtureView(result: Result) {
     fisherExactP: m.details.fisherExactP,
     chanceExactP: m.details.chanceExactP,
     reasons: m.details.reasons,
+    ...(m.details.bootstrap ? { bootstrap: m.details.bootstrap } : {}),
   });
   return {
     id: result.testId,

@@ -1192,16 +1192,193 @@ try {
   console.log(
     "PASS non-numeric binary labels: derived other class, accepted and run by the worker",
   );
+  // #128: a GenAI ingest job from the queue to the imported result. The
+  // auditor freezes a plan (with the detection solution's pinned key),
+  // declares a bundle of accepted logs and queues the ingest; a worker
+  // enrolled for genai_ingest downloads the pinned inputs by index, the
+  // engine parses them as data and recomputes, and the workspace compiles
+  // the authenticated envelope. A hostile bundle queued first fails with its
+  // code and the worker goes on to the next job.
+  {
+    const fixture = (p) => fs.readFile("../engine/tests/fixtures/genai/" + p);
+    const genaiFiles = [
+      [
+        "echo_repeat.results.json",
+        await fixture("promptfoo/echo_repeat.results.json"),
+        "promptfoo_results",
+        "log",
+      ],
+      [
+        "signed_detections.jsonl",
+        await fixture("marking/signed_detections.jsonl"),
+        "signed_detection_jsonl",
+        "marking",
+      ],
+    ];
+    const hostile = [
+      [
+        "deep.jsonl",
+        Buffer.from(
+          (
+            '{"schemaVersion":"genai-marking-check/0.1","x":' +
+            "[".repeat(200) +
+            "]".repeat(200) +
+            "}\n"
+          ).repeat(2),
+        ),
+        "marking_check_jsonl",
+        "marking",
+      ],
+    ];
+    const declare = async (files) => {
+      const ids = [];
+      for (const [name, bytes] of files)
+        ids.push(await upload(name, bytes, "GenAI log"));
+      return (
+        await assurance("declareGenaiBundle", {
+          manifest: {
+            schemaVersion: "genai-bundle/0.1",
+            origin: "auditee_supplied",
+            inputs: files.map(([name, bytes, format, role]) => ({
+              name,
+              sha256: digest(bytes),
+              bytes: bytes.length,
+              format,
+              role,
+            })),
+          },
+          inputArtifactIds: ids,
+        })
+      ).record;
+    };
+    const detectionKey = JSON.parse(
+      await fixture("marking/detection-key.json"),
+    );
+    const genaiPlan = (
+      await assurance("freezeGenaiPlan", {
+        procedureId: procedure.id,
+        plan: {
+          schemaVersion: "genai-plan/0.1",
+          detectionKeys: [detectionKey],
+          criteria: [
+            {
+              id: "pass",
+              kind: "genai_mean",
+              metric: "accuracy",
+              band: { lower: 0.5 },
+            },
+            {
+              id: "detection",
+              kind: "genai_marking",
+              metric: "detection_rate",
+              band: { lower: 0.7 },
+            },
+          ],
+        },
+      })
+    ).record;
+    const hostileBundle = await declare(hostile),
+      genaiBundle = await declare(genaiFiles);
+    const genaiWorker = await assurance("enrollWorker", {
+      name: "Loopback GenAI runner",
+      imageDigest: "sha256:" + "5".repeat(64),
+      formats: ["genai_ingest"],
+      securityReview:
+        "Synthetic fixture process; production GenAI ingest runs in the no-network compute image",
+    });
+    const runGenaiWorker = async () => {
+      const runtime = await processRun(
+        [
+          "-c",
+          "from engine.worker import Transport,Worker,ProcessExecutor; import os,json; t=Transport(os.environ['ASSURANCE_TEST_ORIGIN'],os.environ['ASSURANCE_WORKER_TOKEN'],allow_local_http=True); w=Worker(t,ProcessExecutor(),'tmp/assurance-genai-worker-fixture',worker_id=os.environ['ASSURANCE_TEST_WORKER'],image_digest='sha256:'+'5'*64,heartbeat=1); print(json.dumps(w.once()))",
+        ],
+        {
+          ASSURANCE_WORKER_TOKEN: genaiWorker.token,
+          ASSURANCE_TEST_ORIGIN: origin,
+          ASSURANCE_TEST_WORKER: genaiWorker.workerId,
+        },
+      );
+      assert.equal(runtime.code, 0, runtime.out + runtime.error);
+      return JSON.parse(runtime.out.trim());
+    };
+    const hostileJob = await assurance("queueGenaiIngest", {
+      procedureId: procedure.id,
+      bundleRecordId: hostileBundle.id,
+      planRecordId: genaiPlan.id,
+    });
+    const genaiJob = await assurance("queueGenaiIngest", {
+      procedureId: procedure.id,
+      bundleRecordId: genaiBundle.id,
+      planRecordId: genaiPlan.id,
+    });
+    // The tabular worker is not enrolled for genai_ingest and leaves both alone.
+    assert.equal((await runWorker()).state, "idle");
+    const failed = await runGenaiWorker();
+    assert.deepEqual(
+      [failed.state, failed.jobId, failed.error],
+      ["failed", hostileJob.jobId, "nesting_too_deep"],
+    );
+    const job = (id) =>
+      testDb
+        .prepare("SELECT * FROM execution_jobs WHERE id=?")
+        .bind(id)
+        .first();
+    assert.equal((await job(hostileJob.jobId)).error, "nesting_too_deep");
+    const completed = await runGenaiWorker();
+    assert.equal(completed.state, "completed", JSON.stringify(completed));
+    const genaiRow = await job(genaiJob.jobId);
+    assert.equal(genaiRow.state, "succeeded");
+    const genaiEnvelope = JSON.parse(
+      await (await testBucket.get(genaiRow.result_key)).text(),
+    );
+    assert.equal(genaiEnvelope.provenance.channel, "runner");
+    assert.equal(
+      genaiEnvelope.provenance.requestSha256,
+      genaiRow.request_sha256,
+    );
+    assert.equal(genaiEnvelope.provenance.workerVersion, "1.4.0");
+    const genaiComputation = JSON.parse(genaiEnvelope.computationJSON);
+    assert.deepEqual(
+      genaiComputation.marking.map((b) => [b.format, b.count]),
+      [["signed_detection_jsonl", 100]],
+    );
+    // A tabular import refuses a GenAI job; compile binds it as a worker result.
+    assert.match(
+      (await assurance("importJob", { jobId: genaiJob.jobId }, owner, 409))
+        .error,
+      /GenAI/,
+    );
+    const compiled = (
+      await assurance("compileGenaiResult", { jobId: genaiJob.jobId })
+    ).record;
+    assert.equal(compiled.body.custody, "worker");
+    assert.equal(compiled.body.channel, "runner");
+    const markingRun = compiled.body.summary.runs.find(
+      (r) => r.format === "signed_detection_jsonl",
+    );
+    assert.equal(markingRun.signedResults, 100);
+    assert.equal(
+      compiled.body.summary.criteria.find((c) => c.id === "detection").outcome,
+      genaiComputation.criteria.find((c) => c.id === "detection").outcome,
+    );
+    assert(e.artifacts.some((a) => a.id === genaiJob.jobId));
+    console.log(
+      "PASS GenAI ingest: queue → worker claims genai_ingest → pinned inputs by index → engine recompute with verified signed detections → compiled worker result; a hostile bundle fails with its code",
+    );
+  }
   // #102: a special-category fairness protocol on a dataset the client keeps.
   // The platform records only the file's SHA-256 pin; the client's own worker
   // reads the file in the client's environment and returns aggregates.
-  const baseCsv = csv
+  const renamedCsv = csv
       .replace(
         /^actual,predicted,score,group,/,
         "actual,predicted,score,ethnicity,",
       )
       .replace(/,A,/g, ",group-alpha,")
       .replace(/,B,/g, ",group-beta,"),
+    // Every row twice (80 per group): at least the minimum group size of 50
+    // that a special-category protocol needs (#134).
+    baseCsv = renamedCsv + renamedCsv.slice(renamedCsv.indexOf("\n") + 1),
     [clientHeader, firstRow] = baseCsv.split("\n"),
     // One person in group-gamma: below the minimum group size, so the
     // client's worker withholds that group's counts and rates.
@@ -1214,7 +1391,7 @@ try {
     ),
     clientRows = clientCsv.trim().split("\n").slice(1),
     clientBytes = Buffer.from(clientCsv);
-  assert(clientRows.length >= 60 && clientRows[1].includes("group-alpha"));
+  assert(clientRows.length >= 160 && clientRows[1].includes("group-alpha"));
   assert(clientRows[0].includes("group-gamma"));
   // Uploading the file is refused: its ethnicity column has no basis.
   const refusedUpload = new FormData();
@@ -1232,14 +1409,43 @@ try {
     (await api("/api/evidence", { body: refusedUpload, status: 409 })).error,
     /needs the client's recorded basis before upload: ethnicity/,
   );
+  // The client pins its file with the runtime package's pin tool (#134): it
+  // reads the file locally and prints the pin form's fields, header included.
+  const pinSource = path.resolve("../tmp/client-pin-fixture");
+  await fs.rm(pinSource, { recursive: true, force: true });
+  await fs.mkdir(pinSource, { recursive: true });
+  await fs.writeFile(
+    path.join(pinSource, "client-applicants.csv"),
+    clientBytes,
+  );
+  const pinTool = await processRun([
+    "-m",
+    "engine.client_pin",
+    "pin",
+    "--file",
+    path.join(pinSource, "client-applicants.csv"),
+    "--confirmed-by",
+    "Client data steward",
+  ]);
+  await fs.rm(pinSource, { recursive: true, force: true });
+  assert.equal(pinTool.code, 0, pinTool.out + pinTool.error);
+  const clientPin = JSON.parse(pinTool.out);
+  assert.deepEqual(
+    [clientPin.name, clientPin.sha256, clientPin.size, clientPin.columns],
+    [
+      "client-applicants.csv",
+      digest(clientBytes),
+      clientBytes.length,
+      clientHeader.split(","),
+    ],
+  );
+  for (const row of clientRows)
+    assert(!pinTool.out.includes(row), "the pin carries a row");
   await cmd("pinClientDataset", {
-    name: "client-applicants.csv",
-    sha256: digest(clientBytes),
-    size: clientBytes.length,
-    confirmedBy: "Client data steward",
-    confirmedOn: new Date().toISOString().slice(0, 10),
+    ...clientPin,
     custodyNote: "Kept on the client's analysis host; its own worker reads it",
   });
+  assert.deepEqual(e.artifacts.at(-1).clientPin.columns, clientPin.columns);
   const pinnedId = e.artifacts.at(-1).id;
   assert.equal(e.artifacts.at(-1).custody, "client");
   await cmd("acceptEvidence", { artifactId: pinnedId });
@@ -1271,7 +1477,8 @@ try {
     version: "1",
     task: "Binary classification",
     suite: ["performance", "demographic_parity"],
-    config: { ...config, groupColumn: "ethnicity" },
+    // A special-category protocol needs a minimum group size of 50 (#134).
+    config: { ...config, groupColumn: "ethnicity", minimumGroupSize: 50 },
     datasetContext: e.evaluationProfiles.at(-1).datasetContext,
     rationale: "Numerical integration fixture only",
     // Special-category, client-side route, no basis recorded (D-11).
@@ -1577,7 +1784,7 @@ try {
     JSON.stringify(clientRun, null, 2),
   );
   console.log(
-    "PASS client-local special-category job: pinned by SHA-256, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
+    "PASS client-local special-category job: pinned by SHA-256 and declared header with the runtime pin tool, read in the client's environment, no dataset bytes on the platform, a changed file refused, a one-row group withheld, aggregates imported",
   );
   // A schemaVersion 1.1 protocol pre-registers an explicit plan whose
   // criterion ids differ from the suite names: queueExternal freezes

@@ -11,13 +11,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import type { OperatorEvent, PracticeSummary } from "@/lib/operator";
+import type {
+  IssuedWork,
+  OperatorEvent,
+  PartCheck,
+  PracticeCursor,
+  PracticeSummary,
+} from "@/lib/operator";
 
 type ConsoleData = {
   operator: { email: string; name: string };
   abandonedAfterDays: number;
   practices: PracticeSummary[];
+  /** Where the next page of the listing starts, or null on the last. */
+  next: PracticeCursor | null;
   events: OperatorEvent[];
+};
+
+/** What the operator is about to do to a practice. */
+type Pending = {
+  practice: PracticeSummary;
+  op: "deletePractice" | "archivePractice";
 };
 
 /** Bytes as KB or MB for the listing. */
@@ -27,17 +41,38 @@ export function formatBytes(bytes: number) {
     : Math.max(1, Math.round(bytes / 1024)) + " KB";
 }
 
+/** One integrity check of an issued part, as the console words it. */
+export function partLabel(check: PartCheck) {
+  return {
+    valid: "matches its digest",
+    mismatch: "does not match its digest",
+    missing: "is missing",
+    unavailable: "could not be read now",
+    unreadable: "is unreadable",
+  }[check];
+}
+
+/** The status cell of a practice the operator may not act on. */
+export function practiceStatus(p: PracticeSummary) {
+  if (p.archivedAt) return "Archived " + p.archivedAt.slice(0, 10);
+  return p.retained ? "Retained" : "Active";
+}
+
 /**
- * The operator console: the abandoned practices (or all of them) with what
- * they store, a deletion that needs the practice's name typed and a reason,
- * and the operator audit trail.
+ * The operator console: the abandoned and archived practices (or all of
+ * them), longest inactive first and paged by last activity, with what they
+ * store; a deletion of one without issued work, or an archive of one
+ * with issued work (#151), each needing the practice's name typed and a
+ * reason; an archived practice's issued work for verification requests; and
+ * the operator audit trail.
  */
 export function OperatorConsole() {
   const [data, setData] = useState<ConsoleData | null>(null),
     [all, setAll] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [deleting, setDeleting] = useState<PracticeSummary | null>(null),
+    [pending, setPending] = useState<Pending | null>(null),
+    [issued, setIssued] = useState<IssuedWork | null>(null),
     [confirmName, setConfirmName] = useState(""),
     [reason, setReason] = useState(""),
     [busy, setBusy] = useState(false);
@@ -56,37 +91,96 @@ export function OperatorConsole() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the console data from the API when the filter changes
     void load();
   }, [load]);
-  async function remove() {
-    if (!deleting) return;
+  /** Appends the next page of practices to the listing. */
+  async function more() {
+    if (!data?.next) return;
+    setBusy(true);
+    const query = new URLSearchParams({
+      afterActivity: data.next.lastActivity,
+      afterId: data.next.id,
+      ...(all ? { all: "1" } : {}),
+    });
+    const response = await fetch("/api/operator?" + query, {
+      cache: "no-store",
+    });
+    const body = (await response.json()) as ConsoleData & { error?: string };
+    setBusy(false);
+    if (!response.ok) setError(body.error ?? "The next page could not load");
+    else {
+      setError("");
+      setData({
+        ...body,
+        practices: [...data.practices, ...body.practices],
+      });
+    }
+  }
+  function start(practice: PracticeSummary, op: Pending["op"]) {
+    setPending({ practice, op });
+    setIssued(null);
+    setConfirmName("");
+    setReason("");
+    setNotice("");
+  }
+  async function showIssued(practice: PracticeSummary) {
+    setPending(null);
+    const response = await fetch(
+      "/api/operator?tenantId=" + encodeURIComponent(practice.id),
+      { cache: "no-store" },
+    );
+    const body = (await response.json()) as {
+      error?: string;
+      issued?: IssuedWork;
+    };
+    if (!response.ok || !body.issued)
+      setError(body.error ?? "The issued work could not load");
+    else {
+      setError("");
+      setIssued(body.issued);
+    }
+  }
+  async function submit() {
+    if (!pending) return;
+    const { practice, op } = pending;
     setBusy(true);
     const response = await fetch("/api/operator", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        op: "deletePractice",
-        data: { tenantId: deleting.id, confirmName, reason },
+        op,
+        data: { tenantId: practice.id, confirmName, reason },
       }),
     });
     const body = (await response.json()) as {
       error?: string;
-      details?: { objects: number };
+      details?: { objects?: number; members?: number };
     };
     setBusy(false);
     if (!response.ok) {
-      setError(body.error ?? "The practice was not deleted");
+      setError(
+        body.error ??
+          (op === "archivePractice"
+            ? "The practice was not archived"
+            : "The practice was not deleted"),
+      );
       return;
     }
     setNotice(
-      deleting.name +
-        " was deleted with " +
-        (body.details?.objects ?? 0) +
-        " stored object(s). The deletion is recorded below.",
+      op === "archivePractice"
+        ? practice.name +
+            " was archived: " +
+            (body.details?.members ?? 0) +
+            " member(s) lost access and its issued records are retained. It stays listed here as archived; open its issued work to answer a verification request. The archive is recorded below."
+        : practice.name +
+            " was deleted with " +
+            (body.details?.objects ?? 0) +
+            " stored object(s). The deletion is recorded below.",
     );
-    setDeleting(null);
+    setPending(null);
     setConfirmName("");
     setReason("");
     await load();
   }
+  const archiving = pending?.op === "archivePractice";
   return (
     <main className="operator-console">
       <h1>Operator console</h1>
@@ -94,8 +188,11 @@ export function OperatorConsole() {
         Signed in as {data?.operator.email ?? "a platform operator"}. A practice
         with no recorded activity for {data?.abandonedAfterDays ?? 90} days that
         released no report and signed no dossier counts as abandoned and may be
-        deleted with its snapshots, records and stored objects. Every deletion
-        is recorded in the operator audit trail.
+        deleted with its snapshots, records and stored objects. One that
+        released a report or signed a dossier is never deleted: it is archived
+        instead, so its members lose access while its issued records stay
+        retained and verifiable. Every deletion and archive is recorded in the
+        operator audit trail.
       </p>
       {error && (
         <p role="alert" className="operator-error">
@@ -105,7 +202,7 @@ export function OperatorConsole() {
       {notice && <p role="status">{notice}</p>}
       <section className="panel">
         <h2 className="panel-title">
-          {all ? "All practices" : "Abandoned practices"}
+          {all ? "All practices" : "Abandoned and archived practices"}
         </h2>
         <label className="operator-filter">
           <input
@@ -157,19 +254,30 @@ export function OperatorConsole() {
                         variant="outline"
                         size="sm"
                         disabled={busy}
-                        onClick={() => {
-                          setDeleting(p);
-                          setConfirmName("");
-                          setReason("");
-                          setNotice("");
-                        }}
+                        onClick={() => start(p, "deletePractice")}
                       >
                         Delete…
                       </Button>
+                    ) : p.archivable ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => start(p, "archivePractice")}
+                      >
+                        Archive…
+                      </Button>
+                    ) : p.archivedAt ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void showIssued(p)}
+                      >
+                        {practiceStatus(p)} · issued work
+                      </Button>
                     ) : (
-                      <span className="subtle">
-                        {p.retained ? "Retained" : "Active"}
-                      </span>
+                      <span className="subtle">{practiceStatus(p)}</span>
                     )}
                   </TableCell>
                 </TableRow>
@@ -181,20 +289,46 @@ export function OperatorConsole() {
             {data
               ? all
                 ? "No practices."
-                : "No abandoned practices."
+                : "No abandoned or archived practices."
               : "Loading…"}
           </p>
         )}
       </section>
-      {deleting && (
-        <section className="panel" aria-label="Delete practice">
-          <h2 className="panel-title">Delete {deleting.name}</h2>
-          <p>
-            This permanently deletes the practice, its {deleting.members}{" "}
-            membership(s), {deleting.engagements} engagement(s),{" "}
-            {deleting.snapshots} snapshot(s), {deleting.records} record(s),
-            their audit trails and every stored object. It cannot be undone.
-          </p>
+      {data?.next && (
+        <Button variant="outline" disabled={busy} onClick={() => void more()}>
+          Show more practices
+        </Button>
+      )}
+      {pending && (
+        <section
+          className="panel"
+          aria-label={archiving ? "Archive practice" : "Delete practice"}
+        >
+          <h2 className="panel-title">
+            {archiving ? "Archive " : "Delete "}
+            {pending.practice.name}
+          </h2>
+          {archiving ? (
+            <p>
+              This practice released a report or signed a dossier, so it is
+              archived instead of deleted. Its {pending.practice.activeMembers}{" "}
+              active member(s) lose access, its pending invitations are
+              cancelled and its runner workers stop. Its{" "}
+              {pending.practice.engagements} engagement(s),{" "}
+              {pending.practice.snapshots} snapshot(s),{" "}
+              {pending.practice.records} record(s), audit trails and stored
+              objects are retained. An archive cannot be undone here.
+            </p>
+          ) : (
+            <p>
+              This permanently deletes the practice, its{" "}
+              {pending.practice.members} membership(s),{" "}
+              {pending.practice.engagements} engagement(s),{" "}
+              {pending.practice.snapshots} snapshot(s),{" "}
+              {pending.practice.records} record(s), their audit trails and every
+              stored object. It cannot be undone.
+            </p>
+          )}
           <label>
             Type the practice name to confirm
             <Input
@@ -218,21 +352,83 @@ export function OperatorConsole() {
               variant="destructive"
               disabled={
                 busy ||
-                confirmName.trim() !== deleting.name ||
+                confirmName.trim() !== pending.practice.name ||
                 reason.trim().length < 10
               }
-              onClick={() => void remove()}
+              onClick={() => void submit()}
             >
-              Delete practice permanently
+              {archiving ? "Archive practice" : "Delete practice permanently"}
             </Button>
             <Button
               variant="ghost"
               disabled={busy}
-              onClick={() => setDeleting(null)}
+              onClick={() => setPending(null)}
             >
               Cancel
             </Button>
           </div>
+        </section>
+      )}
+      {issued && (
+        <section className="panel" aria-label="Issued work">
+          <h2 className="panel-title">Issued work of {issued.name}</h2>
+          <p className="subtle">
+            Archived {issued.archivedAt.slice(0, 10)}. Identifiers and digests
+            only. Each report package is read back from storage now and rebuilt
+            against the report&apos;s recorded digest; each dossier record and
+            its signed archive are rehashed against their recorded digests. Give
+            a requester the verification keys through a channel independent of
+            this server.
+          </p>
+          <h3>Released reports</h3>
+          {issued.reports.length ? (
+            <ul className="record-list">
+              {issued.reports.map((r) => (
+                <li key={r.engagementId + r.reportId}>
+                  <b>{r.reportId}</b> · {r.engagementId} · {r.kind} · {r.state}
+                  {r.releasedAt ? " " + r.releasedAt.slice(0, 10) : ""} ·
+                  internal package {partLabel(r.internal)}
+                  {r.client ? " · client package " + partLabel(r.client) : ""}
+                  <span className="block subtle mono">{r.sha256}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-result">No released reports.</p>
+          )}
+          <h3>Signed dossiers</h3>
+          {issued.dossiers.length ? (
+            <ul className="record-list">
+              {issued.dossiers.map((d) => (
+                <li key={d.recordId}>
+                  <b>{d.recordId}</b> · {d.engagementId}
+                  {d.reportId ? " · " + d.reportId : ""}
+                  {d.audience ? " · " + d.audience : ""} ·{" "}
+                  {d.createdAt.slice(0, 10)} · record {partLabel(d.record)} ·
+                  signed archive {partLabel(d.archive)}
+                  <span className="block subtle mono">{d.sha256}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-result">No signed dossiers.</p>
+          )}
+          <h3>Verification keys</h3>
+          {issued.keys.length ? (
+            <ul className="record-list">
+              {issued.keys.map((k) => (
+                <li key={k.keyId}>
+                  <b>{k.keyId}</b> · {k.status}
+                  <span className="block subtle mono">{k.publicKeySPKI}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty-result">No verification keys.</p>
+          )}
+          <Button variant="ghost" onClick={() => setIssued(null)}>
+            Close
+          </Button>
         </section>
       )}
       <section className="panel">

@@ -21,14 +21,23 @@ from .errors import EngineError
 
 # 1.3.0: client-local jobs whose dataset stays with the client (#102): the worker reads the file from its
 # local client data directory by the frozen SHA-256 pin and downloads nothing; only aggregates are returned.
-WORKER_VERSION = "1.3.0"
+# 1.4.0: GenAI ingest jobs (`genai-1.0` requests, docs/design/genai-evidence.md section 10.2, #128): the worker
+# downloads the pinned evidence inputs by index, the compute process runs engine.genai.ingest.run_bundle on
+# their bytes and returns its genai-result/0.1 envelope. Nothing an ingested file names is executed.
+WORKER_VERSION = "1.4.0"
+GENAI_REQUEST_SCHEMA = "genai-1.0"
+GENAI_RESULT_SCHEMA = "genai-result/0.1"
+GENAI_REQUEST_KEYS = frozenset({"schemaVersion", "executionMode", "engagementId", "jobId", "procedure", "inputs", "manifest", "plan", "inputHashes", "records", "limitations"})
+GENAI_INPUT_KEYS = frozenset({"index", "artifactId", "name", "sha256", "size", "role", "format"})
 # 2.0.0: hosted engineConfig 1.1 (derived plan) and 1.4 (explicit plan) become engine configuration 1.3,
 # and hostedResults copy the engine's statistics 1.0.0 decisions (docs/design/audit-statistics.md E4).
 # 2.1.0: the performance rules of test definitions traditional-ml-2.1.0 (#65): binary performance is measured
 # on the frozen performancePositiveLabel while fairness counts the favourable label, and performance results
 # report prevalence, the majority-class baseline accuracy, a per-class table and predicted labels absent
 # from the reference column.
-TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.1.0"
+# 2.2.0: an engineConfig 1.4 plan may declare a cluster design (statistics.clusterField, #136), which the engine
+# decides by the cluster bootstrap exactly as the hosted runner does (section 5.11).
+TRANSLATION_VERSION = "hosted-1.1-1.4-to-engine-1.3/2.2.0"
 ENGINE_CONFIG_VERSIONS = {"1.1", "1.4"}
 MAX_ENVELOPE_BYTES = 2 * 1024 * 1024
 MAX_RESULT_BYTES = 8 * 1024 * 1024
@@ -55,10 +64,19 @@ COMPUTE_FAILURE_CODES = frozenset({
     "model_artifact_invalid", "model_runtime_unavailable", "model_objective_mismatch",
     "model_interface_mismatch", "model_output_invalid", "model_inference_failed",
     "evidence_too_large", "compute_timeout", "compute_resource_exhausted", "compute_internal_error",
+    # GenAI ingest (#128): engine.genai.errors.ERROR_CODES, which a test keeps contained in this set.
+    "input_too_large", "bundle_too_large", "line_too_long", "too_many_items", "too_many_scores",
+    "nesting_too_deep", "invalid_utf8", "invalid_json", "duplicate_key", "number_out_of_range",
+    "unknown_format", "format_mismatch", "unsupported_format", "unsupported_format_version",
+    "zip_invalid", "zip_entry_unsafe_name", "zip_entry_too_large", "zip_entry_size_mismatch", "zip_ratio_exceeded",
+    "zip_method_unsupported", "zip_encrypted", "zip_crc_mismatch", "zstd_unavailable",
+    "missing_required_entry", "lm_eval_bundle_mismatch", "duplicate_item_key",
+    "manifest_invalid", "plan_invalid", "input_hash_mismatch",
+    "signature_invalid", "signature_untrusted", "detection_content_mismatch", "signature_backend_unavailable",
 })
 FAILURE_CODES = COMPUTE_FAILURE_CODES | frozenset({
     "lease_expired_on_receipt", "executable_preprocessing_unsupported", "workspace_job_limit", "workspace_unavailable",
-    "client_dataset_unavailable",
+    "client_dataset_unavailable", "evidence_input_pin_mismatch",
     "transport_unavailable", "transport_idle_timeout", "response_deadline_exceeded", "response_truncated", "response_size_rejected", "model_input_size_mismatch",
     "compute_unavailable", "compute_rejected", "result_verification_failed", "worker_internal_error",
 })
@@ -184,7 +202,57 @@ class Claim:
         return {**self.pins(), "leaseUntil": self.lease_until, "request": self.request, "requestJSON": self.request_json}
 
 
+def genai_request(request):
+    """A GenAI ingest request (`genai-1.0`): it has no model or dataset, only pinned evidence inputs."""
+    return isinstance(request, dict) and request.get("schemaVersion") == GENAI_REQUEST_SCHEMA
+
+
+def genai_input_name(index):
+    """The application-owned file name of one evidence input; request names never become paths."""
+    return "genai-%d.bin" % index
+
+
+def validate_genai_request(request):
+    """A frozen `genai_ingest` request (design section 10.2), checked before anything is downloaded.
+
+    At most MAX_BUNDLE_FILES inputs, each within MAX_INPUT_FILE_BYTES and together within
+    MAX_BUNDLE_BYTES; hex digests; inputHashes and the manifest's inputs equal to the inputs; a
+    manifest and a plan the engine accepts (their own codes, manifest_invalid or plan_invalid).
+    """
+    from .genai import limits, plan as plans
+    if request.get("executionMode") != "genai_ingest" or set(request) - GENAI_REQUEST_KEYS:
+        raise ValueError("Unsupported GenAI request mode or fields")
+    valid_id(request.get("engagementId"), "engagementId")
+    valid_id(request.get("jobId"), "jobId")
+    if not isinstance(request.get("procedure"), dict):
+        raise ValueError("A GenAI request pins its procedure")
+    inputs = request.get("inputs")
+    if not isinstance(inputs, list) or not 1 <= len(inputs) <= limits.MAX_BUNDLE_FILES:
+        raise ValueError("A GenAI request has 1 to 64 inputs")
+    total = 0
+    for position, entry in enumerate(inputs):
+        if not isinstance(entry, dict) or set(entry) != GENAI_INPUT_KEYS or entry["index"] != position or isinstance(entry["index"], bool):
+            raise ValueError("GenAI inputs are listed by index with their pins")
+        valid_id(entry["artifactId"], "inputs.artifactId")
+        valid_hash(entry["sha256"], "inputs.sha256")
+        size = entry["size"]
+        if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= limits.MAX_INPUT_FILE_BYTES:
+            raise ValueError("A GenAI input exceeds the per-file byte limit")
+        total += size
+    if total > limits.MAX_BUNDLE_BYTES:
+        raise ValueError("The GenAI inputs exceed the bundle byte limit")
+    if request.get("inputHashes") != {str(entry["index"]): entry["sha256"] for entry in inputs}:
+        raise ValueError("GenAI inputHashes differ from the inputs")
+    manifest = plans.normalize_manifest(request.get("manifest"))
+    plans.normalize_plan(request.get("plan"))
+    declared = [(m["name"], m["sha256"], m["bytes"], m["role"], m["format"]) for m in manifest["inputs"]]
+    if declared != [(e["name"], e["sha256"], e["size"], e["role"], e["format"]) for e in inputs]:
+        raise ValueError("The manifest's inputs differ from the request's inputs")
+
+
 def validate_request(request):
+    if genai_request(request):
+        return validate_genai_request(request)
     if request.get("schemaVersion") != "1.0" or request.get("executionMode") not in {"provided_predictions", "auditor_model", "client_local"}:
         raise ValueError("Unsupported worker request version/execution mode")
     for key in ("model", "dataset", "engineConfig", "inputHashes"):
@@ -294,12 +362,14 @@ def plan_families(plan):
 
 def validate_plan_request(config):
     """engineConfig 1.4 (section 11.1): an explicit plan, the profile's declared label pair, and a suite
-    that is exactly the families of the plan's criteria. Hosted plans have no calibration criteria."""
+    that is exactly the families of the plan's criteria. Hosted plans have no calibration criteria; since #136
+    they may declare a cluster design, which both runners decide by the cluster bootstrap (section 5.11)."""
     plan = stats.validate_plan(config.get("statistics"))
     if any(c["kind"] == "calibration" for c in plan["criteria"]):
         raise ValueError("A hosted plan cannot contain calibration criteria")
-    if plan["clusterField"] is not None:
-        raise ValueError("A hosted plan cannot declare a cluster design")
+    mapped = {config["config"].get(key) for key in ("labelColumn", "predictionColumn")}
+    if plan["clusterField"] is not None and plan["clusterField"] in mapped:
+        raise ValueError("statistics.clusterField must differ from the target and prediction columns")
     if plan_families(plan) != set(config["suite"]):
         raise ValueError("engineConfig suite must equal the families of the plan's criteria")
     allowed = {"labelColumn", "predictionColumn", "groupColumn", "positiveLabel", "negativeLabel", "performancePositiveLabel"}
@@ -488,6 +558,42 @@ def evidence_envelope(report, claim, *, image_digest, execution):
     if request["inputHashes"].get("preprocessing"):
         hashes["preprocessing"] = valid_hash(request["inputHashes"]["preprocessing"], "preprocessing")
     return {"schemaVersion": "1.0", "externalReport": report, "hostedResults": hosted_results(report, request), "provenance": {"requestSha256": claim.request_sha256, "inputHashes": hashes, "workerVersion": WORKER_VERSION, "translationVersion": TRANSLATION_VERSION, "imageDigest": image_digest, "executionMode": request["executionMode"], "execution": execution, "externalReportSha256": report["reportSha256"], "preprocessingScope": "Preprocessing hashes are source declarations only; this worker scores already prepared numeric columns and does not execute preprocessing artifacts."}}
+
+
+GENAI_ENVELOPE_KEYS = frozenset({"schemaVersion", "computationJSON", "computationSha256", "itemsJSONL", "itemsSha256", "provenance"})
+GENAI_PROVENANCE_KEYS = frozenset({"channel", "producedAt", "requestSha256", "inputHashes", "workerVersion", "imageDigest", "executionMode"})
+
+
+def verify_genai_result_bytes(result_bytes, claim, image_digest):
+    """The control plane's independent check of a genai-result/0.1 envelope before it is submitted.
+
+    Its own pins (computationSha256, and itemsSha256 when items are inline), and that it binds this
+    request, these inputs, this plan and manifest, this worker version and the enrolled image, as
+    the runner route checks them again (site-app/app/api/runner/route.ts, assertGenaiResult).
+    """
+    from .genai import hashing
+    result = strict_json(result_bytes, maximum=MAX_RESULT_BYTES)
+    if not isinstance(result, dict) or set(result) != GENAI_ENVELOPE_KEYS or result["schemaVersion"] != GENAI_RESULT_SCHEMA:
+        raise ValueError("Invalid GenAI result envelope")
+    computation_json, items = result["computationJSON"], result["itemsJSONL"]
+    if not isinstance(computation_json, str) or sha256(computation_json.encode("utf-8")) != result["computationSha256"]:
+        raise ValueError("computationSha256 differs from computationJSON")
+    if items is not None and (not isinstance(items, str) or sha256(items.encode("utf-8")) != result["itemsSha256"]):
+        raise ValueError("itemsSha256 differs from itemsJSONL")
+    valid_hash(result["itemsSha256"], "itemsSha256")
+    provenance, request = result["provenance"], claim.request
+    if not isinstance(provenance, dict) or set(provenance) != GENAI_PROVENANCE_KEYS:
+        raise ValueError("Invalid GenAI result provenance")
+    if provenance["channel"] != "runner" or provenance["requestSha256"] != claim.request_sha256 or provenance["inputHashes"] != request["inputHashes"] or provenance["imageDigest"] != image_digest or provenance["workerVersion"] != WORKER_VERSION or provenance["executionMode"] != "genai_ingest":
+        raise ValueError("GenAI result request/worker identity mismatch")
+    computation = strict_json(computation_json, maximum=MAX_RESULT_BYTES)
+    if not isinstance(computation, dict) or computation.get("schemaVersion") != "genai-computation/0.1":
+        raise ValueError("Invalid GenAI computation")
+    if sorted(i.get("sha256") for i in computation.get("inputs", []) if isinstance(i, dict)) != sorted(request["inputHashes"].values()):
+        raise ValueError("GenAI computation inputs differ from the request")
+    if computation.get("plan", {}).get("planSha256") != hashing.sha256_bytes(hashing.canonical(request["plan"])) or computation.get("manifest", {}).get("manifestSha256") != hashing.sha256_bytes(hashing.canonical(request["manifest"])):
+        raise ValueError("GenAI computation binds another plan or manifest")
+    return result
 
 
 def completion_body(claim, result_bytes):

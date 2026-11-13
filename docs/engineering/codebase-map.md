@@ -80,7 +80,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
    - External runs (`queueExternal`): an `execution_jobs` request is frozen. The Python worker claims it, downloads the pinned inputs, computes, and completes with an HMAC. `importJob` compiles the result into a 1.2 run and a draft paper.
 5. **Reporting.**
    - `createReport` freezes an internal snapshot and a client snapshot, both hashed and offloaded to R2.
-   - `approveReportPackage` approves both hashes; `releaseReport` releases the client projection.
+   - `approveReportPackage` approves both hashes with the approver's MEM-SO-01 completion checklist answers; `releaseReport` releases the client projection, copies the checklist into `release.completion` and records the `notify_client` event, which the client sees as a notification on its overview.
    - `/api/report-package` re-verifies the digests.
    - `/api/dossier` seals an Ed25519-signed dossier per audience, which can be verified offline with `engine/assurance.py verify`; `/api/dossier/keys` lists the practice's active and retired verification keys, and a practice administrator rotates the key with the management op `rotateSigningKey`.
 
@@ -94,7 +94,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
 | Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |
-| Platform operator | `operator_events` (immutable audit trail of practice deletions, `lib/operator.ts`), `practice_erasures` (a marker that exists only inside the deletion batch; the append-only delete triggers admit that practice's rows only while it exists); both since `drizzle/0013` |
+| Platform operator | `operator_events` (immutable audit trail of practice deletions, `lib/operator.ts`), `practice_erasures` (a marker that exists only inside the deletion batch; the append-only delete triggers admit that practice's rows only while it exists); both since `drizzle/0013`; `tenants.archived_at` (a practice with issued work archived instead of deleted, kept archived and closed to new members by the triggers of `drizzle/0015`); `integrity_incidents.handling` (open, acknowledged or resolved by a practice administrator, `drizzle/0016`) |
 
 **Invariants.** Append-only triggers protect `audit_events`, `engagement_snapshots`, `management_events`, `assurance_records`, and completed jobs and attempts. Unique indexes on `json_extract` expressions stop revision forks. All of these exist only in hand-written SQL (`0001`, `0003`).
 
@@ -294,7 +294,7 @@ Each flow lists the steps, the expected results, negative checks, and the known 
     1. Overview → Move to Fieldwork → … → Sign-off (`setStage`). Skipping a stage or moving backwards is blocked.
     2. Reports & sign-off → Prepare final snapshot (`createReport kind:"final"`).
     3. Integrity & downloads → Verify captured content. `GET /api/report-package` returns `proof.valid:true`. Also use Preview exact client package.
-    4. qa-lead clicking Approve package gets 403 (creator). qa-reviewer approves (`approveReportPackage` with both hashes).
+    4. qa-lead clicking Approve package gets 403 (creator). qa-reviewer answers the completion checklist and approves (`approveReportPackage` with both hashes).
     5. qa-reviewer trying to release gets 403 (role). qa-lead: Release to client (`releaseReport`).
     6. qa-viewer sees the package and can Print (`/report?tenantId&engagementId&reportId`). `/api/report-package?download=1` returns `proof.valid:true`.
     7. qa-lead: Withdraw (`withdrawReport`). The client loses access.

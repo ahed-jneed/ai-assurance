@@ -3,16 +3,61 @@
 // report is released at a time: releasing one supersedes the one released
 // before and records the client notification. Where the engagement needs a
 // quality review, release also needs the Engagement Quality Reviewer's
-// sign-off of both exact packages (lib/domain/quality-review.ts).
+// sign-off of both exact packages (lib/domain/quality-review.ts). The
+// approver answers the MEM-SO-01 completion checklist with the approval, and
+// the release copies the answers into its completion record.
 import { z } from "zod";
-import { releaseRequirements, releaseTimeTemplates } from "../domain/gates";
+import {
+  releaseChecklist,
+  releaseChecklistAnswers,
+  releaseRequirements,
+  releaseTimeTemplates,
+  type ReleaseChecklistRecord,
+} from "../domain/gates";
 import { qualityReviewReleaseProblem } from "../domain/quality-review";
 import {
   currentClientSnapshot,
   legacyPackageMessage,
 } from "../client-projection";
 import { releaseState } from "../workflow-state";
-import { fail, short, text, uid, type WorkflowHandler } from "./command";
+import {
+  fail,
+  optional,
+  short,
+  text,
+  uid,
+  type WorkflowHandler,
+} from "./command";
+const answer = z.enum([...releaseChecklistAnswers]);
+const checklistAnswers = z
+  .object(
+    Object.fromEntries(
+      releaseChecklist.map((i) => [i.id, answer]),
+    ) as unknown as Record<
+      (typeof releaseChecklist)[number]["id"],
+      typeof answer
+    >,
+  )
+  .strict();
+/**
+ * The checklist as recorded, in the checklist's order. A not-applicable
+ * answer needs its basis.
+ */
+function checklistRecord(
+  answers: z.infer<typeof checklistAnswers>,
+  note: string,
+): ReleaseChecklistRecord {
+  const items = releaseChecklist.map((i) => ({
+    id: i.id,
+    answer: answers[i.id],
+  }));
+  if (items.some((i) => i.answer === "not_applicable") && !note)
+    fail(
+      400,
+      "State why each completion checklist item marked not applicable does not apply",
+    );
+  return { items, note };
+}
 export const reportReleaseCommands: Record<string, WorkflowHandler> = {
   async approveReportPackage({ e, c, reviewer }, data) {
     reviewer();
@@ -22,12 +67,15 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
           internalHash: short,
           clientHash: short,
           reason: text,
+          checklist: checklistAnswers,
+          checklistNote: optional.optional(),
         })
         .strict()
         .parse(data),
       r =
         e.reports.find((r) => r.id === a.reportId) ??
         fail(404, "Report not found");
+    const checklist = checklistRecord(a.checklist, a.checklistNote ?? "");
     if (
       r.kind !== "final" ||
       !["internal", "approved"].includes(releaseState(r))
@@ -50,6 +98,7 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
       internalHash: r.sha256,
       clientHash: r.clientSha256!,
       reason: a.reason,
+      checklist,
     };
     r.release.state = "approved";
     r.release.history.push({
@@ -123,6 +172,9 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
         approvedAt: release.approval.at,
         releasedBy: c.userId,
         releasedAt: c.at,
+        ...(release.approval.checklist && {
+          checklist: structuredClone(release.approval.checklist),
+        }),
       },
     });
     release.history.push(

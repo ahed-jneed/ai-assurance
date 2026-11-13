@@ -1759,6 +1759,37 @@
         "releasedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "checklist": {
+          "title": "Completion checklist",
+          "description": "The completion checklist the independent approver answered with the approval of both packages. Absent when the approval was recorded before the checklist.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["items", "note"],
+          "properties": {
+            "items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "answer"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "answer": {
+                    "enum": ["confirmed", "not_applicable"]
+                  }
+                }
+              }
+            },
+            "note": {
+              "type": "string",
+              "description": "The basis for every not-applicable answer; empty when none."
+            }
+          }
         }
       }
     },

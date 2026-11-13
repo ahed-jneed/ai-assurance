@@ -18,7 +18,12 @@
 // memo already carries.
 import catalog from "../catalog.json";
 import { packFeatures } from "../criteria/pin";
-import type { Engagement, Paper, Report } from "../domain";
+import {
+  releaseChecklistLines,
+  type Engagement,
+  type Paper,
+  type Report,
+} from "../domain";
 import {
   paperContentDigest,
   paperRevision,
@@ -123,6 +128,13 @@ export async function completionMemo(
           " at " +
           completion.approvedAt,
         "Release: " + completion.releasedBy + " at " + completion.releasedAt,
+        // The completion checklist the approver answered (#94); approvals
+        // recorded before it say so.
+        ...(completion.checklist
+          ? releaseChecklistLines(completion.checklist).map(
+              (line) => "Completion checklist: " + line,
+            )
+          : ["Completion checklist: not recorded with this approval"]),
         ...(signOffs.length
           ? signOffs.map(
               (s) =>

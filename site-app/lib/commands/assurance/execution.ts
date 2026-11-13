@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jobs, recordStatement } from "../../assurance-store";
+import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Outcome, Result, Run } from "../../domain";
 import { save } from "../../engagement-repo";
@@ -19,6 +19,7 @@ import {
   externalGate,
   heldByClient,
   specialCategoryLimitation,
+  undeclaredColumns,
 } from "../../special-category";
 import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
@@ -131,6 +132,19 @@ export const execution: AssuranceModule = defineCommands({
           "This dataset is held by the client: queue it in client-local mode for the client's own worker",
         );
       externalGate(profile, v.mode, clientHeld);
+      // The client declared the pinned file's columns (#134): a mapping the
+      // file cannot satisfy is refused now, not when the worker claims it.
+      const missing = clientHeld ? undeclaredColumns(dataset, profile) : [];
+      if (missing.length)
+        throw new ApiError(
+          409,
+          "The client-held dataset " +
+            dataset.name +
+            " does not declare the protocol's column" +
+            (missing.length > 1 ? "s " : " ") +
+            missing.join(", ") +
+            ". Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+        );
       const plan = profile.statistics,
         outputLabels: string[] = system.body.outputs.classOrder,
         labels = frozenLabelPair({
@@ -214,11 +228,7 @@ export const execution: AssuranceModule = defineCommands({
           outputLabels,
         });
       }
-      const pending = await jobs(ctx, e.id);
-      if (
-        pending.filter((j) => ["queued", "running"].includes(String(j.state)))
-          .length >= 10
-      )
+      if ((await pendingJobCount(ctx, e.id)) >= 10)
         throw new ApiError(429, "Finish or cancel pending external work");
       const jobId = id("JOB"),
         modelArtifact = e.artifacts.find((x) => x.id === m.artifactId)!,

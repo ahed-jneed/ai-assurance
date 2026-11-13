@@ -208,6 +208,8 @@ export function plannedText(planned: Planned, fair: boolean) {
 
 const share = (v: number | null | undefined) =>
   v === null || v === undefined ? "–" : Math.round(v * 100) + "%";
+/** Members whose power formula assumes the errors of each class spread evenly over the others (section 8, #152). */
+const MACRO = { macro_f1: true, macro_precision: true };
 const METRIC_WORDS: Record<string, string> = {
   accuracy: "accuracy",
   balanced_accuracy: "balanced accuracy",
@@ -227,7 +229,7 @@ export function powerSentence(power: CriterionPower, target: number) {
     return (
       `Power is not computed (${power.reasons.join(", ").replaceAll("_", " ")})` +
       (missing.length
-        ? `: statistics 1.0.0 has no power formula for ${missing.join(" and ")}.`
+        ? `: there is no power formula for ${missing.join(" and ")}.`
         : ".") +
       (computed.length
         ? " If the assumptions hold, " +
@@ -260,6 +262,14 @@ export function powerSentence(power: CriterionPower, target: number) {
       : "") +
     (power.failMdeRatio
       ? ` A ratio of ${power.failMdeRatio.toFixed(2)} would fail with ${share(target)} probability.`
+      : "") +
+    (power.members.some((m) => Object.hasOwn(MACRO, m.metric))
+      ? ` For ${power.members
+          .filter((m) => Object.hasOwn(MACRO, m.metric))
+          .map((m) => METRIC_WORDS[m.metric])
+          .join(
+            " and ",
+          )} the check assumes that each class's errors are spread evenly over the other classes.`
       : "")
   );
 }

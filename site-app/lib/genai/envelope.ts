@@ -301,6 +301,8 @@ const computation = z
       z
         .object({
           runKey: z.string(),
+          // Engine 0.2 names the input format of each marking block (#128).
+          format: z.string().max(100).optional(),
           inputSha256: hex64,
           evidenceLevel: level,
           count: z.number(),

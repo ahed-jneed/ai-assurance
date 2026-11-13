@@ -367,6 +367,28 @@
         }
       ]
     },
+    "reductionBand": {
+      "description": "The \"beats the mean baseline\" member mse_reduction (#136): a lower bound of 0 or more and no upper bound.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/band"
+        },
+        {
+          "required": [
+            "lower"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number",
+              "minimum": 0
+            },
+            "upper": {
+              "type": "null"
+            }
+          }
+        }
+      ]
+    },
     "libraryEntry": {
       "description": "A versioned threshold-library entry (section 10.1). parameters holds every parameter value after defaults; overriddenParameters names those that differ from the entry's defaults.",
       "type": "object",
@@ -438,6 +460,7 @@
       }
     },
     "multiclassAssumptions": {
+      "description": "Section 8. Every class has a share and a recall: perClassRecall names exactly the labels of classShares (#113). The shares sum to 1 within 1e-9, and every share and every recall lies strictly between 0 and 1. JSON Schema cannot compare the keys of two objects or sum values, so validate_plan in both runners enforces those two rules. The power formulas of macro F1 and macro precision also assume that the errors of each class spread evenly over the other classes (#152).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -452,6 +475,7 @@
           "maximum": 10000000
         },
         "classShares": {
+          "description": "Assumed share of the rows in each class, keyed by class label: above 0, summing to 1 over the classes.",
           "type": "object",
           "minProperties": 2,
           "maxProperties": 100,
@@ -460,6 +484,7 @@
           }
         },
         "perClassRecall": {
+          "description": "Assumed true recall of each class, keyed by the labels of classShares.",
           "type": "object",
           "minProperties": 2,
           "maxProperties": 100,
@@ -487,7 +512,7 @@
           "exclusiveMinimum": 0
         },
         "targetSd": {
-          "description": "Optional, engine only until the hosted runner mirrors it: the assumed standard deviation of the targets, which adds the mean baseline gate to the pass probability (section 8).",
+          "description": "Optional: the assumed standard deviation of the targets. It adds the mean baseline gate to the pass probability and gives the power of an mse_reduction member (section 8).",
           "type": "number",
           "exclusiveMinimum": 0
         }
@@ -720,7 +745,7 @@
         },
         "members": {
           "type": "array",
-          "maxItems": 2,
+          "maxItems": 3,
           "items": {
             "type": "object",
             "additionalProperties": false,
@@ -732,11 +757,33 @@
               "metric": {
                 "enum": [
                   "mae",
-                  "rmse"
+                  "rmse",
+                  "mse_reduction"
                 ]
               },
               "band": {
-                "$ref": "#/$defs/errorBand"
+                "$ref": "#/$defs/band"
+              }
+            },
+            "if": {
+              "properties": {
+                "metric": {
+                  "const": "mse_reduction"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "band": {
+                  "$ref": "#/$defs/reductionBand"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "band": {
+                  "$ref": "#/$defs/errorBand"
+                }
               }
             }
           }

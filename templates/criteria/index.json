@@ -290,6 +290,40 @@
       "releasedAt": "2026-11-13",
       "selectable": true,
       "sha256": "cfdbf44c6302ae60527c32973deb80ee881998ae13441ecd7b93c5e75d66937a"
+    },
+    {
+      "documentType": "framework",
+      "id": "mitre-atlas",
+      "edition": "2026.10",
+      "version": "2026.11.0",
+      "path": "frameworks/mitre-atlas/2026.10/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #145)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "sha256": "1632c73704d388d47f3457b174947728c3c3b5cbbed16d30c3919b361426cba5"
+    },
+    {
+      "documentType": "pack",
+      "id": "genai-evaluation",
+      "version": "2026.11.1",
+      "path": "packs/genai-evaluation/2026.11.1.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #145)",
+          "at": "2026-11-13"
+        }
+      ],
+      "releasedAt": "2026-11-13",
+      "selectable": true,
+      "sha256": "6e03faa00e3ca7ba5afee6895f2554c4ca10c3b9ee372d57e02770f2b208f550"
     }
   ],
   "defaults": {

@@ -29,7 +29,7 @@ import { registry, selectablePacks } from "./registry";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 

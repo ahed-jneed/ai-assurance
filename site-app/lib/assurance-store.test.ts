@@ -12,7 +12,9 @@ import {
   datasetVersions,
   dossierSeal,
   hasSuccessor,
+  jobs,
   jobTelemetry,
+  pendingJobCount,
   pinnedRecordFacts,
   recordCount,
   recordKindCounts,
@@ -924,6 +926,20 @@ describe("external queue telemetry", () => {
       running: 0,
       stalled: 0,
     });
+  });
+
+  it("counts pending jobs beyond the 100 most recent ones", async () => {
+    // One running job older than 120 finished ones: jobs() does not list it.
+    job("JOB-0", "running");
+    for (let i = 1; i <= 120; i++) job("JOB-" + i, "succeeded");
+    job("JOB-121", "cancelled");
+    job("JOB-122", "queued", null, "ENG-2");
+    expect((await jobs(ctx, "ENG-1")).some((j) => j.id === "JOB-0")).toBe(
+      false,
+    );
+    expect(await pendingJobCount(ctx, "ENG-1")).toBe(1);
+    expect(await pendingJobCount(ctx, "ENG-2")).toBe(1);
+    expect(await pendingJobCount(ctx, "ENG-3")).toBe(0);
   });
 
   it("names the jobs already compiled into a draft paper", async () => {

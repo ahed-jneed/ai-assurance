@@ -18,7 +18,7 @@ function contractCodes() {
     ];
   expect(sets).toHaveLength(2);
   return new Set(
-    sets.flatMap((m) => [...m[1].matchAll(/"([a-z_]+)"/g)].map((x) => x[1])),
+    sets.flatMap((m) => [...m[1].matchAll(/"([a-z0-9_]+)"/g)].map((x) => x[1])),
   );
 }
 
@@ -26,7 +26,7 @@ function contractCodes() {
 function documentedCodes() {
   const section = engine("WORKER.md").split("## Failure codes")[1];
   return new Set(
-    [...section.matchAll(/^\| `([a-z_]+)` \|/gm)].map((m) => m[1]),
+    [...section.matchAll(/^\| `([a-z0-9_]+)` \|/gm)].map((m) => m[1]),
   );
 }
 

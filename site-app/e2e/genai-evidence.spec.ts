@@ -5,6 +5,9 @@
 // uploaded envelope counts as L1 until a worker recomputation authenticates
 // it. The worker path (L2, a validated judge passing the gate) is covered by
 // lib/commands/assurance/genai.test.ts, since the suite runs no worker.
+// #145: with no genai_ingest worker the tab offers no Queue ingest; the
+// auditor records a re-run attestation through its form; and the Evidence
+// vault shows the envelope's level and the level of the logs it pins.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expectAccessible } from "./a11y";
@@ -70,6 +73,56 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
     card.getByText(/not accuracy on the population/i).first(),
   ).toBeVisible();
   await expectAccessible(page, "GenAI evidence tab");
+
+  // #145: no worker of the demo engagement is enrolled with genai_ingest, so
+  // the tab offers no Queue ingest and says why.
+  await expect(page.getByRole("button", { name: "Queue ingest" })).toHaveCount(
+    0,
+  );
+  await expect(page.locator("[data-genai-no-ingest-worker]")).toBeVisible();
+
+  // #145: the re-run attestation form pins both inputs of the envelope.
+  await page.getByRole("button", { name: "Attest a re-run" }).click();
+  const attest = page.getByRole("dialog", { name: "Attest an auditor re-run" });
+  await attest
+    .getByLabel(/^judged_qa_30\.eval/)
+    .first()
+    .check();
+  await attest
+    .getByLabel(/^judge_large_200\.jsonl/)
+    .first()
+    .check();
+  await attest.getByLabel("Harness name").fill("inspect_ai");
+  await attest.getByLabel("Harness version").fill("0.3.90");
+  await attest
+    .getByLabel("System under test: endpoint host")
+    .fill("api.example.com");
+  await attest
+    .getByLabel("System under test: model snapshot")
+    .fill("fixture-2026-10");
+  await attest.getByLabel("Run started (UTC)").fill("2026-11-05T09:00");
+  await attest.getByLabel("Run ended (UTC)").fill("2026-11-05T10:00");
+  await attest.getByLabel("Statement").selectOption({ index: 1 });
+  await attest.getByRole("button", { name: "Record attestation" }).click();
+  await expect(attest).toBeHidden();
+  await expect(card.getByText(/re-run attested/)).toBeVisible();
+  // An uploaded envelope stays at L1 even when attested.
+  await expect(card.getByText("L1 · hashed tool log").first()).toBeVisible();
+
+  // #145: the Evidence vault shows the envelope's level and its inputs'.
+  await page.goto(workspacePath(demo, "Evidence vault"));
+  const envelopeRow = page.getByRole("row").filter({ hasText: envelopeName });
+  await expect(
+    envelopeRow.locator('[data-genai-file-role="result"]'),
+  ).toHaveText("GenAI L1 · hashed tool log");
+  await expect(
+    page
+      .getByRole("row")
+      .filter({ hasText: "judged_qa_30.eval" })
+      .first()
+      .locator('[data-genai-file-role="input"]'),
+  ).toHaveText("GenAI input · L1");
+  await expectAccessible(page, "Evidence vault with GenAI levels");
 
   // The gate: a supported conclusion on a paper linking the envelope fails.
   const { paperId } = await auditor.command(

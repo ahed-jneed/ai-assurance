@@ -44,6 +44,8 @@ BINARY_DESCRIPTIVE = ("accuracy", "precision", "recall", "specificity", "balance
 MULTICLASS_METRICS = ("accuracy", "balanced_accuracy", "macro_precision", "macro_f1")
 REGRESSION_METRICS = ("mae", "rmse")
 REGRESSION_DESCRIPTIVE = ("mae", "rmse", "r2")
+# The optional "beats the mean baseline" member (#136): the MSE reduction over the mean-prediction baseline.
+REGRESSION_MEMBERS = REGRESSION_METRICS + ("mse_reduction",)
 PERFORMANCE_KINDS = ("performance", "multiclass_performance", "regression_performance")
 # Metrics that today's engine rule makes a pass depend on but that 1.0.0 cannot decide by an interval (section 4.8).
 UNDECIDABLE = {"regression_performance": "r2", "calibration": "expected_calibration_error"}
@@ -546,6 +548,8 @@ def band_problem(metric, band, mode="all_pairs"):
         return None
     if metric in ERROR_METRICS:
         return None if lower is None and upper is not None and upper > 0 else "error metrics take an upper bound above 0 only"
+    if metric == "mse_reduction":
+        return None if upper is None and lower is not None and lower >= 0 else "the MSE reduction takes a lower bound of 0 or more only"
     if metric in ("selection_rate_difference", "equalized_odds", "tpr_difference", "fpr_difference", "calibration_gap"):
         if lower is not None and upper is not None:
             return None if lower == -upper and 0.0 < upper < 1.0 else "a difference band is symmetric, {lower: -delta, upper: delta} with 0 < delta < 1"
@@ -597,8 +601,8 @@ CRITERION_FIELDS = {
     "group_comparison": ("metric", "band", "comparison", "groupFields", "declaredGroups", "minimumCoverage", "powerAssumptions"),
     "calibration": ("band", "members", "minimumCoverage", "subgroup", "passBlockedBy", "powerAssumptions"),
 }
-MEMBER_METRICS = {"performance": BINARY_METRICS, "multiclass_performance": MULTICLASS_METRICS, "regression_performance": REGRESSION_METRICS, "calibration": ("brier_score",)}
-MEMBER_LIMITS = {"performance": 7, "multiclass_performance": 4, "regression_performance": 2, "calibration": 1}
+MEMBER_METRICS = {"performance": BINARY_METRICS, "multiclass_performance": MULTICLASS_METRICS, "regression_performance": REGRESSION_MEMBERS, "calibration": ("brier_score",)}
+MEMBER_LIMITS = {"performance": 7, "multiclass_performance": 4, "regression_performance": 3, "calibration": 1}
 PLAN_FIELDS = ("statisticsVersion", "confidenceLevel", "minimums", "configuredMinimums", "multiplicity", "clusterField", "bootstrap", "calibrationBins", "power", "derivedFrom", "criteria")
 
 
@@ -904,8 +908,11 @@ def regression_stat(metric, data, mins):
     n = len(errors)
     status = support(n, mins["sampleSize"], "below_minimum_sample_size")
     if n < 2:  # no rows, or one row without a sample standard deviation
-        estimate = None if n == 0 or metric == "r2" else abs(errors[0])
-        return Stat(estimate, None if metric == "r2" else "normal_approximation", None, None, {"n": n}, "undefined", ["undefined_zero_denominator" if n == 0 or metric == "r2" else "degenerate_interval"])
+        undefined = n == 0 or metric in ("r2", "mse_reduction")
+        estimate = None if undefined else abs(errors[0])
+        return Stat(estimate, None if metric == "r2" else "normal_approximation", None, None, {"n": n}, "undefined", ["undefined_zero_denominator" if undefined else "degenerate_interval"])
+    if metric == "mse_reduction":
+        return mse_reduction_stat(data, status)
     if metric == "r2":
         targets = data.get("targets", [0.0] * n)
         mean_t = math.fsum(targets) / n
@@ -925,6 +932,29 @@ def regression_stat(metric, data, mins):
     if se == 0.0:
         return Stat(math.sqrt(mean), "normal_approximation_mse", None, None, counts, "undefined", ["degenerate_interval"])
     return Stat(math.sqrt(mean), "normal_approximation_mse", lambda z: (math.sqrt(max(0.0, mean - z * se)), math.sqrt(mean + z * se)), lambda band: (lambda d: normal_zstar(mean, se, square_band(band), d)), counts, *status)
+
+
+def mse_reduction_stat(data, status):
+    """The "beats the mean baseline" member (section 5.9, #136): the MSE reduction over the mean-prediction
+    baseline, SST/n - MSE = -mean(d) with d_i = e_i^2 - (mean - y_i)^2, and a normal approximation on mean(d).
+    Its band {lower: L >= 0} passes when the reduction is shown to exceed L and fails when it is shown to lie
+    below L; with L = 0 a fail means the model is significantly worse than predicting the mean."""
+    errors, targets = data["errors"], data.get("targets")
+    n = len(errors)
+    if targets is None:
+        return Stat(None, "normal_approximation", None, None, {"n": n}, "undefined", ["undefined_zero_denominator"])
+    mean_t = math.fsum(targets) / n
+    residuals = [mean_t - t for t in targets]
+    sst = math.fsum(r * r for r in residuals)
+    if sst == 0.0:
+        return Stat(None, "normal_approximation", None, None, {"n": n}, "undefined", ["undefined_zero_denominator"])
+    mean_d, sd_d = mean_sd([e * e - r * r for e, r in zip(errors, residuals)])
+    reduction = 0.0 - mean_d  # never -0.0
+    se = sd_d / math.sqrt(n)
+    counts = {"n": n, "meanSquaredError": math.fsum(e * e for e in errors) / n, "baselineMeanSquaredError": sst / n, "sdSquaredErrorDifference": sd_d}
+    if se == 0.0:
+        return Stat(reduction, "normal_approximation", None, None, counts, "undefined", ["degenerate_interval"])
+    return Stat(reduction, "normal_approximation", lambda z: (reduction - z * se, reduction + z * se), lambda band: (lambda d: normal_zstar(reduction, se, band, d)), counts, *status)
 
 
 def mean_baseline(data, mins):
@@ -1299,6 +1329,7 @@ def evaluate_criteria(plan, data_for, clustered=None):
     level = plan["confidenceLevel"]
     alpha = 1.0 - level
     derived = plan["derivedFrom"] is not None
+    _require(plan["clusterField"] is None or clustered is not None, "a clustered plan is decided by the cluster bootstrap and needs its cluster data")
     if clustered is None:
         results = [evaluate_criterion(c, data_for(c), level, plan["minimums"], derived) for c in plan["criteria"]]
     else:
@@ -1492,6 +1523,8 @@ def cluster_estimator(layout, entry, mins):
     if layout.kind == "regression_performance":
         if metric == "mae":
             return lambda rep: rep[1] / rep[0] if rep[0] else None
+        if metric == "mse_reduction":
+            return lambda rep: None if rep[0] == 0 else 0.0 - mean_difference(rep)
         return lambda rep: math.sqrt(rep[2] / rep[0]) if rep[0] else None
     if layout.kind == "group_comparison":
         key, subject, comparator = RATE_KEYS[metric], entry["subject"], entry["comparator"]
@@ -1549,6 +1582,31 @@ def bootstrap_p(ordered, holds):
     """p = max(2u*, 2/(B_valid + 1)), and 1 when no u decides."""
     u = bootstrap_u_star(ordered, holds)
     return 1.0 if u is None else max(2.0 * u, 2.0 / (len(ordered) + 1))
+
+
+def rate_estimators(layout, state):
+    """Section 5.11 (#136): the per-group rates of a clustered group criterion, one (rate entry, estimator) per
+    group view and rate; their percentile intervals replace the Wilson intervals, and they never decide."""
+    out = []
+    for view in state["groups"] or []:
+        for key in ("selection", "tpr", "fpr"):
+            if key in view:
+                def rate(rep, key=key, group=view["group"]):
+                    x, n = rate_counts(key, rep.get(group))
+                    return x / n if n else None
+                out.append((view[key], rate, []))
+    return out
+
+
+def apply_rate_bootstrap(entry, values, replicates, level, within):
+    """A per-group rate's cluster percentile interval: null beyond the budget, for an undefined rate and with
+    fewer than 0.9 B valid replicates. Rates are descriptive, so there is no minimum-cluster rule."""
+    entry["interval"] = None
+    if not within or entry["estimate"] is None or len(values) < VALID_REPLICATE_SHARE * replicates:
+        return
+    ordered = sorted(values)
+    tail = (1.0 - level) / 2.0
+    entry["interval"] = {"lower": quantile(ordered, tail), "upper": quantile(ordered, 1.0 - tail), "level": level, "method": "cluster_percentile_bootstrap"}
 
 
 def apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within):
@@ -1643,7 +1701,8 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
                     entry["_decide"] = not state["invalidBand"]
                     entries.append((entry, estimator, min(clusters_in.get(unit, 0) for unit in layout.units_of(entry)), descriptive, []))
         gate = [] if spec["kind"] == "regression_performance" else None
-        states.append({"state": state, "layout": layout, "cells": [cells for cells, _ in vectors], "offset": width, "entries": entries, "gate": gate, "clusters": clusters_in.get(None, 0)})
+        rates = rate_estimators(layout, state) if spec["kind"] == "group_comparison" else []
+        states.append({"state": state, "layout": layout, "cells": [cells for cells, _ in vectors], "offset": width, "entries": entries, "rates": rates, "gate": gate, "clusters": clusters_in.get(None, 0)})
         width += layout.size
     if within:
         # Each cell's nonzero clusters and values: a replicate's cell is sum(multiplicity x value) over them,
@@ -1662,10 +1721,17 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
             for _ in range(count):
                 multiplicity[draw(count)] += 1
             weight = multiplicity.__getitem__
+            # Python 3.11 sums left to right like the TypeScript loop (site-app/lib/statistics.ts); from 3.12 on,
+            # sum() uses compensated summation for floats, so float cells may differ in the last ulp there. CI pins
+            # 3.11, and the golden tolerances absorb such a difference.
             dense = [sum(map(operator.mul, map(weight, clusters), values)) for clusters, values in columns]
             for s in states:
                 rep = s["layout"].replicate(dense[s["offset"]:s["offset"] + s["layout"].size])
                 for _, estimator, _, _, values in s["entries"]:
+                    value = estimator(rep)
+                    if value is not None:
+                        values.append(value)
+                for _, estimator, values in s["rates"]:
                     value = estimator(rep)
                     if value is not None:
                         values.append(value)
@@ -1678,6 +1744,8 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
         for entry, _, clusters, descriptive, values in s["entries"]:
             apply_cluster_bootstrap(entry, values, clusters, replicates, level, descriptive, within)
             del entry["_decide"]
+        for entry, _, values in s["rates"]:
+            apply_rate_bootstrap(entry, values, replicates, level, within)
         if s["gate"] is not None:
             cluster_gate(s["state"], s["gate"], s["clusters"], replicates, within)
         results.append(decide_criterion(s["state"], level, mins))
@@ -1715,6 +1783,76 @@ def normal_probs(theta, se, band, z):
     if upper is not None:
         passing.append(phi((upper - theta) / se - z))
         failing += phi((theta - upper) / se - z)
+    return two_sides(passing), failing
+
+
+def even_spread_cells(shares, recalls):
+    """Section 8 (#152): the expected confusion matrix, as shares of n, when class c is recognised with its assumed
+    recall and its errors are spread evenly over the other k - 1 classes (row c is the truth, column j the prediction)."""
+    k = len(shares)
+    return [[s * (r if j == c else (1.0 - r) / (k - 1)) for j in range(k)] for c, (s, r) in enumerate(zip(shares, recalls))]
+
+
+def macro_parts(metric, cells):
+    """Per class: (TP share, denominator share). Macro precision: TP of the predicted count; macro F1: the Jaccard
+    index TP of TP + FP + FN (section 5.4)."""
+    k = len(cells)
+    rows = [math.fsum(cells[c]) for c in range(k)]
+    cols = [math.fsum(cells[i][c] for i in range(k)) for c in range(k)]
+    return [(cells[c][c], cols[c] if metric == "macro_precision" else rows[c] + cols[c] - cells[c][c]) for c in range(k)]
+
+
+def wilson_slope(x, n, z, side):
+    """d(Wilson bound)/d(x-hat) at the proportion x with denominator n; side -1 is the lower bound, +1 the upper."""
+    root = math.sqrt(x * (1.0 - x) / n + z * z / (4.0 * n * n))
+    return (1.0 + side * z * (1.0 - 2.0 * x) / (2.0 * n * root)) / (1.0 + z * z / n)
+
+
+def macro_bound(metric, n, cells, z, side):
+    """Section 8 (#152): a macro bound (side -1 lower, +1 upper) of section 5.4 at critical value z, as it would be
+    computed at the expected counts, and its standard deviation by the delta method over the multinomial confusion
+    matrix: the gradient of the mean of the per-class bounds in the cell shares, through each class's Wilson slope."""
+    k = len(cells)
+    zk = per_class_z(z, k)
+    values, gradient = [], [[0.0] * k for _ in range(k)]
+    for c, (tp, share) in enumerate(macro_parts(metric, cells)):
+        x = tp / share
+        lo, hi = wilson(n * tp, n * share, zk)
+        b = lo if side < 0 else hi
+        slope = wilson_slope(x, n * share, zk, side)
+        if metric == "macro_f1":  # the Jaccard bound maps to F1 through 2J/(1 + J)
+            values.append(f1_from_j(b))
+            slope *= 2.0 / (1.0 + b) ** 2
+        else:
+            values.append(b)
+        for i in range(k):
+            for j in range(k):
+                counted = j == c if metric == "macro_precision" else (i == c or j == c)
+                gradient[i][j] += slope * ((1.0 if i == j == c else 0.0) - (x if counted else 0.0)) / share / k
+    first = math.fsum(gradient[i][j] * cells[i][j] for i in range(k) for j in range(k))
+    second = math.fsum(gradient[i][j] ** 2 * cells[i][j] for i in range(k) for j in range(k))
+    return math.fsum(values) / k, math.sqrt(max(0.0, second - first * first) / n)
+
+
+def normal_tail(distance, sd):
+    """Phi(distance / sd); a bound without variance decides by its sign."""
+    if sd > 0.0:
+        return phi(distance / sd)
+    return 1.0 if distance > 0.0 else 0.0 if distance < 0.0 else 0.5
+
+
+def macro_probs(metric, n, cells, band, z):
+    """Pass and fail probability of a macro F1 or macro precision member: the macro bounds at z are taken as normal
+    around their values at the expected counts (section 8)."""
+    lower, upper = band.get("lower"), band.get("upper")
+    (lo, sd_lo), (hi, sd_hi) = macro_bound(metric, n, cells, z, -1), macro_bound(metric, n, cells, z, 1)
+    passing, failing = [], 0.0
+    if lower is not None:
+        passing.append(normal_tail(lo - lower, sd_lo))
+        failing += normal_tail(lower - hi, sd_hi)
+    if upper is not None:
+        passing.append(normal_tail(upper - hi, sd_hi))
+        failing += normal_tail(lo - upper, sd_lo)
     return two_sides(passing), failing
 
 
@@ -1757,6 +1895,19 @@ def performance_models(crit, a, n, mins):
                 theta = math.fsum(recalls) / k
                 se = math.sqrt(math.fsum(r * (1.0 - r) / (n * s) for s, r in zip(shares, recalls))) / k
                 models.append(power_model(metric, metric, theta, {"perClass": {label: n * s for label, s in zip(labels, shares)}}, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), min(n * s for s in shares) >= cls))
+            elif metric in ("macro_f1", "macro_precision"):
+                # Section 8 (#152): the errors of each class spread evenly over the other classes.
+                cells = even_spread_cells(shares, recalls)
+                parts = macro_parts(metric, cells)
+                if metric == "macro_f1":
+                    theta = math.fsum(2.0 * tp / (tp + share) for tp, share in parts) / k  # 2J/(1 + J) = 2TP/(TP + union)
+                    supported = min(n * s for s in shares) >= cls
+                else:
+                    # Recalls lie strictly inside (0, 1), so each predicted column holds at least s_c * r_c > 0;
+                    # the share guard is defensive only. Support counts the predicted column of each class.
+                    theta = math.fsum(tp / share if share > 0.0 else 0.0 for tp, share in parts) / k
+                    supported = min(n * share for _, share in parts) >= cls
+                models.append(power_model(metric, metric, theta, {"perClass": {label: n * share for label, (_, share) in zip(labels, parts)}}, lambda z, c=cells, m=metric, b=band: macro_probs(m, n, c, b, z), supported))
             else:
                 models.append(power_model(metric, metric, None, None, None, False, computed=False))
     else:
@@ -1766,10 +1917,13 @@ def performance_models(crit, a, n, mins):
             if metric == "mae":
                 theta, se = sigma * math.sqrt(2.0 / math.pi), sigma * math.sqrt(1.0 - 2.0 / math.pi) / math.sqrt(n)
                 models.append(power_model(metric, metric, theta, n, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), n >= mins["sampleSize"]))
+            elif metric == "mse_reduction":
+                models.append(mse_reduction_model(band, sigma, a.get("targetSd"), n, mins))
             else:
                 q, se = sigma * sigma, math.sqrt(2.0) * sigma * sigma / math.sqrt(n)
                 models.append(power_model(metric, metric, sigma, n, lambda z, t=q, s=se, b=square_band(band): normal_probs(t, s, b, z), n >= mins["sampleSize"]))
-        if a.get("targetSd") is not None:
+        # An mse_reduction member (#136) passes only where the gate does, so the gate adds no condition then.
+        if a.get("targetSd") is not None and all(item["metric"] != "mse_reduction" for item in crit["members"]):
             models.append(baseline_gate_model(sigma, a["targetSd"], n, mins))
     return models
 
@@ -1787,6 +1941,17 @@ def baseline_gate_model(sigma, target_sd, n, mins):
         se = math.sqrt(2.0 * (target_sd ** 4 - sigma ** 4)) / math.sqrt(n)
         probs = lambda z: (phi(reduction / se - z), 0.0)
     return power_model("mean_baseline_gate", "baseline_rmse", target_sd, n, probs, n >= mins["sampleSize"])
+
+
+def mse_reduction_model(band, sigma, target_sd, n, mins):
+    """Section 8 (#136): the "beats the mean baseline" member under the conditional-mean model of the gate:
+    reduction targetSd^2 - sigma^2 with SD(d) = sqrt(2 (targetSd^4 - sigma^4)). It needs targetSd above
+    errorSd; otherwise its power is not computed."""
+    if target_sd is None or target_sd <= sigma:
+        return power_model("mse_reduction", "mse_reduction", None, None, None, False, computed=False)
+    theta = target_sd * target_sd - sigma * sigma
+    se = math.sqrt(2.0 * (target_sd ** 4 - sigma ** 4)) / math.sqrt(n)
+    return power_model("mse_reduction", "mse_reduction", theta, n, lambda z: normal_probs(theta, se, band, z), n >= mins["sampleSize"])
 
 
 def group_models(crit, a, sizes, mins):

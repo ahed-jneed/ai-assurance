@@ -1128,6 +1128,69 @@ describe("program submission", () => {
     );
   });
 
+  it("asks a release-time procedure for its applicability only (#94)", async () => {
+    const e = await prepared();
+    const rp02 = workflowOf(e).procedures.find(
+      (p) => p.templateId === "WP-RP-02",
+    )!;
+    const unassigned = {
+      selected: true,
+      applicability: "applicable",
+      population: "",
+      sampling: "",
+      ownerId: "",
+      reviewerId: "",
+      dueDate: "",
+    };
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, unassigned, rp02.id),
+      "auditor",
+    );
+    expect(await submit(e)).toEqual({ programRevision: "1" });
+    await command(
+      e,
+      "approveProgram",
+      { revision: 1, reason: "Program agreed" },
+      "reviewer",
+    );
+    // An approved program keeps asking ordinary work for its assignment,
+    // but not the release-time record.
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, { ...unassigned, ownerId: "auditor" }, rp02.id),
+      "lead",
+    );
+    expect(workflowOf(e).program.status).toBe("approved");
+    await expectFailure(
+      command(e, "saveProcedurePlan", planSave(e, { dueDate: "" }), "lead"),
+      400,
+      "WP-A10-01: approved work needs a preparer, a reviewer and a deadline",
+    );
+  });
+
+  it("still checks an assignment a release-time procedure carries", async () => {
+    const e = await prepared();
+    const rp02 = workflowOf(e).procedures.find(
+      (p) => p.templateId === "WP-RP-02",
+    )!;
+    await command(
+      e,
+      "saveProcedurePlan",
+      planSave(e, { ownerId: "", reviewerId: "", dueDate: "" }, rp02.id),
+      "auditor",
+    );
+    rp02.reviewerId = "reviewer";
+    rp02.contributors.push("reviewer");
+    await expectFailure(
+      submit(e),
+      400,
+      "WP-RP-02: reviewer must be independent",
+    );
+  });
+
   it("checks reviewer independence when planning and again at submission", async () => {
     // Saving makes the editor a contributor, so a Lead cannot name
     // themselves reviewer: assignment changes need no renewed approval.
