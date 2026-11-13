@@ -29,10 +29,13 @@ export const workers: AssuranceModule = defineCommands({
                 "XGBoost",
                 "LightGBM",
                 "PMML",
+                // The engine's GenAI ingest (docs/design/genai-evidence.md
+                // section 10.2): parses pinned logs, executes nothing.
+                "genai_ingest",
               ]),
             )
             .min(1)
-            .max(6),
+            .max(7),
           securityReview: note,
         })
         .strict()

@@ -1,6 +1,7 @@
 import { db, id, now, sha256 } from "../engagement-repo";
 import { pinned } from "../criteria/pin";
 import { templatePaper } from "../factories";
+import { linkedReadiness } from "../genai/store";
 import { seedWorkflow } from "../workflow-seed";
 import { ApiError } from "../http";
 import {
@@ -35,6 +36,7 @@ export const workflow: CommandModule = {
               )
               .bind(ctx.tenantId, uid, e.id)
               .first(),
+          genaiReadiness: (ids) => linkedReadiness(ctx, e, ids),
         }),
       };
     } catch (error) {
