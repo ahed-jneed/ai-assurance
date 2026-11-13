@@ -273,7 +273,8 @@ export function WorkspaceNavigation({
   }
   function attention(route: NavigationRoute) {
     // Damaged engagement records alert practice administrators wherever they
-    // are while members keep meeting them (last seen in the past week); the
+    // are while members keep meeting them (last seen in the past week) and
+    // nobody has acknowledged or resolved them (#151); the
     // Engagements page lists the full history.
     if (route === "Engagements")
       return data?.integrityIncidents?.recent
@@ -281,8 +282,8 @@ export function WorkspaceNavigation({
             count: data.integrityIncidents.recent,
             label:
               data.integrityIncidents.recent === 1
-                ? "recent integrity incident"
-                : "recent integrity incidents",
+                ? "open integrity incident"
+                : "open integrity incidents",
             filter: "",
           }
         : null;

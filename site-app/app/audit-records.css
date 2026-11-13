@@ -356,6 +356,11 @@
 .register-meta.overdue {
   color: #a44c35;
 }
+.register-genai-level {
+  display: inline-block;
+  margin-top: 5px;
+  white-space: normal;
+}
 .audit-register .register-actions > .row-actions {
   justify-content: flex-end;
   gap: 7px;

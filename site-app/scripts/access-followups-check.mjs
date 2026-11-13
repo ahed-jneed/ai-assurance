@@ -5,9 +5,12 @@
 // their contributor's membership show as lapsed and can no longer be
 // updated; and the platform operator lists abandoned practices and deletes
 // one with its snapshots and R2 objects, restricted to PLATFORM_OPERATORS
-// and recorded in operator_events. Also drizzle 0013's email backfill and
-// its append-only triggers. Needs `npm run build` first.
+// and recorded in operator_events; a practice with issued work is never
+// deleted but archived (#151): its users lose access and its issued records
+// stay retained and verifiable. Also drizzle 0013's email backfill and its
+// append-only triggers. Needs `npm run build` first.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
@@ -516,6 +519,250 @@ await withWorker(
     );
     console.log(
       "PASS only a platform operator lists abandoned practices and deletes one with its snapshots and stored objects, recorded in an immutable operator audit trail",
+    );
+  },
+);
+
+// --- The operator archives a practice with issued work (#151) --------------
+await withWorker(
+  { SELF_SIGNUP: "off", PLATFORM_OPERATORS: "ops@fixture.invalid" },
+  async ({ call, rows, db, bucket }) => {
+    const ops = as("ops"),
+      gone = as("gone");
+    await seedAbandoned(db, "t-issued");
+    // Its issued work: one released report with consistent internal and
+    // client packages, stored as dehydrate() (lib/engagement-storage.ts)
+    // stores every saved report: the snapshots in R2 under content-addressed
+    // keys, the record holding `snapshot: {}` and storage references.
+    const hex = (text) => createHash("sha256").update(text).digest("hex");
+    const snapshot = { conclusion: "Unmodified", papers: [], evidence: [] };
+    const clientSnapshot = { conclusion: "Unmodified" };
+    const part = async (type, value) => {
+      const body = JSON.stringify(value),
+        sha256 = hex(body),
+        key = "t-issued/ENG-1/immutable/" + type + "/" + sha256;
+      await bucket.put(key, body, { customMetadata: { sha256 } });
+      return { key, sha256 };
+    };
+    const refs = {
+      snapshot: await part("report", snapshot),
+      clientSnapshot: await part("client-report", clientSnapshot),
+    };
+    const report = {
+      id: "RPT-1",
+      kind: "final",
+      createdAt: old,
+      actor: "user-gone",
+      sha256: hex(JSON.stringify(snapshot)),
+      clientSha256: hex(JSON.stringify(clientSnapshot)),
+      snapshot: {},
+      release: { state: "released", releasedAt: old },
+    };
+    await db
+      .prepare(
+        "UPDATE engagements SET body=? WHERE tenant_id='t-issued' AND id='ENG-1'",
+      )
+      .bind(
+        JSON.stringify({
+          reports: [report],
+          papers: [],
+          runs: [],
+          storageRefs: {
+            reports: { "RPT-1": refs },
+            histories: {},
+            results: {},
+          },
+        }),
+      )
+      .run();
+    // And a signed dossier: the record names its archive in R2 by digest.
+    const archive = '{"manifest":{"files":[]},"signature":{}}';
+    const dossierKey = "t-issued/ENG-1/dossiers/RPT-1/client/" + hex(archive);
+    await bucket.put(dossierKey, archive);
+    const dossierRecord = JSON.stringify({
+      reportId: "RPT-1",
+      audience: "client",
+      key: dossierKey,
+      sha256: hex(archive),
+    });
+    await db
+      .prepare(
+        "INSERT INTO assurance_records(tenant_id,engagement_id,id,kind,body,sha256,created_at,actor) VALUES('t-issued','ENG-1','AS-DOSSIER','dossier',?,?,?,'user-gone')",
+      )
+      .bind(dossierRecord, hex(dossierRecord), old)
+      .run();
+    await db
+      .prepare(
+        "INSERT INTO dossier_keys(tenant_id,id,public_key,active,created_at) VALUES('t-issued','KEY-1','MCowBQYDK2VwAyEA',1,?)",
+      )
+      .bind(old)
+      .run();
+    const keys = "/api/dossier/keys?tenantId=t-issued";
+    assert.equal(
+      (await call(keys, gone)).status,
+      200,
+      "its member still reads its verification keys before the archive",
+    );
+
+    const listing = (await call("/api/operator", ops)).body;
+    assert.deepEqual(
+      listing.practices.map((p) => [
+        p.id,
+        p.retained,
+        p.abandoned,
+        p.archivable,
+      ]),
+      [["t-issued", true, false, true]],
+    );
+    const request = (op) => ({
+      op,
+      data: {
+        tenantId: "t-issued",
+        confirmName: "Dormant practice",
+        reason: "Abandoned after its engagement closed",
+      },
+    });
+    const refused = await call("/api/operator", ops, request("deletePractice"));
+    assert.equal(refused.status, 409);
+    assert.equal(
+      refused.body.error,
+      "This practice released a report or signed a dossier, which must be retained. It cannot be deleted; archive it instead.",
+    );
+    assert.equal(
+      (await call("/api/operator", gone, request("archivePractice"))).status,
+      403,
+      "a practice administrator cannot archive practices",
+    );
+    assert.equal(
+      (await call("/api/operator?tenantId=t-issued", ops)).status,
+      409,
+      "the operator reads no issued work of a practice that is not archived",
+    );
+    const counts = async () =>
+      (
+        await rows(
+          "SELECT (SELECT COUNT(*) FROM engagement_snapshots WHERE tenant_id='t-issued') AS snapshots,(SELECT COUNT(*) FROM audit_events WHERE tenant_id='t-issued') AS events,(SELECT COUNT(*) FROM engagements WHERE tenant_id='t-issued') AS engagements",
+        )
+      )[0];
+    const before = await counts();
+
+    const archived = await call(
+      "/api/operator",
+      ops,
+      request("archivePractice"),
+    );
+    assert.equal(archived.status, 200, JSON.stringify(archived.body));
+    assert.equal(archived.body.details.members, 1);
+    // Its users lose access, with the reason.
+    const archivedMessage =
+      "This practice was archived by the platform operator after a long period without activity. Its released reports and signed dossiers are retained; contact the platform operator to verify them.";
+    for (const url of [
+      keys,
+      "/api/workspace",
+      "/api/workspace?tenantId=t-issued",
+    ])
+      assert.deepEqual(
+        await call(url, gone),
+        { status: 403, body: { error: archivedMessage } },
+        url,
+      );
+    // Its issued records stay retained and verifiable.
+    assert.deepEqual(await counts(), before);
+    assert.deepEqual(
+      (await bucket.list({ prefix: "t-issued/" })).objects
+        .map((o) => o.key)
+        .sort(),
+      [dossierKey, refs.clientSnapshot.key, refs.snapshot.key].sort(),
+    );
+    const issuedWork = async () =>
+      (await call("/api/operator?tenantId=t-issued", ops)).body.issued;
+    const issued = await issuedWork();
+    assert.deepEqual(
+      issued.reports.map((r) => [
+        r.reportId,
+        r.state,
+        r.sha256,
+        r.internal,
+        r.client,
+        r.valid,
+      ]),
+      [["RPT-1", "released", report.sha256, "valid", "valid", true]],
+      "the packages are read back from R2 and match the report's digests",
+    );
+    assert.deepEqual(
+      issued.dossiers.map((d) => [d.recordId, d.record, d.archive, d.valid]),
+      [["AS-DOSSIER", "valid", "valid", true]],
+    );
+    // An altered client package or a missing dossier archive shows as such.
+    await bucket.put(refs.clientSnapshot.key, '{"conclusion":"Adverse"}');
+    await bucket.delete(dossierKey);
+    const damaged = await issuedWork();
+    assert.deepEqual(
+      [damaged.reports[0].internal, damaged.reports[0].client],
+      ["valid", "mismatch"],
+    );
+    assert.equal(damaged.reports[0].valid, false);
+    assert.deepEqual(
+      [damaged.dossiers[0].archive, damaged.dossiers[0].valid],
+      ["missing", false],
+    );
+    await bucket.put(refs.clientSnapshot.key, JSON.stringify(clientSnapshot));
+    await bucket.put(dossierKey, archive);
+    assert.equal((await issuedWork()).reports[0].valid, true);
+    assert.deepEqual(
+      issued.keys.map((k) => [k.keyId, k.status]),
+      [["KEY-1", "active"]],
+    );
+    assert.equal(
+      (await call("/api/operator?tenantId=t-issued", gone)).status,
+      403,
+    );
+    // It is never deleted, and stays archived.
+    assert.equal(
+      (await call("/api/operator", ops, request("deletePractice"))).status,
+      409,
+    );
+    assert.equal(
+      (await call("/api/operator", ops, request("archivePractice"))).status,
+      409,
+    );
+    // The default listing keeps it as archived, so its issued work stays
+    // one click away; it is never offered for deletion or archive again.
+    const afterArchive = (await call("/api/operator", ops)).body;
+    assert.deepEqual(
+      afterArchive.practices.map((p) => [
+        p.id,
+        !!p.archivedAt,
+        p.abandoned,
+        p.archivable,
+      ]),
+      [["t-issued", true, false, false]],
+    );
+    assert.equal(afterArchive.next, null);
+    assert.equal(
+      (await call("/api/operator?afterActivity=x", ops)).status,
+      400,
+      "a page cursor names both the last activity and the practice",
+    );
+    const trail = (await call("/api/operator", ops)).body.events;
+    assert.deepEqual(
+      trail.map((e) => [e.action, e.tenantId, e.actorEmail]),
+      [["archivePractice", "t-issued", "ops@fixture.invalid"]],
+    );
+    await assert.rejects(
+      db.prepare("UPDATE tenants SET archived_at=NULL").run(),
+      /stays archived/,
+    );
+    await assert.rejects(
+      db
+        .prepare(
+          "UPDATE memberships SET status='active' WHERE tenant_id='t-issued'",
+        )
+        .run(),
+      /archived/,
+    );
+    console.log(
+      "PASS a practice whose only issued work is a released report is never deleted; the operator archives it, its users lose access and its issued records stay retained and verifiable",
     );
   },
 );

@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/http";
 import { runWithIdentity, type Identity } from "@/lib/identity";
-import { context } from "@/lib/tenancy";
+import { archivedMessage, context } from "@/lib/tenancy";
 
 // A D1 stand-in that answers context()'s lookups from `rows` and records every
 // statement that would write. Each test installs it as the DB binding.
@@ -196,6 +196,21 @@ describe("context", () => {
     ]);
     const error = await as(lea, () => context()).catch((e: unknown) => e);
     expect((error as ApiError).status).toBe(403);
+    expect(d1.state.writes).toEqual([]);
+  });
+
+  it("tells a member of an archived practice why they lost access (#151)", async () => {
+    Object.assign(env, { SELF_SIGNUP: "open" });
+    rows([
+      [/status='active' ORDER BY tenant_id/, null],
+      [/m\.status='archived' AND t\.archived_at IS NOT NULL/, { 1: 1 }],
+    ]);
+    for (const tenantId of [undefined, "tenant-1"]) {
+      const error = await as(lea, () => context(tenantId)).catch(
+        (e: unknown) => e,
+      );
+      expect(error).toEqual(new ApiError(403, archivedMessage));
+    }
     expect(d1.state.writes).toEqual([]);
   });
 

@@ -23,7 +23,7 @@ KIND_ARTICLES = {"performance": "15", "multiclass_performance": "15", "regressio
 KIND_METRICS = {
     "performance": {"accuracy", "precision", "recall", "specificity", "false_positive_rate", "balanced_accuracy", "f1"},
     "multiclass_performance": {"accuracy", "macro_recall", "macro_precision", "macro_f1"},
-    "regression_performance": {"mae", "rmse", "r2", "baseline_rmse"},
+    "regression_performance": {"mae", "rmse", "r2", "baseline_rmse", "mse_reduction"},
     "calibration": {"maximum_calibration_gap", "brier_score", "expected_calibration_error"},
 }
 # Supplementary descriptive entries of test definitions traditional-ml-2.1.0 (#65): reported, never members.

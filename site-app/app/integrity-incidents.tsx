@@ -2,8 +2,10 @@
 // The practice's engagement integrity incidents (#16, #121): engagement
 // records that a member found damaged while loading them (a D1 body that is
 // not JSON, or an R2 part that is missing, unavailable or altered). Practice
-// administrators see them beside the engagement directory.
+// administrators see them beside the engagement directory and acknowledge or
+// resolve them (#151); a resolved incident that recurs reopens.
 import { ShieldAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -13,9 +15,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type {
+  IncidentHandling,
+  IntegrityIncident,
   IntegrityIncidents,
   IntegrityKind,
 } from "@/lib/engagement-storage";
+import type { OpenModal } from "./workspace/types";
 
 const problems: Record<IntegrityKind, string> = {
   missing: "Stored part missing",
@@ -34,6 +39,26 @@ const meaning: Record<IntegrityKind, string> = {
   unreadable:
     "The engagement's database record is not valid JSON. Restore it from a backup.",
 };
+/** How an incident stands, as the panel words it. */
+export const handlingLabel: Record<IncidentHandling, string> = {
+  open: "Open",
+  acknowledged: "Acknowledged",
+  resolved: "Resolved",
+};
+/** The modal choices that name an incident and the handling to record. */
+export function incidentChoices(
+  i: IntegrityIncident,
+  handling: Exclude<IncidentHandling, "open">,
+): Record<string, string> {
+  return {
+    engagementId: i.engagementId,
+    objectKey: i.objectKey,
+    kind: i.kind,
+    handling,
+    title: i.title ?? "Deleted engagement",
+    problem: problems[i.kind] ?? i.kind,
+  };
+}
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, {
     dateStyle: "medium",
@@ -49,9 +74,13 @@ function objectLabel(key: string) {
 export function IntegrityIncidentsPanel({
   incidents,
   onEngagement,
+  open,
+  busy,
 }: {
   incidents: IntegrityIncidents;
   onEngagement: (id: string) => void;
+  open: OpenModal;
+  busy: boolean;
 }) {
   if (!incidents.count) return null;
   const shown = incidents.incidents.length;
@@ -72,13 +101,16 @@ export function IntegrityIncidentsPanel({
               : "Members have found " +
                 incidents.count.toLocaleString() +
                 " damaged engagement records"}
-            {incidents.recent === incidents.count
-              ? ", all within the past week."
-              : ", " +
-                incidents.recent.toLocaleString() +
-                " within the past week."}{" "}
+            {"; " +
+              incidents.open.toLocaleString() +
+              " open, " +
+              incidents.recent.toLocaleString() +
+              " of them met within the past week."}{" "}
             An engagement stays closed while its record is damaged and opens
             again once the record is restored; this list keeps the history.
+            Acknowledge an incident once someone is on it, and resolve it once
+            the record is restored. A resolved incident reopens if a member
+            meets the damaged record again.
             {incidents.count > shown &&
               " Showing the " + shown + " most recently seen."}
           </p>
@@ -91,6 +123,7 @@ export function IntegrityIncidentsPanel({
             <TableHead>Problem</TableHead>
             <TableHead>Last seen</TableHead>
             <TableHead>Occurrences</TableHead>
+            <TableHead>Handling</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -127,6 +160,55 @@ export function IntegrityIncidentsPanel({
               </TableCell>
               <TableCell data-label="Occurrences">
                 {i.occurrences.toLocaleString()}
+              </TableCell>
+              <TableCell data-label="Handling">
+                <span
+                  className={
+                    "badge " +
+                    (i.handling === "open"
+                      ? "red"
+                      : i.handling === "resolved"
+                        ? "green"
+                        : "amber")
+                  }
+                >
+                  {handlingLabel[i.handling]}
+                </span>
+                {i.handledAt && (
+                  <span className="block subtle">
+                    {when(i.handledAt)}
+                    {i.handledBy ? " by " + i.handledBy : ""}
+                  </span>
+                )}
+                {i.handling !== "resolved" && (
+                  <span className="incident-actions">
+                    {i.handling === "open" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          open(
+                            "incidentHandle",
+                            incidentChoices(i, "acknowledged"),
+                          )
+                        }
+                      >
+                        Acknowledge
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() =>
+                        open("incidentHandle", incidentChoices(i, "resolved"))
+                      }
+                    >
+                      Resolve
+                    </Button>
+                  </span>
+                )}
               </TableCell>
             </TableRow>
           ))}

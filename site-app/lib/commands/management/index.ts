@@ -8,6 +8,7 @@ import type {
 } from "./batch";
 import { clients } from "./clients";
 import { engagements } from "./engagements";
+import { incidents } from "./incidents";
 import { admins } from "./admins";
 import { invitations } from "./invitations";
 import { members } from "./members";
@@ -22,6 +23,7 @@ export const managementModules: readonly ManagementModule[] = [
   invitations,
   practice,
   signingKeys,
+  incidents,
 ];
 /**
  * The ops in module order, which is also the order the envelope's

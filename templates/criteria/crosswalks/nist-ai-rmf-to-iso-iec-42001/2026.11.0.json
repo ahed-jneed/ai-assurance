@@ -1,0 +1,359 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-rmf-to-iso-iec-42001",
+  "version": "2026.11.0",
+  "title": "NIST AI RMF 1.0 to ISO/IEC 42001:2023",
+  "source": {
+    "framework": "nist-ai-rmf",
+    "edition": "1.0"
+  },
+  "target": {
+    "framework": "iso-iec-42001",
+    "edition": "2023"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers who want to show where evidence gathered against one framework also bears on the other.",
+    "purpose": "Show where ISO/IEC 42001 audit evidence also bears on NIST AI RMF outcomes, and the reverse.",
+    "conceptTypes": {
+      "source": "Voluntary outcomes (AI RMF subcategories)",
+      "target": "Management-system requirements (clauses and controls)"
+    },
+    "assumptions": "Relationships compare what each requirement asks for, not how an organisation implements it. Each entry is single-source, so it can be read in both directions. No inference may be drawn from outcomes or requirements that are not mapped. Every entry is intersects_with: a NIST outcome and the other requirement only overlap, so a full result on one side is never shown as full on the other. The NIST side was read against NIST AI 100-1 Tables 1 to 4 (checked 2026-11-13). Draft until the ISO/IEC 42001 framework is released (#57): its numbers are not yet confirmed against a licensed copy, and the titles on that side are our own.",
+    "exhaustive": false
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "GV-1.1"
+      ],
+      "target": "4.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Understanding legal and regulatory requirements overlaps with determining the relevant requirements of interested parties, which include legal ones."
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "GV-1.2"
+      ],
+      "target": "5.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Building trustworthy characteristics into policies overlaps with the AI policy set by top management; neither prescribes the other's content."
+    },
+    {
+      "id": "X3",
+      "sources": [
+        "GV-1.3"
+      ],
+      "target": "6.1.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Setting the level of risk management from risk tolerance overlaps with planning for AI risks and opportunities, including risk criteria."
+    },
+    {
+      "id": "X4",
+      "sources": [
+        "GV-1.4"
+      ],
+      "target": "4.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Establishing the risk management process through policies and controls overlaps with establishing and maintaining the management system."
+    },
+    {
+      "id": "X5",
+      "sources": [
+        "GV-1.5"
+      ],
+      "target": "9.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Planned monitoring and review of the risk process overlap with monitoring and measuring management system performance."
+    },
+    {
+      "id": "X6",
+      "sources": [
+        "GV-1.5"
+      ],
+      "target": "9.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Periodic review of risk management outcomes overlaps with management review at planned intervals."
+    },
+    {
+      "id": "X7",
+      "sources": [
+        "GV-1.6"
+      ],
+      "target": "A.4.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "An inventory of AI systems overlaps with recording the resources each AI system depends on; the inventory itself is not that control's aim."
+    },
+    {
+      "id": "X8",
+      "sources": [
+        "GV-2.1"
+      ],
+      "target": "5.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documented roles and responsibilities for AI risk work overlap with assigning responsibilities and authorities for the management system."
+    },
+    {
+      "id": "X9",
+      "sources": [
+        "GV-2.1"
+      ],
+      "target": "A.3.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documented roles for mapping, measuring and managing AI risks overlap with defining and allocating AI roles."
+    },
+    {
+      "id": "X10",
+      "sources": [
+        "GV-2.2"
+      ],
+      "target": "7.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Training to perform AI risk duties overlaps with ensuring the competence of people doing AI-related work."
+    },
+    {
+      "id": "X11",
+      "sources": [
+        "GV-2.3"
+      ],
+      "target": "5.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Executive responsibility for AI risk decisions overlaps with top management commitment to the management system."
+    },
+    {
+      "id": "X12",
+      "sources": [
+        "GV-4.3"
+      ],
+      "target": "A.3.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Practices that enable incident identification overlap with letting people raise concerns about AI systems."
+    },
+    {
+      "id": "X13",
+      "sources": [
+        "GV-5.1"
+      ],
+      "target": "A.8.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Collecting external feedback on impacts overlaps with letting outside parties report adverse impacts."
+    },
+    {
+      "id": "X14",
+      "sources": [
+        "GV-6.1"
+      ],
+      "target": "A.10.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Policies for third-party AI risks overlap with supplier arrangements for AI."
+    },
+    {
+      "id": "X15",
+      "sources": [
+        "MP-1.1"
+      ],
+      "target": "4.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting intended purposes and context overlaps with determining the organisation's context and issues relevant to AI; MAP 1.1 works per system."
+    },
+    {
+      "id": "X16",
+      "sources": [
+        "MP-1.5"
+      ],
+      "target": "6.1.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Documenting risk tolerances overlaps with the risk criteria set when planning for AI risks."
+    },
+    {
+      "id": "X17",
+      "sources": [
+        "MP-1.6"
+      ],
+      "target": "A.6.2.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Eliciting system requirements overlaps with stating what the AI system must do."
+    },
+    {
+      "id": "X18",
+      "sources": [
+        "MP-2.3"
+      ],
+      "target": "A.7.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "TEVV considerations on data selection overlap with requirements for data to be fit for use."
+    },
+    {
+      "id": "X19",
+      "sources": [
+        "MP-5.1"
+      ],
+      "target": "6.1.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Characterising the likelihood and magnitude of impacts overlaps with planning AI system impact assessments."
+    },
+    {
+      "id": "X20",
+      "sources": [
+        "MP-5.1"
+      ],
+      "target": "A.5.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Characterising impacts on individuals and groups overlaps with assessing effects on individuals and groups of people."
+    },
+    {
+      "id": "X21",
+      "sources": [
+        "MS-1.3"
+      ],
+      "target": "9.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Involving independent assessors overlaps with internal audits of the management system, which concern the system, not each AI system."
+    },
+    {
+      "id": "X22",
+      "sources": [
+        "MS-2.1"
+      ],
+      "target": "A.6.2.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documenting test sets, metrics and tools overlaps with verifying and validating the AI system against its requirements."
+    },
+    {
+      "id": "X23",
+      "sources": [
+        "MS-2.4"
+      ],
+      "target": "A.6.2.6",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Monitoring behaviour in production overlaps with operating and monitoring the AI system in use."
+    },
+    {
+      "id": "X24",
+      "sources": [
+        "MS-3.1"
+      ],
+      "target": "8.2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Tracking existing and emergent risks regularly overlaps with performing AI risk assessments at planned intervals and on change."
+    },
+    {
+      "id": "X25",
+      "sources": [
+        "MG-1.3"
+      ],
+      "target": "6.1.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Planning responses to high-priority risks overlaps with planning AI risk treatment."
+    },
+    {
+      "id": "X26",
+      "sources": [
+        "MG-1.3"
+      ],
+      "target": "8.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Documented responses to high-priority risks overlap with implementing the AI risk treatment plan."
+    },
+    {
+      "id": "X27",
+      "sources": [
+        "MG-3.1"
+      ],
+      "target": "A.10.3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Monitoring third-party risks and controls overlaps with supplier arrangements for AI."
+    },
+    {
+      "id": "X28",
+      "sources": [
+        "MG-4.1"
+      ],
+      "target": "A.6.2.6",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Post-deployment monitoring plans overlap with operating and monitoring the AI system in use."
+    },
+    {
+      "id": "X29",
+      "sources": [
+        "MG-4.2"
+      ],
+      "target": "10.1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Continual improvement built into system updates overlaps with continual improvement of the management system."
+    },
+    {
+      "id": "X30",
+      "sources": [
+        "MG-4.3"
+      ],
+      "target": "A.8.4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Communicating incidents to relevant actors overlaps with telling users about incidents."
+    }
+  ],
+  "notes": "Only the strongest direct overlaps are recorded; an outcome without an entry is unmapped, not a gap. The ISO/IEC 42001 side is cited by clause number only (D-03): no text of the standard is used. NIST publishes its own informative crosswalk on the AI Resource Center; it was not used, and this mapping is not an official one."
+}

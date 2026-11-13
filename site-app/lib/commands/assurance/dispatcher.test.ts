@@ -7,6 +7,7 @@ import {
   compiledJobIds,
   jobs,
   jobTelemetry,
+  pendingJobCount,
   recordKindCounts,
   recordPage,
   recordsById,
@@ -33,6 +34,7 @@ import { context, type Context } from "@/lib/tenancy";
 import { at, declaration } from "@/lib/workflow/test-fixtures";
 import { resolveNew } from "@/lib/criteria/pin";
 import { seedWorkflow } from "@/lib/workflow-seed";
+import { undeclaredColumns } from "@/lib/special-category";
 import { caller, fakeD1, postRequest, stored } from "../test-fixtures";
 
 // Identity, persistence and the assurance record store are faked per test.
@@ -56,6 +58,7 @@ vi.mock("@/lib/assurance-store", async (importOriginal) => ({
   addRecord: vi.fn(),
   recordStatement: vi.fn(),
   jobs: vi.fn(),
+  pendingJobCount: vi.fn(),
 }));
 
 const dataset: Artifact = {
@@ -109,6 +112,7 @@ function load(e: Engagement, ctx: Context = caller()) {
   vi.mocked(compiledJobIds).mockResolvedValue([]);
   vi.mocked(recordsById).mockResolvedValue([]);
   vi.mocked(jobs).mockResolvedValue([]);
+  vi.mocked(pendingJobCount).mockResolvedValue(0);
 }
 function post(e: Engagement, op: string, data: Record<string, unknown> = {}) {
   return POST(
@@ -473,6 +477,18 @@ describe("POST /api/assurance", () => {
     expect(e.workflow!.procedures[0].planHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("refuses a new job at 10 pending jobs counted over every job (#151)", async () => {
+    const { e, queue } = externalFixture();
+    vi.mocked(pendingJobCount).mockResolvedValue(10);
+    const refused = await queue("provided_predictions");
+    expect(refused.status).toBe(429);
+    expect(save).not.toHaveBeenCalled();
+    expect(vi.mocked(pendingJobCount).mock.calls[0][1]).toBe(e.id);
+    expect(jobs).not.toHaveBeenCalled();
+    vi.mocked(pendingJobCount).mockResolvedValue(9);
+    expect((await queue("provided_predictions")).status).toBe(200);
+  });
+
   it("queues a client-held dataset pin only in client-local mode (#102)", async () => {
     const { queue } = externalFixture({
       ...dataset,
@@ -508,6 +524,57 @@ describe("POST /api/assurance", () => {
     expect(frozen.limitations.at(-1)).toContain(
       "The dataset stays in the client's environment",
     );
+  });
+
+  it("checks the mapped columns against the pin's declared header when queued (#134)", async () => {
+    const { e, queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+      clientPin: {
+        confirmedBy: "Client data steward",
+        confirmedOn: "2026-11-05",
+        custodyNote: "Kept on the client's analysis server",
+        columns: ["label", "prediction", "ethnicity"],
+      },
+    });
+    const profile = e.evaluationProfiles![0];
+    profile.config = {
+      ...profile.config,
+      labelColumn: "label",
+      predictionColumn: "score",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [
+        { kind: "group_comparison", groupFields: ["ethnicity", "sex"] },
+      ],
+    } as EvaluationProfile["statistics"];
+    const refused = await queue("client_local");
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe(
+      "The client-held dataset " +
+        dataset.name +
+        " does not declare the protocol's columns score, sex. Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+    );
+    expect(save).not.toHaveBeenCalled();
+    // Declared columns are matched exactly, as the worker reads the header.
+    profile.config = {
+      ...profile.config,
+      predictionColumn: "prediction",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["Ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect((await queue("client_local")).status).toBe(409);
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["ethnicity"] }],
+    } as EvaluationProfile["statistics"];
+    expect(
+      undeclaredColumns(
+        e.artifacts.find((a) => a.id === dataset.id)!,
+        profile,
+      ),
+    ).toEqual([]);
   });
 
   it.each([

@@ -20,7 +20,10 @@ const sample = JSON.parse(
   ),
 ) as Bundle;
 
-/** The committed #28 pack, its frameworks and crosswalks (drafts in index order). */
+/**
+ * The committed drafts in index order: the #28 pack, its frameworks and
+ * crosswalks, and the #29 NIST AI RMF crosswalks into those frameworks.
+ */
 const committedDrafts = () => {
   const { index, documents } = readCriteria();
   return index.documents

@@ -7,6 +7,7 @@ import type { Decision, Plan } from "../statistics";
 import type { Ll144Audit } from "../ll144-audit";
 import type { QualityReview } from "./quality-review";
 import type {
+  ClientPinAttestation,
   SpecialCategoryAcknowledgement,
   SpecialCategoryBasis,
   SpecialCategoryDeclaration,
@@ -127,7 +128,15 @@ export type Artifact = {
    */
   custody?: "client";
   /** Who at the client confirmed a client-held pin, when, and how it is kept. */
-  clientPin?: { confirmedBy: string; confirmedOn: string; custodyNote: string };
+  clientPin?: {
+    confirmedBy: string;
+    confirmedOn: string;
+    custodyNote: string;
+    /** The header columns the client declared (#134); absent on older pins. */
+    columns?: string[];
+    /** The client's verified signed statement of the pin (#134). */
+    attestation?: ClientPinAttestation;
+  };
 };
 export type EvidenceRequest = {
   id: string;

@@ -1,0 +1,48 @@
+{
+  "documentType": "pack",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-rmf",
+  "version": "2026.11.0",
+  "title": "NIST AI RMF 1.0 and Generative AI Profile (crosswalk view)",
+  "summary": "Offers the NIST AI RMF 1.0 and NIST AI 600-1 as coverage views: where an engagement's evidence on its own criteria also bears on NIST outcomes and generative AI risks. No audit programme; it cannot be selected for an engagement.",
+  "kind": "crosswalk_only",
+  "methodologyVersion": "2026.11.0",
+  "criteria": [
+    {
+      "framework": "nist-ai-rmf",
+      "edition": "1.0",
+      "version": "2026.11.0",
+      "role": "primary"
+    },
+    {
+      "framework": "nist-ai-600-1",
+      "edition": "2024-07",
+      "version": "2026.11.0",
+      "role": "supporting"
+    }
+  ],
+  "crosswalks": [
+    {
+      "id": "nist-ai-rmf-to-eu-ai-act",
+      "version": "2026.11.0"
+    },
+    {
+      "id": "nist-ai-600-1-to-eu-ai-act",
+      "version": "2026.11.0"
+    }
+  ],
+  "defaults": {
+    "initialStatus": "draft",
+    "applicability": "pending",
+    "auditorConclusion": "not_assessed",
+    "diagnosticState": "pending",
+    "numericalThreshold": null,
+    "conclusionOwner": "human_auditor",
+    "approvalBindsTo": "revision_and_content_digest",
+    "independentReview": true,
+    "coverageRule": "Unknown, not_run, inconclusive and error do not count as pass.",
+    "statement": "The NIST AI RMF and its profiles are voluntary; a NIST coverage view interprets evidence on the engagement's criteria and is never a statement of conformity with NIST."
+  },
+  "controlObjectives": [],
+  "items": []
+}

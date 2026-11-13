@@ -49,7 +49,7 @@ import { coverageFor } from "./views";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -173,6 +173,18 @@ describe("explicit pins (M1)", () => {
   });
 });
 
+/** The crosswalk stamps of a pack #1 engagement in the committed bundle. */
+const NIST_CROSSWALKS = [
+  ["nist-ai-600-1-to-eu-ai-act", "nist-ai-600-1@2024-07"],
+  ["nist-ai-rmf-to-eu-ai-act", "nist-ai-rmf@1.0"],
+].map(([id, source]) => ({
+  id,
+  version: "2026.11.0",
+  sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+  source,
+  target: "eu-ai-act@02024R1689-20260727",
+}));
+
 describe("report and dossier stamps", () => {
   it("stamps every report and client snapshot with the pack, frameworks and crosswalks", async () => {
     for (const e of [
@@ -193,8 +205,8 @@ describe("report and dossier stamps", () => {
             legalReview: "pending",
           },
         ],
-        // The build has no crosswalk to pack #1's edition yet.
-        crosswalks: [],
+        // The released NIST crosswalks (#29) into pack #1's edition.
+        crosswalks: NIST_CROSSWALKS,
       });
     }
   });
@@ -206,6 +218,8 @@ describe("report and dossier stamps", () => {
     expect(stamp.crosswalks.map((c) => c.id)).toEqual([
       "en-18286-to-eu-ai-act",
       "iso-iec-42001-to-eu-ai-act",
+      "nist-ai-600-1-to-eu-ai-act",
+      "nist-ai-rmf-to-eu-ai-act",
     ]);
     expectCompleteStamp((await capture(e)).snapshot.criteriaPack);
   });
@@ -216,7 +230,7 @@ describe("report and dossier stamps", () => {
     expect(frameworks.length).toBe(1);
     expect(() => expectCompleteStamp(withoutFrameworks)).toThrow();
     const { crosswalks, ...withoutCrosswalks } = stamp;
-    expect(crosswalks).toEqual([]);
+    expect(crosswalks).toEqual(NIST_CROSSWALKS);
     expect(() => expectCompleteStamp(withoutCrosswalks)).toThrow();
   });
 

@@ -20,7 +20,11 @@ import {
 import { requestLabel } from "@/lib/evidence-requests";
 import type { EvidenceRequest } from "@/lib/domain";
 import { opinionLabel, snapshotTerms } from "@/lib/domain/report-model";
-import { humanLabel, readableResults } from "@/lib/presentation";
+import {
+  findingReference,
+  humanLabel,
+  readableResults,
+} from "@/lib/presentation";
 import { legalDate } from "@/lib/rule-pack";
 type Row = Record<string, unknown>;
 const record = (v: unknown): v is Row =>
@@ -455,6 +459,11 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                 </>
               )}
               <h4>{text(statement.heading)}</h4>
+              {text(statement.draftCaveat, "") && (
+                <p className="record-text draft-caveat" role="note">
+                  <strong>{text(statement.draftCaveat)}</strong>
+                </p>
+              )}
               <p className="record-text">{text(statement.text)}</p>
               {text(statement.levelStatement, "") && (
                 <p className="record-text subtle">
@@ -787,7 +796,7 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                     </div>
                     <div>
                       <dt>Requirement</dt>
-                      <dd>Article {text(f.article)}</dd>
+                      <dd>{findingReference(text(f.article))}</dd>
                     </div>
                   </dl>
                   {[

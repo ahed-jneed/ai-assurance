@@ -270,11 +270,49 @@ class StatisticalTests(unittest.TestCase):
             with redirect_stderr(io.StringIO()):
                 self.assertEqual(main(["power", "--input", str(source)]), 2)
 
+    def test_clustered_strata_are_decided_by_the_cluster_bootstrap(self):
+        # #136: with a cluster field the decided strata use the cluster bootstrap (section 5.11) instead of
+        # being refused; the decision equals the plan path's on the same per-cluster counts.
+        from engine import statistics as st
+        rows = population(240)
+        for i, row in enumerate(rows):  # people whose two rows are both selected or both not
+            row["predicted"] = str(i // 2 % 3 % 2)
+        bands = {"selection_rate_difference": {"lower": -0.3, "upper": 0.3}}
+        result = intersectional_slices(rows, protected_fields=["region"], cluster_field="cluster", min_support=30, min_clusters=5, min_class_count=1, replicates=1000, seed=11, bands=bands)
+        decided = result["statistics"]
+        self.assertEqual(decided["plan"]["clusterField"], "cluster")
+        self.assertEqual(decided["plan"]["bootstrap"], {"replicates": 1000})
+        member = decided["criteria"][0]["members"][0]
+        self.assertEqual(member["interval"]["method"], "cluster_percentile_bootstrap")
+        self.assertEqual(member["bootstrap"], {"replicates": 1000, "validReplicates": 1000, "clusters": 60})
+        for view in decided["criteria"][0]["groups"]:
+            self.assertEqual(view["selection"]["interval"]["method"], "cluster_percentile_bootstrap")
+        clusters = {}
+        for row in rows:
+            stratum = json.dumps([row["region"]])  # the stratum label of one protected field
+            cell = clusters.setdefault(row["cluster"], {}).setdefault(stratum, {"tp": 0, "fp": 0, "fn": 0, "tn": 0})
+            actual, predicted = row["actual"] == "1", row["predicted"] == "1"
+            cell["tp" if actual and predicted else "fn" if actual else "fp" if predicted else "tn"] += 1
+        parts = [{"cluster": c, "groups": [{"group": g, **cells} for g, cells in sorted(groups.items())]} for c, groups in clusters.items()]
+        parts[0]["unknownGroupRows"] = 0
+        direct = st.evaluate_plan(st.validate_plan(decided["plan"]), {"seed": 11, "clusters": parts})["criteria"][0]
+        self.assertEqual(public_view(direct["members"]), decided["criteria"][0]["members"])
+        self.assertEqual(public_view(direct["decision"]), decided["criteria"][0]["decision"])
+        # Outside 1000-10000 the descriptive replicate count does not carry over to the decision.
+        small = intersectional_slices(rows, protected_fields=["region"], cluster_field="cluster", min_support=30, min_clusters=5, min_class_count=1, replicates=200, bands=bands)
+        self.assertEqual(small["statistics"]["plan"]["bootstrap"], {"replicates": 2000})
+
     def test_intersectional_cluster_protocol(self):
         result = intersectional_slices(population(), protected_fields=["region"], cluster_field="cluster", min_support=5, min_clusters=5, min_class_count=1, replicates=100)
         self.assertEqual(result["outcome"], "pass")
         self.assertEqual(result["bootstrap"]["method"], "cluster")
         self.assertEqual(result["bootstrap"]["clusterCount"], 40)
+
+
+def public_view(value):
+    if isinstance(value, dict):
+        return {key: public_view(item) for key, item in value.items() if not key.startswith("_")}
+    return [public_view(item) for item in value] if isinstance(value, list) else value
 
 
 class OperationalTests(unittest.TestCase):

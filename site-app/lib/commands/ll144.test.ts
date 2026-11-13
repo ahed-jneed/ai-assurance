@@ -153,6 +153,83 @@ describe("computeLl144Audit", () => {
     );
   });
 
+  it("computes one audit per classification group in a single run (5-301(b)(4), #144)", async () => {
+    const result = (await run("computeLl144Audit", {
+      ...input,
+      selectedValues: undefined,
+      classificationGroups: ["advance", "reject", "hold"],
+    })) as { details: { auditIds: string[]; runId: string } };
+    const audits = e.ll144Audits!;
+    expect(audits).toHaveLength(3);
+    expect(result.details.auditIds).toEqual(audits.map((a) => a.id));
+    expect(new Set(audits.map((a) => a.id)).size).toBe(3);
+    expect(audits.map((a) => a.classification)).toEqual(
+      ["advance", "reject", "hold"].map((group) => ({
+        runId: result.details.runId,
+        group,
+        groups: ["advance", "reject", "hold"],
+      })),
+    );
+    // Each audit's "selected" means classified into its group.
+    const sexRates = (i: number) =>
+      audits[i].result.tables[0].categories.map((c) => [
+        c.category,
+        c.selectionRate,
+      ]);
+    expect(sexRates(0)).toEqual([
+      ["Male", 0.6],
+      ["Female", 0.4],
+    ]);
+    expect(sexRates(1)).toEqual([
+      ["Male", 0.4],
+      ["Female", 0.6],
+    ]);
+    expect(audits[0].mapping.selectedValues).toEqual(["advance"]);
+    expect(audits[2].warnings[0]).toBe(
+      "No individual was classified into group hold: check the value against the outcome column.",
+    );
+    // The summary names the group and the rule.
+    const summary = publishableSummary(audits[1]);
+    expect(summary.summaryVersion).toBe("1.1");
+    expect(summary.classification).toEqual({
+      rule: "6 RCNY § 5-301(b)(4)",
+      group: "reject",
+      groups: ["advance", "reject", "hold"],
+    });
+    expect(summary.requiredElements).toContainEqual({
+      rule: "6 RCNY § 5-301(b)(4)",
+      element: "Classification group these rates are calculated for",
+      value: "reject (one of 3 groups: advance, reject, hold)",
+    });
+    expect(summary.notes[0]).toMatch(
+      /share of its individuals classified into reject; each other group has its own summary/,
+    );
+  });
+
+  it("refuses classification groups on scoring rates, beside selected values, or repeated", async () => {
+    const groups = { classificationGroups: ["advance", "reject"] };
+    for (const [data, message] of [
+      [
+        { ...input, ...groups, rate: "scoring", scoreColumn: "outcome" },
+        /^Classification groups apply to selection rates/,
+      ],
+      [{ ...input, ...groups }, /^List either the values meaning selected/],
+      [
+        {
+          ...input,
+          selectedValues: undefined,
+          classificationGroups: ["advance", "advance"],
+        },
+        /^Each classification group is listed once/,
+      ],
+    ] as const) {
+      const error = await refusal(run("computeLl144Audit", data));
+      expect(error.status).toBe(400);
+      expect(error.message).toMatch(message);
+    }
+    expect(e.ll144Audits ?? []).toEqual([]);
+  });
+
   it("refuses test data without the explanations 5-302(b) requires", async () => {
     const error = await refusal(
       run("computeLl144Audit", {
