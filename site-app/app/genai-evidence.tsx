@@ -7,7 +7,7 @@
 // a worker result, import a CLI envelope) and the reviewer's
 // acknowledgements. The workspace never parses, runs or renders an ingested
 // log: it shows the engine's verified summary only.
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +33,10 @@ import {
 import type { GenaiAcknowledgement } from "@/lib/genai/readiness";
 import type { GenaiRunSummary } from "@/lib/genai/summary";
 import { can } from "@/lib/permissions";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { genaiQuery, refreshAfterMutation } from "@/lib/assurance-query";
 import type { GenaiView } from "@/lib/read-models/genai-view";
+import { ViewLoading } from "./view-loading";
 import {
   art50BandText,
   art50CriteriaSource,
@@ -68,8 +71,6 @@ async function post(
   return v;
 }
 
-const genaiError = (err: unknown) =>
-  err instanceof Error ? err.message : "GenAI evidence unavailable";
 function parseJson(text: string, what: string) {
   try {
     return JSON.parse(text) as Record<string, unknown>;
@@ -423,66 +424,32 @@ export function GenaiEvidence({
   // Every GenAI write op admits the same writers (see lib/permissions.ts).
   const writer = can(role, "freezeGenaiPlan"),
     reviewer = can(role, "acknowledgeGenaiFlag");
-  const [view, setView] = useState<GenaiView | null>(null),
-    [error, setError] = useState(""),
+  const [commandError, setCommandError] = useState(""),
     [busy, setBusy] = useState(false),
     [form, setForm] = useState<Form | null>(null);
-  const read = useCallback(async () => {
-    const r = await fetch(
-      "/api/assurance?" +
-        new URLSearchParams({
-          tenantId,
-          engagementId: e.id,
-          view: "genai",
-        }),
-      { headers: { accept: "application/json" } },
-    );
-    const body = (await r.json().catch(() => ({}))) as GenaiView & {
-      error?: string;
-    };
-    if (!r.ok) throw new Error(body.error ?? "GenAI evidence unavailable");
-    return body;
-  }, [tenantId, e.id]);
-  const show = useCallback((body: GenaiView) => {
-    setView(body);
-    setError("");
-  }, []);
-  async function load() {
-    try {
-      show(await read());
-    } catch (err) {
-      setError(genaiError(err));
-    }
-  }
-  useEffect(() => {
-    // Reread for each engagement version; a response for an engagement or
-    // version that has since changed is dropped.
-    let active = true;
-    read().then(
-      (body) => {
-        if (active) show(body);
-      },
-      (err: unknown) => {
-        if (active) setError(genaiError(err));
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [read, show, e.version]);
+  // Shared with the Evidence vault's levels (lib/assurance-query.ts): read
+  // once per engagement version and again after each command here.
+  const genai = useAssuranceQuery(
+      { tenantId, engagementId: e.id, version: e.version },
+      genaiQuery,
+    ),
+    view = genai.data ?? null,
+    error = commandError || genai.error;
   const run = async (op: string, data: Record<string, unknown>) => {
     setBusy(true);
+    setCommandError("");
     try {
       await post(tenantId, e.id, op, data);
-      await onRefresh();
-      await load();
+      await refreshAfterMutation({ tenantId, engagementId: e.id }, onRefresh);
     } finally {
       setBusy(false);
     }
   };
   const act = (op: string, data: Record<string, unknown>) =>
     run(op, data).catch((err: unknown) =>
-      setError(err instanceof Error ? err.message : "The command failed"),
+      setCommandError(
+        err instanceof Error ? err.message : "The command failed",
+      ),
     );
 
   const procedures = (e.workflow?.procedures ?? []).filter(
@@ -828,6 +795,7 @@ export function GenaiEvidence({
             ))}
           </ul>
         )}
+        {genai.loading && <ViewLoading label="Loading GenAI evidence" />}
         {view && !view.results.length && (
           <p className="subtle">
             No GenAI result yet. Upload the envelope as GenAI log evidence and

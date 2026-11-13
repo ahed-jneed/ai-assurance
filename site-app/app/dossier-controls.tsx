@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 import {
@@ -11,10 +11,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { assuranceRecords } from "@/lib/assurance-store-client";
-import type { Role } from "@/lib/domain";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
+import type { Engagement, Report, Role } from "@/lib/domain";
 import { fetchJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
+import { isClientRole } from "@/lib/workflow-state";
 import { describeScope, type DossierScope } from "@/lib/dossier-scope";
 type CapturedEvidence = { id: string; name: string; status: string };
 type SealedDossier = {
@@ -46,132 +48,108 @@ const emptyDraft: ScopeDraft = {
 };
 const toggled = (list: string[], value: string, on: boolean) =>
   on ? [...list, value] : list.filter((x) => x !== value);
+const dossierRecords = recordsQuery("dossier");
+/**
+ * Sealing and downloading the portable dossiers of one report. The role and
+ * the report come from the workspace state; the sealed dossiers are the
+ * engagement's dossier records, a shared query (lib/assurance-query.ts) read
+ * once per engagement version and again after a seal. Client roles read no
+ * records: they download the client dossier only, once it is sealed.
+ */
 export function DossierControls({
   tenantId,
-  engagementId,
-  reportId,
+  engagement: e,
+  report,
+  role,
   onRefresh,
 }: {
   tenantId: string;
-  engagementId: string;
-  reportId: string;
+  engagement: Engagement;
+  report: Report;
+  role: Role;
   onRefresh?: () => Promise<unknown>;
 }) {
+  const reportId = report.id,
+    engagementId = e.id,
+    client = isClientRole(role),
+    sealer = can(role, "sealDossier");
   const [audience, setAudience] = useState(""),
     [captured, setCaptured] = useState<Record<string, CapturedEvidence[]>>({}),
     [withheld, setWithheld] = useState<Record<string, string>>({});
-  const [role, setRole] = useState(""),
-    [sealed, setSealed] = useState<Record<string, SealedDossier>>({}),
-    [scopedSeals, setScopedSeals] = useState<SealedDossier[]>([]),
-    [choices, setChoices] = useState<ScopeChoices | null>(null),
+  const [choices, setChoices] = useState<ScopeChoices | null>(null),
     [draft, setDraft] = useState<ScopeDraft>(emptyDraft),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     // Whether the client dossier is sealed, as a client reader learns it.
     [clientSealed, setClientSealed] = useState(false);
-  const q = new URLSearchParams({ tenantId, engagementId, reportId });
   useEffect(() => {
+    if (!client) return;
     let active = true;
-    void fetch(
-      "/api/workspace?" + new URLSearchParams({ tenantId, engagementId }),
+    fetchJson<{ sealed: boolean }>(
+      "/api/dossier?" +
+        new URLSearchParams({ tenantId, engagementId, reportId, sealed: "1" }),
       { cache: "no-store" },
     )
-      .then(async (r) => {
-        if (!r.ok) return;
-        const v = (await r.json()) as { identity: { role: string } };
-        if (!active) return;
-        setRole(v.identity.role);
-        if (["Client Viewer", "Client Contributor"].includes(v.identity.role)) {
-          const status = await fetchJson<{ sealed: boolean }>(
-            "/api/dossier?" +
-              new URLSearchParams({
-                tenantId,
-                engagementId,
-                reportId,
-                sealed: "1",
-              }),
-            { cache: "no-store" },
-          );
-          if (active) setClientSealed(status.sealed);
-        } else {
-          const dossiers = await assuranceRecords({
-            tenantId,
-            engagementId,
-            kind: "dossier",
-          });
-          if (!active) return;
-          const ofReport = dossiers.filter((x) => x.body.reportId === reportId);
-          setSealed(
-            Object.fromEntries(
-              ofReport
-                .filter((x) => !x.body.scopeSha256)
-                .map((x) => [x.body.audience, x.body]),
-            ),
-          );
-          setScopedSeals(
-            ofReport
-              .filter((x) => x.body.scopeSha256)
-              .map((x) => x.body as SealedDossier),
-          );
-        }
+      .then((status) => {
+        if (active) setClientSealed(status.sealed);
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, [tenantId, engagementId, reportId]);
-  async function prepare(a: string) {
-    setBusy(true);
+  }, [client, tenantId, engagementId, reportId]);
+  const dossiers = useAssuranceQuery(
+    client ? null : { tenantId, engagementId, version: e.version },
+    dossierRecords,
+  ).data;
+  const { sealed, scopedSeals } = useMemo(() => {
+    const ofReport = (dossiers ?? []).filter(
+      (x) => x.body.reportId === reportId,
+    );
+    return {
+      sealed: Object.fromEntries(
+        ofReport
+          .filter((x) => !x.body.scopeSha256)
+          .map((x) => [x.body.audience, x.body as SealedDossier]),
+      ) as Record<string, SealedDossier>,
+      scopedSeals: ofReport
+        .filter((x) => x.body.scopeSha256)
+        .map((x) => x.body as SealedDossier),
+    };
+  }, [dossiers, reportId]);
+  const q = new URLSearchParams({ tenantId, engagementId, reportId });
+  function prepare(a: string) {
     setError("");
-    try {
-      const r = await fetch(
-          "/api/workspace?" + new URLSearchParams({ tenantId, engagementId }),
-          { cache: "no-store" },
-        ),
-        v = (await r.json()) as {
-          error?: string;
-          engagement: {
-            workflow?: { procedures: { id: string; title: string }[] };
-            reports: {
-              id: string;
-              snapshot?: {
-                evidence?: CapturedEvidence[];
-                assurancePins?: { id: string; kind?: string }[];
-              };
-              clientSnapshot?: { evidence?: CapturedEvidence[] };
-            }[];
-          };
-        };
-      if (!r.ok) throw Error(v.error);
-      // A missing report throws below and surfaces as "Report unavailable".
-      const report = v.engagement.reports.find((r) => r.id === reportId)!;
-      setCaptured({
-        internal: report.snapshot?.evidence ?? [],
-        scoped: report.snapshot?.evidence ?? [],
-        client: report.clientSnapshot?.evidence ?? [],
-      });
-      const pins = report.snapshot?.assurancePins ?? [],
-        kinds = new Map<string, number>();
-      for (const p of pins)
-        if (p.kind) kinds.set(p.kind, (kinds.get(p.kind) ?? 0) + 1);
-      setChoices({
-        procedures: (v.engagement.workflow?.procedures ?? []).map((p) => ({
-          id: p.id,
-          title: p.title,
-        })),
-        kinds: [...kinds]
-          .map(([kind, count]) => ({ kind, count }))
-          .sort((x, y) => x.kind.localeCompare(y.kind)),
-        pinned: pins.length,
-      });
-      setDraft(emptyDraft);
-      setWithheld({});
-      setAudience(a);
-    } catch (x) {
-      setError(x instanceof Error ? x.message : "Report unavailable");
-    } finally {
-      setBusy(false);
-    }
+    // A report's snapshots never change, so the report in the workspace
+    // state is the one to seal.
+    const snapshot = report.snapshot as {
+        evidence?: CapturedEvidence[];
+        assurancePins?: { id: string; kind?: string }[];
+      },
+      clientSnapshot = report.clientSnapshot as
+        { evidence?: CapturedEvidence[] } | undefined;
+    setCaptured({
+      internal: snapshot.evidence ?? [],
+      scoped: snapshot.evidence ?? [],
+      client: clientSnapshot?.evidence ?? [],
+    });
+    const pins = snapshot.assurancePins ?? [],
+      kinds = new Map<string, number>();
+    for (const p of pins)
+      if (p.kind) kinds.set(p.kind, (kinds.get(p.kind) ?? 0) + 1);
+    setChoices({
+      procedures: (e.workflow?.procedures ?? []).map((p) => ({
+        id: p.id,
+        title: p.title,
+      })),
+      kinds: [...kinds]
+        .map(([kind, count]) => ({ kind, count }))
+        .sort((x, y) => x.kind.localeCompare(y.kind)),
+      pinned: pins.length,
+    });
+    setDraft(emptyDraft);
+    setWithheld({});
+    setAudience(a);
   }
   async function seal() {
     setBusy(true);
@@ -212,28 +190,16 @@ export function DossierControls({
             ...(scope ? { scope } : {}),
           }),
         }),
-        v = (await r.json()) as {
-          error?: string;
-          record: { body: SealedDossier };
-        };
+        v = (await r.json()) as { error?: string };
       if (!r.ok) throw Error(v.error);
-      if (scoped)
-        setScopedSeals((list) =>
-          list.some((s) => s.scopeSha256 === v.record.body.scopeSha256)
-            ? list
-            : [...list, v.record.body],
-        );
-      else setSealed({ ...sealed, [audience]: v.record.body });
       setAudience("");
-      await onRefresh?.();
+      await refreshAfterMutation({ tenantId, engagementId }, onRefresh);
     } catch (x) {
       setError(x instanceof Error ? x.message : "Dossier could not be sealed");
     } finally {
       setBusy(false);
     }
   }
-  const client = ["Client Viewer", "Client Contributor"].includes(role),
-    sealer = !!role && can(role as Role, "sealDossier");
   return (
     <section className="release-controls">
       <h3>Portable audit dossier</h3>
@@ -247,7 +213,7 @@ export function DossierControls({
             <Button
               disabled={busy}
               variant="outline"
-              onClick={() => void prepare(a)}
+              onClick={() => prepare(a)}
             >
               <ShieldCheck size={15} />
               Seal {a} dossier
@@ -276,7 +242,7 @@ export function DossierControls({
               <Button
                 disabled={busy}
                 variant="outline"
-                onClick={() => void prepare("scoped")}
+                onClick={() => prepare("scoped")}
               >
                 <ShieldCheck size={15} />
                 Seal scoped internal export
