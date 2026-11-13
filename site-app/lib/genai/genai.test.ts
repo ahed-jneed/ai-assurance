@@ -71,7 +71,7 @@ describe("the genai-result/0.1 envelope", () => {
   it("accepts the engine's envelope by its exact strings", async () => {
     const { envelope, computation } = await readGenaiEnvelope(exampleText);
     expect(envelope.computationSha256).toBe(
-      "f3e6eda381d629c4666a90f4c73431f196b196817e198a067aec6e3891c63f53",
+      "1ed5c4ba51fd2ff0e4e06c25c097a007cc28863890347258a25834c271f663ed",
     );
     expect(computation.runs.map((r) => r.runKey)).toEqual([RUN]);
   });
