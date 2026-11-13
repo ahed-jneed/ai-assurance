@@ -32,6 +32,7 @@ import {
 } from "@/lib/genai/evidence-levels";
 import type { GenaiAcknowledgement } from "@/lib/genai/readiness";
 import type { GenaiRunSummary } from "@/lib/genai/summary";
+import { can } from "@/lib/permissions";
 import type { GenaiView } from "@/lib/read-models/genai-view";
 import {
   art50BandText,
@@ -419,8 +420,9 @@ export function GenaiEvidence({
   onRefresh: () => Promise<unknown>;
   onEditing?: (open: boolean) => void;
 }) {
-  const writer = ["Auditor", "Lead Auditor"].includes(role),
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role);
+  // Every GenAI write op admits the same writers (see lib/permissions.ts).
+  const writer = can(role, "freezeGenaiPlan"),
+    reviewer = can(role, "acknowledgeGenaiFlag");
   const [view, setView] = useState<GenaiView | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),

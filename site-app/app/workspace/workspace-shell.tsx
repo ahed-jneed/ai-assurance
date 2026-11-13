@@ -111,7 +111,9 @@ export default function Workspace() {
   const sheet = useRecordSheet();
   const paper = usePaperEditor(e);
   const lab = useLabIntent(url.view);
-  const attestation = useAttestation(e, workspace.act);
+  const attestation = useAttestation(e, workspace.act, () =>
+    workspace.load(data?.tenantId, e?.id),
+  );
   const [switchOpen, setSwitchOpen] = useState(false),
     [searchOpen, setSearchOpen] = useState(false),
     [sidebarWidth, setSidebarWidth] = useState(272),
@@ -297,7 +299,11 @@ export default function Workspace() {
             onEditing={editing.reporters["member-onboarding"]}
           />
         )}
-        <ViewBoundary label="paper" onReload={reloadView}>
+        <ViewBoundary
+          key={paper.paperId ?? ""}
+          label="paper"
+          onReload={reloadView}
+        >
           <PaperEditorHost
             paper={paper}
             sequence={

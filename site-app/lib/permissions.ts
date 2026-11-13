@@ -298,6 +298,11 @@ export function decisionState(
         : allowed;
     }
     case "approveClassification": {
+      // The server decides from the latest "classify" audit event; the
+      // workspace sees only classification.history. They agree for every
+      // record classified since history was kept. For a legacy record
+      // without history the button stays enabled and the server's 403
+      // appears in the attestation dialog instead.
       const classified = decision.engagement.classification?.history
         ?.filter((h) => h.action === "classified")
         .at(-1);

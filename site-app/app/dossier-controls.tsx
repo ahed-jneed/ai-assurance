@@ -12,7 +12,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { assuranceRecords } from "@/lib/assurance-store-client";
+import type { Role } from "@/lib/domain";
 import { fetchJson } from "@/lib/fetch-json";
+import { can } from "@/lib/permissions";
 import { describeScope, type DossierScope } from "@/lib/dossier-scope";
 type CapturedEvidence = { id: string; name: string; status: string };
 type SealedDossier = {
@@ -230,7 +232,8 @@ export function DossierControls({
       setBusy(false);
     }
   }
-  const client = ["Client Viewer", "Client Contributor"].includes(role);
+  const client = ["Client Viewer", "Client Contributor"].includes(role),
+    sealer = !!role && can(role as Role, "sealDossier");
   return (
     <section className="release-controls">
       <h3>Portable audit dossier</h3>
@@ -240,7 +243,7 @@ export function DossierControls({
       </p>
       {(client ? ["client"] : ["internal", "client"]).map((a) => (
         <div className="row-actions" key={a}>
-          {role === "Lead Auditor" && !sealed[a] && (
+          {sealer && !sealed[a] && (
             <Button
               disabled={busy}
               variant="outline"
@@ -268,7 +271,7 @@ export function DossierControls({
       ))}
       {!client && (
         <div className="scoped-dossiers">
-          {role === "Lead Auditor" && (
+          {sealer && (
             <div className="row-actions">
               <Button
                 disabled={busy}

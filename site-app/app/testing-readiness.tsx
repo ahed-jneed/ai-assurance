@@ -143,6 +143,9 @@ export function ExecutionPlanner({
             label: "External supplied predictions",
           },
           { id: "client_local", label: "Client local predictions" },
+          // queueRun admits writers; the auditor_model mode alone narrows
+          // to the Lead Auditor (lib/commands/assurance/execution.ts), so
+          // the permission map has no op for it.
           ...(role === "Lead Auditor"
             ? [
                 {
