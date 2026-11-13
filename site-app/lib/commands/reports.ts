@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { annexIVIndex } from "../annex-iv";
-import { assurancePins, jobs, assuranceGates } from "../assurance-store";
+import {
+  assurancePins,
+  assuranceGates,
+  pendingJobCount,
+} from "../assurance-store";
 import {
   clientReportSnapshot,
   currentClientSnapshot,
@@ -142,11 +146,7 @@ export const reports = defineCommands({
           "This criteria pack has no certification recommendation; choose another engagement type",
         );
       if (a.kind === "final") {
-        if (
-          (await jobs(ctx, e.id)).some((j) =>
-            ["queued", "running"].includes(String(j.state)),
-          )
-        )
+        if ((await pendingJobCount(ctx, e.id)) > 0)
           throw new ApiError(
             409,
             "Complete or cancel external execution before final capture",
@@ -377,11 +377,7 @@ export async function assertReleasable(
     snapshotConclusion(r.snapshot),
   );
   if (assuranceBlockers.length) throw new ApiError(409, assuranceBlockers[0]);
-  if (
-    (await jobs(ctx, e.id)).some((j) =>
-      ["queued", "running"].includes(String(j.state)),
-    )
-  )
+  if ((await pendingJobCount(ctx, e.id)) > 0)
     throw new ApiError(
       409,
       "Complete or cancel external execution before release",

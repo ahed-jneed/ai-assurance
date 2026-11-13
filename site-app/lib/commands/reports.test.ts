@@ -15,6 +15,7 @@ import {
 } from "../workflow/test-fixtures";
 import { qualityStatement } from "../domain/report-model";
 import { practiceReportSettings } from "../report-settings";
+import { pendingJobCount } from "../assurance-store";
 import { assertReleasable, reports } from "./reports";
 import { caller } from "./test-fixtures";
 
@@ -22,7 +23,7 @@ import { caller } from "./test-fixtures";
 vi.mock("../assurance-store", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../assurance-store")>()),
   assurancePins: vi.fn(async () => []),
-  jobs: vi.fn(async () => []),
+  pendingJobCount: vi.fn(async () => 0),
   assuranceGates: vi.fn(async () => []),
 }));
 
@@ -217,6 +218,17 @@ describe("report model v2 snapshots", () => {
         p.audience,
       ]),
     ).toContainEqual(["memo", "internal"]);
+    await assertReleasable(e, { reportId: r.id }, caller());
+  });
+
+  it("refuses release while any external job is pending, counted over every job", async () => {
+    const e = await issuable();
+    const r = await capture(e, qualified);
+    // An older job beyond the 100 most recent ones still counts (#151).
+    vi.mocked(pendingJobCount).mockResolvedValueOnce(1);
+    await expect(
+      assertReleasable(e, { reportId: r.id }, caller()),
+    ).rejects.toThrow("Complete or cancel external execution before release");
     await assertReleasable(e, { reportId: r.id }, caller());
   });
 
