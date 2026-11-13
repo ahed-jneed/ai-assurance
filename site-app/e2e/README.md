@@ -53,6 +53,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `self-approval.spec.ts` | The Lead Auditor who classified the system or prepared the engagement brief cannot approve it; the Reviewer's approval of the classification succeeds |
 | `quality-reviewer.spec.ts` | The Lead Auditor appoints `qa-eqr` as Engagement Quality Reviewer (an Auditor cannot be appointed); the reviewer records a stand-back checklist item in the Quality review tab; the reviewer's paper edits and the Lead's checklist save are refused |
 | `report-settings.spec.ts` | The Lead Auditor, a practice administrator, saves the practice's report settings; the report form shows them for blank fields, and a readiness draft with gaps asks for the gaps and is captured as not assurance with the settings; an Auditor's `setReportSettings` is refused |
+| `coverage-filters.spec.ts` | Auditor filters the coverage heatmap by actor and applicability date, the filters survive a reload (workspace preferences), the drawer marks rule-pack dates as derived and not reviewed, and the CSV export follows the filters; a Client Viewer's export is refused (403) |
 | `isolation.spec.ts` | An outsider is refused the demo practice in the UI and API; no cross-practice reads; practice switching for `qa-lead2`; a stale engagement version is refused |
 
 Setup steps that are not the subject of a spec (an evidence upload before a
