@@ -5,7 +5,7 @@ import {
   recordStatement,
   systemRevisionExists,
 } from "../../assurance-store";
-import { datasetCardSchema } from "../../dataset-card";
+import { datasetCardSchema, registeredCard } from "../../dataset-card";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { defineCommands } from "../command";
@@ -70,21 +70,12 @@ export const systems: AssuranceModule = defineCommands({
         )
           throw new ApiError(409, "Baseline source pin changed");
       }
-      const log = await recordStatement(ctx, e.id, "dataset", {
-        ...v,
-        artifactSha256: artifact.sha256,
-        artifactName: artifact.name,
-        artifactSize: artifact.size,
-        ...(baseline
-          ? {
-              baselinePin: {
-                recordId: baseline.id,
-                sha256: baseline.sha256,
-                artifactSha256: baseline.body.artifactSha256,
-              },
-            }
-          : {}),
-      });
+      const log = await recordStatement(
+        ctx,
+        e.id,
+        "dataset",
+        registeredCard(v, artifact, baseline),
+      );
       await save(
         ctx,
         e,
