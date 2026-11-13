@@ -1,7 +1,8 @@
 // Self-review: nobody reviews work they prepared or contributed to. A Lead
 // Auditor who prepared a procedure is offered no review of it and the API
 // refuses it, while the assigned Reviewer approves it in the Review tab; a
-// Lead who edited an Auditor's working paper cannot review that paper. The
+// Lead who edited an Auditor's working paper cannot review that paper, even
+// after the Auditor's later revision makes the Auditor its author again. The
 // self-approval of a classification or brief is in self-approval.spec.ts,
 // and a report creator's package approval in report-release.spec.ts.
 import { expectAccessible } from "./a11y";
@@ -112,6 +113,24 @@ test("a Lead Auditor who edited a paper cannot review it", async ({
     evidenceIds: [artifactId],
     required: draft.required,
   });
+  // The Auditor revises it again and becomes its author, so the Lead is only
+  // a contributor and the contributor rule, not the author rule, refuses the
+  // Lead's review.
+  const revised = await paper();
+  expect(revised.authorId).toBe(lead.who.userId);
+  await auditor.command(demo.tenantId, demo.engagementId, "editPaper", {
+    paperId,
+    body: {
+      ...revised.body,
+      results:
+        "Overrides were reviewed by a second officer every week; 40 of 40 logged.",
+    },
+    evidenceIds: [artifactId],
+    required: revised.required,
+  });
+  const final = await paper();
+  expect(final.authorId).toBe(auditor.who.userId);
+  expect(final.contributors).toContain(lead.who.userId);
   await auditor.command(demo.tenantId, demo.engagementId, "submitPaper", {
     paperId,
   });
