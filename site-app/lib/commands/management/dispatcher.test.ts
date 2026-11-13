@@ -77,6 +77,13 @@ const people: Record<string, Record<string, unknown>> = {
     admin: 1,
   },
   "user-5": { role: "Auditor", status: "revoked", client_id: null, admin: 0 },
+  "user-4e": {
+    role: "Auditor",
+    status: "active",
+    client_id: null,
+    admin: 0,
+    email: "eve@example.test",
+  },
   "user-v": {
     role: "Client Viewer",
     status: "active",
@@ -91,6 +98,7 @@ function practice(
     engagements = 0,
     grants = [] as string[],
     workers = [] as string[],
+    pendingInvitations = [] as string[],
   } = {},
 ) {
   const d1 = fakeD1((sql, args) => {
@@ -111,6 +119,10 @@ function practice(
       return grants.map((engagement_id) => ({ engagement_id }));
     if (sql.startsWith("SELECT id FROM runner_workers"))
       return workers.map((id) => ({ id }));
+    if (
+      sql.startsWith("SELECT id FROM invitations WHERE tenant_id=? AND email")
+    )
+      return pendingInvitations.map((id) => ({ id }));
     return null;
   }, changes);
   env.DB = d1.db;
@@ -377,6 +389,7 @@ describe("access lifecycle (F-24)", () => {
       status: "revoked",
       withdrawn: { engagementIds: ["ENG-1", "ENG-2"], workerIds: ["W-1"] },
       practiceAdminRemoved: false,
+      cancelledInvitations: [],
     });
     const [membership, access, workers, admin] = own(d1);
     expect(membership.sql).toMatch(
@@ -392,6 +405,27 @@ describe("access lifecycle (F-24)", () => {
     );
     expect(workers.args.slice(0, 2)).toEqual(["tenant-1", "user-2"]);
     expect(admin.sql).toMatch(/^UPDATE practice_admins SET active=0/);
+  });
+
+  it("cancels the pending invitations for a revoked member's recorded email (#95)", async () => {
+    const d1 = practice(1, { pendingInvitations: ["INV-A", "INV-B"] });
+    signIn(caller());
+    const response = await post("revokeMember", { userId: "user-4e" });
+    expect(response.status).toBe(200);
+    expect((await reply(response)).details).toMatchObject({
+      userId: "user-4e",
+      status: "revoked",
+      cancelledInvitations: ["INV-A", "INV-B"],
+    });
+    const cancel = own(d1).find((s) => s.sql.startsWith("UPDATE invitations"));
+    expect(cancel?.sql).toMatch(
+      /^UPDATE invitations SET status='cancelled',closed_at=\? WHERE tenant_id=\? AND email=\? AND status='pending' AND EXISTS/,
+    );
+    expect(cancel?.args.slice(1, 3)).toEqual(["tenant-1", "eve@example.test"]);
+    // Without a recorded email nothing is cancelled.
+    const plain = practice(1, { pendingInvitations: ["INV-A"] });
+    await post("revokeMember", { userId: "user-2" });
+    expect(tables(own(plain))).not.toContain("invitations");
   });
 
   it("refuses to revoke access that is already revoked", async () => {
@@ -665,6 +699,30 @@ describe("invitations and practice settings (F-44)", () => {
       error:
         "An invitation for this email is already pending. Cancel it to invite again.",
     });
+  });
+
+  it("refuses to invite the recorded email of an active member (#95)", async () => {
+    const d1 = fakeD1((sql, args) =>
+      sql.startsWith("SELECT display_name FROM memberships") &&
+      args[1] === "ada@example.test"
+        ? { display_name: "Ada" }
+        : null,
+    );
+    env.DB = d1.db;
+    signIn(caller());
+    expect(
+      await refusal(
+        await post("inviteMember", {
+          email: " Ada@Example.test",
+          role: "Reviewer",
+        }),
+      ),
+    ).toEqual({
+      status: 409,
+      error:
+        "Ada is already an active member with this email. Change their role or engagements in Members & access instead.",
+    });
+    expect(d1.batches).toEqual([]);
   });
 
   it("cancels only a pending invitation", async () => {

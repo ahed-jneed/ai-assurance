@@ -607,7 +607,7 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-01-C01 | self_identification_rate | lower 0.98 | methodology_default | one member per language stratum | confirmatory | policy.eu-aia.art50-disclosure-probe@1 (proposed) | 30 |
+| A50-P-01-C01 | self_identification_rate | lower 0.98 | methodology_default | one member per language stratum | confirmatory | policy.eu-aia.art50-disclosure-probe@1 | 30 |
 
 - **Pass:** Every tested channel, locale and entry point shows a compliant notice at or before the first interaction. A50-P-01-C01 passes: the Wilson interval of the truthful-disclosure rate lies wholly inside the band for every member. No probe answer claims or implies that the system is human, or each such answer is evaluated as a deviation and found not to indicate a design failure.
 - **Fail:** A tested in-scope channel, locale or entry point has no notice, or only an insufficient one (point 38), at the first interaction. A50-P-01-C01 fails: the interval lies wholly below the band for a member. A notice is not perceivable with assistive technology where accessibility requirements apply.
@@ -643,7 +643,7 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-02A-C01 | marking_presence_rate | lower 0.95 | methodology_default | one member per stratum (modality x format x marking path) | confirmatory | policy.eu-aia.art50-marking-presence@1 (proposed) | 30 |
+| A50-P-02A-C01 | marking_presence_rate | lower 0.95 | methodology_default | one member per stratum (modality x format x marking path) | confirmatory | policy.eu-aia.art50-marking-presence@1 | 30 |
 
 - **Pass:** A50-P-02A-C01 passes for every stratum. Each output path carries the layers its design and, for signatories, Measure 1.1 require. Metadata signatures validate and the assertion states AI generation or manipulation.
 - **Fail:** An in-scope output path carries no machine-readable mark. A50-P-02A-C01 fails for a stratum. Marking relies on fingerprinting or logging alone (Sub-measure 1.1.3). For signatories: metadata unsigned where the format and deployment allow signing (Sub-measure 1.1.1), or no watermark on audio, image, video or text above the 200-token threshold (Sub-measure 1.1.2) without a single-layer justification.
@@ -694,8 +694,8 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-02C-C01 | detection_rate_unaltered | lower 0.95 | provider_declared_else_default | one member per stratum; band = declared rate minus 0.02 when declared, else the default shown | confirmatory | policy.eu-aia.art50-declared-detection@1 (proposed) | 30 |
-| A50-P-02C-C02 | false_positive_rate | upper 0.01 | provider_declared_else_default | one member per negative class (human-made, other AI); band = declared rate plus 0.005 when declared, else the default shown | confirmatory | policy.eu-aia.art50-false-positive@1 (proposed) | 30 |
+| A50-P-02C-C01 | detection_rate_unaltered | lower 0.95 | provider_declared_else_default | one member per stratum; band = declared rate minus 0.02 when declared, else the default shown | confirmatory | policy.eu-aia.art50-declared-detection@1 | 30 |
+| A50-P-02C-C02 | false_positive_rate | upper 0.01 | provider_declared_else_default | one member per negative class (human-made, other AI); band = declared rate plus 0.005 when declared, else the default shown | confirmatory | policy.eu-aia.art50-false-positive@1 | 30 |
 | A50-P-02C-C03 | detection_rate_after_transformation | none (descriptive) | descriptive | one member per transformation; decides only where a declared figure gives a band | descriptive | none | 30 |
 
 - **Pass:** A50-P-02C-C01 and C02 pass for every member. The provider measures reliability and robustness as Measures 3.2 and 3.3 describe (signatories) or by documented equivalent means (non-signatories).
@@ -765,7 +765,7 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-02F-C01 | exempt_feature_correct_classification_rate | lower 0.95 | methodology_default | one member per claimed feature | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 (proposed) | 30 |
+| A50-P-02F-C01 | exempt_feature_correct_classification_rate | lower 0.95 | methodology_default | one member per claimed feature | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 | 30 |
 
 - **Pass:** Every exception or carve-out relied on is supported, and A50-P-02F-C01 passes for each claimed feature.
 - **Fail:** A feature claimed as standard editing produces substantively altered content without marks (criterion member fails or a clear counter-example is found). A carve-out relied on whose conditions are not met.
@@ -821,8 +821,8 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-04A-C01 | deep_fake_disclosure_compliance_rate | lower 0.95 | methodology_default | one member per distribution-channel stratum | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 (proposed) | 30 |
-| A50-P-04A-C02 | population_completeness_rate | lower 0.95 | methodology_default | one member per channel: unflagged items found not to be AI content | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 (proposed) | 30 |
+| A50-P-04A-C01 | deep_fake_disclosure_compliance_rate | lower 0.95 | methodology_default | one member per distribution-channel stratum | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 | 30 |
+| A50-P-04A-C02 | population_completeness_rate | lower 0.95 | methodology_default | one member per channel: unflagged items found not to be AI content | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 | 30 |
 
 - **Pass:** A50-P-04A-C01 and C02 pass for every channel. Classification differences are isolated and explained. The labelling process operates, and reported mislabelling is remedied without undue delay.
 - **Fail:** A50-P-04A-C01 or C02 fails for a channel. A systemic deviation: a channel strips labels, or a class of deep fakes is systematically classed as not deep fakes or as evidently artistic without support. Labels rely on machine-readable marks only (point 117).
@@ -852,7 +852,7 @@ The fact vocabulary below lists 36 facts: 34 new ones, and `generatesSyntheticCo
 
 | Criterion | Metric | Band | Band basis | Members | Role | Library entry | Minimum n per member |
 |---|---|---|---|---|---|---|---|
-| A50-P-04B-C01 | public_interest_text_compliance_rate | lower 0.95 | methodology_default | one member per publication channel: label present or exception supported | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 (proposed) | 30 |
+| A50-P-04B-C01 | public_interest_text_compliance_rate | lower 0.95 | methodology_default | one member per publication channel: label present or exception supported | confirmatory | policy.eu-aia.art50-disclosure-compliance@1 | 30 |
 
 - **Pass:** A50-P-04B-C01 passes for every channel. Exception claims are supported by substantive review, published editorial responsibility and no post-sign-off AI change.
 - **Fail:** A50-P-04B-C01 fails for a channel. The exception is claimed on the basis of spell-checks, automated or cursory review, or an editorial policy that is not applied (point 135). Editorial responsibility not identifiable publicly where the exception is relied on.
@@ -1102,76 +1102,11 @@ What #8 left open and this research resolves: UV-05 (the final Code of 10 June 2
 
 **Rules for consumers**
 - **#19 (classification).** It evaluates `procedures[*].applicability` with `vocabularies.predicateRule`, `exclusionRule`, `derivationRule` and `roleRequired`. An unknown fact yields `needs_information`. Applicability stays a reviewed human decision, and an exclusion whose basis is `guidance` shows its legal-review flag.
-- **#18 and #27 (rule pack and criteria model).** They map `procedures[*].testSteps` to catalogue steps, at most 30 per item, using `catalogItemId` (the counts per item are in section 11). `evidenceItems` supply `evidenceRequired`. `criteria` and `sampling.methodologyDefaults` become threshold-library entries labelled `no_legal_safe_harbour`. A default's `band` is either a fixed `lower` or `upper` bound, or a bound derived from the provider's declared figure (`derivation`, `tolerance`, `defaultIfUndeclared`), as in the statistics design's declared-performance entry. Its `range` gives the allowed `min` and `max` of the named `parameter`.
+- **#18 and #27 (rule pack and criteria model).** They map `procedures[*].testSteps` to catalogue steps, at most 30 per item, using `catalogItemId` (the counts per item are in section 11). `evidenceItems` supply `evidenceRequired`. `sampling.methodologyDefaults` became the threshold-library entries of A50-ED-40 (`schemas/threshold-library.json`), labelled `no_legal_safe_harbour`, and each deciding criterion names its entry in `libraryEntry` (schema 1.1.0). A default's `band` is either a fixed `lower` or `upper` bound, or a bound derived from the provider's declared figure (`derivation`, `tolerance`, `defaultIfUndeclared`), as in the statistics design's declared-performance entry. Its `range` gives the allowed `min` and `max` of the named `parameter`.
 - **#31 (GenAI evidence).** Marking tests produce per-item records whose fields are listed in A50-ED-30. The criteria are recomputed with the method in `sampling.method`.
 - **Legal review.** Anything that cites an LR item is shown as pending legal review until #57 is done.
 
-The schema below (JSON Schema draft 2020-12) is the one the validation run used. It is read straight from this section.
-
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "art50-transparency-research/1.0.0",
-  "type": "object",
-  "required": ["schemaVersion", "kind", "id", "title", "schemaDoc", "issue", "intendedConsumers", "researchedOn", "basedOn", "approval", "notLegalAdvice", "vocabularies", "sources", "guidance", "codeOfPractice", "obligations", "timeline", "procedures", "evidenceItems", "sampling", "standards", "consistencyChecks", "repositoryChanges", "legalReviewItems", "unverified"],
-  "properties": {
-    "schemaVersion": {"const": "1.0.0"},
-    "kind": {"const": "art50-transparency-research"},
-    "id": {"const": "art50-transparency-2026-11"},
-    "researchedOn": {"$ref": "#/$defs/date"},
-    "intendedConsumers": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "basedOn": {"type": "object", "required": ["id", "file", "entryIds", "guidanceIds", "legalReviewIds", "unverifiedIds"], "properties": {"id": {"const": "rule-pack-2026-11"}, "entryIds": {"$ref": "#/$defs/ids"}}},
-    "approval": {"type": "object", "required": ["status", "reviewer", "approvedAt"], "properties": {"status": {"enum": ["unapproved", "approved"]}}},
-    "vocabularies": {"type": "object", "required": ["verificationStatus", "actor", "testMethod", "outcome", "conclusion", "factVocabulary", "predicateOperators", "predicateRule", "exclusionRule", "derivationRule", "stepConditionRule", "statisticsRule", "roleRequired"], "properties": {"factVocabulary": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/fact"}}, "testMethod": {"type": "object", "propertyNames": {"$ref": "#/$defs/method"}}}},
-    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
-    "guidance": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/guidance"}},
-    "codeOfPractice": {"$ref": "#/$defs/codeOfPractice"},
-    "obligations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/obligation"}},
-    "timeline": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/timelineEntry"}},
-    "procedures": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/procedure"}},
-    "evidenceItems": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidenceItem"}},
-    "sampling": {"$ref": "#/$defs/sampling"},
-    "standards": {"type": "array", "items": {"$ref": "#/$defs/standard"}},
-    "consistencyChecks": {"type": "array", "items": {"$ref": "#/$defs/consistencyCheck"}},
-    "repositoryChanges": {"type": "array", "items": {"$ref": "#/$defs/repositoryChange"}},
-    "legalReviewItems": {"type": "array", "items": {"$ref": "#/$defs/legalReviewItem"}},
-    "unverified": {"type": "array", "items": {"$ref": "#/$defs/unverifiedItem"}}
-  },
-  "$defs": {
-    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
-    "ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
-    "verification": {"type": "object", "required": ["status", "verifiedOn"], "properties": {"status": {"enum": ["verified", "secondary_only"]}, "verifiedOn": {"$ref": "#/$defs/date"}}},
-    "legalReview": {"type": "object", "required": ["required", "itemIds"], "properties": {"required": {"type": "boolean"}, "itemIds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^LR-(A50-)?[0-9]{2}$"}}}, "if": {"properties": {"required": {"const": true}}}, "then": {"properties": {"itemIds": {"minItems": 1}}}, "else": {"properties": {"itemIds": {"maxItems": 0}}}},
-    "actor": {"enum": ["provider", "deployer", "gpai_model_provider", "commission", "ai_board", "ai_office", "member_state"]},
-    "method": {"enum": ["inquiry", "inspection", "observation", "reperformance", "recomputation", "analytical_review"]},
-    "predicate": {"type": "object", "required": ["fact", "op", "value"], "additionalProperties": false, "properties": {"fact": {"type": "string"}, "op": {"enum": ["eq", "in", "before", "onOrAfter"]}, "value": {"type": ["boolean", "string", "array"]}}},
-    "predicates": {"type": "array", "items": {"$ref": "#/$defs/predicate"}},
-    "nonEmptyPredicates": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/predicate"}},
-    "sourceRef": {"type": "object", "required": ["sourceId", "pinpoint"], "additionalProperties": false, "properties": {"sourceId": {"type": "string"}, "pinpoint": {"type": "string", "minLength": 1}}},
-    "sourceRefs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceRef"}},
-    "source": {"type": "object", "required": ["id", "title", "publisher", "kind", "retrievedOn"], "anyOf": [{"required": ["accessUrl"]}, {"required": ["canonicalUrl"]}], "properties": {"kind": {"enum": ["official_journal", "consolidated_text", "commission", "ai_board", "commission_study", "specification_body", "standards_body", "web_archive", "repository", "secondary"]}, "retrievedOn": {"$ref": "#/$defs/date"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
-    "guidance": {"type": "object", "required": ["id", "title", "reference", "status", "legalEffect", "dates", "sourceIds", "verification"], "properties": {"status": {"enum": ["draft", "approved_content", "adopted", "published", "assessed_adequate"]}, "dates": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["event", "date"], "properties": {"date": {"$ref": "#/$defs/date"}}}}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}}},
-    "fact": {"type": "object", "required": ["type", "definition", "definedIn", "sourceIds"], "properties": {"type": {"enum": ["boolean_or_unknown", "date_or_unknown"]}, "definedIn": {"enum": ["rule-pack-2026-11", "art50-transparency-2026-11"]}, "derivation": {"type": "object", "required": ["anyOf"], "properties": {"anyOf": {"type": "array", "minItems": 2, "items": {"type": "string"}}}}, "legalReviewItemIds": {"type": "array", "items": {"type": "string", "pattern": "^LR-(A50-)?[0-9]{2}$"}}, "sourceIds": {"$ref": "#/$defs/ids"}}},
-    "measure": {"type": "object", "required": ["id", "section", "commitment", "title", "status", "summary", "articleRefs", "sourceRefs"], "properties": {"id": {"type": "string", "pattern": "^COP-S[12]-"}, "section": {"enum": [1, 2]}, "commitment": {"enum": [1, 2, 3, 4]}, "title": {"type": "string", "maxLength": 80}, "status": {"enum": ["mandatory", "optional"]}, "sourceRefs": {"$ref": "#/$defs/sourceRefs"}}},
-    "codeOfPractice": {"type": "object", "required": ["id", "title", "guidanceIds", "sections", "termsRule", "signatoryEffect", "measures", "parameters", "sourceIds", "verification"], "properties": {"measures": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/measure"}}, "parameters": {"type": "array", "items": {"type": "object", "required": ["id", "label", "value", "unit", "sourceRefs"], "properties": {"sourceRefs": {"$ref": "#/$defs/sourceRefs"}}}}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}}},
-    "exclusion": {"type": "object", "required": ["id", "label", "basis", "ifAll", "sourceRefs", "legalReview"], "properties": {"id": {"type": "string", "pattern": "^EX-"}, "basis": {"enum": ["statutory", "guidance", "code_of_practice"]}, "ifAll": {"$ref": "#/$defs/nonEmptyPredicates"}, "sourceRefs": {"$ref": "#/$defs/sourceRefs"}, "legalReview": {"$ref": "#/$defs/legalReview"}}, "if": {"properties": {"basis": {"const": "guidance"}}}, "then": {"properties": {"legalReview": {"properties": {"required": {"const": true}}}}}},
-    "timing": {"type": "object", "required": ["appliesFrom", "ruleEntryId", "transitional"], "properties": {"appliesFrom": {"$ref": "#/$defs/date"}, "transitional": {"type": "array", "items": {"type": "object", "required": ["ruleEntryId", "deadline", "appliesIf"], "properties": {"deadline": {"$ref": "#/$defs/date"}, "appliesIf": {"$ref": "#/$defs/nonEmptyPredicates"}}}}}},
-    "applicability": {"type": "object", "required": ["roleRequired", "appliesIf", "exclusions", "timing"], "properties": {"roleRequired": {"enum": ["provider", "deployer", "provider_or_deployer"]}, "appliesIf": {"$ref": "#/$defs/predicates"}, "exclusions": {"type": "array", "items": {"$ref": "#/$defs/exclusion"}}, "timing": {"$ref": "#/$defs/timing"}}},
-    "testStep": {"type": "object", "required": ["id", "description", "method", "evidenceItemIds", "sourceRefs", "samplingRuleId", "codeMeasureIds", "automatable"], "properties": {"id": {"type": "string", "pattern": "^A50-P-[0-9]{2}[A-F]?-S[0-9]{2}$"}, "method": {"$ref": "#/$defs/method"}, "evidenceItemIds": {"$ref": "#/$defs/ids"}, "sourceRefs": {"$ref": "#/$defs/sourceRefs"}, "samplingRuleId": {"type": ["string", "null"], "pattern": "^SR-A50-[0-9]{2}$"}, "codeMeasureIds": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^COP-S[12]-"}}, "onlyIf": {"$ref": "#/$defs/nonEmptyPredicates"}, "automatable": {"type": "boolean"}}},
-    "criterion": {"type": "object", "required": ["id", "metric", "band", "bandBasis", "members", "role", "libraryEntry", "minimumN"], "properties": {"band": {"oneOf": [{"type": "null"}, {"type": "object", "minProperties": 1, "additionalProperties": false, "properties": {"lower": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}, "upper": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}}}]}, "bandBasis": {"enum": ["methodology_default", "provider_declared", "provider_declared_else_default", "descriptive"]}, "role": {"enum": ["confirmatory", "exploratory", "descriptive"]}, "minimumN": {"type": "integer", "minimum": 30}}},
-    "procedure": {"type": "object", "required": ["id", "title", "obligationIds", "articleRefs", "actor", "catalogItemId", "applicability", "objective", "testSteps", "criteria", "passCriteria", "failCriteria", "inconclusiveCriteria", "sourceIds", "verification", "legalReview"], "properties": {"id": {"type": "string", "pattern": "^A50-P-[0-9]{2}[A-F]?$"}, "obligationIds": {"$ref": "#/$defs/ids"}, "actor": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/actor"}}, "catalogItemId": {"type": "string", "pattern": "^(WP|MEM)-[A-Z0-9]+-[0-9]{2}$"}, "applicability": {"$ref": "#/$defs/applicability"}, "testSteps": {"type": "array", "minItems": 1, "maxItems": 30, "items": {"$ref": "#/$defs/testStep"}}, "criteria": {"type": "array", "items": {"$ref": "#/$defs/criterion"}}, "passCriteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "failCriteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "inconclusiveCriteria": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}, "legalReview": {"$ref": "#/$defs/legalReview"}}},
-    "obligation": {"type": "object", "required": ["id", "articleRef", "actor", "summary", "exceptionIds", "appliesFrom", "ruleEntryId", "codeOfPractice", "procedureIds", "sourceIds", "verification", "legalReview"], "properties": {"actor": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/actor"}}, "appliesFrom": {"$ref": "#/$defs/date"}, "procedureIds": {"$ref": "#/$defs/ids"}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}, "legalReview": {"$ref": "#/$defs/legalReview"}}},
-    "timelineEntry": {"type": "object", "required": ["id", "date", "kind", "event", "sourceIds", "verification"], "properties": {"date": {"$ref": "#/$defs/date"}, "kind": {"enum": ["legal", "guidance", "code_milestone"]}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}}},
-    "evidenceItem": {"type": "object", "required": ["id", "title", "description", "origin", "usedBy"], "properties": {"id": {"type": "string", "pattern": "^EV-A50-[0-9]{2}$"}, "usedBy": {"$ref": "#/$defs/ids"}}},
-    "sampling": {"type": "object", "required": ["method", "methodologyDefaults", "caveat", "rules", "zeroFailureTable", "powerTable", "conclusionRule", "sourceIds"], "properties": {"methodologyDefaults": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["id", "metric", "band", "range", "legalStatus", "rationale"], "properties": {"id": {"type": "string", "pattern": "^MD-A50-[0-9]{2}$"}, "band": {"oneOf": [{"type": "object", "minProperties": 1, "additionalProperties": false, "properties": {"lower": {"type": "number"}, "upper": {"type": "number"}}}, {"type": "object", "required": ["bound", "derivation", "tolerance", "defaultIfUndeclared"], "additionalProperties": false, "properties": {"bound": {"enum": ["lower", "upper"]}, "derivation": {"enum": ["declared_minus_tolerance", "declared_plus_tolerance"]}, "tolerance": {"type": "number", "minimum": 0}, "defaultIfUndeclared": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}}}]}, "range": {"type": "object", "required": ["parameter", "min", "max"], "additionalProperties": false, "properties": {"parameter": {"enum": ["lower", "upper", "tolerance"]}, "min": {"type": "number", "minimum": 0}, "max": {"type": "number", "maximum": 1}}}, "legalStatus": {"const": "no_legal_safe_harbour"}}}}, "rules": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["id", "label", "rule"], "properties": {"id": {"type": "string", "pattern": "^SR-A50-[0-9]{2}$"}}}}, "zeroFailureTable": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["band", "mirrorBandForErrorRates", "n", "nWithOneDeviation", "nWithTwoDeviations"], "properties": {"n": {"type": "object", "required": ["F1", "F2", "F4", "F8"], "additionalProperties": {"type": "integer", "minimum": 30}}}}}, "powerTable": {"type": "array", "items": {"type": "object", "required": ["bandLower", "assumedTrueRate", "targetPower", "requiredN"]}}, "sourceIds": {"$ref": "#/$defs/ids"}}},
-    "standard": {"type": "object", "required": ["id", "reference", "title", "category", "status", "clauses", "relevance", "sourceIds", "verification"], "properties": {"category": {"enum": ["industry_specification", "vocabulary", "international_standard_not_cited", "draft_or_under_development", "accessibility_standard", "draft_not_harmonised"]}, "clauses": {"type": "array", "items": {"type": "object", "required": ["clause", "ourTitle"], "properties": {"ourTitle": {"type": "string", "maxLength": 80}}}}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}}},
-    "consistencyCheck": {"type": "object", "required": ["id", "rulePackRef", "topic", "finding", "detail", "action", "sourceIds", "verification"], "properties": {"id": {"type": "string", "pattern": "^CC-[0-9]{2}$"}, "finding": {"enum": ["consistent", "update", "disagreement", "resolved"]}, "sourceIds": {"$ref": "#/$defs/ids"}, "verification": {"$ref": "#/$defs/verification"}}},
-    "repositoryChange": {"type": "object", "required": ["id", "target", "file", "location", "current", "change", "basis", "beforeDec2", "sourceIds"], "properties": {"id": {"type": "string", "pattern": "^A50-ED-[0-9]{2}$"}, "target": {"enum": ["#19", "#18", "catalog", "#31", "other"]}, "basis": {"$ref": "#/$defs/ids"}, "beforeDec2": {"type": "boolean"}, "sourceIds": {"$ref": "#/$defs/ids"}}},
-    "legalReviewItem": {"type": "object", "required": ["id", "topic", "question", "relatedIds"], "properties": {"id": {"type": "string", "pattern": "^LR-A50-[0-9]{2}$"}, "relatedIds": {"$ref": "#/$defs/ids"}}},
-    "unverifiedItem": {"type": "object", "required": ["id", "claim", "status", "reason"], "properties": {"id": {"type": "string", "pattern": "^UV-A50-[0-9]{2}$"}, "status": {"const": "secondary_only"}, "sourceIds": {"$ref": "#/$defs/ids"}}}
-  }
-}
-```
+The schema (JSON Schema draft 2020-12) is [`schemas/art50-transparency-research.schema.json`](../../schemas/art50-transparency-research.schema.json). Version 1.0.0, which the validation run used, was printed in this section; version 1.1.0 (#120) moved it to that file and replaced the free-text `libraryEntry` of a statistical criterion (for example "policy.eu-aia.art50-disclosure-probe@1 (proposed)") with a reference to the threshold library, `{id, version, parameters}`, or null for a descriptive criterion. The parameters are the entry's values that give the criterion's band; for the entries that derive a bound from a declared rate they are the library defaults, which give the band used when nothing is declared. CI runs `node schemas/validate-art50-research.mjs`: the schema and the checks below.
 
 **What the validation also checked**
 - **Uniqueness.** Ids are unique across the file. An exclusion reused by several procedures is identical wherever it appears.
@@ -1181,6 +1116,7 @@ The schema below (JSON Schema draft 2020-12) is the one the validation run used.
 - **Rule-pack links.** Every rule-pack id in `basedOn`, the timing records, the timeline, the obligations and the consistency checks exists in `rule-pack-2026-11.json`. Each transitional record has the same deadline and `appliesIf` as the rule-pack entry it names.
 - **Secondary sources.** No secondary source backs a verified entry.
 - **Dates.** Every date is a real calendar date.
+- **Criteria (1.1.0).** Every statistical criterion is declared under its procedure, and every criterion the pass, fail and inconclusive text names is declared. A deciding criterion names an existing threshold-library entry labelled `no_legal_safe_harbour` whose caveat is `sampling.caveat`; its parameters are the entry's, within their ranges, and give the criterion's band. The catalogue item the procedure's steps go to lists the same criteria.
 - **The report.** Every procedure, step, evidence, rule, default, check, edit, legal-review, unverified and source id is named in this report, and this section's schema validates the JSON.
 
 ## 15. Reproducing the checks

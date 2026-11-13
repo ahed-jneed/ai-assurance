@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ApiError } from "./http";
 const short = z.string().trim().min(1).max(300),
   note = z.string().trim().min(1).max(5000);
 export const calendarDate = z
@@ -71,6 +72,48 @@ export const registeredDatasetCardSchema = registeredDatasetCardFields
   .refine(baselineExplained, "Explain the baseline selection");
 export type DatasetCard = z.infer<typeof datasetCardSchema>;
 export type RegisteredDatasetCard = z.infer<typeof registeredDatasetCardSchema>;
+
+/**
+ * The card body registerDataset stores and runs pin as `cardPin.card`: the
+ * declared card with the accepted bytes it describes and, for a regression
+ * baseline, the baseline card's pin. The body is parsed with
+ * registeredDatasetCardSchema, so the API never stores a card the contract
+ * (schemas/dataset-card.schema.json `$defs/registeredCard`) rejects (#137);
+ * the refusal is a 409 naming each failing field.
+ */
+export function registeredCard(
+  declared: DatasetCard,
+  artifact: { sha256: string; name: string; size: number },
+  baseline?: { id: string; sha256: string; body: { artifactSha256?: unknown } },
+): RegisteredDatasetCard {
+  const body = {
+    ...declared,
+    artifactSha256: artifact.sha256,
+    artifactName: artifact.name,
+    artifactSize: artifact.size,
+    ...(baseline
+      ? {
+          baselinePin: {
+            recordId: baseline.id,
+            sha256: baseline.sha256,
+            artifactSha256: baseline.body.artifactSha256,
+          },
+        }
+      : {}),
+  };
+  const card = registeredDatasetCardSchema.safeParse(body);
+  if (!card.success)
+    throw new ApiError(
+      409,
+      "The dataset card does not meet the registered card contract: " +
+        card.error.issues
+          .map((i) => (i.path.join(".") || "card") + " " + i.message)
+          .join("; "),
+    );
+  // The body as built, in its own key order: the record stores and hashes
+  // these bytes, as before the contract check.
+  return body as RegisteredDatasetCard;
+}
 
 /** A registered dataset card record, as the assurance records API returns it. */
 type CardRecord = {

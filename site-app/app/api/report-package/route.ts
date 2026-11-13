@@ -19,17 +19,18 @@ export async function GET(request: Request) {
       client = isClientRole(ctx.role);
     if (!r || (client && !isClientVisible(r)))
       throw new ApiError(404, "Report package not found");
-    const proof = await verifyPackage(r, sha256, client);
+    // Package contract 1.2 adds the papers as working-paper contract
+    // documents (#51), internal packages only: a client snapshot keeps
+    // each paper's conclusion without user ids. Proof 1.1 lists each
+    // document as a leaf (#137).
+    const documents = client ? [] : await exportedPapers(ctx, e, r),
+      proof = await verifyPackage(r, sha256, client, documents);
     if (url.searchParams.get("download") === "1") {
       if (!proof.valid)
         throw new ApiError(
           409,
           "Package integrity check failed; contact the audit lead",
         );
-      // Package contract 1.2 adds the papers as working-paper contract
-      // documents (#51), internal packages only: a client snapshot keeps
-      // each paper's conclusion without user ids.
-      const documents = client ? [] : await exportedPapers(ctx, e, r);
       const body = JSON.stringify(
         {
           contractVersion: "1.2",
