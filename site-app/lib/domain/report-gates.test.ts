@@ -19,6 +19,7 @@ import {
   reportElements,
 } from "./report-gates";
 import {
+  certificationQualityStatement,
   qualityStatement,
   type AssuranceLevel,
   ReportParticulars,
@@ -345,6 +346,20 @@ describe("independence element", () => {
     e.workflow!.brief!.independence = "Internal conflicts note: partner X";
     expect(element(e).value).toBe(qualityStatement);
     expect(element(e).problem).toBe("");
+  });
+  it("states ISO/IEC 17021-1 impartiality for a certification audit", async () => {
+    const e = await issuable();
+    const el = reportElements(
+      e,
+      {
+        engagementType: "certification",
+        assuranceLevel: null,
+        conclusion: "certification_recommended",
+      },
+      particulars,
+    ).find((x) => x.id === "independence")!;
+    expect(el.value).toBe(certificationQualityStatement);
+    expect(el.value).not.toMatch(/IESBA|ISQM/);
   });
   it("comes from the acceptance record and declarations where the gate applies", async () => {
     const e = await issuable();

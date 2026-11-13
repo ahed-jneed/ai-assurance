@@ -415,7 +415,7 @@ export const workspaceDrafts = sqliteTable(
  * The platform operator's audit trail (lib/operator.ts): every deletion of an
  * abandoned practice, with what it removed. Not tied to a practice, so it
  * outlives the practice it records, and never updated or deleted
- * (migration 0012).
+ * (migration 0013).
  */
 export const operatorEvents = sqliteTable(
   "operator_events",
@@ -435,7 +435,7 @@ export const operatorEvents = sqliteTable(
  * A practice being erased by the operator: written and removed again inside
  * the one D1 batch that deletes the practice (lib/operator.ts). While its row
  * exists, and only then, the append-only triggers of migrations 0001 and 0011
- * let that practice's rows be deleted (migration 0012).
+ * let that practice's rows be deleted (migration 0013).
  */
 export const practiceErasures = sqliteTable("practice_erasures", {
   tenantId: text("tenant_id").primaryKey(),

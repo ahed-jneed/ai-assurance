@@ -90,6 +90,9 @@ describe("pack #1 projections", () => {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
     expect(pack1.pack.roles).toEqual({
       limitationMemo: "MEM-EX-01",
@@ -167,7 +170,7 @@ describe("registry", () => {
     expect(digest(pack1.pack)).toBe(PACK_SHA);
   });
 
-  it("offers pack #1 at engagement creation, with its legal review pending", () => {
+  it("offers pack #1, the GenAI pack and the LL144 pack at engagement creation, with their legal review pending", () => {
     expect(selectablePacks(r)).toEqual([
       expect.objectContaining({
         id: "eu-ai-act-amended",
@@ -177,6 +180,25 @@ describe("registry", () => {
         memos: 12,
         legalReviewPending: true,
         clauseNumbersOnly: false,
+      }),
+      expect.objectContaining({
+        id: "genai-evaluation",
+        version: "2026.11.0",
+        isDefault: false,
+        workingPapers: 7,
+        memos: 1,
+        legalReviewPending: true,
+        clauseNumbersOnly: true,
+      }),
+      expect.objectContaining({
+        id: "nyc-ll144-bias-audit",
+        version: "2026.11.0",
+        isDefault: false,
+        workingPapers: 7,
+        memos: 2,
+        legalReviewPending: true,
+        clauseNumbersOnly: true,
+        phases: ["Planning", "Fieldwork", "Reporting"],
       }),
     ]);
   });

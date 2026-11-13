@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "specification": "docs/design/audit-statistics.md section 10",
-  "description": "Threshold library of statistics 1.0.0: versioned acceptance rules an auditor adopts as internal policy. A plan references an entry by id and version and stores its parameter values; every result that uses an entry shows its legalStatus and caveat verbatim. Caveats are timeless; facts that can change live in statusNotes, which are shown beside results but never frozen into them, and updating a note does not change the entry version. The hosted runner reads this file (site-app/lib/threshold-library.json is its generated copy); engine/statistics.py mirrors the entries whose kind is a criterion kind, and engine/tests/test_threshold_library.py keeps the two equal. Nothing here is legal advice; legal content stays pending the qualified legal review of #57 (decision D-02).",
+  "description": "Threshold library of statistics 1.0.0: versioned acceptance rules an auditor adopts as internal policy. A plan references an entry by id and version and stores its parameter values; every result that uses an entry shows its legalStatus and caveat verbatim. Caveats are timeless; facts that can change live in statusNotes, which are shown beside results but never frozen into them, and updating a note does not change the entry version. Both runners read this file through generated copies (npm run sync): the hosted runner site-app/lib/threshold-library.json, and engine/statistics.py engine/threshold-library.json, of which it loads the entries whose kind is a criterion kind. Nothing here is legal advice; legal content stays pending the qualified legal review of #57 (decision D-02).",
   "entries": [
     {
       "id": "screen.us.four-fifths",

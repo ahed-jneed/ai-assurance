@@ -1,0 +1,78 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "en-18286-to-eu-ai-act",
+  "version": "2026.11.1",
+  "title": "EN 18286:2026 to the EU AI Act (amended)",
+  "source": {
+    "framework": "en-18286",
+    "edition": "2026"
+  },
+  "target": {
+    "framework": "eu-ai-act",
+    "edition": "02024R1689-20260727"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers on engagements that use either framework as criteria.",
+    "purpose": "Record which AI Act provisions the harmonised QMS standard relates to, including the scope of its presumption of conformity.",
+    "conceptTypes": {
+      "source": "Management-system requirements (clauses and controls)",
+      "target": "Legal obligations (articles and paragraphs)"
+    },
+    "assumptions": "Relationships compare what each requirement demands, not how an organisation implements it. No inference may be drawn from requirements that are not mapped. Every entry is a draft until the clause numbers are confirmed against licensed copies (#57)."
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "4",
+        "5",
+        "6",
+        "8",
+        "9",
+        "10"
+      ],
+      "target": "AIA-ART-17",
+      "relationship": "intersects_with",
+      "rationale": "functional",
+      "confidence": "low",
+      "justification": "Annex ZA relates these clauses to Art. 17(1); Art. 17(2) to (4) are outside it, and the clauses also cover topics beyond Art. 17. At article level the two only overlap.",
+      "legalEffect": {
+        "kind": "presumption_of_conformity",
+        "basis": "EN 18286:2026 Annex ZA; reference published by Commission Implementing Decision (EU) 2026/2274.",
+        "conditions": "Only for the Art. 17(1) provisions listed in Annex ZA, and only while the reference stays published in the Official Journal. A presumption follows from conformity with the standard; it is not an audit conclusion.",
+        "provenance": {
+          "source": "https://docs.modulos.ai/frameworks/eu-ai-act/harmonized-standards/en-18286",
+          "sourceKind": "secondary",
+          "verification": "secondary_only",
+          "legalReview": "required",
+          "note": "Competitor-authored summary; confirm against Annex ZA of the licensed standard and Implementing Decision (EU) 2026/2274 (Q8, #57)."
+        }
+      }
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "8"
+      ],
+      "target": "AIA-11-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Secondary sources relate the realisation clause to the first sentence of Art. 11(1) only; the content of the documentation is fixed by Annex IV.",
+      "legalEffect": {
+        "kind": "presumption_of_conformity",
+        "basis": "EN 18286:2026 Annex ZA, as described by secondary sources; reference published by Commission Implementing Decision (EU) 2026/2274.",
+        "conditions": "Only for the first sentence of Art. 11(1) if Annex ZA lists it, and only while the reference stays published. Not an audit conclusion.",
+        "provenance": {
+          "source": "https://docs.modulos.ai/frameworks/eu-ai-act/harmonized-standards/en-18286",
+          "sourceKind": "secondary",
+          "verification": "secondary_only",
+          "legalReview": "required",
+          "note": "Competitor-authored summary; confirm against Annex ZA of the licensed standard and Implementing Decision (EU) 2026/2274 (Q8, #57)."
+        }
+      }
+    }
+  ]
+}

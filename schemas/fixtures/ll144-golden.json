@@ -1,0 +1,1482 @@
+{
+  "documentType": "ll144-golden",
+  "schemaVersion": "1.0.0",
+  "specificationVersion": "1.0.0",
+  "howToUse": "Each case runs ll144_audit (engine/ll144.py) and ll144Audit (site-app/lib/ll144.ts) on its input. Numbers match within tolerances.number, every other value exactly. An error case must be rejected with a message containing its error text.",
+  "tolerances": {
+    "number": 1e-09,
+    "interval": 1e-06
+  },
+  "cases": [
+    {
+      "id": "LL-01",
+      "title": "Selection rates for sex, race/ethnicity and intersectional categories, with unknowns in each dimension",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 6
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 4
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "Black or African American",
+            "selected": true,
+            "count": 3
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "Black or African American",
+            "selected": false,
+            "count": 7
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 8
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 2
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Black or African American",
+            "selected": true,
+            "count": 4
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Black or African American",
+            "selected": false,
+            "count": 6
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 2
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 3
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": null,
+            "selected": true
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": null,
+            "selected": false,
+            "count": 4
+          }
+        ],
+        "categories": {
+          "sex": [
+            "Male",
+            "Female"
+          ],
+          "raceEthnicity": [
+            "Black or African American",
+            "Asian"
+          ]
+        }
+      },
+      "handComputation": "50 individuals. Sex: Male 12/20 = 0.6 (reference), Female (6+3+1)/25 = 0.4, ratio 0.4/0.6 = 0.6667; 5 unknown (no sex). Race/ethnicity: Asian (6+8+2)/25 = 0.64 (reference), Black or African American (3+4)/20 = 0.35, ratio 0.35/0.64 = 0.546875; 5 unknown. Intersectional: Male/Asian 0.8 (reference); Male/Black 0.4 -> 0.5; Female/Asian 0.6 -> 0.75; Female/Black 0.3 -> 0.375; 10 unknown (either value missing).",
+      "expected": {
+        "specificationVersion": "1.0.0",
+        "rate": "selection",
+        "confidenceLevel": 0.95,
+        "totalIndividuals": 50,
+        "medianScore": null,
+        "intervalNote": "Supplementary; not required by the rule. The reference category is chosen from the data, so the impact-ratio intervals are conditional on that choice.",
+        "tables": [
+          {
+            "dimension": "sex",
+            "referenceCategory": "Male",
+            "totalIndividuals": 50,
+            "totalAssessedKnown": 45,
+            "unknownCategoryCount": 5,
+            "categories": [
+              {
+                "category": "Male",
+                "n": 20,
+                "selected": 12,
+                "selectionRate": 0.6,
+                "selectionRateInterval": {
+                  "lower": 0.38658150076225317,
+                  "upper": 0.7811934676271829,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.4,
+                "shareOfKnown": 0.4444444444444444,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Female",
+                "n": 25,
+                "selected": 10,
+                "selectionRate": 0.4,
+                "selectionRateInterval": {
+                  "lower": 0.23403302377747973,
+                  "upper": 0.5926054264103301,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5,
+                "shareOfKnown": 0.5555555555555556,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.6666666666666667,
+                "impactRatioInterval": {
+                  "lower": 0.3663214706394036,
+                  "upper": 1.2132634313480983,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Female"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "raceEthnicity",
+            "referenceCategory": "Asian",
+            "totalIndividuals": 50,
+            "totalAssessedKnown": 45,
+            "unknownCategoryCount": 5,
+            "categories": [
+              {
+                "category": "Black or African American",
+                "n": 20,
+                "selected": 7,
+                "selectionRate": 0.35,
+                "selectionRateInterval": {
+                  "lower": 0.18119182410108206,
+                  "upper": 0.5671457233147638,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.4,
+                "shareOfKnown": 0.4444444444444444,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.546875,
+                "impactRatioInterval": {
+                  "lower": 0.28105007534515886,
+                  "upper": 1.0641244812253048,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Black or African American"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Asian",
+                "n": 25,
+                "selected": 16,
+                "selectionRate": 0.64,
+                "selectionRateInterval": {
+                  "lower": 0.44518497748164865,
+                  "upper": 0.7975211922554178,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5,
+                "shareOfKnown": 0.5555555555555556,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "intersectional",
+            "referenceCategory": "[\"Male\",\"Asian\"]",
+            "totalIndividuals": 50,
+            "totalAssessedKnown": 40,
+            "unknownCategoryCount": 10,
+            "categories": [
+              {
+                "category": "[\"Male\",\"Black or African American\"]",
+                "n": 10,
+                "selected": 4,
+                "selectionRate": 0.4,
+                "selectionRateInterval": {
+                  "lower": 0.16818032970623614,
+                  "upper": 0.6873262302663417,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.5,
+                "impactRatioInterval": {
+                  "lower": 0.22023526003081312,
+                  "upper": 1.1351497483419435,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Male",
+                  "Black or African American"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Male\",\"Asian\"]",
+                "n": 10,
+                "selected": 8,
+                "selectionRate": 0.8,
+                "selectionRateInterval": {
+                  "lower": 0.4901624715366418,
+                  "upper": 0.9433178485456248,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Female\",\"Black or African American\"]",
+                "n": 10,
+                "selected": 3,
+                "selectionRate": 0.3,
+                "selectionRateInterval": {
+                  "lower": 0.10779126740630099,
+                  "upper": 0.6032218525388546,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.37499999999999994,
+                "impactRatioInterval": {
+                  "lower": 0.13848262781382392,
+                  "upper": 1.0154703316942848,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Female",
+                  "Black or African American"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Female\",\"Asian\"]",
+                "n": 10,
+                "selected": 6,
+                "selectionRate": 0.6,
+                "selectionRateInterval": {
+                  "lower": 0.31267376973365824,
+                  "upper": 0.8318196702937638,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.7499999999999999,
+                "impactRatioInterval": {
+                  "lower": 0.414330780429121,
+                  "upper": 1.3576109393017348,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Female",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "LL-02",
+      "title": "Scoring rates: the median is taken over the full sample, including the unknown category (5-301(c)(1), Q4)",
+      "input": {
+        "rate": "scoring",
+        "records": [
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "score": 1
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "score": 2
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "score": 3
+          },
+          {
+            "sex": "Female",
+            "raceEthnicity": "White",
+            "score": 5,
+            "count": 2
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Asian",
+            "score": 4
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Asian",
+            "score": 6
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "White",
+            "score": 7
+          },
+          {
+            "sex": null,
+            "raceEthnicity": null,
+            "score": 5
+          },
+          {
+            "sex": null,
+            "raceEthnicity": null,
+            "score": 8
+          }
+        ]
+      },
+      "handComputation": "Scores 1,2,3,4,5,5,5,6,7,8 (10 individuals, two of unknown sex and race): median (5+5)/2 = 5; only scores strictly above 5 count (6, 7, 8). Sex: Male 2/3 (reference), Female 0/5 -> ratio 0; 2 unknown. Race/ethnicity: White 1/3 (reference), Asian 1/5 -> 0.2/0.3333 = 0.6; 2 unknown. Intersectional: Male/White 1/1 (reference), Male/Asian 1/2 -> 0.5, Female/Asian 0/3 -> 0, Female/White 0/2 -> 0. Leaving the unknowns out would give the median 4.5 and different rates (Asian 1/5 vs White 3/3 for the scores 5, 5, 7).",
+      "expected": {
+        "specificationVersion": "1.0.0",
+        "rate": "scoring",
+        "confidenceLevel": 0.95,
+        "totalIndividuals": 10,
+        "medianScore": 5.0,
+        "intervalNote": "Supplementary; not required by the rule. The reference category is chosen from the data, so the impact-ratio intervals are conditional on that choice.",
+        "tables": [
+          {
+            "dimension": "sex",
+            "referenceCategory": "Male",
+            "totalIndividuals": 10,
+            "totalAssessedKnown": 8,
+            "unknownCategoryCount": 2,
+            "categories": [
+              {
+                "category": "Female",
+                "n": 5,
+                "scoredAboveMedian": 0,
+                "scoringRate": 0.0,
+                "scoringRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.43448246478317476,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5,
+                "shareOfKnown": 0.625,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.0,
+                "impactRatioInterval": {
+                  "lower": 0.0,
+                  "upper": 0.87151542336857,
+                  "level": 0.95,
+                  "method": "koopman_score"
+                },
+                "components": [
+                  "Female"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Male",
+                "n": 3,
+                "scoredAboveMedian": 2,
+                "scoringRate": 0.6666666666666666,
+                "scoringRateInterval": {
+                  "lower": 0.20765960080204765,
+                  "upper": 0.9385080552796037,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.3,
+                "shareOfKnown": 0.375,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "raceEthnicity",
+            "referenceCategory": "White",
+            "totalIndividuals": 10,
+            "totalAssessedKnown": 8,
+            "unknownCategoryCount": 2,
+            "categories": [
+              {
+                "category": "Asian",
+                "n": 5,
+                "scoredAboveMedian": 1,
+                "scoringRate": 0.2,
+                "scoringRateInterval": {
+                  "lower": 0.036224108632430085,
+                  "upper": 0.6244653702374747,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5,
+                "shareOfKnown": 0.625,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.6000000000000001,
+                "impactRatioInterval": {
+                  "lower": 0.05588496572317831,
+                  "upper": 6.441804076309739,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "White",
+                "n": 3,
+                "scoredAboveMedian": 1,
+                "scoringRate": 0.3333333333333333,
+                "scoringRateInterval": {
+                  "lower": 0.06149194472039615,
+                  "upper": 0.7923403991979523,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.3,
+                "shareOfKnown": 0.375,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "White"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "intersectional",
+            "referenceCategory": "[\"Male\",\"White\"]",
+            "totalIndividuals": 10,
+            "totalAssessedKnown": 8,
+            "unknownCategoryCount": 2,
+            "categories": [
+              {
+                "category": "[\"Female\",\"Asian\"]",
+                "n": 3,
+                "scoredAboveMedian": 0,
+                "scoringRate": 0.0,
+                "scoringRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.5614970317550455,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.3,
+                "shareOfKnown": 0.375,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.0,
+                "impactRatioInterval": {
+                  "lower": 0.0,
+                  "upper": 0.9603647051735316,
+                  "level": 0.95,
+                  "method": "koopman_score"
+                },
+                "components": [
+                  "Female",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Female\",\"White\"]",
+                "n": 2,
+                "scoredAboveMedian": 0,
+                "scoringRate": 0.0,
+                "scoringRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.6576197724933469,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.0,
+                "impactRatioInterval": {
+                  "lower": 0.0,
+                  "upper": 1.2804862735647085,
+                  "level": 0.95,
+                  "method": "koopman_score"
+                },
+                "components": [
+                  "Female",
+                  "White"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Male\",\"Asian\"]",
+                "n": 2,
+                "scoredAboveMedian": 1,
+                "scoringRate": 0.5,
+                "scoringRateInterval": {
+                  "lower": 0.09453120573423074,
+                  "upper": 0.9054687942657693,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.2,
+                "shareOfKnown": 0.25,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.5,
+                "impactRatioInterval": {
+                  "lower": 0.12504882662995317,
+                  "upper": 1.9992190789586908,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Male",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Male\",\"White\"]",
+                "n": 1,
+                "scoredAboveMedian": 1,
+                "scoringRate": 1.0,
+                "scoringRateInterval": {
+                  "lower": 0.20654931437723745,
+                  "upper": 1.0,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.1,
+                "shareOfKnown": 0.125,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male",
+                  "White"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "LL-03",
+      "title": "2% exclusion: a category under 2% of the data, a declared category with no individuals, and no sex data",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 15
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 15
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": true,
+            "count": 10
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": false,
+            "count": 15
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Two or More Races",
+            "selected": true
+          },
+          {
+            "sex": null,
+            "raceEthnicity": null,
+            "selected": true,
+            "count": 2
+          },
+          {
+            "sex": null,
+            "raceEthnicity": null,
+            "selected": false,
+            "count": 2
+          }
+        ],
+        "categories": {
+          "raceEthnicity": [
+            "White",
+            "Asian",
+            "Two or More Races",
+            "Native American or Alaska Native"
+          ]
+        },
+        "exclusions": [
+          {
+            "dimension": "raceEthnicity",
+            "category": "Two or More Races",
+            "justification": "1 of 60 individuals (1.67% of the audit data, under 2%); a single selection would otherwise set the reference rate."
+          }
+        ]
+      },
+      "handComputation": "60 individuals, 4 of unknown race/ethnicity, none with a sex. Two or More Races is 1/60 = 1.67% of the data (1/56 = 1.79% of the known categories), so it may be excluded: it keeps n = 1 and rate 1.0 but gets no impact ratio. Reference Asian 15/30 = 0.5; White 10/25 = 0.4 -> 0.8. Native American or Alaska Native is declared with no individuals: n 0, no rate. The sex and intersectional tables have no known category: all 60 are unknown.",
+      "expected": {
+        "specificationVersion": "1.0.0",
+        "rate": "selection",
+        "confidenceLevel": 0.95,
+        "totalIndividuals": 60,
+        "medianScore": null,
+        "intervalNote": "Supplementary; not required by the rule. The reference category is chosen from the data, so the impact-ratio intervals are conditional on that choice.",
+        "tables": [
+          {
+            "dimension": "sex",
+            "referenceCategory": null,
+            "totalIndividuals": 60,
+            "totalAssessedKnown": 0,
+            "unknownCategoryCount": 60,
+            "categories": [],
+            "notes": [
+              "no_known_category"
+            ]
+          },
+          {
+            "dimension": "raceEthnicity",
+            "referenceCategory": "Asian",
+            "totalIndividuals": 60,
+            "totalAssessedKnown": 56,
+            "unknownCategoryCount": 4,
+            "categories": [
+              {
+                "category": "White",
+                "n": 25,
+                "selected": 10,
+                "selectionRate": 0.4,
+                "selectionRateInterval": {
+                  "lower": 0.23403302377747973,
+                  "upper": 0.5926054264103301,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.4166666666666667,
+                "shareOfKnown": 0.44642857142857145,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.8,
+                "impactRatioInterval": {
+                  "lower": 0.4395857647672843,
+                  "upper": 1.4559161176177182,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "White"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Asian",
+                "n": 30,
+                "selected": 15,
+                "selectionRate": 0.5,
+                "selectionRateInterval": {
+                  "lower": 0.33154125640533766,
+                  "upper": 0.6684587435946623,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5,
+                "shareOfKnown": 0.5357142857142857,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Two or More Races",
+                "n": 1,
+                "selected": 1,
+                "selectionRate": 1.0,
+                "selectionRateInterval": {
+                  "lower": 0.20654931437723745,
+                  "upper": 1.0,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.016666666666666666,
+                "shareOfKnown": 0.017857142857142856,
+                "eligibleForTwoPercentExclusion": true,
+                "excluded": true,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Two or More Races"
+                ],
+                "exclusionJustification": "1 of 60 individuals (1.67% of the audit data, under 2%); a single selection would otherwise set the reference rate."
+              },
+              {
+                "category": "Native American or Alaska Native",
+                "n": 0,
+                "selected": 0,
+                "selectionRate": null,
+                "selectionRateInterval": null,
+                "shareOfData": 0.0,
+                "shareOfKnown": 0.0,
+                "eligibleForTwoPercentExclusion": true,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Native American or Alaska Native"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "intersectional",
+            "referenceCategory": null,
+            "totalIndividuals": 60,
+            "totalAssessedKnown": 0,
+            "unknownCategoryCount": 60,
+            "categories": [],
+            "notes": [
+              "no_known_category"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "LL-04",
+      "title": "DCWP worked example (race/ethnicity) reproduced from records, as GC-32",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": null,
+            "raceEthnicity": "Hispanic or Latino",
+            "selected": true,
+            "count": 204
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Hispanic or Latino",
+            "selected": false,
+            "count": 204
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": true,
+            "count": 412
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": false,
+            "count": 385
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Black or African American",
+            "selected": true,
+            "count": 170
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Black or African American",
+            "selected": false,
+            "count": 220
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Native Hawaiian or Pacific Islander",
+            "selected": true,
+            "count": 52
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Native Hawaiian or Pacific Islander",
+            "selected": false,
+            "count": 67
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 302
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 314
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Native American or Alaska Native",
+            "selected": true,
+            "count": 18
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Native American or Alaska Native",
+            "selected": false,
+            "count": 23
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Two or More Races",
+            "selected": true,
+            "count": 96
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Two or More Races",
+            "selected": false,
+            "count": 117
+          },
+          {
+            "sex": null,
+            "raceEthnicity": null,
+            "selected": false,
+            "count": 250
+          }
+        ],
+        "categories": {
+          "raceEthnicity": [
+            "Hispanic or Latino",
+            "White",
+            "Black or African American",
+            "Native Hawaiian or Pacific Islander",
+            "Asian",
+            "Native American or Alaska Native",
+            "Two or More Races"
+          ]
+        }
+      },
+      "handComputation": "The DCWP example of the rule: 2,834 individuals, 250 of unknown race/ethnicity, reference White 412/797. The race/ethnicity table equals GC-32 of the statistics fixture; no sex data, so the sex and intersectional tables are all unknown.",
+      "expected": {
+        "specificationVersion": "1.0.0",
+        "rate": "selection",
+        "confidenceLevel": 0.95,
+        "totalIndividuals": 2834,
+        "medianScore": null,
+        "intervalNote": "Supplementary; not required by the rule. The reference category is chosen from the data, so the impact-ratio intervals are conditional on that choice.",
+        "tables": [
+          {
+            "dimension": "sex",
+            "referenceCategory": null,
+            "totalIndividuals": 2834,
+            "totalAssessedKnown": 0,
+            "unknownCategoryCount": 2834,
+            "categories": [],
+            "notes": [
+              "no_known_category"
+            ]
+          },
+          {
+            "dimension": "raceEthnicity",
+            "referenceCategory": "White",
+            "totalIndividuals": 2834,
+            "totalAssessedKnown": 2584,
+            "unknownCategoryCount": 250,
+            "categories": [
+              {
+                "category": "Hispanic or Latino",
+                "n": 408,
+                "selected": 204,
+                "selectionRate": 0.5,
+                "selectionRateInterval": {
+                  "lower": 0.451710460536,
+                  "upper": 0.548289539464,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.143966125618,
+                "shareOfKnown": 0.157894736842,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.967233009709,
+                "impactRatioInterval": {
+                  "lower": 0.859593018312,
+                  "upper": 1.08835190042,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Hispanic or Latino"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "White",
+                "n": 797,
+                "selected": 412,
+                "selectionRate": 0.516938519448,
+                "selectionRateInterval": {
+                  "lower": 0.482247662341,
+                  "upper": 0.551466875914,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.281227946366,
+                "shareOfKnown": 0.308436532508,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 1.0,
+                "impactRatioInterval": null,
+                "components": [
+                  "White"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Black or African American",
+                "n": 390,
+                "selected": 170,
+                "selectionRate": 0.435897435897,
+                "selectionRateInterval": {
+                  "lower": 0.387545479885,
+                  "upper": 0.485499881693,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.137614678899,
+                "shareOfKnown": 0.15092879257,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.843228777695,
+                "impactRatioInterval": {
+                  "lower": 0.739441685377,
+                  "upper": 0.961583293983,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Black or African American"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Native Hawaiian or Pacific Islander",
+                "n": 119,
+                "selected": 52,
+                "selectionRate": 0.436974789916,
+                "selectionRateInterval": {
+                  "lower": 0.351209795713,
+                  "upper": 0.526681592553,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.0419901199718,
+                "shareOfKnown": 0.0460526315789,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.845312882435,
+                "impactRatioInterval": {
+                  "lower": 0.681982873722,
+                  "upper": 1.04775925722,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Native Hawaiian or Pacific Islander"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Asian",
+                "n": 616,
+                "selected": 302,
+                "selectionRate": 0.49025974026,
+                "selectionRateInterval": {
+                  "lower": 0.450965471665,
+                  "upper": 0.529674739103,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.21736062103,
+                "shareOfKnown": 0.238390092879,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.948390808221,
+                "impactRatioInterval": {
+                  "lower": 0.854010250667,
+                  "upper": 1.05320179051,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Native American or Alaska Native",
+                "n": 41,
+                "selected": 18,
+                "selectionRate": 0.439024390244,
+                "selectionRateInterval": {
+                  "lower": 0.298901317366,
+                  "upper": 0.589594727779,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.014467184192,
+                "shareOfKnown": 0.015866873065,
+                "eligibleForTwoPercentExclusion": true,
+                "excluded": false,
+                "impactRatio": 0.849277764622,
+                "impactRatioInterval": {
+                  "lower": 0.597008667961,
+                  "upper": 1.20814447124,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Native American or Alaska Native"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Two or More Races",
+                "n": 213,
+                "selected": 96,
+                "selectionRate": 0.450704225352,
+                "selectionRateInterval": {
+                  "lower": 0.385346171903,
+                  "upper": 0.517808879192,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.075158786168,
+                "shareOfKnown": 0.0824303405573,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": 0.871872008752,
+                "impactRatioInterval": {
+                  "lower": 0.740927616269,
+                  "upper": 1.02595824876,
+                  "level": 0.95,
+                  "method": "katz_log"
+                },
+                "components": [
+                  "Two or More Races"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": []
+          },
+          {
+            "dimension": "intersectional",
+            "referenceCategory": null,
+            "totalIndividuals": 2834,
+            "totalAssessedKnown": 0,
+            "unknownCategoryCount": 2834,
+            "categories": [],
+            "notes": [
+              "no_known_category"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "LL-05",
+      "title": "Nobody selected: every impact ratio is undefined",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 12
+          },
+          {
+            "sex": "Male",
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 9
+          }
+        ]
+      },
+      "handComputation": "21 individuals, none selected: every rate is 0, the reference rate is 0, so no impact ratio is defined (note reference_rate_zero).",
+      "expected": {
+        "specificationVersion": "1.0.0",
+        "rate": "selection",
+        "confidenceLevel": 0.95,
+        "totalIndividuals": 21,
+        "medianScore": null,
+        "intervalNote": "Supplementary; not required by the rule. The reference category is chosen from the data, so the impact-ratio intervals are conditional on that choice.",
+        "tables": [
+          {
+            "dimension": "sex",
+            "referenceCategory": "Female",
+            "totalIndividuals": 21,
+            "totalAssessedKnown": 21,
+            "unknownCategoryCount": 0,
+            "categories": [
+              {
+                "category": "Female",
+                "n": 12,
+                "selected": 0,
+                "selectionRate": 0.0,
+                "selectionRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.24249400665524085,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5714285714285714,
+                "shareOfKnown": 0.5714285714285714,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Female"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "Male",
+                "n": 9,
+                "selected": 0,
+                "selectionRate": 0.0,
+                "selectionRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.29914504841954404,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.42857142857142855,
+                "shareOfKnown": 0.42857142857142855,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": [
+              "reference_rate_zero"
+            ]
+          },
+          {
+            "dimension": "raceEthnicity",
+            "referenceCategory": "Asian",
+            "totalIndividuals": 21,
+            "totalAssessedKnown": 21,
+            "unknownCategoryCount": 0,
+            "categories": [
+              {
+                "category": "Asian",
+                "n": 21,
+                "selected": 0,
+                "selectionRate": 0.0,
+                "selectionRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.15463901892484697,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 1.0,
+                "shareOfKnown": 1.0,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": [
+              "reference_rate_zero"
+            ]
+          },
+          {
+            "dimension": "intersectional",
+            "referenceCategory": "[\"Female\",\"Asian\"]",
+            "totalIndividuals": 21,
+            "totalAssessedKnown": 21,
+            "unknownCategoryCount": 0,
+            "categories": [
+              {
+                "category": "[\"Female\",\"Asian\"]",
+                "n": 12,
+                "selected": 0,
+                "selectionRate": 0.0,
+                "selectionRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.24249400665524085,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.5714285714285714,
+                "shareOfKnown": 0.5714285714285714,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Female",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              },
+              {
+                "category": "[\"Male\",\"Asian\"]",
+                "n": 9,
+                "selected": 0,
+                "selectionRate": 0.0,
+                "selectionRateInterval": {
+                  "lower": 0.0,
+                  "upper": 0.29914504841954404,
+                  "level": 0.95,
+                  "method": "wilson"
+                },
+                "shareOfData": 0.42857142857142855,
+                "shareOfKnown": 0.42857142857142855,
+                "eligibleForTwoPercentExclusion": false,
+                "excluded": false,
+                "impactRatio": null,
+                "impactRatioInterval": null,
+                "components": [
+                  "Male",
+                  "Asian"
+                ],
+                "exclusionJustification": null
+              }
+            ],
+            "notes": [
+              "reference_rate_zero"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "errorCases": [
+    {
+      "id": "LL-E1",
+      "title": "A category of 2% or more cannot be excluded",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true,
+            "count": 15
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 15
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": true,
+            "count": 10
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": false,
+            "count": 15
+          }
+        ],
+        "exclusions": [
+          {
+            "dimension": "raceEthnicity",
+            "category": "White",
+            "justification": "x"
+          }
+        ]
+      },
+      "error": "2% exclusion only allowed below 2% of the data"
+    },
+    {
+      "id": "LL-E2",
+      "title": "A scoring record needs a score",
+      "input": {
+        "rate": "scoring",
+        "records": [
+          {
+            "sex": "Female",
+            "raceEthnicity": "Asian",
+            "selected": true
+          }
+        ]
+      },
+      "error": "unknown fields"
+    },
+    {
+      "id": "LL-E3",
+      "title": "An exclusion needs a justification",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": true,
+            "count": 10
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "White",
+            "selected": false,
+            "count": 89
+          }
+        ],
+        "exclusions": [
+          {
+            "dimension": "raceEthnicity",
+            "category": "Asian",
+            "justification": " "
+          }
+        ]
+      },
+      "error": "justification"
+    },
+    {
+      "id": "LL-E4",
+      "title": "An excluded category must occur in the data",
+      "input": {
+        "rate": "selection",
+        "records": [
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": true
+          },
+          {
+            "sex": null,
+            "raceEthnicity": "Asian",
+            "selected": false,
+            "count": 9
+          }
+        ],
+        "exclusions": [
+          {
+            "dimension": "sex",
+            "category": "Female",
+            "justification": "x"
+          }
+        ]
+      },
+      "error": "not in the data"
+    }
+  ]
+}

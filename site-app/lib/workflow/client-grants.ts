@@ -42,6 +42,7 @@ export const clientGrantCommands: Record<string, WorkflowHandler> = {
             "Instructions",
             "Oversight",
             "Security",
+            "GenAI log",
             "Other",
           ]),
           handlingBasis: z.enum(["synthetic", "anonymized"]),

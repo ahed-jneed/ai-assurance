@@ -133,4 +133,4 @@ node schemas/validate-criteria.mjs --legacy-check rows.json   # the pre-deploy c
 
 ## Threshold library
 
-`threshold-library.json` is the threshold library of statistics 1.0.0 (`docs/design/audit-statistics.md` section 10): versioned acceptance rules with their legal status, timeless caveat and dated status notes. `site-app/lib/threshold-library.json` is its generated copy (`npm run sync`), and `engine/tests/test_threshold_library.py` keeps `engine/statistics.py` LIBRARY equal to its decidable entries.
+`threshold-library.json` is the threshold library of statistics 1.0.0 (`docs/design/audit-statistics.md` section 10): versioned acceptance rules with their legal status, timeless caveat and dated status notes. `site-app/lib/threshold-library.json` and `engine/threshold-library.json` are its generated copies (`npm run sync`); the hosted runner and `engine/statistics.py` load them, so neither keeps its own list of entries (#113).

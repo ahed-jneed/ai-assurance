@@ -23,7 +23,14 @@ function PackCard({ pack }: { pack: PackSummary }) {
       <b>
         {pack.title} <span className="subtle">{pack.version}</span>
         {pack.isDefault && <span className="badge"> Default</span>}
+        {pack.draft && <span className="badge"> Draft preview</span>}
       </b>
+      {pack.draft && (
+        <small className="block">
+          Not released: a local draft preview. Its clause numbers and licences
+          are not yet confirmed, and its coverage never shows Covered.
+        </small>
+      )}
       <small className="block">
         {pack.frameworks
           .map((f) => f.shortTitle + " (" + f.edition + ")")

@@ -27,7 +27,13 @@ export async function GET(request: Request) {
       );
     let profile;
     try {
-      profile = inspectCSV(csv);
+      // values=<column> lists a column's distinct values and counts=<column>
+      // their row counts, for the power check's classes and planned group
+      // sizes; at most two of each (the mapped target and group columns).
+      profile = inspectCSV(csv, {
+        values: url.searchParams.getAll("values").slice(0, 2),
+        counts: url.searchParams.getAll("counts").slice(0, 2),
+      });
     } catch (error) {
       throw new ApiError(400, (error as Error).message);
     }

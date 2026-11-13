@@ -454,6 +454,7 @@ export function RequestAccess({
                   "Instructions",
                   "Oversight",
                   "Security",
+                  "GenAI log",
                   "Other",
                 ].map((value) => ({ value, label: value })),
               },

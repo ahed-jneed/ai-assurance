@@ -5,7 +5,7 @@
 // their contributor's membership show as lapsed and can no longer be
 // updated; and the platform operator lists abandoned practices and deletes
 // one with its snapshots and R2 objects, restricted to PLATFORM_OPERATORS
-// and recorded in operator_events. Also drizzle 0012's email backfill and
+// and recorded in operator_events. Also drizzle 0013's email backfill and
 // its append-only triggers. Needs `npm run build` first.
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -520,7 +520,7 @@ await withWorker(
   },
 );
 
-// --- drizzle 0012 -----------------------------------------------------------
+// --- drizzle 0013 -----------------------------------------------------------
 {
   const mf = new Miniflare({
     modules: true,
@@ -565,7 +565,7 @@ await withWorker(
       /Management events are immutable/,
     );
     console.log(
-      "PASS drizzle 0012 records the email of members who joined by invitation and keeps history append-only outside an operator deletion",
+      "PASS drizzle 0013 records the email of members who joined by invitation and keeps history append-only outside an operator deletion",
     );
   } finally {
     await mf.dispose();
