@@ -1835,8 +1835,10 @@ def performance_models(crit, a, n, mins):
                     theta = math.fsum(2.0 * tp / (tp + share) for tp, share in parts) / k  # 2J/(1 + J) = 2TP/(TP + union)
                     supported = min(n * s for s in shares) >= cls
                 else:
+                    # Recalls lie strictly inside (0, 1), so each predicted column holds at least s_c * r_c > 0;
+                    # the share guard is defensive only. Support counts the predicted column of each class.
                     theta = math.fsum(tp / share if share > 0.0 else 0.0 for tp, share in parts) / k
-                    supported = min(n * share for _, share in parts) >= cls  # a class never predicted has no precision
+                    supported = min(n * share for _, share in parts) >= cls
                 models.append(power_model(metric, metric, theta, {"perClass": {label: n * share for label, (_, share) in zip(labels, parts)}}, lambda z, c=cells, m=metric, b=band: macro_probs(m, n, c, b, z), supported))
             else:
                 models.append(power_model(metric, metric, None, None, None, False, computed=False))

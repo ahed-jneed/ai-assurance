@@ -3316,7 +3316,9 @@ function performanceModels(
                   : 0.0,
             ),
           ) / k;
-        // A class never predicted has no precision.
+        // Recalls lie strictly inside (0, 1), so each predicted column holds
+        // at least s_c * r_c > 0; the share guard is defensive only. Support
+        // counts the predicted column of each class.
         const supported =
           metric === "macro_f1"
             ? Math.min(...shares.map((s) => n * s)) >= cls

@@ -144,7 +144,9 @@ export function art50GenaiPlan(templateId: string): Art50GenaiPlan | null {
     procedures.filter((p) => p.catalogItemId === templateId).map((p) => p.id),
   );
   const decided = (c: ResolvedArt50Criterion) =>
-    !!c.band && c.role !== "descriptive" && c.metric in ART50_GENAI_METRICS;
+    !!c.band &&
+    c.role !== "descriptive" &&
+    Object.hasOwn(ART50_GENAI_METRICS, c.metric);
   const preRegistered = criteria.filter(decided);
   if (!preRegistered.length) return null;
   return {

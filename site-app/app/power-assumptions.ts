@@ -263,9 +263,9 @@ export function powerSentence(power: CriterionPower, target: number) {
     (power.failMdeRatio
       ? ` A ratio of ${power.failMdeRatio.toFixed(2)} would fail with ${share(target)} probability.`
       : "") +
-    (power.members.some((m) => m.metric in MACRO)
+    (power.members.some((m) => Object.hasOwn(MACRO, m.metric))
       ? ` For ${power.members
-          .filter((m) => m.metric in MACRO)
+          .filter((m) => Object.hasOwn(MACRO, m.metric))
           .map((m) => METRIC_WORDS[m.metric])
           .join(
             " and ",
