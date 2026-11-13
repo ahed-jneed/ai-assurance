@@ -460,6 +460,7 @@
       }
     },
     "multiclassAssumptions": {
+      "description": "Section 8. Every class has a share and a recall: perClassRecall names exactly the labels of classShares (#113). The shares sum to 1 within 1e-9, and every share and every recall lies strictly between 0 and 1. JSON Schema cannot compare the keys of two objects or sum values, so validate_plan in both runners enforces those two rules. The power formulas of macro F1 and macro precision also assume that the errors of each class spread evenly over the other classes (#152).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -474,6 +475,7 @@
           "maximum": 10000000
         },
         "classShares": {
+          "description": "Assumed share of the rows in each class, keyed by class label: above 0, summing to 1 over the classes.",
           "type": "object",
           "minProperties": 2,
           "maxProperties": 100,
@@ -482,6 +484,7 @@
           }
         },
         "perClassRecall": {
+          "description": "Assumed true recall of each class, keyed by the labels of classShares.",
           "type": "object",
           "minProperties": 2,
           "maxProperties": 100,

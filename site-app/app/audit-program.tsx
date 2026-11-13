@@ -50,7 +50,7 @@ import {
   revisionWarnings,
   runBindsProcedure,
 } from "@/lib/workflow-state";
-import { packFeatures, type WorkspaceData } from "./workspace-types";
+import type { WorkspaceData } from "./workspace-types";
 import { FrozenReportDetails } from "./report-details";
 import { ProcedureContext } from "./procedure-context";
 import { ProcedureComparison } from "./revision-comparison";
@@ -69,12 +69,8 @@ import {
   Art50StatisticalCriteria,
   Art50Suggestion,
 } from "./audit-program/art50-plan";
-import { classificationRules } from "@/lib/classification-rules";
-import {
-  art50PaperSuggestion,
-  type PaperSuggestion,
-} from "@/lib/domain/art50-papers";
-import { asRulePack } from "@/lib/rule-pack";
+import type { PaperSuggestion } from "@/lib/domain/art50-papers";
+import { art50Suggestions } from "./audit-program/art50-suggestion";
 type Option = {
   value: string;
   label: string;
@@ -518,23 +514,12 @@ export function AuditProgram({
     data.people.find((m) => m.user_id === id)?.display_name ??
     (id ? "Unknown or inactive member" : "Unassigned");
   // The applicability the classification suggests for an Art 50 paper
-  // (#120); never applied without the auditor saving the plan.
-  const classificationRulesOfPack = classificationRules(
-      asRulePack(data.catalog?.regulatorySnapshot),
-    ),
-    classified = packFeatures(data).aiActClassification,
+  // (#120), dated against the engagement period (#152); never applied
+  // without the auditor saving the plan.
+  const suggestionFor = art50Suggestions(data, e),
     catalogItem = (templateId: string) =>
       data.catalog?.items.find((i) => i.id === templateId),
-    art50Suggestion = (p: Procedure) => {
-      const item = classified ? catalogItem(p.templateId) : undefined;
-      return item && e.classification
-        ? art50PaperSuggestion(
-            e.classification,
-            classificationRulesOfPack,
-            item,
-          )
-        : null;
-    };
+    art50Suggestion = (p: Procedure) => suggestionFor(p.templateId);
   function draftScope(
     kind: DraftScope["kind"],
     recordId: string,

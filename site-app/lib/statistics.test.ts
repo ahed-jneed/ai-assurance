@@ -49,10 +49,10 @@ function compute(c: any): unknown {
 describe("statistics golden fixture (hosted runner, core level)", () => {
   it("has the fixture shape the specification fixes", () => {
     expect(GOLDEN.specificationVersion).toBe(st.SPEC_VERSION);
-    expect(GOLDEN.cases).toHaveLength(60);
+    expect(GOLDEN.cases).toHaveLength(62);
     expect(GOLDEN.defaults.minimums).toEqual(st.FLOORS);
     // Every case except the engine-only calibration case runs here, the clustered ones included (#136).
-    expect(HOSTED).toHaveLength(59);
+    expect(HOSTED).toHaveLength(61);
   });
 
   it.each(HOSTED.map((c: any) => [c.id, c]))(

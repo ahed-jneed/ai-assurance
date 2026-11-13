@@ -1786,6 +1786,76 @@ def normal_probs(theta, se, band, z):
     return two_sides(passing), failing
 
 
+def even_spread_cells(shares, recalls):
+    """Section 8 (#152): the expected confusion matrix, as shares of n, when class c is recognised with its assumed
+    recall and its errors are spread evenly over the other k - 1 classes (row c is the truth, column j the prediction)."""
+    k = len(shares)
+    return [[s * (r if j == c else (1.0 - r) / (k - 1)) for j in range(k)] for c, (s, r) in enumerate(zip(shares, recalls))]
+
+
+def macro_parts(metric, cells):
+    """Per class: (TP share, denominator share). Macro precision: TP of the predicted count; macro F1: the Jaccard
+    index TP of TP + FP + FN (section 5.4)."""
+    k = len(cells)
+    rows = [math.fsum(cells[c]) for c in range(k)]
+    cols = [math.fsum(cells[i][c] for i in range(k)) for c in range(k)]
+    return [(cells[c][c], cols[c] if metric == "macro_precision" else rows[c] + cols[c] - cells[c][c]) for c in range(k)]
+
+
+def wilson_slope(x, n, z, side):
+    """d(Wilson bound)/d(x-hat) at the proportion x with denominator n; side -1 is the lower bound, +1 the upper."""
+    root = math.sqrt(x * (1.0 - x) / n + z * z / (4.0 * n * n))
+    return (1.0 + side * z * (1.0 - 2.0 * x) / (2.0 * n * root)) / (1.0 + z * z / n)
+
+
+def macro_bound(metric, n, cells, z, side):
+    """Section 8 (#152): a macro bound (side -1 lower, +1 upper) of section 5.4 at critical value z, as it would be
+    computed at the expected counts, and its standard deviation by the delta method over the multinomial confusion
+    matrix: the gradient of the mean of the per-class bounds in the cell shares, through each class's Wilson slope."""
+    k = len(cells)
+    zk = per_class_z(z, k)
+    values, gradient = [], [[0.0] * k for _ in range(k)]
+    for c, (tp, share) in enumerate(macro_parts(metric, cells)):
+        x = tp / share
+        lo, hi = wilson(n * tp, n * share, zk)
+        b = lo if side < 0 else hi
+        slope = wilson_slope(x, n * share, zk, side)
+        if metric == "macro_f1":  # the Jaccard bound maps to F1 through 2J/(1 + J)
+            values.append(f1_from_j(b))
+            slope *= 2.0 / (1.0 + b) ** 2
+        else:
+            values.append(b)
+        for i in range(k):
+            for j in range(k):
+                counted = j == c if metric == "macro_precision" else (i == c or j == c)
+                gradient[i][j] += slope * ((1.0 if i == j == c else 0.0) - (x if counted else 0.0)) / share / k
+    first = math.fsum(gradient[i][j] * cells[i][j] for i in range(k) for j in range(k))
+    second = math.fsum(gradient[i][j] ** 2 * cells[i][j] for i in range(k) for j in range(k))
+    return math.fsum(values) / k, math.sqrt(max(0.0, second - first * first) / n)
+
+
+def normal_tail(distance, sd):
+    """Phi(distance / sd); a bound without variance decides by its sign."""
+    if sd > 0.0:
+        return phi(distance / sd)
+    return 1.0 if distance > 0.0 else 0.0 if distance < 0.0 else 0.5
+
+
+def macro_probs(metric, n, cells, band, z):
+    """Pass and fail probability of a macro F1 or macro precision member: the macro bounds at z are taken as normal
+    around their values at the expected counts (section 8)."""
+    lower, upper = band.get("lower"), band.get("upper")
+    (lo, sd_lo), (hi, sd_hi) = macro_bound(metric, n, cells, z, -1), macro_bound(metric, n, cells, z, 1)
+    passing, failing = [], 0.0
+    if lower is not None:
+        passing.append(normal_tail(lo - lower, sd_lo))
+        failing += normal_tail(lower - hi, sd_hi)
+    if upper is not None:
+        passing.append(normal_tail(upper - hi, sd_hi))
+        failing += normal_tail(lo - upper, sd_lo)
+    return two_sides(passing), failing
+
+
 def assumed(value, group):
     return value[group] if isinstance(value, dict) else value
 
@@ -1825,6 +1895,19 @@ def performance_models(crit, a, n, mins):
                 theta = math.fsum(recalls) / k
                 se = math.sqrt(math.fsum(r * (1.0 - r) / (n * s) for s, r in zip(shares, recalls))) / k
                 models.append(power_model(metric, metric, theta, {"perClass": {label: n * s for label, s in zip(labels, shares)}}, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), min(n * s for s in shares) >= cls))
+            elif metric in ("macro_f1", "macro_precision"):
+                # Section 8 (#152): the errors of each class spread evenly over the other classes.
+                cells = even_spread_cells(shares, recalls)
+                parts = macro_parts(metric, cells)
+                if metric == "macro_f1":
+                    theta = math.fsum(2.0 * tp / (tp + share) for tp, share in parts) / k  # 2J/(1 + J) = 2TP/(TP + union)
+                    supported = min(n * s for s in shares) >= cls
+                else:
+                    # Recalls lie strictly inside (0, 1), so each predicted column holds at least s_c * r_c > 0;
+                    # the share guard is defensive only. Support counts the predicted column of each class.
+                    theta = math.fsum(tp / share if share > 0.0 else 0.0 for tp, share in parts) / k
+                    supported = min(n * share for _, share in parts) >= cls
+                models.append(power_model(metric, metric, theta, {"perClass": {label: n * share for label, (_, share) in zip(labels, parts)}}, lambda z, c=cells, m=metric, b=band: macro_probs(m, n, c, b, z), supported))
             else:
                 models.append(power_model(metric, metric, None, None, None, False, computed=False))
     else:
