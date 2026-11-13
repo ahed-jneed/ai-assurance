@@ -551,6 +551,24 @@ export function ManagementViews({
             )}
           </section>
         )}
+        {lead && !!data.revocationCancellations?.length && (
+          <section className="panel" aria-label="Invitations cancelled">
+            <h2 className="panel-title">Invitations cancelled by revocation</h2>
+            <p className="subtle">
+              Revoking a member cancels the pending invitations sent to their
+              recorded email, so the invitation cannot readmit them.
+            </p>
+            <ul className="record-list">
+              {data.revocationCancellations.map((r) => (
+                <li key={r.eventId}>
+                  <b>{r.displayName ?? r.userId}</b> revoked by {r.revokedBy} on{" "}
+                  {r.createdAt.slice(0, 10)} · cancelled{" "}
+                  {r.invitations.map((i) => i.email).join(", ")}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <details className="help-panel">
           <summary>Add a colleague</summary>
           <ol className="record-list">

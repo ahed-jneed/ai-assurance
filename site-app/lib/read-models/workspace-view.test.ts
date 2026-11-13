@@ -140,6 +140,52 @@ describe("workspaceView", () => {
     expect(incidents(sqlite)).toMatchObject([{ occurrences: 2 }]);
   });
 
+  it("names the invitation emails each revocation cancelled, for administrators (#151)", async () => {
+    const { sqlite } = await practice(three());
+    const run = (sql: string, ...args: string[]) =>
+      sqlite.prepare(sql).run(...args);
+    run(
+      "INSERT INTO invitations(tenant_id,id,email,role,invited_by,created_at,expires_at,status) VALUES(?,'INV-1','nia@example.test','Auditor','lead','2026-11-01T00:00:00.000Z','2026-12-01T00:00:00.000Z','cancelled')",
+      tenantId,
+    );
+    const event = (id: string, details: object, at: string) =>
+      run(
+        "INSERT INTO management_events(tenant_id,id,actor,action,details,hash,created_at) VALUES(?,?,'lead',?,?,'h',?)",
+        tenantId,
+        id,
+        "revokeMember",
+        JSON.stringify(details),
+        at,
+      );
+    event(
+      "ME-1",
+      { userId: "user-nia", cancelledInvitations: ["INV-1"] },
+      "2026-11-02T00:00:00.000Z",
+    );
+    // Neither a revocation that cancelled nothing nor one recorded before
+    // #148 listed cancellations is shown.
+    event(
+      "ME-2",
+      { userId: "user-ada", cancelledInvitations: [] },
+      "2026-11-03T00:00:00.000Z",
+    );
+    event("ME-3", { userId: "user-bo" }, "2026-11-04T00:00:00.000Z");
+    const admin = { ...lead(), practiceAdmin: true };
+    expect((await workspaceView(admin, null)).revocationCancellations).toEqual([
+      {
+        eventId: "ME-1",
+        createdAt: "2026-11-02T00:00:00.000Z",
+        userId: "user-nia",
+        displayName: null,
+        revokedBy: "lead",
+        invitations: [{ id: "INV-1", email: "nia@example.test" }],
+      },
+    ]);
+    expect((await workspaceView(lead(), null)).revocationCancellations).toEqual(
+      [],
+    );
+  });
+
   it("marks a platform operator, so the account menu links the console (#151)", async () => {
     await practice(three());
     expect((await workspaceView(lead(), null)).identity.operator).toBe(false);

@@ -3,6 +3,7 @@ import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
 import type { IntegrityIncidents } from "@/lib/engagement-storage";
+import type { RevocationCancellation } from "@/lib/read-models/workspace-view";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -105,6 +106,11 @@ export type WorkspaceData = {
     hash: string;
     details: string;
   }[];
+  /**
+   * The practice's latest revocations that cancelled pending invitations,
+   * with the emails (#151), for practice administrators.
+   */
+  revocationCancellations?: RevocationCancellation[];
   /**
    * The practice's recorded engagement integrity incidents (damaged records
    * members met), for practice administrators; null for everyone else.
