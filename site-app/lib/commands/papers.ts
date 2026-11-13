@@ -6,8 +6,11 @@ import {
   type Paper,
 } from "../domain";
 import { id, now, sha256 } from "../engagement-repo";
-import { pinned } from "../criteria/pin";
+import { managementSystemView, pinned } from "../criteria/pin";
+import { earlierPhasePapers } from "../domain/management-system";
 import { templatePaper } from "../factories";
+import { procedureGenaiBlockers } from "../genai/readiness";
+import { linkedReadiness } from "../genai/store";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
@@ -78,7 +81,7 @@ export const papers = defineCommands({
   },
   editPaper: {
     roles: ["Auditor", "Lead Auditor"],
-    handle(e, d, ctx) {
+    async handle(e, d, ctx) {
       const a = z
           .object({
             paperId: short,
@@ -122,6 +125,21 @@ export const papers = defineCommands({
         )
       )
         throw new ApiError(400, "Link accepted evidence from this engagement");
+      // The GenAI gate applies to a free paper as to a procedure's
+      // (docs/design/genai-evidence.md section 12.3).
+      if (["supported", "qualified"].includes(a.body.conclusionStatus)) {
+        const blockers = procedureGenaiBlockers(
+          p.templateId,
+          await linkedReadiness(ctx, e, a.evidenceIds),
+        );
+        if (blockers.length)
+          throw new ApiError(
+            400,
+            "The linked GenAI evidence cannot support this conclusion yet (" +
+              [...new Set(blockers.map((b) => b.code))].join(", ") +
+              ")",
+          );
+      }
       // An existing supplementary paper is not an applicability exclusion. Removing a required paper or recording not-applicable remains Lead-controlled.
       const supplementary =
         !p.required &&
@@ -249,6 +267,15 @@ export const papers = defineCommands({
         );
       if (p.comments.some((c) => !c.resolved))
         throw new ApiError(400, "Unresolved comments block sign-off");
+      // Programme phases (#28): Stage 2 work is signed once Stage 1 is.
+      const phases = managementSystemView(pinned(e))?.phases ?? [];
+      const earlier = earlierPhasePapers(e, phases, p);
+      if (earlier.length)
+        throw new ApiError(
+          409,
+          "Sign the papers of the earlier programme phase first: " +
+            earlier.map((q) => q.templateId).join(", "),
+        );
       const hash = await sha256(
         JSON.stringify({
           body: p.body,

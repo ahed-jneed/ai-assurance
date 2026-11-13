@@ -11,7 +11,8 @@ import {
   responseError,
   sha256,
 } from "@/lib/store";
-import { buildDossier, signDossier } from "@/lib/dossier";
+import { buildDossier, scopeSha256, signDossier } from "@/lib/dossier";
+import { dossierScopeRequest, scopeDefinition } from "@/lib/dossier-scope";
 import { activeSigningKey } from "@/lib/signing-keys";
 import { addRecord, dossierSeal } from "@/lib/assurance-store";
 import {
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
             )
             .max(100)
             .default([]),
+          // A scoped internal export (#83); omitted for the full dossier.
+          scope: dossierScopeRequest.optional(),
         })
         .strict()
         .parse(await readJson(request, 20000)),
@@ -60,7 +63,16 @@ export async function POST(request: Request) {
         409,
         "Select a captured report; client dossiers require release approval",
       );
-    const sealed = await dossierSeal(ctx, e.id, r.id, v.audience);
+    if (v.scope && v.audience !== "internal")
+      throw new ApiError(400, "Scoped exports are internal audit files");
+    const scope = v.scope
+        ? scopeDefinition(
+            v.scope,
+            (e.workflow?.procedures ?? []).map((p) => p.id),
+          )
+        : null,
+      scopeKey = scope ? await scopeSha256(scope) : null;
+    const sealed = await dossierSeal(ctx, e.id, r.id, v.audience, scopeKey);
     if (sealed) return Response.json({ record: sealed, existing: true });
     if (
       v.withheld.some(
@@ -84,6 +96,7 @@ export async function POST(request: Request) {
           v.audience === "client",
           signingKey.id,
           v.withheld,
+          scope,
         ),
       ),
       body = JSON.stringify(dossier),
@@ -96,6 +109,7 @@ export async function POST(request: Request) {
         r.id +
         "/" +
         v.audience +
+        (scopeKey ? "-scoped" : "") +
         "/" +
         hash;
     await bucket().put(key, body, {
@@ -112,6 +126,9 @@ export async function POST(request: Request) {
       publicKeySPKI: dossier.signature.publicKeySPKI,
       files: dossier.manifest.files.length,
       withheld: dossier.manifest.withheld,
+      ...(scopeKey
+        ? { scope: dossier.manifest.scope, scopeSha256: scopeKey }
+        : {}),
       createdAt: now(),
       signing:
         "Application Ed25519 practice key, wrapped at rest under the DOSSIER_KEK Worker secret; no external timestamp or KMS attestation",
@@ -145,7 +162,13 @@ export async function GET(request: Request) {
         : "internal";
     if (audience === "client" && !isClientVisible(r))
       throw new ApiError(404, "Client dossier not released");
-    const seal = await dossierSeal(ctx, e.id, r.id, audience);
+    // A scoped export is found by its scope digest (#83).
+    const scopeKey = u.searchParams.get("scope");
+    if (scopeKey !== null && !/^[a-f0-9]{64}$/.test(scopeKey))
+      throw new ApiError(400, "Name a scoped export by its scope SHA-256");
+    if (scopeKey !== null && audience !== "internal")
+      throw new ApiError(404, "Dossier not available");
+    const seal = await dossierSeal(ctx, e.id, r.id, audience, scopeKey);
     if (!seal)
       throw new ApiError(
         409,
@@ -160,7 +183,12 @@ export async function GET(request: Request) {
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition":
-          'attachment; filename="dossier-' + r.id + "-" + audience + '.json"',
+          'attachment; filename="dossier-' +
+          r.id +
+          "-" +
+          audience +
+          (scopeKey ? "-scope-" + scopeKey.slice(0, 12) : "") +
+          '.json"',
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
         "X-Dossier-SHA256": seal.body.sha256,

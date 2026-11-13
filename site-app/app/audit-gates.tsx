@@ -23,7 +23,7 @@ import {
   assuranceLevelIds,
   assuranceLevels,
   conclusionTypes,
-  engagementTypeIds,
+  offeredEngagementTypes,
   engagementTypes,
   normalizeTerms,
   requiresSupport,
@@ -79,6 +79,7 @@ export function AuditGateList({
     "Findings",
     "Report elements",
     "Quality review",
+    "Management system",
     "Engagement stage",
   ];
   const group = (g: AuditGate) =>
@@ -100,6 +101,7 @@ export function AuditGateList({
           conclusion: "Conclusion exceptions",
           report: "Report elements",
           quality_review: "Quality review",
+          management_system: "Management system",
         }[g.kind];
   function row(g: AuditGate) {
     const p = ["paper", "conclusion"].includes(g.kind)
@@ -121,7 +123,9 @@ export function AuditGateList({
               ? "Independent classification approval required."
               : "Record the intended purpose and risk route, then obtain independent approval."
           : g.kind === "finding"
-            ? "An open High or Critical finding prevents an unmodified or readiness conclusion."
+            ? g.id === g.recordId
+              ? "An open High or Critical finding prevents an unmodified or readiness conclusion."
+              : g.message
             : g.kind === "run"
               ? run?.state === "queued"
                 ? "An Auditor or Lead Auditor executes or cancels this queued evaluation."
@@ -167,6 +171,7 @@ export function AuditGateList({
             ? "Open scope & program"
             : "Edit report terms",
           quality_review: "Open quality review",
+          management_system: "Open management system",
         }[g.kind];
     const content = (
       <>
@@ -229,9 +234,12 @@ export function AuditGateList({
 export function ReportTermsPicker({
   terms,
   onTerms,
+  certification = false,
 }: {
   terms: ReportTerms;
   onTerms: (terms: ReportTerms) => void;
+  /** The pack has certification recommendations (#28). */
+  certification?: boolean;
 }) {
   const type = engagementTypes[terms.engagementType];
   const pick = (patch: Partial<Record<keyof ReportTerms, string>>) =>
@@ -248,7 +256,7 @@ export function ReportTermsPicker({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {engagementTypeIds.map((t) => (
+            {offeredEngagementTypes(certification).map((t) => (
               <SelectItem key={t} value={t}>
                 {engagementTypes[t].label}
               </SelectItem>
@@ -354,7 +362,11 @@ export function ReportReadiness({
           </p>
         </div>
       </div>
-      <ReportTermsPicker terms={terms} onTerms={onTerms} />
+      <ReportTermsPicker
+        terms={terms}
+        onTerms={onTerms}
+        certification={!!features?.certificationRecommendation}
+      />
       {!requiresSupport(terms.conclusion) && !!exceptions && (
         <p className="readiness-context">
           {exceptions} open High or Critical{" "}

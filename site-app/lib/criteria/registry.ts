@@ -39,6 +39,15 @@ const keyOf = (e: {
 }) => `${e.documentType}:${e.id}@${e.edition ?? ""}#${e.version}`;
 const released = (e: IndexEntry) =>
   e.status === "released" || e.status === "withdrawn";
+/**
+ * A draft in a local draft preview: only a bundle built with
+ * CRITERIA_INCLUDE_DRAFTS=1 gives drafts a digest, and check:sync keeps such
+ * a bundle out of the repository, so production never has one. A preview
+ * draft can be pinned and selected, is labelled a draft, and coverage clamps
+ * its links to partial (design section 9.2).
+ */
+export const previewDraft = (e: IndexEntry) =>
+  e.status === "draft" && e.sha256 !== undefined;
 
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -106,20 +115,21 @@ export const frameworkEntry = (
   f: { id: string; edition: string; version: string },
 ) => entryOf(r, "framework", f.id, f.version, f.edition);
 
-/** The highest released, non-withdrawn version of a pack or crosswalk. */
+/**
+ * The highest released, non-withdrawn version of a pack or crosswalk; in a
+ * local draft preview, the highest preview draft when none is released.
+ */
 export function currentVersion(
   r: Registry,
   documentType: "pack" | "crosswalk",
   id: string,
 ) {
-  return r.entries
-    .filter(
-      (e) =>
-        e.documentType === documentType &&
-        e.id === id &&
-        e.status === "released",
-    )
-    .sort((a, b) => compareVersions(b.version, a.version))[0];
+  const versions = r.entries
+    .filter((e) => e.documentType === documentType && e.id === id)
+    .sort((a, b) => compareVersions(b.version, a.version));
+  return (
+    versions.find((e) => e.status === "released") ?? versions.find(previewDraft)
+  );
 }
 /** The latest released, non-withdrawn data version of a framework edition. */
 export function latestFramework(r: Registry, id: string, edition: string) {
@@ -141,7 +151,11 @@ export function latestFramework(r: Registry, id: string, edition: string) {
  */
 export function resolve(r: Registry, pin: CriteriaPin): Resolved {
   const entry = entryOf(r, "pack", pin.packId, pin.packVersion);
-  if (!entry || !released(entry) || entry.sha256 !== pin.packSha256)
+  if (
+    !entry ||
+    !(released(entry) || previewDraft(entry)) ||
+    entry.sha256 !== pin.packSha256
+  )
     throw new ApiError(
       500,
       `The criteria pack ${pin.packId} ${pin.packVersion} this engagement is pinned to is not available in this build`,
@@ -177,15 +191,19 @@ export function pinFor(r: Registry, id: string, version: string): CriteriaPin {
 /** Whether a pack version may be pinned by a new engagement. */
 export function selectable(r: Registry, id: string, version: string) {
   const e = entryOf(r, "pack", id, version);
-  if (!e || e.status !== "released" || !e.selectable) return false;
+  if (!e || !(e.status === "released" || previewDraft(e)) || !e.selectable)
+    return false;
   const pack = packDocument(r, id, version)!;
+  // A preview draft's frameworks are drafts whose licences may be
+  // unconfirmed: that is what keeps them drafts.
   return (
     pack.kind === "audit_programme" &&
-    pack.criteria.every(
-      (s) =>
-        frameworkDocument(r, s.framework, s.edition, s.version)?.licence
-          .status === "confirmed",
-    )
+    (previewDraft(e) ||
+      pack.criteria.every(
+        (s) =>
+          frameworkDocument(r, s.framework, s.edition, s.version)?.licence
+            .status === "confirmed",
+      ))
   );
 }
 
@@ -261,7 +279,9 @@ export function selectablePacks(r: Registry): PackSummary[] {
       ...new Set(
         r.entries
           .filter(
-            (e) => e.documentType === "crosswalk" && e.status === "released",
+            (e) =>
+              e.documentType === "crosswalk" &&
+              (e.status === "released" || previewDraft(e)),
           )
           .map((e) => r.documents.get(keyOf(e)) as CrosswalkDocument)
           .flatMap((c) => {
@@ -285,6 +305,7 @@ export function selectablePacks(r: Registry): PackSummary[] {
         title: pack.title,
         summary: pack.summary ?? "",
         isDefault: defaults.id === id && defaults.version === current.version,
+        draft: previewDraft(current),
         workingPapers: pack.items.filter((i) => i.kind === "working_paper")
           .length,
         memos: pack.items.filter((i) => i.kind === "memo").length,

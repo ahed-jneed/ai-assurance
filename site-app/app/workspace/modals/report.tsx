@@ -6,8 +6,9 @@ import { packFeatures } from "../../workspace-types";
 import {
   assuranceLevelIds,
   assuranceLevels,
+  certificationQualityStatement,
   conclusionTypes,
-  engagementTypeIds,
+  offeredEngagementTypes,
   engagementTypes,
   normalizeTerms,
   resolveParticulars,
@@ -124,7 +125,9 @@ function ReportFields({
           <Choice
             label="Engagement type"
             value={report.engagementType}
-            values={engagementTypeIds.map((t) => ({
+            values={offeredEngagementTypes(
+              packFeatures(data).certificationRecommendation,
+            ).map((t) => ({
               value: t,
               label: engagementTypes[t].label,
             }))}
@@ -177,20 +180,29 @@ function ReportFields({
         "Location",
         "Where the practitioner practises, e.g. Vienna, Austria.",
       )}
-      <label>
-        Independence and quality management statement
-        <Textarea
-          name="qualityStatement"
-          maxLength={2000}
-          value={choices.qualityStatement ?? ""}
-          placeholder={report.particulars?.qualityStatement}
-          onChange={(ev) => choice("qualityStatement", ev.target.value)}
-        />
-        <small className="subtle">
-          The firm&apos;s ethical requirements and system of quality management
-          as the report states them.{fromSettings("qualityStatement")}
-        </small>
-      </label>
+      {report.engagementType === "certification" ? (
+        <p className="subtle">
+          Independence and quality management: a certification audit states the
+          ISO/IEC 17021-1 impartiality statement. &ldquo;
+          {certificationQualityStatement}&rdquo;
+        </p>
+      ) : (
+        <label>
+          Independence and quality management statement
+          <Textarea
+            name="qualityStatement"
+            maxLength={2000}
+            value={choices.qualityStatement ?? ""}
+            placeholder={report.particulars?.qualityStatement}
+            onChange={(ev) => choice("qualityStatement", ev.target.value)}
+          />
+          <small className="subtle">
+            The firm&apos;s ethical requirements and system of quality
+            management as the report states them.
+            {fromSettings("qualityStatement")}
+          </small>
+        </label>
+      )}
       {statesBasis(report.conclusion) &&
         (report.conclusion === "readiness_gaps" ? (
           <label>

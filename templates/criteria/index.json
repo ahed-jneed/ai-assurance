@@ -38,6 +38,57 @@
       "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
     },
     {
+      "documentType": "framework",
+      "id": "owasp-llm-top-10",
+      "edition": "2026",
+      "version": "2026.11.0",
+      "path": "frameworks/owasp-llm-top-10/2026/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "sha256": "4141359e33be7cfbc134d3ef3257d1b38f4ca206277dcfa2fabe229ca7646e53"
+    },
+    {
+      "documentType": "framework",
+      "id": "owasp-agentic-top-10",
+      "edition": "2025-12",
+      "version": "2026.11.0",
+      "path": "frameworks/owasp-agentic-top-10/2025-12/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "sha256": "d87de88b9a52ac0465af85208583a90280255d3861acdeccaf1003550b2992a1"
+    },
+    {
+      "documentType": "pack",
+      "id": "genai-evaluation",
+      "version": "2026.11.0",
+      "path": "packs/genai-evaluation/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "selectable": true,
+      "sha256": "c1f2db0c1e531d9b7d651e541fd4ea76449bd77bbab84f35ed84765fc4302f14"
+    },
+    {
       "documentType": "pack",
       "id": "eu-ai-act-amended",
       "version": "2026.11.3",
@@ -53,6 +104,79 @@
       "releasedAt": "2026-11-07",
       "selectable": true,
       "sha256": "a92288fa3921dedd0099fd64152f05a063269280a9bc426e4380f075d6864554"
+    },
+    {
+      "documentType": "framework",
+      "id": "iso-iec-42001",
+      "edition": "2023",
+      "version": "2026.11.1",
+      "path": "frameworks/iso-iec-42001/2023/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "framework",
+      "id": "en-18286",
+      "edition": "2026",
+      "version": "2026.11.1",
+      "path": "frameworks/en-18286/2026/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "pack",
+      "id": "en18286-iso42001",
+      "version": "2026.11.1",
+      "path": "packs/en18286-iso42001/2026.11.1.json",
+      "status": "draft",
+      "selectable": true
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "iso-iec-42001-to-eu-ai-act",
+      "version": "2026.11.1",
+      "path": "crosswalks/iso-iec-42001-to-eu-ai-act/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "crosswalk",
+      "id": "en-18286-to-eu-ai-act",
+      "version": "2026.11.1",
+      "path": "crosswalks/en-18286-to-eu-ai-act/2026.11.1.json",
+      "status": "draft"
+    },
+    {
+      "documentType": "framework",
+      "id": "nyc-ll144",
+      "edition": "2023-07-05",
+      "version": "2026.11.0",
+      "path": "frameworks/nyc-ll144/2023-07-05/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #30)",
+          "at": "2026-11-12"
+        }
+      ],
+      "legalReview": "pending",
+      "releasedAt": "2026-11-12",
+      "sha256": "e25d25808510cff55cf8a696fd07760c3d8328ee59737c867212df470d287df0"
+    },
+    {
+      "documentType": "pack",
+      "id": "nyc-ll144-bias-audit",
+      "version": "2026.11.0",
+      "path": "packs/nyc-ll144-bias-audit/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #30)",
+          "at": "2026-11-12"
+        }
+      ],
+      "releasedAt": "2026-11-12",
+      "selectable": true,
+      "sha256": "f6ede6d58353983d233c54cdd690a0cc8e3e9b4ee4ec5ec74d8c21d0e2af643c"
     }
   ],
   "defaults": {

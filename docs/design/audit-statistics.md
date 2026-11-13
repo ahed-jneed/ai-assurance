@@ -633,13 +633,13 @@ Because the interval now decides, minimums are a safety net rather than the main
 ## 8. Power and minimum detectable effect (at plan approval)
 
 **Inputs.** Each confirmatory criterion carries `powerAssumptions` in the plan, in a shape that depends on its kind (section 9). The approval step also needs the target power (plan `power.targetPower`, default 0.80), the confidence level and the family size F.
-- Planned sizes may be pre-filled from the registered dataset's row and group counts.
+- Planned sizes may be pre-filled from the registered dataset's row and group counts. The testing lab does so (#113): `n` is the row count, `groupSizes` are the rows of each value of the protected-group column, and a multiclass criterion asks for a share and a recall for every class of the target column.
 - Outcome-derived quantities (prevalence, assumed rates, assumed metric values) are entered by the auditor, never read from the data being tested.
 
 | Kind | `powerAssumptions` | What follows from them |
 |---|---|---|
 | `performance` (binary) | `n`, `prevalence` π, `truePositiveRate`, `trueNegativeRate` | P = nπ, N = n(1 − π), and every binary metric's true value and denominator (table below) |
-| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1), `perClassRecall` {label: recall} | accuracy = Σ share·recall; balanced accuracy = mean recall |
+| `multiclass_performance` | `n`, `classShares` {label: share} (sum 1, every share above 0), `perClassRecall` {label: recall} (the same labels; #113) | accuracy = Σ share·recall; balanced accuracy = mean recall |
 | `regression_performance` | `n`, `errorSd` σ, and optionally `targetSd` σ_y (#93, engine only until the hosted runner mirrors it) | Errors are assumed normal with mean 0: MAE = σ√(2/π), SD(\|e\|) = σ√(1 − 2/π), MSE = σ², SD(e²) = √2·σ². With σ_y, the mean baseline gate (section 5.9) becomes a pass condition (below) |
 | `group_comparison` | `groupSizes` {group: n}. Selection-rate metrics: `baselineRate` and optional `assumedRates` {group: rate} (default: every group at the baseline). Equalized odds: `prevalence`, `truePositiveRate`, `falsePositiveRate` (each a number or per group). | Members as they would be formed at evaluation; for equalized odds, the per-group positives n_g·π_g and negatives n_g·(1 − π_g) |
 | `calibration` | none | not computed (`power_not_specified_for_metric`) |
@@ -834,7 +834,7 @@ The derivation reads one fact from the data: for a multiclass task, k, the numbe
 
 ### 10.1 Library entries
 
-Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); the hosted runner reads its generated copy and `engine/statistics.py` mirrors the entries a criterion can reference, which `engine/tests/test_threshold_library.py` checks.
+Library entries are versioned data, shipped identically in both runners. The data file is `schemas/threshold-library.json` (#22); both runners read generated copies of it (`npm run sync`): the hosted runner `site-app/lib/threshold-library.json`, and `engine/statistics.py` `engine/threshold-library.json`, from which it loads the entries a criterion can reference (#113; the copy sits in `engine/` so that the compute image built from that folder carries it). `engine/tests/test_threshold_library.py` checks the copy and the loaded entries.
 - A plan references an entry by `id` and `version` and stores the parameter values (section 9.1).
 - Every result that uses an entry MUST show its `legalStatus` label and `caveat` text verbatim. `decision.libraryEntry` carries both.
 - The run schema's `threshold.source` stays `"internal_policy"`, because the auditor adopts every entry as an internal acceptance rule.
@@ -1060,8 +1060,8 @@ These rules replace today's point-estimate checks: `validate_report`'s contractV
 | Binary data in which only one of the two declared labels occurs (GC-15, GC-37) | **evaluate** when both labels are declared (`positiveLabel` and the new `negativeLabel`); the gates of section 4.4 decide. A legacy profile without `negativeLabel` keeps today's two-label check. | yes (`positiveLabel` and `negativeLabel` are already declared) | `engineConfig` 1.4: the profile's declared pair, with the top-level `negativeLabel` equal to `config.negativeLabel`. `engineConfig` 1.1: #47's top-level `negativeLabel`; without it, the other label derived from the data, or in `auditor_model` mode from `modelSpec.outputLabels` (E4) |
 | Power and MDE at plan approval | **mirror** (approval UI), except the mean baseline gate of `targetSd`: the hosted plan normaliser drops `targetSd` and the approval UI does not ask for it (a follow-up of #93) | yes (CLI and report) | – |
 | Threshold library (data) | **mirror** | yes | copied |
-| LL144 computations | via #30 (same arithmetic) | via #30 | – |
-| Intersectional strata (several protected columns) | **mirror** once the profile accepts up to five group columns, which #30 adds (section 15); until then one column | yes (`intersectional_slices`) | – |
+| LL144 computations | **mirror** (`lib/ll144.ts`, #30; same arithmetic, `schemas/fixtures/ll144-golden.json`) | yes (`engine/ll144.py`) | – |
+| Intersectional strata (several protected columns) | **mirror** (#30): a hosted plan criterion may set `groupFields` (1–5 columns); strata labels, blank values as `unknownGroupRows` and the 1,000-strata limit follow `engine/criteria.py`. A special-category declaration and its basis cover every grouped column | yes (`intersectional_slices`) | – |
 | Calibration bins, ECE and Brier (need score columns) | not available; `interval_requires_engine` | engine-only | copied |
 | Cluster bootstrap, descriptive bootstrap (ECE, R²) and the MAE/RMSE sensitivity interval | not available: a plan with a `clusterField` is rejected (section 5.11) | engine-only (#93) | copied; a hosted `engineConfig` 1.4 plan with a cluster design is rejected |
 | Boschloo, BCa, shrinkage | not in 1.0.0 | possible engine-only additions (Q8; on the Later list) | – |
@@ -1413,6 +1413,7 @@ Regulation and guidance:
 - NYC:
   - [DCWP Notice of Adoption, Local Law 144 rules (6 RCNY §§ 5-300–5-304)](https://www.sidley.com/-/media/resource-pages/ai-monitor/laws-and-regulations/20230406-nyc-dcwp-notice-of-adoption-of-final-rule-for-local-law-144.pdf?la=en) and the [NYC rules page](https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-updated/), effective 5 July 2023. No later amendment was found; this was not re-verified beyond these pages.
   - The § 5-300 definitions and § 5-301(b)(5), (c)(1), (c)(5) and (d) were checked against the unofficial reproduction at [AGORA](https://agora.eto.tech/instrument/2002).
+  - #30 re-checked §§ 5-300 to 5-304 against the DCWP notice of adoption on the City's rules site (12 November 2026); the legal-review items are in `docs/research/ll144-2026-11.md` (LR-LL144-01 to LR-LL144-08).
 
 Statistics:
 - [Wilson 1927](https://doi.org/10.1080/01621459.1927.10502953); [Brown, Cai & DasGupta 2001](https://doi.org/10.1214/ss/1009213286); [Newcombe 1998](https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8%3C873::AID-SIM779%3E3.0.CO;2-I).

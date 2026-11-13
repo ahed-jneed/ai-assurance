@@ -8,7 +8,7 @@ import {
   conclusionTypes,
   engagementTypes,
   practitionerResponsibility,
-  qualityStatement,
+  qualityStatementFor,
   reportTitle,
   statesBasis,
   termsProblem,
@@ -282,7 +282,10 @@ export function reportElements(
       // assessment; an older workflow keeps its brief's free-text note.
       // Briefs no longer ask for that note, so an older workflow without
       // one is pointed to the acceptance record, which then applies.
-      value: particulars?.qualityStatement?.trim() || qualityStatement,
+      value: qualityStatementFor(
+        t.engagementType,
+        particulars?.qualityStatement,
+      ),
       problem: acceptanceApplies(e.workflow)
         ? acceptanceGates(e).length
           ? independenceProblem

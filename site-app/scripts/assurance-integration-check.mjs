@@ -299,6 +299,23 @@ try {
     rationale: "Numerical integration fixture only",
   });
   const classProfileId = e.evaluationProfiles.at(-1).id;
+  // A legacy protocol whose performance positive class "2" is not one of
+  // the system's output classes: refused when queued (#113), not by the
+  // worker's protocol_config_invalid.
+  await cmd("createEvaluationProfile", {
+    name: "External acceptance",
+    version: "2-class-2",
+    task: "Binary classification",
+    suite: ["performance"],
+    config: { ...config, performancePositiveLabel: "2" },
+    datasetContext: e.evaluationProfiles.at(-1).datasetContext,
+    rationale: "Numerical integration fixture only",
+  });
+  const strayClassProfileId = e.evaluationProfiles.at(-1).id;
+  assert.equal(
+    e.evaluationProfiles.at(-1).config.performancePositiveLabel,
+    "2",
+  );
   const system = (
     await assurance("registerSystem", {
       name: "Fixture AI system",
@@ -872,6 +889,28 @@ try {
     assert.equal(runtime.code, 0, runtime.out + runtime.error);
     return JSON.parse(runtime.out.trim());
   };
+  // A performance positive class outside the system's output classes is
+  // refused at queue time (#113); the worker would fail the job.
+  const pointClassProcedure = async (id) => {
+    e.workflow.procedures.find((p) => p.id === classProcedure.id).profileId =
+      id;
+    await writeEngagement();
+  };
+  await pointClassProcedure(strayClassProfileId);
+  const strayClass = await assurance(
+    "queueExternal",
+    { ...plan, profileId: strayClassProfileId, procedureId: classProcedure.id },
+    owner,
+    400,
+  );
+  assert.match(
+    strayClass.error,
+    /measures binary performance on the class '2', which is not one of the system revision's output classes \('1', '0'\)/,
+  );
+  await pointClassProcedure(classProfileId);
+  console.log(
+    "PASS a performance positive class outside the system's output classes is refused when queued",
+  );
   // The worker measures binary performance on the protocol's performance
   // positive class "0" (#65), and fairness would count the favourable "1".
   const classJob = await assurance("queueExternal", {
@@ -2012,8 +2051,10 @@ try {
     "--require-trusted-signature",
   ]);
   assert.equal(verified.code, 0, verified.out + verified.error);
-  // Manifest 1.1 signs the key ID and the captured versions (#25).
-  assert.equal(dossier.manifest.schemaVersion, "1.1");
+  // Manifest 1.1 signs the key ID and the captured versions (#25); 1.2 also
+  // signs the export scope, null for the full dossier (#83).
+  assert.equal(dossier.manifest.schemaVersion, "1.2");
+  assert.equal(dossier.manifest.scope, null);
   assert.equal(dossier.manifest.signingKeyId, dossier.signature.keyId);
   assert.deepEqual(dossier.manifest.rulePack, {
     version: e.rulePack.version,
@@ -2136,7 +2177,7 @@ try {
   ]);
   assert.equal(afterRotation.code, 0, afterRotation.out + afterRotation.error);
   console.log(
-    "PASS wrapped signing key, manifest 1.1, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
+    "PASS wrapped signing key, manifest 1.2, admin-only rotation with a management event, and pre-rotation dossier verification against published keys",
   );
   const stored = await testDb
     .prepare("SELECT body FROM engagements WHERE tenant_id=? AND id=?")

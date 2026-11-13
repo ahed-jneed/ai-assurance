@@ -101,9 +101,9 @@ export async function acceptInvitations(
         .bind(user.userId, at, tenantId, invitationId, at, ...supersededArgs),
       db()
         .prepare(
-          "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status,access_since) SELECT ?,?,?,?,?,'active',? WHERE " +
+          "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status,access_since,email) SELECT ?,?,?,?,?,'active',?,? WHERE " +
             guard +
-            " ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role,client_id=excluded.client_id,display_name=excluded.display_name,status='active',access_since=excluded.access_since WHERE memberships.status<>'active' AND (memberships.access_since IS NULL OR memberships.access_since<?)",
+            " ON CONFLICT(tenant_id,user_id) DO UPDATE SET role=excluded.role,client_id=excluded.client_id,display_name=excluded.display_name,status='active',access_since=excluded.access_since,email=excluded.email WHERE memberships.status<>'active' AND (memberships.access_since IS NULL OR memberships.access_since<?)",
         )
         .bind(
           tenantId,
@@ -112,6 +112,7 @@ export async function acceptInvitations(
           invitation.client_id,
           (invitation.display_name || user.displayName).slice(0, 300),
           at,
+          email,
           ...guardArgs,
           invitation.created_at,
         ),

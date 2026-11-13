@@ -4,7 +4,13 @@
 // (scripts/ts-modules.mjs), which compiles it and its relative imports.
 import type { Engagement, Report, Role, Run } from "./domain";
 import { isReleaseTimeRecord } from "./domain/release-time";
-import type { Brief, Procedure, Program, Workflow } from "./workflow-types";
+import type {
+  Brief,
+  ClientGrant,
+  Procedure,
+  Program,
+  Workflow,
+} from "./workflow-types";
 import type { DraftKind } from "./workspace-state";
 export const isClientRole = (role: Role | string) =>
   role === "Client Viewer" || role === "Client Contributor";
@@ -54,6 +60,26 @@ export function activeGrant(
         Date.parse(g.expiresAt) > at &&
         (!since || g.at >= since),
     ) ?? []
+  );
+}
+/** The contributor's membership as a client request grant depends on it. */
+export type GrantHolder = { status: string; access_since?: string | null };
+/**
+ * Whether a client request grant that is still marked active has lapsed: its
+ * contributor's membership was revoked, or their current grant began after
+ * the request grant was issued (a revocation, re-grant or role change since),
+ * so activeGrant no longer admits it. Lapsed grants stay in the engagement
+ * record; the Lead's request views show them as lapsed.
+ */
+export function clientGrantLapsed(
+  g: Pick<ClientGrant, "active" | "at">,
+  holder: GrantHolder | null | undefined,
+) {
+  return (
+    g.active &&
+    (!holder ||
+      holder.status !== "active" ||
+      (!!holder.access_since && g.at < holder.access_since))
   );
 }
 /**

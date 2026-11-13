@@ -84,6 +84,34 @@ export function assertDeclaredLabel(
 }
 
 /**
+ * Binary performance is measured on the protocol's performance positive
+ * class (#65). The worker accepts only one of the frozen label pair, which
+ * frozenLabelPair takes from the system revision's output classes, and would
+ * otherwise fail the job with protocol_config_invalid; refuse it here with a
+ * 400 instead. A legacy (1.0) protocol is the case that reaches this check:
+ * a 1.1 protocol's class is one of its declared pair, which the queue already
+ * matched to the system. Empty means the favourable label.
+ */
+export function assertPerformancePositiveLabel(
+  performancePositiveLabel: string | undefined,
+  frozen: { positiveLabel: string; negativeLabel: string } | undefined,
+) {
+  // The worker compares the stripped value (performance_positive_label).
+  const label = performancePositiveLabel?.trim();
+  if (
+    !frozen ||
+    !label ||
+    label === frozen.positiveLabel ||
+    label === frozen.negativeLabel
+  )
+    return;
+  throw new ApiError(
+    400,
+    `The protocol measures binary performance on the class '${label}', which is not one of the system revision's output classes (${quoted([frozen.positiveLabel, frozen.negativeLabel])}); the worker would refuse the job. Use a protocol version whose performance positive class is one of them, or leave it empty to use the favourable label '${frozen.positiveLabel}'.`,
+  );
+}
+
+/**
  * The worker's modelSpec limits for independent model inference
  * (validate_model_spec in engine/worker_contract.py).
  */

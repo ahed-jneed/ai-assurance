@@ -5,6 +5,7 @@ import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
+import { Ll144Panel } from "../../ll144-panel";
 import { WorkingPaperRegister } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
 import type { LabIntentState } from "../lab-intent";
@@ -40,6 +41,11 @@ import {
 import { Empty } from "../workspace-ui";
 import { EvidenceVault } from "./evidence-vault";
 import { Findings } from "./findings";
+import {
+  Nonconformities,
+  ProgrammePhases,
+  StatementOfApplicability,
+} from "./management-system";
 import { Methodology } from "./methodology";
 import { Overview } from "./overview";
 import { PageHead } from "./page-head";
@@ -308,8 +314,33 @@ export function WorkspaceViews({
             resolve={resolve}
             onEvidence={() => nav.navigate("Evidence vault")}
           />
+          {!viewer && (
+            <Ll144Panel
+              key={"ll144:" + data.tenantId + ":" + e.id}
+              engagement={e}
+              tenantId={data.tenantId}
+              writer={writer}
+              reviewer={reviewer || lead}
+              userId={data.identity.id}
+              busy={busy}
+              act={act}
+              onEditing={reporters["ll144-audit"]}
+            />
+          )}
         </Suspense>
       )}
+      {view === "Findings" &&
+        !viewer &&
+        packFeatures(data).nonconformityGrading && (
+          <Nonconformities
+            engagement={e}
+            writer={writer}
+            reviewer={reviewer}
+            userId={data.identity.id}
+            busy={busy}
+            act={safeAct}
+          />
+        )}
       {view === "Findings" && (
         <Findings
           engagement={e}
@@ -342,6 +373,25 @@ export function WorkspaceViews({
           onApprove={() => safeAct("approveClassification", {})}
         />
       )}
+      {view === "Regulatory mapping" &&
+        !viewer &&
+        data.criteria?.managementSystem && (
+          <>
+            <ProgrammePhases
+              engagement={e}
+              view={data.criteria.managementSystem}
+            />
+            <StatementOfApplicability
+              engagement={e}
+              view={data.criteria.managementSystem}
+              writer={writer}
+              reviewer={reviewer}
+              userId={data.identity.id}
+              busy={busy}
+              act={safeAct}
+            />
+          </>
+        )}
       {view === "Reports & sign-off" && (
         <Suspense fallback={panelFallback}>
           <ReportWorkspace
