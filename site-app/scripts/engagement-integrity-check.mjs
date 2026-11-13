@@ -5,6 +5,7 @@
 // the work inbox usable for everyone, shows the integrity error and records
 // an incident. Run `npm run build` first.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";

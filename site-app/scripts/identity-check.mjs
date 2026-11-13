@@ -5,6 +5,7 @@
 // Needs `npm run build` first. A Sites checkout (one with .openai/hosting.json)
 // builds a Worker that defaults to sites mode, which the checks expect there.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
