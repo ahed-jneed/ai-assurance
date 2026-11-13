@@ -89,8 +89,8 @@ def add_shapes(defs):
         'direction': {'enum': ['pass', 'fail', 'none']}, 'smallCell': {'type': 'boolean'},
         'fisherExactP': nullable(RATIO), 'chanceExactP': nullable(RATIO), 'reasons': ref('statisticsReasons')}
     required = list(details)
-    # Engine only, and optional (section 11.2): the cluster bootstrap behind a clustered entry (section 5.11)
-    # and the MAE/RMSE percentile-bootstrap sensitivity interval, which never decides (section 5.9).
+    # Optional (section 11.2): the cluster bootstrap behind a clustered entry (section 5.11; both runners since
+    # #136) and the engine-only MAE/RMSE percentile-bootstrap sensitivity interval, which never decides (section 5.9).
     details['bootstrap'] = obj({'replicates': {'type': 'integer', 'minimum': 1000, 'maximum': 10000}, 'validReplicates': COUNT, 'clusters': COUNT})
     details['sensitivityInterval'] = nullable(ref('statisticsInterval'))
     defs['statisticsMetricDetails'] = obj(details, required)

@@ -174,5 +174,58 @@ class ClusterBootstrapEndToEndTests(unittest.TestCase):
             self.assertEqual(schema_violations(report), [])
 
 
+class MseReductionMemberTests(unittest.TestCase):
+    """#136: the optional "beats the mean baseline" member and its fail direction."""
+
+    def plan(self, band, cluster=False):
+        return st.validate_plan({**({"clusterField": "site"} if cluster else {}), "criteria": [{"id": "r", "kind": "regression_performance", "members": [{"metric": "rmse", "band": {"upper": 1.2}}, {"metric": "mse_reduction", "band": band}]}]})
+
+    def test_band_rules(self):
+        self.plan({"lower": 0})
+        self.plan({"lower": 0.25})
+        for band in ({"lower": -0.1}, {"upper": 1.0}, {"lower": 0, "upper": 1.0}):
+            with self.assertRaises(st.StatisticsError, msg=band):
+                self.plan(band)
+        with self.assertRaisesRegex(st.StatisticsError, "at most 3"):
+            st.validate_plan({"criteria": [{"id": "r", "kind": "regression_performance", "members": [{"metric": m, "band": {"upper": 1}} for m in ("mae", "rmse")] + [{"metric": "mse_reduction", "band": {"lower": 0}}] * 2}]})
+
+    def test_a_model_worse_than_the_mean_fails_and_a_good_one_passes(self):
+        worse = st.evaluate_plan(st.plan_for(golden("GC-59")), golden("GC-59")["data"])["criteria"][0]
+        self.assertEqual((worse["outcome"], worse["decision"]["decidingMemberId"]), ("fail", "mse_reduction"))
+        targets = [10.0 + 0.5 * ((i % 5) - 2) for i in range(60)]
+        errors = [0.1 * (1 + i % 3) * (-1.0) ** i for i in range(60)]
+        better = st.evaluate_plan(self.plan({"lower": 0}), {"kind": "regression", "targets": targets, "errors": errors})["criteria"][0]
+        self.assertEqual(better["outcome"], "pass")
+        member = better["members"][1]
+        self.assertAlmostEqual(member["estimate"], 0.5 - sum(e * e for e in errors) / 60, delta=1e-12)
+        # Without targets the member is undefined and blocks a pass.
+        blind = st.evaluate_plan(self.plan({"lower": 0}), {"kind": "regression", "errors": errors})["criteria"][0]
+        self.assertEqual((blind["members"][1]["status"], blind["outcome"]), ("undefined", "inconclusive"))
+
+    def test_clustered_member_uses_the_shared_replicates(self):
+        case = golden("GC-55")
+        plan = self.plan({"lower": 0}, cluster=True)
+        plan["criteria"][0]["members"][0]["band"] = {"lower": None, "upper": 0.6}
+        data = {**case["data"], "clusters": [{**part, "cluster": part["cluster"]} for part in case["data"]["clusters"]]}
+        result = st.evaluate_plan(plan, data)["criteria"][0]
+        member = result["members"][1]
+        self.assertEqual(member["interval"]["method"], "cluster_percentile_bootstrap")
+        self.assertEqual(member["bootstrap"]["clusters"], 60)
+        gate = next(e for e in result["descriptive"] if e["metric"] == "baseline_rmse")["counts"]
+        self.assertAlmostEqual(member["estimate"], gate["meanSquaredErrorReduction"], delta=1e-12)
+        self.assertEqual(member["direction"], "pass")
+        # The member and the gate test the same statistic on the same replicates.
+        self.assertAlmostEqual(member["pValue"], gate["gatePValue"], delta=1e-12)
+
+    def test_power_needs_the_target_sd(self):
+        criterion = {"id": "r", "kind": "regression_performance", "members": [{"metric": "mse_reduction", "band": {"lower": 0}}], "powerAssumptions": {"n": 120, "errorSd": 1.0}}
+        missing = st.evaluate_power({"kind": "criterion", "criterion": criterion})
+        self.assertEqual((missing["status"], missing["members"][0]["reasons"]), ("not_computed", ["power_not_specified_for_metric"]))
+        criterion["powerAssumptions"]["targetSd"] = 1.1
+        computed = st.evaluate_power({"kind": "criterion", "criterion": criterion})
+        self.assertAlmostEqual(computed["members"][0]["passProbability"], golden("GC-58")["expected"]["members"][2]["passProbability"], delta=1e-12)
+        self.assertEqual([m["memberId"] for m in computed["members"]], ["mse_reduction"])
+
+
 if __name__ == "__main__":
     unittest.main()

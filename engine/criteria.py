@@ -21,7 +21,7 @@ MAX_DESCRIPTIVE_BOOTSTRAP_WORK = 5_000_000
 ARTICLES = {"performance": "15", "multiclass_performance": "15", "regression_performance": "15", "calibration": "15", "group_comparison": "10"}
 KIND_LABELS = {"performance": "Binary classification performance", "multiclass_performance": "Multiclass classification performance", "regression_performance": "Regression performance", "calibration": "Probability calibration"}
 GROUP_LABELS = {"selection_rate_difference": "Demographic parity difference", "selection_rate_ratio": "Disparate impact ratio", "equalized_odds": "Equalized odds difference"}
-UNITS = {"mae": "target_units", "rmse": "target_units", "r2": "dimensionless", "baseline_rmse": "target_units"}
+UNITS = {"mae": "target_units", "rmse": "target_units", "r2": "dimensionless", "baseline_rmse": "target_units", "mse_reduction": "target_units_squared"}
 # Plain-language limitation text for each reason code (section 4.4). Codes stay in decision.reasons.
 REASON_TEXT = {
     "below_minimum_sample_size": "Fewer rows were evaluated than the pre-registered minimum sample size, so no claim is made either way.",
@@ -50,7 +50,7 @@ REASON_TEXT = {
     "small_cell_clustered": "A comparison has a cell under 5 in a clustered design. Fisher's exact test assumes independent rows, so that comparison supports no claim.",
     "below_minimum_cluster_count": "A metric or compared group has fewer than 10 independent clusters, so it cannot support a pass.",
 }
-CLUSTER_NOTE = "Rows are clustered by '{field}': every member and descriptive interval is a cluster percentile bootstrap over {clusters} clusters ({replicates} replicates, seed {seed}). The per-group rates, prevalence and majority-class baseline intervals still assume independent rows."
+CLUSTER_NOTE = "Rows are clustered by '{field}': every member and descriptive interval is a cluster percentile bootstrap over {clusters} clusters ({replicates} replicates, seed {seed}). The per-group rates are cluster percentile intervals too; the prevalence and majority-class baseline intervals still assume independent rows."
 BASE_NOTES = {
     "performance": "Performance is measured on supplied labels and predictions; independence, representativeness, temporal validity and target leakage require review.",
     "multiclass_performance": "Saved predictions do not establish cross-validation, dataset independence or freedom from leakage.",
