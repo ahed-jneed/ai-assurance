@@ -78,7 +78,11 @@ function storage(e: Engagement) {
       if (sql.startsWith("SELECT 1 FROM engagement_access")) return { 1: 1 };
       if (sql.startsWith("SELECT COUNT(*) AS n FROM engagement_snapshots"))
         return { n: 0 };
-      if (sql.startsWith("SELECT m.role,m.client_id,m.status FROM memberships"))
+      if (
+        sql.startsWith(
+          "SELECT m.role,m.client_id,m.status,m.access_since FROM memberships",
+        )
+      )
         return people[String(args[1])] ?? null;
       if (sql.startsWith("SELECT body,base_revision,version,updated_at"))
         return drafts.get(draftKey(args)) ?? null;
