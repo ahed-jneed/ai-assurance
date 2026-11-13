@@ -124,18 +124,36 @@ export function EvidenceVault({
           <section className="panel evidence-files-panel">
             <DatabaseToolbar
               label="Evidence"
-              views={[
-                { value: "all", label: "All evidence" },
-                {
-                  value: "unverified",
-                  label: "Awaiting acceptance",
-                },
-                { value: "accepted", label: "Accepted" },
-                {
-                  value: "quarantined",
-                  label: "Quarantined",
-                },
-              ]}
+              views={
+                viewer
+                  ? // The client portal (#36): a client sees accepted,
+                    // shared evidence, and a contributor also its own
+                    // submissions; quarantine is the audit team's concern.
+                    [
+                      { value: "all", label: "All shared evidence" },
+                      ...(role === "Client Contributor"
+                        ? [
+                            {
+                              value: "unverified",
+                              label: "Your submissions awaiting review",
+                            },
+                            { value: "accepted", label: "Accepted" },
+                          ]
+                        : []),
+                    ]
+                  : [
+                      { value: "all", label: "All evidence" },
+                      {
+                        value: "unverified",
+                        label: "Awaiting acceptance",
+                      },
+                      { value: "accepted", label: "Accepted" },
+                      {
+                        value: "quarantined",
+                        label: "Quarantined",
+                      },
+                    ]
+              }
               value={filter}
               onView={setFilter}
               search={search}
@@ -176,12 +194,16 @@ export function EvidenceVault({
                 <h3>
                   {e.artifacts.length
                     ? "No matching evidence"
-                    : "No evidence yet"}
+                    : viewer
+                      ? "No shared evidence yet"
+                      : "No evidence yet"}
                 </h3>
                 <p>
                   {e.artifacts.length
                     ? "No files match this view, category and search."
-                    : "Add the files supporting this engagement."}
+                    : viewer
+                      ? "Your auditor has not shared any accepted evidence yet."
+                      : "Add the files supporting this engagement."}
                 </p>
                 {e.artifacts.length ? (
                   <Button
