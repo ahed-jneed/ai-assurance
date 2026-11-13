@@ -83,6 +83,8 @@ export type Field = {
   ids?: string[];
   optional?: boolean;
   hint?: string;
+  /** Overrides the default limit (8,000 for an area, 300 for text). */
+  maxLength?: number;
 };
 export type WorkflowAct = (
   op: string,
@@ -233,7 +235,7 @@ export function WorkflowDialog({
                           value={String(values[f.name] ?? "")}
                           onChange={() => {}}
                           required={!f.optional}
-                          maxLength={8000}
+                          maxLength={f.maxLength ?? 8000}
                         />
                       ) : f.type === "select" ? (
                         <select
@@ -256,7 +258,9 @@ export function WorkflowDialog({
                           value={String(values[f.name] ?? "")}
                           onChange={() => {}}
                           required={!f.optional}
-                          maxLength={f.type === "date" ? undefined : 300}
+                          maxLength={
+                            f.type === "date" ? undefined : (f.maxLength ?? 300)
+                          }
                         />
                       )}
                     </label>

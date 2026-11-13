@@ -569,3 +569,12 @@ export async function compiledJobIds(ctx: Context, engagementId: string) {
  */
 export const activeJobGuard =
   "EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=execution_jobs.tenant_id AND m.user_id=execution_jobs.created_by AND m.status='active' AND m.role IN ('Auditor','Lead Auditor') AND a.engagement_id=execution_jobs.engagement_id AND a.active=1) AND EXISTS(SELECT 1 FROM engagements e,json_each(e.body,'$.workflow.procedures') p WHERE e.tenant_id=execution_jobs.tenant_id AND e.id=execution_jobs.engagement_id AND json_extract(e.body,'$.workflow.brief.status')='approved' AND json_extract(e.body,'$.workflow.program.status')='approved' AND json_extract(e.body,'$.workflow.brief.revision')=json_extract(execution_jobs.request,'$.procedure.briefRevision') AND json_extract(p.value,'$.id')=json_extract(execution_jobs.request,'$.procedure.id') AND (CASE WHEN json_extract(execution_jobs.request,'$.procedure.planHash') IS NOT NULL AND json_extract(p.value,'$.planHash') IS NOT NULL THEN json_extract(p.value,'$.planHash')=json_extract(execution_jobs.request,'$.procedure.planHash') ELSE json_extract(p.value,'$.revision')=json_extract(execution_jobs.request,'$.procedure.revision') END) AND json_extract(p.value,'$.selected')=1)";
+
+/**
+ * SQL condition on a `runner_workers w` row: the worker is active and the
+ * Lead Auditor who enrolled it still holds an active membership and active
+ * access to its engagement. The runner route claims and completes jobs only
+ * for such a worker, and the GenAI view counts only such workers.
+ */
+export const workerSponsorGuard =
+  "w.active=1 AND EXISTS(SELECT 1 FROM memberships m JOIN engagement_access a ON a.tenant_id=m.tenant_id AND a.user_id=m.user_id WHERE m.tenant_id=w.tenant_id AND m.user_id=w.created_by AND m.status='active' AND m.role='Lead Auditor' AND a.engagement_id=w.engagement_id AND a.active=1)";
