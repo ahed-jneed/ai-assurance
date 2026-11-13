@@ -32,7 +32,10 @@ function mount<T>(
   query: AssuranceQuery<T>,
 ) {
   void cache.ensure(at(version), query);
-  return cache.subscribe(AssuranceQueryCache.keyOf(engagement, query), () => {});
+  return cache.subscribe(
+    AssuranceQueryCache.keyOf(engagement, query),
+    () => {},
+  );
 }
 
 const state = (cache: AssuranceQueryCache, query: { key: string }) =>
