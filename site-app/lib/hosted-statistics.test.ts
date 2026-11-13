@@ -24,11 +24,9 @@ function reasonCodeTable(): string[] {
     "utf8",
   );
   const start = doc.indexOf("### 4.4 Gates and reason codes");
-  const section = doc.slice(start, doc.indexOf("
-### ", start + 1));
+  const section = doc.slice(start, doc.indexOf("\n### ", start + 1));
   const codes = section
-    .split(/?
-/)
+    .split(/\r?\n/)
     .filter((line) => line.startsWith("| `"))
     .flatMap((line) =>
       [...line.split("|")[1].matchAll(/`([a-z0-9_]+)`/g)].map((m) => m[1]),
