@@ -366,7 +366,7 @@ try {
     );
     assert.equal(
       workspace.selectablePacks.map((p) => p.id).join(),
-      "eu-ai-act-amended,nyc-ll144-bias-audit",
+      "eu-ai-act-amended,genai-evaluation,nyc-ll144-bias-audit",
     );
     const chosen = await management("createEngagement", {
       clientId: e.clientId,
