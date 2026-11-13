@@ -910,13 +910,15 @@ export async function verifyPinAttestation(
 }
 /**
  * The mapped columns a job needs that the client's pin does not declare
- * (#134): the target, prediction and group columns and the plan's other
- * group fields. Empty for a pin recorded before declared columns, which the
- * worker still checks when it reads the file.
+ * (#134): the target, prediction and group columns, the plan's other group
+ * fields and its cluster column (#166). Empty for a pin recorded before
+ * declared columns, which the worker still checks when it reads the file.
  */
 export function undeclaredColumns(
   pin: Pick<Artifact, "clientPin">,
-  profile: GroupedProfile,
+  profile: GroupedProfile & {
+    statistics?: Partial<Pick<Plan, "clusterField">>;
+  },
 ) {
   const declared = pin.clientPin?.columns;
   if (!declared) return [];
@@ -926,7 +928,8 @@ export function undeclaredColumns(
         profile.config.labelColumn,
         profile.config.predictionColumn,
         ...protocolGroupColumns(profile),
-      ].filter(Boolean),
+        profile.statistics?.clusterField,
+      ].filter((c): c is string => !!c),
     ),
   ].filter((c) => !declared.includes(c));
 }
