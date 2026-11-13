@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { Engagement, Paper } from "@/lib/domain";
 import { readableResults } from "@/lib/presentation";
 
@@ -27,47 +27,52 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
     [commentReset, setCommentReset] = useState(0);
   const [discardPaper, setDiscardPaper] = useState(false),
     [paperConflict, setPaperConflict] = useState(false);
+  // The saved revision the open draft is compared with, and the selected
+  // paper it was last advanced to.
+  const [savedPaper, setSavedPaper] = useState<Paper | undefined>(undefined),
+    [seenPaper, setSeenPaper] = useState<Paper | undefined>(undefined);
   const pendingNavigation = useRef<(() => void) | null>(null),
-    savedPaperRef = useRef<Paper | undefined>(undefined),
     draftRef = useRef<Paper | null>(null),
-    dirtyRef = useRef(false),
     navigationDirtyRef = useRef(false);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by acceptSavedRevision(); writing it during render is the current behaviour
-  draftRef.current = paperDraft;
   const selectedPaper = engagement?.papers.find((p) => p.id === paperId);
-  /* eslint-disable react-hooks/refs -- the saved-paper baseline and the dirty flags live in refs that the navigation guards read; reading and writing them during render is the current behaviour */
   const paperBaseline =
-    savedPaperRef.current?.id === paperDraft?.id
-      ? savedPaperRef.current
-      : selectedPaper;
+    savedPaper?.id === paperDraft?.id ? savedPaper : selectedPaper;
   const paperDirty =
     !!paperBaseline &&
     !!paperDraft &&
     paperFingerprint(paperBaseline) !== paperFingerprint(paperDraft);
-  dirtyRef.current = paperDirty;
   const navigationDirty = paperDirty || hasPendingComment;
-  navigationDirtyRef.current = navigationDirty;
-  /* eslint-enable react-hooks/refs */
-  useEffect(() => {
-    if (!selectedPaper) return;
-    const previous = savedPaperRef.current;
-    savedPaperRef.current = selectedPaper;
-    if (previous?.id === selectedPaper.id && dirtyRef.current) {
-      if (previous.revision !== selectedPaper.revision) setPaperConflict(true);
-      return;
+  // A newer copy of the open paper (a refresh or another user's save)
+  // becomes the baseline. A clean draft follows it; a dirty draft is kept and
+  // flagged as a conflict when the revision moved.
+  if (selectedPaper !== seenPaper) {
+    setSeenPaper(selectedPaper);
+    if (selectedPaper) {
+      setSavedPaper(selectedPaper);
+      if (savedPaper?.id === selectedPaper.id && paperDirty) {
+        if (savedPaper.revision !== selectedPaper.revision)
+          setPaperConflict(true);
+      } else {
+        setPaperDraft(editableDraft(selectedPaper));
+        setPaperConflict(false);
+      }
     }
-    setPaperDraft(editableDraft(selectedPaper));
-    setPaperConflict(false);
-  }, [selectedPaper]);
+  }
+  // Latest values for acceptSavedRevision() and the navigation guards, which
+  // read them outside render.
+  useLayoutEffect(() => {
+    draftRef.current = paperDraft;
+    navigationDirtyRef.current = navigationDirty;
+  });
   /** Rebases the open draft on a revision returned by an editPaper save. */
   const acceptSavedRevision = useCallback((saved: Paper) => {
     if (draftRef.current?.id !== saved.id) return;
-    savedPaperRef.current = saved;
+    setSavedPaper(saved);
     setPaperDraft(editableDraft(saved));
     setPaperConflict(false);
   }, []);
   function showPaper(paper: Paper, draft: Paper) {
-    savedPaperRef.current = paper;
+    setSavedPaper(paper);
     setPaperId(paper.id);
     setPaperDraft(draft);
     setPaperConflict(false);
@@ -77,7 +82,7 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
     setPaperDraft(null);
   }
   function forgetSavedPaper() {
-    savedPaperRef.current = undefined;
+    setSavedPaper(undefined);
   }
   /** Whether leaving now would lose unsaved paper edits or comments. */
   const isNavigationDirty = () => navigationDirtyRef.current;
@@ -90,7 +95,6 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
     pendingNavigation.current = null;
   }
   function discardAndContinue() {
-    dirtyRef.current = false;
     navigationDirtyRef.current = false;
     setHasPendingComment(false);
     setCommentReset((v) => v + 1);
@@ -100,7 +104,6 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
   }
   /** Drops local edits and reloads the newer saved revision. */
   function loadSavedRevision() {
-    dirtyRef.current = false;
     setPaperDraft(editableDraft(selectedPaper!));
     setPaperConflict(false);
   }

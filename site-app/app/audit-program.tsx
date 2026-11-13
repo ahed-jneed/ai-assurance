@@ -1,6 +1,6 @@
 "use client";
 import { packageStatusLabel } from "@/lib/report-presentation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -117,15 +117,12 @@ export function WorkflowDialog({
   const [error, setError] = useState(""),
     [dirty, setDirty] = useState(false),
     [confirm, setConfirm] = useState(false),
-    [values, setValues] = useState<Record<string, string | string[]>>({});
-  const recovery = useRecoverableDraft(
-    form?.draft,
-    values,
-    dirty,
-    !!form?.draft,
-  );
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialises the editor fields each time another form opens
+    [values, setValues] = useState<Record<string, string | string[]>>({}),
+    [openForm, setOpenForm] = useState<Form | null>(null);
+  // Each form that opens starts from its own field values, in the render
+  // that shows it.
+  if (openForm !== form) {
+    setOpenForm(form);
     setError("");
     setDirty(false);
     setConfirm(false);
@@ -137,6 +134,14 @@ export function WorkflowDialog({
         ]) ?? [],
       ),
     );
+  }
+  const recovery = useRecoverableDraft(
+    form?.draft,
+    values,
+    dirty,
+    !!form?.draft,
+  );
+  useEffect(() => {
     onEditing?.(!!form);
     return () => onEditing?.(false);
   }, [form, onEditing]);
@@ -469,27 +474,30 @@ export function AuditProgram({
     ),
     [batchIds, setBatchIds] = useState<string[]>([]);
   const restoringLocation = useRef<{
-      id: string | undefined;
-      section: string;
-    } | null>(null),
-    onLocationRef = useRef(onLocation);
-  // eslint-disable-next-line react-hooks/refs -- latest-callback ref read by the URL-sync effects; writing it during render is the current behaviour
-  onLocationRef.current = onLocation;
-  useEffect(() => {
-    programViewMemory.set(memoryKey, { tab, query, filter, section });
-  }, [memoryKey, tab, query, filter, section]);
-  useEffect(() => {
-    if (form) return;
+    id: string | undefined;
+    section: string;
+  } | null>(null);
+  const reportLocation = useEffectEvent((id: string, at: string) =>
+    onLocation(id, at),
+  );
+  // An incoming procedure link is applied when the linked procedure, section
+  // or open form changes; the current section is read at that moment.
+  const applyLocation = useEffectEvent(() => {
     // Hold URL updates until both parts of an incoming procedure link are applied.
     restoringLocation.current = {
       id: availableInitialProcedure,
       section: requestedProcedureSection ?? section,
     };
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- applies an incoming procedure deep link
     setSelected(availableInitialProcedure);
     if (requestedProcedureSection) setSection(requestedProcedureSection);
     if (requestedProgramTab) setTab(requestedProgramTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-applied only when the linked procedure, section or open form changes; the tab and current section are read at that moment
+  });
+  useEffect(() => {
+    programViewMemory.set(memoryKey, { tab, query, filter, section });
+  }, [memoryKey, tab, query, filter, section]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the link must be applied after commit, together with restoringLocation, which holds the URL-sync effect below until both parts are in place
+    if (!form) applyLocation();
   }, [availableInitialProcedure, initialSection, form]);
   useEffect(() => {
     if (form) return;
@@ -500,7 +508,7 @@ export function AuditProgram({
     )
       return;
     restoringLocation.current = null;
-    if (selected) onLocationRef.current(selected, section);
+    if (selected) reportLocation(selected, section);
   }, [selected, section, availableInitialProcedure, initialSection, form]);
   const p = w?.procedures.find((p) => p.id === selected),
     people = (allowed: Role[]) =>

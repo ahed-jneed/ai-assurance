@@ -99,11 +99,13 @@ export function usePersonalPreferences(tenantId: string) {
     }
   }, [tenantId]);
   useEffect(() => {
+    // The request state is one object for the hook's lifetime; the cleanup
+    // aborts whichever request is in flight by then.
+    const current = request.current;
     void load();
     return () => {
-      request.current.generation++;
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
-      request.current.controller?.abort();
+      current.generation++;
+      current.controller?.abort();
     };
   }, [load]);
   async function save(next: PersonalPreferences) {
@@ -351,10 +353,15 @@ export function EngagementTaskQueue({
       ),
     ).filter((i) => i.personal),
     [all, setAll] = useState(false);
+  // Another engagement or stage shows the queue collapsed again.
+  const stageKey = e.id + "|" + e.stage,
+    [shownStage, setShownStage] = useState(stageKey);
+  if (shownStage !== stageKey) {
+    setShownStage(stageKey);
+    setAll(false);
+  }
   const actionable = items.filter((i) => i.state !== "waiting"),
     waiting = items.filter((i) => i.state === "waiting");
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- collapses the queue again after the engagement or stage changes (post-commit reset is the current behaviour)
-  useEffect(() => setAll(false), [e.id, e.stage]);
   return (
     <section className="panel engagement-task-queue">
       <div className="panel-head">

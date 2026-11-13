@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Finding } from "@/lib/domain";
 
 export function getForm(form: HTMLFormElement) {
@@ -45,7 +45,7 @@ export function formFingerprint(
  * the values it opened with, the discard confirmation and the error shown.
  */
 export function useModalState() {
-  const [modal, setModal] = useState("");
+  const [modal, showModal] = useState("");
   const [choices, setChoices] = useState<Record<string, string>>({}),
     [checks, setChecks] = useState<Record<string, boolean>>({});
   const [finding, setFinding] = useState<Finding | null>(null);
@@ -57,15 +57,17 @@ export function useModalState() {
     modalBaselineRef = useRef(""),
     modalSubmitting = useRef(false),
     modalDirtyRef = useRef(false);
-  // eslint-disable-next-line react-hooks/refs -- latest-value ref read by close(); writing it during render is the current behaviour
-  modalDirtyRef.current = modalDirty;
-  useEffect(() => {
-    if (!modal) modalBaselineRef.current = "";
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the modal state after another modal opens or it closes
+  useLayoutEffect(() => {
+    modalDirtyRef.current = modalDirty;
+  });
+  /** Opens another form or closes it ("") with a fresh dirty, error and discard state. */
+  function setModal(name: string) {
+    if (!name) modalBaselineRef.current = "";
     setModalDirty(false);
     setModalError("");
     setDiscardModal(false);
-  }, [modal]);
+    showModal(name);
+  }
   useEffect(() => {
     if (modal && modalBaselineRef.current)
       setModalDirty(

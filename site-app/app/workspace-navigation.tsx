@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useEffectEvent,
   useRef,
   useState,
   type ReactNode,
@@ -144,16 +145,18 @@ export function WorkspaceNavigation({
     [resizing, setResizing] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null),
     dragRef = useRef<{ x: number; width: number } | null>(null);
-  const setters = useRef({ setOpen, onWidthChange });
-  // eslint-disable-next-line react-hooks/refs -- latest-setters ref so that the restore effect depends only on preferenceKey; writing it during render is the current behaviour
-  setters.current = { setOpen, onWidthChange };
+  // Applies restored preferences with the latest setters, so the restore
+  // effect depends only on preferenceKey.
+  const applyLayout = useEffectEvent((next: typeof defaultNavigation) => {
+    setOpen(!next.compact);
+    onWidthChange(next.width);
+  });
   const preferenceKey = data
     ? navigationPreferenceKey(data.identity.id, data.tenantId)
     : "";
   const allowed = data
-      ? permittedNavigationRoutes(data.identity.role, !!e)
-      : [],
-    allowedKey = allowed.join("|");
+    ? permittedNavigationRoutes(data.identity.role, !!e)
+    : [];
   const visibleAudit = auditModules.filter(([route]) =>
     allowed.includes(route),
   );
@@ -180,32 +183,33 @@ export function WorkspaceNavigation({
       saved = parseNavigationPreferences(localStorage.getItem(preferenceKey));
     } catch {}
     const next = saved ?? defaultNavigation;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores navigation preferences from browser-only storage after hydration
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is read only after hydration, so the server and first client render agree; this effect is that external read
     setPreferences(next);
-    setters.current.setOpen(!next.compact);
-    setters.current.onWidthChange(next.width);
+    applyLayout(next);
     setRestoredKey(preferenceKey);
   }, [preferenceKey]);
-  useEffect(() => {
-    if (
-      restoredKey !== preferenceKey ||
-      !allowed.includes(view as NavigationRoute)
-    )
-      return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- records the current view as recent once the stored preferences are restored
-    setPreferences((p) =>
-      p.recent[0] === view
-        ? p
-        : {
-            ...p,
-            recent: [
-              view as NavigationRoute,
-              ...p.recent.filter((route) => route !== view),
-            ].slice(0, 5),
-          },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- allowedKey is the stable stand-in for the allowed array, which is rebuilt on every render
-  }, [view, allowedKey, restoredKey, preferenceKey]);
+  // Once the stored preferences are restored, the current view becomes the
+  // most recent page, in the render that shows it.
+  const recentKey =
+      restoredKey === preferenceKey && allowed.includes(view as NavigationRoute)
+        ? preferenceKey + "|" + view
+        : "",
+    [recordedKey, setRecordedKey] = useState("");
+  if (recentKey !== recordedKey) {
+    setRecordedKey(recentKey);
+    if (recentKey)
+      setPreferences((p) =>
+        p.recent[0] === view
+          ? p
+          : {
+              ...p,
+              recent: [
+                view as NavigationRoute,
+                ...p.recent.filter((route) => route !== view),
+              ].slice(0, 5),
+            },
+      );
+  }
   useEffect(() => {
     if (!preferenceKey || restoredKey !== preferenceKey) return;
     try {
@@ -239,10 +243,16 @@ export function WorkspaceNavigation({
   useEffect(() => {
     if (!isMobile || openMobile) revealCurrent();
   }, [view, compact, isMobile, openMobile, revealCurrent]);
+  // Switching practice or engagement closes the quick-page menu and the
+  // mobile sidebar.
+  const scopeKey = (data?.tenantId ?? "") + "|" + (e?.id ?? ""),
+    [menuScope, setMenuScope] = useState(scopeKey);
+  if (menuScope !== scopeKey) {
+    setMenuScope(scopeKey);
+    setQuickOpen(false);
+  }
   useEffect(() => {
     setOpenMobile(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- closes the quick-page menu after switching practice or engagement
-    setQuickOpen(false);
   }, [data?.tenantId, e?.id, setOpenMobile]);
 
   function go(route: NavigationRoute, filter?: string) {

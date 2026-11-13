@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 import {
   Plus,
   Play,
@@ -423,11 +423,11 @@ export function TestingLab({
     setSaveOnly(only);
     setWizard(true);
   }
-  useEffect(() => {
-    if (!intent) return;
-    const action = resolveLabIntent(intent, e);
+  // Applies each hand-off once, when it arrives, against the engagement as it
+  // is then; an engagement refresh does not apply it again.
+  const applyIntent = useEffectEvent((next: NonNullable<typeof intent>) => {
+    const action = resolveLabIntent(next, e);
     if (action.kind === "evaluate")
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- opens the setup a hand-off asks for, once
       startWizard(action.model, action.profile, false, {
         procedureId: action.procedureId,
         datasetCardRecordId: action.datasetCardRecordId,
@@ -436,8 +436,11 @@ export function TestingLab({
       onView("runs");
       setSelectedRun(action.run);
     }
-    onIntentUsed(intent);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- applies each hand-off once, when it arrives, not when the engagement refreshes
+    onIntentUsed(next);
+  });
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a hand-off is a one-time event from another view; it is consumed (onIntentUsed) in the parent, which cannot happen during this render
+    if (intent) applyIntent(intent);
   }, [intent]);
   function startRegistration(m?: Model) {
     setTouched(false);
@@ -456,19 +459,57 @@ export function TestingLab({
     );
     setCard(m?.card ? structuredClone(m.card) : structuredClone(emptyCard));
   }
+  // Another model (or reopening the setup) clears the previous inspection
+  // while the model's dataset is read, in the render that switches.
+  const artifactId = model?.artifactId,
+    inspectKey =
+      wizard && artifactId !== undefined
+        ? JSON.stringify([modelId, artifactId, e.id, tenantId])
+        : "",
+    [inspectedFor, setInspectedFor] = useState("");
+  if (inspectedFor !== inspectKey) {
+    setInspectedFor(inspectKey);
+    if (inspectKey) {
+      setInspect(null);
+      setInspecting(true);
+    }
+  }
+  // Applies an inspection with the profile chosen when it arrives; picking a
+  // profile does not inspect the dataset again.
+  const applyInspection = useEffectEvent((value: Inspection) => {
+    setInspect(value);
+    if (!profileId)
+      setDraft((d) => {
+        const names = value.columns.map((c) => c.name),
+          pick = (choices: string[]) =>
+            choices.find((c) => names.includes(c)) ?? "";
+        return {
+          ...d,
+          config: {
+            ...d.config,
+            labelColumn:
+              d.config.labelColumn ||
+              pick(["actual", "label", "target", "y_true"]),
+            predictionColumn:
+              d.config.predictionColumn ||
+              pick(["predicted", "prediction", "y_pred"]),
+            groupColumn:
+              d.config.groupColumn || pick(["group", "protected_group"]),
+          },
+        };
+      });
+  });
+  const engagementId = e.id;
   useEffect(() => {
-    if (!wizard || !model) return;
+    if (!wizard || artifactId === undefined) return;
     let active = true;
     const controller = new AbortController();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the previous inspection while the selected model's dataset is fetched
-    setInspect(null);
-    setInspecting(true);
     fetch(
       "/api/evaluation/dataset?" +
         new URLSearchParams({
           tenantId,
-          engagementId: e.id,
-          artifactId: model.artifactId,
+          engagementId,
+          artifactId,
         }),
       { signal: controller.signal },
     )
@@ -480,29 +521,7 @@ export function TestingLab({
         return value as Inspection;
       })
       .then((value) => {
-        if (active) {
-          setInspect(value);
-          if (!profileId)
-            setDraft((d) => {
-              const names = value.columns.map((c) => c.name),
-                pick = (choices: string[]) =>
-                  choices.find((c) => names.includes(c)) ?? "";
-              return {
-                ...d,
-                config: {
-                  ...d.config,
-                  labelColumn:
-                    d.config.labelColumn ||
-                    pick(["actual", "label", "target", "y_true"]),
-                  predictionColumn:
-                    d.config.predictionColumn ||
-                    pick(["predicted", "prediction", "y_pred"]),
-                  groupColumn:
-                    d.config.groupColumn || pick(["group", "protected_group"]),
-                },
-              };
-            });
-        }
+        if (active) applyInspection(value);
       })
       .catch((err) => {
         if (active) setError(err.message);
@@ -514,8 +533,7 @@ export function TestingLab({
       active = false;
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- modelId identifies model; picking a profile must not re-inspect the dataset
-  }, [wizard, modelId, e.id, tenantId]);
+  }, [wizard, modelId, artifactId, engagementId, tenantId]);
   async function registerVersion(ev: React.FormEvent) {
     ev.preventDefault();
     setError("");
