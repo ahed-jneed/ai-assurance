@@ -465,10 +465,16 @@ try {
       { origin: null, version: null },
     );
     const views = await request("/api/coverage?" + scope);
+    // The AI Act criteria view, then the NIST crosswalk views (#29).
     assert.deepEqual(
       views.views.map((v) => v.key),
-      [packKey],
+      [packKey, "nist-ai-rmf@1.0", "nist-ai-600-1@2024-07"],
     );
+    const nist = await request(
+      "/api/coverage?" + scope + "&framework=nist-ai-rmf%401.0",
+    );
+    assert.equal(nist.view.kind, "crosswalk");
+    assert.equal(nist.summary.full, 0, "NIST is never fully covered");
     const coverage = await request(
       "/api/coverage?" + scope + "&framework=" + encodeURIComponent(packKey),
     );

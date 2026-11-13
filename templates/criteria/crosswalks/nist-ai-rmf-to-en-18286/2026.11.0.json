@@ -1,0 +1,95 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-rmf-to-en-18286",
+  "version": "2026.11.0",
+  "title": "NIST AI RMF 1.0 to EN 18286:2026",
+  "source": {
+    "framework": "nist-ai-rmf",
+    "edition": "1.0"
+  },
+  "target": {
+    "framework": "en-18286",
+    "edition": "2026"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers who want to show where evidence gathered against one framework also bears on the other.",
+    "purpose": "Show where EN 18286 audit evidence also bears on NIST AI RMF outcomes, and the reverse.",
+    "conceptTypes": {
+      "source": "Voluntary outcomes (AI RMF subcategories)",
+      "target": "Quality management system clauses"
+    },
+    "assumptions": "Relationships compare what each requirement asks for, not how an organisation implements it. Each entry is single-source, so it can be read in both directions. No inference may be drawn from outcomes or requirements that are not mapped. Every entry is intersects_with: a NIST outcome and the other requirement only overlap, so a full result on one side is never shown as full on the other. The NIST side was read against NIST AI 100-1 Tables 1 to 4 (checked 2026-11-13). Draft until the EN 18286 framework is released (#57): its numbers are not yet confirmed against a licensed copy, and the titles on that side are our own. The EN 18286 clause structure itself comes from a secondary source, so every entry is low confidence.",
+    "exhaustive": false
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "GV-1.4"
+      ],
+      "target": "4",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Establishing the risk management process overlaps with establishing the quality management system and its scope."
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "GV-2.3"
+      ],
+      "target": "5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Executive responsibility for AI risk decisions overlaps with the leadership clause."
+    },
+    {
+      "id": "X3",
+      "sources": [
+        "GV-1.3"
+      ],
+      "target": "6",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Setting the level of risk management activity overlaps with planning the quality management system."
+    },
+    {
+      "id": "X4",
+      "sources": [
+        "MS-2.3"
+      ],
+      "target": "8",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Measuring performance before deployment overlaps with the life-cycle realisation clause, which covers much more."
+    },
+    {
+      "id": "X5",
+      "sources": [
+        "MG-4.1"
+      ],
+      "target": "9",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Post-deployment monitoring overlaps with the market and monitoring clause."
+    },
+    {
+      "id": "X6",
+      "sources": [
+        "GV-1.5"
+      ],
+      "target": "10",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Periodic review of the risk process overlaps with management review."
+    }
+  ],
+  "notes": "Clause-level overlaps only; the EN 18286 side is cited by clause number only (D-03). Not an official NIST crosswalk."
+}
