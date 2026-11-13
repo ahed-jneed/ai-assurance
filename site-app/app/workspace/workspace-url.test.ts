@@ -176,8 +176,7 @@ describe("workspaceParams", () => {
 
 describe("historyMethod", () => {
   /** The URL the workspace wrote for a location. */
-  const previousOf = (next: Partial<WorkspaceLocation>) =>
-    "/?" + query(next);
+  const previousOf = (next: Partial<WorkspaceLocation>) => "/?" + query(next);
   const change = (
     previousUrl: string,
     next: Partial<WorkspaceLocation>,
