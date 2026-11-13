@@ -398,6 +398,11 @@ describe("workspaceView", () => {
     expect(() =>
       sqlite.exec("UPDATE integrity_incidents SET handling='ignored'"),
     ).toThrow(/Unknown incident handling/);
+    expect(() =>
+      sqlite.exec(
+        "INSERT INTO integrity_incidents(tenant_id,engagement_id,object_key,kind,status,first_seen,last_seen,last_user_id,occurrences,handling) VALUES('T','E','k','missing',404,'x','x','u',1,'ignored')",
+      ),
+    ).toThrow(/Unknown incident handling/);
   });
 
   it("lists a record whose body is not JSON with an integrity error and opens the next one", async () => {
