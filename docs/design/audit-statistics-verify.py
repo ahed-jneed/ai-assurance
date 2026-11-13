@@ -461,6 +461,9 @@ def normalize_assumptions(criterion, assumptions):
         return {key: assumptions[key] for key in ("n", "prevalence", "truePositiveRate", "trueNegativeRate")}
     if kind == "multiclass_performance":
         assert abs(math.fsum(assumptions["classShares"].values()) - 1.0) <= 1e-9, "class shares must sum to 1"
+        # Section 8 (#113): each class's expected support n*share is a denominator, and every class needs its recall.
+        assert all(share > 0 for share in assumptions["classShares"].values()), "every class share must be above 0"
+        assert set(assumptions.get("perClassRecall") or {}) == set(assumptions["classShares"]), "perClassRecall must name exactly the classes of classShares"
         return {key: assumptions[key] for key in ("n", "classShares", "perClassRecall")}
     if kind == "regression_performance":
         out = {key: assumptions[key] for key in ("n", "errorSd")}
@@ -1488,6 +1491,76 @@ def normal_probs(theta, se, band, z):
     return two_sides(passing), failing
 
 
+def even_spread_cells(shares, recalls):
+    """Section 8 (#152): the expected confusion matrix, as shares of n, when class c is recognised with its assumed
+    recall and its errors are spread evenly over the other k - 1 classes (row c is the truth, column j the prediction)."""
+    k = len(shares)
+    return [[s * (r if j == c else (1.0 - r) / (k - 1)) for j in range(k)] for c, (s, r) in enumerate(zip(shares, recalls))]
+
+
+def macro_parts(metric, cells):
+    """Per class: (TP share, denominator share). Macro precision: TP of the predicted count; macro F1: the Jaccard
+    index TP of TP + FP + FN (section 5.4)."""
+    k = len(cells)
+    rows = [math.fsum(cells[c]) for c in range(k)]
+    cols = [math.fsum(cells[i][c] for i in range(k)) for c in range(k)]
+    return [(cells[c][c], cols[c] if metric == "macro_precision" else rows[c] + cols[c] - cells[c][c]) for c in range(k)]
+
+
+def wilson_slope(x, n, z, side):
+    """d(Wilson bound)/d(x-hat) at the proportion x with denominator n; side -1 is the lower bound, +1 the upper."""
+    root = math.sqrt(x * (1.0 - x) / n + z * z / (4.0 * n * n))
+    return (1.0 + side * z * (1.0 - 2.0 * x) / (2.0 * n * root)) / (1.0 + z * z / n)
+
+
+def macro_bound(metric, n, cells, z, side):
+    """Section 8 (#152): a macro bound (side -1 lower, +1 upper) of section 5.4 at critical value z, as it would be
+    computed at the expected counts, and its standard deviation by the delta method over the multinomial confusion
+    matrix: the gradient of the mean of the per-class bounds in the cell shares, through each class's Wilson slope."""
+    k = len(cells)
+    zk = per_class_z(z, k)
+    values, gradient = [], [[0.0] * k for _ in range(k)]
+    for c, (tp, share) in enumerate(macro_parts(metric, cells)):
+        x = tp / share
+        lo, hi = wilson(n * tp, n * share, zk)
+        b = lo if side < 0 else hi
+        slope = wilson_slope(x, n * share, zk, side)
+        if metric == "macro_f1":  # the Jaccard bound maps to F1 through 2J/(1 + J)
+            values.append(f1_from_j(b))
+            slope *= 2.0 / (1.0 + b) ** 2
+        else:
+            values.append(b)
+        for i in range(k):
+            for j in range(k):
+                counted = j == c if metric == "macro_precision" else (i == c or j == c)
+                gradient[i][j] += slope * ((1.0 if i == j == c else 0.0) - (x if counted else 0.0)) / share / k
+    first = math.fsum(gradient[i][j] * cells[i][j] for i in range(k) for j in range(k))
+    second = math.fsum(gradient[i][j] ** 2 * cells[i][j] for i in range(k) for j in range(k))
+    return math.fsum(values) / k, math.sqrt(max(0.0, second - first * first) / n)
+
+
+def normal_tail(distance, sd):
+    """Phi(distance / sd); a bound without variance decides by its sign."""
+    if sd > 0.0:
+        return phi(distance / sd)
+    return 1.0 if distance > 0.0 else 0.0 if distance < 0.0 else 0.5
+
+
+def macro_probs(metric, n, cells, band, z):
+    """Pass and fail probability of a macro F1 or macro precision member: the macro bounds at z are taken as normal
+    around their values at the expected counts (section 8)."""
+    lower, upper = band.get("lower"), band.get("upper")
+    (lo, sd_lo), (hi, sd_hi) = macro_bound(metric, n, cells, z, -1), macro_bound(metric, n, cells, z, 1)
+    passing, failing = [], 0.0
+    if lower is not None:
+        passing.append(normal_tail(lo - lower, sd_lo))
+        failing += normal_tail(lower - hi, sd_hi)
+    if upper is not None:
+        passing.append(normal_tail(upper - hi, sd_hi))
+        failing += normal_tail(lo - upper, sd_lo)
+    return two_sides(passing), failing
+
+
 def assumed(value, group):
     return value[group] if isinstance(value, dict) else value
 
@@ -1527,6 +1600,17 @@ def performance_models(crit, a, n, mins):
                 theta = math.fsum(recalls) / k
                 se = math.sqrt(math.fsum(r * (1.0 - r) / (n * s) for s, r in zip(shares, recalls))) / k
                 models.append(power_model(metric, metric, theta, {"perClass": {label: n * s for label, s in zip(labels, shares)}}, lambda z, t=theta, s=se, b=band: normal_probs(t, s, b, z), min(n * s for s in shares) >= cls))
+            elif metric in ("macro_f1", "macro_precision"):
+                # Section 8 (#152): the errors of each class spread evenly over the other classes.
+                cells = even_spread_cells(shares, recalls)
+                parts = macro_parts(metric, cells)
+                if metric == "macro_f1":
+                    theta = math.fsum(2.0 * tp / (tp + share) for tp, share in parts) / k  # 2J/(1 + J) = 2TP/(TP + union)
+                    supported = min(n * s for s in shares) >= cls
+                else:
+                    theta = math.fsum(tp / share if share > 0.0 else 0.0 for tp, share in parts) / k
+                    supported = min(n * share for _, share in parts) >= cls  # a class never predicted has no precision
+                models.append(power_model(metric, metric, theta, {"perClass": {label: n * share for label, (_, share) in zip(labels, parts)}}, lambda z, c=cells, m=metric, b=band: macro_probs(m, n, c, b, z), supported))
             else:
                 models.append(power_model(metric, metric, None, None, None, False, computed=False))
     else:
@@ -1985,7 +2069,7 @@ CASES = [
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 3, "criterion": {**perf("performance", [("accuracy", band(0.85)), ("recall", band(0.70)), ("balanced_accuracy", band(0.50)), ("f1", band(0.70)), ("false_positive_rate", band(None, 0.15))]), "powerAssumptions": {"n": 400, "prevalence": 0.25, "truePositiveRate": 0.85, "trueNegativeRate": 0.92}}}},
     {"id": "GC-42", "category": "power", "title": "Equalized odds with per-group prevalence: a true TPR gap on the band edge makes the target unreachable", "type": "power",
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {**grp("equalized-odds-0.10", "equalized_odds", EO10), "powerAssumptions": {"groupSizes": {"A": 600, "B": 300}, "prevalence": {"A": 0.3, "B": 0.2}, "truePositiveRate": {"A": 0.75, "B": 0.65}, "falsePositiveRate": 0.10}}}},
-    {"id": "GC-43", "category": "power", "title": "Multiclass criterion: accuracy and macro recall are computed, macro F1 is not, so the criterion is not_computed", "type": "power",
+    {"id": "GC-43", "category": "power", "title": "Multiclass criterion: accuracy, macro recall and macro F1 (the errors of each class spread evenly over the others, #152) are all computed", "type": "power",
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "multiclass-performance", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": band(0.75)}, {"metric": "balanced_accuracy", "band": band(0.70)}, {"metric": "macro_f1", "band": band(0.70)}], "powerAssumptions": {"n": 600, "classShares": {"a": 0.5, "b": 0.3, "c": 0.2}, "perClassRecall": {"a": 0.9, "b": 0.8, "c": 0.7}}}}},
     {"id": "GC-44", "category": "power", "title": "Regression criterion: MAE and RMSE maxima under normal errors with standard deviation 1", "type": "power",
      "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "regression-performance", "role": "confirmatory", "kind": "regression_performance", "members": [{"metric": "mae", "band": band(None, 0.9)}, {"metric": "rmse", "band": band(None, 1.15)}], "powerAssumptions": {"n": 120, "errorSd": 1.0}}}},
@@ -2030,6 +2114,10 @@ CASES = [
     {"id": "GC-57", "category": "clustered", "title": "45 clusters over three classes with the errors concentrated in every fourth cluster: accuracy >= 0.6 and macro recall >= 0.35 pass on cluster-bootstrap intervals, the chance gate still applied", "type": "plan",
      "data": clustered_classes(),
      "plan": {"clusterField": "cluster", "criteria": [{"id": "multiclass-performance", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "accuracy", "band": band(0.6)}, {"metric": "balanced_accuracy", "band": band(0.35)}]}]}},
+    {"id": "GC-59", "category": "power", "title": "Four imbalanced classes in a family of two: macro precision within [0.70, 0.90] and macro F1 at least 0.72, both bounds of the two-sided band binding, with the errors of each class spread evenly over the others", "type": "power",
+     "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 2, "criterion": {"id": "multiclass-macro", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "macro_precision", "band": band(0.70, 0.90)}, {"metric": "macro_f1", "band": band(0.72)}], "powerAssumptions": {"n": 1000, "classShares": {"a": 0.6, "b": 0.25, "c": 0.1, "d": 0.05}, "perClassRecall": {"a": 0.95, "b": 0.85, "c": 0.8, "d": 0.75}}}}},
+    {"id": "GC-60", "category": "power", "title": "Two classes, macro F1 truly 0.806 under a 0.85 minimum: the member fails with probability 0.754 at 800 rows and no size reaches the target (target_unreachable)", "type": "power",
+     "input": {"kind": "criterion", "confidenceLevel": 0.95, "targetPower": 0.80, "familySize": 1, "criterion": {"id": "multiclass-macro-f1", "role": "confirmatory", "kind": "multiclass_performance", "members": [{"metric": "macro_f1", "band": band(0.85)}], "powerAssumptions": {"n": 800, "classShares": {"a": 0.7, "b": 0.3}, "perClassRecall": {"a": 0.9, "b": 0.7}}}}},
 ]
 
 
@@ -2723,6 +2811,53 @@ def cross_check(fixture):
             fai += norm.cdf((theta - b["upper"]) / se - z)
         return ind_side(pas), fai
 
+    def ind_macro(metric, shares, recalls, n, b, mins, z_pass, z_fail):
+        """Macro F1 and macro precision power, written again from section 8 (#152): the even-spread confusion matrix,
+        statsmodels Wilson bounds at the per-class Bonferroni level, each bound's slope by implicit differentiation of
+        the score equation (x - b)^2 = z^2 b (1 - b)/m, and the multinomial covariance (diag(pi) - pi pi^T)/n."""
+        k = len(shares)
+        cells = np.outer(shares * (1 - recalls) / (k - 1), np.ones(k))
+        np.fill_diagonal(cells, shares * recalls)
+        flat, tp, unit = cells.ravel(), np.diag(cells), np.eye(k)
+        if metric == "macro_precision":
+            den = cells.sum(axis=0)
+            touched = [np.outer(np.ones(k), unit[c]) for c in range(k)]  # column c: predicted as c
+            ok = float((n * den).min()) >= mins["classCount"]
+        else:
+            den = cells.sum(axis=0) + cells.sum(axis=1) - tp
+            touched = [np.maximum(np.outer(unit[c], np.ones(k)), np.outer(np.ones(k), unit[c])) for c in range(k)]  # row or column c
+            ok = float((n * shares).min()) >= mins["classCount"]
+        cov = (np.diag(flat) - np.outer(flat, flat)) / n
+
+        def bound(z, side):
+            zk = float(norm.isf(norm.sf(z) / k))
+            values, grad = [], np.zeros((k, k))
+            for c in range(k):
+                x, m = tp[c] / den[c], n * den[c]
+                bc = sm_wilson(n * tp[c], m, 2 * norm.sf(zk))[0 if side < 0 else 1]
+                slope = 2 * (x - bc) / (2 * (x - bc) + zk * zk * (1 - 2 * bc) / m)
+                if metric == "macro_f1":
+                    values.append(2 * bc / (1 + bc))
+                    slope *= 2 / (1 + bc) ** 2
+                else:
+                    values.append(bc)
+                grad += slope * (np.outer(unit[c], unit[c]) - x * touched[c]) / den[c] / k
+            g = grad.ravel()
+            return float(np.mean(values)), float(np.sqrt(g @ cov @ g))
+
+        def probs(z):
+            (lo, s_lo), (hi, s_hi) = bound(z, -1), bound(z, 1)
+            passing, failing = [], 0.0
+            if b.get("lower") is not None:
+                passing.append(norm.cdf((lo - b["lower"]) / s_lo))
+                failing += norm.cdf((b["lower"] - hi) / s_hi)
+            if b.get("upper") is not None:
+                passing.append(norm.cdf((b["upper"] - hi) / s_hi))
+                failing += norm.cdf((lo - b["upper"]) / s_lo)
+            return ind_side(passing), failing
+
+        return (probs(z_pass)[0], probs(z_fail)[1], ok, True)
+
     def ind_perf_members(crit, a, n, mins, z_pass, z_fail):
         out = []
         kind = crit["kind"]
@@ -2754,6 +2889,8 @@ def cross_check(fixture):
                 elif metric == "balanced_accuracy":
                     theta, se = float(recalls.mean()), float(np.sqrt(np.sum(recalls * (1 - recalls) / (n * shares)))) / len(shares)
                     out.append((ind_norm(theta, se, b, z_pass)[0], ind_norm(theta, se, b, z_fail)[1], float((n * shares).min()) >= mins["classCount"], True))
+                elif metric in ("macro_f1", "macro_precision"):
+                    out.append(ind_macro(metric, shares, recalls, n, b, mins, z_pass, z_fail))
                 else:
                     out.append((None, None, False, False))
             else:
@@ -3012,6 +3149,27 @@ def cross_check(fixture):
         plan = json.loads(json.dumps(base))
         mutate(plan)
         expect(not plan_validator.is_valid(plan), "plan_schema", f"schema accepts an invalid plan: {label}")
+    # Multiclass power assumptions (#113, #152): the schema rejects a share or recall outside (0, 1) and a single
+    # class; the reference normalisation, like validate_plan in both runners, rejects what the schema cannot state.
+    multiclass = next(c for c in fixture["cases"] if c["id"] == "GC-43")["input"]["criterion"]
+    for label, change, by_schema in (
+        ("a class share of 0", {"classShares": {"a": 0.0, "b": 0.5, "c": 0.5}}, True),
+        ("a single class", {"classShares": {"a": 1.0}, "perClassRecall": {"a": 0.9}}, True),
+        ("a recall of 1", {"perClassRecall": {"a": 1.0, "b": 0.8, "c": 0.7}}, True),
+        ("recall labels that differ from the share labels", {"perClassRecall": {"a": 0.9, "b": 0.8, "d": 0.7}}, False),
+        ("shares that do not sum to 1", {"classShares": {"a": 0.5, "b": 0.3, "c": 0.3}}, False),
+    ):
+        changed = json.loads(json.dumps(multiclass))
+        changed["powerAssumptions"].update(change)
+        if by_schema:
+            expect(not criterion_validator.is_valid(changed), "plan_schema", f"schema accepts invalid multiclass assumptions: {label}")
+        else:
+            try:
+                normalize_criterion(changed)
+                rejected = False
+            except AssertionError:
+                rejected = True
+            expect(rejected, "plan_schema", f"normalisation accepts invalid multiclass assumptions: {label}")
     # passBlockedBy is set only by derivation, and only to the kind's own undecidable metric.
     for label, case_id, blocked in (("passBlockedBy in a plan that was not derived", "GC-35", ["r2"]), ("passBlockedBy naming another kind's metric", "GC-48", ["expected_calibration_error"]), ("passBlockedBy on a binary criterion", "GC-47", [])):
         plan = json.loads(json.dumps(next(c for c in fixture["cases"] if c["id"] == case_id)["expected"]["normalizedPlan"]))
@@ -3108,6 +3266,9 @@ def mutation_test(fixture):
         "clustered small cell decided as if rows were independent": lambda f: crit(f, "GC-56")["members"][1].update(pValue=0.0031, reasons=[]),
         "cluster-bootstrap mean baseline gate p-value": lambda f: next(m for m in crit(f, "GC-55")["descriptive"] if m["metric"] == "baseline_rmse")["counts"].__setitem__("gatePValue", 0.2),
         "mean baseline gate pass probability at plan approval": lambda f: case(f, "GC-58")["expected"]["members"][2].__setitem__("passProbability", 0.9),
+        "macro precision pass probability at plan approval": lambda f: bump(case(f, "GC-59")["expected"]["members"][0], "passProbability", 1e-4),
+        "macro F1 fail probability at plan approval": lambda f: bump(case(f, "GC-60")["expected"]["members"][0], "failProbability", 1e-4),
+        "macro F1 required n": lambda f: bump(case(f, "GC-59")["expected"], "requiredNForPass", 1),
     }
     missed = []
     for name, mutate in mutations.items():
@@ -3321,7 +3482,7 @@ def simulate(fixture, sims=20000):
     report = []
     FORMULA_ERROR = 0.02  # sections 8 and 13.3: the member formulas are normal approximations
     GATE_ERROR = 0.04  # section 8: the gate's statistic e^2 - r^2 is skewed, so its normal approximation is coarser
-    worst_member, worst_range, worst_gate = 0.0, 0.0, 0.0
+    worst_member, worst_range, worst_gate, worst_fail = 0.0, 0.0, 0.0, 0.0
 
     def interval_pass(lo, hi, b):
         return (b["lower"] is None or lo >= b["lower"]) and (b["upper"] is None or hi <= b["upper"])
@@ -3333,7 +3494,7 @@ def simulate(fixture, sims=20000):
             continue
         crit = normalize_criterion(inp["criterion"])
         a, z = crit["powerAssumptions"], zcrit(1 - (1 - inp["confidenceLevel"]) / inp["familySize"])
-        hits, member_hits = 0, Counter()
+        hits, member_hits, fail_hits = 0, Counter(), Counter()
         if crit["kind"] == "group_comparison" and crit["metric"] != "equalized_odds":
             names = sorted(a["groupSizes"])
             sizes = [a["groupSizes"][g] for g in names]
@@ -3400,9 +3561,38 @@ def simulate(fixture, sims=20000):
                     member_hits["mean_baseline_gate"] += passed
                     ok = ok and passed
                 hits += ok
+        elif crit["kind"] == "multiclass_performance":
+            # #152: confusion matrices drawn under the even-spread assumption of section 8 and decided as a runner
+            # decides them, the chance gate included; fails of the macro members are counted at z_F. Its own stream
+            # keeps the earlier figures of section 13.3 unchanged.
+            labels = sorted(a["classShares"], key=code_point_key)
+            cells = even_spread_cells([a["classShares"][label] for label in labels], [a["perClassRecall"][label] for label in labels])
+            k, family = len(labels), inp["familySize"]
+            alpha_member = (1 - inp["confidenceLevel"]) / family
+            z_fail = zcrit(1 - (1 - inp["confidenceLevel"]) / (family * len(crit["members"])))
+            for matrix in np.random.default_rng(20261113).multinomial(a["n"], np.array(cells).ravel(), sims).reshape(sims, k, k):
+                data = {"labels": labels, "matrix": matrix.tolist()}
+                ok = True
+                for item in crit["members"]:
+                    stat = multiclass_stat(item["metric"], data, FLOORS)
+                    passed = stat.status == "evaluated" and interval_pass(*stat.ci_at(z), item["band"])
+                    if passed and chance_gated(item["band"], stat.chance):
+                        passed = chance_exact_p(stat.chance[1]) <= alpha_member + EPS
+                    member_hits[item["metric"]] += passed
+                    if item["metric"] in ("macro_f1", "macro_precision"):
+                        lo, hi = stat.ci_at(z_fail) if stat.status == "evaluated" else (None, None)
+                        b = item["band"]
+                        fail_hits[item["metric"]] += lo is not None and ((b["lower"] is not None and hi < b["lower"]) or (b["upper"] is not None and lo > b["upper"]))
+                    ok = ok and passed
+                hits += ok
         else:
             continue
         exp = case["expected"]
+        for m in exp["members"]:
+            if m["metric"] in fail_hits:
+                gap = abs(m["failProbability"] - fail_hits[m["metric"]] / sims)
+                worst_fail = max(worst_fail, gap)
+                report.append(f"{case['id']} {m['memberId']}: fail probability formula {m['failProbability']:.4f}, simulated {fail_hits[m['metric']] / sims:.4f} (gap {gap:.4f})")
         formula_members = ", ".join(f"{m['passProbability']:.4f}" for m in exp["members"])
         simulated_members = ", ".join(f"{count / sims:.4f}" for count in member_hits.values())
         assert len(member_hits) == len(exp["members"])
@@ -3415,8 +3605,8 @@ def simulate(fixture, sims=20000):
         where = "inside the range" if range_gap == 0.0 else f"outside the range by {range_gap:.4f}"
         gate_text = f"; mean baseline gate gap {gate_gap:.4f}" if "mean_baseline_gate" in member_hits else ""
         report.append(f"{case['id']}: criterion pass probability formula [{exp['passProbability']:.4f}, {exp['passProbabilityUpperBound']:.4f}], simulated {rate:.4f} ({where}); members formula ({formula_members}), simulated ({simulated_members}), largest member gap {member_gap:.4f}{gate_text}")
-    ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR and worst_gate <= GATE_ERROR
-    report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}; largest mean baseline gate gap {worst_gate:.4f}, against its error of {GATE_ERROR}: {'within' if ok else 'EXCEEDED'}")
+    ok = worst_member <= FORMULA_ERROR and worst_range <= FORMULA_ERROR and worst_gate <= GATE_ERROR and worst_fail <= FORMULA_ERROR
+    report.append(f"power: largest member gap {worst_member:.4f} and largest distance of a criterion's simulated rate from its range {worst_range:.4f}, against the member formulas' error of {FORMULA_ERROR}; largest mean baseline gate gap {worst_gate:.4f}, against its error of {GATE_ERROR}; largest macro fail-probability gap {worst_fail:.4f}, against {FORMULA_ERROR}: {'within' if ok else 'EXCEEDED'}")
 
     # Coverage of the derived intervals.
     z = zcrit(0.95)

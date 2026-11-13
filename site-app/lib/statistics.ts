@@ -3034,6 +3034,129 @@ function normalProbs(
   return [twoSides(passing), failing];
 }
 
+/**
+ * Section 8 (#152): the expected confusion matrix, as shares of n, when class
+ * c is recognised with its assumed recall and its errors are spread evenly
+ * over the other k - 1 classes (row c is the truth, column j the prediction).
+ */
+function evenSpreadCells(shares: number[], recalls: number[]) {
+  const k = shares.length;
+  return shares.map((s, c) =>
+    shares.map((_, j) =>
+      j === c ? s * recalls[c] : (s * (1.0 - recalls[c])) / (k - 1),
+    ),
+  );
+}
+
+/**
+ * Per class: [TP share, denominator share]. Macro precision: TP of the
+ * predicted count; macro F1: the Jaccard index TP of TP + FP + FN (section 5.4).
+ */
+function macroParts(metric: string, cells: number[][]): [number, number][] {
+  const rows = cells.map((row) => fsum(row));
+  const cols = cells.map((_, c) => fsum(cells.map((row) => row[c])));
+  return cells.map((row, c) => [
+    row[c],
+    metric === "macro_precision" ? cols[c] : rows[c] + cols[c] - row[c],
+  ]);
+}
+
+/** d(Wilson bound)/d(x-hat) at the proportion x with denominator n; side -1 is the lower bound, +1 the upper. */
+function wilsonSlope(x: number, n: number, z: number, side: number) {
+  const root = Math.sqrt((x * (1.0 - x)) / n + (z * z) / (4.0 * n * n));
+  return (
+    (1.0 + (side * z * (1.0 - 2.0 * x)) / (2.0 * n * root)) /
+    (1.0 + (z * z) / n)
+  );
+}
+
+/**
+ * Section 8 (#152): a macro bound (side -1 lower, +1 upper) of section 5.4 at
+ * critical value z, as it would be computed at the expected counts, and its
+ * standard deviation by the delta method over the multinomial confusion
+ * matrix: the gradient of the mean of the per-class bounds in the cell
+ * shares, through each class's Wilson slope.
+ */
+function macroBound(
+  metric: string,
+  n: number,
+  cells: number[][],
+  z: number,
+  side: number,
+): [number, number] {
+  const k = cells.length;
+  const zk = perClassZ(z, k);
+  const values: number[] = [];
+  const gradient = cells.map((row) => row.map(() => 0.0));
+  macroParts(metric, cells).forEach(([tp, share], c) => {
+    const x = tp / share;
+    const [lo, hi] = wilson(n * tp, n * share, zk);
+    const b = side < 0 ? lo : hi;
+    let slope = wilsonSlope(x, n * share, zk, side);
+    if (metric === "macro_f1") {
+      // the Jaccard bound maps to F1 through 2J/(1 + J)
+      values.push(f1FromJ(b));
+      slope *= 2.0 / (1.0 + b) ** 2;
+    } else values.push(b);
+    for (let i = 0; i < k; i++)
+      for (let j = 0; j < k; j++) {
+        const counted =
+          metric === "macro_precision" ? j === c : i === c || j === c;
+        gradient[i][j] +=
+          (slope * ((i === c && j === c ? 1.0 : 0.0) - (counted ? x : 0.0))) /
+          share /
+          k;
+      }
+  });
+  const terms = (power: number) =>
+    fsum(
+      gradient.flatMap((row, i) =>
+        row.map((g, j) => (power === 1 ? g : g ** 2) * cells[i][j]),
+      ),
+    );
+  const first = terms(1),
+    second = terms(2);
+  return [
+    fsum(values) / k,
+    Math.sqrt(Math.max(0.0, second - first * first) / n),
+  ];
+}
+
+/** Phi(distance / sd); a bound without variance decides by its sign. */
+function normalTail(distance: number, sd: number) {
+  if (sd > 0.0) return phi(distance / sd);
+  return distance > 0.0 ? 1.0 : distance < 0.0 ? 0.0 : 0.5;
+}
+
+/**
+ * Pass and fail probability of a macro F1 or macro precision member: the
+ * macro bounds at z are taken as normal around their values at the expected
+ * counts (section 8).
+ */
+function macroProbs(
+  metric: string,
+  n: number,
+  cells: number[][],
+  band: Partial<Band>,
+  z: number,
+): [number, number] {
+  const lower = bound(band, "lower"),
+    upper = bound(band, "upper");
+  const [lo, sdLo] = macroBound(metric, n, cells, z, -1),
+    [hi, sdHi] = macroBound(metric, n, cells, z, 1);
+  const passing: number[] = [];
+  let failing = 0.0;
+  if (lower !== null) {
+    passing.push(normalTail(lo - lower, sdLo));
+    failing += normalTail(lower - hi, sdHi);
+  }
+  if (upper !== null) {
+    passing.push(normalTail(upper - hi, sdHi));
+    failing += normalTail(lo - upper, sdLo);
+  }
+  return [twoSides(passing), failing];
+}
+
 const assumed = (value: any, group: string) =>
   value !== null && typeof value === "object" ? value[group] : value;
 
@@ -3177,6 +3300,39 @@ function performanceModels(
             },
             (z) => normalProbs(theta, se, band, z),
             Math.min(...shares.map((s) => n * s)) >= cls,
+          ),
+        );
+      } else if (metric === "macro_f1" || metric === "macro_precision") {
+        // Section 8 (#152): the errors of each class spread evenly over the other classes.
+        const cells = evenSpreadCells(shares, recalls);
+        const parts = macroParts(metric, cells);
+        const theta =
+          fsum(
+            parts.map(([tp, share]) =>
+              metric === "macro_f1"
+                ? (2.0 * tp) / (tp + share)
+                : share > 0.0
+                  ? tp / share
+                  : 0.0,
+            ),
+          ) / k;
+        // A class never predicted has no precision.
+        const supported =
+          metric === "macro_f1"
+            ? Math.min(...shares.map((s) => n * s)) >= cls
+            : Math.min(...parts.map(([, share]) => n * share)) >= cls;
+        models.push(
+          powerModel(
+            metric,
+            metric,
+            theta,
+            {
+              perClass: Object.fromEntries(
+                labels.map((l, i) => [l, n * parts[i][1]]),
+              ),
+            },
+            (z) => macroProbs(metric, n, cells, band, z),
+            supported,
           ),
         );
       } else

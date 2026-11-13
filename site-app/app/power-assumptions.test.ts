@@ -89,6 +89,48 @@ describe("multiclass power assumptions in both runners", () => {
     );
   });
 
+  it("gives the engine's macro F1 and macro precision numbers (#152)", () => {
+    // engine/tests/test_multiclass_power.py: the same criterion with both
+    // macro members, under the even-spread assumption of section 8.
+    const out = evaluatePower({
+      ...SHARED,
+      criterion: {
+        ...SHARED.criterion,
+        members: [
+          ...SHARED.criterion.members,
+          { metric: "macro_f1", band: { lower: 0.7, upper: null } },
+          { metric: "macro_precision", band: { lower: 0.7, upper: null } },
+        ],
+      },
+    }) as CriterionPower;
+    expect(out.status).toBe("computed");
+    expect(out.passProbability).toBe(0);
+    expect(out.passProbabilityUpperBound).toBeCloseTo(0.07755466798616595, 12);
+    expect(out.requiredNForPass).toBe(969);
+    expect(
+      out.members.slice(2).map((m) => [m.assumedValue, m.passProbability]),
+    ).toEqual([
+      [
+        expect.closeTo(0.7800613945479498, 12),
+        expect.closeTo(0.3629895303213081, 12),
+      ],
+      [
+        expect.closeTo(0.777158419950862, 12),
+        expect.closeTo(0.07755466798616595, 12),
+      ],
+    ]);
+    expect(out.members[3].denominator).toEqual({
+      perClass: {
+        a: expect.closeTo(145.5, 9),
+        b: expect.closeTo(92.25, 9),
+        c: expect.closeTo(62.25, 9),
+      },
+    });
+    expect(powerSentence(out, 0.8)).toContain(
+      "For macro F1 and macro precision the check assumes that each class's errors are spread evenly over the other classes.",
+    );
+  });
+
   it("refuses assumptions that miss a class or give one no share", () => {
     const withAssumptions = (changes: Record<string, unknown>) => ({
       ...SHARED,
@@ -213,9 +255,9 @@ describe("the testing lab's power inputs", () => {
       n: 1000,
       perClassRecall: { a: 0.9, b: 0.9, c: 0.9 },
     });
-    // The lab's plan keeps macro F1, which has no power formula in 1.0.0
-    // (GC-43): the criterion is not computed, but accuracy and balanced
-    // accuracy are, and the sentence reports them.
+    // The lab's plan keeps macro F1, which has a power formula since #152
+    // (GC-43): every member is computed, so is the criterion, and the
+    // sentence names the even-spread assumption.
     const withPower = labPlan(
       "Multiclass classification",
       ["performance"],
@@ -223,14 +265,14 @@ describe("the testing lab's power inputs", () => {
       3,
     );
     const result = power(withPower);
-    expect(result.status).toBe("not_computed");
+    expect(result.status).toBe("computed");
     expect(result.members.map((m) => [m.metric, m.status])).toEqual([
       ["accuracy", "computed"],
       ["balanced_accuracy", "computed"],
-      ["macro_f1", "not_computed"],
+      ["macro_f1", "computed"],
     ]);
     expect(powerSentence(result, 0.8)).toMatch(
-      /^Power is not computed \(member power not computed\): statistics 1\.0\.0 has no power formula for macro F1\. If the assumptions hold, accuracy would pass with probability \d+%, balanced accuracy would pass with probability \d+%\.$/,
+      /^If the assumptions hold, a system meeting them would pass with probability between \d+% and \d+%\.( Reaching 80% needs about [\d,]+ rows\.)? For macro F1 the check assumes that each class's errors are spread evenly over the other classes\.$/,
     );
   });
 

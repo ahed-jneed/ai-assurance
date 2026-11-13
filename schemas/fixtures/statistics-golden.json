@@ -12750,7 +12750,7 @@
   {
    "id": "GC-43",
    "category": "power",
-   "title": "Multiclass criterion: accuracy and macro recall are computed, macro F1 is not, so the criterion is not_computed",
+   "title": "Multiclass criterion: accuracy, macro recall and macro F1 (the errors of each class spread evenly over the others, #152) are all computed",
    "type": "power",
    "input": {
     "kind": "criterion",
@@ -12808,10 +12808,11 @@
     "hosted": false
    },
    "expected": {
-    "status": "not_computed",
-    "passProbability": null,
-    "passProbabilityUpperBound": null,
-    "failProbability": null,
+    "status": "computed",
+    "passProbability": 0.979574572232,
+    "passProbabilityUpperBound": 0.98130155943,
+    "failProbability": 1.11022302463e-15,
+    "requiredNForPass": 383,
     "members": [
      {
       "memberId": "accuracy",
@@ -12842,19 +12843,21 @@
      {
       "memberId": "macro_f1",
       "metric": "macro_f1",
-      "assumedValue": null,
-      "denominator": null,
-      "status": "not_computed",
-      "passProbability": null,
-      "failProbability": null,
-      "reasons": [
-       "power_not_specified_for_metric"
-      ]
+      "assumedValue": 0.802224185827,
+      "denominator": {
+       "perClass": {
+        "a": 336.0,
+        "b": 213.0,
+        "c": 153.0
+       }
+      },
+      "status": "computed",
+      "passProbability": 0.98130155943,
+      "failProbability": 0.0,
+      "reasons": []
      }
     ],
-    "reasons": [
-     "member_power_not_computed"
-    ]
+    "reasons": []
    }
   },
   {
@@ -22920,6 +22923,178 @@
      }
     ],
     "reasons": []
+   }
+  },
+  {
+   "id": "GC-59",
+   "category": "power",
+   "title": "Four imbalanced classes in a family of two: macro precision within [0.70, 0.90] and macro F1 at least 0.72, both bounds of the two-sided band binding, with the errors of each class spread evenly over the others",
+   "type": "power",
+   "input": {
+    "kind": "criterion",
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8,
+    "familySize": 2,
+    "criterion": {
+     "id": "multiclass-macro",
+     "role": "confirmatory",
+     "kind": "multiclass_performance",
+     "members": [
+      {
+       "metric": "macro_precision",
+       "band": {
+        "lower": 0.7,
+        "upper": 0.9
+       }
+      },
+      {
+       "metric": "macro_f1",
+       "band": {
+        "lower": 0.72,
+        "upper": null
+       }
+      }
+     ],
+     "powerAssumptions": {
+      "n": 1000,
+      "classShares": {
+       "a": 0.6,
+       "b": 0.25,
+       "c": 0.1,
+       "d": 0.05
+      },
+      "perClassRecall": {
+       "a": 0.95,
+       "b": 0.85,
+       "c": 0.8,
+       "d": 0.75
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "status": "computed",
+    "passProbability": 0.206917239524,
+    "passProbabilityUpperBound": 0.455395108045,
+    "failProbability": 0.0,
+    "requiredNForPass": 1451,
+    "members": [
+     {
+      "memberId": "macro_precision",
+      "metric": "macro_precision",
+      "assumedValue": 0.795972110754,
+      "denominator": {
+       "perClass": {
+        "a": 593.333333333,
+        "b": 233.333333333,
+        "c": 106.666666667,
+        "d": 66.6666666667
+       }
+      },
+      "status": "computed",
+      "passProbability": 0.455395108045,
+      "failProbability": 0.0,
+      "reasons": []
+     },
+     {
+      "memberId": "macro_f1",
+      "metric": "macro_f1",
+      "assumedValue": 0.81291707466,
+      "denominator": {
+       "perClass": {
+        "a": 623.333333333,
+        "b": 270.833333333,
+        "c": 126.666666667,
+        "d": 79.1666666667
+       }
+      },
+      "status": "computed",
+      "passProbability": 0.751522131479,
+      "failProbability": 0.0,
+      "reasons": []
+     }
+    ],
+    "reasons": []
+   }
+  },
+  {
+   "id": "GC-60",
+   "category": "power",
+   "title": "Two classes, macro F1 truly 0.806 under a 0.85 minimum: the member fails with probability 0.754 at 800 rows and no size reaches the target (target_unreachable)",
+   "type": "power",
+   "input": {
+    "kind": "criterion",
+    "confidenceLevel": 0.95,
+    "targetPower": 0.8,
+    "familySize": 1,
+    "criterion": {
+     "id": "multiclass-macro-f1",
+     "role": "confirmatory",
+     "kind": "multiclass_performance",
+     "members": [
+      {
+       "metric": "macro_f1",
+       "band": {
+        "lower": 0.85,
+        "upper": null
+       }
+      }
+     ],
+     "powerAssumptions": {
+      "n": 800,
+      "classShares": {
+       "a": 0.7,
+       "b": 0.3
+      },
+      "perClassRecall": {
+       "a": 0.9,
+       "b": 0.7
+      }
+     }
+    }
+   },
+   "runners": [
+    "engine",
+    "hosted"
+   ],
+   "endToEnd": {
+    "engine": false,
+    "hosted": false
+   },
+   "expected": {
+    "status": "computed",
+    "passProbability": 3.50238487545e-07,
+    "passProbabilityUpperBound": 3.50238487545e-07,
+    "failProbability": 0.754154436834,
+    "requiredNForPass": null,
+    "members": [
+     {
+      "memberId": "macro_f1",
+      "metric": "macro_f1",
+      "assumedValue": 0.805730937348,
+      "denominator": {
+       "perClass": {
+        "a": 632.0,
+        "b": 296.0
+       }
+      },
+      "status": "computed",
+      "passProbability": 3.50238487545e-07,
+      "failProbability": 0.754154436834,
+      "reasons": []
+     }
+    ],
+    "reasons": [
+     "target_unreachable"
+    ]
    }
   }
  ]
