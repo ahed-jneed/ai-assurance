@@ -296,10 +296,12 @@ export function AssuranceWorkbench({
     }
   }, [data.tenantId, e.id, obligationsOn]);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the workbench snapshot whenever the engagement changes
+    // The request state is one object for the component's lifetime; the
+    // cleanup aborts whichever request is in flight by then.
+    const request = requestRef.current;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching the snapshot is the external sync; load() marks the view refreshing before the request starts
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally aborts whichever request is in flight at cleanup time
-    return () => requestRef.current.controller?.abort();
+    return () => request.controller?.abort();
   }, [load]);
 
   useEffect(() => {
@@ -346,10 +348,12 @@ export function AssuranceWorkbench({
     onEditing(dirty || busy);
     return () => onEditing(false);
   }, [dirty, busy, onEditing]);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the unsaved-review flag after another record is selected
+  // Selecting another record clears the unsaved-review flag.
+  const [dirtyRecord, setDirtyRecord] = useState(location.recordId);
+  if (dirtyRecord !== location.recordId) {
+    setDirtyRecord(location.recordId);
     setDirty(false);
-  }, [location.recordId]);
+  }
 
   const all = snapshot?.records ?? [],
     scope: SearchScope = { tenantId: data.tenantId, engagementId: e.id },

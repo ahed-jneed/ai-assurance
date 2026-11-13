@@ -1,6 +1,6 @@
 "use client";
 import { ChevronRight, FileText, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { paperChecklist, type PaperTarget } from "@/lib/paper-workflow";
 import { stagePaperQueue, auditStageIndex } from "@/lib/auditor-workflow";
@@ -21,8 +21,13 @@ export function NextSteps({
   const { active, later, waiting, teamOutstanding, earlierOutstanding } =
     stagePaperQueue(e, role, userId);
   const [showAll, setShowAll] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- collapses the list again after the engagement or stage changes (post-commit reset is the current behaviour)
-  useEffect(() => setShowAll(false), [e.id, e.stage]);
+  // Another engagement or stage shows the list collapsed again.
+  const stageKey = e.id + "|" + e.stage,
+    [shownStage, setShownStage] = useState(stageKey);
+  if (shownStage !== stageKey) {
+    setShownStage(stageKey);
+    setShowAll(false);
+  }
   function row(item: (typeof active)[number], index: number, primary = false) {
     const carryover =
       auditStageIndex(item.paper.stage) >= 0 &&

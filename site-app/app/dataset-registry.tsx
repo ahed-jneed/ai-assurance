@@ -6,6 +6,8 @@ import type { Engagement, Role } from "@/lib/domain";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import { assuranceRecords } from "@/lib/assurance-store-client";
 type Form = NonNullable<Parameters<typeof WorkflowDialog>[0]["form"]>;
+const cardsError = (err: unknown) =>
+  err instanceof Error ? err.message : "Dataset cards unavailable";
 export function DatasetRegistry({
   engagement: e,
   tenantId,
@@ -25,26 +27,41 @@ export function DatasetRegistry({
     [form, setForm] = useState<Form | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const load = useCallback(async () => {
-    try {
-      const datasets = await assuranceRecords({
-        tenantId,
-        engagementId: e.id,
-        kind: "dataset",
-      });
+  const read = useCallback(
+    () => assuranceRecords({ tenantId, engagementId: e.id, kind: "dataset" }),
+    [tenantId, e.id],
+  );
+  const show = useCallback(
+    (datasets: AssuranceRecord[]) => {
       setCards(datasets);
       onCards(datasets);
       setError("");
+    },
+    [onCards],
+  );
+  async function load() {
+    try {
+      show(await read());
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Dataset cards unavailable",
-      );
+      setError(cardsError(err));
     }
-  }, [tenantId, e.id, onCards]);
+  }
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the dataset cards from the API whenever the engagement version changes
-    void load();
-  }, [load, e.version]);
+    // Reread for each engagement version; a response for an engagement or
+    // version that has since changed is dropped.
+    let active = true;
+    read().then(
+      (datasets) => {
+        if (active) show(datasets);
+      },
+      (err: unknown) => {
+        if (active) setError(cardsError(err));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [read, show, e.version]);
   function register(previous?: AssuranceRecord) {
     const c = previous?.body ?? {},
       fields: Form["fields"] = [

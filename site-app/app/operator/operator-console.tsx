@@ -76,21 +76,33 @@ export function OperatorConsole() {
     [confirmName, setConfirmName] = useState(""),
     [reason, setReason] = useState(""),
     [busy, setBusy] = useState(false);
-  const load = useCallback(async () => {
+  const read = useCallback(async () => {
     const response = await fetch("/api/operator" + (all ? "?all=1" : ""), {
       cache: "no-store",
     });
-    const body = (await response.json()) as ConsoleData & { error?: string };
-    if (!response.ok) setError(body.error ?? "The console could not load");
+    return {
+      ok: response.ok,
+      body: (await response.json()) as ConsoleData & { error?: string },
+    };
+  }, [all]);
+  const show = useCallback(({ ok, body }: Awaited<ReturnType<typeof read>>) => {
+    if (!ok) setError(body.error ?? "The console could not load");
     else {
       setError("");
       setData(body);
     }
-  }, [all]);
+  }, []);
+  const load = async () => show(await read());
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the console data from the API when the filter changes
-    void load();
-  }, [load]);
+    // A response for a filter that has since changed is dropped.
+    let active = true;
+    void read().then((result) => {
+      if (active) show(result);
+    });
+    return () => {
+      active = false;
+    };
+  }, [read, show]);
   /** Appends the next page of practices to the listing. */
   async function more() {
     if (!data?.next) return;
