@@ -13,6 +13,8 @@ const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   lead: readonly Role[] = ["Lead Auditor"],
   internal: readonly Role[] = ["Auditor", "Lead Auditor", "Reviewer"],
   qualityReviewer: readonly Role[] = ["Engagement Quality Reviewer"],
+  clientContributor: readonly Role[] = ["Client Contributor"],
+  clientRoles: readonly Role[] = ["Client Viewer", "Client Contributor"],
   staff: readonly Role[] = [
     "Auditor",
     "Lead Auditor",
@@ -184,15 +186,97 @@ const actions: Record<Action, readonly Role[]> = {
 export const viewAccess = {
   /** The team scope of My work: every assignment of the engagement team. */
   teamWork: lead,
-  /** The evidence requests tab of the Evidence vault. */
+  /**
+   * The evidence requests tab of the Evidence vault, its review queue and
+   * its links.
+   */
   evidenceRequests: staff,
+  /**
+   * The client portal (evidence requests granted to the client) on the
+   * Overview and the Evidence vault.
+   */
+  clientPortal: clientContributor,
 } as const satisfies Record<string, readonly Role[]>;
 
 export type View = keyof typeof viewAccess;
 
 /** Whether `role` may see `view`. */
-export function canSee(role: Role, view: View) {
-  return viewAccess[view].includes(role);
+export function canSee(role: Role | string, view: View) {
+  return (viewAccess[view] as readonly string[]).includes(role);
+}
+
+/**
+ * The role the workspace assumes before it knows the caller's: the one that
+ * may see and do the least.
+ */
+export const fallbackRole: Role = "Client Viewer";
+
+/**
+ * Whether `role` is a client's (Client Viewer or Client Contributor): the
+ * workspace shows them the client summary of an engagement instead of its
+ * audit work, and the server answers their reads with the client projection
+ * (lib/client-projection.ts).
+ */
+export function isClientRole(role: Role | string) {
+  return (clientRoles as readonly string[]).includes(role);
+}
+
+/** Whether `role` is one of the practice's engagement staff. */
+export function isInternalRole(role: Role | string) {
+  return (staff as readonly string[]).includes(role);
+}
+
+/**
+ * Who may be assigned to work or given access, as the server checks each
+ * assignee (lib/workflow/brief-program.ts, monitoring.ts,
+ * acceptance-commands.ts, client-grants.ts and
+ * lib/commands/assurance/access.ts): the member
+ * pickers offer exactly these members.
+ */
+export const assignableRoles = {
+  /** A procedure's preparer, or the owner of a follow-up case. */
+  preparer: writers,
+  /** A procedure's independent reviewer. */
+  reviewer: reviewers,
+  /** A member of the engagement team in the acceptance record. */
+  team: internal,
+  /** An internal member a Lead Auditor grants engagement access (setAccess). */
+  engagementAccess: internal,
+  /** A client member granted one evidence request (grantClientRequest). */
+  clientRequest: clientContributor,
+} as const satisfies Record<string, readonly Role[]>;
+
+export type Assignment = keyof typeof assignableRoles;
+
+/** Whether a member in `role` may be assigned as `assignment`. */
+export function canBeAssigned(role: Role | string, assignment: Assignment) {
+  return (assignableRoles[assignment] as readonly string[]).includes(role);
+}
+
+/**
+ * The base duties the action map is built from, for code that groups work by
+ * who does it (lib/work-items.ts): preparing audit work, reviewing it
+ * independently, authorizing it as Lead Auditor, and the engagement quality
+ * review, which is an Engagement Quality Reviewer's only work.
+ */
+export function duties(role: Role | string) {
+  const has = (roles: readonly Role[]) =>
+    (roles as readonly string[]).includes(role);
+  return {
+    prepare: has(writers),
+    review: has(reviewers),
+    authorize: has(lead),
+    qualityReview: has(qualityReviewer),
+  };
+}
+
+/**
+ * Whether `role` may queue an external job in the auditor_model mode:
+ * queueExternal admits writers, and lib/commands/assurance/execution.ts
+ * narrows that mode to a Lead Auditor.
+ */
+export function canQueueAuditorModel(role: Role | string) {
+  return (lead as readonly string[]).includes(role);
 }
 
 /** The roles that may take `action`. */

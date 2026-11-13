@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { commandModules, dispatch } from "@/lib/commands";
 import { assuranceModules } from "@/lib/commands/assurance";
@@ -6,11 +7,18 @@ import { caller, stored } from "@/lib/commands/test-fixtures";
 import { roles, type Engagement, type Finding, type Paper } from "@/lib/domain";
 import { ApiError } from "@/lib/http";
 import {
+  assignableRoles,
   assuranceActions,
   can,
   canAssignEngagementAccess,
+  canBeAssigned,
+  canQueueAuditorModel,
   canSee,
   decisionState,
+  duties,
+  fallbackRole,
+  isClientRole,
+  isInternalRole,
   manageState,
   managementReferrals,
   narrowedActions,
@@ -18,6 +26,7 @@ import {
   viewAccess,
   workspaceActions,
   type Action,
+  type Assignment,
   type NarrowedAction,
 } from "@/lib/permissions";
 import {
@@ -29,7 +38,6 @@ import {
   workflowOf,
   context as workflowContext,
 } from "@/lib/workflow/test-fixtures";
-import { isClientRole } from "@/lib/workflow-state";
 import {
   WorkflowError,
   workflowCommand,
@@ -199,11 +207,16 @@ describe("client permissions match the server's role checks", () => {
     const asUser = { Auditor: "auditor", "Lead Auditor": "lead" } as const;
     const outcomes: string[] = [],
       expected: string[] = [];
-    for (const approved of [false, true])
+    // A draft engagement; one whose scope and acceptance are approved and
+    // whose program is submitted; and one whose program is approved too.
+    for (const program of ["draft", "submitted", "approved"] as const)
       for (const action of narrowedActions)
         for (const role of ["Auditor", "Lead Auditor"] as const) {
           const e = structuredEngagement();
-          if (approved) e.workflow = approvedWorkflow(workflowOf(e).procedures);
+          if (program !== "draft") {
+            e.workflow = approvedWorkflow(workflowOf(e).procedures);
+            e.workflow.program.status = program;
+          }
           const state = decisionState(role, asUser[role], {
             action,
             engagement: e,
@@ -221,7 +234,7 @@ describe("client permissions match the server's role checks", () => {
             outcome instanceof WorkflowError &&
             outcome.status === 403 &&
             outcome.message === "A Lead Auditor must authorize this decision";
-          const label = `${action} as ${role}${approved ? " (approved)" : ""}`;
+          const label = `${action} as ${role} (${program} program)`;
           outcomes.push(label + (narrowed ? ": Lead required" : ": open"));
           expected.push(
             label + (state.refusal === "state" ? ": Lead required" : ": open"),
@@ -229,9 +242,17 @@ describe("client permissions match the server's role checks", () => {
           if (state.refusal === "state") expect(state.reason).toMatch(/Lead/);
         }
     expect(outcomes).toEqual(expected);
-    // An Auditor meets the narrowing on each approved record.
-    expect(outcomes.filter((o) => o.endsWith("Lead required"))).toHaveLength(
-      narrowedActions.length,
+    // An Auditor meets the narrowing on each approved record, and on the
+    // plans and scope of a program once it is submitted.
+    expect(outcomes.filter((o) => o.endsWith("Lead required")).sort()).toEqual(
+      ["submitted", "approved"]
+        .flatMap((program) =>
+          narrowedActions.map(
+            (action) =>
+              `${action} as Auditor (${program} program): Lead required`,
+          ),
+        )
+        .sort(),
     );
   });
 
@@ -300,9 +321,104 @@ describe("canSee", () => {
       expect(canSee(role, "evidenceRequests"), role).toBe(!isClientRole(role));
   });
 
+  it("shows the client portal to a Client Contributor only", () => {
+    expect(roles.filter((role) => canSee(role, "clientPortal"))).toEqual([
+      "Client Contributor",
+    ]);
+  });
+
   it("names only known roles", () => {
     for (const [view, admitted] of Object.entries(viewAccess))
       for (const role of admitted) expect(roles, view).toContain(role);
+  });
+});
+
+describe("role groups", () => {
+  it("splits every role into the practice's staff or a client", () => {
+    for (const role of roles)
+      expect(isClientRole(role), role).toBe(!isInternalRole(role));
+    expect(roles.filter(isClientRole)).toEqual([
+      "Client Viewer",
+      "Client Contributor",
+    ]);
+  });
+
+  it("assumes the least privileged role before the identity loads", () => {
+    expect(isClientRole(fallbackRole)).toBe(true);
+    for (const op of Object.keys(workspaceActions) as Action[])
+      expect(can(fallbackRole, op), op).toBe(false);
+  });
+
+  it("groups duties by the action map's base roles", () => {
+    for (const role of roles) {
+      const duty = duties(role);
+      expect(duty.prepare, role).toBe(can(role, "submitProcedure"));
+      expect(duty.review, role).toBe(can(role, "reviewProcedure"));
+      expect(duty.authorize, role).toBe(can(role, "releaseReport"));
+      expect(duty.qualityReview, role).toBe(can(role, "signOffQualityReview"));
+    }
+  });
+});
+
+describe("assignments and mode narrowings match the server's checks", () => {
+  const server = (path: string) =>
+    readFileSync(new URL("./" + path, import.meta.url), "utf8");
+  const sorted = (list: readonly string[]) => [...list].sort();
+  /** The role lists each `authorized(<assignee>, [...])` call checks. */
+  function assigneeChecks(path: string) {
+    return [
+      ...server(path).matchAll(/authorized\(\s*([^,]+),\s*\[([^\]]+)\]/g),
+    ].map(([, assignee, list]) => ({
+      assignee,
+      roles: sorted(list.split(",").map((r) => JSON.parse(r.trim()))),
+    }));
+  }
+
+  it("offers each picker exactly the members the commands accept", () => {
+    const found: Record<string, string[][]> = {};
+    const add = (assignment: Assignment, roles: string[]) =>
+      (found[assignment] ??= []).push(roles);
+    for (const { assignee, roles } of [
+      ...assigneeChecks("workflow/brief-program.ts"),
+      ...assigneeChecks("workflow/monitoring.ts"),
+    ])
+      add(/review/i.test(assignee) ? "reviewer" : "preparer", roles);
+    for (const { roles } of assigneeChecks("workflow/acceptance-commands.ts"))
+      add("team", roles);
+    for (const { roles } of assigneeChecks("workflow/client-grants.ts"))
+      add("clientRequest", roles);
+    const access = server("commands/assurance/access.ts").match(
+      /role IN \(([^)]+)\)/,
+    );
+    add(
+      "engagementAccess",
+      sorted(access![1].split(",").map((r) => r.trim().slice(1, -1))),
+    );
+    expect(Object.keys(found).sort()).toEqual(
+      Object.keys(assignableRoles).sort(),
+    );
+    for (const [assignment, checks] of Object.entries(found))
+      for (const roles of checks)
+        expect(roles, assignment).toEqual(
+          sorted(assignableRoles[assignment as Assignment]),
+        );
+    for (const role of roles)
+      expect(canBeAssigned(role, "preparer"), role).toBe(
+        assignableRoles.preparer.includes(role),
+      );
+  });
+
+  it("narrows the auditor_model mode as queueExternal does", () => {
+    const narrowed = server("commands/assurance/execution.ts").match(
+      /v\.mode === "auditor_model"\) \{\s*requireRole\(ctx, \[([^\]]+)\]\)/,
+    );
+    expect(narrowed, "the auditor_model role check").not.toBeNull();
+    const admitted = narrowed![1].split(",").map((r) => JSON.parse(r.trim()));
+    expect(roles.filter(canQueueAuditorModel)).toEqual(
+      roles.filter(
+        (role) => admitted.includes(role) && can(role, "queueExternal"),
+      ),
+    );
   });
 });
 
