@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sanitize } from "../client-projection";
-import type { Engagement, Report } from "../domain";
+import type { Engagement, Paper, Report } from "../domain";
 import { ApiError } from "../http";
 import {
   artifact,
@@ -372,6 +372,89 @@ describe("report model v2 snapshots", () => {
       (s.criteria as { openFindings: number }[]).map((c) => c.openFindings);
     expect(counts(r.snapshot)).toEqual([2]);
     expect(counts(r.clientSnapshot!)).toEqual([1]);
+  });
+
+  it("references retired limitation memos and superseded papers, not as current papers (#94)", async () => {
+    const e = await issuable();
+    const retired = {
+      requestId: "REQ-1",
+      actor: "lead",
+      at: "2026-11-04T10:00:00.000Z",
+      reason: "The client sent a new extract",
+    };
+    const signature = {
+      userId: "lead",
+      at: "2026-11-03T10:00:00.000Z",
+      revision: 2,
+    } as unknown as Paper["signatures"][number];
+    e.papers.push(
+      paper({
+        id: "memo-retired",
+        templateId: "MEM-LS-01",
+        kind: "memo",
+        required: false,
+        revision: 2,
+        status: "signed",
+        retired,
+        signatures: [signature],
+      }),
+      paper({
+        id: "paper-old",
+        templateId: "WP-A10-01",
+        status: "signed",
+        supersededBy: "paper-new",
+        supersededAt: "2026-11-02T10:00:00.000Z",
+      }),
+      // Retired, then superseded: listed once, as superseded.
+      paper({
+        id: "memo-both",
+        templateId: "MEM-LS-01",
+        kind: "memo",
+        required: false,
+        retired,
+        supersededBy: "memo-retired",
+      }),
+    );
+    e.evidenceRequests = [
+      {
+        ...(e.evidenceRequests?.[0] ?? {}),
+        id: "REQ-1",
+        limitationPaperId: "memo-retired",
+      } as NonNullable<Engagement["evidenceRequests"]>[number],
+    ];
+    const r = await capture(e, qualified);
+    const s = r.snapshot as {
+      papers: { id: string }[];
+      workingPapers: { documents: { id: string }[] };
+      retiredPapers: Record<string, unknown>[];
+      supersededPapers: { id: string }[];
+      evidenceRequests: { limitationPaperId?: string }[];
+    };
+    expect(s.retiredPapers).toEqual([
+      {
+        id: "memo-retired",
+        templateId: "MEM-LS-01",
+        revision: 2,
+        retired,
+        signatures: [signature],
+      },
+    ]);
+    expect(s.supersededPapers.map((p) => p.id)).toEqual([
+      "paper-old",
+      "memo-both",
+    ]);
+    for (const id of ["memo-retired", "paper-old", "memo-both"]) {
+      expect(s.papers.map((p) => p.id)).not.toContain(id);
+      expect(s.workingPapers.documents.map((p) => p.id)).not.toContain(id);
+    }
+    // The request's limitation memo resolves in the snapshot.
+    const limitation = s.evidenceRequests.find(
+      (q) => q.limitationPaperId,
+    )!.limitationPaperId;
+    expect(s.retiredPapers.map((p) => p.id)).toContain(limitation);
+    // Neither list reaches the client.
+    expect(r.clientSnapshot).not.toHaveProperty("retiredPapers");
+    expect(JSON.stringify(r.clientSnapshot)).not.toContain("memo-retired");
   });
 
   it("states the firm's independence statement, not the internal planning note", async () => {
