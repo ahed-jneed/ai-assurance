@@ -645,7 +645,8 @@ export function GenaiEvidence({
           label: "Environment",
           type: "area",
           optional: true,
-          hint: "Where and how the run was made; never paste secrets.",
+          maxLength: 2000,
+          hint: "Where and how the run was made, in at most 2,000 characters; never paste secrets.",
         },
         {
           name: "statement",

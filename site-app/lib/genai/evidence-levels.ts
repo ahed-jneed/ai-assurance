@@ -144,6 +144,8 @@ export function attestationPayload(
   const start = utcInstant(text("start"), "The run start"),
     end = utcInstant(text("end"), "The run end");
   if (start > end) throw new Error("The run ends before it starts");
+  if (text("environment").length > 2000)
+    throw new Error("Describe the environment in at most 2,000 characters");
   const imageDigest = text("imageDigest");
   return {
     bundleSha256s: [...new Set(selected)],

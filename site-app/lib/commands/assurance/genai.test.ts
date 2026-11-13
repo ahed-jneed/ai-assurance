@@ -631,6 +631,20 @@ describe("the results view (#145)", () => {
     expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
     enrol("W-GENAI", ["provided_predictions", "genai_ingest"]);
     expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(1);
+    // A worker whose sponsor lost engagement access does not count, as the
+    // runner route would not serve it a job either.
+    store.sqlite
+      .prepare(
+        "UPDATE engagement_access SET active=0 WHERE engagement_id='ENG-G' AND user_id='lead'",
+      )
+      .run();
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(0);
+    store.sqlite
+      .prepare(
+        "UPDATE engagement_access SET active=1 WHERE engagement_id='ENG-G' AND user_id='lead'",
+      )
+      .run();
+    expect((await genaiView(auditor(), "ENG-G")).ingestWorkers).toBe(1);
     // Another engagement's worker does not count.
     store.sqlite
       .prepare("UPDATE runner_workers SET engagement_id='ENG-X' WHERE id=?")

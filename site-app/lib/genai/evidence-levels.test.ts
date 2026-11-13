@@ -159,6 +159,9 @@ describe("attestationPayload", () => {
       attestationPayload({ ...values, statement: "" }, files),
     ).toThrow("statement");
     expect(() =>
+      attestationPayload({ ...values, environment: "x".repeat(2001) }, files),
+    ).toThrow("at most 2,000 characters");
+    expect(() =>
       attestationPayload(
         { ...values, start: "2026-11-05T12:00", end: "2026-11-05T11:00" },
         files,

@@ -5,7 +5,7 @@
 // active workers were enrolled with the genai_ingest capability. With
 // `recordId`, the full computation of one result, read from R2 and checked
 // against its pins. Internal roles only.
-import { jobs } from "../assurance-store";
+import { jobs, workerSponsorGuard } from "../assurance-store";
 import { bucket, db } from "../bindings";
 import { loadEngagement } from "../engagement-repo";
 import { readGenaiEnvelope } from "../genai/envelope";
@@ -75,14 +75,17 @@ export async function genaiView(ctx: Context, engagementId: string) {
 }
 
 /**
- * Active workers of the engagement whose enrolment lists `genai_ingest`: the
- * runner route serves a GenAI ingest job to no other worker, so the view
- * offers to queue one only when this is at least 1.
+ * Active workers of the engagement whose enrolment lists `genai_ingest` and
+ * whose sponsor passes the runner route's guard (workerSponsorGuard): the
+ * route serves a GenAI ingest job to no other worker, so the view offers to
+ * queue one only when this is at least 1.
  */
 async function ingestWorkerCount(ctx: Context, engagementId: string) {
   const row = await db()
     .prepare(
-      "SELECT COUNT(*) AS n FROM runner_workers w WHERE w.tenant_id=? AND w.engagement_id=? AND w.active=1 AND json_valid(w.capabilities) AND EXISTS(SELECT 1 FROM json_each(w.capabilities) WHERE value='genai_ingest')",
+      "SELECT COUNT(*) AS n FROM runner_workers w WHERE w.tenant_id=? AND w.engagement_id=? AND " +
+        workerSponsorGuard +
+        " AND json_valid(w.capabilities) AND EXISTS(SELECT 1 FROM json_each(w.capabilities) WHERE value='genai_ingest')",
     )
     .bind(ctx.tenantId, engagementId)
     .first<{ n: number }>();
