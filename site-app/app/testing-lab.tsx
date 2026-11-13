@@ -60,6 +60,8 @@ import { planSha256, type Plan } from "@/lib/statistics";
 import { PowerCheck, powerShortfalls } from "./power-check";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
+import { GenaiEvidence } from "./genai-evidence";
+import { isClientRole } from "@/lib/workflow-state";
 import {
   ClientDatasetPins,
   declarationFor,
@@ -346,6 +348,7 @@ export function TestingLab({
   act,
 }: Props) {
   const writer = ["Auditor", "Lead Auditor"].includes(role),
+    internal = !isClientRole(role),
     [register, setRegister] = useState<Partial<Model> | null>(null),
     [card, setCard] = useState<ModelCard>(structuredClone(emptyCard)),
     [selectedModel, setSelectedModel] = useState<Model | null>(null),
@@ -781,6 +784,9 @@ export function TestingLab({
             <TabsTrigger value="protocols">Protocols</TabsTrigger>
             <TabsTrigger value="runs">Evaluations</TabsTrigger>
             <TabsTrigger value="catalog">Test catalog</TabsTrigger>
+            {internal && (
+              <TabsTrigger value="genai">GenAI evidence</TabsTrigger>
+            )}
           </TabsList>
           <div className="row-actions">
             {view === "models" && writer && (
@@ -1160,6 +1166,19 @@ export function TestingLab({
             ))}
           </section>
         </TabsContent>
+        {internal && (
+          <TabsContent value="genai">
+            {view === "genai" && (
+              <GenaiEvidence
+                engagement={e}
+                tenantId={tenantId}
+                role={role}
+                onRefresh={onRefresh}
+                onEditing={onEditorOpen}
+              />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
       <Dialog
         open={!!register}
