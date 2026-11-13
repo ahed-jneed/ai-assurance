@@ -331,6 +331,30 @@ describe("protocols with a pre-registered statistics plan", () => {
     });
   });
 
+  it("accept a cluster design in its own column (#136)", () => {
+    const profile = registerProfile(
+      e,
+      planProtocol({
+        version: "cluster-1",
+        statistics: { ...recallPlan(), clusterField: "person" },
+      }),
+      "auditor",
+    );
+    expect(profile.statistics!.clusterField).toBe("person");
+    expect(
+      thrown(() =>
+        registerProfile(
+          e,
+          planProtocol({
+            version: "cluster-2",
+            statistics: { ...recallPlan(), clusterField: "actual" },
+          }),
+          "auditor",
+        ),
+      ).message,
+    ).toMatch(/cluster column/);
+  });
+
   it("leave the chance baseline out only with a recorded rationale", () => {
     const plan = recallPlan();
     plan.criteria[0].rationale = "Recall alone is the contractual criterion";

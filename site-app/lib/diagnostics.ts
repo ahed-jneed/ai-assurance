@@ -213,14 +213,17 @@ export function runPlan(
  * band, with n and an interval for every metric.
  */
 export function evaluate(
-  run: Pick<Run, "config" | "task" | "suite" | "manifest">,
+  run: Pick<Run, "config" | "task" | "suite" | "manifest"> &
+    Partial<Pick<Run, "seed">>,
   csv: string,
 ): HostedEvaluation {
   const rows = validateEvaluation(run, csv);
+  // The run seed draws a clustered plan's bootstrap replicates (section 5.11).
   return evaluateHostedPlan(
     runPlan(run, rows),
     rows,
     run.config,
     run.task ?? "Binary classification",
+    run.seed ?? 42,
   );
 }

@@ -18,6 +18,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- plans and legacy
    configurations are untyped JSON validated here, as in the Python core. */
 
+import { PythonRandom } from "./python-random";
 import library from "./threshold-library.json";
 
 export class StatisticsError extends Error {}
@@ -58,6 +59,8 @@ export const MULTICLASS_METRICS = [
 ] as const;
 export const REGRESSION_METRICS = ["mae", "rmse"] as const;
 const REGRESSION_DESCRIPTIVE = ["mae", "rmse", "r2"];
+/** The optional "beats the mean baseline" member (#136): the MSE reduction over the mean-prediction baseline. */
+const REGRESSION_MEMBERS = [...REGRESSION_METRICS, "mse_reduction"] as const;
 export const PERFORMANCE_KINDS = [
   "performance",
   "multiclass_performance",
@@ -938,7 +941,13 @@ function normalizeAssumptions(criterion: any, assumptions: any) {
     );
     return pick(["n", "classShares", "perClassRecall"]);
   }
-  if (kind === "regression_performance") return pick(["n", "errorSd"]);
+  if (kind === "regression_performance") {
+    const out: Record<string, unknown> = pick(["n", "errorSd"]);
+    // Optional: models the mean baseline gate and the mse_reduction member (section 8).
+    if (get(assumptions, "targetSd") !== null)
+      out.targetSd = assumptions.targetSd;
+    return out;
+  }
   throw new StatisticsError("power assumptions are not defined for " + kind);
 }
 
@@ -1139,6 +1148,10 @@ export function bandProblem(
     return lower === null && upper !== null && upper > 0
       ? null
       : "error metrics take an upper bound above 0 only";
+  if (metric === "mse_reduction")
+    return upper === null && lower !== null && lower >= 0
+      ? null
+      : "the MSE reduction takes a lower bound of 0 or more only";
   if (
     [
       "selection_rate_difference",
@@ -1237,13 +1250,13 @@ const CRITERION_FIELDS: Record<string, readonly string[]> = {
 const MEMBER_METRICS: Record<string, readonly string[]> = {
   performance: BINARY_METRICS,
   multiclass_performance: MULTICLASS_METRICS,
-  regression_performance: REGRESSION_METRICS,
+  regression_performance: REGRESSION_MEMBERS,
   calibration: ["brier_score"],
 };
 const MEMBER_LIMITS: Record<string, number> = {
   performance: 7,
   multiclass_performance: 4,
-  regression_performance: 2,
+  regression_performance: 3,
   calibration: 1,
 };
 const PLAN_FIELDS = [
@@ -1753,6 +1766,8 @@ export type Member = {
   fisherExactP: number | null;
   chanceExactP: number | null;
   reasons: string[];
+  /** A clustered plan's entries (section 5.11): the cluster bootstrap behind the interval. */
+  bootstrap?: { replicates: number; validReplicates: number; clusters: number };
   _ciAt?: CiAt;
   _pInterval?: number;
 };
@@ -2107,9 +2122,10 @@ function regressionStat(
   const status = support(n, mins.sampleSize, "below_minimum_sample_size");
   if (n < 2) {
     // No rows, or one row without a sample standard deviation.
-    const estimate = n === 0 || metric === "r2" ? null : Math.abs(errors[0]);
+    const undefinedMetric =
+      n === 0 || metric === "r2" || metric === "mse_reduction";
     return stat(
-      estimate,
+      undefinedMetric ? null : Math.abs(errors[0]),
       metric === "r2" ? null : "normal_approximation",
       null,
       null,
@@ -2117,13 +2133,14 @@ function regressionStat(
       [
         "undefined",
         [
-          n === 0 || metric === "r2"
+          undefinedMetric
             ? "undefined_zero_denominator"
             : "degenerate_interval",
         ],
       ],
     );
   }
+  if (metric === "mse_reduction") return mseReductionStat(data, status);
   if (metric === "r2") {
     const targets = data.targets ?? new Array<number>(n).fill(0.0);
     const meanT = fsum(targets) / n;
@@ -2179,6 +2196,56 @@ function regressionStat(
     "normal_approximation_mse",
     (z) => [Math.sqrt(Math.max(0.0, mean - z * se)), Math.sqrt(mean + z * se)],
     (band) => (d) => normalZstar(mean, se, squareBand(band), d),
+    counts,
+    status,
+  );
+}
+
+/**
+ * The "beats the mean baseline" member (section 5.9, #136): the MSE reduction
+ * over the mean-prediction baseline, SST/n − MSE = −mean(d) with
+ * d_i = e_i² − (mean − y_i)², and a normal approximation on mean(d). Its band
+ * {lower: L ≥ 0} passes when the reduction is shown to exceed L and fails
+ * when it is shown to lie below L; with L = 0 a fail means the model is
+ * significantly worse than predicting the mean.
+ */
+function mseReductionStat(
+  data: RegressionData,
+  status: [Member["status"], string[]],
+): Stat {
+  const { errors, targets } = data;
+  const n = errors.length;
+  const undefinedStat = () =>
+    stat(null, "normal_approximation", null, null, { n }, [
+      "undefined",
+      ["undefined_zero_denominator"],
+    ]);
+  if (targets === undefined) return undefinedStat();
+  const meanT = fsum(targets) / n;
+  const residuals = targets.map((t) => meanT - t);
+  const sst = fsum(residuals.map((r) => r * r));
+  if (sst === 0.0) return undefinedStat();
+  const [meanD, sdD] = meanSd(
+    errors.map((e, i) => e * e - residuals[i] * residuals[i]),
+  );
+  const reduction = 0.0 - meanD; // never -0
+  const se = sdD / Math.sqrt(n);
+  const counts = {
+    n,
+    meanSquaredError: fsum(errors.map((e) => e * e)) / n,
+    baselineMeanSquaredError: sst / n,
+    sdSquaredErrorDifference: sdD,
+  };
+  if (se === 0.0)
+    return stat(reduction, "normal_approximation", null, null, counts, [
+      "undefined",
+      ["degenerate_interval"],
+    ]);
+  return stat(
+    reduction,
+    "normal_approximation",
+    (z) => [reduction - z * se, reduction + z * se],
+    (band) => (d) => normalZstar(reduction, se, band, d),
     counts,
     status,
   );
@@ -2695,7 +2762,35 @@ export function evaluateCriterion(
   mins: Minimums,
   derived = false,
 ): CriterionResult {
-  const alpha = 1.0 - level;
+  return decideCriterion(
+    buildCriterion(spec, data, level, mins, derived),
+    level,
+    mins,
+  );
+}
+
+/** One criterion's members, descriptive entries and gates before its decision (section 4.3). */
+type CriterionState = {
+  spec: PlanCriterion;
+  kind: string;
+  members: Member[];
+  descriptive: Member[];
+  groups: GroupView[] | null;
+  context: Context;
+  invalidBand: boolean;
+};
+
+/**
+ * Builds a criterion's entries; the cluster bootstrap (section 5.11) replaces
+ * the members' intervals and p-values between this step and the decision.
+ */
+function buildCriterion(
+  spec: PlanCriterion,
+  data: CriterionData,
+  level: number,
+  mins: Minimums,
+  derived = false,
+): CriterionState {
   const kind = spec.kind;
   // Section 3: a derived legacy plan keeps a band the table rejects; that
   // criterion is inconclusive (invalid_band).
@@ -2787,6 +2882,23 @@ export function evaluateCriterion(
     throw new StatisticsError(
       "calibration criteria need score columns; the engine evaluates them",
     );
+  return { spec, kind, members, descriptive, groups, context, invalidBand };
+}
+
+function decideCriterion(
+  state: CriterionState,
+  level: number,
+  mins: Minimums,
+): CriterionResult {
+  const alpha = 1.0 - level;
+  const { spec, kind, members, descriptive, groups, context, invalidBand } =
+    state;
+  // Section 5.11: a clustered member with a small 2x2 cell makes no claim; its
+  // own code explains the outcome.
+  const smallClustered = members.some(
+    (m) =>
+      m.status !== "suppressed" && m.reasons.includes("small_cell_clustered"),
+  );
   const reasons = [...context.reasons];
   if (
     (PERFORMANCE_KINDS.includes(kind) && !spec.members!.length) ||
@@ -2829,7 +2941,8 @@ export function evaluateCriterion(
       reasons.push("small_cell_exact_test_not_significant");
     else if (p > alpha + EPS && deciding.pValue! <= alpha + EPS)
       reasons.push("within_criterion_multiplicity");
-    else if (p > alpha + EPS) reasons.push("interval_straddles_band");
+    else if (p > alpha + EPS && !smallClustered)
+      reasons.push("interval_straddles_band");
   } else {
     const complete =
       pool.length > 0 &&
@@ -2838,7 +2951,7 @@ export function evaluateCriterion(
     if (complete && !context.passBlocked) {
       deciding = tupleMin(pool, (m) => [-m.pValue!, m.memberId]);
       p = deciding.pValue!;
-      if (p > alpha + EPS) {
+      if (p > alpha + EPS && !smallClustered) {
         // Without the chance gate of section 5.2.
         const ungated = Math.max(...pool.map((m) => m._pInterval!));
         reasons.push(
@@ -2904,24 +3017,60 @@ export type PlanEvaluation = {
 
 /** Evaluates a normalised plan on one data object (the golden cases' shape). */
 export function evaluatePlan(plan: Plan, data: CriterionData) {
+  // A plan with a clusterField takes the clustered shape
+  // {seed, clusters: [{cluster, ...one cluster's data}]} (section 5.11).
+  if (plan.clusterField !== null) {
+    const clustered = data as ClusteredData;
+    require_(
+      Array.isArray(clustered.clusters) &&
+        clustered.clusters.length > 0 &&
+        Number.isInteger(clustered.seed),
+      "a clustered plan needs data.clusters and data.seed",
+    );
+    const ordered = [...clustered.clusters].sort((a, b) =>
+      codePointCompare(clusterKey(a.cluster), clusterKey(b.cluster)),
+    );
+    const parts = ordered.map(({ cluster: _, ...part }) => part);
+    return evaluateCriteria(plan, () => data, {
+      ids: ordered.map((part) => part.cluster),
+      partsFor: () => parts,
+      seed: clustered.seed,
+    });
+  }
   return evaluateCriteria(plan, () => data);
 }
+
+/** The golden cases' clustered data shape (section 5.11). */
+export type ClusteredData = {
+  seed: number;
+  clusters: (CriterionData & { cluster: unknown })[];
+};
+/** A clustered evaluation: the clusters in clusterKey order, one data object per cluster in that order, and the run seed. */
+export type Clustered = {
+  ids: unknown[];
+  partsFor: (criterion: PlanCriterion) => CriterionData[];
+  seed: number;
+};
 
 /**
  * Evaluates every criterion of a normalised plan on the data `dataFor`
  * returns, then applies the family adjustments (section 4.5) and the run
- * aggregation over confirmatory criteria (section 4.6).
+ * aggregation over confirmatory criteria (section 4.6). With `clustered`,
+ * every member is decided by the cluster bootstrap instead (section 5.11).
  */
 export function evaluateCriteria(
   plan: Plan,
   dataFor: (criterion: PlanCriterion) => CriterionData,
+  clustered?: Clustered,
 ): PlanEvaluation {
   const level = plan.confidenceLevel;
   const alpha = 1.0 - level;
   const derived = plan.derivedFrom !== null;
-  const results = plan.criteria.map((c) =>
-    evaluateCriterion(c, dataFor(c), level, plan.minimums, derived),
-  );
+  const results = clustered
+    ? clusterBootstrapCriteria(plan, clustered)
+    : plan.criteria.map((c) =>
+        evaluateCriterion(c, dataFor(c), level, plan.minimums, derived),
+      );
   for (const [role, method, adjust] of [
     ["confirmatory", "bonferroni", bonferroni],
     ["exploratory", "benjamini_hochberg", benjaminiHochberg],
@@ -2957,6 +3106,578 @@ export function evaluateCriteria(
       .filter((r) => r.decision.role === "exploratory" && r.outcome === "fail")
       .map((r) => r.id),
   };
+}
+
+// ------------------------------------------------------------ cluster bootstrap (section 5.11)
+// The engine's cluster_bootstrap_criteria, step for step, so that both
+// runners decide a clustered plan on the same replicates (#136).
+export const MAX_DECISION_DRAWS = 50_000_000; // B x C cluster draws per run
+const MIN_CLUSTERS = 10;
+const VALID_REPLICATE_SHARE = 0.9;
+const U_TOLERANCE = 1e-9;
+const UNBOOTSTRAPPED = new Set([
+  "r2",
+  "expected_calibration_error",
+  "baseline_rmse",
+]);
+
+/** Clusters are ordered by the UTF-8 bytes (code points) of their canonical JSON, as the engine's cluster_key. */
+export function clusterKey(cluster: unknown) {
+  return typeof cluster === "string" ? JSON.stringify(cluster) : jcs(cluster);
+}
+
+/** Type-7 (linear interpolation) quantile of an ascending list. */
+function quantile(ordered: number[], probability: number) {
+  const position = (ordered.length - 1) * probability;
+  const lower = Math.floor(position),
+    upper = Math.ceil(position);
+  return (
+    ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+  );
+}
+
+/** One criterion's data over all clusters: counts summed by group or class label, regression rows concatenated in cluster order. */
+function mergeParts(parts: CriterionData[]): CriterionData {
+  const first = parts[0];
+  if (first.groups) {
+    const cells = new Map<string, Record<string, number>>();
+    for (const part of parts)
+      for (const g of part.groups!) {
+        const { group, ...counts } = g as unknown as Record<string, number> & {
+          group: string;
+        };
+        let acc = cells.get(group);
+        if (!acc) {
+          acc = Object.fromEntries(Object.keys(counts).map((k) => [k, 0]));
+          cells.set(group, acc);
+        }
+        require_(
+          Object.keys(acc).sort().join() === Object.keys(counts).sort().join(),
+          "a group mixes selection-only and confusion-matrix counts",
+        );
+        for (const [k, v] of Object.entries(counts)) acc[k] += v;
+      }
+    const out: CriterionData = {
+      groups: byCodePoint(cells.keys()).map(
+        (group) => ({ group, ...cells.get(group)! }) as unknown as GroupData,
+      ),
+    };
+    if (parts.some((part) => part.unknownGroupRows !== undefined))
+      out.unknownGroupRows = sum(parts.map((p) => p.unknownGroupRows ?? 0));
+    return out;
+  }
+  if (first.matrix) {
+    const labels = byCodePoint(new Set(parts.flatMap((p) => p.labels!)));
+    const position = new Map(labels.map((label, i) => [label, i]));
+    const matrix = labels.map(() => labels.map(() => 0));
+    for (const part of parts)
+      part.matrix!.forEach((row, i) =>
+        row.forEach((count, j) => {
+          matrix[position.get(part.labels![i])!][
+            position.get(part.labels![j])!
+          ] += count;
+        }),
+      );
+    return { kind: "multiclass", labels, matrix };
+  }
+  const out: CriterionData = {
+    kind: "regression",
+    errors: parts.flatMap((p) => p.errors!),
+  };
+  if (parts.every((p) => p.targets !== undefined))
+    out.targets = parts.flatMap((p) => p.targets!);
+  return out;
+}
+
+type Unit = string | null;
+/** The cells of one criterion that every replicate sums: one count vector per cluster. */
+class ClusterLayout {
+  size: number;
+  labels: string[] = [];
+  position = new Map<string, number>();
+  centre = 0.0;
+  groups: string[] = [];
+  cells: string[] = [];
+  offset = new Map<string, number>();
+
+  constructor(
+    readonly kind: string,
+    merged: CriterionData,
+  ) {
+    if (kind === "performance") this.size = 4;
+    else if (kind === "multiclass_performance") {
+      this.labels = merged.labels!;
+      this.labels.forEach((label, i) => this.position.set(label, i));
+      this.size = this.labels.length ** 2;
+    } else if (kind === "regression_performance") {
+      const targets =
+        merged.targets ?? new Array<number>(merged.errors!.length).fill(0.0);
+      this.centre = targets.length ? fsum(targets) / targets.length : 0.0;
+      this.size = 5;
+    } else {
+      this.groups = merged.groups!.map((g) => g.group);
+      this.cells = merged.groups!.some((g) => "selected" in g)
+        ? ["selected", "n"]
+        : ["tp", "fp", "fn", "tn"];
+      this.groups.forEach((name, i) =>
+        this.offset.set(name, i * this.cells.length),
+      );
+      this.size = this.groups.length * this.cells.length;
+    }
+  }
+
+  /** A cluster's cells, and its rows per unit (the whole criterion, null, or a group). */
+  vector(part: CriterionData): [number[], Map<Unit, number>] {
+    let cells = new Array<number>(this.size).fill(0);
+    const units = new Map<Unit, number>();
+    if (this.kind === "performance") {
+      for (const g of part.groups!)
+        (["tp", "fp", "fn", "tn"] as const).forEach((key, i) => {
+          cells[i] += (g as Confusion)[key];
+        });
+      units.set(null, sum(cells));
+    } else if (this.kind === "multiclass_performance") {
+      const k = this.labels.length;
+      part.matrix!.forEach((row, i) =>
+        row.forEach((count, j) => {
+          cells[
+            this.position.get(part.labels![i])! * k +
+              this.position.get(part.labels![j])!
+          ] += count;
+        }),
+      );
+      units.set(null, sum(cells));
+    } else if (this.kind === "regression_performance") {
+      const errors = part.errors!;
+      const targets = part.targets ?? new Array<number>(errors.length).fill(0);
+      const shifted = targets.map((t) => t - this.centre);
+      cells = [
+        errors.length,
+        fsum(errors.map((e) => Math.abs(e))),
+        fsum(errors.map((e) => e * e)),
+        fsum(shifted),
+        fsum(shifted.map((t) => t * t)),
+      ];
+      units.set(null, errors.length);
+    } else
+      for (const g of part.groups!) {
+        const base = this.offset.get(g.group)!;
+        this.cells.forEach((key, i) => {
+          cells[base + i] += (g as unknown as Record<string, number>)[key];
+        });
+        units.set(g.group, (units.get(g.group) ?? 0) + groupRows(g));
+      }
+    return [cells, units];
+  }
+
+  /** A replicate's data in the shape the estimators read. */
+  replicate(cells: number[]): unknown {
+    if (this.kind === "performance")
+      return { tp: cells[0], fp: cells[1], fn: cells[2], tn: cells[3] };
+    if (this.kind === "multiclass_performance") {
+      const k = this.labels.length;
+      return {
+        labels: this.labels,
+        matrix: this.labels.map((_, i) => cells.slice(i * k, (i + 1) * k)),
+      };
+    }
+    if (this.kind === "regression_performance") return cells;
+    return Object.fromEntries(
+      this.groups.map((name) => {
+        const base = this.offset.get(name)!;
+        return [
+          name,
+          Object.fromEntries(
+            this.cells.map((key, i) => [key, cells[base + i]]),
+          ),
+        ];
+      }),
+    ) as unknown as Record<string, GroupData>;
+  }
+
+  unitsOf(entry: Member): Unit[] {
+    return this.kind === "group_comparison"
+      ? [entry.subject, entry.comparator]
+      : [null];
+  }
+}
+
+/** mean d = MSE − SST/n on a regression replicate: the statistic of the mean baseline gate (section 5.9). */
+function meanDifference(rep: number[]) {
+  const n = rep[0];
+  if (n === 0) return null;
+  const centred = rep[3] / n;
+  return rep[2] / n - (rep[4] / n - centred * centred);
+}
+
+/** A replicate's shape differs by criterion kind (ClusterLayout.replicate). */
+type Estimator = (rep: any) => number | null;
+/** The estimate of one entry on a replicate (null where undefined), or null for the entries that keep their own treatment (R², the baseline RMSE). */
+function clusterEstimator(
+  layout: ClusterLayout,
+  entry: Member,
+  mins: Minimums,
+): Estimator | null {
+  const metric = entry.metric;
+  if (UNBOOTSTRAPPED.has(metric)) return null;
+  if (layout.kind === "performance")
+    return (rep: Confusion) => binaryStat(metric, rep, mins).estimate;
+  if (layout.kind === "multiclass_performance")
+    return (rep: MulticlassData) => multiclassStat(metric, rep, mins).estimate;
+  if (layout.kind === "regression_performance") {
+    if (metric === "mae")
+      return (rep: number[]) => (rep[0] ? rep[1] / rep[0] : null);
+    if (metric === "mse_reduction")
+      return (rep: number[]) =>
+        rep[0] === 0 ? null : 0.0 - meanDifference(rep)!;
+    return (rep: number[]) => (rep[0] ? Math.sqrt(rep[2] / rep[0]) : null);
+  }
+  const key = RATE_KEYS[metric],
+    subject = entry.subject!,
+    comparator = entry.comparator!;
+  return (rep: Record<string, GroupData>) => {
+    const [xs, ns] = rateCounts(key, rep[subject]),
+      [xc, nc] = rateCounts(key, rep[comparator]);
+    if (ns === 0 || nc === 0) return null;
+    if (metric === "selection_rate_ratio")
+      return xc === 0 ? null : xs / ns / (xc / nc);
+    return xs / ns - xc / nc;
+  };
+}
+
+/** Whether an interval (lo, hi) lies inside the band (pass, inclusive bounds) or outside it (fail, strict). */
+function bandHolds(band: Band, direction: Direction) {
+  const { lower, upper } = band;
+  if (direction === "pass")
+    return (lo: number, hi: number) =>
+      (lower === null || lo >= lower) && (upper === null || hi <= upper);
+  return (lo: number, hi: number) =>
+    (lower !== null && hi < lower) || (upper !== null && lo > upper);
+}
+
+/** u* = inf{u in (0, 0.5] : [q(u), q(1 − u)] decides}, by bisection to 1e-9; null when even the median does not decide. */
+function bootstrapUStar(
+  ordered: number[],
+  holds: (lo: number, hi: number) => boolean,
+) {
+  const middle = quantile(ordered, 0.5);
+  if (!holds(middle, middle)) return null;
+  if (holds(ordered[0], ordered[ordered.length - 1])) return 0.0;
+  let lo = 0.0,
+    hi = 0.5;
+  while (hi - lo > U_TOLERANCE) {
+    const mid = (lo + hi) / 2.0;
+    if (holds(quantile(ordered, mid), quantile(ordered, 1.0 - mid))) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+/** p = max(2u*, 2/(B_valid + 1)), and 1 when no u decides. */
+function bootstrapP(
+  ordered: number[],
+  holds: (lo: number, hi: number) => boolean,
+) {
+  const u = bootstrapUStar(ordered, holds);
+  return u === null ? 1.0 : Math.max(2.0 * u, 2.0 / (ordered.length + 1));
+}
+
+const ascending = (values: number[]) => [...values].sort((a, b) => a - b);
+
+/** Replaces an entry's analytic interval, direction and p-value by the cluster percentile bootstrap. */
+function applyClusterBootstrap(
+  entry: Member,
+  values: number[],
+  clusters: number,
+  replicates: number,
+  level: number,
+  descriptive: boolean,
+  within: boolean,
+  decide: boolean,
+) {
+  delete entry._ciAt;
+  delete entry._pInterval;
+  entry.interval = null;
+  entry.reasons = entry.reasons.filter(
+    (r) => r !== "estimate_on_band_boundary",
+  );
+  if (!descriptive) {
+    entry.direction = "none";
+    entry.pValue = 1.0;
+  }
+  entry.bootstrap = {
+    replicates,
+    validReplicates: within ? values.length : 0,
+    clusters,
+  };
+  if (!within) {
+    entry.reasons.push("bootstrap_budget_exceeded");
+    if (entry.status !== "suppressed") entry.status = "undefined";
+    return;
+  }
+  if (entry.estimate === null) return; // its own status and reason stand
+  if (clusters < MIN_CLUSTERS && entry.status === "evaluated") {
+    entry.status = "insufficient_support";
+    entry.reasons.push("below_minimum_cluster_count");
+  }
+  if (values.length < VALID_REPLICATE_SHARE * replicates) {
+    if (entry.status !== "suppressed") entry.status = "undefined";
+    entry.reasons.push("bootstrap_insufficient_valid_replicates");
+    return;
+  }
+  const ordered = ascending(values);
+  const tail = (1.0 - level) / 2.0;
+  entry.interval = {
+    lower: quantile(ordered, tail),
+    upper: quantile(ordered, 1.0 - tail),
+    level,
+    method: "cluster_percentile_bootstrap",
+  };
+  // The percentile interval at the two-sided level of critical value z, for the headline.
+  entry._ciAt = (z) => {
+    const u = 0.5 * erfc(z / SQRT2);
+    return [quantile(ordered, u), quantile(ordered, 1.0 - u)];
+  };
+  if (descriptive || entry.status !== "evaluated" || !decide) return;
+  const direction = directionOf(quantile(ordered, 0.5), entry.band!); // from the median replicate
+  entry.direction = direction;
+  if (direction === "none") {
+    entry.reasons.push("estimate_on_band_boundary");
+    return;
+  }
+  const p = bootstrapP(ordered, bandHolds(entry.band!, direction));
+  entry.pValue = entry._pInterval = p;
+  if (entry.smallCell) {
+    // Fisher assumes independent rows, so a small cell supports no claim either way.
+    entry.pValue = entry._pInterval = 1.0;
+    entry.reasons.push("small_cell_clustered");
+  } else if (direction === "pass" && entry.chanceExactP !== null)
+    entry.pValue = Math.max(p, entry.chanceExactP); // the chance gate (section 5.2) stays a pass condition
+}
+
+/**
+ * A per-group rate's cluster percentile interval (#136): null beyond the
+ * budget, for an undefined rate and with fewer than 0.9 B valid replicates.
+ * Rates are descriptive, so there is no minimum-cluster rule.
+ */
+function applyRateBootstrap(
+  entry: RateEntry,
+  values: number[],
+  replicates: number,
+  level: number,
+  within: boolean,
+) {
+  entry.interval = null;
+  if (
+    !within ||
+    entry.estimate === null ||
+    values.length < VALID_REPLICATE_SHARE * replicates
+  )
+    return;
+  const ordered = ascending(values);
+  const tail = (1.0 - level) / 2.0;
+  entry.interval = {
+    lower: quantile(ordered, tail),
+    upper: quantile(ordered, 1.0 - tail),
+    level,
+    method: "cluster_percentile_bootstrap",
+  };
+}
+
+/**
+ * The mean baseline gate on the shared replicates (sections 5.9 and 5.11):
+ * p = max(2u*, 2/(B_valid + 1)) with u* = inf{u : q(1 − u) of mean d < 0}.
+ * The rounding rule, fewer than 10 clusters or 0.9 B valid replicates, or a
+ * run beyond the budget give p = 1.
+ */
+function clusterGate(
+  state: CriterionState,
+  values: number[],
+  clusters: number,
+  replicates: number,
+  within: boolean,
+) {
+  const entry = state.descriptive.find((e) => e.metric === "baseline_rmse")!;
+  const counts = entry.counts as Record<string, number | string>;
+  let p = 1.0;
+  const beaten =
+    "meanSquaredErrorReduction" in counts &&
+    (counts.meanSquaredErrorReduction as number) >
+      BASELINE_TOLERANCE * (counts.meanSquaredError as number);
+  if (
+    beaten &&
+    within &&
+    clusters >= MIN_CLUSTERS &&
+    values.length >= VALID_REPLICATE_SHARE * replicates
+  )
+    p = bootstrapP(ascending(values), (_, hi) => hi < 0.0);
+  if ("gatePValue" in counts) {
+    counts.gatePValue = p;
+    counts.gateMethod = "cluster_percentile_bootstrap";
+  }
+  state.context.baselineP = p;
+}
+
+type ClusterState = {
+  state: CriterionState;
+  layout: ClusterLayout;
+  cells: number[][];
+  offset: number;
+  entries: {
+    entry: Member;
+    estimator: Estimator;
+    clusters: number;
+    descriptive: boolean;
+    values: number[];
+  }[];
+  rates: { entry: RateEntry; estimator: Estimator; values: number[] }[];
+  gate: number[] | null;
+  clusters: number;
+};
+
+/**
+ * Section 5.11: every member of a clustered plan is decided by one shared set
+ * of B cluster-bootstrap replicates. Clusters come in clusterKey order; a
+ * replicate draws C indices with randrange(C) from one random.Random(seed)
+ * stream (PythonRandom) and sums the drawn clusters' count vectors.
+ */
+function clusterBootstrapCriteria(
+  plan: Plan,
+  { ids, partsFor, seed }: Clustered,
+): CriterionResult[] {
+  const level = plan.confidenceLevel,
+    mins = plan.minimums,
+    derived = plan.derivedFrom !== null;
+  const replicates = plan.bootstrap.replicates,
+    count = ids.length;
+  const within = replicates * count <= MAX_DECISION_DRAWS;
+  const states: ClusterState[] = [];
+  let width = 0;
+  for (const spec of plan.criteria) {
+    const parts = partsFor(spec);
+    require_(
+      parts.length === count,
+      "every criterion needs one data object per cluster",
+    );
+    const merged = mergeParts(parts);
+    const state = buildCriterion(spec, merged, level, mins, derived);
+    const layout = new ClusterLayout(spec.kind, merged);
+    const vectors = parts.map((part) => layout.vector(part));
+    const clustersIn = new Map<Unit, number>();
+    for (const [, units] of vectors)
+      for (const [unit, rows] of units)
+        if (rows) clustersIn.set(unit, (clustersIn.get(unit) ?? 0) + 1);
+    const entries: ClusterState["entries"] = [];
+    for (const [descriptive, items] of [
+      [false, state.members],
+      [true, state.descriptive],
+    ] as const)
+      for (const entry of items) {
+        const estimator = clusterEstimator(layout, entry, mins);
+        if (estimator !== null)
+          entries.push({
+            entry,
+            estimator,
+            clusters: Math.min(
+              ...layout.unitsOf(entry).map((unit) => clustersIn.get(unit) ?? 0),
+            ),
+            descriptive,
+            values: [],
+          });
+      }
+    const rates: ClusterState["rates"] = [];
+    for (const view of state.groups ?? [])
+      for (const key of ["selection", "tpr", "fpr"] as const) {
+        const entry = view[key];
+        if (entry)
+          rates.push({
+            entry,
+            estimator: (rep: Record<string, GroupData>) => {
+              const [x, n] = rateCounts(key, rep[view.group]);
+              return n ? x / n : null;
+            },
+            values: [],
+          });
+      }
+    states.push({
+      state,
+      layout,
+      cells: vectors.map(([cells]) => cells),
+      offset: width,
+      entries,
+      rates,
+      gate: spec.kind === "regression_performance" ? [] : null,
+      clusters: clustersIn.get(null) ?? 0,
+    });
+    width += layout.size;
+  }
+  if (within) {
+    // Each cell's nonzero clusters and values: a replicate's cell is
+    // sum(multiplicity × value) over them, in cluster order, which equals the
+    // sum of the drawn clusters' vectors.
+    const columns = Array.from({ length: width }, () => ({
+      clusters: [] as number[],
+      values: [] as number[],
+    }));
+    for (const s of states)
+      s.cells.forEach((cells, c) =>
+        cells.forEach((value, i) => {
+          if (value) {
+            columns[s.offset + i].clusters.push(c);
+            columns[s.offset + i].values.push(value);
+          }
+        }),
+      );
+    const rng = new PythonRandom(seed);
+    const multiplicity = new Float64Array(count);
+    const dense = new Array<number>(width);
+    for (let b = 0; b < replicates; b++) {
+      multiplicity.fill(0);
+      for (let i = 0; i < count; i++) multiplicity[rng.randrange(count)] += 1;
+      for (let col = 0; col < width; col++) {
+        const { clusters, values } = columns[col];
+        let total = 0;
+        for (let i = 0; i < clusters.length; i++)
+          total += multiplicity[clusters[i]] * values[i];
+        dense[col] = total;
+      }
+      for (const s of states) {
+        const rep = s.layout.replicate(
+          dense.slice(s.offset, s.offset + s.layout.size),
+        );
+        for (const e of s.entries) {
+          const value = e.estimator(rep);
+          if (value !== null) e.values.push(value);
+        }
+        for (const r of s.rates) {
+          const value = r.estimator(rep);
+          if (value !== null) r.values.push(value);
+        }
+        if (s.gate !== null) {
+          const value = meanDifference(rep as number[]);
+          if (value !== null) s.gate.push(value);
+        }
+      }
+    }
+  }
+  return states.map((s) => {
+    for (const e of s.entries)
+      applyClusterBootstrap(
+        e.entry,
+        e.values,
+        e.clusters,
+        replicates,
+        level,
+        e.descriptive,
+        within,
+        !s.state.invalidBand,
+      );
+    for (const r of s.rates)
+      applyRateBootstrap(r.entry, r.values, replicates, level, within);
+    if (s.gate !== null)
+      clusterGate(s.state, s.gate, s.clusters, replicates, within);
+    return decideCriterion(s.state, level, mins);
+  });
 }
 
 // ------------------------------------------------------------ power (normal approximations at assumed true values)
@@ -3183,7 +3904,11 @@ function performanceModels(
             n >= mins.sampleSize,
           ),
         );
-      } else {
+      } else if (metric === "mse_reduction")
+        models.push(
+          mseReductionModel(band, sigma, a.targetSd ?? null, n, mins),
+        );
+      else {
         const q = sigma * sigma,
           se = (Math.SQRT2 * sigma * sigma) / Math.sqrt(n);
         const sb = squareBand(band);
@@ -3199,8 +3924,79 @@ function performanceModels(
         );
       }
     }
+    // An mse_reduction member (#136) passes only where the gate does, so the
+    // gate adds no condition beside it.
+    if (
+      (a.targetSd ?? null) !== null &&
+      crit.members!.every((m) => m.metric !== "mse_reduction")
+    )
+      models.push(baselineGateModel(sigma, a.targetSd, n, mins));
   }
   return models;
+}
+
+/**
+ * Section 8: the mean baseline gate (section 5.9) as a pass-only condition at
+ * the planned size. The model is assumed to predict the conditional mean, so
+ * e and the deviation from the mean r are jointly normal with Var e = σ²,
+ * Var r = targetSd² and Cov(e, r) = σ²: the MSE reduction is targetSd² − σ²
+ * and SD(e² − r²) = sqrt(2 (targetSd⁴ − σ⁴)). The gate never fails a
+ * criterion; with σ ≥ targetSd it never passes either.
+ */
+function baselineGateModel(
+  sigma: number,
+  targetSd: number,
+  n: number,
+  mins: Minimums,
+): PowerModel {
+  const reduction = targetSd * targetSd - sigma * sigma;
+  let probs: Probs = () => [0.0, 0.0];
+  if (reduction > 0.0) {
+    const se = Math.sqrt(2.0 * (targetSd ** 4 - sigma ** 4)) / Math.sqrt(n);
+    probs = (z) => [phi(reduction / se - z), 0.0];
+  }
+  return powerModel(
+    "mean_baseline_gate",
+    "baseline_rmse",
+    targetSd,
+    n,
+    probs,
+    n >= mins.sampleSize,
+  );
+}
+
+/**
+ * Section 8 (#136): the "beats the mean baseline" member under the gate's
+ * conditional-mean model. It needs targetSd above errorSd; otherwise its
+ * power is not computed.
+ */
+function mseReductionModel(
+  band: Band,
+  sigma: number,
+  targetSd: number | null,
+  n: number,
+  mins: Minimums,
+): PowerModel {
+  if (targetSd === null || targetSd <= sigma)
+    return powerModel(
+      "mse_reduction",
+      "mse_reduction",
+      null,
+      null,
+      null,
+      false,
+      false,
+    );
+  const theta = targetSd * targetSd - sigma * sigma;
+  const se = Math.sqrt(2.0 * (targetSd ** 4 - sigma ** 4)) / Math.sqrt(n);
+  return powerModel(
+    "mse_reduction",
+    "mse_reduction",
+    theta,
+    n,
+    (z) => normalProbs(theta, se, band, z),
+    n >= mins.sampleSize,
+  );
 }
 
 function groupModels(
