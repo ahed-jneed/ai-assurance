@@ -6,12 +6,14 @@
 // approve their own package, an approval must name the exact package digests,
 // and nothing is released before approval.
 import type { Page } from "@playwright/test";
+import { releaseChecklist } from "../lib/domain/release-time";
 import { expectAccessible } from "./a11y";
 import {
   attempt,
   engagementInSignOff,
   engagementOf,
   finalReport,
+  RELEASE_CHECKLIST,
   run,
   type Engagement,
 } from "./engagement";
@@ -90,6 +92,7 @@ test("a released report is superseded by the next release", async ({
       internalHash: first.sha256,
       clientHash: first.clientSha256,
       reason: "Own package",
+      checklist: RELEASE_CHECKLIST,
     }),
   ).toEqual({
     status: 403,
@@ -102,6 +105,7 @@ test("a released report is superseded by the next release", async ({
       internalHash: "0".repeat(64),
       clientHash: first.clientSha256,
       reason: "A package I did not review",
+      checklist: RELEASE_CHECKLIST,
     }),
   ).toEqual({ status: 409, error: "Review both exact package hashes" });
 
@@ -115,6 +119,9 @@ test("a released report is superseded by the next release", async ({
   const approval = review.getByRole("dialog", {
     name: "Approve both exact packages",
   });
+  // The approver answers the completion checklist (MEM-SO-01) with it.
+  for (const item of releaseChecklist)
+    await approval.getByLabel(item.label).selectOption("confirmed");
   await approval
     .getByLabel("Review decision and rationale")
     .fill("Internal report and client preview reviewed against the work.");
@@ -124,7 +131,15 @@ test("a released report is superseded by the next release", async ({
   await runCommand(review, "approveReportPackage", () =>
     approval.getByRole("button", { name: "Approve package" }).click(),
   );
-  expect((await releaseOf(lead, e, first)).state).toBe("approved");
+  const approved = await releaseOf(lead, e, first);
+  expect(approved.state).toBe("approved");
+  expect(approved.approval.checklist).toEqual({
+    items: releaseChecklist.map((item) => ({
+      id: item.id,
+      answer: "confirmed",
+    })),
+    note: "",
+  });
 
   // The Lead Auditor releases it; the client sees it.
   const page = await signIn("qa-lead");
@@ -143,6 +158,7 @@ test("a released report is superseded by the next release", async ({
     internalHash: second.sha256,
     clientHash: second.clientSha256,
     reason: "Amended packages reviewed",
+    checklist: RELEASE_CHECKLIST,
   });
   await releaseInUi(page, e, second);
   const superseded = await releaseOf(lead, e, first);

@@ -5,6 +5,7 @@
 // the spec drives the step it is about through the UI. A spec that changes
 // an engagement's lifecycle works on its own engagement, so the shared demo
 // engagement keeps the state the other specs expect.
+import { releaseChecklist } from "../lib/domain/release-time";
 import { expect, persona, unique, type Api, type PersonaId } from "./fixtures";
 
 /** The ids of an engagement a spec created for itself. */
@@ -364,6 +365,14 @@ export const FINAL_REPORT = {
   signatory: "E2E Assurance GmbH",
   summary: "Readiness of the credit scoring model (persona suite).",
 };
+
+/**
+ * The completion checklist (MEM-SO-01) an approval of both exact packages
+ * answers, every item confirmed.
+ */
+export const RELEASE_CHECKLIST = Object.fromEntries(
+  releaseChecklist.map((item) => [item.id, "confirmed"]),
+);
 
 /** A final readiness report captured by the Lead Auditor. */
 export async function finalReport(

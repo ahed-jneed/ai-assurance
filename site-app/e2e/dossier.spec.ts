@@ -10,6 +10,7 @@ import {
   assurance,
   engagementInSignOff,
   finalReport,
+  RELEASE_CHECKLIST,
   run,
   type Engagement,
 } from "./engagement";
@@ -111,6 +112,7 @@ test("the Lead Auditor seals the dossiers of a released report", async ({
     internalHash: report.sha256,
     clientHash: report.clientSha256,
     reason: "Both packages reviewed",
+    checklist: RELEASE_CHECKLIST,
   });
   await run(lead, e, "releaseReport", {
     reportId: report.id,
