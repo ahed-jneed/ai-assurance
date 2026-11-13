@@ -289,12 +289,57 @@ const emptyPin = {
   confirmedBy: "",
   confirmedOn: "",
   custodyNote: "",
+  /** The header columns, one per line. */
+  columns: "",
 };
+type PinForm = typeof emptyPin & {
+  /** The client's signed statement, from a pin file (#134). */
+  attestation?: Record<string, unknown> & { keySha256?: string };
+};
+/** Pin files are small JSON; anything larger is not read at all. */
+const pinFileBytes = 512 * 1024;
+
+/**
+ * The fields of a pin file written by the runtime package's pin tool
+ * (python -m engine.client_pin), read in the browser. Null when the file is
+ * not such a pin file. The dataset itself is never read here.
+ */
+export function pinFileFields(text: string): Partial<PinForm> | null {
+  let v: Record<string, unknown>;
+  try {
+    v = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (
+    !v ||
+    typeof v !== "object" ||
+    typeof v.sha256 !== "string" ||
+    typeof v.size !== "number" ||
+    !Array.isArray(v.columns) ||
+    !v.columns.every((c) => typeof c === "string")
+  )
+    return null;
+  const str = (k: string) => (typeof v[k] === "string" ? String(v[k]) : "");
+  return {
+    name: str("name"),
+    sha256: v.sha256,
+    size: String(v.size),
+    columns: (v.columns as string[]).join("\n"),
+    confirmedBy: str("confirmedBy"),
+    confirmedOn: str("confirmedOn"),
+    ...(v.attestation && typeof v.attestation === "object"
+      ? { attestation: v.attestation as PinForm["attestation"] }
+      : {}),
+  };
+}
 
 /**
  * Datasets the client keeps (#102): the platform records each file's name,
- * byte size and SHA-256 instead of its bytes. Only a client-local job can
- * use such a pin; the client's own worker reads the file by its hash.
+ * byte size, SHA-256 and header columns instead of its bytes, with the
+ * client's signed statement of the pin when it made one (#134). Only a
+ * client-local job can use such a pin; the client's own worker reads the
+ * file by its hash.
  */
 export function ClientDatasetPins({
   engagement: e,
@@ -308,22 +353,36 @@ export function ClientDatasetPins({
   act: Act;
 }) {
   const pins = e.artifacts.filter((a) => a.custody === "client"),
-    [form, setForm] = useState<typeof emptyPin | null>(null),
+    [form, setForm] = useState<PinForm | null>(null),
     [error, setError] = useState("");
   async function submit(ev: React.FormEvent) {
     ev.preventDefault();
     if (!form) return;
     setError("");
     try {
+      const { attestation, ...fields } = form;
       await act("pinClientDataset", {
-        ...form,
+        ...fields,
         sha256: form.sha256.trim().toLowerCase(),
         size: Number(form.size),
+        columns: form.columns.split(/\r?\n/).filter((c) => c.trim()),
+        ...(attestation ? { attestation } : {}),
       });
       setForm(null);
     } catch (err) {
       setError((err as Error).message);
     }
+  }
+  async function load(file: File | undefined) {
+    if (!file || !form) return;
+    setError("");
+    const fields =
+      file.size <= pinFileBytes ? pinFileFields(await file.text()) : null;
+    if (!fields)
+      return setError(
+        "This is not a pin file from the runtime package's pin tool. Choose the .json file it wrote, not the dataset.",
+      );
+    setForm({ ...form, ...fields });
   }
   const field = (
     key: keyof typeof emptyPin,
@@ -356,14 +415,27 @@ export function ClientDatasetPins({
       </div>
       <p className="subtle">
         A dataset the client keeps never reaches this platform: record its file
-        name, exact byte size and SHA-256 instead of uploading it, then accept
-        the pin in the evidence register. Only a client-local external job can
-        use it. The client&apos;s own worker finds the file in its client data
-        directory by the pin, refuses a changed file and returns only aggregate
-        results, withholding groups below the minimum group size. Groups at or
-        above it are reported exactly. Under the platform&apos;s current Art 4a
-        reading, a fairness protocol on a special-category column needs no
-        recorded basis on this route. <PendingLegalReview />
+        name, exact byte size, SHA-256 and header columns instead of uploading
+        it, then accept the pin in the evidence register. Only a client-local
+        external job can use it, and a job whose mapped columns the header does
+        not hold is refused when it is queued. The client&apos;s own worker
+        finds the file in its client data directory by the pin, refuses a
+        changed file and returns only aggregate results, withholding groups
+        below the minimum group size. Groups at or above it are reported
+        exactly. Under the platform&apos;s current Art 4a reading, a fairness
+        protocol on a special-category column needs no recorded basis on this
+        route. <PendingLegalReview />
+      </p>
+      <p className="subtle">
+        A client without an enrolled worker computes these values with the pin
+        tool in the <a href="/tools/assurance-runtime.zip">runtime package</a>:{" "}
+        <code>
+          python -m engine.client_pin pin --file data.csv --confirmed-by
+          &quot;Name, role&quot;
+        </code>
+        . It reads the file locally and uploads nothing. With <code>--key</code>{" "}
+        it also signs the pin with the client&apos;s own Ed25519 key; load its
+        pin file below.
       </p>
       {pins.length ? (
         <ul className="record-list">
@@ -376,6 +448,19 @@ export function ClientDatasetPins({
                   a.clientPin.confirmedBy +
                   " on " +
                   a.clientPin.confirmedOn}
+              {a.clientPin?.columns &&
+                " · " + a.clientPin.columns.length + " declared columns"}
+              {a.clientPin?.attestation ? (
+                <>
+                  {" "}
+                  · signed by client key{" "}
+                  <code title={a.clientPin.attestation.keySha256}>
+                    {a.clientPin.attestation.keySha256.slice(0, 16)}…
+                  </code>
+                </>
+              ) : (
+                " · not signed by the client"
+              )}
             </li>
           ))}
         </ul>
@@ -385,6 +470,23 @@ export function ClientDatasetPins({
       {form && (
         <form onSubmit={submit} aria-label="Pin client dataset">
           <fieldset disabled={busy}>
+            <label className="ml-field">
+              <span>Pin file from the pin tool (optional)</span>
+              <Input
+                type="file"
+                accept=".json,application/json"
+                onChange={(ev) => load(ev.target.files?.[0])}
+              />
+            </label>
+            {form.attestation && (
+              <p className="ml-notice">
+                Signed by the client&apos;s key{" "}
+                <code>{String(form.attestation.keySha256 ?? "")}</code>. Confirm
+                this fingerprint with the client through a separate channel. The
+                platform verifies the signature over the fields below, so a
+                changed field is refused.
+              </p>
+            )}
             <div className="ml-form-grid">
               {field("name", "File name at the client")}
               {field("sha256", "SHA-256 (64 hex digits)", {
@@ -399,6 +501,17 @@ export function ClientDatasetPins({
               {field("confirmedBy", "Confirmed by (client name and role)")}
               {field("confirmedOn", "Confirmed on", { type: "date" })}
             </div>
+            <label className="ml-field">
+              <span>Header columns, one per line, exactly as in the file</span>
+              <Textarea
+                required
+                spellCheck={false}
+                value={form.columns}
+                onChange={(ev) =>
+                  setForm({ ...form, columns: ev.target.value })
+                }
+              />
+            </label>
             <label className="ml-field">
               <span>Where the client keeps the file and runs its worker</span>
               <Textarea

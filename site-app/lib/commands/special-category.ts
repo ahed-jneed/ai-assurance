@@ -7,6 +7,7 @@ import {
   heldByClient,
   normalizeColumn,
   type SpecialCategoryBasis,
+  verifyPinAttestation,
 } from "../special-category";
 import { defineCommands } from "./command";
 /** The UTC calendar date after the instant `at`. */
@@ -56,16 +57,19 @@ export const specialCategory = defineCommands({
    * Pins a dataset the client keeps (#102): the platform records its name,
    * size and SHA-256 as Dataset evidence without bytes. Accepted like other
    * evidence, only a client-local job on the client's own worker can use it.
+   * The pin declares the file's header columns, and may carry the client's
+   * signed statement of the pin, verified here (#134).
    */
   pinClientDataset: {
     roles: ["Auditor", "Lead Auditor"],
-    handle(e, d, ctx) {
+    async handle(e, d, ctx) {
       const v = clientPinInputSchema.parse(d),
         at = now();
       if (v.confirmedOn > tomorrow(at))
         throw new ApiError(400, "The client cannot confirm a pin in future");
       if (e.artifacts.some((a) => heldByClient(a) && a.sha256 === v.sha256))
         throw new ApiError(409, "This client-held dataset is already pinned");
+      const attestation = await verifyPinAttestation(v, at);
       const artifact: Artifact = {
         id: id("EV"),
         name: v.name,
@@ -83,6 +87,8 @@ export const specialCategory = defineCommands({
           confirmedBy: v.confirmedBy,
           confirmedOn: v.confirmedOn,
           custodyNote: v.custodyNote,
+          columns: v.columns,
+          ...(attestation ? { attestation } : {}),
         },
       };
       e.artifacts.push(artifact);
@@ -94,6 +100,9 @@ export const specialCategory = defineCommands({
           custody: "client",
           confirmedBy: v.confirmedBy,
           confirmedOn: v.confirmedOn,
+          columnCount: v.columns.length,
+          attested: !!attestation,
+          ...(attestation ? { clientKeySha256: attestation.keySha256 } : {}),
         },
       };
     },
