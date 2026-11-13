@@ -1,0 +1,573 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- the fixtures are partial records, as the workspace receives them. */
+// The work inbox: scopes, task states and filters, due-date views, reminders,
+// ordering, URL state and the release and classification work it lists.
+// Ported from scripts/work-inbox-check.mjs (#52); the daylight-saving checks
+// that need the Vienna time zone are in work-inbox.local-calendar.test.ts.
+import assert from "node:assert/strict";
+import { describe, it } from "vitest";
+import {
+  defaultInboxQuery,
+  readInboxQuery,
+  normalizeInboxQuery,
+  inboxQueryParams,
+  selectWork,
+  groupWork,
+  localWorkDay,
+  calendarWorkDay,
+  reminderResumeAt,
+  activeReminders,
+} from "./work-inbox";
+import { engagementWork } from "./work-items";
+
+const today = "2026-10-09";
+const item = (id: any, patch: any = {}): any =>
+  Object.freeze({
+    id,
+    engagementId: "ENG-credit",
+    engagement: "Credit model review",
+    client: "Müller Analytics",
+    kind: "procedure",
+    recordId: "PROC-" + id,
+    module: "Audit program",
+    title: id,
+    action: "Evaluate evidence",
+    reason: "Check the approved source manifest",
+    ownerId: "auditor",
+    dueDate: today,
+    state: "ready",
+    priority: 3,
+    personal: true,
+    ...patch,
+  });
+const fixtures: any = Object.freeze([
+  item("ready", {
+    dueDate: "2026-10-10",
+    reason: "Validate the source manifest against sampling coverage",
+  }),
+  item("review", { state: "review", kind: "report", priority: 1 }),
+  item("planning", {
+    state: "planning",
+    kind: "program",
+    engagementId: "ENG-claims",
+    dueDate: "",
+  }),
+  item("waiting", {
+    state: "waiting",
+    kind: "request",
+    dueDate: "2026-10-08",
+    priority: 0,
+  }),
+  item("snoozed", {
+    kind: "paper",
+    engagementId: "ENG-claims",
+    dueDate: "2026-10-12",
+  }),
+  item("team", {
+    personal: false,
+    ownerId: "another-auditor",
+    dueDate: "2026-10-10",
+    priority: 0,
+  }),
+  item("later", { dueDate: "2026-10-13" }),
+]);
+const reminders = new Map([["snoozed", "2026-10-10T06:00:00.000Z"]]);
+const query = (patch: any): any => ({
+  ...defaultInboxQuery,
+  sort: "name",
+  ...patch,
+});
+const ids = (list: any) => list.map((i: any) => i.id);
+const select = (
+  patch: any = {},
+  rows: any = fixtures,
+  paused = reminders,
+  days = 3,
+) => selectWork(rows, query(patch), paused, today, days);
+
+const complete: any = {
+  scope: "team",
+  view: "reviews",
+  due: "soon",
+  engagementId: "ENG-credit",
+  kind: "report",
+  sort: "due",
+  search: "Müller & approval / PROC-9",
+};
+const engagement: any = {
+  id: "ENG-release",
+  title: "Release review",
+  stage: "Reporting",
+  dueDate: "2026-10-20",
+  papers: [],
+  artifacts: [],
+  evidenceRequests: [],
+  findings: [],
+  reports: [
+    {
+      id: "approved",
+      kind: "final",
+      actor: "creator",
+      snapshot: { workflow: {} },
+      release: { state: "approved", approval: { userId: "approver" } },
+    },
+    {
+      id: "internal",
+      kind: "final",
+      actor: "creator",
+      snapshot: { workflow: {} },
+      release: { state: "internal" },
+    },
+    {
+      id: "legacy",
+      kind: "final",
+      actor: "creator",
+      snapshot: {},
+      release: { state: "internal" },
+    },
+  ],
+};
+
+describe("work inbox (ported from work-inbox-check)", () => {
+  it("personal/team scope, task states and combined engagement/kind/text filters", async () => {
+    assert.deepEqual(ids(select()), [
+      "later",
+      "planning",
+      "ready",
+      "review",
+      "waiting",
+    ]);
+    assert.deepEqual(ids(select({ scope: "team" })), [
+      "later",
+      "planning",
+      "ready",
+      "review",
+      "team",
+      "waiting",
+    ]);
+    for (const [view, expected] of [
+      ["ready", ["later", "ready"]],
+      ["reviews", ["review"]],
+      ["planning", ["planning"]],
+      ["waiting", ["waiting"]],
+    ]) {
+      assert.deepEqual(
+        ids(select({ view })),
+        expected,
+        `${view} contains only the matching personal state`,
+      );
+    }
+    assert.deepEqual(
+      ids(
+        select({
+          kind: "procedure",
+          engagementId: "ENG-credit",
+          search: "SOURCE MANIFEST AGAINST",
+        }),
+      ),
+      ["ready"],
+    );
+    assert.deepEqual(
+      ids(select({ search: "PROC-review" })),
+      ["review"],
+      "Search finds exact record references",
+    );
+    assert.deepEqual(
+      ids(select({ search: "Evidence request" })),
+      ["waiting"],
+      "Search finds human-readable work kinds",
+    );
+    assert.deepEqual(
+      ids(
+        select({
+          engagementId: "ENG-credit",
+          kind: "procedure",
+          search: "evaluate evidence",
+        }),
+      ),
+      ["later", "ready"],
+    );
+    assert.equal(
+      select({ search: "  müller  " }).length,
+      5,
+      "Client search trims surrounding whitespace",
+    );
+    assert.deepEqual(ids(select({ engagementId: "ENG-claims" })), ["planning"]);
+    assert.deepEqual(ids(select({ engagementId: "ENG-missing" })), []);
+    assert.deepEqual(ids(select({ kind: "finding" })), []);
+  });
+
+  it("distinct overdue/today/upcoming/undated filters and inclusive calendar boundaries", async () => {
+    assert.deepEqual(ids(select({ due: "overdue" })), ["waiting"]);
+    assert.deepEqual(ids(select({ due: "today" })), ["review"]);
+    assert.deepEqual(
+      ids(select({ due: "soon" })),
+      ["ready", "review"],
+      "Due soon includes today and excludes overdue, undated and out-of-window work",
+    );
+    assert.deepEqual(
+      ids(select({ due: "soon" }, fixtures, new Map(), 3)),
+      ["ready", "review", "snoozed"],
+      "Due soon includes the last calendar day of the reminder window",
+    );
+    assert.deepEqual(ids(select({ due: "soon" }, fixtures, new Map(), 1)), [
+      "ready",
+      "review",
+    ]);
+    assert.deepEqual(ids(select({ due: "undated" })), ["planning"]);
+    assert.equal(calendarWorkDay("2026-12-31", 1), "2027-01-01");
+    assert.equal(calendarWorkDay("2028-02-28", 1), "2028-02-29");
+    assert.equal(calendarWorkDay("2028-02-28", 2), "2028-03-01");
+  });
+
+  it("snoozed queue, expiration boundary, invalid reminders and per-item resume", async () => {
+    const instant = Date.parse("2026-10-09T12:00:00.000Z");
+    const paused = activeReminders(
+      [
+        { id: "expired", until: "2026-10-09T11:59:59.999Z" },
+        { id: "boundary", until: "2026-10-09T12:00:00.000Z" },
+        { id: "invalid", until: "not-a-date" },
+        { id: "snoozed", until: "2026-10-10T06:00:00.000Z" },
+      ],
+      instant,
+    );
+    assert.deepEqual([...paused.keys()], ["snoozed"]);
+    assert.deepEqual(ids(select({ view: "snoozed" }, fixtures, paused)), [
+      "snoozed",
+    ]);
+    assert(!ids(select({}, fixtures, paused)).includes("snoozed"));
+    const resumed = new Map(paused);
+    resumed.delete("snoozed");
+    assert(ids(select({}, fixtures, resumed)).includes("snoozed"));
+    assert.deepEqual(ids(select({ view: "snoozed" }, fixtures, resumed)), []);
+    assert.equal(
+      paused.size,
+      1,
+      "Resuming a reminder does not mutate the previous reminder snapshot",
+    );
+    assert.deepEqual(
+      ids(
+        select(
+          { view: "snoozed", engagementId: "ENG-credit" },
+          fixtures,
+          paused,
+        ),
+      ),
+      [],
+    );
+  });
+
+  it("actionable priority, due-date ordering, deterministic ties, nonmutation and state grouping", async () => {
+    const ordered = Object.freeze([
+      item("dependency", {
+        state: "waiting",
+        priority: 0,
+        dueDate: "2026-10-01",
+      }),
+      item("undated", { dueDate: "" }),
+      item("dated", { dueDate: "2026-10-10" }),
+      item("overdue", { priority: 5, dueDate: "2026-10-08" }),
+      item("urgent", { priority: 0, dueDate: "2026-10-11" }),
+    ]);
+    const before = JSON.stringify(ordered);
+    assert.deepEqual(
+      ids(select({ sort: "priority" }, ordered, new Map())),
+      ["overdue", "urgent", "dated", "undated", "dependency"],
+      "Waiting dependencies stay behind actionable work even when overdue",
+    );
+    assert.deepEqual(ids(select({ sort: "due" }, ordered, new Map())), [
+      "dependency",
+      "overdue",
+      "dated",
+      "urgent",
+      "undated",
+    ]);
+    const tied = Object.freeze([
+      item("tie-b", { title: "Same action" }),
+      item("tie-a", { title: "Same action" }),
+    ]);
+    for (const sort of ["priority", "due", "name"]) {
+      assert.deepEqual(ids(select({ sort }, tied, new Map())), [
+        "tie-a",
+        "tie-b",
+      ]);
+      assert.deepEqual(
+        ids(select({ sort }, [...tied].reverse(), new Map())),
+        ["tie-a", "tie-b"],
+        "Ordering is deterministic when labels and dates tie",
+      );
+    }
+    assert.equal(
+      JSON.stringify(ordered),
+      before,
+      "Selecting and sorting do not mutate input fixtures",
+    );
+    const groups = groupWork(select({ sort: "priority" }));
+    assert.deepEqual(
+      groups.map((g) => g.state),
+      ["review", "ready", "planning", "waiting"],
+    );
+    assert.equal(groups.flatMap((g) => g.items).length, select().length);
+    assert.deepEqual(groupWork([]), []);
+    assert.deepEqual(
+      groupWork([fixtures[1]]).map((g) => g.state),
+      ["review"],
+      "Grouping omits empty sections",
+    );
+  });
+
+  it("bounded URL state, filter roundtrip and unauthorized team-scope rejection", async () => {
+    assert.deepEqual(inboxQueryParams(defaultInboxQuery), []);
+    const encoded = new URLSearchParams(inboxQueryParams(complete)).toString();
+    assert.deepEqual(
+      readInboxQuery(encoded, true),
+      complete,
+      "Filters and search survive a shareable URL roundtrip",
+    );
+    assert.deepEqual(
+      readInboxQuery(encoded, false),
+      { ...complete, scope: "mine" },
+      "An unauthorized team URL cannot restore team scope",
+    );
+    assert.deepEqual(readInboxQuery(""), defaultInboxQuery);
+    assert.deepEqual(
+      readInboxQuery(
+        "workScope=outsider&workView=invalid&workDue=invalid&workKind=invalid&workSort=invalid",
+        true,
+      ),
+      defaultInboxQuery,
+    );
+    for (const inherited of ["toString", "__proto__", "constructor"]) {
+      assert.equal(
+        readInboxQuery("workKind=" + inherited).kind,
+        "all",
+        "Inherited properties are not accepted as work kinds",
+      );
+    }
+    assert.equal(
+      readInboxQuery(
+        new URLSearchParams({
+          q: "x".repeat(400),
+          workEngagement: "e".repeat(400),
+        }).toString(),
+      ).search.length,
+      300,
+    );
+    assert.equal(
+      readInboxQuery(
+        new URLSearchParams({ workEngagement: "e".repeat(400) }).toString(),
+      ).engagementId.length,
+      300,
+    );
+    assert.deepEqual(
+      defaultInboxQuery,
+      {
+        scope: "mine",
+        view: "all",
+        due: "any",
+        engagementId: "",
+        kind: "all",
+        sort: "priority",
+        search: "",
+      },
+      "Parsing leaves shared defaults unchanged",
+    );
+  });
+
+  it("context normalization, accessible-filter preservation, nonmutation and truthful copied URLs", async () => {
+    const previousPracticeQuery = Object.freeze({
+      ...complete,
+      engagementId: "ENG-previous-practice",
+    });
+    assert.strictEqual(
+      normalizeInboxQuery(complete, true, ["ENG-credit"]),
+      complete,
+      "Valid unchanged context preserves query identity",
+    );
+    assert.deepEqual(
+      normalizeInboxQuery(complete, false, ["ENG-credit"]),
+      { ...complete, scope: "mine" },
+      "Role downgrade removes team scope while preserving accessible filters",
+    );
+    assert.deepEqual(
+      normalizeInboxQuery(previousPracticeQuery, true, ["ENG-credit"]),
+      { ...previousPracticeQuery, engagementId: "" },
+      "Practice changes remove inaccessible engagement filters",
+    );
+    const normalized = normalizeInboxQuery(previousPracticeQuery, false, [
+      "ENG-credit",
+    ]);
+    assert.deepEqual(normalized, {
+      ...previousPracticeQuery,
+      scope: "mine",
+      engagementId: "",
+    });
+    assert.equal(previousPracticeQuery.scope, "team");
+    assert.equal(
+      previousPracticeQuery.engagementId,
+      "ENG-previous-practice",
+      "Normalization does not mutate the saved query",
+    );
+    assert.strictEqual(
+      normalizeInboxQuery(defaultInboxQuery, false, []),
+      defaultInboxQuery,
+    );
+    const normalizedURL = new URLSearchParams(inboxQueryParams(normalized));
+    assert.equal(
+      normalizedURL.has("workScope"),
+      false,
+      "Copied links reflect the effective personal scope",
+    );
+    assert.equal(
+      normalizedURL.has("workEngagement"),
+      false,
+      "Copied links omit inaccessible engagement filters",
+    );
+    assert.deepEqual(
+      readInboxQuery(normalizedURL.toString(), false),
+      normalized,
+    );
+    const staleFilter = query({
+      scope: "team",
+      view: "ready",
+      engagementId: "ENG-previous-practice",
+      search: "source manifest",
+    });
+    assert.deepEqual(
+      ids(selectWork(fixtures, staleFilter, reminders, today)),
+      [],
+    );
+    assert.deepEqual(
+      ids(
+        selectWork(
+          fixtures,
+          normalizeInboxQuery(staleFilter, false, ["ENG-credit", "ENG-claims"]),
+          reminders,
+          today,
+        ),
+      ),
+      ["later", "ready"],
+      "Clearing stale context filters restores matching personal work",
+    );
+  });
+
+  it("local day boundaries and tomorrow-at-08:00 reminders across spring/fall daylight saving", async () => {
+    assert.equal(localWorkDay(new Date(2026, 9, 9, 0, 1)), today);
+    assert.equal(
+      new Date(reminderResumeAt(new Date(2026, 9, 9, 23, 59))).getHours(),
+      8,
+    );
+  });
+
+  it("report approval/release independence, legacy snapshot exclusion and client-role queue restriction", async () => {
+    const reportWork = (role: any, person: any, id: any): any =>
+      engagementWork(engagement, role, person).find((i) => i.recordId === id);
+    assert.equal(
+      reportWork("Lead Auditor", "approver", "approved").personal,
+      false,
+      "The package approver cannot be assigned its independent release",
+    );
+    assert.equal(
+      reportWork("Lead Auditor", "other-lead", "approved").personal,
+      true,
+    );
+    assert.equal(
+      reportWork("Reviewer", "other-reviewer", "approved").personal,
+      false,
+    );
+    assert.equal(reportWork("Reviewer", "creator", "internal").personal, false);
+    assert.equal(
+      reportWork("Reviewer", "other-reviewer", "internal").personal,
+      true,
+    );
+    assert.equal(
+      reportWork("Lead Auditor", "other-lead", "legacy").personal,
+      false,
+      "Legacy snapshots without captured workflow do not create an actionable approval",
+    );
+    assert.deepEqual(engagementWork(engagement, "Client Viewer", "client"), []);
+    assert.deepEqual(
+      engagementWork(engagement, "Client Contributor", "client"),
+      [],
+    );
+  });
+
+  it("migrated classification and pre-migration package work", async () => {
+    // #104: a classification migrated from the four flags is work until it is
+    // recorded again, and a final package that captured the four flags must be
+    // captured again.
+    const migrated: any = {
+      ...engagement,
+      classification: {
+        status: "provisional",
+        model: 2,
+        legacy: { status: "approved", approvedBy: "reviewer" },
+        history: [{ action: "approved_v1", by: "reviewer" }],
+      },
+      reports: [
+        {
+          id: "pre-19",
+          kind: "final",
+          actor: "creator",
+          snapshot: {
+            workflow: {},
+            engagement: { classification: { status: "approved" } },
+          },
+        },
+      ],
+    };
+    assert.deepEqual(
+      engagementWork(migrated, "Lead Auditor", "lead")
+        .filter((i) => ["classification", "report"].includes(i.kind))
+        .map((i) => [i.kind, i.action, i.personal]),
+      [
+        ["classification", "Reclassify the system", true],
+        ["report", "Capture the package again", true],
+      ],
+    );
+    assert.equal(
+      engagementWork(
+        {
+          ...migrated,
+          classification: {
+            ...migrated.classification,
+            history: [
+              ...migrated.classification.history,
+              { action: "classified" },
+            ],
+          },
+        },
+        "Lead Auditor",
+        "lead",
+      ).some((i) => i.kind === "classification"),
+      false,
+    );
+    // A later final package captured since the migration retires the old one.
+    assert.deepEqual(
+      engagementWork(
+        {
+          ...migrated,
+          reports: [
+            { ...migrated.reports[0], createdAt: "2026-11-01T00:00:00.000Z" },
+            {
+              id: "post-19",
+              kind: "final",
+              actor: "creator",
+              createdAt: "2026-11-06T00:00:00.000Z",
+              snapshot: {
+                workflow: {},
+                engagement: {
+                  classification: { status: "approved", model: 2 },
+                },
+              },
+            },
+          ],
+        },
+        "Lead Auditor",
+        "lead",
+      )
+        .filter((i) => i.kind === "report")
+        .map((i) => i.recordId),
+      ["post-19"],
+    );
+  });
+});

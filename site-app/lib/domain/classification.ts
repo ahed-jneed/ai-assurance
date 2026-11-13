@@ -5,8 +5,8 @@
 // the AI Office competence flag; SME or small mid-cap status; the Art 50 facts
 // and the Art 50 items of docs/obligation-subitems.json evaluated with the rule
 // pack's three-valued predicates. Unknown never means "Minimal risk": it gives
-// "Needs information" and blocks approval. Pure and without data imports, so
-// the check harnesses can load it; lib/classification-rules.ts binds the data.
+// "Needs information" and blocks approval. Pure and without data imports;
+// lib/classification-rules.ts binds the data.
 import {
   all,
   any,

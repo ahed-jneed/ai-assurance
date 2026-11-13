@@ -8,6 +8,7 @@
 // Client Viewer (F-56); and drizzle 0007 withdrawing what earlier revocations
 // left active. Needs `npm run build` first.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
