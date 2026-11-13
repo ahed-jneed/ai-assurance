@@ -13,6 +13,7 @@ import type {
   RecordSearchPage,
   SearchedRecord,
 } from "@/lib/assurance-search";
+import { errorMessage, fetchJson } from "@/lib/fetch-json";
 import { AssuranceRegister } from "./assurance-register";
 
 export type SearchScope = { tenantId: string; engagementId: string };
@@ -50,13 +51,10 @@ async function fetchPage(
       params.set("review", query.review);
   }
   if (cursor) params.set("cursor", cursor);
-  const response = await fetch("/api/assurance?" + params, {
-      cache: "no-store",
-      signal,
-    }),
-    page = (await response.json()) as RecordSearchPage & { error?: string };
-  if (!response.ok) throw Error(page.error ?? "Assurance records unavailable");
-  return page;
+  return fetchJson<RecordSearchPage>("/api/assurance?" + params, {
+    cache: "no-store",
+    signal,
+  });
 }
 
 type SearchState = {
@@ -201,25 +199,17 @@ export function useRecordContext(
       view: "record",
       id,
     });
-    fetch("/api/assurance?" + params, {
+    fetchJson<RecordContext>("/api/assurance?" + params, {
       cache: "no-store",
       signal: abort.signal,
     })
-      .then(async (response) => {
-        const value = (await response.json()) as RecordContext & {
-          error?: string;
-        };
-        if (!response.ok)
-          throw Error(value.error ?? "Assurance record unavailable");
-        setState({ key, context: value, error: "" });
-      })
+      .then((value) => setState({ key, context: value, error: "" }))
       .catch((x: unknown) => {
         if (!abort.signal.aborted)
           setState({
             key,
             context: null,
-            error:
-              x instanceof Error ? x.message : "Assurance record unavailable",
+            error: errorMessage(x, "Assurance record unavailable"),
           });
       });
     return () => abort.abort();

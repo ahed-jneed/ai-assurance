@@ -23,6 +23,7 @@
 // server's search directly (app/assurance-record-search.tsx), as before.
 import type { AssuranceRecord } from "./assurance-core";
 import { assuranceRecords } from "./assurance-store-client";
+import { fetchJson } from "./fetch-json";
 import type { GenaiView } from "./read-models/genai-view";
 
 type EngagementRef = { tenantId: string; engagementId: string };
@@ -249,38 +250,31 @@ export function recordsQuery(kind: string): AssuranceQuery<AssuranceRecord[]> {
   return query;
 }
 
-/** A JSON read of GET /api/assurance with `params`, failing with the server's error. */
+/**
+ * A JSON read of GET /api/assurance with `params` through fetchJson: it
+ * fails with the server's error, or with the status's message when the
+ * answer is not JSON.
+ */
 export function viewQuery<T>(
   name: string,
   params: Record<string, string>,
-  fallback: string,
 ): AssuranceQuery<T> {
   return {
     key: "view:" + name,
-    read: async (scope, signal) => {
-      const response = await fetch(
-          "/api/assurance?" + new URLSearchParams({ ...scope, ...params }),
-          {
-            cache: "no-store",
-            signal,
-            headers: { accept: "application/json" },
-          },
-        ),
-        body = (await response.json().catch(() => ({}))) as T & {
-          error?: string;
-        };
-      if (!response.ok) throw new Error(body.error ?? fallback);
-      return body;
-    },
+    read: (scope, signal) =>
+      fetchJson<T>(
+        "/api/assurance?" + new URLSearchParams({ ...scope, ...params }),
+        {
+          cache: "no-store",
+          signal,
+          headers: { accept: "application/json" },
+        },
+      ),
   };
 }
 
 /** GET /api/assurance?view=genai: the GenAI results, plans, bundles and workers. */
-export const genaiQuery = viewQuery<GenaiView>(
-  "genai",
-  { view: "genai" },
-  "GenAI evidence unavailable",
-);
+export const genaiQuery = viewQuery<GenaiView>("genai", { view: "genai" });
 
 /** The version of the engagement in a workspace load's answer, if it has one. */
 function versionOf(loaded: unknown) {
