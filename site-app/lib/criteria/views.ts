@@ -18,6 +18,13 @@ import {
   type StateCounts,
   type Unusable,
 } from "./coverage";
+import {
+  datesFramework,
+  deriveApplicability,
+  effectiveRows,
+  type DatedSnapshot,
+  type DerivedApplicabilityRow,
+} from "./applicability";
 import { coverageSources, type ObligationRecord } from "./coverage-sources";
 import { criteriaFor, features, legalReviewPending } from "./projection";
 import {
@@ -271,7 +278,15 @@ export type CellView = {
     source?: Pick<CoverageSource, "kind" | "label" | "templateId" | "evidence">;
   })[];
   caps: Cap[];
+  /** The actors the framework data names for the requirement. */
+  actors?: string[];
+  /** Reviewed applicability rows of the framework data. */
   applicability?: RequirementNode["applicability"];
+  /**
+   * Rows derived from the pinned rule pack's dated entries (own or inherited
+   * from a group): derived, not reviewed, never a coverage state.
+   */
+  derivedApplicability?: DerivedApplicabilityRow[];
   legalEffects?: {
     crosswalk: string;
     entryId?: string;
@@ -318,11 +333,13 @@ function toResponse(
     string,
     { crosswalk: string; entryId?: string; legalEffect: unknown }[]
   >,
+  derived?: (id: string) => DerivedApplicabilityRow[],
 ) {
   const cells: CellView[] = [];
   for (const n of ev.order) {
     const res = ev.nodes.get(n.id);
     if (!res) continue;
+    const dated = derived?.(n.id) ?? [];
     cells.push({
       id: n.id,
       ref: n.ref,
@@ -345,7 +362,9 @@ function toResponse(
           : c;
       }),
       caps: res.caps,
+      ...(n.actors?.length ? { actors: n.actors } : {}),
       ...(n.applicability ? { applicability: n.applicability } : {}),
+      ...(dated.length ? { derivedApplicability: dated } : {}),
       ...(legalEffects?.get(n.id)
         ? {
             legalEffects: legalEffects.get(n.id)!.map((x) => {
@@ -416,6 +435,9 @@ export function coverageFor(
     });
   let response: Omit<CoverageResponse, "banners" | "legalReviewPending">;
   let pending = false;
+  const snapshot = (pack.compat?.catalog?.regulatorySnapshot ??
+    null) as DatedSnapshot | null;
+  let derivation: ReturnType<typeof deriveApplicability> | null = null;
   if (view.kind === "criteria") {
     const i = pack.criteria.findIndex(
       (s) => viewKey(s.framework, s.edition) === key,
@@ -423,6 +445,10 @@ export function coverageFor(
     const c = criteria[i];
     const fw = resolved.frameworks[i];
     pending = legalReviewPending(fw, resolved.frameworkEntries[i]);
+    derivation = datesFramework(fw, snapshot)
+      ? deriveApplicability(fw, snapshot)
+      : null;
+    const rows = derivation?.rows;
     response = {
       view,
       views,
@@ -434,7 +460,12 @@ export function coverageFor(
       },
       programApproved: e.workflow?.program.status === "approved",
       versions: { framework: fw.version, crosswalks: [] },
-      ...toResponse(c.evaluation, c.sources),
+      ...toResponse(
+        c.evaluation,
+        c.sources,
+        undefined,
+        rows ? (id) => effectiveRows(fw, rows, id) : undefined,
+      ),
       unusableEntries: [],
       notes: {
         unusableObligations: c.result.unusable.length,
@@ -510,6 +541,18 @@ export function coverageFor(
     banners.push({
       id: "unplaced-findings",
       text: `${response.notes.unplacedFindings} unresolved finding(s) are linked to no procedure, paper or criterion and are not placed.`,
+    });
+  const dated = response.cells.filter(
+    (c) => c.type === "requirement" && c.derivedApplicability?.length,
+  ).length;
+  if (derivation && snapshot && dated)
+    banners.push({
+      id: "derived-applicability",
+      text: `Applicability dates on ${dated} requirement(s) are derived from the dated entries of rule pack ${snapshot.rulePackVersion} by an automatic mapping of provisions to requirements. They are derived, not reviewed: they inform review only and do not change any coverage state.${
+        derivation.unmapped.length
+          ? ` ${derivation.unmapped.length} dated provision(s) map to no requirement of this framework.`
+          : ""
+      }`,
     });
   if (response.migrated)
     banners.push({ id: "migration", text: MIGRATION_NOTE });
