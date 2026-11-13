@@ -4,8 +4,7 @@
 // the DOSSIER_KEK Worker secret, bound to its practice and key ID, and only
 // ever unwrapped into a non-extractable CryptoKey. A retired key keeps only its
 // public half, which stays published so earlier signatures still verify.
-import { env } from "cloudflare:workers";
-import { db } from "./bindings";
+import { db, env } from "./bindings";
 import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import type { Context } from "./tenancy";

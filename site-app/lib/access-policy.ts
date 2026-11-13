@@ -1,6 +1,6 @@
 // Who may provision a practice of their own, and how much one practice may
 // write. Both come from Worker variables (docs/security/identity.md).
-import { env } from "cloudflare:workers";
+import { env } from "./bindings";
 import { ApiError } from "./http";
 
 /** The Worker variables read here (cloudflare-env.d.ts). */
