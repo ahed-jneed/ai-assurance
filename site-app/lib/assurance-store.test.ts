@@ -620,6 +620,12 @@ describe("assurance gates and pins in SQL", () => {
     expect(readiness.join()).not.toMatch(/A1\b|A3|A6|A8|I1|I2|X1/);
   });
 
+  // Hashing and inserting 600 to 1,200 records, then comparing every gate
+  // and pin with the in-memory computation, takes 0.1 to 0.4 s on an idle
+  // machine but passed the default 5 s timeout with three suites running at
+  // once (#174). These tests check results, not speed, so the timeout only
+  // ends a run that never finishes.
+  const heavy = 60_000;
   it.each([1, 2, 3])(
     "agree with the in-memory computations on random records (seed %i)",
     async (seed) => {
@@ -645,19 +651,24 @@ describe("assurance gates and pins in SQL", () => {
         );
       expect(await assurancePins(ctx, "ENG-1")).toEqual(legacyPins(all));
     },
+    heavy,
   );
 
-  it("read past the old 1,000-record limit", async () => {
-    await insert(randomRecords(4, 1200));
-    const all = everyRecord();
-    expect(all).toHaveLength(1200);
-    expect(await assuranceGates(ctx, "ENG-1", "Adverse conclusion")).toEqual(
-      legacyGates(all, "Adverse conclusion"),
-    );
-    const pins = await assurancePins(ctx, "ENG-1");
-    expect(pins.length).toBeGreaterThan(500);
-    expect(pins).toEqual(legacyPins(all));
-  });
+  it(
+    "read past the old 1,000-record limit",
+    async () => {
+      await insert(randomRecords(4, 1200));
+      const all = everyRecord();
+      expect(all).toHaveLength(1200);
+      expect(await assuranceGates(ctx, "ENG-1", "Adverse conclusion")).toEqual(
+        legacyGates(all, "Adverse conclusion"),
+      );
+      const pins = await assurancePins(ctx, "ENG-1");
+      expect(pins.length).toBeGreaterThan(500);
+      expect(pins).toEqual(legacyPins(all));
+    },
+    heavy,
+  );
 });
 
 describe("assurance record lookups", () => {
