@@ -298,8 +298,7 @@ function ResultCard({
             {run.signedResults
               ? " · " + run.signedResults + " signatures verified"
               : ""}{" "}
-            ·{" "}
-            <Level level={runLevel(run.runKey)} />
+            · <Level level={runLevel(run.runKey)} />
             {run.missing.length
               ? " · " + run.missing.length + " metadata missing"
               : ""}

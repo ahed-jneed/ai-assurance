@@ -1293,7 +1293,10 @@ try {
       await (await testBucket.get(genaiRow.result_key)).text(),
     );
     assert.equal(genaiEnvelope.provenance.channel, "runner");
-    assert.equal(genaiEnvelope.provenance.requestSha256, genaiRow.request_sha256);
+    assert.equal(
+      genaiEnvelope.provenance.requestSha256,
+      genaiRow.request_sha256,
+    );
     assert.equal(genaiEnvelope.provenance.workerVersion, "1.4.0");
     const genaiComputation = JSON.parse(genaiEnvelope.computationJSON);
     assert.deepEqual(

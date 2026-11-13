@@ -381,7 +381,8 @@ describe("plans and manifests the workspace freezes", () => {
       keyId: "test-detector-key-1",
       solutionId: "example-detector",
       algorithm: "Ed25519",
-      publicKeySPKI: "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=",
+      publicKeySPKI:
+        "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=",
     };
     expect(genaiPlan.safeParse({ ...plan, detectionKeys: [key] }).success).toBe(
       true,
