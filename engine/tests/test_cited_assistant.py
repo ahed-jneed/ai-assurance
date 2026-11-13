@@ -11,12 +11,7 @@ from unittest.mock import Mock, patch
 
 from engine import cited_assistant as service
 
-try:
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    HAS_CRYPTOGRAPHY = True
-except ImportError:
-    HAS_CRYPTOGRAPHY = False
+from engine.tests.signature_support import Ed25519PrivateKey, requires_cryptography, serialization
 
 
 NOW = datetime(2025, 1, 1, 12, tzinfo=timezone.utc)
@@ -205,7 +200,7 @@ class PacketAuthorityTests(unittest.TestCase):
             with self.assertRaises(service.BriefingRejected):
                 self.validate(value)
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "optional cryptography is unavailable")
+    @requires_cryptography
     def test_trusted_exporter_signature_and_wrong_trust(self):
         value = packet()
         key = Ed25519PrivateKey.generate()

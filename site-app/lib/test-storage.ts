@@ -13,12 +13,14 @@ import type { Context } from "./tenancy";
 import { sqliteD1 } from "./test-d1";
 import { resolveNew } from "./criteria/pin";
 
-/** An R2 stand-in holding objects in memory and recording each get. */
+/** An R2 stand-in holding objects in memory and recording each get and put. */
 export function countingBucket() {
   const objects = new Map<string, string>(),
-    reads: string[] = [];
+    reads: string[] = [],
+    writes: string[] = [];
   const bucket = {
     async put(key: string, body: string) {
+      writes.push(key);
       objects.set(key, body);
     },
     async get(key: string) {
@@ -29,7 +31,7 @@ export function countingBucket() {
       return { arrayBuffer: async () => bytes.buffer };
     },
   };
-  return { bucket: bucket as unknown as R2Bucket, objects, reads };
+  return { bucket: bucket as unknown as R2Bucket, objects, reads, writes };
 }
 
 export const tenantId = "tenant-1";
@@ -138,8 +140,9 @@ export async function practice(
         )
         .run(tenantId, e.id, userId, at);
   }
-  // Seeding wrote the parts; tests count the reads that follow.
+  // Seeding wrote the parts; tests count the reads and writes that follow.
   r2.reads.length = 0;
+  r2.writes.length = 0;
   return { sqlite, ...r2 };
 }
 

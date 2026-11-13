@@ -3,7 +3,8 @@
 // practice-administration permissions. A user without a membership first
 // accepts their pending invitations (lib/invitations.ts); a user with neither
 // may provision a practice of their own only where self-signup is allowed
-// (lib/access-policy.ts). Apart from those, resolving the caller only reads.
+// (lib/access-policy.ts). Apart from those, and recording the member's identity
+// email once when it is new or changed, resolving the caller only reads.
 import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
 import type { Role } from "./domain";
@@ -17,7 +18,7 @@ import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
 import { currentUser } from "./identity";
 import { now, sha256 } from "./ids";
-import { acceptInvitations } from "./invitations";
+import { acceptInvitations, normalizeEmail } from "./invitations";
 export type Context = {
   user: { userId: string; displayName: string; email: string };
   tenantId: string;
@@ -34,14 +35,36 @@ type MemberRow = {
   role: Role;
   client_id: string | null;
   access_since: string | null;
+  email?: string | null;
 };
 const memberRow = (tenantId: string, userId: string) =>
   db()
     .prepare(
-      "SELECT role,client_id,access_since FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
+      "SELECT role,client_id,access_since,email FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
     )
     .bind(tenantId, userId)
     .first<MemberRow>();
+/**
+ * Records the member's normalized identity email on their membership when it
+ * is not recorded yet or the identity provider now reports another one, so
+ * revocation can cancel their pending invitations and an administrator
+ * cannot invite them again while they are active (#95). Writes nothing when
+ * the stored email is current.
+ */
+async function recordEmail(
+  tenantId: string,
+  user: Context["user"],
+  member: MemberRow,
+) {
+  const email = normalizeEmail(user.email ?? "");
+  if (!email || member.email === email) return;
+  await db()
+    .prepare(
+      "UPDATE memberships SET email=? WHERE tenant_id=? AND user_id=? AND email IS NOT ?",
+    )
+    .bind(email, tenantId, user.userId, email)
+    .run();
+}
 export async function context(tenantId?: string): Promise<Context> {
   const user = currentUser();
   if (!user) throw new ApiError(401, "Sign in to access the audit workspace");
@@ -82,6 +105,7 @@ export async function context(tenantId?: string): Promise<Context> {
   }
   if (!tenantId || !member || !roles.includes(member.role))
     throw new ApiError(403, "You do not have access to this practice");
+  await recordEmail(tenantId, user, member);
   const practiceAdmin = !!(await db()
     .prepare(
       "SELECT 1 FROM practice_admins WHERE tenant_id=? AND user_id=? AND active=1",
@@ -126,9 +150,17 @@ async function provisionPractice(user: Context["user"]) {
       .bind(tenantId, practiceName(user), at),
     db()
       .prepare(
-        "INSERT OR IGNORE INTO memberships(tenant_id,user_id,role,client_id,display_name,access_since) VALUES(?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO memberships(tenant_id,user_id,role,client_id,display_name,access_since,email) VALUES(?,?,?,?,?,?,?)",
       )
-      .bind(tenantId, user.userId, "Lead Auditor", null, user.displayName, at),
+      .bind(
+        tenantId,
+        user.userId,
+        "Lead Auditor",
+        null,
+        user.displayName,
+        at,
+        normalizeEmail(user.email ?? "") || null,
+      ),
     db()
       .prepare(
         "INSERT OR IGNORE INTO practice_admins(tenant_id,user_id,active) VALUES(?,?,1)",

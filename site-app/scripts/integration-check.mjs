@@ -366,7 +366,7 @@ try {
     );
     assert.equal(
       workspace.selectablePacks.map((p) => p.id).join(),
-      "eu-ai-act-amended,nyc-ll144-bias-audit",
+      "eu-ai-act-amended,genai-evaluation,nyc-ll144-bias-audit",
     );
     const chosen = await management("createEngagement", {
       clientId: e.clientId,
@@ -2603,17 +2603,24 @@ try {
       .all()
   ).results.map((r) => r.id);
   assert(recordIds.length > 1200);
-  // The workbench view answers the first page; its cursor walks the rest.
+  // The workbench view counts the records and holds none of them (#121);
+  // view=records answers the first page and its cursor walks the rest.
   const assurancePath = (query = {}) =>
     "/api/assurance?" +
     new URLSearchParams({ tenantId, engagementId: e.id, ...query });
   const workbench = await request(assurancePath());
   assert.equal(workbench.total, recordIds.length);
-  assert.equal(workbench.records.length, 200);
+  assert.equal(
+    Object.values(workbench.kindCounts).reduce((sum, n) => sum + n, 0),
+    recordIds.length,
+  );
+  assert(!("records" in workbench) && !("nextCursor" in workbench));
   assert(Array.isArray(workbench.jobs) && workbench.capabilities);
-  const listed = [...workbench.records],
+  const first = await request(assurancePath({ view: "records" }));
+  assert.equal(first.records.length, 200);
+  const listed = [...first.records],
     pageBreaks = [];
-  for (let cursor = workbench.nextCursor; cursor;) {
+  for (let cursor = first.nextCursor; cursor;) {
     const page = await request(assurancePath({ cursor }));
     assert.deepEqual(Object.keys(page).sort(), ["nextCursor", "records"]);
     assert(page.records.length > 0 && page.records.length <= 200);

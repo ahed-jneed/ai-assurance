@@ -60,6 +60,8 @@ import { planSha256, type Plan } from "@/lib/statistics";
 import { PowerCheck, powerShortfalls } from "./power-check";
 import { RunDetails } from "./record-details";
 import { DatasetRegistry } from "./dataset-registry";
+import { GenaiEvidence } from "./genai-evidence";
+import { isClientRole } from "@/lib/workflow-state";
 import {
   ClientDatasetPins,
   declarationFor,
@@ -346,6 +348,7 @@ export function TestingLab({
   act,
 }: Props) {
   const writer = ["Auditor", "Lead Auditor"].includes(role),
+    internal = !isClientRole(role),
     [register, setRegister] = useState<Partial<Model> | null>(null),
     [card, setCard] = useState<ModelCard>(structuredClone(emptyCard)),
     [selectedModel, setSelectedModel] = useState<Model | null>(null),
@@ -532,9 +535,6 @@ export function TestingLab({
   const classCount =
       inspect?.columns.find((c) => c.name === draft.config.labelColumn)
         ?.uniqueCount ?? null,
-    groupCount =
-      inspect?.columns.find((c) => c.name === draft.config.groupColumn)
-        ?.uniqueCount ?? 2,
     // A saved protocol keeps its frozen plan; a new one pre-registers the form's.
     lockedProfile = profiles.find((p) => p.id === profileId),
     planned = lockedProfile?.statistics
@@ -781,6 +781,9 @@ export function TestingLab({
             <TabsTrigger value="protocols">Protocols</TabsTrigger>
             <TabsTrigger value="runs">Evaluations</TabsTrigger>
             <TabsTrigger value="catalog">Test catalog</TabsTrigger>
+            {internal && (
+              <TabsTrigger value="genai">GenAI evidence</TabsTrigger>
+            )}
           </TabsList>
           <div className="row-actions">
             {view === "models" && writer && (
@@ -1160,6 +1163,19 @@ export function TestingLab({
             ))}
           </section>
         </TabsContent>
+        {internal && (
+          <TabsContent value="genai">
+            {view === "genai" && (
+              <GenaiEvidence
+                engagement={e}
+                tenantId={tenantId}
+                role={role}
+                onRefresh={onRefresh}
+                onEditing={onEditorOpen}
+              />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
       <Dialog
         open={!!register}
@@ -2008,7 +2024,23 @@ export function TestingLab({
                       <PowerCheck
                         plan={planned.plan}
                         rows={inspect.rowCount}
-                        groups={fair ? groupCount : 1}
+                        dataset={{
+                          tenantId,
+                          engagementId: e.id,
+                          artifactId: inspect.artifactId,
+                        }}
+                        groupColumn={
+                          fair && draft.config.groupColumn
+                            ? draft.config.groupColumn
+                            : null
+                        }
+                        labelColumn={
+                          draft.task === "Multiclass classification" &&
+                          draft.suite.includes("performance") &&
+                          draft.config.labelColumn
+                            ? draft.config.labelColumn
+                            : null
+                        }
                         assumptions={draft.plan.powerAssumptions}
                         acknowledgement={draft.plan.acknowledgement}
                         disabled={busy}

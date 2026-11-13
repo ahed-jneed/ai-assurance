@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         "Instructions",
         "Oversight",
         "Security",
+        "GenAI log",
         "Other",
       ].includes(category)
     )

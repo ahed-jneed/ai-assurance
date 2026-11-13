@@ -417,6 +417,24 @@ h1 {
   font-weight: 600;
   margin: 0 0 12px;
 }
+.integrity-incidents {
+  border-color: #efc9c0;
+  margin-bottom: 20px;
+}
+.integrity-incidents-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.integrity-incidents-head > svg {
+  color: #a64435;
+  flex: none;
+  margin-top: 1px;
+}
+.integrity-incidents-head .panel-title {
+  margin-bottom: 4px;
+}
 .grant-list {
   margin: 0;
   padding: 0;

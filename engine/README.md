@@ -1,10 +1,10 @@
 # Traditional ML diagnostic runner
 
-This is an executable evidence engine for the assurance platform. Its default dependency-free path evaluates CSV datasets containing labels and **precomputed predictions**. Optional model-backed adapters and Parquet ingestion require separately provisioned runtimes. It does not perform an automatic legal compliance determination. Core runtime: Python 3.12+; tested on bundled CPython 3.12.14. No third-party dependencies or installation are required for the default path.
+This is an executable evidence engine for the assurance platform. Its default dependency-free path evaluates CSV datasets containing labels and **precomputed predictions**. Optional model-backed adapters and Parquet ingestion require separately provisioned runtimes. It does not perform an automatic legal compliance determination. Supported runtime: Python 3.12 (CPython 3.12.x), the one version CI tests and the compute image ships; see [Packaging](#packaging-python-version-and-image). No third-party dependencies or installation are required for the default path.
 
 The independent `/api/runner` pull client is implemented in `worker.py`; see [WORKER.md](WORKER.md) for enrollment, exact-byte completion signatures, hosted/external contract translation, isolated native execution and current limitations. Its local loopback end-to-end tests do not establish a deployed worker service or native-runtime validation.
 
-GenAI evaluation evidence (Inspect, lm-evaluation-harness, promptfoo, garak, PyRIT, DeepEval, Ragas, human-versus-judge labels and Art. 50 marking checks) is ingested and recomputed by `python -m engine.genai`; see [GENAI.md](GENAI.md). It never executes, imports or deserializes code that an ingested log names. Reading Inspect `.eval` logs needs a zstd back-end: the standard library from Python 3.14, otherwise the optional `zstandard` package pinned in `requirements-optional.txt` and `requirements-dev.txt` (#62 settles the packaging).
+GenAI evaluation evidence (Inspect, lm-evaluation-harness, promptfoo, garak, PyRIT, DeepEval, Ragas, human-versus-judge labels and Art. 50 marking checks) is ingested and recomputed by `python -m engine.genai`; see [GENAI.md](GENAI.md). It never executes, imports or deserializes code that an ingested log names. Reading Inspect `.eval` logs needs a zstd back-end; on the supported Python 3.12 that is the `zstandard` package (see [Packaging](#packaging-python-version-and-image)).
 
 Read-only MLflow and Hugging Face registration snapshots are implemented in `registry_import.py`; see [REGISTRY_IMPORT.md](REGISTRY_IMPORT.md) for exact version/commit acquisition, declaration-only feature contracts, approved digest-bound artifact copies and unknown fields. Importing a snapshot does not approve a model or enable a runtime.
 
@@ -16,6 +16,39 @@ python -m engine --data engine/examples/predictions.csv --reference engine/examp
 ```
 
 If Python is not on PATH, use the executable returned by Codex's workspace dependency tool. The initial delivered report already exists; use a new output filename for another execution. An existing output is never overwritten. Each invocation needs a newly allocated run ID in production; the example ID is for demonstration only. `engine/examples/generate_fixture.py` regenerates the synthetic input fixtures.
+
+## Packaging: Python version and image
+
+**One supported version: CPython 3.12.** The compute image's base is `python:3.12.14-slim` (`Dockerfile`), CI runs every Python step on 3.12 (`.github/workflows/ci.yml`, jobs `engine` and `web`), and `engine/tests/test_packaging.py` fails when the Dockerfile, CI, `requirements.txt` or these docs name another version. A production base digest must be the same minor version. Moving to another version is one change across those files, after the engine tests pass on it.
+
+| File | Installs | Where |
+| --- | --- | --- |
+| `requirements.txt` | nothing: the default CSV path is standard-library only | any 3.12 interpreter |
+| `requirements-image.txt` | `cryptography` (with `cffi`, `pycparser`) and `zstandard`, pinned with SHA-256 hashes of the cp312/abi3 manylinux wheels for x86_64 and aarch64 | the compute image; a source install that verifies signatures or reads Inspect `.eval` logs |
+| `requirements-dev.txt` | the same `cryptography` and `zstandard` versions, plus `jsonschema` and `numpy` for the tests | CI and local test environments |
+| `requirements-optional.txt` | native model and Parquet runtimes (a baseline, not a lock) | an operator-owned derived image |
+
+**Signatures.** `cryptography` verifies Ed25519 signatures: trusted dossier signatures (`assurance.py`) and trusted exporter signatures (`cited_assistant.py`). Without it a dossier signature is reported as not verified (`verification_unavailable`, outcome inconclusive) and a signed briefing packet is rejected, so every install that must verify signatures declares it, and the image installs it. The signature tests skip without the package, unless `ENGINE_REQUIRE_CRYPTOGRAPHY=1`: then they fail. CI sets the variable, as it sets `GENAI_REQUIRE_ZSTD=1` for the `.eval` tests.
+
+**zstd for GenAI bundles (#32).** Inspect `.eval` logs are zip archives with zstd entries. `engine/genai/readers.py` uses the standard library's `compression.zstd` on Python 3.14 and later, otherwise `zstandard==0.25.0`. On the supported 3.12 the back-end is therefore `zstandard`, installed hash-locked in the image and listed in `requirements-dev.txt` and `requirements-optional.txt` at the same version. Without a back-end a `.eval` input fails with `zstd_unavailable`; no other format needs it. `zstandard` can be dropped when the supported version reaches 3.14.
+
+**Build the image** from the repository root; pip installs only `requirements-image.txt`, with `--require-hashes --only-binary=:all:`, and the build fails if `cryptography` or `zstandard` does not import:
+
+```bash
+docker build -t assurance-compute:dev engine
+docker run --rm assurance-compute:dev
+docker run --rm --entrypoint python assurance-compute:dev -I -c "import cryptography, zstandard"
+```
+
+The second command prints the worker's `--readiness` report. CI's `engine` job runs all three. For production pass `--build-arg PYTHON_IMAGE=python@sha256:<reviewed-base-digest>` (see [WORKER.md](WORKER.md)).
+
+**Tests on the supported version**, in a virtual environment outside the repository:
+
+```bash
+python3.12 -m venv ../engine-venv
+../engine-venv/bin/python -m pip install -r engine/requirements-dev.txt
+ENGINE_REQUIRE_CRYPTOGRAPHY=1 GENAI_REQUIRE_ZSTD=1 ../engine-venv/bin/python -m unittest discover -s engine/tests
+```
 
 ## Implemented controls
 
