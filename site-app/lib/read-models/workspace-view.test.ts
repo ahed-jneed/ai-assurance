@@ -140,6 +140,21 @@ describe("workspaceView", () => {
     expect(incidents(sqlite)).toMatchObject([{ occurrences: 2 }]);
   });
 
+  it("marks a platform operator, so the account menu links the console (#151)", async () => {
+    await practice(three());
+    expect((await workspaceView(lead(), null)).identity.operator).toBe(false);
+    (env as { PLATFORM_OPERATORS?: string }).PLATFORM_OPERATORS =
+      "lead@fixture.invalid";
+    try {
+      expect((await workspaceView(lead(), null)).identity.operator).toBe(true);
+      expect((await workspaceView(auditor(), null)).identity.operator).toBe(
+        false,
+      );
+    } finally {
+      delete (env as { PLATFORM_OPERATORS?: string }).PLATFORM_OPERATORS;
+    }
+  });
+
   it("shows internal members the practice's quality review policy", async () => {
     const { sqlite } = await practice(three());
     expect((await workspaceView(lead(), null)).qualityReviewPolicy).toEqual({

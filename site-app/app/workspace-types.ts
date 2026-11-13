@@ -48,7 +48,14 @@ export type Invitation = {
   expires_at: string;
 };
 export type WorkspaceData = {
-  identity: { id: string; name: string; role: Role; practiceAdmin?: boolean };
+  identity: {
+    id: string;
+    name: string;
+    role: Role;
+    practiceAdmin?: boolean;
+    /** Whether the signed-in person is a platform operator (#151). */
+    operator?: boolean;
+  };
   tenantId: string;
   memberships: { tenant_id: string; name: string; role: Role }[];
   clients: Client[];

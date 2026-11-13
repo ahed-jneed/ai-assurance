@@ -14,6 +14,7 @@ import {
   integrityIncidents,
   recordIntegrityIncident,
 } from "../engagement-storage";
+import { isOperator } from "../operator";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import {
@@ -298,6 +299,9 @@ export async function workspaceView(
       name: ctx.user.displayName,
       role: ctx.role,
       practiceAdmin: ctx.practiceAdmin,
+      // A platform operator (PLATFORM_OPERATORS) gets a link to /operator in
+      // the account menu (#151); the console checks the list again itself.
+      operator: isOperator(ctx.user.email),
     },
     tenantId: ctx.tenantId,
     memberships,
