@@ -3063,6 +3063,10 @@ export function evaluateCriteria(
   dataFor: (criterion: PlanCriterion) => CriterionData,
   clustered?: Clustered,
 ): PlanEvaluation {
+  require_(
+    plan.clusterField === null || clustered !== undefined,
+    "a clustered plan is decided by the cluster bootstrap and needs its cluster data",
+  );
   const level = plan.confidenceLevel;
   const alpha = 1.0 - level;
   const derived = plan.derivedFrom !== null;

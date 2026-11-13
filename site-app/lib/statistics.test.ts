@@ -62,6 +62,15 @@ describe("statistics golden fixture (hosted runner, core level)", () => {
     },
   );
 
+  it("refuses to decide a clustered plan without its cluster data", () => {
+    const c: any = GOLDEN.cases.find((x: any) => x.id === "GC-54");
+    const plan = st.planFor(c);
+    expect(plan.clusterField).not.toBeNull();
+    expect(() => st.evaluateCriteria(plan, () => c.data)).toThrow(
+      /cluster bootstrap/,
+    );
+  });
+
   it("notices a corrupted value, reason or plan field", () => {
     const c = structuredClone(GOLDEN.cases.find((x: any) => x.id === "GC-50"));
     const actual = publicView(compute(c));

@@ -50,6 +50,12 @@ class ClusterBootstrapCoreTests(unittest.TestCase):
         self.assertNotEqual(recall[0], recall[1])
         self.assertEqual(recall[0]["method"], "cluster_percentile_bootstrap")
 
+    def test_clustered_plan_needs_its_cluster_data(self):
+        case = golden("GC-54")
+        plan = st.plan_for(case)
+        with self.assertRaisesRegex(st.StatisticsError, "cluster bootstrap"):
+            st.evaluate_criteria(plan, lambda criterion: case["data"])
+
     def test_one_replicate_set_serves_every_criterion(self):
         data = {"seed": 7, "clusters": people(40)}
         together = st.evaluate_plan(recall_plan(criteria=2), data)["criteria"]

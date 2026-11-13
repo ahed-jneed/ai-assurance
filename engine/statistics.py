@@ -1318,6 +1318,7 @@ def evaluate_criteria(plan, data_for, clustered=None):
     level = plan["confidenceLevel"]
     alpha = 1.0 - level
     derived = plan["derivedFrom"] is not None
+    _require(plan["clusterField"] is None or clustered is not None, "a clustered plan is decided by the cluster bootstrap and needs its cluster data")
     if clustered is None:
         results = [evaluate_criterion(c, data_for(c), level, plan["minimums"], derived) for c in plan["criteria"]]
     else:
@@ -1709,6 +1710,9 @@ def cluster_bootstrap_criteria(plan, cluster_ids, parts_for, seed):
             for _ in range(count):
                 multiplicity[draw(count)] += 1
             weight = multiplicity.__getitem__
+            # Python 3.11 sums left to right like the TypeScript loop (site-app/lib/statistics.ts); from 3.12 on,
+            # sum() uses compensated summation for floats, so float cells may differ in the last ulp there. CI pins
+            # 3.11, and the golden tolerances absorb such a difference.
             dense = [sum(map(operator.mul, map(weight, clusters), values)) for clusters, values in columns]
             for s in states:
                 rep = s["layout"].replicate(dense[s["offset"]:s["offset"] + s["layout"].size])
