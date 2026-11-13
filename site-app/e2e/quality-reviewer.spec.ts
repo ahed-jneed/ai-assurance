@@ -7,6 +7,7 @@ import {
   expect,
   runCommand,
   test,
+  unique,
   workspacePath,
   type Api,
   type Demo,
@@ -99,9 +100,13 @@ test("the reviewer records the checklist but cannot edit papers", async ({
     hasText: "Understand the engagement, its subject matter and its risks",
   });
   await item.getByLabel("Result").selectOption("satisfied");
+  // Notes of their own, so a second run has a change to save: the save is
+  // offered only for a changed checklist.
   await item
     .getByLabel("Notes")
-    .fill("Read the brief, the classification and the audit program.");
+    .fill(
+      `Read the brief, the classification and the audit program (${unique()}).`,
+    );
   // Read through the API only once the Worker has answered the UI's command,
   // never while its save is still in flight (#119).
   await runCommand(page, "saveQualityReview", () =>
