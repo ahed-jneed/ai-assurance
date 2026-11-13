@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
+import { depScanEnvironments } from "./build/dep-scan";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 
@@ -74,6 +75,8 @@ export default defineConfig(async ({ command }) => {
       : {};
 
   return {
+    // Keeps test files out of the development dependency scan.
+    environments: depScanEnvironments,
     define: {
       __SITES_IDENTITY_DEFAULT__: sitesBuild
         ? JSON.stringify("sites")
