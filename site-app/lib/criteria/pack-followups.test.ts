@@ -12,6 +12,7 @@ import {
   findingArticleOf,
   injectRegistry,
   packFeatures,
+  primaryReferenceOf,
   resolveNew,
 } from "./pin";
 import { registry } from "./registry";
@@ -141,5 +142,25 @@ describe("the LL144 Testing lab feature (#144)", () => {
     // Released before the feature existed: no switch, so the panel shows
     // only the audits such an engagement already holds.
     expect(pinned("nyc-ll144-bias-audit", "2026.11.0")).toBe(false);
+  });
+});
+
+describe("primaryReferenceOf (#144)", () => {
+  const pack = {
+    criteria: [
+      { framework: "owasp-llm-top-10", role: "supporting" },
+      { framework: "iso-iec-42001", role: "primary" },
+    ],
+  };
+  it("takes the first criterion from a primary criteria set", () => {
+    expect(
+      primaryReferenceOf(pack, ["owasp-llm-top-10:LLM01", "iso-iec-42001:8.4"]),
+    ).toBe("iso-iec-42001:8.4");
+  });
+  it("falls back to the first criterion, and to none without criteria", () => {
+    expect(primaryReferenceOf(pack, ["owasp-llm-top-10:LLM01"])).toBe(
+      "owasp-llm-top-10:LLM01",
+    );
+    expect(primaryReferenceOf(pack, [])).toBeUndefined();
   });
 });

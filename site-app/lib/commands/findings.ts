@@ -3,6 +3,8 @@ import {
   defaultFindingCriteria,
   findingArticleOf,
   findingCriteriaRefs,
+  pinned,
+  primaryReferenceOf,
 } from "../criteria/pin";
 import { risk, type Finding } from "../domain";
 import { id, now } from "../engagement-repo";
@@ -87,9 +89,8 @@ export const findings = defineCommands({
           : [];
       if (chosen.length) f.criteriaRefs = chosen;
       if (!f.article) {
-        const article = chosen.length
-          ? findingArticleOf(e, chosen[0])
-          : undefined;
+        const first = primaryReferenceOf(pinned(e).pack, chosen);
+        const article = first ? findingArticleOf(e, first) : undefined;
         if (!article)
           throw new ApiError(
             400,

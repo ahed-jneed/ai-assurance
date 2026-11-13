@@ -457,6 +457,21 @@ export function defaultFindingCriteria(
 }
 
 /**
+ * The criterion a finding's primary reference comes from (#144): the first
+ * of `refs` from a primary criteria set, as the finding modal lists those
+ * first, or else the first of `refs`.
+ */
+export function primaryReferenceOf(
+  pack: { criteria: readonly { framework: string; role: string }[] },
+  refs: readonly string[],
+): string | undefined {
+  const primary = new Set(
+    pack.criteria.filter((s) => s.role === "primary").map((s) => s.framework),
+  );
+  return refs.find((r) => primary.has(r.split(":")[0])) ?? refs[0];
+}
+
+/**
  * The `article` text a finding on `ref` records (see findingArticle): on a
  * pack whose primary criteria are not the AI Act, a finding names its clause
  * there rather than an article (#144). Undefined for a reference outside the
