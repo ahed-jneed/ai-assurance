@@ -577,6 +577,47 @@ describe("POST /api/assurance", () => {
     ).toEqual([]);
   });
 
+  it("checks a clustered plan's cluster column against the pin's declared header when queued (#166)", async () => {
+    const { e, queue } = externalFixture({
+      ...dataset,
+      key: "",
+      custody: "client",
+      clientPin: {
+        confirmedBy: "Client data steward",
+        confirmedOn: "2026-11-05",
+        custodyNote: "Kept on the client's analysis server",
+        columns: ["label", "prediction", "ethnicity", "person"],
+      },
+    });
+    const profile = e.evaluationProfiles![0];
+    profile.config = {
+      ...profile.config,
+      labelColumn: "label",
+      predictionColumn: "prediction",
+    } as EvaluationProfile["config"];
+    profile.statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["ethnicity"] }],
+      clusterField: "household",
+    } as EvaluationProfile["statistics"];
+    const refused = await queue("client_local");
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe(
+      "The client-held dataset " +
+        dataset.name +
+        " does not declare the protocol's column household. Map the protocol to the pinned file's columns, or pin the client's file again with its header.",
+    );
+    expect(save).not.toHaveBeenCalled();
+    // A declared cluster column, or an unclustered plan, passes the check.
+    const pin = e.artifacts.find((a) => a.id === dataset.id)!;
+    for (const clusterField of ["person", null]) {
+      profile.statistics = {
+        criteria: [{ kind: "group_comparison", groupFields: ["ethnicity"] }],
+        clusterField,
+      } as EvaluationProfile["statistics"];
+      expect(undeclaredColumns(pin, profile)).toEqual([]);
+    }
+  });
+
   it.each([
     ["client", "platform"],
     ["platform", "client"],
