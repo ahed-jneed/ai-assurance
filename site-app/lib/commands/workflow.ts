@@ -1,6 +1,7 @@
 import { db, id, now, sha256 } from "../engagement-repo";
 import { pinned } from "../criteria/pin";
 import { templatePaper } from "../factories";
+import { linkedReadiness } from "../genai/store";
 import { seedWorkflow } from "../workflow-seed";
 import { ApiError } from "../http";
 import {
@@ -31,10 +32,11 @@ export const workflow: CommandModule = {
           member: (uid) =>
             db()
               .prepare(
-                "SELECT m.role,m.client_id,m.status FROM memberships m WHERE m.tenant_id=? AND m.user_id=? AND (m.role IN ('Client Viewer','Client Contributor') OR EXISTS(SELECT 1 FROM engagement_access a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.engagement_id=? AND a.active=1))",
+                "SELECT m.role,m.client_id,m.status,m.access_since FROM memberships m WHERE m.tenant_id=? AND m.user_id=? AND (m.role IN ('Client Viewer','Client Contributor') OR EXISTS(SELECT 1 FROM engagement_access a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.engagement_id=? AND a.active=1))",
               )
               .bind(ctx.tenantId, uid, e.id)
               .first(),
+          genaiReadiness: (ids) => linkedReadiness(ctx, e, ids),
         }),
       };
     } catch (error) {

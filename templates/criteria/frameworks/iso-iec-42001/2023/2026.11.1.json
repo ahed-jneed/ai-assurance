@@ -1,0 +1,666 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "iso-iec-42001",
+  "edition": "2023",
+  "version": "2026.11.1",
+  "title": "ISO/IEC 42001:2023 Information technology - Artificial intelligence - Management system",
+  "shortTitle": "ISO/IEC 42001:2023",
+  "kind": "international_standard",
+  "publisher": "ISO/IEC JTC 1/SC 42",
+  "jurisdiction": "international",
+  "status": "published",
+  "editionDate": "2023-12-18",
+  "sources": [
+    {
+      "role": "catalogue_entry",
+      "url": "https://www.iso.org/standard/42001"
+    }
+  ],
+  "licence": {
+    "holder": "ISO and IEC",
+    "textPolicy": "paraphrased_titles",
+    "status": "unconfirmed",
+    "basis": "Clause numbers and our own short titles of at most 80 characters only; no text, tables or figures of the standard (D-03). Release waits for counsel to confirm this policy (open question Q1, #57)."
+  },
+  "defaultProvenance": {
+    "source": "https://www.iso.org/standard/42001",
+    "sourceKind": "secondary",
+    "verification": "unverified",
+    "legalReview": "not_required",
+    "note": "Clause and Annex A control numbers as the team knows edition 1; not yet checked against a licensed copy. Titles are our own descriptive wording, not the standard's headings; a short generic title may still coincide with a heading, so the title list goes to counsel under Q1 (#57). Confirm every number before release (#57)."
+  },
+  "requirements": [
+    {
+      "id": "4",
+      "ref": "4",
+      "title": "The organisation and its setting",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "4.1",
+      "ref": "4.1",
+      "title": "Organisation's context and issues relevant to AI",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.2",
+      "ref": "4.2",
+      "title": "Interested parties and their relevant requirements",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.3",
+      "ref": "4.3",
+      "title": "Boundaries and applicability of the AI management system",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "4.4",
+      "ref": "4.4",
+      "title": "Establishing and maintaining the AI management system",
+      "type": "requirement",
+      "parent": "4"
+    },
+    {
+      "id": "5",
+      "ref": "5",
+      "title": "Top management leadership",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "5.1",
+      "ref": "5.1",
+      "title": "Top management commitment to the AI management system",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "5.2",
+      "ref": "5.2",
+      "title": "AI policy set by top management",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "5.3",
+      "ref": "5.3",
+      "title": "Who is responsible and authorised for AI management",
+      "type": "requirement",
+      "parent": "5"
+    },
+    {
+      "id": "6",
+      "ref": "6",
+      "title": "Planning the AI management system",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "6.1",
+      "ref": "6.1",
+      "title": "Handling AI risks and opportunities",
+      "type": "group",
+      "parent": "6",
+      "exhaustive": false
+    },
+    {
+      "id": "6.1.1",
+      "ref": "6.1.1",
+      "title": "Planning for AI risks and opportunities",
+      "type": "requirement",
+      "parent": "6.1"
+    },
+    {
+      "id": "6.1.2",
+      "ref": "6.1.2",
+      "title": "Assessing AI risks (planning)",
+      "type": "requirement",
+      "parent": "6.1",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "6.1.3",
+      "ref": "6.1.3",
+      "title": "Treating AI risks, with the Statement of Applicability",
+      "type": "requirement",
+      "parent": "6.1"
+    },
+    {
+      "id": "6.1.4",
+      "ref": "6.1.4",
+      "title": "Assessing impacts of AI systems (planning)",
+      "type": "requirement",
+      "parent": "6.1",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "6.2",
+      "ref": "6.2",
+      "title": "Measurable AI objectives and how they will be met",
+      "type": "requirement",
+      "parent": "6"
+    },
+    {
+      "id": "6.3",
+      "ref": "6.3",
+      "title": "Planned changes to the AI management system",
+      "type": "requirement",
+      "parent": "6"
+    },
+    {
+      "id": "7",
+      "ref": "7",
+      "title": "Support for the AI management system",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "7.1",
+      "ref": "7.1",
+      "title": "Resources provided for the AI management system",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.2",
+      "ref": "7.2",
+      "title": "Competence of the people doing AI-related work",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.3",
+      "ref": "7.3",
+      "title": "Awareness of the AI policy and of one's contribution",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.4",
+      "ref": "7.4",
+      "title": "Deciding what to communicate, to whom and when",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "7.5",
+      "ref": "7.5",
+      "title": "Creating, updating and controlling management system records",
+      "type": "requirement",
+      "parent": "7"
+    },
+    {
+      "id": "8",
+      "ref": "8",
+      "title": "Running the AI management system",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "8.1",
+      "ref": "8.1",
+      "title": "Planning and controlling AI-related processes",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "8.2",
+      "ref": "8.2",
+      "title": "Assessing AI risks (operation)",
+      "type": "requirement",
+      "parent": "8",
+      "provenance": {
+        "source": "https://www.vde-verlag.de/iec-normen/preview-pdf/info_isoiec42001%7Bed1.0%7Den.pdf",
+        "sourceKind": "standard_text",
+        "verification": "verified",
+        "checkedAt": "2026-11-05",
+        "legalReview": "not_required",
+        "note": "Clause number checked against the table of contents in the publisher's preview of edition 1.0 (design #26, section 19). Title is our own."
+      }
+    },
+    {
+      "id": "8.3",
+      "ref": "8.3",
+      "title": "Treating AI risks (operation)",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "8.4",
+      "ref": "8.4",
+      "title": "Assessing impacts of AI systems (operation)",
+      "type": "requirement",
+      "parent": "8"
+    },
+    {
+      "id": "9",
+      "ref": "9",
+      "title": "Evaluating how the AI management system performs",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "9.1",
+      "ref": "9.1",
+      "title": "Monitoring and measuring AI management system performance",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "9.2",
+      "ref": "9.2",
+      "title": "Internal audits of the AI management system",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "9.3",
+      "ref": "9.3",
+      "title": "Top management reviews of the AI management system",
+      "type": "requirement",
+      "parent": "9"
+    },
+    {
+      "id": "10",
+      "ref": "10",
+      "title": "Improving the AI management system",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "10.1",
+      "ref": "10.1",
+      "title": "Ongoing improvement of suitability and effectiveness",
+      "type": "requirement",
+      "parent": "10"
+    },
+    {
+      "id": "10.2",
+      "ref": "10.2",
+      "title": "Handling nonconformities and removing their causes",
+      "type": "requirement",
+      "parent": "10"
+    },
+    {
+      "id": "A",
+      "ref": "A",
+      "title": "Annex A control set",
+      "type": "group",
+      "exhaustive": false
+    },
+    {
+      "id": "A.2",
+      "ref": "A.2",
+      "title": "Policies that direct AI work",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.2.2",
+      "ref": "A.2.2",
+      "title": "A written AI policy",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.2.3",
+      "ref": "A.2.3",
+      "title": "Consistency of the AI policy with other policies",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.2.4",
+      "ref": "A.2.4",
+      "title": "Reviewing the AI policy at planned intervals",
+      "type": "requirement",
+      "parent": "A.2"
+    },
+    {
+      "id": "A.3",
+      "ref": "A.3",
+      "title": "Accountability inside the organisation",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.3.2",
+      "ref": "A.3.2",
+      "title": "Defining and allocating AI roles",
+      "type": "requirement",
+      "parent": "A.3"
+    },
+    {
+      "id": "A.3.3",
+      "ref": "A.3.3",
+      "title": "Raising concerns about AI systems",
+      "type": "requirement",
+      "parent": "A.3"
+    },
+    {
+      "id": "A.4",
+      "ref": "A.4",
+      "title": "What AI systems depend on",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.4.2",
+      "ref": "A.4.2",
+      "title": "Record of what each AI system depends on",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.3",
+      "ref": "A.4.3",
+      "title": "Datasets an AI system relies on",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.4",
+      "ref": "A.4.4",
+      "title": "Tools used to build and run AI systems",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.5",
+      "ref": "A.4.5",
+      "title": "Infrastructure and compute behind AI systems",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.4.6",
+      "ref": "A.4.6",
+      "title": "People and skills behind AI systems",
+      "type": "requirement",
+      "parent": "A.4"
+    },
+    {
+      "id": "A.5",
+      "ref": "A.5",
+      "title": "Effects of AI systems on people and society",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.5.2",
+      "ref": "A.5.2",
+      "title": "Method for assessing AI system impacts",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.3",
+      "ref": "A.5.3",
+      "title": "Keeping impact assessment records",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.4",
+      "ref": "A.5.4",
+      "title": "Effects on individuals and groups of people",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.5.5",
+      "ref": "A.5.5",
+      "title": "Wider effects on society",
+      "type": "requirement",
+      "parent": "A.5"
+    },
+    {
+      "id": "A.6",
+      "ref": "A.6",
+      "title": "Building and running AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.1",
+      "ref": "A.6.1",
+      "title": "Direction given for AI development",
+      "type": "group",
+      "parent": "A.6",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.1.2",
+      "ref": "A.6.1.2",
+      "title": "Goals that steer responsible AI development",
+      "type": "requirement",
+      "parent": "A.6.1"
+    },
+    {
+      "id": "A.6.1.3",
+      "ref": "A.6.1.3",
+      "title": "Defined processes for responsible design and build",
+      "type": "requirement",
+      "parent": "A.6.1"
+    },
+    {
+      "id": "A.6.2",
+      "ref": "A.6.2",
+      "title": "Stages from requirements to operation",
+      "type": "group",
+      "parent": "A.6",
+      "exhaustive": false
+    },
+    {
+      "id": "A.6.2.2",
+      "ref": "A.6.2.2",
+      "title": "Stating what the AI system must do",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.3",
+      "ref": "A.6.2.3",
+      "title": "Recording design and development choices",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.4",
+      "ref": "A.6.2.4",
+      "title": "Checking the AI system against its requirements",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.5",
+      "ref": "A.6.2.5",
+      "title": "Planning the release of an AI system into use",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.6",
+      "ref": "A.6.2.6",
+      "title": "Running and watching the AI system in use",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.7",
+      "ref": "A.6.2.7",
+      "title": "Technical records for those who need them",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.6.2.8",
+      "ref": "A.6.2.8",
+      "title": "Keeping logs of system events",
+      "type": "requirement",
+      "parent": "A.6.2"
+    },
+    {
+      "id": "A.7",
+      "ref": "A.7",
+      "title": "Managing data used by AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.7.2",
+      "ref": "A.7.2",
+      "title": "Data management for building and improving AI",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.3",
+      "ref": "A.7.3",
+      "title": "Obtaining data and recording how it was obtained",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.4",
+      "ref": "A.7.4",
+      "title": "Requirements for data to be fit for use",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.5",
+      "ref": "A.7.5",
+      "title": "Recording where data came from and how it changed",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.7.6",
+      "ref": "A.7.6",
+      "title": "Criteria and methods for getting data ready for use",
+      "type": "requirement",
+      "parent": "A.7"
+    },
+    {
+      "id": "A.8",
+      "ref": "A.8",
+      "title": "Telling stakeholders about AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.8.2",
+      "ref": "A.8.2",
+      "title": "What users are told about the system",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.3",
+      "ref": "A.8.3",
+      "title": "Letting outside parties report adverse impacts",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.4",
+      "ref": "A.8.4",
+      "title": "Telling users about incidents",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.8.5",
+      "ref": "A.8.5",
+      "title": "Meeting obligations to inform stakeholders",
+      "type": "requirement",
+      "parent": "A.8"
+    },
+    {
+      "id": "A.9",
+      "ref": "A.9",
+      "title": "How the organisation uses AI systems",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.9.2",
+      "ref": "A.9.2",
+      "title": "Defined processes for using AI responsibly",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.9.3",
+      "ref": "A.9.3",
+      "title": "Goals that steer responsible use",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.9.4",
+      "ref": "A.9.4",
+      "title": "Using AI systems as intended",
+      "type": "requirement",
+      "parent": "A.9"
+    },
+    {
+      "id": "A.10",
+      "ref": "A.10",
+      "title": "Working with suppliers, partners and customers",
+      "type": "group",
+      "parent": "A",
+      "exhaustive": false
+    },
+    {
+      "id": "A.10.2",
+      "ref": "A.10.2",
+      "title": "Splitting responsibilities with other parties",
+      "type": "requirement",
+      "parent": "A.10"
+    },
+    {
+      "id": "A.10.3",
+      "ref": "A.10.3",
+      "title": "Supplier arrangements for AI",
+      "type": "requirement",
+      "parent": "A.10"
+    },
+    {
+      "id": "A.10.4",
+      "ref": "A.10.4",
+      "title": "Meeting customer expectations for AI",
+      "type": "requirement",
+      "parent": "A.10"
+    }
+  ]
+}

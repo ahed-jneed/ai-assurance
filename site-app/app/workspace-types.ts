@@ -1,3 +1,4 @@
+import type { CriteriaTemplate } from "@/lib/catalog-criteria";
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
@@ -13,6 +14,8 @@ export type CatalogItem = {
   regulatoryRefs: string[];
   evidenceRequired: string[];
   automationMode: string;
+  /** The research procedures an item's steps come from (Art 50 papers). */
+  researchProcedures?: CriteriaTemplate["researchProcedures"];
 };
 export type Client = { id: string; name: string; sector: string };
 export type Member = {
@@ -25,6 +28,8 @@ export type Member = {
   practice_admin?: boolean;
   /** The engagements the member may open now (live grants only). */
   grants?: { id: string; title: string }[];
+  /** The identity email recorded on the membership, once known. */
+  email?: string | null;
   /** Active runner workers the member sponsored. */
   sponsored_workers?: number;
 };
@@ -37,6 +42,8 @@ export type Invitation = {
   client_id: string | null;
   engagement_ids: string[];
   invited_by: string;
+  /** The display name of the administrator who sent it. */
+  invited_by_name?: string | null;
   created_at: string;
   expires_at: string;
 };
@@ -62,6 +69,11 @@ export type WorkspaceData = {
   members: Member[];
   /** Pending invitations, for practice administrators. */
   invitations?: Invitation[];
+  /**
+   * Client request grants of the selected engagement still marked active
+   * whose contributor's membership was since revoked or re-granted.
+   */
+  lapsedClientGrants?: string[];
   people: {
     user_id: string;
     display_name: string;
@@ -114,15 +126,23 @@ export type WorkspaceData = {
   /** The packs a practice administrator may pin a new engagement to. */
   selectablePacks?: PackSummary[];
 };
-/** What the selected engagement's pack switches on; pack #1 (all on) without one. */
+/**
+ * What the selected engagement's pack switches on, with its Statement of
+ * Applicability controls for the gates; pack #1 (the AI Act features on)
+ * without one.
+ */
 export function packFeatures(
   data: Pick<WorkspaceData, "criteria"> | null | undefined,
 ) {
-  return (
-    data?.criteria?.features ?? {
+  return {
+    ...(data?.criteria?.features ?? {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
-    }
-  );
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
+    }),
+    soaControls: data?.criteria?.managementSystem?.controls ?? [],
+  };
 }

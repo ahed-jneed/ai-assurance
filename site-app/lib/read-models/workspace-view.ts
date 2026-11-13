@@ -16,7 +16,12 @@ import {
 } from "../engagement-storage";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
 import type { Context } from "../tenancy";
-import { isClientRole, isInternalRole } from "../workflow-state";
+import {
+  clientGrantLapsed,
+  type GrantHolder,
+  isClientRole,
+  isInternalRole,
+} from "../workflow-state";
 
 /** A row of the engagement directory. */
 export type EngagementRow = {
@@ -102,6 +107,34 @@ export async function engagementTrail(ctx: Context, e: Engagement) {
   ).results;
   return { events, metadataBytes: storedSize(e) ?? null };
 }
+/**
+ * The ids of the engagement's client request grants that are still marked
+ * active but have lapsed with their contributor's membership. Internal roles
+ * only; clients never see other contributors' grants.
+ */
+export async function lapsedGrants(
+  ctx: Context,
+  e: Engagement | null,
+): Promise<string[]> {
+  const grants = e?.workflow?.clientGrants.filter((g) => g.active) ?? [];
+  if (!isInternalRole(ctx.role) || !grants.length) return [];
+  const holders = new Map(
+    (
+      await db()
+        .prepare(
+          "SELECT user_id,status,access_since FROM memberships WHERE tenant_id=? AND user_id IN (SELECT value FROM json_each(?))",
+        )
+        .bind(
+          ctx.tenantId,
+          JSON.stringify([...new Set(grants.map((g) => g.userId))]),
+        )
+        .all<{ user_id: string } & GrantHolder>()
+    ).results.map((m) => [m.user_id, m]),
+  );
+  return grants
+    .filter((g) => clientGrantLapsed(g, holders.get(g.userId)))
+    .map((g) => g.id);
+}
 /** How many engagements the default selection tries before giving up. */
 const defaultAttempts = 3;
 /**
@@ -179,7 +212,7 @@ export async function workspaceView(
     ? (
         await db()
           .prepare(
-            "SELECT m.user_id,m.role,m.client_id,m.display_name,m.status,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin,(SELECT json_group_array(json_object('id',e.id,'title',e.title)) FROM engagement_access x JOIN engagements e ON e.tenant_id=x.tenant_id AND e.id=x.engagement_id WHERE x.tenant_id=m.tenant_id AND x.user_id=m.user_id AND x.active=1) AS grants,(SELECT COUNT(*) FROM runner_workers w WHERE w.tenant_id=m.tenant_id AND w.created_by=m.user_id AND w.active=1) AS sponsored_workers FROM memberships m WHERE m.tenant_id=? ORDER BY m.display_name",
+            "SELECT m.user_id,m.role,m.client_id,m.display_name,m.status,m.email,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin,(SELECT json_group_array(json_object('id',e.id,'title',e.title)) FROM engagement_access x JOIN engagements e ON e.tenant_id=x.tenant_id AND e.id=x.engagement_id WHERE x.tenant_id=m.tenant_id AND x.user_id=m.user_id AND x.active=1) AS grants,(SELECT COUNT(*) FROM runner_workers w WHERE w.tenant_id=m.tenant_id AND w.created_by=m.user_id AND w.active=1) AS sponsored_workers FROM memberships m WHERE m.tenant_id=? ORDER BY m.display_name",
           )
           .bind(ctx.tenantId)
           .all<Record<string, unknown>>()
@@ -196,7 +229,7 @@ export async function workspaceView(
     ? (
         await db()
           .prepare(
-            "SELECT id,email,display_name,role,client_id,engagement_ids,invited_by,created_at,expires_at FROM invitations WHERE tenant_id=? AND status='pending' AND expires_at>? ORDER BY created_at DESC LIMIT 100",
+            "SELECT i.id,i.email,i.display_name,i.role,i.client_id,i.engagement_ids,i.invited_by,(SELECT m.display_name FROM memberships m WHERE m.tenant_id=i.tenant_id AND m.user_id=i.invited_by) AS invited_by_name,i.created_at,i.expires_at FROM invitations i WHERE i.tenant_id=? AND i.status='pending' AND i.expires_at>? ORDER BY i.created_at DESC LIMIT 100",
           )
           .bind(ctx.tenantId, new Date().toISOString())
           .all<Record<string, unknown>>()
@@ -217,6 +250,10 @@ export async function workspaceView(
           .all()
       ).results
     : [];
+  // Client request grants still marked active whose contributor's membership
+  // has since been revoked or re-granted (clientGrantLapsed): the Lead's
+  // request views show them as lapsed rather than active.
+  const lapsedClientGrants = await lapsedGrants(ctx, e);
   const tenant = (await db()
     .prepare(
       "SELECT version,eqr_cooling_off_days AS cooling_off_days,report_settings FROM tenants WHERE id=?",
@@ -271,6 +308,7 @@ export async function workspaceView(
     metadataBytes: trail?.metadataBytes ?? null,
     members,
     invitations,
+    lapsedClientGrants,
     people,
     managementVersion,
     qualityReviewPolicy,

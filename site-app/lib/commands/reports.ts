@@ -33,6 +33,7 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../engagement-repo";
 import { ApiError } from "../http";
+import { publishableSummary } from "../ll144-audit";
 import { paperContext, paperRevisions } from "../papers/revision";
 import {
   assertReviewerIndependent,
@@ -43,10 +44,13 @@ import {
   annexIvMapOf,
   criteriaLookup,
   criteriaStamp,
+  gateFeatures,
   packFeatures,
   pinned,
   recordVersions,
 } from "../criteria/pin";
+import { generativeSystem, reportLimitationText } from "../genai/limitation";
+import { genaiCovered } from "../genai/store";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
@@ -129,6 +133,14 @@ export const reports = defineCommands({
         );
       const problem = termsProblem(terms);
       if (problem) throw new ApiError(400, problem);
+      if (
+        a.engagementType === "certification" &&
+        !packFeatures(e).certificationRecommendation
+      )
+        throw new ApiError(
+          400,
+          "This criteria pack has no certification recommendation; choose another engagement type",
+        );
       if (a.kind === "final") {
         if (
           (await jobs(ctx, e.id)).some((j) =>
@@ -145,7 +157,7 @@ export const reports = defineCommands({
         const gates = finalReportGates(
           e,
           { ...terms, particulars },
-          packFeatures(e),
+          gateFeatures(e),
         );
         if (gates[0]?.kind === "stage")
           throw new ApiError(400, gates[0].message);
@@ -170,6 +182,9 @@ export const reports = defineCommands({
       const elements = reportElements(e, terms, particulars, createdAt).map(
         ({ id, label, value }) => ({ id, label, value }),
       );
+      const approvedLl144 = (e.ll144Audits ?? []).filter(
+        (x) => x.status === "approved",
+      );
       const report = {
         terms,
         particulars,
@@ -181,6 +196,11 @@ export const reports = defineCommands({
           criteriaPhrase,
         ),
         criteria: criterionRollup(e, undefined, lookup),
+        // The publishable LL144 summaries of the approved audits (#30). They
+        // carry no user id or row data, so both snapshots hold them.
+        ...(approvedLl144.length
+          ? { ll144Summaries: approvedLl144.map(publishableSummary) }
+          : {}),
       };
       const snapshot = {
         workflow: e.workflow ? structuredClone(e.workflow) : null,
@@ -226,6 +246,10 @@ export const reports = defineCommands({
           })),
         evidence: e.artifacts.map(({ key, ...a }) => a),
         findings: e.findings,
+        // The Statement of Applicability the recommendation rests on (#28).
+        ...(features.statementOfApplicability
+          ? { statementOfApplicability: e.statementOfApplicability ?? null }
+          : {}),
         models: e.models,
         evaluationProfiles: e.evaluationProfiles ?? [],
         runs: e.runs,
@@ -242,7 +266,12 @@ export const reports = defineCommands({
           ? { regulatorySource: pack.reporting.regulatorySource }
           : {}),
         limitations: [
-          pack.reporting?.limitations ?? "",
+          reportLimitationText(pack.reporting?.limitations ?? "", {
+            generative: features.aiActClassification
+              ? generativeSystem(e)
+              : "unknown",
+            genaiCovered: await genaiCovered(ctx, e),
+          }),
           ...specialCategoryLimitations(e.runs),
         ]
           .filter(Boolean)
@@ -358,7 +387,7 @@ export async function assertReleasable(
       "Complete or cancel external execution before release",
     );
   const features = packFeatures(e);
-  const gates = finalReportGates(e, report, features);
+  const gates = finalReportGates(e, report, gateFeatures(e));
   if (gates.length) throw new ApiError(409, gates[0].message);
   await assertReviewerIndependent(ctx, e);
   await assertSignerActive(ctx, e);
@@ -378,6 +407,9 @@ export async function assertReleasable(
     JSON.stringify(r.snapshot.papers) !==
       JSON.stringify(capturedPapers(e, "final")) ||
     JSON.stringify(r.snapshot.findings) !== JSON.stringify(e.findings) ||
+    ("statementOfApplicability" in r.snapshot &&
+      JSON.stringify(r.snapshot.statementOfApplicability) !==
+        JSON.stringify(e.statementOfApplicability ?? null)) ||
     // Without the AI Act classification the snapshot has none to compare.
     (features.aiActClassification &&
       JSON.stringify(

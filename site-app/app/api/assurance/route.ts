@@ -10,6 +10,7 @@ import {
   assuranceSearch,
   assuranceView,
 } from "@/lib/read-models/assurance-view";
+import { genaiComputation, genaiView } from "@/lib/read-models/genai-view";
 import { context, refuseReadOnly } from "@/lib/tenancy";
 import { isClientRole } from "@/lib/workflow-state";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,9 @@ export const dynamic = "force-dynamic";
  * of records. `view=search` (`kinds`, `q`, `review`, `cursor`, `limit`)
  * answers one page of a search over every record; `view=queue` the caller's
  * review queue, or with `state` one page of it; `view=record` (`id`) one
- * record with its review state and the records its details read.
+ * record with its review state and the records its details read. `view=genai`
+ * lists the GenAI evidence and its readiness, and with `recordId` returns one
+ * result's verified computation.
  */
 export async function GET(request: Request) {
   try {
@@ -31,28 +34,35 @@ export async function GET(request: Request) {
       kind = param("kind"),
       cursor = param("cursor"),
       limit = param("limit") ? Number(param("limit")) : undefined;
-    if (view && !["search", "queue", "record", "records"].includes(view))
+    if (
+      view &&
+      !["search", "queue", "record", "records", "genai"].includes(view)
+    )
       throw new ApiError(400, "Unknown assurance view");
     return Response.json(
       view === "record"
         ? await assuranceRecord(ctx, engagementId, param("id"))
-        : view === "search"
-          ? await assuranceSearch(ctx, engagementId, {
-              kinds: param("kinds") ? param("kinds").split(",") : [],
-              term: param("q"),
-              review: param("review"),
-              cursor,
-              limit,
-            })
-          : view === "queue"
-            ? await assuranceReviewQueue(ctx, engagementId, {
-                state: param("state"),
+        : view === "genai"
+          ? param("recordId")
+            ? await genaiComputation(ctx, engagementId, param("recordId"))
+            : await genaiView(ctx, engagementId)
+          : view === "search"
+            ? await assuranceSearch(ctx, engagementId, {
+                kinds: param("kinds") ? param("kinds").split(",") : [],
+                term: param("q"),
+                review: param("review"),
                 cursor,
                 limit,
               })
-            : view === "records" || kind || cursor
-              ? await assuranceRecordPage(ctx, engagementId, { kind, cursor })
-              : await assuranceView(ctx, engagementId),
+            : view === "queue"
+              ? await assuranceReviewQueue(ctx, engagementId, {
+                  state: param("state"),
+                  cursor,
+                  limit,
+                })
+              : view === "records" || kind || cursor
+                ? await assuranceRecordPage(ctx, engagementId, { kind, cursor })
+                : await assuranceView(ctx, engagementId),
       { headers: { "Cache-Control": "private, no-store" } },
     );
   } catch (e) {

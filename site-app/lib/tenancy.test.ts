@@ -91,8 +91,8 @@ describe("context", () => {
     rows([
       [/status='active' ORDER BY tenant_id/, { tenant_id: "tenant-1" }],
       [
-        /SELECT role,client_id,access_since FROM memberships/,
-        { role: "Auditor", client_id: null },
+        /SELECT role,client_id,access_since,email FROM memberships/,
+        { role: "Auditor", client_id: null, email: "lea@practice.example" },
       ],
       [/FROM practice_admins/, null],
     ]);
@@ -109,13 +109,41 @@ describe("context", () => {
     expect(d1.state.writes).toEqual([]);
   });
 
+  it("records a member's identity email once when it is missing or changed (#95)", async () => {
+    for (const stored of [null, "old@practice.example"]) {
+      d1.state.writes = [];
+      rows([
+        [
+          /SELECT role,client_id,access_since,email FROM memberships/,
+          { role: "Auditor", client_id: null, email: stored },
+        ],
+      ]);
+      await as({ ...lea, email: " Lea@Practice.example " }, () =>
+        context("tenant-1"),
+      );
+      expect(d1.state.writes).toEqual([
+        {
+          sql: "UPDATE memberships SET email=? WHERE tenant_id=? AND user_id=? AND email IS NOT ?",
+          args: [
+            "lea@practice.example",
+            "tenant-1",
+            "user-lea",
+            "lea@practice.example",
+          ],
+        },
+      ]);
+    }
+  });
+
   it("provisions a first practice the user administers and may open", async () => {
     env.SELF_SIGNUP = "open";
     let provisioned = false;
     d1.state.lookup = (sql) => {
       if (/SELECT tenant_id FROM memberships/.test(sql)) return null;
-      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
-        return provisioned ? { role: "Lead Auditor", client_id: null } : null;
+      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
+        return provisioned
+          ? { role: "Lead Auditor", client_id: null, email: lea.email }
+          : null;
       if (/FROM practice_admins/.test(sql))
         return provisioned ? { 1: 1 } : null;
       return null;
@@ -149,6 +177,8 @@ describe("context", () => {
         "user-lea",
       ]);
       expect(d1.state.writes[2].args).toEqual([ctx.tenantId, "user-lea"]);
+      // The founder's identity email is recorded on the membership (#95).
+      expect(d1.state.writes[1].args.at(-1)).toBe("lea@practice.example");
       // Named after its founder, so practices are told apart (#55).
       expect(d1.state.writes[0].args[1]).toBe("Lea Lead practice");
     } finally {
@@ -227,9 +257,14 @@ describe("context", () => {
         )
       )
         return joined ? { tenant_id: "tenant-firm" } : null;
-      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
+      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
         return joined
-          ? { role: "Auditor", client_id: null, access_since: "2026-11-06" }
+          ? {
+              role: "Auditor",
+              client_id: null,
+              access_since: "2026-11-06",
+              email: lea.email,
+            }
           : null;
       return null;
     };
@@ -310,9 +345,14 @@ describe("context", () => {
         )
       )
         return joined ? { tenant_id: "tenant-firm" } : null;
-      if (/SELECT role,client_id,access_since FROM memberships/.test(sql))
+      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
         return joined
-          ? { role: "Auditor", client_id: null, access_since: "2026-11-06" }
+          ? {
+              role: "Auditor",
+              client_id: null,
+              access_since: "2026-11-06",
+              email: lea.email,
+            }
           : null;
       return null;
     };

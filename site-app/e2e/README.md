@@ -54,6 +54,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `quality-reviewer.spec.ts` | The Lead Auditor appoints `qa-eqr` as Engagement Quality Reviewer (an Auditor cannot be appointed); the reviewer records a stand-back checklist item in the Quality review tab; the reviewer's paper edits and the Lead's checklist save are refused |
 | `report-settings.spec.ts` | The Lead Auditor, a practice administrator, saves the practice's report settings; the report form shows them for blank fields, and a readiness draft with gaps asks for the gaps and is captured as not assurance with the settings; an Auditor's `setReportSettings` is refused |
 | `assurance-workbench.spec.ts` | Lead Auditor records an assertion whose source is found by a server search in the source picker; the record opens by id and shows the Reviewer's confirmation; the workbench never pages through every record |
+| `art50-paper-suggestion.spec.ts` | The Lead Auditor classifies a new engagement's provider chatbot; the Art 50 paper WP-XC-07 shows the suggested applicability and the statistical criteria with their threshold-library entries; "Use in plan" fills in the plan form, and cancelling it records nothing; the marking paper WP-XC-10 is suggested as not applicable in the program list |
 | `isolation.spec.ts` | An outsider is refused the demo practice in the UI and API; no cross-practice reads; practice switching for `qa-lead2`; a stale engagement version is refused |
 
 Setup steps that are not the subject of a spec (an evidence upload before a

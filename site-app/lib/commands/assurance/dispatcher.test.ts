@@ -786,6 +786,14 @@ describe("assurance command registry", () => {
     queueExternal: ["Auditor", "Lead Auditor"],
     cancelJob: ["Auditor", "Lead Auditor"],
     importJob: ["Auditor", "Lead Auditor"],
+    // GenAI evidence (#33, docs/design/genai-evidence.md section 12.1).
+    freezeGenaiPlan: ["Auditor", "Lead Auditor"],
+    declareGenaiBundle: ["Auditor", "Lead Auditor"],
+    queueGenaiIngest: ["Auditor", "Lead Auditor"],
+    compileGenaiResult: ["Auditor", "Lead Auditor"],
+    importGenaiEnvelope: ["Auditor", "Lead Auditor"],
+    acknowledgeGenaiFlag: ["Reviewer", "Lead Auditor"],
+    attestGenaiRerun: ["Auditor", "Lead Auditor"],
   };
 
   it("lists each accepted op in exactly one module", () => {

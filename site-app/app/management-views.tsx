@@ -120,7 +120,7 @@ export function ManagementViews({
   const members = data.members.filter(
     (m) =>
       (memberView === "all" || m.status === memberView) &&
-      matches(m.display_name + " " + m.role),
+      matches(m.display_name + " " + m.role + " " + (m.email ?? "")),
   );
   function EngagementTable() {
     return engagements.length ? (
@@ -352,6 +352,9 @@ export function ManagementViews({
                           Administrator
                         </span>
                       )}
+                      {m.email && (
+                        <span className="block subtle">{m.email}</span>
+                      )}
                       <details className="account-id">
                         <summary>Account ID</summary>
                         <span className="mono">{m.user_id}</span>
@@ -495,6 +498,7 @@ export function ManagementViews({
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Scope</TableHead>
+                    <TableHead>Invited by</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead />
                   </TableRow>
@@ -513,6 +517,12 @@ export function ManagementViews({
                         {i.client_id
                           ? data.clients.find((c) => c.id === i.client_id)?.name
                           : i.engagement_ids.length + " engagement(s)"}
+                      </TableCell>
+                      <TableCell data-label="Invited by">
+                        {i.invited_by_name ?? i.invited_by}
+                        <span className="block subtle">
+                          {i.created_at.slice(0, 10)}
+                        </span>
                       </TableCell>
                       <TableCell data-label="Expires">
                         {i.expires_at.slice(0, 10)}

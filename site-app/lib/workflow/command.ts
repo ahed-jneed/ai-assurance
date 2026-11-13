@@ -3,6 +3,7 @@
 // guards and lookups bound to one engagement and caller.
 import { z } from "zod";
 import type { Engagement, Paper, Role } from "../domain";
+import type { GenaiReadiness } from "../genai/readiness";
 import { procedureWorkRevisions, revisionLimits } from "../workflow-state";
 import type {
   Procedure,
@@ -45,7 +46,14 @@ export type Context = {
     role: Role;
     client_id: string | null;
     status: string;
+    /** When the member's current grant began (memberships.access_since). */
+    access_since?: string | null;
   } | null>;
+  /**
+   * The readiness of the GenAI results that these evidence ids link
+   * (lib/genai/store.ts); absent, no evidence id links one.
+   */
+  genaiReadiness?: (artifactIds: string[]) => Promise<GenaiReadiness[]>;
 };
 export function snapshot<
   T extends {

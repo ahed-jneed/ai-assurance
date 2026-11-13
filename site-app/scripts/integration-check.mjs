@@ -353,7 +353,12 @@ try {
       annexIvIndex: true,
       aiActClassification: true,
       obligationAssessments: true,
+      statementOfApplicability: false,
+      nonconformityGrading: false,
+      certificationRecommendation: false,
     });
+    assert.equal(workspace.criteria.draft, false);
+    assert.equal(workspace.criteria.managementSystem, undefined);
     assert.equal(workspace.criteria.frameworks[0].legalReviewPending, true);
     assert.equal(
       e.criteria.pin.packVersion,
@@ -361,7 +366,7 @@ try {
     );
     assert.equal(
       workspace.selectablePacks.map((p) => p.id).join(),
-      "eu-ai-act-amended",
+      "eu-ai-act-amended,genai-evaluation,nyc-ll144-bias-audit",
     );
     const chosen = await management("createEngagement", {
       clientId: e.clientId,

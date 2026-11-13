@@ -10,6 +10,7 @@ import type {
   RulePackStamp,
 } from "@/lib/domain";
 import type { CriteriaStamp } from "@/lib/criteria/types";
+import type { Ll144Summary } from "@/lib/ll144-audit";
 import type { CriterionResult } from "@/lib/domain/report-gates";
 import {
   snapshotTerms,
@@ -50,6 +51,8 @@ export type ReportSnapshot = {
     notAssurance: boolean;
   };
   criteria?: CriterionResult[];
+  /** The publishable summaries of the approved LL144 audits (#30). */
+  ll144Summaries?: Ll144Summary[];
   /** The capture time, in both snapshots. */
   createdAt?: string;
   /** Recorded at capture from rule pack 2026.11.1 on; absent on older snapshots. */
@@ -206,7 +209,11 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
   );
 }
 
-export function reportMarkup(report: Report, s: ReportSnapshot) {
+export function reportMarkup(
+  report: Report,
+  s: ReportSnapshot,
+  tenantId?: string,
+) {
   const scope = s.scope ?? s.workflow?.brief,
     v2 = !!snapshotTerms(s) && !!s.conclusionStatement,
     supersededBy = report.supersededBy ?? report.release?.supersededBy;
@@ -481,6 +488,33 @@ export function reportMarkup(report: Report, s: ReportSnapshot) {
               )}
             </article>
           ))}
+        </section>
+      )}
+      {!!s.ll144Summaries?.length && (
+        <section>
+          <h2>NYC Local Law 144 bias audit summaries</h2>
+          <ul>
+            {s.ll144Summaries.map((x) => (
+              <li key={x.auditId}>
+                {x.tool.name}: bias audit of {x.auditDate}, distribution date{" "}
+                {x.tool.distributionDate}, {x.numberOfApplicants} individuals
+                assessed.{" "}
+                <a
+                  href={
+                    "/ll144-summary?" +
+                    new URLSearchParams({
+                      ...(tenantId ? { tenantId } : {}),
+                      engagementId: s.engagement.id,
+                      auditId: x.auditId,
+                      reportId: report.id,
+                    })
+                  }
+                >
+                  Publishable summary
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
       <section>
