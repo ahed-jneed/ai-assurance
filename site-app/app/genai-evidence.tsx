@@ -26,6 +26,10 @@ import {
   fmt,
   reasonLabel,
 } from "@/lib/genai/labels";
+import {
+  RERUN_STATEMENT,
+  attestationPayload,
+} from "@/lib/genai/evidence-levels";
 import type { GenaiAcknowledgement } from "@/lib/genai/readiness";
 import type { GenaiRunSummary } from "@/lib/genai/summary";
 import type { GenaiView } from "@/lib/read-models/genai-view";
@@ -329,6 +333,69 @@ function ResultCard({
   );
 }
 
+/**
+ * The auditor's intake buttons. "Queue ingest" appears only while an active
+ * worker of the engagement is enrolled with genai_ingest (the runner route
+ * serves the job to no other worker).
+ */
+export function IntakeActions({
+  view,
+  busy,
+  canFreeze,
+  canImport,
+  canAttest,
+  onFreeze,
+  onDeclare,
+  onQueue,
+  onImport,
+  onAttest,
+}: {
+  view: Pick<GenaiView, "plans" | "bundles" | "ingestWorkers"> | null;
+  busy: boolean;
+  canFreeze: boolean;
+  canImport: boolean;
+  canAttest: boolean;
+  onFreeze: () => void;
+  onDeclare: () => void;
+  onQueue: () => void;
+  onImport: () => void;
+  onAttest: () => void;
+}) {
+  return (
+    <div className="row-actions">
+      <Button
+        variant="outline"
+        disabled={busy || !canFreeze}
+        onClick={onFreeze}
+      >
+        Freeze plan
+      </Button>
+      <Button variant="outline" disabled={busy} onClick={onDeclare}>
+        Declare bundle
+      </Button>
+      {!!view && view.ingestWorkers > 0 && (
+        <Button
+          variant="outline"
+          disabled={busy || !view.plans.length || !view.bundles.length}
+          onClick={onQueue}
+        >
+          Queue ingest
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        disabled={busy || !canAttest}
+        onClick={onAttest}
+      >
+        Attest a re-run
+      </Button>
+      <Button disabled={busy || !canImport} onClick={onImport}>
+        Import envelope
+      </Button>
+    </div>
+  );
+}
+
 export function GenaiEvidence({
   engagement: e,
   tenantId,
@@ -405,6 +472,21 @@ export function GenaiEvidence({
         a.status === "accepted" &&
         !imported.has(a.id),
     ),
+    // Tool logs and label files a re-run attestation may pin.
+    pinnedInputs = new Set(
+      (view?.results ?? []).flatMap((r) =>
+        r.summary.inputs.map((i) => i.sha256),
+      ),
+    ),
+    attestable = e.artifacts.filter(
+      (a) =>
+        a.category === "GenAI log" &&
+        a.status === "accepted" &&
+        !imported.has(a.id),
+    ),
+    // The runner route serves a GenAI ingest job only to an active worker
+    // enrolled with genai_ingest; until one is, a queued job would wait.
+    ingestAvailable = !!view && view.ingestWorkers > 0,
     compilable = (view?.jobs ?? []).filter(
       (j) => j.state === "succeeded" && !imported.has(String(j.id)),
     );
@@ -515,6 +597,65 @@ export function GenaiEvidence({
       ],
       save: (v) => run("importGenaiEnvelope", v),
     });
+  const attestRerun = () =>
+    setForm({
+      title: "Attest an auditor re-run",
+      description:
+        "Record that you ran the evaluation yourself and that the pinned files are its unmodified output. A result reaches L3 only when the engine also recomputed it on an enrolled worker (L2) and one attestation pins every input of that result.",
+      action: "Record attestation",
+      fields: [
+        {
+          name: "artifactIds",
+          label: "Files the re-run produced",
+          type: "checklist",
+          ids: [],
+          options: attestable.map((a) => ({
+            value: a.id,
+            label:
+              a.name +
+              (pinnedInputs.has(a.sha256) ? " · input of a GenAI result" : ""),
+          })),
+        },
+        { name: "harnessName", label: "Harness name" },
+        { name: "harnessVersion", label: "Harness version" },
+        {
+          name: "imageDigest",
+          label: "Harness image digest",
+          optional: true,
+          hint: "sha256: followed by 64 hexadecimal characters, if the harness ran from an image.",
+        },
+        {
+          name: "endpointHost",
+          label: "System under test: endpoint host",
+          hint: "The host only (for example api.example.com), without a path or credentials.",
+        },
+        { name: "snapshot", label: "System under test: model snapshot" },
+        {
+          name: "start",
+          label: "Run started (UTC)",
+          hint: "For example 2026-11-05T09:00",
+        },
+        {
+          name: "end",
+          label: "Run ended (UTC)",
+          hint: "For example 2026-11-05T11:30",
+        },
+        {
+          name: "environment",
+          label: "Environment",
+          type: "area",
+          optional: true,
+          hint: "Where and how the run was made; never paste secrets.",
+        },
+        {
+          name: "statement",
+          label: "Statement",
+          type: "select",
+          options: [{ value: RERUN_STATEMENT, label: RERUN_STATEMENT }],
+        },
+      ],
+      save: (v) => run("attestGenaiRerun", attestationPayload(v, e.artifacts)),
+    });
   const acknowledge = (result: Result, a: GenaiAcknowledgement) =>
     setForm({
       title: "Acknowledge: " + (ACK_LABELS[a.flag] ?? a.flag),
@@ -546,31 +687,18 @@ export function GenaiEvidence({
             <span className="count-label">{view?.results.length ?? 0}</span>
           </h2>
           {writer && (
-            <div className="row-actions">
-              <Button
-                variant="outline"
-                disabled={busy || !procedureOptions.length}
-                onClick={freezePlan}
-              >
-                Freeze plan
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={declareBundle}>
-                Declare bundle
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy || !view?.plans.length || !view.bundles.length}
-                onClick={queueIngest}
-              >
-                Queue ingest
-              </Button>
-              <Button
-                disabled={busy || !envelopes.length}
-                onClick={importEnvelope}
-              >
-                Import envelope
-              </Button>
-            </div>
+            <IntakeActions
+              view={view}
+              busy={busy}
+              canFreeze={procedureOptions.length > 0}
+              canImport={envelopes.length > 0}
+              canAttest={attestable.length > 0}
+              onFreeze={freezePlan}
+              onDeclare={declareBundle}
+              onQueue={queueIngest}
+              onImport={importEnvelope}
+              onAttest={attestRerun}
+            />
           )}
         </div>
         <p className="subtle">
@@ -590,7 +718,15 @@ export function GenaiEvidence({
           <p className="subtle">
             {view.plans.length} frozen plans · {view.bundles.length} declared
             bundles · {view.jobs.length} ingest jobs ·{" "}
-            {view.acknowledgements.length} acknowledgements
+            {view.acknowledgements.length} acknowledgements ·{" "}
+            {view.attestations.length} re-run attestations
+          </p>
+        )}
+        {writer && view && !ingestAvailable && (
+          <p className="subtle" data-genai-no-ingest-worker>
+            No active worker of this engagement is enrolled with the
+            genai_ingest capability, so the engine&apos;s ingest cannot be
+            queued yet. Until one is, import envelopes made with the engine CLI.
           </p>
         )}
         {writer && compilable.length > 0 && (
