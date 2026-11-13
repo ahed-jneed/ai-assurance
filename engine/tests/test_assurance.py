@@ -19,12 +19,7 @@ from engine.assurance import (
 )
 from engine.tests.test_statistics_golden import GOLDEN
 
-try:
-    from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    HAS_CRYPTOGRAPHY = True
-except ImportError:
-    HAS_CRYPTOGRAPHY = False
+from engine.tests.signature_support import Ed25519PrivateKey, requires_cryptography, serialization
 
 
 def population(count=80):
@@ -430,7 +425,7 @@ class DossierTests(unittest.TestCase):
             build_dossier({"report.json": b"{}"}, report_id="R", report_path="report.json", created_at="2025-01-01")
         self.assertFalse(verify_dossier(build_dossier({"report.json": b"not a JSON report"}, report_id="R", report_path="report.json", created_at="2025-01-01T00:00:00Z"))["valid"])
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    @requires_cryptography
     def test_signature_validity_separate_from_external_trust(self):
         with temporary_directory() as directory:
             key = Ed25519PrivateKey.generate()  # Disposable synthetic test key.
@@ -457,7 +452,7 @@ class DossierTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sign_dossier(signed, private_key_path=key_path, key_id="fixture-key")
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    @requires_cryptography
     def test_signature_covers_rehashed_manifest(self):
         with temporary_directory() as directory:
             key_path = Path(directory) / "fixture.pem"
@@ -506,7 +501,7 @@ class DossierTests(unittest.TestCase):
         for container in bad:
             self.assertFalse(verify_dossier(container)["valid"], container["manifest"])
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    @requires_cryptography
     def test_manifest_1_1_signature_names_the_signed_key_id(self):
         with temporary_directory() as directory:
             key_path = Path(directory) / "fixture.pem"
@@ -586,7 +581,7 @@ class DossierTests(unittest.TestCase):
         with_evidence["manifest"]["scope"]["evidence"] = "included"
         self.assertTrue(verify_dossier(rehash(with_evidence))["valid"])
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    @requires_cryptography
     def test_manifest_1_2_signature_covers_the_scope(self):
         with temporary_directory() as directory:
             key_path = Path(directory) / "fixture.pem"

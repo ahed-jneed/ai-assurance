@@ -43,7 +43,7 @@ def sources(root):
                 if 'examples' in relative.parts:
                     allowed = file.parent == base/'examples' and file.name in EXAMPLES
                 else:
-                    allowed = file.suffix in {'.py', '.md'} or file.name in ENGINE_SPECIAL or file.name in {'requirements.txt', 'requirements-optional.txt'}
+                    allowed = file.suffix in {'.py', '.md'} or file.name in ENGINE_SPECIAL or file.name in {'requirements.txt', 'requirements-image.txt', 'requirements-optional.txt'}
             else:
                 allowed = file.parent == base and (file.suffix in {'.py', '.mjs', '.md'} or file.name.endswith('.schema.json')
                     or file.name in SCHEMA_INPUTS)

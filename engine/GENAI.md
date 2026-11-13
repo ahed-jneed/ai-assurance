@@ -2,7 +2,7 @@
 
 `engine/genai/` implements the engine side of `docs/design/genai-evidence.md` (#31) for issue #32: it **ingests** the per-item records that evaluation tools already write, **recomputes** every statistic itself, and **binds** the result to the hashed source logs in a `genai-result/0.1` envelope that the workspace (#33) can import. It runs no harness and never executes, imports or deserializes code an ingested file names: task files, scorer names, `!function` hooks, JavaScript assertions and `file://` providers are strings. Parsers are pure functions over bytes.
 
-The core is standard-library only. Inspect `.eval` logs are zip archives with zstd entries: reading them needs `compression.zstd` (Python 3.14 and later) or the optional `zstandard==0.25.0` (pinned in `requirements-optional.txt` and `requirements-dev.txt`; #62 settles the packaging). Without either, a `.eval` input fails with `zstd_unavailable`.
+The core is standard-library only. Inspect `.eval` logs are zip archives with zstd entries: reading them needs `compression.zstd` (Python 3.14 and later) or `zstandard==0.25.0`. On the supported Python 3.12 that is `zstandard`, which the compute image installs hash-locked from `requirements-image.txt` and `requirements-dev.txt` and `requirements-optional.txt` pin at the same version (`README.md`, section Packaging). Without either, a `.eval` input fails with `zstd_unavailable`.
 
 ## Command line
 
@@ -128,7 +128,7 @@ Errors (`GenaiInputError.code`, `engine/genai/errors.py`): `input_too_large`, `b
 
 ## Follow-ups
 
-- **G5, worker job `genai_ingest`**: `validate_genai_request`, the `evidence` download, the branch in `Worker.execute` and `compute_job`, `verify_genai_result_bytes`, the codes in `COMPUTE_FAILURE_CODES` and `WORKER.md`, a hash-pinned `zstandard` in `engine/Dockerfile` (`engine/genai/` already ships in the compute image through `COPY . /app/engine`; `engine/.dockerignore` excludes only `tests/fixtures/genai`), the `genaiIngest` readiness entry and the capability gate, plus the section 11.3 measurements in the compute image.
+- **G5, worker job `genai_ingest`**: `validate_genai_request`, the `evidence` download, the branch in `Worker.execute` and `compute_job`, `verify_genai_result_bytes`, the codes in `COMPUTE_FAILURE_CODES` and `WORKER.md` (the hash-pinned `zstandard` is already in `engine/Dockerfile` through `requirements-image.txt`, #62; `engine/genai/` already ships in the compute image through `COPY . /app/engine`; `engine/.dockerignore` excludes only `tests/fixtures/genai`), the `genaiIngest` readiness entry and the capability gate, plus the section 11.3 measurements in the compute image.
 - Signature verification of signed detection results (Code Sub-measure 2.1.2) and ingestion of C2PA validator reports as their own format (A50-ED-33).
 - Excerpts (`failures`, `all`) as inert text, if the workspace needs them.
 - An optional coverage-guided harness (`engine/tests/fuzz/genai_atheris.py`, design section 11.5).
