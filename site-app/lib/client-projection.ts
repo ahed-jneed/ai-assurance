@@ -9,6 +9,7 @@ import type {
   Engagement,
   Finding,
   Paper,
+  Report,
 } from "./domain";
 import { paperCurrent } from "./domain/gates";
 import type { Context } from "./tenancy";
@@ -199,6 +200,20 @@ export function clientReportSnapshot(
   };
 }
 
+/**
+ * The client notification a release recorded (#94), as the client sees it:
+ * when, and the recipient scope the Lead released it to. The event's reason
+ * is an instruction to the audit team and stays internal.
+ */
+export function clientNotification(r: Report) {
+  const event = r.release?.history
+    .filter((h) => h.action === "notify_client")
+    .at(-1);
+  return event
+    ? { at: event.at, recipients: r.release?.recipientScope ?? "" }
+    : undefined;
+}
+
 /** How a client sees a successor that was withdrawn after its release. */
 export const withdrawnSuccessor = "a later report, since withdrawn";
 
@@ -274,6 +289,7 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
           ? r.release.supersededBy
           : withdrawnSuccessor,
       }),
+      ...(clientNotification(r) && { notification: clientNotification(r) }),
     })),
     ...(contributor
       ? {

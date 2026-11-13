@@ -97,7 +97,7 @@ def parse(files, plan, manifest_inputs=None):
             labels["referenceContextsSha256"] = hashing.sha256_canonical(row["reference_contexts"])
         labels.update(common.labels_from({k: row.get(k) for k in label_columns if k in row}, run.warnings, locator))
         item["labels"] = dict(list(labels.items())[:50])
-        ctx = {"error": False, "nullReasons": null_reasons}
+        ctx = common.keep_excerpt({"error": False, "nullReasons": null_reasons}, plan, user_input, row.get("response"), run.warnings, locator)
         status, reason, value, rule = metric_outcome(item, ctx, primary, plan["successRule"], "ragas.metric_value")
         common.set_outcome(item, status, reason, value, rule, plan["scorePolicy"])
         run.add(item, ctx)

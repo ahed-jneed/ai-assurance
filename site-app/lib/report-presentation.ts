@@ -59,3 +59,27 @@ export function packageOpenLabel(report: Report, role: Role, userId: string) {
     return "Review release";
   return state === "released" ? "View released report" : "Review package";
 }
+
+/**
+ * The release notifications a client sees on its overview (#94), newest
+ * first: one per released report whose release notified the client. Each
+ * names the reports it replaces, so a client sees why an earlier report is
+ * now superseded.
+ */
+export function clientNotices(reports: Report[]) {
+  return reports
+    .flatMap((r) => (r.notification ? [{ r, n: r.notification }] : []))
+    .map(({ r, n }) => ({
+      reportId: r.id,
+      at: n.at,
+      text:
+        "Report " +
+        r.id +
+        " was released to " +
+        (n.recipients || "your organisation") +
+        (r.replaces?.length ? "; it replaces " + r.replaces.join(", ") : "") +
+        (r.supersededBy ? ". It has since been superseded" : "") +
+        ".",
+    }))
+    .sort((a, b) => b.at.localeCompare(a.at));
+}

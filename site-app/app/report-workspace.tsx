@@ -212,6 +212,18 @@ export function ReportWorkspace({
                       <dd>{r.replaces.join(", ")}</dd>
                     </div>
                   )}
+                  {!!r.notification && (
+                    <div>
+                      <dt>Client notified</dt>
+                      <dd>
+                        <time dateTime={r.notification.at}>
+                          {date(r.notification.at)}
+                        </time>
+                        {r.notification.recipients &&
+                          " · " + r.notification.recipients}
+                      </dd>
+                    </div>
+                  )}
                   {!!r.supersededBy && (
                     <div>
                       <dt>Superseded by</dt>

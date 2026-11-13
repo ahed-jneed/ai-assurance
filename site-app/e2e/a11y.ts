@@ -41,9 +41,10 @@ export const TRACKED_EXCEPTIONS: Exception[] = [
     rule: "label-content-name-mismatch",
     issue: "#36",
     reason:
-      "The sidebar's workspace, search and engagement-switcher buttons have an aria-label that omits their visible text.",
-    selector: ".nav-workspace, .nav-search, .nav-engagement",
-    maxNodes: 3,
+      "The sidebar's workspace, search and engagement-switcher buttons, and an evidence request's More actions button, have an aria-label that omits their visible text.",
+    selector:
+      '.nav-workspace, .nav-search, .nav-engagement, [aria-label="More request actions"]',
+    maxNodes: 4,
   },
 ];
 
@@ -61,11 +62,26 @@ async function inScope(page: Page, exception: Exception, targets: string[]) {
   );
 }
 
-/** Runs axe on the page and fails on serious or critical violations. */
-export async function expectAccessible(page: Page, label: string) {
-  const { violations } = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
-    .analyze();
+/**
+ * Runs axe on the page and fails on serious or critical violations. With
+ * `include`, a CSS selector, only that part of the page is checked: a modal
+ * dialog, whose page behind it the spec has already checked.
+ */
+export async function expectAccessible(
+  page: Page,
+  label: string,
+  { include }: { include?: string } = {},
+) {
+  const builder = new AxeBuilder({ page }).withTags([
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa",
+    "wcag22aa",
+  ]);
+  const { violations } = await (
+    include ? builder.include(include) : builder
+  ).analyze();
   // E2E_A11Y_SURVEY=1 prints every blocking violation, tracked or not, without
   // failing, to review the exception list.
   const survey = !!process.env.E2E_A11Y_SURVEY;

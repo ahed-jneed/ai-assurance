@@ -497,6 +497,12 @@ export type Report = {
    * was withdrawn and the client cannot read it, without naming it).
    */
   supersededBy?: string;
+  /**
+   * The release's client notification (its `notify_client` event): when the
+   * client was told the report is available, and to whom it was released.
+   * Set on the client projection, which shows no release history.
+   */
+  notification?: { at: string; recipients: string };
 };
 export type Engagement = {
   workflow?: Workflow;

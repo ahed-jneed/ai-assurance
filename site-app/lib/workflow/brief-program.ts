@@ -13,7 +13,7 @@
 // (preparer, reviewer, due date) is versioned apart from it and changes
 // without renewed program approval or invalidating any work.
 import { z } from "zod";
-import { paperCurrent } from "../domain/gates";
+import { isReleaseTimeRecord, paperCurrent } from "../domain/gates";
 import {
   briefReturns,
   programReturns,
@@ -150,6 +150,7 @@ async function revisePlans(
     if (
       settled &&
       inScope(next) &&
+      !isReleaseTimeRecord(next.templateId) &&
       (!next.ownerId || !next.reviewerId || !next.dueDate)
     )
       fail(
@@ -453,7 +454,20 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
           p.templateId +
             ": record applicability, criterion, period analysis and scope rationale",
         );
-      if (inScope(p)) {
+      // A release-time record (WP-RP-02, MEM-SO-01) is recorded by the
+      // release against the final package: nobody prepares or reviews it, so
+      // it needs no assignment, deadline, population or sampling. Any
+      // assignment it does carry must still be eligible and independent.
+      if (inScope(p) && isReleaseTimeRecord(p.templateId)) {
+        if (p.ownerId) await authorized(p.ownerId, ["Auditor", "Lead Auditor"]);
+        if (p.reviewerId)
+          await authorized(p.reviewerId, ["Reviewer", "Lead Auditor"]);
+        if (
+          p.reviewerId &&
+          (p.reviewerId === p.ownerId || p.contributors.includes(p.reviewerId))
+        )
+          fail(400, p.templateId + ": reviewer must be independent");
+      } else if (inScope(p)) {
         if (!p.population.trim() || !p.sampling.trim() || !p.dueDate)
           fail(
             400,
