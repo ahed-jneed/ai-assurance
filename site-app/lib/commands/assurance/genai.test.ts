@@ -421,6 +421,56 @@ describe("plans, bundles and the queue", () => {
     ).toEqual(["EV-LOG", "EV-LABELS"]);
   });
 
+  it("refuses queueing at 10 pending jobs counted beyond the 100 most recent (#151)", async () => {
+    const { procedure } = await engagement();
+    const frozen = (await op(
+      "freezeGenaiPlan",
+      { procedureId: procedure.id, plan },
+      auditor(),
+    )) as { record: { id: string } };
+    const bundle = (await op(
+      "declareGenaiBundle",
+      { manifest, inputArtifactIds: ["EV-LOG", "EV-LABELS"] },
+      auditor(),
+    )) as unknown as { record: { id: string } };
+    const insert = store.sqlite.prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at) VALUES(?,?,'ENG-G',?,'{}',?,'auditor',?)",
+    );
+    // Ten pending jobs older than a hundred newer finished ones.
+    for (let i = 0; i < 10; i++)
+      insert.run(
+        "JOB-OLD-" + i,
+        tenantId,
+        "queued",
+        "0".repeat(64),
+        "2026-10-01T00:00:0" + i + ".000Z",
+      );
+    for (let i = 0; i < 100; i++)
+      insert.run(
+        "JOB-NEW-" + i,
+        tenantId,
+        "failed",
+        "0".repeat(64),
+        "2026-11-0" + (1 + (i % 4)) + "T00:00:00.000Z",
+      );
+    const queue = () =>
+      op(
+        "queueGenaiIngest",
+        {
+          procedureId: procedure.id,
+          bundleRecordId: bundle.record.id,
+          planRecordId: frozen.record.id,
+        },
+        auditor(),
+      );
+    const error = await refused(queue());
+    expect(error.status).toBe(429);
+    store.sqlite
+      .prepare("UPDATE execution_jobs SET state='cancelled' WHERE id=?")
+      .run("JOB-OLD-0");
+    expect(((await queue()) as Response).status).toBe(200);
+  });
+
   it("refuses a plan that lowers the judge floor and a manifest with other bytes", async () => {
     const { procedure } = await engagement();
     await expect(
