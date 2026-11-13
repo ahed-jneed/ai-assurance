@@ -1,0 +1,161 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "nist-ai-600-1-to-eu-ai-act",
+  "version": "2026.11.0",
+  "title": "NIST AI 600-1 (Generative AI Profile) to the EU AI Act (amended)",
+  "source": {
+    "framework": "nist-ai-600-1",
+    "edition": "2024-07"
+  },
+  "target": {
+    "framework": "eu-ai-act",
+    "edition": "02024R1689-20260727"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers of generative AI systems on engagements that use the AI Act as criteria.",
+    "purpose": "Show which AI Act obligations bear on the twelve generative AI risks of NIST AI 600-1, so that evidence on the obligations can be read against the risks.",
+    "conceptTypes": {
+      "source": "Generative AI risk areas (NIST AI 600-1 section 2)",
+      "target": "Legal obligations (articles and paragraphs)"
+    },
+    "assumptions": "A risk area is read as the outcome that the risk is identified and managed. Relationships compare subject matter, not how an organisation implements either side. Each entry is single-source, so it can be read in both directions. No inference may be drawn from outcomes or requirements that are not mapped. Every entry is intersects_with: a NIST outcome and the other requirement only overlap, so a full result on one side is never shown as full on the other. The NIST side was read against section 2 of NIST AI 600-1 (checked 2026-11-13). The AI Act side follows the eu-ai-act framework data (rule pack 2026.11.2), pending qualified legal review (D-02); the links were not legally reviewed.",
+    "exhaustive": true
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "2.2"
+      ],
+      "target": "AIA-15-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Confabulation is a failure of accuracy; managing it overlaps with the appropriate accuracy of Art. 15(1), which applies to high-risk systems and sets no generative-specific measure."
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "2.2"
+      ],
+      "target": "AIA-15-3",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Measuring confabulation rates overlaps with declaring accuracy metrics under Art. 15(3); a declared metric need not address confabulation."
+    },
+    {
+      "id": "X3",
+      "sources": [
+        "2.4"
+      ],
+      "target": "AIA-ART-4A",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Managing data privacy risk overlaps with the safeguards of Art. 4a for special categories of personal data used for bias detection; most privacy duties sit in data protection law, outside this framework."
+    },
+    {
+      "id": "X4",
+      "sources": [
+        "2.6"
+      ],
+      "target": "AIA-10-2F",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Managing harmful bias overlaps with examining data for possible biases under Art. 10(2)(f); homogenisation of outputs is outside Art. 10."
+    },
+    {
+      "id": "X5",
+      "sources": [
+        "2.6"
+      ],
+      "target": "AIA-10-2G",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Managing harmful bias overlaps with measures to detect, prevent and mitigate biases under Art. 10(2)(g)."
+    },
+    {
+      "id": "X6",
+      "sources": [
+        "2.7"
+      ],
+      "target": "AIA-14-4B",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "The human-AI configuration risk includes automation bias and over-reliance, which overlap with keeping overseers aware of automation bias under Art. 14(4)(b)."
+    },
+    {
+      "id": "X7",
+      "sources": [
+        "2.7"
+      ],
+      "target": "AIA-50-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Telling people that they interact with an AI system under Art. 50(1) addresses part of the anthropomorphising risk of the human-AI configuration risk, not its other aspects."
+    },
+    {
+      "id": "X8",
+      "sources": [
+        "2.8"
+      ],
+      "target": "AIA-50-2",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Machine-readable marking and detectability of synthetic outputs under Art. 50(2) address part of the information integrity risk; the risk also covers content that does not distinguish fact from opinion."
+    },
+    {
+      "id": "X9",
+      "sources": [
+        "2.8"
+      ],
+      "target": "AIA-50-4-DF",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Disclosing deep fakes under Art. 50(4) addresses part of the information integrity risk for image, audio and video content."
+    },
+    {
+      "id": "X10",
+      "sources": [
+        "2.8"
+      ],
+      "target": "AIA-50-4-TXT",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "Disclosing AI-generated text published on matters of public interest under Art. 50(4) addresses a narrow part of the information integrity risk."
+    },
+    {
+      "id": "X11",
+      "sources": [
+        "2.9"
+      ],
+      "target": "AIA-15-5",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "The information security risk includes attacks on training data and model weights, which overlap with the AI-specific cybersecurity of Art. 15(5); lowered barriers to offensive cyber capabilities are outside it."
+    },
+    {
+      "id": "X12",
+      "sources": [
+        "2.12"
+      ],
+      "target": "AIA-10-2B",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "The value chain risk includes improperly obtained data, which overlaps with recording data collection processes and origin under Art. 10(2)(b)."
+    }
+  ],
+  "notes": "Every risk area was examined. CBRN information (2.1), dangerous, violent or hateful content (2.3), environmental impacts (2.5), intellectual property (2.10) and obscene, degrading or abusive content (2.11) have no entry: the obligations that bear on them (for example the duties of providers of general-purpose AI models in Art. 53 and 55) are not in the eu-ai-act framework data, so no AI Act evidence of this platform reaches them. Not an official NIST crosswalk."
+}
