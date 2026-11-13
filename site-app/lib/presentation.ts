@@ -1,4 +1,11 @@
 import type { Result } from "./domain";
+/**
+ * A finding's primary reference as the registers show it: "Article 10" for
+ * an AI Act article, otherwise the citation as recorded, e.g. "ISO/IEC 42001
+ * 8.4" on a management-system pack (#144).
+ */
+export const findingReference = (article: string) =>
+  /^\d/.test(article) ? "Article " + article : article;
 export function humanLabel(value: string) {
   const names: Record<string, string> = {
     id: "Reference",

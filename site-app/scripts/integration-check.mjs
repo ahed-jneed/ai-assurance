@@ -356,6 +356,7 @@ try {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     assert.equal(workspace.criteria.draft, false);
     assert.equal(workspace.criteria.managementSystem, undefined);
@@ -465,10 +466,16 @@ try {
       { origin: null, version: null },
     );
     const views = await request("/api/coverage?" + scope);
+    // The AI Act criteria view, then the NIST crosswalk views (#29).
     assert.deepEqual(
       views.views.map((v) => v.key),
-      [packKey],
+      [packKey, "nist-ai-rmf@1.0", "nist-ai-600-1@2024-07"],
     );
+    const nist = await request(
+      "/api/coverage?" + scope + "&framework=nist-ai-rmf%401.0",
+    );
+    assert.equal(nist.view.kind, "crosswalk");
+    assert.equal(nist.summary.full, 0, "NIST is never fully covered");
     const coverage = await request(
       "/api/coverage?" + scope + "&framework=" + encodeURIComponent(packKey),
     );
@@ -480,6 +487,26 @@ try {
       status: 404,
     });
     await request("/api/coverage?" + scope, { user: viewer, status: 403 });
+    // #135: derived applicability dates and the internal-only CSV export.
+    assert(coverage.banners.some((b) => b.id === "derived-applicability"));
+    const exportPath =
+      "/api/coverage?" +
+      scope +
+      "&" +
+      new URLSearchParams({
+        framework: packKey,
+        format: "csv",
+        actor: "Provider",
+      });
+    const csv = await transport(base + exportPath, { headers: h(owner) });
+    assert.equal(csv.status, 200);
+    assert.match(csv.headers.get("content-type"), /^text\/csv/);
+    assert.match(csv.headers.get("content-disposition"), /attachment/);
+    const csvLines = (await csv.text()).trimEnd().split("\r\n");
+    assert(csvLines[0].startsWith("view,framework_data_version,pack"));
+    assert(csvLines.length > 1 && csvLines.length < coverage.summary.total);
+    assert(csvLines.slice(1).every((l) => l.includes("Provider")));
+    await request(exportPath, { user: viewer, status: 403 });
     // A rule-pack stamp the index does not know fails closed.
     await testDb
       .prepare(
@@ -489,7 +516,7 @@ try {
       .run();
     await request("/api/coverage?" + scope, { status: 500 });
     console.log(
-      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, client 403 and unknown stamps fail closed",
+      "PASS criteria pins: default pack, chosen pack, legacy pin without writes, explicit legacy pin and its reversal, coverage views, derived applicability, the CSV export, client 403 and unknown stamps fail closed",
     );
   }
   await request("/api/workspace-state?" + new URLSearchParams(draftScope), {
@@ -2603,17 +2630,24 @@ try {
       .all()
   ).results.map((r) => r.id);
   assert(recordIds.length > 1200);
-  // The workbench view answers the first page; its cursor walks the rest.
+  // The workbench view counts the records and holds none of them (#121);
+  // view=records answers the first page and its cursor walks the rest.
   const assurancePath = (query = {}) =>
     "/api/assurance?" +
     new URLSearchParams({ tenantId, engagementId: e.id, ...query });
   const workbench = await request(assurancePath());
   assert.equal(workbench.total, recordIds.length);
-  assert.equal(workbench.records.length, 200);
+  assert.equal(
+    Object.values(workbench.kindCounts).reduce((sum, n) => sum + n, 0),
+    recordIds.length,
+  );
+  assert(!("records" in workbench) && !("nextCursor" in workbench));
   assert(Array.isArray(workbench.jobs) && workbench.capabilities);
-  const listed = [...workbench.records],
+  const first = await request(assurancePath({ view: "records" }));
+  assert.equal(first.records.length, 200);
+  const listed = [...first.records],
     pageBreaks = [];
-  for (let cursor = workbench.nextCursor; cursor;) {
+  for (let cursor = first.nextCursor; cursor;) {
     const page = await request(assurancePath({ cursor }));
     assert.deepEqual(Object.keys(page).sort(), ["nextCursor", "records"]);
     assert(page.records.length > 0 && page.records.length <= 200);
@@ -3211,6 +3245,9 @@ try {
       dossier: JSON.parse(new TextDecoder().decode(bytes)),
     };
   };
+  // The internal dossier's paper leaves, which the package proof's document
+  // leaves must match (#137).
+  let internalPaperLeaves;
   const checkDossier = async (dossier, audience) => {
     assert.equal(dossier.manifest.audience, audience);
     assert.equal(dossier.manifest.schemaVersion, "1.2");
@@ -3256,6 +3293,9 @@ try {
       assert.equal(
         memo.records.releaseCompletion.internalHash,
         internalFinal.sha256,
+      );
+      internalPaperLeaves = dossier.manifest.files.filter((f) =>
+        f.path.startsWith("papers/"),
       );
       await fs.writeFile(
         ".sites-runtime/dossier-papers.json",
@@ -3553,6 +3593,34 @@ try {
   );
   assert.equal(internalProof.valid, true);
   assert.equal(internalProof.expectedSha256, internalFinal.sha256);
+  // Proof 1.1 lists every exported working-paper document with the digest of
+  // the bytes the signed dossier files under papers/ (#137): the captured
+  // documents inside the snapshot digest, the completion memo bound to the
+  // package through the release record.
+  assert.equal(internalProof.schemaVersion, "1.1");
+  const documentLeaves = internalProof.items.filter(
+    (i) => i.kind === "working_paper_document",
+  );
+  assert.equal(documentLeaves.length, internalPaperLeaves.length);
+  for (const leaf of documentLeaves)
+    assert.equal(
+      internalPaperLeaves.find(
+        (f) => f.path === "papers/" + leaf.id + "-r" + leaf.revision + ".json",
+      )?.sha256,
+      leaf.sha256,
+      leaf.id,
+    );
+  assert.deepEqual(
+    documentLeaves
+      .filter((l) => l.basis === "release_record")
+      .map((l) => [l.catalogId, l.bindsPackage]),
+    [["MEM-SO-01", true]],
+  );
+  assert(
+    documentLeaves.every(
+      (l) => l.catalogId === "MEM-SO-01" || l.basis === "snapshot",
+    ),
+  );
   const clientProof = await request(
     "/api/report-package?" +
       new URLSearchParams({
@@ -3564,6 +3632,7 @@ try {
   );
   assert.equal(clientProof.valid, true);
   assert.equal(clientProof.expectedSha256, internalFinal.clientSha256);
+  assert(!clientProof.items.some((i) => i.kind === "working_paper_document"));
   assert(!JSON.stringify(clientProof).includes("INTERNAL_REQUEST_SECRET"));
   const clientBundle = await request(
     "/api/report-package?" +

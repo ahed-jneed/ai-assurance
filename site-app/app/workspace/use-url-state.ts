@@ -4,7 +4,7 @@
 // first load and for back/forward.
 import { useEffect, useRef, useState } from "react";
 import type { Role } from "@/lib/domain";
-import { defaultTerms, type ReportTerms } from "@/lib/domain/report-model";
+import type { TermsChoice } from "@/lib/domain/report-model";
 import { readEvidenceQuery } from "@/lib/evidence-presentation";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import {
@@ -67,7 +67,9 @@ export function useUrlState(data: WorkspaceData | null) {
     [requestFilter, setRequestFilter] = useState("all");
   const [inboxQuery, setInboxQuery] = useState(defaultInboxQuery),
     [workbenchQuery, setWorkbenchQuery] = useState(defaultWorkbenchQuery);
-  const [reportTerms, setReportTerms] = useState<ReportTerms>(defaultTerms),
+  // The report terms picked per engagement; the pack decides the defaults
+  // (reportTermsFor, #144).
+  const [reportTerms, setReportTerms] = useState<TermsChoice | null>(null),
     [reportSection, setReportSection] = useState("packages");
   const [procedureContext, setProcedureContext] = useState<
       string | undefined

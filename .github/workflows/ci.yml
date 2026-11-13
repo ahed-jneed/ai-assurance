@@ -71,6 +71,12 @@ jobs:
       - name: Validate the rule pack
         run: node schemas/validate-rule-pack.mjs
 
+      # The Article 50 research the catalogue and the rule pack consume:
+      # schema, references, catalogue links and the statistical criteria
+      # against the threshold library.
+      - name: Validate the Art 50 research
+        run: node schemas/validate-art50-research.mjs
+
       # The criteria documents of templates/criteria: schema, integrity rules
       # and the index history against the base (docs/design/criteria-model.md
       # section 14.2, rule 13). A pull request compares with the base branch

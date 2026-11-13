@@ -93,6 +93,7 @@ describe("pack #1 projections", () => {
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     });
     expect(pack1.pack.roles).toEqual({
       limitationMemo: "MEM-EX-01",
@@ -192,7 +193,7 @@ describe("registry", () => {
       }),
       expect.objectContaining({
         id: "nyc-ll144-bias-audit",
-        version: "2026.11.0",
+        version: "2026.11.1",
         isDefault: false,
         workingPapers: 7,
         memos: 2,

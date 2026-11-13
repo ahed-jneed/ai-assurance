@@ -14,7 +14,7 @@ import {
   genaiLevelBadge,
   type GenaiArtifactLevel,
 } from "@/lib/genai/evidence-levels";
-import { humanLabel } from "@/lib/presentation";
+import { findingReference, humanLabel } from "@/lib/presentation";
 import { FindingActions } from "./finding-actions";
 
 export const evidenceSize = (bytes: number) =>
@@ -222,7 +222,9 @@ export function FindingRegister({
                 <button className="paper-link" onClick={() => onOpen(f)}>
                   {f.title}
                 </button>
-                <small className="register-meta">Article {f.article}</small>
+                <small className="register-meta">
+                  {findingReference(f.article)}
+                </small>
               </TableCell>
               <TableCell className="register-risk">
                 <Status value={f.severity} />

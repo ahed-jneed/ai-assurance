@@ -75,8 +75,13 @@ export default defineConfig(async ({ command }) => {
       : {};
 
   return {
-    // Keeps test files out of the development dependency scan.
-    environments: depScanEnvironments,
+    // vinext scans every app/**/*.{tsx,ts,jsx,js} for dependencies to
+    // pre-bundle, tests included. Test fixtures import ../schemas/*.mjs,
+    // outside the project root, which the scanner cannot load: the scan then
+    // fails, the development server skips pre-bundling and reloads pages under
+    // it (#121, #145). Tests are never served, so the development server
+    // leaves them out (build/dep-scan.ts); Vite appends vinext's entries.
+    ...(command === "serve" ? { environments: depScanEnvironments } : {}),
     define: {
       __SITES_IDENTITY_DEFAULT__: sitesBuild
         ? JSON.stringify("sites")

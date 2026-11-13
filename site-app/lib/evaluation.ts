@@ -13,8 +13,12 @@ export const tasks = [
 // 3.1.0: a regression criterion reports the mean-prediction baseline RMSE and
 // passes only when the model's MSE is shown to be below it (section 5.9), so
 // a constant prediction cannot pass the RMSE criterion.
-export const runnerVersion = "interactive-predictions-3.1.0";
-export const testDefinitionVersion = "traditional-ml-3.1.0";
+// 3.2.0: a plan with a clusterField is decided by the cluster bootstrap on
+// the engine's draws (section 5.11), the per-group rates of a clustered plan
+// take cluster percentile intervals, and a regression criterion may carry
+// the mse_reduction member with its fail direction (#136).
+export const runnerVersion = "interactive-predictions-3.2.0";
+export const testDefinitionVersion = "traditional-ml-3.2.0";
 export const tests = [
   {
     id: "performance",

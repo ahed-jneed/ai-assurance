@@ -112,6 +112,25 @@ export async function recordPage(
       rows.length > limit ? encodeCursor(records[records.length - 1]) : null,
   };
 }
+/**
+ * How many records of each kind the engagement holds: one grouped read of
+ * idx_assurance_kind, which the workbench uses for its totals and empty
+ * states instead of loading the records.
+ */
+export async function recordKindCounts(ctx: Context, engagementId: string) {
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT kind,COUNT(*) AS n FROM assurance_records WHERE tenant_id=? AND engagement_id=? GROUP BY kind",
+      )
+      .bind(ctx.tenantId, engagementId)
+      .all<{ kind: string; n: number }>()
+  ).results;
+  return Object.fromEntries(rows.map((r) => [r.kind, r.n])) as Record<
+    string,
+    number
+  >;
+}
 export async function recordCount(ctx: Context, engagementId: string) {
   const row = await db()
     .prepare(
@@ -499,6 +518,45 @@ export async function jobs(ctx: Context, engagementId: string) {
       .bind(ctx.tenantId, engagementId)
       .all()
   ).results;
+}
+/**
+ * The external queue of the engagement over every job, not only the 100 most
+ * recent that jobs() lists: how many there are, how many are queued or
+ * running, and how many running jobs have an expired lease (their worker
+ * stopped renewing it; another worker may claim them). Leases are ISO
+ * timestamps, as the runner writes them, so they compare as text.
+ */
+export async function jobTelemetry(ctx: Context, engagementId: string) {
+  const row = await db()
+    .prepare(
+      "SELECT COUNT(*) AS total,COALESCE(SUM(state='queued'),0) AS queued,COALESCE(SUM(state='running'),0) AS running,COALESCE(SUM(state='running' AND lease_until<?),0) AS stalled FROM execution_jobs WHERE tenant_id=? AND engagement_id=?",
+    )
+    .bind(new Date().toISOString(), ctx.tenantId, engagementId)
+    .first<{
+      total: number;
+      queued: number;
+      running: number;
+      stalled: number;
+    }>();
+  return {
+    total: row?.total ?? 0,
+    queued: row?.queued ?? 0,
+    running: row?.running ?? 0,
+    stalled: row?.stalled ?? 0,
+  };
+}
+/** The ids of the external jobs already compiled into a draft paper. */
+export async function compiledJobIds(ctx: Context, engagementId: string) {
+  return (
+    await db()
+      .prepare(
+        "SELECT DISTINCT json_extract(body,'$.jobId') AS job FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND kind='execution_compilation'",
+      )
+      .bind(ctx.tenantId, engagementId)
+      .all<{ job: string | null }>()
+  ).results
+    .map((r) => r.job)
+    .filter((j): j is string => typeof j === "string");
 }
 /**
  * SQL that keeps an external job alive: its creator still holds auditor

@@ -9,6 +9,7 @@ await fs.mkdir(dir, { recursive: true });
 // diagnostics.ts imports the others; type-only imports disappear.
 const modules = [
   "evaluation",
+  "python-random",
   "statistics",
   "hosted-statistics",
   "diagnostics",
@@ -22,7 +23,7 @@ for (const name of modules) {
       },
     })
     .outputText.replace(
-      /from (['"])\.\/(evaluation|statistics|hosted-statistics)\1/g,
+      /from (['"])\.\/(evaluation|python-random|statistics|hosted-statistics)\1/g,
       "from './$2.js'",
     )
     // Node loads JSON modules with an import attribute.
@@ -66,7 +67,8 @@ for (const c of golden.cases) {
     decided++;
   });
 }
-assert.equal(decided, 46, "every hosted golden criterion is checked");
+// 46 before #136, plus the clustered GC-54 to GC-57 (five criteria) and GC-59.
+assert.equal(decided, 52, "every hosted golden criterion is checked");
 
 // 2. Saved-prediction evaluation decides by interval, with n and an interval for every metric.
 const config = configSchema.parse({

@@ -1,6 +1,8 @@
+import type { CriteriaTemplate } from "@/lib/catalog-criteria";
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
 import type { Engagement, Role } from "@/lib/domain";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
+import type { IntegrityIncidents } from "@/lib/engagement-storage";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -12,6 +14,8 @@ export type CatalogItem = {
   regulatoryRefs: string[];
   evidenceRequired: string[];
   automationMode: string;
+  /** The research procedures an item's steps come from (Art 50 papers). */
+  researchProcedures?: CriteriaTemplate["researchProcedures"];
 };
 export type Client = { id: string; name: string; sector: string };
 export type Member = {
@@ -94,6 +98,11 @@ export type WorkspaceData = {
     hash: string;
     details: string;
   }[];
+  /**
+   * The practice's recorded engagement integrity incidents (damaged records
+   * members met), for practice administrators; null for everyone else.
+   */
+  integrityIncidents?: IntegrityIncidents | null;
   events: {
     id: string;
     action: string;
@@ -133,6 +142,7 @@ export function packFeatures(
       statementOfApplicability: false,
       nonconformityGrading: false,
       certificationRecommendation: false,
+      ll144BiasAudit: false,
     }),
     soaControls: data?.criteria?.managementSystem?.controls ?? [],
   };
