@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 import { DossierControls } from "./dossier-controls";
+import { ExportedPapers, type ExportedPaperItem } from "./exported-papers";
 export function PackageIntegrity({
   tenantId,
   engagementId,
@@ -16,7 +17,7 @@ export function PackageIntegrity({
 }) {
   const [result, setResult] = useState<{
       valid: boolean;
-      count: number;
+      items: ExportedPaperItem[];
     } | null>(null),
     [error, setError] = useState(""),
     [checking, setChecking] = useState(false),
@@ -30,11 +31,11 @@ export function PackageIntegrity({
         }),
         v = (await response.json()) as {
           valid: boolean;
-          items: unknown[];
+          items: ExportedPaperItem[];
           error?: string;
         };
       if (!response.ok) throw Error(v.error);
-      setResult({ valid: v.valid, count: v.items.length });
+      setResult({ valid: v.valid, items: v.items });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not verify package");
     } finally {
@@ -77,9 +78,10 @@ export function PackageIntegrity({
           {result.valid
             ? "Captured content matches its recorded SHA-256 digest."
             : "Package integrity check failed."}{" "}
-          {result.count} captured manifest references.
+          {result.items.length} captured manifest references.
         </p>
       )}
+      {result && <ExportedPapers items={result.items} />}
       {error && (
         <p className="form-error" role="alert">
           {error}
