@@ -1,0 +1,115 @@
+{
+  "documentType": "framework",
+  "schemaVersion": "1.0.0",
+  "id": "owasp-agentic-top-10",
+  "edition": "2025-12",
+  "version": "2026.11.0",
+  "title": "OWASP Top 10 for Agentic Applications (announced 9 December 2025)",
+  "shortTitle": "OWASP Agentic Top 10",
+  "kind": "framework",
+  "publisher": "OWASP GenAI Security Project",
+  "jurisdiction": "international",
+  "status": "published",
+  "editionDate": "2025-12-09",
+  "researchedAsOf": "2026-11-07",
+  "sources": [
+    {
+      "role": "publisher_page",
+      "url": "https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/"
+    },
+    {
+      "role": "secondary",
+      "url": "https://genai.owasp.org/download/56857/",
+      "title": "OWASP Top 10 for LLM Applications 2026, Appendix A (ASI mapping)"
+    }
+  ],
+  "licence": {
+    "holder": "OWASP Foundation",
+    "textPolicy": "paraphrased_titles",
+    "status": "confirmed",
+    "basis": "OWASP GenAI Security Project content is licensed under CC BY-SA 4.0. The platform stores the risk identifiers and risk names with attribution and no other text.",
+    "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode",
+    "attribution": "OWASP Top 10 for Agentic Applications, OWASP GenAI Security Project, CC BY-SA 4.0"
+  },
+  "defaultProvenance": {
+    "source": "https://genai.owasp.org/2025/12/09/owasp-top-10-for-agentic-applications-the-benchmark-for-agentic-security-in-the-age-of-autonomous-ai/",
+    "sourceKind": "standard_text",
+    "verification": "verified",
+    "checkedAt": "2026-11-07",
+    "legalReview": "not_required",
+    "note": "Identifiers ASI01 to ASI10 verified on the OWASP announcement for design #31 (5 November 2026) and against Appendix A of the official OWASP LLM Top 10 2026 PDF for #33, which names this list 'OWASP Top 10 for Agentic Applications (ASI) 2026 (announced 2025-12-09)'."
+  },
+  "requirements": [
+    {
+      "id": "ASI01",
+      "ref": "ASI01",
+      "title": "Agent Goal Hijack",
+      "type": "requirement",
+      "aliases": ["ASI01"]
+    },
+    {
+      "id": "ASI02",
+      "ref": "ASI02",
+      "title": "Tool Misuse and Exploitation",
+      "type": "requirement",
+      "aliases": ["ASI02"]
+    },
+    {
+      "id": "ASI03",
+      "ref": "ASI03",
+      "title": "Identity and Privilege Abuse",
+      "type": "requirement",
+      "aliases": ["ASI03"]
+    },
+    {
+      "id": "ASI04",
+      "ref": "ASI04",
+      "title": "Agentic Supply Chain Vulnerabilities",
+      "type": "requirement",
+      "aliases": ["ASI04"]
+    },
+    {
+      "id": "ASI05",
+      "ref": "ASI05",
+      "title": "Unexpected Code Execution (RCE)",
+      "type": "requirement",
+      "aliases": ["ASI05"]
+    },
+    {
+      "id": "ASI06",
+      "ref": "ASI06",
+      "title": "Memory and Context Poisoning",
+      "type": "requirement",
+      "aliases": ["ASI06"]
+    },
+    {
+      "id": "ASI07",
+      "ref": "ASI07",
+      "title": "Insecure Inter-Agent Communication",
+      "type": "requirement",
+      "aliases": ["ASI07"]
+    },
+    {
+      "id": "ASI08",
+      "ref": "ASI08",
+      "title": "Cascading Failures",
+      "type": "requirement",
+      "aliases": ["ASI08"]
+    },
+    {
+      "id": "ASI09",
+      "ref": "ASI09",
+      "title": "Human-Agent Trust Exploitation",
+      "type": "requirement",
+      "aliases": ["ASI09"]
+    },
+    {
+      "id": "ASI10",
+      "ref": "ASI10",
+      "title": "Rogue Agents",
+      "type": "requirement",
+      "aliases": ["ASI10"]
+    }
+  ],
+  "notes": "Risk identifiers and names only. promptfoo spells a few names differently; the engine maps tool tags to its own GenAI categories by name (docs/design/genai-evidence.md section 9.3)."
+}
