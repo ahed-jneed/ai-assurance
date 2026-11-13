@@ -15,6 +15,21 @@ describe("shared performance golden cases", () => {
     );
   });
 
+  it("records one outcome and one decision per case, never one per runner", () => {
+    for (const c of golden.cases)
+      expect(Object.keys(c).sort()).toEqual([
+        "config",
+        "decision",
+        "description",
+        "engineMetrics",
+        "id",
+        "metrics",
+        "negativeLabel",
+        "outcome",
+        "rows",
+      ]);
+  });
+
   for (const c of golden.cases)
     it(`${c.id}: the hosted runner reports the shared decision and metrics`, () => {
       const csv = [

@@ -7,6 +7,7 @@ import {
   assertClaimFits,
   assertDeclaredLabel,
   assertModelSpecLimits,
+  assertPerformancePositiveLabel,
   frozenLabelPair,
 } from "../../external-worker-contract";
 import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
@@ -139,6 +140,14 @@ export const execution: AssuranceModule = defineCommands({
           requested: v.negativeLabel || undefined,
         });
       assertDeclaredLabel(plan, profile.config.negativeLabel, labels);
+      // The worker measures a performance positive class only when the
+      // protocol runs the performance test.
+      assertPerformancePositiveLabel(
+        profile.suite.includes("performance")
+          ? profile.config.performancePositiveLabel
+          : undefined,
+        labels,
+      );
       const card = v.datasetCardRecordId
         ? await find(v.datasetCardRecordId, "dataset")
         : undefined;

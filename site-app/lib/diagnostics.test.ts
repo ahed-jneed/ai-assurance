@@ -438,6 +438,56 @@ describe("hosted decisions by interval", () => {
   });
 });
 
+describe("inspectCSV lists values and group sizes on request", () => {
+  const csv = [
+    "actual,predicted,group,id",
+    ...["b,b,B,1", "a,a,A,2", "a,b,A,3", "c,c,,4", "b,a,B,5", "a,a,A,6"],
+  ].join("\n");
+
+  it("gives nothing but the column profile unless asked", () => {
+    const profile = inspectCSV(csv);
+    expect(profile).not.toHaveProperty("values");
+    expect(profile).not.toHaveProperty("counts");
+    expect(profile.columns.map((c) => c.uniqueCount)).toEqual([3, 3, 2, 6]);
+  });
+
+  it("lists the classes of a column and the rows of each group, by code point", () => {
+    const profile = inspectCSV(csv, {
+      values: ["actual"],
+      counts: ["group", "missing", "__proto__"],
+    });
+    expect(profile.values).toEqual({ actual: ["a", "b", "c"] });
+    // Missing cells are not a group; unknown columns list nothing.
+    expect(profile.counts).toEqual(
+      Object.fromEntries([
+        [
+          "group",
+          [
+            { value: "A", count: 3 },
+            { value: "B", count: 2 },
+          ],
+        ],
+        ["missing", null],
+        ["__proto__", null],
+      ]),
+    );
+  });
+
+  it("lists no column with more than 50 distinct values", () => {
+    const many = [
+      "actual,predicted,group",
+      ...Array.from({ length: 51 }, (_, i) => `1,1,g${i}`),
+    ].join("\n");
+    expect(inspectCSV(many, { counts: ["group"] }).counts).toEqual({
+      group: null,
+    });
+    const fifty = many.split("\n").slice(0, 51).join("\n");
+    expect(inspectCSV(fifty, { counts: ["group"] }).counts?.group).toHaveLength(
+      50,
+    );
+  });
+});
+
 describe("blank rows", () => {
   const rows = "actual,predicted\n1,1\n0,0";
 

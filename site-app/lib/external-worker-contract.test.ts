@@ -4,6 +4,7 @@ import {
   assertClaimFits,
   assertDeclaredLabel,
   assertModelSpecLimits,
+  assertPerformancePositiveLabel,
   claimResponse,
   claimResponseBytes,
   frozenLabelPair,
@@ -146,6 +147,38 @@ describe("assertDeclaredLabel", () => {
     });
     expect(pair).toBeUndefined();
     expect(() => assertDeclaredLabel(plan, "", pair)).not.toThrow();
+  });
+});
+
+describe("assertPerformancePositiveLabel", () => {
+  const pair = frozenLabelPair({
+    task: "Binary classification",
+    classOrder: ["fraud", "ok"],
+    positiveLabel: "ok",
+  });
+  it("accepts either output class, and empty for the favourable label", () => {
+    for (const label of ["ok", "fraud", " fraud ", "", undefined])
+      expect(() => assertPerformancePositiveLabel(label, pair)).not.toThrow();
+  });
+  it("refuses a class the system revision does not output", () => {
+    for (const label of ["1", "Fraud", "declined"]) {
+      const error = refusal(() => assertPerformancePositiveLabel(label, pair));
+      expect(error.status).toBe(400);
+      expect(error.message).toContain(
+        `the class '${label}', which is not one of the system revision's output classes ('ok', 'fraud')`,
+      );
+    }
+  });
+  it("has nothing to check for tasks without a frozen pair", () => {
+    expect(() =>
+      assertPerformancePositiveLabel("fraud", undefined),
+    ).not.toThrow();
+  });
+  it("names the label pair the worker requires (engine/worker_contract.py)", () => {
+    // The worker refuses any other class with protocol_config_invalid.
+    expect(workerContract).toMatch(
+      /def performance_positive_label\([\s\S]*?value\.strip\(\) not in \{labels\["positiveLabel"\], labels\["negativeLabel"\]\}[\s\S]*?protocol_config_invalid/,
+    );
   });
 });
 
