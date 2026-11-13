@@ -16,9 +16,11 @@ import {
   assertPlatformBytes,
   basisInputSchema,
   csvHeader,
+  declareProtocol,
   heldByClient,
   namesSpecialCategory,
   normalizeColumn,
+  protocolGroupColumns,
   specialCategoryLimitation,
   specialCategoryLimitations,
   specialColumns,
@@ -187,6 +189,42 @@ describe("column detection", () => {
       },
       { column: "region", why: ["recorded_basis"], basisId: "BASIS-1" },
     ]);
+  });
+
+  it("treats the columns of intersectional strata as group columns (#30)", () => {
+    const statistics = {
+      criteria: [{ kind: "group_comparison", groupFields: ["sex", "race"] }],
+    } as EvaluationProfile["statistics"];
+    const profile = {
+      suite: ["demographic_parity"],
+      config: { groupColumn: "sex" },
+      statistics,
+      specialCategory: { specialCategory: true },
+    } as EvaluationProfile;
+    expect(protocolGroupColumns(profile)).toEqual(["sex", "race"]);
+    expect(
+      specialColumns(["sex", "race", "income"], {
+        evaluationProfiles: [profile],
+      }).map((c) => c.column),
+    ).toEqual(["sex", "race"]);
+    const e = { specialCategoryBases: [{ ...basis, columns: ["race"] }] };
+    const declaration = {
+      specialCategory: true,
+      route: "hosted" as const,
+      basisId: "BASIS-1",
+    };
+    expect(
+      refusal(() =>
+        declareProtocol(e, profile, declaration, "user-1", "2026-11-07"),
+      ).message,
+    ).toBe("Choose a recorded basis that covers the group columns sex, race");
+    const covered = {
+      specialCategoryBases: [{ ...basis, columns: ["Sex", "race"] }],
+    };
+    expect(
+      declareProtocol(covered, profile, declaration, "user-1", "2026-11-07")
+        ?.basis?.id,
+    ).toBe("BASIS-1");
   });
 });
 

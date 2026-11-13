@@ -1,7 +1,8 @@
-// The Annex IV index a report captures: for each section of the map, the
-// current papers of its mapped templates, the accepted candidate evidence and
-// the explicit gaps a human reviewer must still assess.
-import annexMap from "./annex-iv-map.json";
+// The Annex IV index a report captures: for each section of the pinned pack's
+// Annex IV map (lib/criteria/pin.ts `annexIvMapOf`), the current papers of its
+// mapped templates, the accepted candidate evidence and the explicit gaps a
+// human reviewer must still assess.
+import type { AnnexIvMap } from "./criteria/types";
 import { paperCurrent, paperRequired, type Engagement } from "./domain";
 
 /**
@@ -11,7 +12,7 @@ import { paperCurrent, paperRequired, type Engagement } from "./domain";
  * so they are neither matched nor reported as gaps. A mapped template without
  * a current paper is an explicit gap.
  */
-export function annexIVIndex(e: Engagement) {
+export function annexIVIndex(e: Engagement, annexMap: AnnexIvMap) {
   return annexMap.sections.map((section) => {
     const matching = e.papers.filter(
         (p) =>
@@ -47,4 +48,3 @@ export function annexIVIndex(e: Engagement) {
     };
   });
 }
-export const annexMapVersion = annexMap.mapVersion;

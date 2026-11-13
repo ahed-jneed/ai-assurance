@@ -20,7 +20,9 @@ import {
 } from "./dataset-header";
 import type { Artifact, Engagement, EvaluationProfile, Run } from "./domain";
 import { fairnessSelected } from "./evaluation";
+import { planGroupFields } from "./hosted-statistics";
 import { ApiError } from "./http";
+import type { Plan } from "./statistics";
 
 /** The legal-review item the Art 4a reading waits on (#57). */
 export const art4aLegalReview = "LR-06";
@@ -242,6 +244,26 @@ export function groupColumnIsSpecial(
     (profile.specialCategory?.specialCategory ?? true)
   );
 }
+type GroupedProfile = Pick<EvaluationProfile, "config"> & {
+  statistics?: Pick<Plan, "criteria">;
+};
+/**
+ * Every column a fairness protocol groups by: its group column and the
+ * columns of its plan's intersectional strata (#30). A declaration and its
+ * basis cover all of them.
+ */
+export function protocolGroupColumns(profile: GroupedProfile) {
+  return [
+    ...new Set(
+      [
+        profile.config.groupColumn,
+        ...planGroupFields(profile.statistics),
+      ].filter(Boolean),
+    ),
+  ];
+}
+const columnList = (profile: GroupedProfile) =>
+  protocolGroupColumns(profile).join(", ");
 /** The latest recorded basis that covers `column`. */
 export function basisFor(
   e: Pick<Engagement, "specialCategoryBases">,
@@ -270,7 +292,7 @@ export function specialColumns(
   const groupColumns = new Set(
     (e.evaluationProfiles ?? [])
       .filter(groupColumnIsSpecial)
-      .map((p) => normalizeColumn(p.config.groupColumn)),
+      .flatMap((p) => protocolGroupColumns(p).map(normalizeColumn)),
   );
   return headers.flatMap((column): SpecialColumn[] => {
     const basis = basisFor(e, column),
@@ -528,7 +550,9 @@ export function uploadGate(
  */
 export function declareProtocol(
   e: Pick<Engagement, "specialCategoryBases">,
-  profile: Pick<EvaluationProfile, "suite" | "config">,
+  profile: Pick<EvaluationProfile, "suite" | "config"> & {
+    statistics?: Pick<Plan, "criteria">;
+  },
   input: SpecialCategoryDeclarationInput | undefined,
   actor: string,
   at: string,
@@ -548,13 +572,22 @@ export function declareProtocol(
     const found = (e.specialCategoryBases ?? []).find(
       (b) => b.id === v.basisId,
     );
+    const columns = protocolGroupColumns(profile);
     if (
       !found ||
-      !found.columns.some((c) => normalizeColumn(c) === normalizeColumn(column))
+      columns.some(
+        (column) =>
+          !found.columns.some(
+            (c) => normalizeColumn(c) === normalizeColumn(column),
+          ),
+      )
     )
       throw new ApiError(
         400,
-        "Choose a recorded basis that covers the group column " + column,
+        (columns.length > 1
+          ? "Choose a recorded basis that covers the group columns "
+          : "Choose a recorded basis that covers the group column ") +
+          columns.join(", "),
       );
     basis = structuredClone(found);
   }
@@ -562,7 +595,7 @@ export function declareProtocol(
     throw new ApiError(
       400,
       "A hosted fairness protocol on special-category column " +
-        column +
+        columnList(profile) +
         " needs the client's recorded Art 4a or GDPR Art 9(2) basis. Record it, or keep the client-side route.",
     );
   return {
@@ -616,7 +649,7 @@ export function hostedGate(
   // so its group column counts as special-category like an old protocol.
   if (!groupColumnIsSpecial(profile ?? frozen)) return null;
   const d = profile?.specialCategory,
-    column = (profile ?? frozen).config.groupColumn;
+    column = columnList(profile ?? frozen);
   if (!d)
     throw new ApiError(
       409,
@@ -720,7 +753,7 @@ export function externalGate(
   throw new ApiError(
     409,
     "Special-category column " +
-      profile.config.groupColumn +
+      columnList(profile) +
       (mode === "client_local"
         ? " can run without a recorded basis only on a client-held dataset pin, which the client's worker reads in the client's environment; this dataset's bytes are on the platform."
         : " can run without a recorded basis only on the client's own worker (client-local mode) reading a client-held dataset pin.") +
@@ -753,7 +786,7 @@ export function specialCategoryLimitation(
     "Run " +
     runId +
     " evaluated special-category column " +
-    profile.config.groupColumn +
+    columnList(profile) +
     " " +
     where +
     (d?.basis

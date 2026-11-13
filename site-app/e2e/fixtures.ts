@@ -124,7 +124,7 @@ export class Api {
     tenantId: string,
     engagementId: string,
     name: string,
-    content: string,
+    content: string | Buffer,
     category = "Governance",
     visibility: "internal" | "client" = "internal",
   ) {
@@ -138,7 +138,11 @@ export class Api {
         category,
         handlingBasis: "synthetic",
         visibility,
-        file: { name, mimeType: "text/plain", buffer: Buffer.from(content) },
+        file: {
+          name,
+          mimeType: "text/plain",
+          buffer: typeof content === "string" ? Buffer.from(content) : content,
+        },
       },
     });
     expect(response.status(), await response.text()).toBe(200);

@@ -1,6 +1,7 @@
 // Finding assurance commands: the support behind a finding, the
 // independent retest of its remediation and reopening a closed finding.
 import { z } from "zod";
+import { defaultFindingCriteria } from "../criteria/pin";
 import { fail, short, text, uid, type WorkflowHandler } from "./command";
 export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
   async linkFindingSupport({ e, c, writer, procedure, accepted }, data) {
@@ -18,7 +19,7 @@ export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
       f =
         e.findings.find((f) => f.id === a.findingId) ??
         fail(404, "Finding not found");
-    if (a.procedureId) procedure(a.procedureId);
+    const linked = a.procedureId ? procedure(a.procedureId) : undefined;
     if (
       a.paperIds.some((id) => !e.papers.some((p) => p.id === id)) ||
       a.runIds.some((id) => !e.runs.some((r) => r.id === id))
@@ -26,6 +27,12 @@ export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
       fail(400, "Support must belong to this engagement");
     accepted(a.evidenceIds);
     f.support = { ...a, actor: c.userId, at: c.at };
+    // A finding without criteria takes those of its procedure's item
+    // (docs/design/criteria-model.md section 7, phase 2).
+    if (linked && !f.criteriaRefs?.length) {
+      const refs = defaultFindingCriteria(e, linked.templateId);
+      if (refs.length) f.criteriaRefs = refs;
+    }
     return { findingId: f.id };
   },
   async recordFindingRetest({ e, c, reviewer, accepted }, data) {

@@ -1,0 +1,137 @@
+{
+  "documentType": "crosswalk",
+  "schemaVersion": "1.0.0",
+  "id": "iso-iec-42001-to-eu-ai-act",
+  "version": "2026.11.1",
+  "title": "ISO/IEC 42001:2023 to the EU AI Act (amended)",
+  "source": {
+    "framework": "iso-iec-42001",
+    "edition": "2023"
+  },
+  "target": {
+    "framework": "eu-ai-act",
+    "edition": "02024R1689-20260727"
+  },
+  "useCase": {
+    "intendedUsers": "Lead auditors and reviewers on engagements that use either framework as criteria.",
+    "purpose": "Show where ISO/IEC 42001 audit evidence also bears on AI Act obligations, and where it does not.",
+    "conceptTypes": {
+      "source": "Management-system requirements (clauses and controls)",
+      "target": "Legal obligations (articles and paragraphs)"
+    },
+    "assumptions": "Relationships compare what each requirement demands, not how an organisation implements it. No inference may be drawn from requirements that are not mapped. Every entry is a draft until the clause numbers are confirmed against licensed copies (#57)."
+  },
+  "method": "human",
+  "entries": [
+    {
+      "id": "X1",
+      "sources": [
+        "6.1.2"
+      ],
+      "target": "AIA-9-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Both require an established risk process. ISO/IEC 42001 addresses risks to the organisation's AI objectives; Art. 9(1) requires a lifecycle risk-management system for one high-risk system. Neither contains the other."
+    },
+    {
+      "id": "X2",
+      "sources": [
+        "8.2"
+      ],
+      "target": "AIA-9-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Performing assessments at planned intervals supports the 'maintained' element of Art. 9(1) but does not establish the system-level risk-management system."
+    },
+    {
+      "id": "X3",
+      "sources": [
+        "4.4"
+      ],
+      "target": "AIA-ART-17",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "An established management system overlaps with the quality management system of Art. 17, which lists provider-specific elements the standard does not require."
+    },
+    {
+      "id": "X4",
+      "sources": [
+        "A.6.2.7"
+      ],
+      "target": "AIA-11-1",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Technical documentation of an AI system overlaps with Art. 11(1), whose content is fixed by Annex IV and goes further."
+    },
+    {
+      "id": "X5",
+      "sources": [
+        "A.6.2.8"
+      ],
+      "target": "AIA-ART-12",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Event logging overlaps with the record-keeping duties of Art. 12, which set specific logging capabilities."
+    },
+    {
+      "id": "X6",
+      "sources": [
+        "A.7"
+      ],
+      "target": "AIA-ART-10",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Data controls overlap with the data governance duties of Art. 10, which add quality criteria for training, validation and testing data."
+    },
+    {
+      "id": "X7",
+      "sources": [
+        "A.8.2"
+      ],
+      "target": "AIA-ART-13",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Information for users overlaps with the instructions for use of Art. 13, whose content is prescribed."
+    },
+    {
+      "id": "X8",
+      "sources": [
+        "6.1.4"
+      ],
+      "target": "AIA-ART-27",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "low",
+      "justification": "An impact assessment overlaps with the fundamental rights impact assessment of Art. 27, which applies to certain deployers and has prescribed content."
+    },
+    {
+      "id": "X9",
+      "sources": [
+        "9.1"
+      ],
+      "target": "AIA-ART-72",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Monitoring and measurement overlap with post-market monitoring under Art. 72, which requires a plan and data collection from the market."
+    },
+    {
+      "id": "X10",
+      "sources": [
+        "A.8.4"
+      ],
+      "target": "AIA-ART-73",
+      "relationship": "intersects_with",
+      "rationale": "semantic",
+      "confidence": "medium",
+      "justification": "Communicating incidents overlaps with serious-incident reporting under Art. 73, which sets recipients and deadlines."
+    }
+  ]
+}

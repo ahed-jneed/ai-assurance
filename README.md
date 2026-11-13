@@ -92,6 +92,8 @@ The root `docs/`, `engine/`, `schemas/` and `templates/` folders are canonical. 
 |---|---|
 | `site-app/lib/catalog.json`, `site-app/lib/annex-iv-map.json` | `templates/` (byte copies) |
 | `site-app/lib/obligation-subitems.json` | `docs/obligation-subitems.json` |
+| `docs/obligation-subitems.json`, `templates/annex-iv-map.json` | the default criteria pack in `templates/criteria/` (its AI Act framework's obligation subitems and its Annex IV map) |
+| `site-app/lib/criteria/bundle.generated.json` | `templates/criteria/` |
 | `site-app/public/tools/assurance-verifier.py` | `engine/assurance.py` |
 | `site-app/public/tools/assurance-runtime.zip` | `engine/` (without `engine/tests/`) and `schemas/`, via `python -m engine.package_runtime` (see `engine/RUNTIME_PACKAGE.md`) |
 | `schemas/test-run.schema.json` | `schemas/test-run.base.json` (hand-maintained legacy run body and shared definitions), `schemas/.build-run-schema.py` and `.extend-assurance-schema.py` |

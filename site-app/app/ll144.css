@@ -1,0 +1,51 @@
+/* The standalone NYC Local Law 144 summary (/ll144-summary, #30). */
+.ll144-summary .ll144-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+  margin: 0;
+}
+.ll144-summary .ll144-draft,
+.ll144-summary .ll144-pending {
+  border-left: 4px solid currentColor;
+  padding: 0.4rem 0.75rem;
+}
+.ll144-summary .ll144-draft {
+  color: #8a1c1c;
+  font-weight: 600;
+}
+.ll144-summary .ll144-rule {
+  font-weight: 400;
+  opacity: 0.75;
+}
+.ll144-summary .ll144-elements div {
+  margin-bottom: 0.5rem;
+}
+.ll144-summary .ll144-elements dt {
+  font-weight: 600;
+}
+.ll144-summary .ll144-elements dd {
+  margin: 0.1rem 0 0;
+}
+.ll144-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin: 0.5rem 0;
+}
+.ll144-table th,
+.ll144-table td {
+  border-bottom: 1px solid #d5d9e0;
+  padding: 0.35rem 0.5rem;
+  text-align: right;
+  vertical-align: top;
+}
+.ll144-table th[scope="row"],
+.ll144-table thead th:first-child {
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .ll144-summary section {
+    overflow-x: auto;
+  }
+}
