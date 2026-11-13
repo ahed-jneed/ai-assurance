@@ -1,6 +1,7 @@
 // The binary dataset header readers behind the special-category upload gate
 // (#103): Parquet footer schemas and spreadsheet header rows.
-import { describe, expect, it } from "vitest";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { describe, expect, it, vi } from "vitest";
 import { pyarrowParquet, workbook, zipArchive } from "./dataset-header.fixture";
 import {
   endsParquet,
@@ -346,91 +347,113 @@ describe("spreadsheetColumns", () => {
     expect(performance.now() - started).toBeLessThan(3000);
   });
 
-  it("reads each worksheet once, within one budget for the whole package", async () => {
-    // The #125 review probe: one worksheet named by 64 Overrides, about
-    // 4 MiB of filler before a header cell that points near the end of
-    // 16 MiB of shared strings. Without deduplication and one budget it
-    // decompressed about 272 MiB and took 31 s of CPU.
-    const mib = 1024 * 1024,
-      overrides = Array.from(
-        { length: 64 },
+  it(
+    "reads each worksheet once, within one budget for the whole package",
+    {
+      // The reader's work is bounded by counting what it decompresses below,
+      // not by timing it. What remains is building the fixtures (deflating
+      // about 37 MiB of XML) and inflating at most the 16 MiB budget: about
+      // 1.5 s alone, past Vitest's default 5 s under parallel load (#170).
+      timeout: 60_000,
+    },
+    async () => {
+      // The #125 review probe: one worksheet named by 64 Overrides, about
+      // 4 MiB of filler before a header cell that points near the end of
+      // 16 MiB of shared strings. Without deduplication and one budget it
+      // decompressed about 272 MiB and took 31 s of CPU.
+      const mib = 1024 * 1024,
+        overrides = Array.from(
+          { length: 64 },
+          () =>
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+        ).join(""),
+        count = Math.floor((16 * mib) / "<si><t>x</t></si>".length),
+        probe = await zipArchive([
+          {
+            name: "[Content_Types].xml",
+            text:
+              '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+              overrides +
+              '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
+          },
+          { name: "xl/workbook.xml", text: "<workbook/>" },
+          {
+            name: "xl/worksheets/sheet1.xml",
+            text:
+              "<worksheet><sheetData>" +
+              "<x>".repeat(Math.floor((4 * mib - 512) / 3)) +
+              '<row><c t="s"><v>' +
+              (count - 2) +
+              "</v></c></row></sheetData></worksheet>",
+          },
+          {
+            name: "xl/sharedStrings.xml",
+            text: "<sst>" + "<si><t>x</t></si>".repeat(count) + "</sst>",
+          },
+        ]);
+      expect(probe.length).toBeLessThan(200_000);
+      let inflated = await inflation(() => spreadsheetColumns(probe));
+      expect(inflated.result).toEqual({
+        unreadable:
+          "the workbook decompresses to more than 16 MiB before its header rows are read",
+      });
+      // [Content_Types].xml, the worksheet once for all 64 Overrides, and the
+      // shared strings: within the one budget, not 4 MiB per Override plus
+      // 16 MiB of shared strings.
+      expect(inflated.streams).toBe(3);
+      expect(inflated.bytes).toBeLessThanOrEqual(budget + slack);
+
+      // Many distinct worksheets share the budget too.
+      const sheets = Array.from(
+        { length: 20 },
         () =>
-          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
-      ).join(""),
-      count = Math.floor((16 * mib) / "<si><t>x</t></si>".length),
-      probe = await zipArchive([
-        {
-          name: "[Content_Types].xml",
-          text:
-            '<Types><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
-            overrides +
-            '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>',
-        },
-        { name: "xl/workbook.xml", text: "<workbook/>" },
-        {
-          name: "xl/worksheets/sheet1.xml",
-          text:
-            "<worksheet><sheetData>" +
-            "<x>".repeat(Math.floor((4 * mib - 512) / 3)) +
-            '<row><c t="s"><v>' +
-            (count - 2) +
-            "</v></c></row></sheetData></worksheet>",
-        },
-        {
-          name: "xl/sharedStrings.xml",
-          text: "<sst>" + "<si><t>x</t></si>".repeat(count) + "</sst>",
-        },
-      ]);
-    expect(probe.length).toBeLessThan(200_000);
-    let started = performance.now();
-    expect(await spreadsheetColumns(probe)).toEqual({
-      unreadable:
-        "the workbook decompresses to more than 16 MiB before its header rows are read",
-    });
-    expect(performance.now() - started).toBeLessThan(3000);
+          "<x>".repeat(Math.floor(mib / 3)) +
+          '<row><c t="inlineStr"><is><t>a</t></is></c></row>',
+      );
+      const many = await workbook(sheets);
+      inflated = await inflation(() => spreadsheetColumns(many));
+      expect(inflated.result).toEqual({
+        unreadable:
+          "the workbook decompresses to more than 16 MiB before its header rows are read",
+      });
+      // About 1 MiB a worksheet: the budget runs out before the last ones are
+      // opened, and the 20 MiB of worksheets are not all inflated.
+      expect(inflated.streams).toBeLessThan(1 + sheets.length);
+      expect(inflated.bytes).toBeLessThanOrEqual(budget + slack);
+      expect(
+        await spreadsheetColumns(await workbook(sheets.slice(0, 12))),
+      ).toEqual({ columns: ["a"] });
 
-    // Many distinct worksheets share the budget too.
-    const sheets = Array.from(
-      { length: 20 },
-      () =>
-        "<x>".repeat(Math.floor(mib / 3)) +
-        '<row><c t="inlineStr"><is><t>a</t></is></c></row>',
-    );
-    started = performance.now();
-    expect(await spreadsheetColumns(await workbook(sheets))).toEqual({
-      unreadable:
-        "the workbook decompresses to more than 16 MiB before its header rows are read",
-    });
-    expect(performance.now() - started).toBeLessThan(3000);
-    expect(
-      await spreadsheetColumns(await workbook(sheets.slice(0, 12))),
-    ).toEqual({ columns: ["a"] });
-
-    // Central-directory entries that share one local header read it once:
-    // 64 of them are no more than one worksheet.
-    const shared = await workbook(
-        Array.from(
-          { length: 65 },
-          (_, i) =>
-            '<row><c t="inlineStr"><is><t>c' + i + "</t></is></c></row>",
+      // Central-directory entries that share one local header read it once:
+      // 64 of them are no more than one worksheet.
+      const shared = await workbook(
+          Array.from(
+            { length: 65 },
+            (_, i) =>
+              '<row><c t="inlineStr"><is><t>c' + i + "</t></is></c></row>",
+          ),
         ),
-      ),
-      view = new DataView(shared.buffer, shared.byteOffset, shared.byteLength),
-      eocd = shared.length - 22,
-      decoder = new TextDecoder();
-    let p = view.getUint32(eocd + 16, true),
-      first = -1;
-    for (let k = 0; k < view.getUint16(eocd + 10, true); k++) {
-      const nameLength = view.getUint16(p + 28, true),
-        name = decoder.decode(shared.subarray(p + 46, p + 46 + nameLength));
-      if (name.startsWith("xl/worksheets/")) {
-        if (first < 0) first = view.getUint32(p + 42, true);
-        else view.setUint32(p + 42, first, true);
+        view = new DataView(
+          shared.buffer,
+          shared.byteOffset,
+          shared.byteLength,
+        ),
+        eocd = shared.length - 22,
+        decoder = new TextDecoder();
+      let p = view.getUint32(eocd + 16, true),
+        first = -1;
+      for (let k = 0; k < view.getUint16(eocd + 10, true); k++) {
+        const nameLength = view.getUint16(p + 28, true),
+          name = decoder.decode(shared.subarray(p + 46, p + 46 + nameLength));
+        if (name.startsWith("xl/worksheets/")) {
+          if (first < 0) first = view.getUint32(p + 42, true);
+          else view.setUint32(p + 42, first, true);
+        }
+        p += 46 + nameLength;
       }
-      p += 46 + nameLength;
-    }
-    expect(await spreadsheetColumns(shared)).toEqual({ columns: ["c0"] });
-  });
+      expect(await spreadsheetColumns(shared)).toEqual({ columns: ["c0"] });
+    },
+  );
 
   it("scans each complete row once as the sheet grows", () => {
     const scan = firstRowScanner();
@@ -449,6 +472,53 @@ describe("spreadsheetColumns", () => {
     );
   });
 });
+
+const budget = 16 * 1024 * 1024,
+  /**
+   * What a stream may inflate past the point where the reader stops it:
+   * the chunk that crossed the limit and those queued behind it.
+   */
+  slack = 1024 * 1024;
+
+/**
+ * Runs `read` with DecompressionStream wrapped to count the streams opened
+ * and the bytes they produce: the reader's work, independent of how loaded
+ * the machine is. Only streams opened from within `read` count, so work
+ * still running from a test that timed out does not.
+ */
+async function inflation<T>(read: () => Promise<T>) {
+  const Inner = globalThis.DecompressionStream,
+    counted = { streams: 0, bytes: 0 },
+    scope = new AsyncLocalStorage<typeof counted>();
+  class Counting {
+    readonly writable: WritableStream<BufferSource>;
+    readonly readable: ReadableStream<Uint8Array>;
+    constructor(format: CompressionFormat) {
+      const inner = new Inner(format);
+      this.writable = inner.writable;
+      if (scope.getStore() !== counted) {
+        this.readable = inner.readable;
+        return;
+      }
+      counted.streams++;
+      this.readable = inner.readable.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            counted.bytes += chunk.byteLength;
+            controller.enqueue(chunk);
+          },
+        }),
+      );
+    }
+  }
+  vi.stubGlobal("DecompressionStream", Counting);
+  try {
+    const result = await scope.run(counted, read);
+    return { result, ...counted };
+  } finally {
+    vi.unstubAllGlobals();
+  }
+}
 
 describe("uploadHeader on binary datasets", () => {
   it("returns the columns, or why they could not be read", async () => {
