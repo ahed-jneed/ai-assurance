@@ -108,6 +108,14 @@ export const integrityIncidents = sqliteTable(
     lastSeen: text("last_seen").notNull(),
     lastUserId: text("last_user_id").notNull(),
     occurrences: integer("occurrences").notNull().default(1),
+    /**
+     * How the practice's administrators handled it (#151): 'open',
+     * 'acknowledged' or 'resolved'. Meeting a resolved incident again
+     * reopens it.
+     */
+    handling: text("handling").notNull().default("open"),
+    handledAt: text("handled_at"),
+    handledBy: text("handled_by"),
   },
   (t) => [
     primaryKey({

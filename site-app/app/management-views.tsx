@@ -721,6 +721,8 @@ export function ManagementViews({
         <IntegrityIncidentsPanel
           incidents={data.integrityIncidents}
           onEngagement={onEngagement}
+          open={open}
+          busy={busy}
         />
       )}
       <section className="panel">
