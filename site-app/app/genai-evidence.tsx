@@ -298,8 +298,11 @@ function ResultCard({
         <details key={run.runKey} className="genai-run">
           <summary>
             {run.runKey} · {run.format}
-            {run.kind === "marking" ? " · marking check" : ""} ·{" "}
-            <Level level={runLevel(run.runKey)} />
+            {run.kind === "marking" ? " · marking check" : ""}
+            {run.signedResults
+              ? " · " + run.signedResults + " signatures verified"
+              : ""}{" "}
+            · <Level level={runLevel(run.runKey)} />
             {run.missing.length
               ? " · " + run.missing.length + " metadata missing"
               : ""}

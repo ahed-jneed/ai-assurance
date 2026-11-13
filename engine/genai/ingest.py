@@ -1,4 +1,4 @@
-"""`run_bundle`: the one entry point of the CLI (and of the future worker job) (design sections 4, 6.3 and 10).
+"""`run_bundle`: the one entry point of the CLI and of the `genai_ingest` worker job (design sections 4, 6.3 and 10).
 
 Validation, detection, parsing, declarations, judge validation,
 recomputation and the result envelope. Inputs are bytes matched to the
@@ -16,13 +16,14 @@ from .. import statistics as core
 from . import GENAI_VERSION, hashing, limits, plan as plans, recompute, taxonomy
 from .errors import GenaiInputError, Warnings, fail, require
 from .families import heuristic_family
-from .formats import common, deepeval, garak, inspect, judge_validation, lm_eval, marking, promptfoo, pyrit, ragas
+from .formats import c2pa, common, deepeval, garak, inspect, judge_validation, lm_eval, marking, promptfoo, pyrit, ragas, signed_detection
 from .readers import ZipArchive, decode_text, first_jsonl_object, load_jsonl, loads
 
 COMPUTATION_SCHEMA = "genai-computation/0.1"
 PARSER_VERSIONS = {
     "inspect_eval": "0.1.0", "inspect_json": "0.1.0", "lm_eval_samples": "0.1.0", "promptfoo_results": "0.1.0", "garak_report": "0.1.0",
     "pyrit_export": "0.1.0", "deepeval_test_run": "0.1.0", "ragas_results": "0.1.0", "judge_validation_jsonl": "0.1.0", "marking_check_jsonl": "0.1.0",
+    "c2pa_validator_report": "0.1.0", "signed_detection_jsonl": "0.1.0",
 }
 SNAPSHOT_SUFFIX = re.compile(r"^[-_.:@]v?[0-9]")
 REVISION = re.compile(r"^[0-9a-f]{7,40}$|^sha256:[0-9a-f]{64}$")
@@ -83,6 +84,10 @@ def detect(data: bytes, *, strict: bool = False):
             return "judge_validation_jsonl", "judge_validation"
         if marking.detect(first):
             return "marking_check_jsonl", "marking"
+        if c2pa.detect(first):
+            return "c2pa_validator_report", "marking"
+        if signed_detection.detect(first):
+            return "signed_detection_jsonl", "marking"
         try:
             rows = [row for _, row in load_jsonl(data, "input")]
         except GenaiInputError:
@@ -390,7 +395,7 @@ def _group_inputs(entries):
         groups.append(("garak_report", [report] + hitlogs))
     for entry in entries:
         fmt = entry[0]["format"]
-        if fmt in ("lm_eval_samples", "garak_report", "judge_validation_jsonl", "marking_check_jsonl"):
+        if fmt in ("lm_eval_samples", "garak_report", "judge_validation_jsonl", *plans.MARKING_FORMATS):
             continue
         groups.append((fmt, [entry]))
     return groups
@@ -400,6 +405,7 @@ PARSERS = {
     "inspect_eval": inspect.parse, "inspect_json": inspect.parse, "lm_eval_samples": lm_eval.parse, "promptfoo_results": promptfoo.parse,
     "pyrit_export": pyrit.parse, "deepeval_test_run": deepeval.parse, "ragas_results": ragas.parse,
 }
+MARKING_PARSERS = {"marking_check_jsonl": marking, "c2pa_validator_report": c2pa, "signed_detection_jsonl": signed_detection}
 DECLARED_VERSION_FORMATS = {"deepeval_test_run": "4.3", "ragas_results": "0.4"}
 
 
@@ -477,14 +483,19 @@ def ingest_bundle(inputs, manifest, plan, *, provenance=None):
         if spec["format"] == "judge_validation_jsonl":
             label_files.append((spec, guarded(judge_validation.parse, spec, data)))
             format_versions[spec["sha256"]] = judge_validation.SCHEMA
-        elif spec["format"] == "marking_check_jsonl":
-            parsed = guarded(marking.parse, spec, data)
+        elif spec["format"] in MARKING_PARSERS:
+            module = MARKING_PARSERS[spec["format"]]
+            parsed = guarded(module.parse, spec, data, plan) if module is signed_detection else guarded(module.parse, spec, data)
             marking_runs.append(parsed)
             bundle_warnings.merge(parsed["warnings"])
-            format_versions[spec["sha256"]] = marking.SCHEMA
+            format_versions[spec["sha256"]] = module.SCHEMA
+    keys = [m["runKey"] for m in marking_runs] + [r.run_key for r in runs]
+    require(len(keys) == len(set(keys)), "duplicate_item_key", "two runs share a run key")
     judge_results = validate_judges(label_files, runs, manifest, plan)
     for run in runs:
         common.finalize(run)
+        if plan["excerpts"] != "none":
+            common.attach_excerpts(run, plan["excerpts"])
     all_items = [item for run in runs for item in run.items]
     common.require_unique_keys(all_items)
     criteria, overall, review_flags = recompute.evaluate(plan, runs, marking_runs, bundle_warnings)
@@ -511,7 +522,7 @@ def ingest_bundle(inputs, manifest, plan, *, provenance=None):
             "warnings": run.warnings.as_list(),
         })
         bundle_warnings.merge(run.warnings)
-    marking_blocks = [{"runKey": m["runKey"], "inputSha256": m["inputSha256"], "evidenceLevel": "L2", "records": m["records"], "count": len(m["records"])} for m in marking_runs]
+    marking_blocks = [{"runKey": m["runKey"], "format": m["format"], "inputSha256": m["inputSha256"], "evidenceLevel": "L2", "records": m["records"], "count": len(m["records"])} for m in marking_runs]
     computation = {
         "schemaVersion": COMPUTATION_SCHEMA,
         "engine": {"version": ENGINE_VERSION, "genaiVersion": GENAI_VERSION, "parsers": {f: PARSER_VERSIONS[f] for f in sorted({s["format"] for s, _ in entries})},

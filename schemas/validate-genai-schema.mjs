@@ -150,11 +150,14 @@ for (const mutate of [
 }
 const plan = {schemaVersion: 'genai-plan/0.1', criteria: [{id: 'acc', kind: 'genai_mean', metric: 'accuracy', band: {lower: 0.7}}]};
 check(validatePlan, plan, 'plan');
+check(validatePlan, {...plan, excerpts: 'failures', detectionKeys: [{keyId: 'test-detector-key-1', solutionId: 'example-detector', algorithm: 'Ed25519', publicKeySPKI: 'MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U='}]}, 'plan with excerpts and detection keys');
 for (const mutate of [
   (v) => { v.minimums = {sampleSize: 10}; },
   (v) => { v.judgeValidation = {minimumKappaLowerBound: 0.5}; },
   (v) => { v.judgeValidation = {requireDifferentFamily: false}; },
-  (v) => { v.excerpts = 'all'; },
+  (v) => { v.excerpts = 'some'; },
+  (v) => { v.detectionKeys = [{keyId: 'k', solutionId: 's', algorithm: 'RSA', publicKeySPKI: 'AAAA'}]; },
+  (v) => { v.criteria[0].requireTrustedSigner = false; },
   (v) => { v.criteria[0].kind = 'genai_vibes'; },
 ]) {
   const value = structuredClone(plan);
