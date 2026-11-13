@@ -530,23 +530,66 @@ await withWorker(
     const ops = as("ops"),
       gone = as("gone");
     await seedAbandoned(db, "t-issued");
-    // Its only issued work: one released report with a consistent package.
+    // Its issued work: one released report with consistent internal and
+    // client packages, stored as dehydrate() (lib/engagement-storage.ts)
+    // stores every saved report: the snapshots in R2 under content-addressed
+    // keys, the record holding `snapshot: {}` and storage references.
     const hex = (text) => createHash("sha256").update(text).digest("hex");
     const snapshot = { conclusion: "Unmodified", papers: [], evidence: [] };
+    const clientSnapshot = { conclusion: "Unmodified" };
+    const part = async (type, value) => {
+      const body = JSON.stringify(value),
+        sha256 = hex(body),
+        key = "t-issued/ENG-1/immutable/" + type + "/" + sha256;
+      await bucket.put(key, body, { customMetadata: { sha256 } });
+      return { key, sha256 };
+    };
+    const refs = {
+      snapshot: await part("report", snapshot),
+      clientSnapshot: await part("client-report", clientSnapshot),
+    };
     const report = {
       id: "RPT-1",
       kind: "final",
       createdAt: old,
       actor: "user-gone",
       sha256: hex(JSON.stringify(snapshot)),
-      snapshot,
+      clientSha256: hex(JSON.stringify(clientSnapshot)),
+      snapshot: {},
       release: { state: "released", releasedAt: old },
     };
     await db
       .prepare(
         "UPDATE engagements SET body=? WHERE tenant_id='t-issued' AND id='ENG-1'",
       )
-      .bind(JSON.stringify({ reports: [report] }))
+      .bind(
+        JSON.stringify({
+          reports: [report],
+          papers: [],
+          runs: [],
+          storageRefs: {
+            reports: { "RPT-1": refs },
+            histories: {},
+            results: {},
+          },
+        }),
+      )
+      .run();
+    // And a signed dossier: the record names its archive in R2 by digest.
+    const archive = '{"manifest":{"files":[]},"signature":{}}';
+    const dossierKey = "t-issued/ENG-1/dossiers/RPT-1/client/" + hex(archive);
+    await bucket.put(dossierKey, archive);
+    const dossierRecord = JSON.stringify({
+      reportId: "RPT-1",
+      audience: "client",
+      key: dossierKey,
+      sha256: hex(archive),
+    });
+    await db
+      .prepare(
+        "INSERT INTO assurance_records(tenant_id,engagement_id,id,kind,body,sha256,created_at,actor) VALUES('t-issued','ENG-1','AS-DOSSIER','dossier',?,?,?,'user-gone')",
+      )
+      .bind(dossierRecord, hex(dossierRecord), old)
       .run();
     await db
       .prepare(
@@ -554,7 +597,6 @@ await withWorker(
       )
       .bind(old)
       .run();
-    await bucket.put("t-issued/ENG-1/immutable/report/aaa", "stored object");
     const keys = "/api/dossier/keys?tenantId=t-issued";
     assert.equal(
       (await call(keys, gone)).status,
@@ -627,15 +669,46 @@ await withWorker(
     // Its issued records stay retained and verifiable.
     assert.deepEqual(await counts(), before);
     assert.deepEqual(
-      (await bucket.list({ prefix: "t-issued/" })).objects.map((o) => o.key),
-      ["t-issued/ENG-1/immutable/report/aaa"],
+      (await bucket.list({ prefix: "t-issued/" })).objects
+        .map((o) => o.key)
+        .sort(),
+      [dossierKey, refs.clientSnapshot.key, refs.snapshot.key].sort(),
     );
-    const issued = (await call("/api/operator?tenantId=t-issued", ops)).body
-      .issued;
+    const issuedWork = async () =>
+      (await call("/api/operator?tenantId=t-issued", ops)).body.issued;
+    const issued = await issuedWork();
     assert.deepEqual(
-      issued.reports.map((r) => [r.reportId, r.state, r.sha256, r.valid]),
-      [["RPT-1", "released", report.sha256, true]],
+      issued.reports.map((r) => [
+        r.reportId,
+        r.state,
+        r.sha256,
+        r.internal,
+        r.client,
+        r.valid,
+      ]),
+      [["RPT-1", "released", report.sha256, "valid", "valid", true]],
+      "the packages are read back from R2 and match the report's digests",
     );
+    assert.deepEqual(
+      issued.dossiers.map((d) => [d.recordId, d.record, d.archive, d.valid]),
+      [["AS-DOSSIER", "valid", "valid", true]],
+    );
+    // An altered client package or a missing dossier archive shows as such.
+    await bucket.put(refs.clientSnapshot.key, '{"conclusion":"Adverse"}');
+    await bucket.delete(dossierKey);
+    const damaged = await issuedWork();
+    assert.deepEqual(
+      [damaged.reports[0].internal, damaged.reports[0].client],
+      ["valid", "mismatch"],
+    );
+    assert.equal(damaged.reports[0].valid, false);
+    assert.deepEqual(
+      [damaged.dossiers[0].archive, damaged.dossiers[0].valid],
+      ["missing", false],
+    );
+    await bucket.put(refs.clientSnapshot.key, JSON.stringify(clientSnapshot));
+    await bucket.put(dossierKey, archive);
+    assert.equal((await issuedWork()).reports[0].valid, true);
     assert.deepEqual(
       issued.keys.map((k) => [k.keyId, k.status]),
       [["KEY-1", "active"]],
@@ -653,7 +726,24 @@ await withWorker(
       (await call("/api/operator", ops, request("archivePractice"))).status,
       409,
     );
-    assert.deepEqual((await call("/api/operator", ops)).body.practices, []);
+    // The default listing keeps it as archived, so its issued work stays
+    // one click away; it is never offered for deletion or archive again.
+    const afterArchive = (await call("/api/operator", ops)).body;
+    assert.deepEqual(
+      afterArchive.practices.map((p) => [
+        p.id,
+        !!p.archivedAt,
+        p.abandoned,
+        p.archivable,
+      ]),
+      [["t-issued", true, false, false]],
+    );
+    assert.equal(afterArchive.next, null);
+    assert.equal(
+      (await call("/api/operator?afterActivity=x", ops)).status,
+      400,
+      "a page cursor names both the last activity and the practice",
+    );
     const trail = (await call("/api/operator", ops)).body.events;
     assert.deepEqual(
       trail.map((e) => [e.action, e.tenantId, e.actorEmail]),

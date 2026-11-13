@@ -9,6 +9,13 @@
 // (docs/security/identity.md).
 import { env } from "cloudflare:workers";
 import type { Report } from "./domain";
+import {
+  IntegrityError,
+  loadStoredPart,
+  type IntegrityKind,
+  type ReportRefs,
+  type StorageRef,
+} from "./engagement-storage";
 import { ApiError } from "./http";
 import type { Identity } from "./identity";
 import { normalizeEmail } from "./invitations";
@@ -130,27 +137,76 @@ const summary = (row: SummaryRow): PracticeSummary => ({
   archivable: !!row.archivable,
 });
 
+/** Where a page of the practice listing continues: after this practice. */
+export type PracticeCursor = { lastActivity: string; id: string };
+
+/** How many practices one page of the operator console lists. */
+export const practicePageSize = 50;
+
 /**
- * The practices, the longest inactive first: only those the operator may
- * delete or archive now unless `all` is set. At most `limit` of them.
+ * The practices, the longest inactive first, paged by last activity (#151):
+ * unless `all` is set, only those the operator may delete or archive now and
+ * those already archived, whose issued work the console verifies. At most
+ * `limit` of them, after `after` when given.
  */
 export async function listPractices(
   db: D1Database,
   at: string,
-  { all = false, limit = 100 }: { all?: boolean; limit?: number } = {},
+  {
+    all = false,
+    limit = 100,
+    after,
+  }: { all?: boolean; limit?: number; after?: PracticeCursor } = {},
 ): Promise<PracticeSummary[]> {
   const cutoff = abandonedBefore(at);
   const rows = (
     await db
       .prepare(
-        summarySql +
-          (all ? "" : ` WHERE (${abandonedSql} OR ${archivableSql})`) +
-          " ORDER BY lastActivity,t.id LIMIT ?",
+        "SELECT * FROM (" +
+          summarySql +
+          (all
+            ? ""
+            : ` WHERE (${abandonedSql} OR ${archivableSql} OR t.archived_at IS NOT NULL)`) +
+          ") s" +
+          (after
+            ? " WHERE s.lastActivity>? OR (s.lastActivity=? AND s.id>?)"
+            : "") +
+          " ORDER BY s.lastActivity,s.id LIMIT ?",
       )
-      .bind(cutoff, cutoff, ...(all ? [] : [cutoff, cutoff]), limit)
+      .bind(
+        cutoff,
+        cutoff,
+        ...(all ? [] : [cutoff, cutoff]),
+        ...(after ? [after.lastActivity, after.lastActivity, after.id] : []),
+        limit,
+      )
       .all<SummaryRow>()
   ).results;
   return rows.map(summary);
+}
+
+/**
+ * One page of the operator console's listing: {@link practicePageSize}
+ * practices and the cursor of the next page, or null on the last one.
+ */
+export async function practicePage(
+  db: D1Database,
+  at: string,
+  options: { all?: boolean; after?: PracticeCursor } = {},
+): Promise<{ practices: PracticeSummary[]; next: PracticeCursor | null }> {
+  const rows = await listPractices(db, at, {
+    ...options,
+    limit: practicePageSize + 1,
+  });
+  const practices = rows.slice(0, practicePageSize),
+    last = practices.at(-1);
+  return {
+    practices,
+    next:
+      rows.length > practicePageSize && last
+        ? { lastActivity: last.lastActivity, id: last.id }
+        : null,
+  };
 }
 
 /** One practice's summary, or null when it does not exist. */
@@ -569,7 +625,14 @@ export async function archivePractice(
   };
 }
 
-/** A released report of an archived practice, with its package check. */
+/**
+ * How one issued part checked out: "valid", or why not. "mismatch" means the
+ * stored bytes, or the package rebuilt from them, no longer hash to the
+ * recorded digest; "missing", "unavailable" and "unreadable" say the stored
+ * part could not be read back intact (lib/engagement-storage.ts).
+ */
+export type PartCheck = "valid" | IntegrityKind;
+/** A released report of an archived practice, with its package checks. */
 export type IssuedReport = {
   engagementId: string;
   reportId: string;
@@ -578,10 +641,14 @@ export type IssuedReport = {
   releasedAt: string | null;
   sha256: string;
   clientSha256: string | null;
-  /** Whether the captured snapshots still hash to the recorded digests. */
+  /** The internal package, loaded from R2 and rechecked against sha256. */
+  internal: PartCheck;
+  /** The client package against clientSha256; null when none was issued. */
+  client: PartCheck | null;
+  /** Whether every package of the report checked out. */
   valid: boolean;
 };
-/** A signed dossier of an archived practice, with its record check. */
+/** A signed dossier of an archived practice, with its two checks. */
 export type IssuedDossier = {
   engagementId: string;
   recordId: string;
@@ -589,7 +656,11 @@ export type IssuedDossier = {
   audience: string | null;
   createdAt: string;
   sha256: string;
-  /** Whether the stored record still hashes to its recorded digest. */
+  /** The D1 record against its recorded digest. */
+  record: "valid" | "mismatch";
+  /** The signed dossier archive in R2 against the digest the record names. */
+  archive: PartCheck;
+  /** Whether both checked out. */
   valid: boolean;
 };
 /** What an archived practice issued, for answering verification requests. */
@@ -614,14 +685,18 @@ export type IssuedWork = {
 
 /**
  * The issued work of an archived practice (#151): each released (or since
- * superseded or withdrawn) report with its package digests rechecked, each
- * signed dossier with its record digest rechecked, and the practice's
- * verification keys. Identifiers and digests only, never the content. Only
- * archived practices are answered, so the operator reads nothing of a
- * practice its members still run.
+ * superseded or withdrawn) report with its internal and client packages
+ * loaded from R2, where dehydrate() keeps them, and rechecked against the
+ * report's digests; each signed dossier with its record digest and its signed
+ * archive in R2 rechecked; and the practice's verification keys. A part that
+ * is missing, unavailable or altered is reported as such, never thrown.
+ * Identifiers and digests only, never the content. Only archived practices
+ * are answered, so the operator reads nothing of a practice its members
+ * still run.
  */
 export async function issuedWork(
   db: D1Database,
+  store: Pick<R2Bucket, "get">,
   tenantId: string,
 ): Promise<IssuedWork> {
   const practice = await db
@@ -637,18 +712,32 @@ export async function issuedWork(
   const released = (
     await db
       .prepare(
-        "SELECT e.id AS engagementId,r.value AS report FROM engagements e, json_each(CASE WHEN json_valid(e.body) THEN e.body ELSE '{}' END,'$.reports') r WHERE e.tenant_id=? AND json_extract(r.value,'$.release.state') IN ('released','superseded','withdrawn') ORDER BY e.id,json_extract(r.value,'$.createdAt')",
+        "SELECT e.id AS engagementId,r.value AS report,json_extract(e.body,'$.storageRefs.reports') AS refs FROM engagements e, json_each(CASE WHEN json_valid(e.body) THEN e.body ELSE '{}' END,'$.reports') r WHERE e.tenant_id=? AND json_extract(r.value,'$.release.state') IN ('released','superseded','withdrawn') ORDER BY e.id,json_extract(r.value,'$.createdAt')",
       )
       .bind(tenantId)
-      .all<{ engagementId: string; report: string }>()
+      .all<{ engagementId: string; report: string; refs: string | null }>()
   ).results;
   const reports: IssuedReport[] = [];
   for (const row of released) {
     const report = JSON.parse(row.report) as Report;
-    const internal = await packageValid(report, false);
-    const client = report.clientSnapshot
-      ? await packageValid(report, true)
-      : true;
+    const refs = (row.refs ? JSON.parse(row.refs) : {}) as ReportRefs;
+    const ref = refs[report.id];
+    const internal = await packageCheck(
+      store,
+      row.engagementId,
+      report,
+      false,
+      ref?.snapshot,
+    );
+    const client = report.clientSha256
+      ? await packageCheck(
+          store,
+          row.engagementId,
+          report,
+          true,
+          ref?.clientSnapshot,
+        )
+      : null;
     reports.push({
       engagementId: row.engagementId,
       reportId: report.id,
@@ -657,7 +746,9 @@ export async function issuedWork(
       releasedAt: report.release?.releasedAt ?? null,
       sha256: report.sha256,
       clientSha256: report.clientSha256 ?? null,
-      valid: internal && client,
+      internal,
+      client,
+      valid: internal === "valid" && (client === null || client === "valid"),
     });
   }
   const dossierRows = (
@@ -666,11 +757,21 @@ export async function issuedWork(
         "SELECT engagement_id AS engagementId,id AS recordId,json_extract(body,'$.reportId') AS reportId,json_extract(body,'$.audience') AS audience,created_at AS createdAt,sha256,body FROM assurance_records WHERE tenant_id=? AND kind='dossier' ORDER BY created_at,id",
       )
       .bind(tenantId)
-      .all<Omit<IssuedDossier, "valid"> & { body: string }>()
+      .all<
+        Omit<IssuedDossier, "record" | "archive" | "valid"> & { body: string }
+      >()
   ).results;
   const dossiers: IssuedDossier[] = [];
-  for (const { body, ...row } of dossierRows)
-    dossiers.push({ ...row, valid: (await sha256(body)) === row.sha256 });
+  for (const { body, ...row } of dossierRows) {
+    const record = (await sha256(body)) === row.sha256 ? "valid" : "mismatch";
+    const archive = await dossierCheck(store, row.engagementId, body);
+    dossiers.push({
+      ...row,
+      record,
+      archive,
+      valid: record === "valid" && archive === "valid",
+    });
+  }
   const keys = (
     await db
       .prepare(
@@ -692,11 +793,75 @@ export async function issuedWork(
   };
 }
 
-/** Whether a report's captured package still matches its digest. */
-async function packageValid(report: Report, client: boolean) {
+/** What went wrong with a part, as a check result. */
+const failure = (error: unknown): IntegrityKind =>
+  error instanceof IntegrityError ? error.kind : "unreadable";
+
+/**
+ * One package of a released report: its snapshot loaded from R2 by the
+ * stored reference (or, for a record stored before dehydrate(), held inline),
+ * then the package rebuilt from it and compared with the report's digest.
+ */
+async function packageCheck(
+  store: Pick<R2Bucket, "get">,
+  engagementId: string,
+  report: Report,
+  client: boolean,
+  ref: StorageRef | undefined,
+): Promise<PartCheck> {
+  let snapshot: Record<string, unknown> | undefined;
+  if (ref)
+    try {
+      snapshot = (await loadStoredPart(store, engagementId, ref)) as Record<
+        string,
+        unknown
+      >;
+    } catch (error) {
+      return failure(error);
+    }
+  else {
+    const inline = client ? report.clientSnapshot : report.snapshot;
+    if (inline && Object.keys(inline).length) snapshot = inline;
+  }
+  if (!snapshot || typeof snapshot !== "object") return "missing";
   try {
-    return (await verifyPackage(report, sha256, client)).valid;
+    const proof = await verifyPackage(
+      client
+        ? { ...report, clientSnapshot: snapshot }
+        : { ...report, snapshot },
+      sha256,
+      client,
+    );
+    return proof.valid ? "valid" : "mismatch";
   } catch {
-    return false;
+    return "unreadable";
+  }
+}
+
+/**
+ * The signed dossier archive a dossier record names (app/api/dossier): read
+ * from R2 by its key and checked against the digest the record holds.
+ */
+async function dossierCheck(
+  store: Pick<R2Bucket, "get">,
+  engagementId: string,
+  body: string,
+): Promise<PartCheck> {
+  let ref: { key?: unknown; sha256?: unknown };
+  try {
+    ref = JSON.parse(body) as typeof ref;
+  } catch {
+    return "unreadable";
+  }
+  if (typeof ref.key !== "string" || typeof ref.sha256 !== "string")
+    return "missing";
+  try {
+    await loadStoredPart(store, engagementId, {
+      key: ref.key,
+      sha256: ref.sha256,
+    });
+    return "valid";
+  } catch (error) {
+    return failure(error);
   }
 }

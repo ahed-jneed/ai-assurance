@@ -9,17 +9,21 @@ import {
   archivePractice,
   deletePractice,
   issuedWork,
-  listPractices,
   operatorEvents,
+  practicePage,
   requireOperator,
 } from "@/lib/operator";
 
 export const dynamic = "force-dynamic";
 
+/** A page cursor's last activity: an ISO timestamp, as listPractices sorts. */
+const cursorActivity = z.string().max(40);
+
 /**
- * The operator console's data (lib/operator.ts): the practices, only those
- * that may be deleted or archived unless `?all=1`, and the operator audit
- * trail; or, with `?tenantId=`, an archived practice's issued work for
+ * The operator console's data (lib/operator.ts): one page of the practices,
+ * longest inactive first (only those that may be deleted or archived and
+ * those archived, unless `?all=1`; the next page with `?afterActivity=` and
+ * `?afterId=` from `next`), and the operator audit trail; or, with `?tenantId=`, an archived practice's issued work for
  * answering verification requests. Platform operators only; a practice
  * membership grants nothing here.
  */
@@ -31,22 +35,36 @@ export async function GET(request: Request) {
     const tenantId = query.get("tenantId");
     if (tenantId !== null)
       return Response.json(
-        { issued: await issuedWork(db(), short.parse(tenantId)) },
+        { issued: await issuedWork(db(), bucket(), short.parse(tenantId)) },
         { headers },
       );
-    const all = query.get("all") === "1";
+    const all = query.get("all") === "1",
+      afterActivity = query.get("afterActivity"),
+      afterId = query.get("afterId");
+    const after =
+      afterActivity !== null || afterId !== null
+        ? {
+            lastActivity: cursorActivity.parse(afterActivity),
+            id: short.parse(afterId),
+          }
+        : undefined;
+    const page = await practicePage(db(), now(), { all, after });
     return Response.json(
       {
         operator: { email: operator.email, name: operator.displayName },
         abandonedAfterDays,
-        practices: await listPractices(db(), now(), { all }),
+        practices: page.practices,
+        next: page.next,
         events: await operatorEvents(db()),
       },
       { headers },
     );
   } catch (error) {
     if (error instanceof z.ZodError)
-      return Response.json({ error: "Invalid practice" }, { status: 400 });
+      return Response.json(
+        { error: "Invalid practice or page" },
+        { status: 400 },
+      );
     return responseError(error);
   }
 }

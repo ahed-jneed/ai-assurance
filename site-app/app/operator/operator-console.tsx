@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   IssuedWork,
   OperatorEvent,
+  PartCheck,
+  PracticeCursor,
   PracticeSummary,
 } from "@/lib/operator";
 
@@ -21,6 +23,8 @@ type ConsoleData = {
   operator: { email: string; name: string };
   abandonedAfterDays: number;
   practices: PracticeSummary[];
+  /** Where the next page of the listing starts, or null on the last. */
+  next: PracticeCursor | null;
   events: OperatorEvent[];
 };
 
@@ -37,6 +41,17 @@ export function formatBytes(bytes: number) {
     : Math.max(1, Math.round(bytes / 1024)) + " KB";
 }
 
+/** One integrity check of an issued part, as the console words it. */
+export function partLabel(check: PartCheck) {
+  return {
+    valid: "matches its digest",
+    mismatch: "does not match its digest",
+    missing: "is missing",
+    unavailable: "could not be read now",
+    unreadable: "is unreadable",
+  }[check];
+}
+
 /** The status cell of a practice the operator may not act on. */
 export function practiceStatus(p: PracticeSummary) {
   if (p.archivedAt) return "Archived " + p.archivedAt.slice(0, 10);
@@ -44,8 +59,9 @@ export function practiceStatus(p: PracticeSummary) {
 }
 
 /**
- * The operator console: the abandoned practices (or all of them) with what
- * they store; a deletion of one without issued work, or an archive of one
+ * The operator console: the abandoned and archived practices (or all of
+ * them), longest inactive first and paged by last activity, with what they
+ * store; a deletion of one without issued work, or an archive of one
  * with issued work (#151), each needing the practice's name typed and a
  * reason; an archived practice's issued work for verification requests; and
  * the operator audit trail.
@@ -75,6 +91,29 @@ export function OperatorConsole() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the console data from the API when the filter changes
     void load();
   }, [load]);
+  /** Appends the next page of practices to the listing. */
+  async function more() {
+    if (!data?.next) return;
+    setBusy(true);
+    const query = new URLSearchParams({
+      afterActivity: data.next.lastActivity,
+      afterId: data.next.id,
+      ...(all ? { all: "1" } : {}),
+    });
+    const response = await fetch("/api/operator?" + query, {
+      cache: "no-store",
+    });
+    const body = (await response.json()) as ConsoleData & { error?: string };
+    setBusy(false);
+    if (!response.ok) setError(body.error ?? "The next page could not load");
+    else {
+      setError("");
+      setData({
+        ...body,
+        practices: [...data.practices, ...body.practices],
+      });
+    }
+  }
   function start(practice: PracticeSummary, op: Pending["op"]) {
     setPending({ practice, op });
     setIssued(null);
@@ -130,7 +169,7 @@ export function OperatorConsole() {
         ? practice.name +
             " was archived: " +
             (body.details?.members ?? 0) +
-            " member(s) lost access and its issued records are retained. The archive is recorded below."
+            " member(s) lost access and its issued records are retained. It stays listed here as archived; open its issued work to answer a verification request. The archive is recorded below."
         : practice.name +
             " was deleted with " +
             (body.details?.objects ?? 0) +
@@ -163,7 +202,7 @@ export function OperatorConsole() {
       {notice && <p role="status">{notice}</p>}
       <section className="panel">
         <h2 className="panel-title">
-          {all ? "All practices" : "Abandoned practices"}
+          {all ? "All practices" : "Abandoned and archived practices"}
         </h2>
         <label className="operator-filter">
           <input
@@ -250,11 +289,16 @@ export function OperatorConsole() {
             {data
               ? all
                 ? "No practices."
-                : "No abandoned practices."
+                : "No abandoned or archived practices."
               : "Loading…"}
           </p>
         )}
       </section>
+      {data?.next && (
+        <Button variant="outline" disabled={busy} onClick={() => void more()}>
+          Show more practices
+        </Button>
+      )}
       {pending && (
         <section
           className="panel"
@@ -330,8 +374,11 @@ export function OperatorConsole() {
           <h2 className="panel-title">Issued work of {issued.name}</h2>
           <p className="subtle">
             Archived {issued.archivedAt.slice(0, 10)}. Identifiers and digests
-            only, rechecked against the retained records now. Give a requester
-            the verification keys through a channel independent of this server.
+            only. Each report package is read back from storage now and rebuilt
+            against the report&apos;s recorded digest; each dossier record and
+            its signed archive are rehashed against their recorded digests. Give
+            a requester the verification keys through a channel independent of
+            this server.
           </p>
           <h3>Released reports</h3>
           {issued.reports.length ? (
@@ -339,8 +386,9 @@ export function OperatorConsole() {
               {issued.reports.map((r) => (
                 <li key={r.engagementId + r.reportId}>
                   <b>{r.reportId}</b> · {r.engagementId} · {r.kind} · {r.state}
-                  {r.releasedAt ? " " + r.releasedAt.slice(0, 10) : ""} ·{" "}
-                  {r.valid ? "digests match" : "digest mismatch"}
+                  {r.releasedAt ? " " + r.releasedAt.slice(0, 10) : ""} ·
+                  internal package {partLabel(r.internal)}
+                  {r.client ? " · client package " + partLabel(r.client) : ""}
                   <span className="block subtle mono">{r.sha256}</span>
                 </li>
               ))}
@@ -356,8 +404,8 @@ export function OperatorConsole() {
                   <b>{d.recordId}</b> · {d.engagementId}
                   {d.reportId ? " · " + d.reportId : ""}
                   {d.audience ? " · " + d.audience : ""} ·{" "}
-                  {d.createdAt.slice(0, 10)} ·{" "}
-                  {d.valid ? "digest matches" : "digest mismatch"}
+                  {d.createdAt.slice(0, 10)} · record {partLabel(d.record)} ·
+                  signed archive {partLabel(d.archive)}
                   <span className="block subtle mono">{d.sha256}</span>
                 </li>
               ))}
