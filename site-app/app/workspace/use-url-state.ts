@@ -2,7 +2,7 @@
 // step with the address bar in both directions. State → URL is the sync
 // effect in useUrlSync; URL → state is applyWorkspaceLink, used for the
 // first load and for back/forward.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { Role } from "@/lib/domain";
 import type { TermsChoice } from "@/lib/domain/report-model";
 import { readEvidenceQuery } from "@/lib/evidence-presentation";
@@ -79,23 +79,28 @@ export function useUrlState(data: WorkspaceData | null) {
     undefined,
   );
   const [labView, setLabView] = useState("models");
-  useEffect(() => {
-    if (data)
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- re-normalises the inbox query after the account or the engagement list changes
-      setInboxQuery((q) =>
-        normalizeInboxQuery(
-          q,
-          data.identity.role === "Lead Auditor",
+  // The inbox query is re-normalised when the account or the engagement list
+  // changes, in the same render, so a query for an engagement the account can
+  // no longer see is never shown.
+  const inboxScope = data
+      ? JSON.stringify([
+          data.tenantId,
+          data.identity.id,
+          data.identity.role,
           data.engagements.map((e) => e.id),
-        ),
-      );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depends on the listed fields of data, not on its identity, which changes on every refresh
-  }, [
-    data?.tenantId,
-    data?.identity.id,
-    data?.identity.role,
-    data?.engagements,
-  ]);
+        ])
+      : "",
+    [normalizedFor, setNormalizedFor] = useState("");
+  if (data && inboxScope !== normalizedFor) {
+    setNormalizedFor(inboxScope);
+    setInboxQuery((q) =>
+      normalizeInboxQuery(
+        q,
+        data.identity.role === "Lead Auditor",
+        data.engagements.map((e) => e.id),
+      ),
+    );
+  }
   const registerQuery = { view: filter, facet, search, sort };
   /** The filter this view keeps in view memory and saved views. */
   const savedFilter =
@@ -205,11 +210,8 @@ export function useUrlSync({
   displayedEvidenceTab,
   paper,
   sheet,
-  busy,
   loading,
   bootstrapping,
-  modal,
-  editorOpen,
   guarded,
   load,
   getData,
@@ -221,11 +223,8 @@ export function useUrlSync({
   displayedEvidenceTab: string;
   paper: PaperEditorState;
   sheet: RecordSheetState;
-  busy: boolean;
   loading: boolean;
   bootstrapping: boolean;
-  modal: string;
-  editorOpen: boolean;
   guarded: Guarded;
   load: WorkspaceLoad;
   getData: () => WorkspaceData | null;
@@ -344,12 +343,14 @@ export function useUrlSync({
     sort,
   } = url;
   const paperId = paper.paperId,
-    detail = sheet.detail;
+    detail = sheet.detail,
+    tenantId = data?.tenantId,
+    engagement = data?.engagement;
   useEffect(() => {
-    if (!data || bootstrapping || loading) return;
+    if (tenantId === undefined || bootstrapping || loading) return;
     const { params, kind, recordId } = workspaceParams({
-      tenantId: data.tenantId,
-      engagement: data.engagement,
+      tenantId,
+      engagement,
       role,
       view,
       paperId,
@@ -385,10 +386,10 @@ export function useUrlSync({
     if (method === "replaceState") window.history.replaceState(null, "", href);
     else window.history.pushState(null, "", href);
     lastLink.current = href;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncs the URL from the listed fields of data, not from its identity, which changes on every refresh
+    // A refreshed engagement usually writes the same href, which returns early.
   }, [
-    data?.tenantId,
-    data?.engagement?.id,
+    tenantId,
+    engagement,
     view,
     paperId,
     paperTarget,
@@ -410,28 +411,29 @@ export function useUrlSync({
     bootstrapping,
     loading,
   ]);
+  // Back/forward goes through the guards as they are at that moment.
+  const restoreLocation = useEffectEvent(() => {
+    const link = readWorkspaceLink(window.location.search),
+      current = getData();
+    if (!link || !current) return;
+    const previous = lastLink.current;
+    const result = guarded(() => {
+      void (async () => {
+        linkRestoring.current = true;
+        const target =
+          current.tenantId === link.tenantId &&
+          current.engagement?.id === link.engagementId
+            ? current
+            : await load(link.tenantId, link.engagementId || undefined);
+        if (target) applyWorkspaceLink(target, link);
+      })();
+    });
+    if (result !== "opened") window.history.replaceState(null, "", previous);
+  });
   useEffect(() => {
-    const pop = () => {
-      const link = readWorkspaceLink(window.location.search),
-        current = getData();
-      if (!link || !current) return;
-      const previous = lastLink.current;
-      const result = guarded(() => {
-        void (async () => {
-          linkRestoring.current = true;
-          const target =
-            current.tenantId === link.tenantId &&
-            current.engagement?.id === link.engagementId
-              ? current
-              : await load(link.tenantId, link.engagementId || undefined);
-          if (target) applyWorkspaceLink(target, link);
-        })();
-      });
-      if (result !== "opened") window.history.replaceState(null, "", previous);
-    };
+    const pop = () => restoreLocation();
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-registers when the guarding state changes; applyWorkspaceLink and guarded are plain functions recreated on every render
-  }, [busy, loading, bootstrapping, modal, editorOpen, load, getData]);
+  }, []);
   return applyWorkspaceLink;
 }

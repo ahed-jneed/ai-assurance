@@ -35,42 +35,22 @@ export function MemberOnboarding({
     [email, setEmail] = useState(""),
     [name, setName] = useState(""),
     [role, setRole] = useState("Auditor"),
-    [clientId, setClientId] = useState(""),
+    // The wizard is mounted afresh each time it opens (workspace-shell.tsx),
+    // so these are the values every run starts from.
+    [clientId, setClientId] = useState(() => data.clients[0]?.id ?? ""),
     [engagements, setEngagements] = useState<string[]>([]),
     [requests, setRequests] = useState<string[]>([]),
     [clientSubject, setClientSubject] = useState(""),
     [instructions, setInstructions] = useState(""),
-    [expires, setExpires] = useState(""),
+    [expires, setExpires] = useState(() =>
+      new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+    ),
     [handling, setHandling] = useState("anonymized"),
     [error, setError] = useState(""),
     [completed, setCompleted] = useState<string[]>([]),
     [saving, setSaving] = useState(false),
     [siteReady, setSiteReady] = useState(false),
     [discard, setDiscard] = useState(false);
-  useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the wizard each time the dialog opens
-      setStep(0);
-      setUserId("");
-      setByEmail(true);
-      setEmail("");
-      setName("");
-      setRole("Auditor");
-      setClientId(data.clients[0]?.id ?? "");
-      setEngagements([]);
-      setRequests([]);
-      setClientSubject("");
-      setInstructions("");
-      setCompleted([]);
-      setError("");
-      setSiteReady(false);
-      setDiscard(false);
-      setExpires(
-        new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-      );
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when the dialog opens; a refreshed client list must not wipe a form in progress
-  }, [open]);
   useEffect(() => {
     onEditing(open);
     return () => onEditing(false);

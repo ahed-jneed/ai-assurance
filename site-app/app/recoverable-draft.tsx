@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { DraftKind } from "@/lib/workspace-state";
 export type DraftScope = {
@@ -135,18 +135,23 @@ export function useRecoverableDraft(
         scope.baseRevision,
       ].join("|")
     : "";
-  useEffect(() => {
-    const g = ++generation.current;
-    autosave.reset(key);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the recovery state for the new draft scope before fetching it
+  // Another draft scope starts without a recovery copy or status, in the
+  // render that switches.
+  const fetchKey = JSON.stringify([key, enabled]),
+    [fetchedFor, setFetchedFor] = useState(fetchKey);
+  if (fetchedFor !== fetchKey) {
+    setFetchedFor(fetchKey);
     setLoaded(false);
     setRecovery(null);
     setStatus("");
+  }
+  // Reads the stored draft for the scope as it is when the scope changes;
+  // the content is compared once, when the stored draft arrives.
+  const fetchStored = useEffectEvent((g: number, signal: AbortSignal): void => {
     if (!scope || !enabled) return;
-    const controller = new AbortController();
     void fetch("/api/workspace-state?" + new URLSearchParams({ ...scope }), {
       cache: "no-store",
-      signal: controller.signal,
+      signal,
     })
       .then(async (r) => {
         const v = (await r.json()) as {
@@ -165,25 +170,35 @@ export function useRecoverableDraft(
         setLoaded(true);
       })
       .catch((e) => {
-        if (!controller.signal.aborted)
+        if (!signal.aborted)
           setStatus(e.message ?? "Draft recovery unavailable");
       });
+  });
+  useEffect(() => {
+    const g = ++generation.current;
+    autosave.reset(key);
+    const controller = new AbortController();
+    fetchStored(g, controller.signal);
     return () => {
       autosave.reset("");
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- key encodes scope; content is compared only once, when the stored draft arrives
-  }, [key, enabled]);
+  }, [autosave, key, enabled]);
   const encoded = JSON.stringify(content);
-  useEffect(() => {
+  // key and encoded are the serialised forms of scope and content, so the
+  // autosave is updated when they change, with the scope and content of
+  // that render.
+  const updateAutosave = useEffectEvent(() =>
     autosave.update(
       scope && enabled && loaded && dirty && !recovery
         ? { scope, content, encoded }
         : undefined,
-    );
+    ),
+  );
+  useEffect(() => {
+    updateAutosave();
     // Status is deliberately not a dependency: DraftAutosave reschedules
     // itself when a save settles, so a refused save is not retried per render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- key and encoded are the serialised forms of scope and content
   }, [key, enabled, loaded, dirty, recovery, encoded]);
   return {
     recovery,

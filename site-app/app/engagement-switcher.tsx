@@ -52,29 +52,37 @@ export function EngagementSwitcher({
     try {
       ids = parseRecentEngagements(localStorage.getItem(key));
     } catch {}
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- restores the recent list from browser-only storage after hydration
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is read only after hydration, so the server and first client render agree; this effect is that external read
     setRecentIds(ids);
     setRestoredKey(key);
   }, [key]);
-  useEffect(() => {
-    if (restoredKey !== key || !currentId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- records the opened engagement once the stored list has been restored
-    setRecentIds((ids) =>
-      ids[0] === currentId
-        ? ids
-        : [currentId, ...ids.filter((id) => id !== currentId)].slice(0, 5),
-    );
-  }, [currentId, key, restoredKey]);
+  // Once the stored list is restored, the open engagement becomes the most
+  // recent one, in the render that shows it.
+  const recordKey =
+      restoredKey === key && currentId ? key + "|" + currentId : "",
+    [recordedKey, setRecordedKey] = useState("");
+  if (recordKey !== recordedKey) {
+    setRecordedKey(recordKey);
+    if (currentId)
+      setRecentIds((ids) =>
+        ids[0] === currentId
+          ? ids
+          : [currentId, ...ids.filter((id) => id !== currentId)].slice(0, 5),
+      );
+  }
   useEffect(() => {
     if (restoredKey !== key) return;
     try {
       localStorage.setItem(key, JSON.stringify(recentIds));
     } catch {}
   }, [recentIds, key, restoredKey]);
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets paging after the search, sort or account changes (post-commit reset is the current behaviour)
+  // Another search, sort or account shows the first 50 rows again.
+  const pagingScope = JSON.stringify([query, sort, key]),
+    [pagedScope, setPagedScope] = useState(pagingScope);
+  if (pagedScope !== pagingScope) {
+    setPagedScope(pagingScope);
     setLimit(50);
-  }, [query, sort, key]);
+  }
   const matches = data.engagements
     .filter((e) =>
       (e.title + " " + clientName(e.client_id))
