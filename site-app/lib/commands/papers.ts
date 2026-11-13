@@ -5,7 +5,7 @@ import {
   type Engagement,
   type Paper,
 } from "../domain";
-import { id, now, sha256 } from "../engagement-repo";
+import { id, now, sha256 } from "../ids";
 import { managementSystemView, pinned } from "../criteria/pin";
 import { earlierPhasePapers } from "../domain/management-system";
 import { templatePaper } from "../factories";

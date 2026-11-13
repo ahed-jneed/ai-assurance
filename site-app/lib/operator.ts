@@ -7,7 +7,7 @@
 // either, practice administrators included. Every deletion and archive is
 // recorded in operator_events, which is immutable and outlives the practice
 // (docs/security/identity.md).
-import { env } from "cloudflare:workers";
+import { env } from "./bindings";
 import type { Report } from "./domain";
 import {
   IntegrityError,

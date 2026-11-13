@@ -4,14 +4,10 @@ import {
   recordIntegrityIncident,
 } from "@/lib/engagement-storage";
 import { integrityMessage } from "@/lib/read-models/workspace-view";
-import {
-  ApiError,
-  context,
-  db,
-  getEngagement,
-  requireRole,
-  responseError,
-} from "@/lib/store";
+import { db } from "@/lib/bindings";
+import { getEngagement } from "@/lib/engagement-repo";
+import { ApiError, responseError } from "@/lib/http";
+import { context, requireRole } from "@/lib/tenancy";
 import { engagementClassificationRules } from "@/lib/commands/classification";
 import { packFeatures } from "@/lib/criteria/pin";
 import { engagementWork, orderWork, type WorkItem } from "@/lib/work-items";
