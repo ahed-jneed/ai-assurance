@@ -50,6 +50,8 @@ import {
   pinned,
   recordVersions,
 } from "../criteria/pin";
+import { generativeSystem, reportLimitationText } from "../genai/limitation";
+import { genaiCovered } from "../genai/store";
 import { specialCategoryLimitations } from "../special-category";
 import type { Context } from "../tenancy";
 import { defineCommands, type CommandData } from "./command";
@@ -272,7 +274,12 @@ export const reports = defineCommands({
           ? { regulatorySource: pack.reporting.regulatorySource }
           : {}),
         limitations: [
-          pack.reporting?.limitations ?? "",
+          reportLimitationText(pack.reporting?.limitations ?? "", {
+            generative: features.aiActClassification
+              ? generativeSystem(e)
+              : "unknown",
+            genaiCovered: await genaiCovered(ctx, e),
+          }),
           ...specialCategoryLimitations(e.runs),
         ]
           .filter(Boolean)

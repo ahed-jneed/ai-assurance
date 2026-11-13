@@ -38,6 +38,57 @@
       "sha256": "63fd1dfa21b1df4bf860776dbbddb4cf885abf53ecdd3b6add96d2c582229c81"
     },
     {
+      "documentType": "framework",
+      "id": "owasp-llm-top-10",
+      "edition": "2026",
+      "version": "2026.11.0",
+      "path": "frameworks/owasp-llm-top-10/2026/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "sha256": "4141359e33be7cfbc134d3ef3257d1b38f4ca206277dcfa2fabe229ca7646e53"
+    },
+    {
+      "documentType": "framework",
+      "id": "owasp-agentic-top-10",
+      "edition": "2025-12",
+      "version": "2026.11.0",
+      "path": "frameworks/owasp-agentic-top-10/2025-12/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "sha256": "d87de88b9a52ac0465af85208583a90280255d3861acdeccaf1003550b2992a1"
+    },
+    {
+      "documentType": "pack",
+      "id": "genai-evaluation",
+      "version": "2026.11.0",
+      "path": "packs/genai-evaluation/2026.11.0.json",
+      "status": "released",
+      "approvals": [
+        {
+          "role": "methodology_owner",
+          "by": "ahed-jneed (methodology owner, by merging #33)",
+          "at": "2026-11-07"
+        }
+      ],
+      "releasedAt": "2026-11-07",
+      "selectable": true,
+      "sha256": "c1f2db0c1e531d9b7d651e541fd4ea76449bd77bbab84f35ed84765fc4302f14"
+    },
+    {
       "documentType": "pack",
       "id": "eu-ai-act-amended",
       "version": "2026.11.3",

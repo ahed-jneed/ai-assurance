@@ -44,5 +44,6 @@ export const evidenceCategories = [
   "Instructions",
   "Oversight",
   "Security",
+  "GenAI log",
   "Other",
 ];
