@@ -1322,6 +1322,7 @@ export function AuditProgram({
                 ].map(([v, t]) => (
                   <button
                     className={v === filter ? "active" : ""}
+                    aria-pressed={v === filter}
                     key={v}
                     onClick={() => setFilter(v)}
                   >

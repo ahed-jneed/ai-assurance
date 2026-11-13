@@ -97,9 +97,7 @@ test("the Auditor registers a model and evaluates it in the testing lab", async 
   await form
     .getByLabel("Output meaning")
     .fill("1 approves the application; 0 declines it");
-  await expectAccessible(page, "Model registration form", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Model registration form");
   const registered = await runCommand(page, "createModel", () =>
     form.getByRole("button", { name: "Register version" }).click(),
   );
@@ -134,9 +132,7 @@ test("the Auditor registers a model and evaluates it in the testing lab", async 
   const results = page.getByRole("dialog", { name: "Evaluation results" });
   await expect(results).toBeVisible();
   await expect(results.getByText("succeeded").first()).toBeVisible();
-  await expectAccessible(page, "Evaluation results", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Evaluation results");
 
   const evaluated = (await engagementOf(auditor, e)).runs.find(
     (r: { id: string }) => r.id === runId,

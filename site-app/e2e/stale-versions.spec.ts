@@ -63,9 +63,7 @@ test("a decision on a changed engagement is refused until the page reloads", asy
       hasText: "The engagement changed. Reload before saving.",
     }),
   ).toBeVisible();
-  await expectAccessible(page, "Refused stale approval", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Refused stale approval");
   expect((await engagementOf(lead, e)).workflow.brief.status).toBe("submitted");
 
   // After a reload the same decision is taken on the current version.

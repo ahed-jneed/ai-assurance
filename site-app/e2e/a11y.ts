@@ -25,28 +25,9 @@ type Exception = {
   maxNodes: number;
 };
 
-// #36 (F-46) fixes the workspace's WCAG AA failures and removes these entries;
-// its acceptance criterion is that this list is empty.
-export const TRACKED_EXCEPTIONS: Exception[] = [
-  {
-    rule: "color-contrast",
-    issue: "#36",
-    reason:
-      "Secondary text, tab triggers, toasts, stat labels and summaries below 4.5:1 (F-46).",
-    // The working paper review has the most (12 in a fresh run); its evidence
-    // choices grow when a reused server keeps earlier runs' records.
-    maxNodes: 20,
-  },
-  {
-    rule: "label-content-name-mismatch",
-    issue: "#36",
-    reason:
-      "The sidebar's workspace, search and engagement-switcher buttons, and an evidence request's More actions button, have an aria-label that omits their visible text.",
-    selector:
-      '.nav-workspace, .nav-search, .nav-engagement, [aria-label="More request actions"]',
-    maxNodes: 4,
-  },
-];
+// Empty since #36 fixed the workspace's WCAG AA failures (F-46). A new entry
+// needs the issue that fixes it, a reason, and a scope.
+export const TRACKED_EXCEPTIONS: Exception[] = [];
 
 const BLOCKING = new Set(["serious", "critical"]);
 
@@ -63,25 +44,13 @@ async function inScope(page: Page, exception: Exception, targets: string[]) {
 }
 
 /**
- * Runs axe on the page and fails on serious or critical violations. With
- * `include`, a CSS selector, only that part of the page is checked: a modal
- * dialog, whose page behind it the spec has already checked.
+ * Runs axe on the whole page, an open dialog included, and fails on serious
+ * or critical violations.
  */
-export async function expectAccessible(
-  page: Page,
-  label: string,
-  { include }: { include?: string } = {},
-) {
-  const builder = new AxeBuilder({ page }).withTags([
-    "wcag2a",
-    "wcag2aa",
-    "wcag21a",
-    "wcag21aa",
-    "wcag22aa",
-  ]);
-  const { violations } = await (
-    include ? builder.include(include) : builder
-  ).analyze();
+export async function expectAccessible(page: Page, label: string) {
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
+    .analyze();
   // E2E_A11Y_SURVEY=1 prints every blocking violation, tracked or not, without
   // failing, to review the exception list.
   const survey = !!process.env.E2E_A11Y_SURVEY;

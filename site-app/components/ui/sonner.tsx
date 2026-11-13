@@ -30,6 +30,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          // Rich toast text at 4.5:1 or more on its tinted background (#36).
+          "--success-text": "#006b24",
+          "--error-text": "#b42318",
+          "--info-text": "#0a5cad",
+          "--warning-text": "#8a5a12",
         } as React.CSSProperties
       }
       {...props}

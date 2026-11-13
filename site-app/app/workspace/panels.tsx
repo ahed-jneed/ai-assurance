@@ -69,6 +69,7 @@ export const ReportWorkspace = memo(
 );
 export const panelFallback = (
   <div className="loading-grid" role="status" aria-label="Loading">
+    <span className="sr-only">Loading…</span>
     <Skeleton className="h-16" />
     <Skeleton className="h-80" />
   </div>
@@ -76,6 +77,7 @@ export const panelFallback = (
 /** The workspace shell's placeholder while the engagement loads (#135). */
 export const workspaceFallback = (
   <div className="loading-grid" role="status" aria-label="Loading workspace">
+    <span className="sr-only">Loading workspace…</span>
     <Skeleton className="h-16" />
     <Skeleton className="h-32" />
     <Skeleton className="h-80" />

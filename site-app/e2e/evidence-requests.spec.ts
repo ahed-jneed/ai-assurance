@@ -57,9 +57,7 @@ test("an evidence request goes from the Auditor to the client and back", async (
     .getByRole("checkbox", { name: new RegExp(DEMO.paperTemplate) })
     .first()
     .check();
-  await expectAccessible(page, "Evidence request form", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Evidence request form");
   const created = await runCommand(page, "createEvidenceRequest", () =>
     form.getByRole("button", { name: "Create request" }).click(),
   );
@@ -127,9 +125,7 @@ test("an evidence request goes from the Auditor to the client and back", async (
   await assessment
     .getByLabel("Relevance, reliability, coverage & limitations")
     .fill("Report covers model 3.2 for the audit period; source verified.");
-  await expectAccessible(page, "Evidence assessment form", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Evidence assessment form");
   await runCommand(page, "assessEvidenceRequest", () =>
     assessment.getByRole("button", { name: "Record assessment" }).click(),
   );

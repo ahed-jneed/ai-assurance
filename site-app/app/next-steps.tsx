@@ -103,7 +103,7 @@ export function NextSteps({
       )}
       {!active.length && (
         <div className="queue-empty">
-          <CheckCircle2 size={17} />
+          <CheckCircle2 size={17} aria-hidden="true" />
           <span>
             {teamOutstanding
               ? "No personal paper actions in this stage. Team work remains."

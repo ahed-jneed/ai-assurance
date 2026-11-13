@@ -141,7 +141,7 @@
   text-align: left;
 }
 .coverage-tile:focus-visible {
-  outline: 2px solid #2f6fdb;
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 .coverage-ref {
@@ -182,14 +182,14 @@
 .coverage-tile.state-unmapped {
   background: #f1f1ef;
   border-color: #d3d1cb;
-  color: #787774;
+  color: var(--text-secondary);
 }
 .coverage-tile.state-excluded {
-  color: #787774;
+  color: var(--text-secondary);
   text-decoration: line-through;
 }
 .coverage-tile.state-not_applicable {
-  color: #787774;
+  color: var(--text-secondary);
   font-style: italic;
 }
 .coverage-drawer-body {

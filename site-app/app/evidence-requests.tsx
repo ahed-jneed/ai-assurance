@@ -448,7 +448,7 @@ export function EvidenceRequestDetails({
                   variant="ghost"
                   size="sm"
                   disabled={busy}
-                  aria-label="More request actions"
+                  aria-label="More actions for this request"
                 >
                   <MoreHorizontal size={16} aria-hidden="true" />
                   <span>More actions</span>

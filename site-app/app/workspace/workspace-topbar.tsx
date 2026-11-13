@@ -99,7 +99,7 @@ export function WorkspaceTopbar({
           <kbd>Ctrl K</kbd>
         </Button>
         <span className="topbar-access">
-          <LockKeyhole size={13} />
+          <LockKeyhole size={13} aria-hidden="true" />
           {role}
         </span>
       </div>

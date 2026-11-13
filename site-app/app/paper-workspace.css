@@ -45,7 +45,7 @@
   flex: 1 1 180px;
   max-width: 300px;
   min-width: 0;
-  border: 1px solid #e4e6e9;
+  border: 1px solid var(--border-strong);
   background: #fff;
   color: #6b7280;
 }
@@ -288,7 +288,7 @@ select.paper-section-select {
   max-width: 100%;
   min-height: 36px;
   padding: 7px 30px 7px 10px;
-  border: 1px solid #e4e6e9;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   color: #37352f;
   background: #fff;

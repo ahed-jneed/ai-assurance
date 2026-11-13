@@ -13,6 +13,8 @@ export function ViewLoading({
 }) {
   return (
     <div className="loading-grid" role="status" aria-label={label}>
+      {/* Live regions announce their text, not their label. */}
+      <span className="sr-only">{label}…</span>
       {Array.from({ length: rows }, (_, i) => (
         <Skeleton key={i} className="h-16" />
       ))}
