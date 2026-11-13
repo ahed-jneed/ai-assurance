@@ -1,8 +1,9 @@
 "use client";
-// The signed-in account: who and in which role, Sign out, and on the
-// development server a switch to another test persona. Sign-in and sign-out
+// The signed-in account: who and in which role, the operator console for
+// platform operators, Sign out, and on the development server a switch to
+// another test persona. Sign-in and sign-out
 // are top-level navigations that come back to the current location.
-import { LogOut, UserRound, UsersRound } from "lucide-react";
+import { LogOut, ServerCog, UserRound, UsersRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -148,6 +149,14 @@ function AccountMenuItems({ data }: { data: WorkspaceData }) {
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+      )}
+      {data.identity.operator && (
+        <DropdownMenuItem asChild>
+          <a href="/operator" target="_top">
+            <ServerCog size={16} aria-hidden="true" />
+            Operator console
+          </a>
+        </DropdownMenuItem>
       )}
       <DropdownMenuItem asChild>
         <a href={signOutPath(returnTo)} target="_top">

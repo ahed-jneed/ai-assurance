@@ -94,7 +94,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
 | Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |
-| Platform operator | `operator_events` (immutable audit trail of practice deletions, `lib/operator.ts`), `practice_erasures` (a marker that exists only inside the deletion batch; the append-only delete triggers admit that practice's rows only while it exists); both since `drizzle/0013` |
+| Platform operator | `operator_events` (immutable audit trail of practice deletions, `lib/operator.ts`), `practice_erasures` (a marker that exists only inside the deletion batch; the append-only delete triggers admit that practice's rows only while it exists); both since `drizzle/0013`; `tenants.archived_at` (a practice with issued work archived instead of deleted, kept archived and closed to new members by the triggers of `drizzle/0015`); `integrity_incidents.handling` (open, acknowledged or resolved by a practice administrator, `drizzle/0016`) |
 
 **Invariants.** Append-only triggers protect `audit_events`, `engagement_snapshots`, `management_events`, `assurance_records`, and completed jobs and attempts. Unique indexes on `json_extract` expressions stop revision forks. All of these exist only in hand-written SQL (`0001`, `0003`).
 

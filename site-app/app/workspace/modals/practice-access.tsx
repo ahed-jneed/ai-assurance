@@ -247,6 +247,31 @@ export const signingKeyRotateModal: ModalDefinition = {
   submit: ({ manage, values: v }) =>
     manage("rotateSigningKey", { reason: v.reason }),
 };
+/**
+ * Acknowledges or resolves an integrity incident (#151); the choices come
+ * from incidentChoices in app/integrity-incidents.tsx.
+ */
+export const incidentHandleModal: ModalDefinition = {
+  title: "Handle integrity incident",
+  submitLabel: "Record handling",
+  Fields: ({ choices }) => (
+    <p>
+      {choices.handling === "resolved" ? "Resolve" : "Acknowledge"}{" "}
+      <b>{choices.problem}</b> in <b>{choices.title}</b>?{" "}
+      {choices.handling === "resolved"
+        ? "Resolve it once the record is restored. It reopens if a member meets the damaged record again."
+        : "Acknowledge it once someone is working on it; the navigation badge stops counting it. Resolve it once the record is restored."}{" "}
+      The change is recorded in the practice&apos;s management history.
+    </p>
+  ),
+  submit: ({ manage, choices }) =>
+    manage("handleIntegrityIncident", {
+      engagementId: choices.engagementId,
+      objectKey: choices.objectKey,
+      kind: choices.kind,
+      handling: choices.handling,
+    }),
+};
 export const adminGrantModal: ModalDefinition = {
   title: "Grant practice administration",
   submitLabel: "Grant administration",

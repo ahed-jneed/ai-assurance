@@ -23,6 +23,12 @@ export const tenants = sqliteTable("tenants", {
   // The practice's report settings as JSON (lib/report-settings.ts): the
   // signatory, location and quality-management statement new reports state.
   reportSettings: text("report_settings").notNull().default("{}"),
+  // When the platform operator archived the practice (#151): an abandoned
+  // practice that issued work is archived instead of deleted. Its members
+  // lose access and its records stay retained (lib/operator.ts); triggers of
+  // migration 0015 keep it archived and refuse new memberships and
+  // invitations.
+  archivedAt: text("archived_at"),
 });
 export const memberships = sqliteTable(
   "memberships",
@@ -102,6 +108,14 @@ export const integrityIncidents = sqliteTable(
     lastSeen: text("last_seen").notNull(),
     lastUserId: text("last_user_id").notNull(),
     occurrences: integer("occurrences").notNull().default(1),
+    /**
+     * How the practice's administrators handled it (#151): 'open',
+     * 'acknowledged' or 'resolved'. Meeting a resolved incident again
+     * reopens it.
+     */
+    handling: text("handling").notNull().default("open"),
+    handledAt: text("handled_at"),
+    handledBy: text("handled_by"),
   },
   (t) => [
     primaryKey({

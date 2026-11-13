@@ -144,6 +144,57 @@ const allParts: HydrateParts = {
   results: true,
 };
 /**
+ * Reads one stored object and checks it against the digest its reference
+ * records: an IntegrityError says whether it is missing, unavailable or
+ * altered.
+ */
+async function readVerified(
+  store: Pick<R2Bucket, "get">,
+  engagementId: string,
+  ref: Ref,
+) {
+  let o: R2ObjectBody | null;
+  try {
+    o = await store.get(ref.key);
+  } catch {
+    throw new IntegrityError(engagementId, "unavailable", ref.key);
+  }
+  if (!o) throw new IntegrityError(engagementId, "missing", ref.key);
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await o.arrayBuffer();
+  } catch {
+    throw new IntegrityError(engagementId, "unavailable", ref.key);
+  }
+  if ((await sha256(bytes)) !== ref.sha256)
+    throw new IntegrityError(engagementId, "mismatch", ref.key);
+  return new TextDecoder().decode(bytes);
+}
+
+/** A stored engagement record's reference to one of its R2 parts. */
+export type StorageRef = Ref;
+/** The R2 references of a stored report's snapshots, by report id. */
+export type ReportRefs = StorageRefs["reports"];
+
+/**
+ * Loads one stored part outside a request (the operator's issued-work check,
+ * lib/operator.ts): read from `store`, checked against the reference's
+ * digest and parsed, or an IntegrityError naming what is wrong with it.
+ */
+export async function loadStoredPart(
+  store: Pick<R2Bucket, "get">,
+  engagementId: string,
+  ref: Ref,
+): Promise<unknown> {
+  const text = await readVerified(store, engagementId, ref);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new IntegrityError(engagementId, "unreadable", ref.key);
+  }
+}
+
+/**
  * Verified R2 reads per request, keyed by the request's Context. Parts are
  * content-addressed, so a key read once in a request is never read again in
  * it; each caller parses its own copy.
@@ -156,18 +207,9 @@ function read(ctx: Context | undefined, engagementId: string, ref: Ref) {
   const cached = cache?.get(ref.key);
   if (cached) return cached;
   const pending = (async () => {
-    let o: R2ObjectBody | null;
-    try {
-      o = await bucket().get(ref.key);
-    } catch {
-      throw new IntegrityError(engagementId, "unavailable", ref.key);
-    }
-    if (!o) throw new IntegrityError(engagementId, "missing", ref.key);
-    const bytes = await o.arrayBuffer();
-    if ((await sha256(bytes)) !== ref.sha256)
-      throw new IntegrityError(engagementId, "mismatch", ref.key);
+    const text = await readVerified(bucket(), engagementId, ref);
     if (ctx) presentIn(ctx).add(ref.key);
-    return new TextDecoder().decode(bytes);
+    return text;
   })();
   cache?.set(ref.key, pending);
   pending.catch(() => cache?.delete(ref.key));
@@ -235,20 +277,41 @@ export type IntegrityIncident = {
   occurrences: number;
   /** Who last met it: a display name, or the user id without a membership. */
   lastSeenBy: string;
+  /** How the administrators handled it; meeting it again reopens it. */
+  handling: IncidentHandling;
+  /** When it was last acknowledged or resolved; null while never handled. */
+  handledAt: string | null;
+  /** Who did: a display name, or the user id without a membership. */
+  handledBy: string | null;
 };
+/**
+ * How an incident stands (#151): open until an administrator acknowledges it
+ * (the problem is known and being worked on) or resolves it (the record was
+ * restored). A resolved incident that a member meets again reopens.
+ */
+export const incidentHandlings = ["open", "acknowledged", "resolved"] as const;
+export type IncidentHandling = (typeof incidentHandlings)[number];
 /** How many incidents the practice view lists, most recently seen first. */
 export const integrityIncidentLimit = 50;
 /**
  * How long an incident counts as recent: the navigation badge counts only
- * incidents a member met in this window, so it clears once a restored record
- * stops failing. Incidents cannot be acknowledged yet (#121 follow-up).
+ * open incidents a member met in this window, so it clears once a restored
+ * record stops failing or an administrator acknowledges or resolves it.
  */
 export const integrityIncidentRecentDays = 7;
 /**
+ * Repeats of one incident are recorded at most once in this many seconds
+ * (#151): a damaged record that every page load meets does not write to D1
+ * on every request. Occurrences therefore count the recorded repeats. A
+ * resolved incident is reopened at once.
+ */
+export const integrityIncidentThrottleSeconds = 60;
+/**
  * The practice's recorded integrity incidents for its administrators: how
- * many were ever recorded, how many were last seen in the past
+ * many were ever recorded, how many are open (neither acknowledged nor
+ * resolved), how many of those were last seen in the past
  * {@link integrityIncidentRecentDays} days, and the most recently seen ones,
- * newest first. The rows are history: a record restored since stays listed.
+ * newest first. The rows are history: a resolved incident stays listed.
  */
 export async function integrityIncidents(ctx: Context) {
   const since = new Date(
@@ -257,13 +320,13 @@ export async function integrityIncidents(ctx: Context) {
   const [count, rows] = await Promise.all([
     db()
       .prepare(
-        "SELECT COUNT(*) AS n,COALESCE(SUM(last_seen>=?),0) AS recent FROM integrity_incidents WHERE tenant_id=?",
+        "SELECT COUNT(*) AS n,COALESCE(SUM(handling='open'),0) AS open,COALESCE(SUM(handling='open' AND last_seen>=?),0) AS recent FROM integrity_incidents WHERE tenant_id=?",
       )
       .bind(since, ctx.tenantId)
-      .first<{ n: number; recent: number }>(),
+      .first<{ n: number; open: number; recent: number }>(),
     db()
       .prepare(
-        "SELECT i.engagement_id,e.title,i.object_key,i.kind,i.status,i.first_seen,i.last_seen,i.occurrences,COALESCE(m.display_name,i.last_user_id) AS last_seen_by FROM integrity_incidents i LEFT JOIN engagements e ON e.tenant_id=i.tenant_id AND e.id=i.engagement_id LEFT JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.last_user_id WHERE i.tenant_id=? ORDER BY i.last_seen DESC,i.engagement_id,i.object_key,i.kind LIMIT ?",
+        "SELECT i.engagement_id,e.title,i.object_key,i.kind,i.status,i.first_seen,i.last_seen,i.occurrences,COALESCE(m.display_name,i.last_user_id) AS last_seen_by,i.handling,i.handled_at,CASE WHEN i.handled_by IS NULL THEN NULL ELSE COALESCE(h.display_name,i.handled_by) END AS handled_by FROM integrity_incidents i LEFT JOIN engagements e ON e.tenant_id=i.tenant_id AND e.id=i.engagement_id LEFT JOIN memberships m ON m.tenant_id=i.tenant_id AND m.user_id=i.last_user_id LEFT JOIN memberships h ON h.tenant_id=i.tenant_id AND h.user_id=i.handled_by WHERE i.tenant_id=? ORDER BY i.last_seen DESC,i.engagement_id,i.object_key,i.kind LIMIT ?",
       )
       .bind(ctx.tenantId, integrityIncidentLimit)
       .all<{
@@ -276,10 +339,14 @@ export async function integrityIncidents(ctx: Context) {
         last_seen: string;
         occurrences: number;
         last_seen_by: string;
+        handling: IncidentHandling;
+        handled_at: string | null;
+        handled_by: string | null;
       }>(),
   ]);
   return {
     count: count?.n ?? 0,
+    open: count?.open ?? 0,
     recent: count?.recent ?? 0,
     incidents: rows.results.map((r): IntegrityIncident => ({
       engagementId: r.engagement_id,
@@ -291,6 +358,9 @@ export async function integrityIncidents(ctx: Context) {
       lastSeen: r.last_seen,
       occurrences: r.occurrences,
       lastSeenBy: r.last_seen_by,
+      handling: r.handling,
+      handledAt: r.handled_at,
+      handledBy: r.handled_by,
     })),
   };
 }
@@ -298,8 +368,11 @@ export type IntegrityIncidents = Awaited<ReturnType<typeof integrityIncidents>>;
 
 /**
  * Records that an engagement failed to load intact: one row per engagement,
- * stored object and kind, counting repeats, plus a log line. Best effort: a
- * failure to record never fails the request that found the problem.
+ * stored object and kind, counting repeats at most once per
+ * {@link integrityIncidentThrottleSeconds} (a repeat inside that window
+ * changes no row), plus a log line on every occurrence. A resolved incident
+ * met again is reopened at once. Best effort: a failure to record never
+ * fails the request that found the problem.
  */
 export async function recordIntegrityIncident(
   ctx: Context,
@@ -315,10 +388,14 @@ export async function recordIntegrityIncident(
     }),
   );
   try {
-    const at = now();
+    const at = now(),
+      throttled = new Date(
+        Date.parse(at) - integrityIncidentThrottleSeconds * 1000,
+      ).toISOString();
+    // SET reads the row as it was, so a resolved incident reopens.
     await db()
       .prepare(
-        "INSERT INTO integrity_incidents(tenant_id,engagement_id,object_key,kind,status,first_seen,last_seen,last_user_id,occurrences) VALUES(?,?,?,?,?,?,?,?,1) ON CONFLICT(tenant_id,engagement_id,object_key,kind) DO UPDATE SET last_seen=excluded.last_seen,last_user_id=excluded.last_user_id,status=excluded.status,occurrences=occurrences+1",
+        "INSERT INTO integrity_incidents(tenant_id,engagement_id,object_key,kind,status,first_seen,last_seen,last_user_id,occurrences) VALUES(?,?,?,?,?,?,?,?,1) ON CONFLICT(tenant_id,engagement_id,object_key,kind) DO UPDATE SET last_seen=excluded.last_seen,last_user_id=excluded.last_user_id,status=excluded.status,occurrences=occurrences+1,handling=CASE WHEN handling='resolved' THEN 'open' ELSE handling END,handled_at=CASE WHEN handling='resolved' THEN NULL ELSE handled_at END,handled_by=CASE WHEN handling='resolved' THEN NULL ELSE handled_by END WHERE integrity_incidents.last_seen<=? OR integrity_incidents.handling='resolved'",
       )
       .bind(
         ctx.tenantId,
@@ -329,6 +406,7 @@ export async function recordIntegrityIncident(
         at,
         at,
         ctx.user.userId,
+        throttled,
       )
       .run();
   } catch {

@@ -545,6 +545,21 @@ export async function jobTelemetry(ctx: Context, engagementId: string) {
     stalled: row?.stalled ?? 0,
   };
 }
+/**
+ * How many of the engagement's external jobs are still queued or running,
+ * over every job (#151): the pending-work checks before queueing, final
+ * capture and release count here, not in the 100 most recent jobs() lists,
+ * so an older job that is still active is never missed.
+ */
+export async function pendingJobCount(ctx: Context, engagementId: string) {
+  const row = await db()
+    .prepare(
+      "SELECT COUNT(*) AS n FROM execution_jobs WHERE tenant_id=? AND engagement_id=? AND state IN ('queued','running')",
+    )
+    .bind(ctx.tenantId, engagementId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
 /** The ids of the external jobs already compiled into a draft paper. */
 export async function compiledJobIds(ctx: Context, engagementId: string) {
   return (

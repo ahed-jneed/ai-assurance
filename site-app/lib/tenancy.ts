@@ -65,6 +65,12 @@ async function recordEmail(
     .bind(email, tenantId, user.userId, email)
     .run();
 }
+/**
+ * Why a member of an archived practice is refused (#151): the platform
+ * operator archived it, and only its issued records remain.
+ */
+export const archivedMessage =
+  "This practice was archived by the platform operator after a long period without activity. Its released reports and signed dossiers are retained; contact the platform operator to verify them.";
 export async function context(tenantId?: string): Promise<Context> {
   const user = currentUser();
   if (!user) throw new ApiError(401, "Sign in to access the audit workspace");
@@ -82,6 +88,15 @@ export async function context(tenantId?: string): Promise<Context> {
         .bind(user.userId)
         .first<{ tenant_id: string }>();
       if (existing) tenantId = existing.tenant_id;
+      else if (
+        await db()
+          .prepare(
+            "SELECT 1 FROM memberships m JOIN tenants t ON t.id=m.tenant_id WHERE m.user_id=? AND m.status='archived' AND t.archived_at IS NOT NULL LIMIT 1",
+          )
+          .bind(user.userId)
+          .first()
+      )
+        throw new ApiError(403, archivedMessage);
       else if (
         await db()
           .prepare("SELECT tenant_id FROM memberships WHERE user_id=? LIMIT 1")
@@ -102,6 +117,16 @@ export async function context(tenantId?: string): Promise<Context> {
       else tenantId = await provisionPractice(user);
     }
     member = await memberRow(tenantId, user.userId);
+    if (
+      !member &&
+      (await db()
+        .prepare(
+          "SELECT 1 FROM memberships m JOIN tenants t ON t.id=m.tenant_id WHERE m.tenant_id=? AND m.user_id=? AND m.status='archived' AND t.archived_at IS NOT NULL",
+        )
+        .bind(tenantId, user.userId)
+        .first())
+    )
+      throw new ApiError(403, archivedMessage);
   }
   if (!tenantId || !member || !roles.includes(member.role))
     throw new ApiError(403, "You do not have access to this practice");
