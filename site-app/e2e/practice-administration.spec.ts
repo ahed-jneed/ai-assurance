@@ -106,6 +106,9 @@ test("the administrator manages invitations, administrators and the signing key"
 
   await row.getByRole("button", { name: "Cancel" }).click();
   const cancel = page.getByRole("dialog", { name: "Cancel invitation" });
+  await expectAccessible(page, "Cancel invitation", {
+    include: "[role=dialog]",
+  });
   await runCommand(
     page,
     "cancelInvitation",
@@ -138,6 +141,9 @@ test("the administrator manages invitations, administrators and the signing key"
   await member.getByRole("button", { name: "Remove administration" }).click();
   const revoke = page.getByRole("dialog", {
     name: "Remove practice administration",
+  });
+  await expectAccessible(page, "Remove administration", {
+    include: "[role=dialog]",
   });
   await runCommand(
     page,

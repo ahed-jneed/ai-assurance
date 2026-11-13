@@ -146,6 +146,7 @@ test("the Lead Auditor seals the dossiers of a released report", async ({
   const internalDossier = await download(lead, e, report.id, {
     audience: "internal",
   });
+  expect(internalDossier.manifest.audience).toBe("internal");
   expect(internalDossier.signature.keyId).toBe(internal.keyId);
   expect(internalDossier.manifest.files).toHaveLength(internal.files);
 
@@ -158,6 +159,7 @@ test("the Lead Auditor seals the dossiers of a released report", async ({
   const clientDossier = await download(viewer, e, report.id, {
     audience: "internal",
   });
+  expect(clientDossier.manifest.audience).toBe("client");
   expect(clientDossier.signature.keyId).toBe(client.keyId);
   expect(clientDossier.manifest.files).toHaveLength(client.files);
 
@@ -180,6 +182,7 @@ test("the Lead Auditor seals the dossiers of a released report", async ({
     audience: "internal",
     scope: scoped.scopeSha256!,
   });
+  expect(scopedDossier.manifest.audience).toBe("internal");
   expect(scopedDossier.manifest.scope?.procedureIds).toEqual([e.procedureId]);
   expect(scopedDossier.signature.keyId).toBe(scoped.keyId);
 });

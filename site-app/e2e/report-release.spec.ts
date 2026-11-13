@@ -25,7 +25,10 @@ const reportPath = (e: Engagement, r: Report) =>
 /** The Lead releases an approved report from its record sheet. */
 async function releaseInUi(page: Page, e: Engagement, r: Report) {
   await page.goto(reportPath(e, r));
-  await page.getByRole("button", { name: "Release to client" }).click();
+  const open = page.getByRole("button", { name: "Release to client" });
+  await expect(open).toBeEnabled();
+  await expectAccessible(page, "Approved report before release");
+  await open.click();
   const release = page.getByRole("dialog", {
     name: "Authorize client release",
   });

@@ -35,6 +35,7 @@ test("a decision on a changed engagement is refused until the page reloads", asy
   await page.getByRole("tab", { name: "Engagement brief" }).click();
   const approve = page.getByRole("button", { name: "Approve scope" });
   await expect(approve).toBeEnabled();
+  await expectAccessible(page, "Submitted brief for the Reviewer");
 
   // The Auditor changes the engagement after the Reviewer opened it.
   await auditor.uploadEvidence(
@@ -70,7 +71,10 @@ test("a decision on a changed engagement is refused until the page reloads", asy
   // After a reload the same decision is taken on the current version.
   await page.reload();
   await page.getByRole("tab", { name: "Engagement brief" }).click();
-  await page.getByRole("button", { name: "Approve scope" }).click();
+  const reloaded = page.getByRole("button", { name: "Approve scope" });
+  await expect(reloaded).toBeEnabled();
+  await expectAccessible(page, "Brief after the reload");
+  await reloaded.click();
   const current = page.getByRole("dialog", {
     name: `Approve scope revision ${brief.revision}`,
   });
