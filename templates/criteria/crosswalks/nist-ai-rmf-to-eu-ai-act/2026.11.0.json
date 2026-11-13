@@ -253,7 +253,7 @@
       "relationship": "intersects_with",
       "rationale": "semantic",
       "confidence": "medium",
-      "justification": "Demonstrating performance before deployment overlaps with the testing duty of Art. 9(6) and (8), which adds testing against prior defined metrics and, where appropriate, in real-world conditions."
+      "justification": "Demonstrating performance before deployment overlaps with the testing duty of Art. 9(6) and (8), which adds testing against prior defined metrics and probabilistic thresholds."
     },
     {
       "id": "X22",
