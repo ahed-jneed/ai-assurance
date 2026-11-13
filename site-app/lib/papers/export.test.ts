@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import type { Engagement, Report } from "../domain";
+import { releaseChecklist, type Engagement, type Report } from "../domain";
 import {
   approvedWorkflow,
   at,
@@ -195,6 +195,44 @@ describe("internal paper exports", () => {
         (d) => d.catalogId,
       ),
     ).toEqual(["MEM-AC-01"]);
+  });
+
+  it("carries the approver's completion checklist answers (#94)", async () => {
+    const { e, r } = await releasedReport();
+    const checklist = {
+      items: releaseChecklist.map((i) => ({
+        id: i.id,
+        answer:
+          i.id === "representations"
+            ? ("not_applicable" as const)
+            : ("confirmed" as const),
+      })),
+      note: "The engaging party is the responsible party.",
+    };
+    r.release!.completion = { ...completion, checklist };
+    const memo = (await completionMemo(e, r, "tenant-1"))!;
+    expect(memo.records!.releaseCompletion).toEqual({
+      reportId: "REPORT-1",
+      ...completion,
+      checklist,
+    });
+    expect(memo.narrative.results).toContain(
+      "Completion checklist: Written representations from the responsible party were obtained: not applicable",
+    );
+    expect(memo.narrative.results).toContain(
+      "Completion checklist: Basis for not-applicable answers: The engaging party is the responsible party.",
+    );
+    const result = validate([memo]);
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
+  it("says when the approval recorded no completion checklist", async () => {
+    const { e, r } = await releasedReport();
+    const memo = (await completionMemo(e, r, "tenant-1"))!;
+    expect(memo.narrative.results).toContain(
+      "Completion checklist: not recorded with this approval",
+    );
   });
 
   it("states a missing quality review sign-off instead of inventing one", async () => {

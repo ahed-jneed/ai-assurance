@@ -28,7 +28,12 @@ export type {
 } from "./domain/classification";
 export { classify } from "./domain/classification";
 export { risk } from "./domain/risk";
-export type { AuditGate, FinalReport, GateFeatures } from "./domain/gates";
+export type {
+  AuditGate,
+  FinalReport,
+  GateFeatures,
+  ReleaseChecklistRecord,
+} from "./domain/gates";
 export {
   completionGates,
   finalReportGates,
@@ -36,7 +41,10 @@ export {
   isReleaseTimeRecord,
   paperCurrent,
   paperRequired,
+  releaseChecklist,
+  releaseChecklistLines,
   releaseRequirements,
+  releaseTimeAssignmentNote,
   releaseTimeMessage,
   releaseTimeTemplates,
   reportBlockers,

@@ -3,8 +3,9 @@ import { useState, useEffect } from "react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import { assuranceRecords } from "@/lib/assurance-store-client";
 import { CheckCircle2, Circle } from "lucide-react";
+import { procedureReadiness } from "@/lib/procedure-readiness";
 import { procedureWork } from "@/lib/work-items";
-import { currentExecution, planPinsCurrent } from "@/lib/workflow-state";
+import { planPinsCurrent } from "@/lib/workflow-state";
 import type { Engagement } from "@/lib/domain";
 import type { Procedure } from "@/lib/workflow-types";
 export function ProcedureContext({
@@ -43,44 +44,40 @@ export function ProcedureContext({
         r.procedureBinding?.procedureId === p.id,
     ),
     findings = e.findings.filter((f) => f.support?.procedureId === p.id);
-  const checks = [
-    [
-      "Scope & program approved",
-      e.workflow?.brief?.status === "approved" &&
-        e.workflow.program.status === "approved",
-    ],
-    ["Preparer & reviewer assigned", !!p.ownerId && !!p.reviewerId],
-    ["Current execution recorded", !!p.execution && currentExecution(e, p)],
-    ["Evidence requests resolved", !x.outstanding.length],
-    [
-      "Supporting files accepted",
-      !!p.execution?.evidenceIds.length &&
-        p.execution.evidenceIds.every((id) =>
-          e.artifacts.some((a) => a.id === id && a.status === "accepted"),
-        ),
-    ],
-    ["Review questions resolved", !x.paper?.comments.some((c) => !c.resolved)],
-    ["Evidence assessment recorded", !!p.execution?.assessment],
-    ["Independent review completed", p.state === "reviewed" && !!p.review],
-    ["Working paper signed", x.paper?.status === "signed"],
-  ] as const;
+  const readiness = procedureReadiness(e, p);
   return (
     <div className="procedure-work-context">
-      <details open>
-        <summary>Procedure readiness</summary>
-        <ul>
-          {checks.map(([text, done]) => (
-            <li key={text}>
-              {done ? (
+      {readiness.kind === "checks" ? (
+        <details open>
+          <summary>Procedure readiness</summary>
+          <ul>
+            {readiness.checks.map(([text, done]) => (
+              <li key={text}>
+                {done ? (
+                  <CheckCircle2 size={16} color="#477a59" />
+                ) : (
+                  <Circle size={16} color="#9298a1" />
+                )}
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : (
+        <details open>
+          <summary>Release record</summary>
+          <ul>
+            <li>
+              {readiness.recorded ? (
                 <CheckCircle2 size={16} color="#477a59" />
               ) : (
                 <Circle size={16} color="#9298a1" />
               )}
-              <span>{text}</span>
+              <span>{readiness.text}</span>
             </li>
-          ))}
-        </ul>
-      </details>
+          </ul>
+        </details>
+      )}
       <details>
         <summary>
           Connected evidence & decisions (

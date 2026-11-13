@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { legacyPackageMessage } from "../client-projection";
-import type { Report } from "../domain";
+import { releaseChecklist, type Report } from "../domain";
 import { seedWorkflow } from "../workflow-seed";
 import {
   approvedWorkflow,
@@ -58,6 +59,30 @@ function setup(...ids: string[]) {
 }
 const reportOf = (id: string) =>
   engagementWith.reports.find((r) => r.id === id)!;
+/** Every completion checklist item confirmed, as the approval form sends it. */
+const confirmed = Object.fromEntries(
+  releaseChecklist.map((i) => [i.id, "confirmed"]),
+);
+/** R1 captured with a current client snapshot, not yet approved. */
+function internalReport() {
+  const r = reportOf("R1");
+  r.release = { state: "internal", history: [] };
+  r.snapshot = { opinion: "Adverse conclusion", workflow: approvedWorkflow() };
+  return r;
+}
+const approve = (data: Record<string, unknown>) =>
+  command(
+    engagementWith,
+    "approveReportPackage",
+    {
+      reportId: "R1",
+      internalHash: "R1-internal",
+      clientHash: "R1-client",
+      reason: "Both packages reviewed",
+      ...data,
+    },
+    "reviewer",
+  );
 
 describe("report release", () => {
   it("records the release-time completion records against both hashes", async () => {
@@ -167,6 +192,7 @@ describe("report release", () => {
           internalHash: "R1-internal",
           clientHash: "R1-client",
           reason: "Both packages reviewed",
+          checklist: confirmed,
         },
         "reviewer",
       ),
@@ -190,5 +216,53 @@ describe("report release", () => {
       { ...rp01, selected: true, applicability: "applicable" },
     ];
     await expectFailure(release("R2"), 409);
+  });
+});
+
+describe("the MEM-SO-01 completion checklist (#94)", () => {
+  it("records the approver's answers with the approval and the release", async () => {
+    setup("R1");
+    internalReport();
+    await approve({
+      checklist: { ...confirmed, representations: "not_applicable" },
+      checklistNote: "The engaging party is the responsible party.",
+    });
+    const checklist = {
+      items: releaseChecklist.map((i) => ({
+        id: i.id,
+        answer: i.id === "representations" ? "not_applicable" : "confirmed",
+      })),
+      note: "The engaging party is the responsible party.",
+    };
+    expect(reportOf("R1").release!.approval!.checklist).toEqual(checklist);
+    await release("R1");
+    expect(reportOf("R1").release!.completion!.checklist).toEqual(checklist);
+  });
+
+  it("needs every item answered, and a basis for not-applicable answers", async () => {
+    setup("R1");
+    const r = internalReport();
+    await expect(approve({})).rejects.toBeInstanceOf(ZodError);
+    const { independence: _, ...partial } = confirmed;
+    await expect(approve({ checklist: partial })).rejects.toBeInstanceOf(
+      ZodError,
+    );
+    await expect(
+      approve({ checklist: { ...confirmed, independence: "no" } }),
+    ).rejects.toBeInstanceOf(ZodError);
+    await expectFailure(
+      approve({ checklist: { ...confirmed, distribution: "not_applicable" } }),
+      400,
+      "State why each completion checklist item marked not applicable does not apply",
+    );
+    expect(r.release!.state).toBe("internal");
+    await approve({ checklist: confirmed });
+    expect(r.release!.approval!.checklist!.note).toBe("");
+  });
+
+  it("releases an approval recorded before the checklist without one", async () => {
+    setup("R1");
+    await release("R1");
+    expect(reportOf("R1").release!.completion).not.toHaveProperty("checklist");
   });
 });
