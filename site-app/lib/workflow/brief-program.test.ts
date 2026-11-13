@@ -540,94 +540,109 @@ describe("procedure planning", () => {
     expect(workflowOf(e)).toEqual(saved);
   });
 
-  it("refuses a plan read before another change to its assignment, instead of reverting it", async () => {
-    const resample = { sampling: "Stratified sample of 40" };
-    for (const reassignment of [
-      { ownerId: "second-auditor" },
-      { reviewerId: "second-reviewer" },
-      { dueDate: "2026-12-15" },
-    ]) {
-      const e = structuredEngagement();
-      await approveProgram(e);
-      const p = procedureOf(e, procedureId),
-        revision = p.revision;
-      // A Lead opens the plan to change the sample while another Lead
-      // reassigns the work, which leaves the plan revision as it was.
-      const opened = planSave(e, resample);
-      await command(
-        e,
-        "bulkPlanProcedures",
-        { procedureIds: [procedureId], patch: reassignment },
-        "second-lead",
-      );
-      expect(p).toMatchObject({
-        ...reassignment,
-        revision,
-        assignmentRevision: opened.assignmentRevision + 1,
-      });
-      const reassigned = structuredClone(workflowOf(e));
-      await expectFailure(
-        command(e, "saveProcedurePlan", opened, "lead"),
-        409,
-        "The preparer, reviewer or due date of " +
-          p.title +
-          " changed after this plan was opened. Reload and apply your changes again.",
-      );
-      expect(workflowOf(e)).toEqual(reassigned);
-      // Read again, the plan keeps the other Lead's change.
-      await command(
-        e,
-        "saveProcedurePlan",
-        planSave(e, { ...resample, ...reassignment }),
-        "lead",
-      );
-      expect(p).toMatchObject({ ...resample, ...reassignment });
-      expect(workflowOf(e).program.status).toBe("draft");
-    }
-  });
+  // The next two tests run a workflow through many commands: three approved
+  // programs, or 400 draft saves. They take 0.05 to 0.1 s on an idle
+  // machine but passed the default 5 s timeout with three suites running at
+  // once (#174). They check results, not speed, so the timeout only ends a
+  // run that never finishes.
+  const heavy = 60_000;
 
-  it("lets 200 draft saves amend the program and its plans without using their history", async () => {
-    const e = structuredEngagement();
-    await approveScope(e);
-    await planProgram(e);
-    for (let i = 0; i < 200; i++)
-      await save(e, {
-        sampling: "Sample design " + i,
-        dueDate: i % 2 ? "2026-11-30" : "2026-12-15",
-      });
-    const p = procedureOf(e, procedureId),
-      program = workflowOf(e).program;
-    expect(program).toMatchObject({ revision: 1, status: "draft" });
-    expect(program.history).toEqual([]);
-    expect(p.history).toHaveLength(1);
-    await command(e, "submitProgram", {}, "auditor");
-    await command(
-      e,
-      "returnProgram",
-      { reason: "Size the sample" },
-      "reviewer",
-    );
-    for (let i = 0; i < 200; i++)
-      await save(e, { sampling: "Sample of " + (40 + i) });
-    await command(e, "submitProgram", {}, "auditor");
-    await command(
-      e,
-      "approveProgram",
-      { revision: 2, reason: "Program agreed" },
-      "reviewer",
-    );
-    expect(program.history.map((h) => h.revision + " " + h.status)).toEqual([
-      "1 submitted",
-      "1 returned",
-      "2 submitted",
-      "2 approved",
-    ]);
-    // The seed plan, then the plan as returned.
-    expect(p.history.map((h) => h.plan.sampling)).toEqual([
-      "",
-      "Sample design 199",
-    ]);
-  });
+  it(
+    "refuses a plan read before another change to its assignment, instead of reverting it",
+    async () => {
+      const resample = { sampling: "Stratified sample of 40" };
+      for (const reassignment of [
+        { ownerId: "second-auditor" },
+        { reviewerId: "second-reviewer" },
+        { dueDate: "2026-12-15" },
+      ]) {
+        const e = structuredEngagement();
+        await approveProgram(e);
+        const p = procedureOf(e, procedureId),
+          revision = p.revision;
+        // A Lead opens the plan to change the sample while another Lead
+        // reassigns the work, which leaves the plan revision as it was.
+        const opened = planSave(e, resample);
+        await command(
+          e,
+          "bulkPlanProcedures",
+          { procedureIds: [procedureId], patch: reassignment },
+          "second-lead",
+        );
+        expect(p).toMatchObject({
+          ...reassignment,
+          revision,
+          assignmentRevision: opened.assignmentRevision + 1,
+        });
+        const reassigned = structuredClone(workflowOf(e));
+        await expectFailure(
+          command(e, "saveProcedurePlan", opened, "lead"),
+          409,
+          "The preparer, reviewer or due date of " +
+            p.title +
+            " changed after this plan was opened. Reload and apply your changes again.",
+        );
+        expect(workflowOf(e)).toEqual(reassigned);
+        // Read again, the plan keeps the other Lead's change.
+        await command(
+          e,
+          "saveProcedurePlan",
+          planSave(e, { ...resample, ...reassignment }),
+          "lead",
+        );
+        expect(p).toMatchObject({ ...resample, ...reassignment });
+        expect(workflowOf(e).program.status).toBe("draft");
+      }
+    },
+    heavy,
+  );
+
+  it(
+    "lets 200 draft saves amend the program and its plans without using their history",
+    async () => {
+      const e = structuredEngagement();
+      await approveScope(e);
+      await planProgram(e);
+      for (let i = 0; i < 200; i++)
+        await save(e, {
+          sampling: "Sample design " + i,
+          dueDate: i % 2 ? "2026-11-30" : "2026-12-15",
+        });
+      const p = procedureOf(e, procedureId),
+        program = workflowOf(e).program;
+      expect(program).toMatchObject({ revision: 1, status: "draft" });
+      expect(program.history).toEqual([]);
+      expect(p.history).toHaveLength(1);
+      await command(e, "submitProgram", {}, "auditor");
+      await command(
+        e,
+        "returnProgram",
+        { reason: "Size the sample" },
+        "reviewer",
+      );
+      for (let i = 0; i < 200; i++)
+        await save(e, { sampling: "Sample of " + (40 + i) });
+      await command(e, "submitProgram", {}, "auditor");
+      await command(
+        e,
+        "approveProgram",
+        { revision: 2, reason: "Program agreed" },
+        "reviewer",
+      );
+      expect(program.history.map((h) => h.revision + " " + h.status)).toEqual([
+        "1 submitted",
+        "1 returned",
+        "2 submitted",
+        "2 approved",
+      ]);
+      // The seed plan, then the plan as returned.
+      expect(p.history.map((h) => h.plan.sampling)).toEqual([
+        "",
+        "Sample design 199",
+      ]);
+    },
+    heavy,
+  );
 
   it("is recorded by an Auditor or Lead for a known procedure", async () => {
     const e = structuredEngagement();

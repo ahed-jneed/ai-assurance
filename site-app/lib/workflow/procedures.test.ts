@@ -747,7 +747,11 @@ describe("procedure review", () => {
       "lead",
     );
     await expectFailure(review(changed), 409, notReady);
-  });
+    // Four engagements taken to submitted work: about 0.1 s on an idle
+    // machine, but it passed the default 5 s timeout with three suites
+    // running at once (#174). The timeout only ends a run that never
+    // finishes.
+  }, 60_000);
 });
 
 describe("returning submitted work", () => {
