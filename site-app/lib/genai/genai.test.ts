@@ -12,6 +12,10 @@ import {
   registry,
   selectablePacks,
 } from "../criteria/registry";
+import { criteriaRegistry, pinned, resolveNew } from "../criteria/pin";
+import { coverageFor, offeredViews } from "../criteria/views";
+import type { Engagement } from "../domain";
+import { freshEngagement } from "../factories";
 import { sha256 } from "../ids";
 import {
   readGenaiEnvelope,
@@ -418,7 +422,7 @@ describe("the genai-evaluation pack", () => {
   it("is offered at engagement creation with the OWASP lists and MITRE ATLAS as supporting criteria", () => {
     expect(
       selectablePacks(registry()).find((p) => p.id === "genai-evaluation"),
-    ).toMatchObject({ version: "2026.11.1", workingPapers: 7, memos: 1 });
+    ).toMatchObject({ version: "2026.11.2", workingPapers: 7, memos: 1 });
     expect(
       packDocument(registry(), "genai-evaluation", "2026.11.0")!.criteria.map(
         (s) => [s.framework, s.role],
@@ -544,6 +548,214 @@ describe("the genai-evaluation pack's crosswalk links (#145)", () => {
     // The test-plan and client-policy objectives map to no technique.
     for (const id of ["CO-GA-PLAN", "CO-GA-POLICY-VIOLATION"])
       expect(links.some((l) => l.objective === id)).toBe(false);
+  });
+});
+
+describe("the genai-evaluation pack's NIST AI 600-1 links (#161)", () => {
+  const r = registry();
+  const before = packDocument(r, "genai-evaluation", "2026.11.1")!,
+    after = packDocument(r, "genai-evaluation", "2026.11.2")!;
+  const GAI = "nist-ai-600-1@2024-07";
+  const links = after.controlObjectives.flatMap((o) =>
+    o.addresses
+      .filter((l) => l.requirement.startsWith("nist-ai-600-1:"))
+      .map((l) => ({ objective: o.id, ...l, risk: l.requirement.slice(14) })),
+  );
+  const risksOf = (objective: string) =>
+    links.filter((l) => l.objective === objective).map((l) => l.risk);
+
+  it("changes nothing of 2026.11.1 but adds the NIST links, their criteria set and notes", () => {
+    expect(after.criteria.map((s) => [s.framework, s.role])).toEqual([
+      ["eu-ai-act", "primary"],
+      ["owasp-llm-top-10", "supporting"],
+      ["owasp-agentic-top-10", "supporting"],
+      ["mitre-atlas", "supporting"],
+      ["nist-ai-600-1", "supporting"],
+    ]);
+    const strip = (p: typeof before) => ({
+      ...p,
+      version: undefined,
+      methodologyVersion: undefined,
+      summary: undefined,
+      notes: undefined,
+      criteria: p.criteria.filter((s) => s.framework !== "nist-ai-600-1"),
+      controlObjectives: p.controlObjectives.map((o) => ({
+        ...o,
+        addresses: o.addresses.filter(
+          (l) => !l.requirement.startsWith("nist-ai-600-1:"),
+        ),
+      })),
+    });
+    expect(strip(after)).toEqual(strip(before));
+    // The released 2026.11.1 has no NIST link (rule 1: it never changes).
+    expect(
+      before.controlObjectives.some((o) =>
+        o.addresses.some((l) => l.requirement.startsWith("nist-ai-600-1:")),
+      ),
+    ).toBe(false);
+  });
+
+  it("links NIST AI 600-1 conservatively: intersects_with, justified, to risks that exist", () => {
+    const set = after.criteria.find((s) => s.framework === "nist-ai-600-1")!;
+    const gai = frameworkDocument(
+      r,
+      "nist-ai-600-1",
+      set.edition,
+      set.version,
+    )!;
+    expect([gai.edition, gai.version, gai.licence.status]).toEqual([
+      "2024-07",
+      "2026.11.0",
+      "confirmed",
+    ]);
+    const risks = new Map(gai.requirements.map((n) => [n.id, n]));
+    expect(links.length).toBeGreaterThan(0);
+    for (const l of links) {
+      expect(l.relationship).toBe("intersects_with");
+      expect(l.rationale).toBe("semantic");
+      expect(l.origin).toBe("authored");
+      expect(l.justification).toContain("not an official crosswalk");
+      expect(l.justification).toContain(
+        "does not establish that it is identified and managed",
+      );
+      // A risk, never the section group: no link claims all twelve.
+      expect(risks.get(l.risk)?.type, l.requirement).toBe("requirement");
+    }
+    // The objectives and the risks they bear on directly.
+    expect(
+      Object.fromEntries(
+        after.controlObjectives.map((o) => [o.id, risksOf(o.id)]),
+      ),
+    ).toEqual({
+      "CO-GA-PLAN": [],
+      "CO-GA-PROMPT-INJECTION-DIRECT": ["2.9"],
+      "CO-GA-PROMPT-INJECTION-INDIRECT": ["2.9"],
+      "CO-GA-JAILBREAK": ["2.9"],
+      "CO-GA-GOAL-HIJACK": ["2.9"],
+      "CO-GA-HIDDEN-CONTEXT-EXPOSURE": ["2.9"],
+      "CO-GA-SENSITIVE-INFORMATION-DISCLOSURE": ["2.4"],
+      "CO-GA-VECTOR-EMBEDDING-WEAKNESS": ["2.4", "2.9"],
+      "CO-GA-EXCESSIVE-AGENCY": ["2.9"],
+      "CO-GA-PRIVILEGE-ABUSE": ["2.9"],
+      "CO-GA-UNEXPECTED-CODE-EXECUTION": ["2.9"],
+      "CO-GA-IMPROPER-OUTPUT-HANDLING": ["2.9"],
+      "CO-GA-MEMORY-CONTEXT-POISONING": ["2.9"],
+      "CO-GA-DATA-MODEL-POISONING": ["2.9", "2.12"],
+      "CO-GA-SUPPLY-CHAIN": ["2.12"],
+      "CO-GA-UNBOUNDED-CONSUMPTION": [],
+      "CO-GA-INTER-AGENT-COMMUNICATION": ["2.9"],
+      "CO-GA-CASCADING-FAILURE": [],
+      "CO-GA-HUMAN-TRUST-EXPLOITATION": ["2.7"],
+      "CO-GA-ROGUE-AGENT": [],
+      "CO-GA-MISINFORMATION": ["2.2"],
+      "CO-GA-CAPABILITY-ACCURACY": [],
+      "CO-GA-HARMFUL-CONTENT": ["2.3", "2.11"],
+      "CO-GA-BIAS-FAIRNESS": ["2.6"],
+      "CO-GA-AI-INTERACTION-DISCLOSURE": ["2.7"],
+      "CO-GA-SYNTHETIC-CONTENT-MARKING": ["2.8"],
+      "CO-GA-POLICY-VIOLATION": [],
+    });
+    // No test or assessed evidence bears on these risks: they stay unmapped.
+    const linked = new Set(links.map((l) => l.risk));
+    expect(
+      gai.requirements
+        .filter((n) => n.type === "requirement" && !linked.has(n.id))
+        .map((n) => n.id),
+    ).toEqual(["2.1", "2.5", "2.10"]);
+    // Each justification says what the link rests on.
+    const evidenceAssessed = [
+      "CO-GA-SUPPLY-CHAIN",
+      "CO-GA-DATA-MODEL-POISONING",
+    ];
+    for (const l of links)
+      if (evidenceAssessed.includes(l.objective)) {
+        expect(l.justification).toContain("No test emulates it");
+        expect(l.justification).not.toContain("success rate");
+      } else {
+        expect(l.justification).toContain("the test produces evidence");
+        expect(l.justification).toMatch(/holds? only for/);
+      }
+  });
+
+  /** A GenAI engagement whose every working paper is signed as supported. */
+  const signedEngagement = (version: string) => {
+    const e = freshEngagement(
+      resolveNew("genai-evaluation", version),
+      "CL-1",
+      "GenAI",
+      "lead",
+    );
+    for (const p of e.papers.filter((p) => p.templateId.startsWith("WP-GA-")))
+      Object.assign(p, {
+        status: "signed",
+        body: { ...p.body, conclusionStatus: "supported" },
+        reviews: [{ userId: "reviewer", revision: 1, at: "2026-11-13" }],
+        signatures: [
+          {
+            userId: "lead",
+            revision: 1,
+            at: "2026-11-13",
+            hash: "0".repeat(64),
+          },
+        ],
+      });
+    return e;
+  };
+  type Cell = { id: string; state: string };
+  const cells = (e: Engagement, key: string) =>
+    coverageFor(criteriaRegistry(), pinned(e), e, [], key)!.cells as Cell[];
+
+  it("shows NIST AI 600-1 as a criteria view of a new engagement, never fully covered", () => {
+    const e = signedEngagement("2026.11.2");
+    expect(e.criteria?.pin).toMatchObject({
+      packId: "genai-evaluation",
+      packVersion: "2026.11.2",
+    });
+    expect(
+      offeredViews(criteriaRegistry(), pinned(e)).find((v) => v.key === GAI),
+    ).toMatchObject({ kind: "criteria", role: "supporting" });
+    const view = coverageFor(criteriaRegistry(), pinned(e), e, [], GAI)!;
+    const state = new Map(
+      (view.cells as Cell[]).map((c) => [c.id, c.state] as const),
+    );
+    // Every paper is supported, yet intersects_with links stay partial.
+    for (const id of [
+      "2.2",
+      "2.3",
+      "2.4",
+      "2.6",
+      "2.7",
+      "2.8",
+      "2.9",
+      "2.11",
+      "2.12",
+    ])
+      expect(state.get(id), id).toBe("partial");
+    for (const id of ["2.1", "2.5", "2.10"])
+      expect(state.get(id), id).toBe("unmapped");
+    expect([...state.values()]).not.toContain("full");
+    expect(view.summary.full).toBe(0);
+    expect(view.groups.every((g) => g.rollup === null)).toBe(true);
+  });
+
+  it("leaves engagements pinned to 2026.11.1 as they were", () => {
+    const e = signedEngagement("2026.11.1");
+    expect(pinned(e).pack.version).toBe("2026.11.1");
+    // NIST AI 600-1 is still reached only through the AI Act crosswalk.
+    expect(
+      offeredViews(criteriaRegistry(), pinned(e)).find((v) => v.key === GAI),
+    ).toMatchObject({ kind: "crosswalk" });
+    expect(cells(e, GAI).some((c) => c.state === "full")).toBe(false);
+    expect(
+      offeredViews(criteriaRegistry(), pinned(e)).map((v) => [v.key, v.kind]),
+    ).toEqual([
+      ["eu-ai-act@02024R1689-20260727", "criteria"],
+      ["owasp-llm-top-10@2026", "criteria"],
+      ["owasp-agentic-top-10@2025-12", "criteria"],
+      ["mitre-atlas@2026.10", "criteria"],
+      ["nist-ai-rmf@1.0", "crosswalk"],
+      [GAI, "crosswalk"],
+    ]);
   });
 });
 
