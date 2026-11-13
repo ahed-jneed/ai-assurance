@@ -1,13 +1,19 @@
 "use client";
-// The main content of the workspace: the open view.
-import { Suspense } from "react";
+// The main content of the workspace: the open view. The view and every
+// panel beside it are memoised (#63, F-48): the shell passes stable props
+// (stable-shape.ts) and the handlers below keep their identity, so typing in
+// one view, a paper or a form re-renders only what reads the change.
+import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
-import { reportTermsFor } from "@/lib/domain/report-model";
+import { reportTermsFor, type ReportTerms } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
-import { Ll144Panel, ll144PanelAccess } from "../../ll144-panel";
-import { WorkingPaperRegister } from "../../paper-register";
+import {
+  Ll144Panel as Ll144PanelView,
+  ll144PanelAccess,
+} from "../../ll144-panel";
+import { WorkingPaperRegister as PaperRegisterView } from "../../paper-register";
 import { packFeatures, type WorkspaceData } from "../../workspace-types";
 import type { LabIntentState } from "../lab-intent";
 import { classificationDefaults } from "../modals/classification";
@@ -28,6 +34,7 @@ import {
   panelFallback,
 } from "../panels";
 import { reportTitle } from "../records";
+import { useStableShape } from "../stable-shape";
 import type {
   OpenModal,
   ViewDetail,
@@ -40,17 +47,29 @@ import {
   type WorkspaceNavigation,
 } from "../use-workspace-navigation";
 import { Empty } from "../workspace-ui";
-import { EvidenceVault } from "./evidence-vault";
-import { Findings } from "./findings";
+import { EvidenceVault as EvidenceVaultView } from "./evidence-vault";
+import { Findings as FindingsView } from "./findings";
 import {
-  Nonconformities,
-  ProgrammePhases,
-  StatementOfApplicability,
+  Nonconformities as NonconformitiesView,
+  ProgrammePhases as ProgrammePhasesView,
+  StatementOfApplicability as SoaView,
 } from "./management-system";
-import { Methodology } from "./methodology";
-import { Overview } from "./overview";
-import { PageHead } from "./page-head";
-import { RegulatoryMapping } from "./regulatory-mapping";
+import { Methodology as MethodologyView } from "./methodology";
+import { Overview as OverviewView } from "./overview";
+import { PageHead as PageHeadView } from "./page-head";
+import { RegulatoryMapping as RegulatoryMappingView } from "./regulatory-mapping";
+
+const Ll144Panel = memo(Ll144PanelView),
+  WorkingPaperRegister = memo(PaperRegisterView),
+  EvidenceVault = memo(EvidenceVaultView),
+  Findings = memo(FindingsView),
+  Nonconformities = memo(NonconformitiesView),
+  ProgrammePhases = memo(ProgrammePhasesView),
+  StatementOfApplicability = memo(SoaView),
+  Methodology = memo(MethodologyView),
+  Overview = memo(OverviewView),
+  PageHead = memo(PageHeadView),
+  RegulatoryMapping = memo(RegulatoryMappingView);
 
 export type Access = {
   role: Role;
@@ -61,7 +80,7 @@ export type Access = {
   viewer: boolean;
 };
 
-export function WorkspaceViews({
+export const WorkspaceViews = memo(function WorkspaceViews({
   data,
   url,
   nav,
@@ -100,7 +119,105 @@ export function WorkspaceViews({
   const { view } = url;
   const { role, writer, reviewer, lead, viewer } = access;
   const e = data.engagement;
-  const copyLink = () => void copyWorkspaceLink();
+  const features = packFeatures(data);
+  const reportTerms = e
+    ? reportTermsFor(
+        url.reportTerms,
+        e.id,
+        features.certificationRecommendation,
+      )
+    : undefined;
+  // Everything the views receive that is built here, with the same identity
+  // while its values are unchanged.
+  const on = useStableShape({
+    copyLink: () => void copyWorkspaceLink(),
+    backToClients: () => nav.navigate("Clients"),
+    reload: () => (e ? load(data.tenantId, e.id) : Promise.resolve(null)),
+    features,
+    reportTerms,
+    savedView: {
+      module: view,
+      search: url.search,
+      filter: url.savedFilter,
+      facet: url.facet,
+      sort: url.sort,
+    },
+    openSavedView: (v: {
+      module: string;
+      search: string;
+      filter: string;
+      facet: string;
+      sort: string;
+    }) =>
+      nav.navigate(
+        v.module,
+        { search: v.search, filter: v.filter, facet: v.facet },
+        () => url.setSort(v.sort),
+      ),
+    settings: () => onModal("rename"),
+    headAction:
+      e && view === "Regulatory mapping" && features.aiActClassification
+        ? {
+            label: "Assess classification",
+            onClick: () => {
+              const form = classificationDefaults(e);
+              onModal("classification", form.choices, form.checks);
+            },
+          }
+        : undefined,
+    clearProcedure: () => url.setProcedureContext(undefined),
+    programLocation: (id: string | undefined, section: string) => {
+      url.setProcedureContext(id);
+      url.setProcedureSection(section);
+    },
+    procedureFinding: (p: Parameters<typeof procedureFindingDefaults>[0]) =>
+      onModal("finding", procedureFindingDefaults(p)),
+    followup: (id: string) => nav.openEngagement(id),
+    advance: (stage: string) => safeAct("setStage", { stage }),
+    newPaper: writer ? () => onModal("paper") : undefined,
+    vaultEditing: {
+      clientPortal: reporters["client-portal"],
+      requestAccess: reporters["request-access"],
+    },
+    openArtifact: (a: { name: string }) => onDetail(a.name, a),
+    openRequest: (r: { subject: string }) => onDetail(r.subject, r),
+    upload: () => onModal("upload", uploadDefaults()),
+    newRequest: () => nav.requestForm("request"),
+    workbenchLocation: (q: Parameters<typeof normalizeWorkbenchQuery>[0]) =>
+      url.setWorkbenchQuery(normalizeWorkbenchQuery(q)),
+    workbenchEvidence: (id: string) => {
+      const artifact = e?.artifacts.find((a) => a.id === id);
+      if (artifact) nav.viewRecord(artifact.name, artifact);
+    },
+    workbenchPaper: (id: string) => {
+      const p = e?.papers.find((p) => p.id === id);
+      if (p) nav.openPaper(p);
+    },
+    labEvidence: () => nav.navigate("Evidence vault"),
+    openFinding: (f: { title: string }) => onDetail(f.title, f),
+    newFinding: () => onModal("finding", newFindingDefaults()),
+    coverage:
+      e && !viewer
+        ? { tenantId: data.tenantId, engagementId: e.id, version: e.version }
+        : undefined,
+    approveClassification: () => safeAct("approveClassification", {}),
+    reportTermsChange: (terms: ReportTerms) =>
+      e && url.setReportTerms({ engagementId: e.id, terms }),
+    paperAudience: (paperId: string, audience: "internal" | "client") =>
+      safeAct("setPaperAudience", { paperId, audience }),
+    createReport: (kind: "draft" | "final") =>
+      e &&
+      reportTerms &&
+      onModal("report", {
+        kind,
+        engagementType: reportTerms.engagementType,
+        assuranceLevel: reportTerms.assuranceLevel ?? "",
+        conclusion: reportTerms.conclusion,
+        addressee: e.workflow?.brief?.audience ?? "",
+      }),
+    openReport: (r: Parameters<typeof reportTitle>[0]) =>
+      onDetail(reportTitle(r), r),
+  });
   if (view === "My work" && !viewer)
     return (
       <Suspense fallback={panelFallback}>
@@ -109,7 +226,7 @@ export function WorkspaceViews({
           onOpen={nav.openWork}
           query={url.inboxQuery}
           onQueryChange={url.setInboxQuery}
-          onCopyLink={copyLink}
+          onCopyLink={on.copyLink}
         />
       </Suspense>
     );
@@ -117,7 +234,7 @@ export function WorkspaceViews({
     return (
       <Suspense fallback={panelFallback}>
         <ManagementViews
-          onBack={() => nav.navigate("Clients")}
+          onBack={on.backToClients}
           view={view}
           data={data}
           clientId={url.clientId}
@@ -131,7 +248,7 @@ export function WorkspaceViews({
         />
       </Suspense>
     );
-  if (!e)
+  if (!e || !on.reportTerms)
     return data.engagementError ? (
       <Empty
         icon={Building2}
@@ -145,13 +262,7 @@ export function WorkspaceViews({
         text="Ask your Lead Auditor to assign client access."
       />
     );
-  const reload = () => load(data.tenantId, e.id);
-  const ll144 = ll144PanelAccess(packFeatures(data).ll144BiasAudit, e);
-  const reportTerms = reportTermsFor(
-    url.reportTerms,
-    e.id,
-    packFeatures(data).certificationRecommendation,
-  );
+  const ll144 = ll144PanelAccess(on.features.ll144BiasAudit, e);
   return (
     <>
       <PageHead
@@ -163,45 +274,19 @@ export function WorkspaceViews({
         lead={lead}
         writer={writer}
         busy={busy}
-        savedView={{
-          module: view,
-          search: url.search,
-          filter: url.savedFilter,
-          facet: url.facet,
-          sort: url.sort,
-        }}
-        onSavedView={(v) =>
-          nav.navigate(
-            v.module,
-            { search: v.search, filter: v.filter, facet: v.facet },
-            () => url.setSort(v.sort),
-          )
-        }
-        onCopyLink={copyLink}
-        onSettings={() => onModal("rename")}
+        savedView={on.savedView}
+        onSavedView={on.openSavedView}
+        onCopyLink={on.copyLink}
+        onSettings={on.settings}
         onNavigate={nav.navigate}
-        action={
-          view === "Regulatory mapping" &&
-          packFeatures(data).aiActClassification
-            ? {
-                label: "Assess classification",
-                onClick: () => {
-                  const form = classificationDefaults(e);
-                  onModal("classification", form.choices, form.checks);
-                },
-              }
-            : undefined
-        }
+        action={on.headAction}
         procedureContext={url.procedureContext}
-        onClearProcedure={() => url.setProcedureContext(undefined)}
+        onClearProcedure={on.clearProcedure}
       />
       {view === "Audit program" && !viewer && (
         <Suspense fallback={panelFallback}>
           <AuditProgram
-            onLocation={(id, section) => {
-              url.setProcedureContext(id);
-              url.setProcedureSection(section);
-            }}
+            onLocation={on.programLocation}
             key={e.id}
             data={data}
             busy={busy}
@@ -214,8 +299,8 @@ export function WorkspaceViews({
             initialSection={url.procedureSection}
             onRecord={onDetail}
             onContext={url.setProcedureContext}
-            onFinding={(p) => onModal("finding", procedureFindingDefaults(p))}
-            onFollowup={(id) => nav.openEngagement(id)}
+            onFinding={on.procedureFinding}
+            onFollowup={on.followup}
             onQueuedRun={nav.showQueuedRun}
           />
         </Suspense>
@@ -228,13 +313,13 @@ export function WorkspaceViews({
           viewer={viewer}
           busy={busy}
           onEditing={reporters["client-portal"]}
-          onReload={reload}
+          onReload={on.reload}
           onNavigate={nav.navigate}
           onWork={nav.openWork}
           onPaper={nav.openPaper}
           onGate={nav.openGate}
           onRequests={nav.openRequests}
-          onAdvance={(stage) => safeAct("setStage", { stage })}
+          onAdvance={on.advance}
         />
       )}
       {view === "Working papers" && (
@@ -249,7 +334,7 @@ export function WorkspaceViews({
           onProcedure={nav.openPaperProcedure}
           resolve={resolve}
           busy={busy}
-          onNew={writer ? () => onModal("paper") : undefined}
+          onNew={on.newPaper}
         />
       )}
       {view === "Evidence vault" && (
@@ -264,37 +349,26 @@ export function WorkspaceViews({
           displayedEvidenceTab={displayedEvidenceTab}
           resolve={resolve}
           act={act}
-          onEditing={{
-            clientPortal: reporters["client-portal"],
-            requestAccess: reporters["request-access"],
-          }}
-          onReload={reload}
-          onOpenArtifact={(a) => onDetail(a.name, a)}
-          onOpenRequest={(r) => onDetail(r.subject, r)}
-          onUpload={() => onModal("upload", uploadDefaults())}
-          onNewRequest={() => nav.requestForm("request")}
+          onEditing={on.vaultEditing}
+          onReload={on.reload}
+          onOpenArtifact={on.openArtifact}
+          onOpenRequest={on.openRequest}
+          onUpload={on.upload}
+          onNewRequest={on.newRequest}
         />
       )}
       {view === "Assurance workbench" && !viewer && (
         <Suspense fallback={panelFallback}>
           <AssuranceWorkbench
             location={url.workbenchQuery}
-            onLocation={(q) =>
-              url.setWorkbenchQuery(normalizeWorkbenchQuery(q))
-            }
-            onEvidence={(id) => {
-              const artifact = e.artifacts.find((a) => a.id === id);
-              if (artifact) nav.viewRecord(artifact.name, artifact);
-            }}
+            onLocation={on.workbenchLocation}
+            onEvidence={on.workbenchEvidence}
             initialProcedure={url.procedureContext}
             onHosted={nav.handOffToLab}
             key={data.tenantId + ":" + e.id}
             data={data}
-            onRefresh={reload}
-            onPaper={(id) => {
-              const p = e.papers.find((p) => p.id === id);
-              if (p) nav.openPaper(p);
-            }}
+            onRefresh={on.reload}
+            onPaper={on.workbenchPaper}
             onNavigate={nav.navigate}
             onEditing={reporters["assurance-workbench"]}
           />
@@ -305,7 +379,7 @@ export function WorkspaceViews({
           <TestingLab
             intent={lab.intent}
             onIntentUsed={lab.consume}
-            onRefresh={reload}
+            onRefresh={on.reload}
             key={data.tenantId + ":" + e.id}
             engagement={e}
             tenantId={data.tenantId}
@@ -319,7 +393,7 @@ export function WorkspaceViews({
             act={act}
             onPaper={nav.openPaper}
             resolve={resolve}
-            onEvidence={() => nav.navigate("Evidence vault")}
+            onEvidence={on.labEvidence}
           />
           {!viewer && ll144.shown && (
             <Ll144Panel
@@ -336,18 +410,16 @@ export function WorkspaceViews({
           )}
         </Suspense>
       )}
-      {view === "Findings" &&
-        !viewer &&
-        packFeatures(data).nonconformityGrading && (
-          <Nonconformities
-            engagement={e}
-            writer={writer}
-            reviewer={reviewer}
-            userId={data.identity.id}
-            busy={busy}
-            act={safeAct}
-          />
-        )}
+      {view === "Findings" && !viewer && on.features.nonconformityGrading && (
+        <Nonconformities
+          engagement={e}
+          writer={writer}
+          reviewer={reviewer}
+          userId={data.identity.id}
+          busy={busy}
+          act={safeAct}
+        />
+      )}
       {view === "Findings" && (
         <Findings
           engagement={e}
@@ -356,28 +428,20 @@ export function WorkspaceViews({
           userId={data.identity.id}
           writer={writer}
           busy={busy}
-          onOpen={(f) => onDetail(f.title, f)}
+          onOpen={on.openFinding}
           onRemediate={nav.remediateFinding}
-          onNew={() => onModal("finding", newFindingDefaults())}
+          onNew={on.newFinding}
         />
       )}
       {view === "Regulatory mapping" && (
         <RegulatoryMapping
-          features={packFeatures(data)}
-          coverage={
-            viewer
-              ? undefined
-              : {
-                  tenantId: data.tenantId,
-                  engagementId: e.id,
-                  version: e.version,
-                }
-          }
+          features={on.features}
+          coverage={on.coverage}
           engagement={e}
           catalog={data.catalog}
           reviewer={reviewer}
           busy={busy}
-          onApprove={() => safeAct("approveClassification", {})}
+          onApprove={on.approveClassification}
         />
       )}
       {view === "Regulatory mapping" &&
@@ -403,31 +467,19 @@ export function WorkspaceViews({
         <Suspense fallback={panelFallback}>
           <ReportWorkspace
             key={e.id}
-            features={packFeatures(data)}
+            features={on.features}
             engagement={e}
             tenantId={data.tenantId}
             role={role}
             userId={data.identity.id}
             people={data.people}
             busy={busy}
-            terms={reportTerms}
-            onTerms={(terms) =>
-              url.setReportTerms({ engagementId: e.id, terms })
-            }
-            onAudience={(paperId, audience) =>
-              safeAct("setPaperAudience", { paperId, audience })
-            }
+            terms={on.reportTerms}
+            onTerms={on.reportTermsChange}
+            onAudience={on.paperAudience}
             onGate={nav.openGate}
-            onCreate={(kind) =>
-              onModal("report", {
-                kind,
-                engagementType: reportTerms.engagementType,
-                assuranceLevel: reportTerms.assuranceLevel ?? "",
-                conclusion: reportTerms.conclusion,
-                addressee: e.workflow?.brief?.audience ?? "",
-              })
-            }
-            onOpen={(r) => onDetail(reportTitle(r), r)}
+            onCreate={on.createReport}
+            onOpen={on.openReport}
             onAct={safeAct}
             section={url.reportSection}
             onSection={url.setReportSection}
@@ -450,4 +502,4 @@ export function WorkspaceViews({
       )}
     </>
   );
-}
+});

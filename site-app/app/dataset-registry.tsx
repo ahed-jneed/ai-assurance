@@ -1,67 +1,41 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkflowDialog } from "./audit-program";
 import type { Engagement, Role } from "@/lib/domain";
 import type { AssuranceRecord } from "@/lib/assurance-core";
-import { assuranceRecords } from "@/lib/assurance-store-client";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
+import { ViewLoading } from "./view-loading";
 type Form = NonNullable<Parameters<typeof WorkflowDialog>[0]["form"]>;
-const cardsError = (err: unknown) =>
-  err instanceof Error ? err.message : "Dataset cards unavailable";
+const datasetCards = recordsQuery("dataset");
+/**
+ * The engagement's dataset cards, from the shared dataset query
+ * (lib/assurance-query.ts) that the Testing lab, the planned evaluations and
+ * the workbench also read: read once per engagement version, and again after
+ * a card is registered here.
+ */
 export function DatasetRegistry({
   engagement: e,
   tenantId,
   role,
   onEditing,
   onRefresh,
-  onCards,
 }: {
   engagement: Engagement;
   tenantId: string;
   role: Role;
   onEditing: (v: boolean) => void;
   onRefresh: () => Promise<unknown>;
-  onCards: (cards: AssuranceRecord[]) => void;
 }) {
-  const [cards, setCards] = useState<AssuranceRecord[]>([]),
-    [form, setForm] = useState<Form | null>(null),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const read = useCallback(
-    () => assuranceRecords({ tenantId, engagementId: e.id, kind: "dataset" }),
-    [tenantId, e.id],
-  );
-  const show = useCallback(
-    (datasets: AssuranceRecord[]) => {
-      setCards(datasets);
-      onCards(datasets);
-      setError("");
-    },
-    [onCards],
-  );
-  async function load() {
-    try {
-      show(await read());
-    } catch (err) {
-      setError(cardsError(err));
-    }
-  }
-  useEffect(() => {
-    // Reread for each engagement version; a response for an engagement or
-    // version that has since changed is dropped.
-    let active = true;
-    read().then(
-      (datasets) => {
-        if (active) show(datasets);
-      },
-      (err: unknown) => {
-        if (active) setError(cardsError(err));
-      },
-    );
-    return () => {
-      active = false;
-    };
-  }, [read, show, e.version]);
+  const [form, setForm] = useState<Form | null>(null),
+    [busy, setBusy] = useState(false);
+  const datasets = useAssuranceQuery(
+      { tenantId, engagementId: e.id, version: e.version },
+      datasetCards,
+    ),
+    cards = datasets.data ?? [],
+    error = datasets.error;
   function register(previous?: AssuranceRecord) {
     const c = previous?.body ?? {},
       fields: Form["fields"] = [
@@ -170,8 +144,10 @@ export function DatasetRegistry({
             }),
             v = (await r.json()) as { error?: string };
           if (!r.ok) throw Error(v.error);
-          await onRefresh();
-          await load();
+          await refreshAfterMutation(
+            { tenantId, engagementId: e.id },
+            onRefresh,
+          );
         } finally {
           setBusy(false);
         }
@@ -193,11 +169,12 @@ export function DatasetRegistry({
       {error && (
         <p className="form-error" role="alert">
           {error}{" "}
-          <Button variant="ghost" onClick={() => void load()}>
+          <Button variant="ghost" onClick={() => void datasets.reload()}>
             Retry
           </Button>
         </p>
       )}
+      {datasets.loading && <ViewLoading label="Loading dataset versions" />}
       <div className="dataset-cards">
         {cards.map((r) => (
           <article className="dataset-card" key={r.id}>
@@ -246,7 +223,7 @@ export function DatasetRegistry({
           </article>
         ))}
       </div>
-      {!cards.length && !error && (
+      {!cards.length && !error && !datasets.loading && (
         <p className="empty-result">
           Register an accepted dataset to capture its population, independence
           and reference baseline.

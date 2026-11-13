@@ -21,7 +21,8 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { assuranceRecords } from "@/lib/assurance-store-client";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { recordsQuery } from "@/lib/assurance-query";
 import {
   Table,
   TableHeader,
@@ -332,6 +333,9 @@ function modelCapability(m: Model) {
 }
 /** An evaluation set up for an approved procedure, with its dataset card. */
 type ProcedureBinding = { procedureId: string; datasetCardRecordId: string };
+const datasetCards = recordsQuery("dataset"),
+  noCards: AssuranceRecord[] = [];
+
 export function TestingLab({
   intent,
   onIntentUsed,
@@ -375,19 +379,15 @@ export function TestingLab({
       {},
     ),
     [acknowledged, setAcknowledged] = useState(false);
-  const [cards, setCards] = useState<AssuranceRecord[]>([]),
-    // Belongs to the open setup only: every other evaluation starts unbound.
-    [binding, setBinding] = useState<ProcedureBinding | null>(null);
-  useEffect(() => {
-    const controller = new AbortController();
-    void assuranceRecords(
-      { tenantId, engagementId: e.id, kind: "dataset" },
-      { signal: controller.signal },
-    )
-      .then(setCards)
-      .catch(() => {});
-    return () => controller.abort();
-  }, [tenantId, e.id, e.version]);
+  // Belongs to the open setup only: every other evaluation starts unbound.
+  const [binding, setBinding] = useState<ProcedureBinding | null>(null);
+  // The dataset cards, shared with the dataset registry below (one read per
+  // engagement version).
+  const cards =
+    useAssuranceQuery(
+      { tenantId, engagementId: e.id, version: e.version },
+      datasetCards,
+    ).data ?? noCards;
   const model = e.models.find((m) => m.id === modelId),
     profiles = e.evaluationProfiles ?? [],
     locked = !!profileId;
@@ -866,7 +866,6 @@ export function TestingLab({
             role={role}
             onEditing={onDatasetEditing}
             onRefresh={onRefresh}
-            onCards={setCards}
           />
         </TabsContent>
         <TabsContent value="models">

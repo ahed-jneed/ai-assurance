@@ -2,19 +2,24 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
+import type { Engagement, Report, Role } from "@/lib/domain";
 import { DossierControls } from "./dossier-controls";
 import { ExportedPapers, type ExportedPaperItem } from "./exported-papers";
 export function PackageIntegrity({
   tenantId,
-  engagementId,
-  reportId,
+  engagement,
+  report,
+  role,
   onRefresh,
 }: {
   tenantId: string;
-  engagementId: string;
-  reportId: string;
+  engagement: Engagement;
+  report: Report;
+  role: Role;
   onRefresh?: () => Promise<unknown>;
 }) {
+  const engagementId = engagement.id,
+    reportId = report.id;
   const [result, setResult] = useState<{
       valid: boolean;
       items: ExportedPaperItem[];
@@ -68,8 +73,9 @@ export function PackageIntegrity({
         </section>
         <DossierControls
           tenantId={tenantId}
-          engagementId={engagementId}
-          reportId={reportId}
+          engagement={engagement}
+          report={report}
+          role={role}
           onRefresh={onRefresh}
         />
       </details>

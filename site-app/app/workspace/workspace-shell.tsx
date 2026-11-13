@@ -2,8 +2,11 @@
 // The audit workspace: composes the data, location, editor and guard hooks
 // and lays out the sidebar, top bar, open view, dialogs and record sheet.
 import {
+  memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -20,10 +23,10 @@ import {
   SIGN_IN_LABEL,
   signInHere,
 } from "../account-menu";
-import { EngagementSwitcher } from "../engagement-switcher";
-import { MemberOnboarding } from "../member-onboarding";
-import { WorkspaceNavigation } from "../workspace-navigation";
-import { WorkspaceSearch } from "../workspace-search";
+import { EngagementSwitcher as EngagementSwitcherView } from "../engagement-switcher";
+import { MemberOnboarding as MemberOnboardingView } from "../member-onboarding";
+import { WorkspaceNavigation as WorkspaceNavigationView } from "../workspace-navigation";
+import { WorkspaceSearch as WorkspaceSearchView } from "../workspace-search";
 import { useLabIntent } from "./lab-intent";
 import { ModalHost } from "./modal-host";
 import { useModelContextTools } from "./model-context-tools";
@@ -35,6 +38,7 @@ import {
 import { PaperEditorHost } from "./paper-editor-host";
 import { usePanelPrefetch, workspaceFallback } from "./panels";
 import { RecordSheet } from "./record-sheet";
+import { useStableShape } from "./stable-shape";
 import { nameResolver } from "./records";
 import { useModalState } from "./use-modal-state";
 import { usePaperEditor } from "./use-paper-editor";
@@ -47,7 +51,15 @@ import {
 } from "./use-workspace-data";
 import { useWorkspaceNavigation } from "./use-workspace-navigation";
 import { WorkspaceViews } from "./views/workspace-views";
-import { WorkspaceTopbar } from "./workspace-topbar";
+import { WorkspaceTopbar as WorkspaceTopbarView } from "./workspace-topbar";
+
+// The panels around the open view re-render only when their own props
+// change (#63), not on each keystroke in a paper, a form or the view.
+const EngagementSwitcher = memo(EngagementSwitcherView),
+  MemberOnboarding = memo(MemberOnboardingView),
+  WorkspaceNavigation = memo(WorkspaceNavigationView),
+  WorkspaceSearch = memo(WorkspaceSearchView),
+  WorkspaceTopbar = memo(WorkspaceTopbarView);
 
 /** Ctrl/Cmd+K toggles workspace search unless it is disabled. */
 function useSearchShortcut(
@@ -185,16 +197,46 @@ export default function Workspace() {
   useLeaveGuard(
     paper.navigationDirty || editing.editorOpen || modal.modalDirty,
   );
-  const resolveName = nameResolver(data);
-  const paperRows = e
-    ? selectPaperRegister(
-        e,
-        role,
-        data?.identity.id ?? "",
-        url.paperQuery,
-        resolveName,
-      ).rows
-    : [];
+  // The views are memoised (#63): they receive these with the same identity
+  // until their values change, so typing in a paper, a form or another view
+  // does not re-render them.
+  const resolveName = useMemo(() => nameResolver(data), [data]);
+  const paperQuery = useStableShape(url.paperQuery);
+  const paperRows = useMemo(
+    () =>
+      e
+        ? selectPaperRegister(
+            e,
+            role,
+            data?.identity.id ?? "",
+            paperQuery,
+            resolveName,
+          ).rows
+        : [],
+    [e, role, data?.identity.id, paperQuery, resolveName],
+  );
+  const viewUrl = useStableShape(url),
+    viewNav = useStableShape(nav),
+    // By identity: the lab consumes an intent by comparing it with the pending one.
+    viewLab = useMemo(
+      () => ({ intent: lab.intent, consume: lab.consume }),
+      [lab.intent, lab.consume],
+    ),
+    handlers = useStableShape({
+      openModal: modal.open,
+      viewDetail: sheet.viewDetail,
+      onboard: () => {
+        setOnboardingRun((n) => n + 1);
+        setOnboarding(true);
+      },
+    }),
+    access = useMemo(
+      () => ({ role, writer, reviewer, lead, viewer }),
+      [role, writer, reviewer, lead, viewer],
+    );
+  const openSearch = useCallback(() => setSearchOpen(true), []),
+    closeOnboarding = useCallback(() => setOnboarding(false), []),
+    account = useMemo(() => <AccountMenu data={data} />, [data]);
   if (workspace.signedOut) return <SignedOut />;
   return (
     <SidebarProvider
@@ -217,12 +259,12 @@ export default function Workspace() {
         navigationDisabled={
           !data || busy || loading || bootstrapping || switchOpen
         }
-        onSearch={() => setSearchOpen(true)}
+        onSearch={openSearch}
         searchDisabled={searchDisabled}
-        onNavigate={nav.navigate}
-        onSwitch={nav.switchEngagement}
-        onPractice={nav.changePractice}
-        account={<AccountMenu data={data} />}
+        onNavigate={viewNav.navigate}
+        onSwitch={viewNav.switchEngagement}
+        onPractice={viewNav.changePractice}
+        account={account}
       />
       <SidebarInset>
         <WorkspaceTopbar
@@ -231,9 +273,9 @@ export default function Workspace() {
           clientId={url.clientId}
           role={role}
           searchDisabled={searchDisabled}
-          onSearch={() => setSearchOpen(true)}
-          onNavigate={nav.navigate}
-          onClient={nav.openClient}
+          onSearch={openSearch}
+          onNavigate={viewNav.navigate}
+          onClient={viewNav.openClient}
         />
         <main id="audit-main-content" tabIndex={-1} className="audit-main">
           {workspace.error && (
@@ -249,9 +291,9 @@ export default function Workspace() {
             : data && (
                 <WorkspaceViews
                   data={data}
-                  url={url}
-                  nav={nav}
-                  access={{ role, writer, reviewer, lead, viewer }}
+                  url={viewUrl}
+                  nav={viewNav}
+                  access={access}
                   busy={busy}
                   act={workspace.act}
                   safeAct={workspace.safeAct}
@@ -260,13 +302,10 @@ export default function Workspace() {
                   paperRows={paperRows}
                   reporters={editing.reporters}
                   resolve={resolveName}
-                  lab={lab}
-                  onModal={modal.open}
-                  onDetail={sheet.viewDetail}
-                  onOnboard={() => {
-                    setOnboardingRun((n) => n + 1);
-                    setOnboarding(true);
-                  }}
+                  lab={viewLab}
+                  onModal={handlers.openModal}
+                  onDetail={handlers.viewDetail}
+                  onOnboard={handlers.onboard}
                 />
               )}
         </main>
@@ -275,7 +314,7 @@ export default function Workspace() {
         <MemberOnboarding
           key={onboardingRun}
           open={onboarding}
-          onClose={() => setOnboarding(false)}
+          onClose={closeOnboarding}
           data={data}
           busy={busy}
           manage={workspace.manage}
@@ -345,7 +384,7 @@ export default function Workspace() {
           data={data}
           open={switchOpen}
           onOpenChange={setSwitchOpen}
-          onSelect={nav.openEngagement}
+          onSelect={viewNav.openEngagement}
         />
       )}
       {data && (
@@ -353,7 +392,7 @@ export default function Workspace() {
           data={data}
           open={searchOpen}
           onOpenChange={setSearchOpen}
-          onSelect={nav.searchSelect}
+          onSelect={viewNav.searchSelect}
         />
       )}
     </SidebarProvider>

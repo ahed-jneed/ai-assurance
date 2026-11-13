@@ -60,8 +60,8 @@ import {
   type DraftScope,
 } from "./recoverable-draft";
 import { procedureWork } from "@/lib/work-items";
-import { assuranceRecords } from "@/lib/assurance-store-client";
-import type { AssuranceRecord } from "@/lib/assurance-core";
+import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { recordsQuery } from "@/lib/assurance-query";
 import { datasetCardFor } from "@/lib/dataset-card";
 import { acceptanceGates } from "@/lib/workflow/acceptance";
 import { AcceptancePanel } from "./audit-program/acceptance-panel";
@@ -2692,6 +2692,7 @@ export function FindingAssurance({
     </section>
   );
 }
+const datasetCards = recordsQuery("dataset");
 /**
  * "Queue planned evaluation" for an automated procedure. The run pins the
  * dataset card that describes the procedure's accepted dataset bytes, as the
@@ -2715,31 +2716,17 @@ function PlannedEvaluation({
   act: WorkflowAct;
   onQueuedRun: (runId: string) => void;
 }) {
-  const [cards, setCards] = useState<AssuranceRecord[] | null>(null),
-    [unavailable, setUnavailable] = useState(false),
-    [refresh, setRefresh] = useState(0);
-  // A card registered in another tab or view need not bump the engagement
-  // version, so the cards are read again when the window regains focus.
-  useEffect(() => {
-    const onFocus = () => setRefresh((n) => n + 1);
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
-  useEffect(() => {
-    const controller = new AbortController();
-    void assuranceRecords(
-      { tenantId, engagementId: e.id, kind: "dataset" },
-      { signal: controller.signal },
-    )
-      .then((records) => {
-        setCards(records);
-        setUnavailable(false);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setUnavailable(true);
-      });
-    return () => controller.abort();
-  }, [tenantId, e.id, e.version, refresh]);
+  // The dataset cards, one read shared by every planned evaluation and the
+  // Testing lab (lib/assurance-query.ts). A card registered in another tab
+  // need not bump the engagement version, so they are read again when the
+  // window regains focus.
+  const datasets = useAssuranceQuery(
+      { tenantId, engagementId: e.id, version: e.version },
+      datasetCards,
+      { revalidateOnFocus: true },
+    ),
+    cards = datasets.data ?? null,
+    unavailable = !!datasets.error;
   const active = activeProcedureRun(e, p.id),
     dataset = e.artifacts.find(
       (a) => a.id === p.datasetId && a.status === "accepted",

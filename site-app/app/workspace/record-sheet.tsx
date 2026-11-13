@@ -208,8 +208,9 @@ export function RecordSheet({
                   "snapshot" in liveDetail && (
                     <PackageIntegrity
                       tenantId={data.tenantId}
-                      engagementId={e.id}
-                      reportId={(liveDetail as Report).id}
+                      engagement={e}
+                      report={liveDetail as Report}
+                      role={role}
                       onRefresh={() => load(data.tenantId, e.id)}
                     />
                   )}
