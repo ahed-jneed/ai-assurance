@@ -9,17 +9,27 @@ import {
   assuranceActions,
   can,
   canAssignEngagementAccess,
+  canSee,
   decisionState,
   manageState,
   managementReferrals,
+  narrowedActions,
   roleReason,
+  viewAccess,
   workspaceActions,
   type Action,
+  type NarrowedAction,
 } from "@/lib/permissions";
 import {
+  acceptanceInput,
   approvedWorkflow,
+  briefInput,
+  planSave,
+  structuredEngagement,
+  workflowOf,
   context as workflowContext,
 } from "@/lib/workflow/test-fixtures";
+import { isClientRole } from "@/lib/workflow-state";
 import {
   WorkflowError,
   workflowCommand,
@@ -43,14 +53,14 @@ const roleRefusals = new Set([
 
 /**
  * An engagement with an approved scope, so each workflow command reaches its
- * role check before it asks for missing state. With `program`, the program
- * is in that status: planning a draft program is the engagement team's,
- * while changing a submitted or approved one needs a Lead Auditor.
+ * role check before it asks for missing state. Its program is a draft:
+ * planning a draft program is the engagement team's, while changing a
+ * submitted or approved one needs a Lead Auditor (see the narrowing test).
  */
-function probed(program: "draft" | "approved" = "draft"): Engagement {
+function probed(): Engagement {
   const e = stored();
   e.workflow = approvedWorkflow();
-  if (program === "draft") e.workflow.program.status = "draft";
+  e.workflow.program.status = "draft";
   return e;
 }
 
@@ -172,18 +182,57 @@ describe("client permissions match the server's role checks", () => {
 
   // The map holds each op's base role check. Some commands narrow it by
   // state: changing the plans of a submitted or approved program, like
-  // saving an approved scope, needs a Lead Auditor.
-  it("leaves state-dependent narrowing to the commands", async () => {
-    for (const op of ["bulkPlanProcedures", "scopeProgramCandidates"]) {
-      expect(can("Auditor", op as Action), op).toBe(true);
-      await expect(
-        dispatch(probed("approved"), op, {}, caller("Auditor")),
-        op,
-      ).rejects.toMatchObject({
-        status: 403,
-        message: "A Lead Auditor must authorize this decision",
-      });
-    }
+  // saving an approved scope, needs a Lead Auditor. decisionState explains
+  // the narrowing (#178); the commands still enforce it.
+  it("narrows by state exactly where the commands do", async () => {
+    const payloads: Record<NarrowedAction, (e: Engagement) => unknown> = {
+      saveBrief: () => ({ ...briefInput, changeImpact: "Period extended" }),
+      saveAcceptance: () => ({
+        ...acceptanceInput,
+        changeReason: "Engagement letter renewed",
+      }),
+      saveProcedurePlan: (e) => planSave(e),
+      bulkPlanProcedures: () => ({}),
+      scopeProgramCandidates: () => ({}),
+    };
+    expect(Object.keys(payloads).sort()).toEqual([...narrowedActions].sort());
+    const asUser = { Auditor: "auditor", "Lead Auditor": "lead" } as const;
+    const outcomes: string[] = [],
+      expected: string[] = [];
+    for (const approved of [false, true])
+      for (const action of narrowedActions)
+        for (const role of ["Auditor", "Lead Auditor"] as const) {
+          const e = structuredEngagement();
+          if (approved) e.workflow = approvedWorkflow(workflowOf(e).procedures);
+          const state = decisionState(role, asUser[role], {
+            action,
+            engagement: e,
+          });
+          const outcome = await workflowCommand(
+            e,
+            action,
+            payloads[action](e),
+            workflowContext(asUser[role]),
+          ).then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+          const narrowed =
+            outcome instanceof WorkflowError &&
+            outcome.status === 403 &&
+            outcome.message === "A Lead Auditor must authorize this decision";
+          const label = `${action} as ${role}${approved ? " (approved)" : ""}`;
+          outcomes.push(label + (narrowed ? ": Lead required" : ": open"));
+          expected.push(
+            label + (state.refusal === "state" ? ": Lead required" : ": open"),
+          );
+          if (state.refusal === "state") expect(state.reason).toMatch(/Lead/);
+        }
+    expect(outcomes).toEqual(expected);
+    // An Auditor meets the narrowing on each approved record.
+    expect(outcomes.filter((o) => o.endsWith("Lead required"))).toHaveLength(
+      narrowedActions.length,
+    );
   });
 
   it("refuses the ops referred to management for every role that writes", async () => {
@@ -236,6 +285,24 @@ describe("client permissions match the server's role checks", () => {
     expect(
       canAssignEngagementAccess({ role: "Lead Auditor", practiceAdmin: true }),
     ).toBe(true);
+  });
+});
+
+describe("canSee", () => {
+  it("shows the team's work to a Lead Auditor only", () => {
+    expect(roles.filter((role) => canSee(role, "teamWork"))).toEqual([
+      "Lead Auditor",
+    ]);
+  });
+
+  it("shows evidence requests to the practice's staff, never to client roles", () => {
+    for (const role of roles)
+      expect(canSee(role, "evidenceRequests"), role).toBe(!isClientRole(role));
+  });
+
+  it("names only known roles", () => {
+    for (const [view, admitted] of Object.entries(viewAccess))
+      for (const role of admitted) expect(roles, view).toContain(role);
   });
 });
 

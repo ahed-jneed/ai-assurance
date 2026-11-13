@@ -26,6 +26,8 @@ import {
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
 import type { WorkItem } from "@/lib/work-items";
+import { errorMessage, fetchJson } from "@/lib/fetch-json";
+import { canSee } from "@/lib/permissions";
 import {
   activeReminders,
   defaultInboxQuery,
@@ -91,7 +93,7 @@ export function WorkInbox({
   });
   const operation = useRef(false);
   const q =
-    query.scope === "team" && data.identity.role !== "Lead Auditor"
+    query.scope === "team" && !canSee(data.identity.role, "teamWork")
       ? { ...query, scope: "mine" as const }
       : query;
   const account = JSON.stringify([
@@ -140,23 +142,16 @@ export function WorkInbox({
       request.current.controller = controller;
       setBusy(true);
       try {
-        const response = await fetch(
-          "/api/work-inbox?" +
-            new URLSearchParams({ tenantId: data.tenantId, page: String(p) }),
-          { cache: "no-store", signal: controller.signal },
-        );
-        const value = (await response.json()) as {
-          error?: string;
+        const value = await fetchJson<{
           items: WorkItem[];
           integrityErrors?: IntegrityNotice[];
           nextPage: number | null;
           loadedEngagements: number;
-        };
-        if (!response.ok)
-          throw Error(
-            value.error ||
-              "Work could not be loaded. Retry to refresh your assignments.",
-          );
+        }>(
+          "/api/work-inbox?" +
+            new URLSearchParams({ tenantId: data.tenantId, page: String(p) }),
+          { cache: "no-store", signal: controller.signal },
+        );
         if (generation !== request.current.generation) return;
         setItems((old) =>
           p
@@ -183,9 +178,7 @@ export function WorkInbox({
           generation === request.current.generation
         )
           setError(
-            e instanceof Error
-              ? e.message
-              : "Work unavailable. Retry to load assignments.",
+            errorMessage(e, "Work unavailable. Retry to load assignments."),
           );
       } finally {
         if (generation === request.current.generation) setBusy(false);
@@ -326,7 +319,7 @@ export function WorkInbox({
       </div>
       <div className="work-inbox-context">
         <div>
-          {data.identity.role === "Lead Auditor" ? (
+          {canSee(data.identity.role, "teamWork") ? (
             <div className="work-scope-switch" aria-label="Assignment scope">
               <button
                 aria-pressed={q.scope === "mine"}

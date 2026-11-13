@@ -5,7 +5,8 @@
 // competence matrix. lib/workflow/acceptance.ts holds the rules the
 // Planning-exit gate applies.
 import { Button } from "@/components/ui/button";
-import { can } from "@/lib/permissions";
+import { can, decisionState } from "@/lib/permissions";
+import { DecisionButton } from "../workspace/decision-button";
 import type { Engagement, Role } from "@/lib/domain";
 import {
   acceptancePrompt,
@@ -105,7 +106,6 @@ export function AcceptancePanel({
     a = w.acceptance,
     uid = data.identity.id,
     role: Role = data.identity.role,
-    writer = can(role, "saveAcceptance"),
     lead = can(role, "approveAcceptance"),
     reviewer = can(role, "resolveDeclaredThreat"),
     internal = can(role, "saveDeclaration");
@@ -556,11 +556,16 @@ export function AcceptancePanel({
         </p>
       )}
       <div className="row-actions">
-        {writer && (a?.status !== "approved" || lead) && (
-          <Button disabled={busy} onClick={acceptanceForm}>
-            {a ? "Revise acceptance" : "Record acceptance"}
-          </Button>
-        )}
+        <DecisionButton
+          state={decisionState(role, uid, {
+            action: "saveAcceptance",
+            engagement: e,
+          })}
+          disabled={busy}
+          onClick={acceptanceForm}
+        >
+          {a ? "Revise acceptance" : "Record acceptance"}
+        </DecisionButton>
         {lead && a?.status === "draft" && (
           <Button
             variant="outline"

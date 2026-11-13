@@ -445,7 +445,16 @@ export function AuditProgram({
     // Coarse flags for the program's sections; decisions check their own op.
     writer = can(role, "recordProcedureExecution"),
     lead = can(role, "approveAcceptance"),
-    reviewer = can(role, "reviewProcedure");
+    reviewer = can(role, "reviewProcedure"),
+    // Planning narrows to a Lead Auditor once the program is submitted.
+    planState = decisionState(role, uid, {
+      action: "saveProcedurePlan",
+      engagement: e,
+    }),
+    bulkPlan = decisionState(role, uid, {
+      action: "bulkPlanProcedures",
+      engagement: e,
+    });
   const attest = useAttest();
   const memoryKey = data.tenantId + ":" + uid + ":" + e.id,
     memory = programViewMemory.get(memoryKey);
@@ -1182,13 +1191,18 @@ export function AuditProgram({
               </p>
             )}
             <div className="row-actions">
-              {writer &&
-                b?.status !== "submitted" &&
-                (b?.status !== "approved" || lead) && (
-                  <Button disabled={busy} onClick={brief}>
-                    {b ? "Revise scope" : "Complete brief"}
-                  </Button>
-                )}
+              {b?.status !== "submitted" && (
+                <DecisionButton
+                  state={decisionState(role, uid, {
+                    action: "saveBrief",
+                    engagement: e,
+                  })}
+                  disabled={busy}
+                  onClick={brief}
+                >
+                  {b ? "Revise scope" : "Complete brief"}
+                </DecisionButton>
+              )}
               {writer && b?.status === "draft" && (
                 <Button
                   variant="outline"
@@ -1243,11 +1257,17 @@ export function AuditProgram({
                 </small>
               </div>
               <div className="row-actions">
-                {writer && (w.program.status === "draft" || lead) && (
-                  <Button variant="outline" disabled={busy} onClick={bulk}>
-                    Assess candidates
-                  </Button>
-                )}
+                <DecisionButton
+                  state={decisionState(role, uid, {
+                    action: "scopeProgramCandidates",
+                    engagement: e,
+                  })}
+                  variant="outline"
+                  disabled={busy}
+                  onClick={bulk}
+                >
+                  Assess candidates
+                </DecisionButton>
                 {writer && w.program.status === "draft" && (
                   <Button
                     disabled={busy || b?.status !== "approved"}
@@ -1369,11 +1389,8 @@ export function AuditProgram({
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={
-                    busy ||
-                    !batchIds.length ||
-                    (w.program.status !== "draft" && !lead)
-                  }
+                  disabled={busy || !batchIds.length || !bulkPlan.allowed}
+                  title={bulkPlan.reason}
                   onClick={staffing}
                 >
                   Assign & schedule
@@ -1913,11 +1930,7 @@ export function AuditProgram({
                         <Art50Suggestion
                           suggestion={s}
                           current={p.applicability}
-                          canUse={
-                            writer &&
-                            (w.program.status === "draft" || lead) &&
-                            !busy
-                          }
+                          canUse={planState.allowed && !busy}
                           onUse={(s) => planForm(p, s)}
                         />
                       ) : null;
@@ -1931,11 +1944,13 @@ export function AuditProgram({
                         ) ?? []
                       }
                     />
-                    {writer && (w.program.status === "draft" || lead) && (
-                      <Button disabled={busy} onClick={() => planForm(p)}>
-                        Edit plan
-                      </Button>
-                    )}
+                    <DecisionButton
+                      state={planState}
+                      disabled={busy}
+                      onClick={() => planForm(p)}
+                    >
+                      Edit plan
+                    </DecisionButton>
                   </TabsContent>
                   <TabsContent value="execute">
                     <details className="captured-record" open={!p.execution}>

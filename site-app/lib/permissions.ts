@@ -12,7 +12,13 @@ const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   reviewers: readonly Role[] = ["Reviewer", "Lead Auditor"],
   lead: readonly Role[] = ["Lead Auditor"],
   internal: readonly Role[] = ["Auditor", "Lead Auditor", "Reviewer"],
-  qualityReviewer: readonly Role[] = ["Engagement Quality Reviewer"];
+  qualityReviewer: readonly Role[] = ["Engagement Quality Reviewer"],
+  staff: readonly Role[] = [
+    "Auditor",
+    "Lead Auditor",
+    "Reviewer",
+    "Engagement Quality Reviewer",
+  ];
 
 /** POST /api/workspace: the roles each op admits. */
 export const workspaceActions = {
@@ -169,6 +175,26 @@ const actions: Record<Action, readonly Role[]> = {
   ...routeActions,
 };
 
+/**
+ * Views and parts of views each role may see, beside the actions above. They
+ * decide what the workspace offers and which links and saved queries it
+ * keeps (app/workspace/use-url-state.ts, app/work-inbox.tsx): the server
+ * still decides what each read returns.
+ */
+export const viewAccess = {
+  /** The team scope of My work: every assignment of the engagement team. */
+  teamWork: lead,
+  /** The evidence requests tab of the Evidence vault. */
+  evidenceRequests: staff,
+} as const satisfies Record<string, readonly Role[]>;
+
+export type View = keyof typeof viewAccess;
+
+/** Whether `role` may see `view`. */
+export function canSee(role: Role, view: View) {
+  return viewAccess[view].includes(role);
+}
+
 /** The roles that may take `action`. */
 export function rolesFor(action: Action): readonly Role[] {
   return actions[action];
@@ -230,10 +256,11 @@ export type ActionState = {
   reason?: string;
   /**
    * Why it is refused: the person's role never may (the control is hidden),
-   * or this record's independence rule bars them (it is shown disabled with
-   * the reason, so they know whom to ask).
+   * this record's independence rule bars them, or the record's state narrows
+   * the action to fewer roles (both are shown disabled with the reason, so
+   * they know whom to ask).
    */
-  refusal?: "role" | "independence";
+  refusal?: "role" | "independence" | "state";
 };
 const allowed: ActionState = { allowed: true };
 function refused(
@@ -250,9 +277,58 @@ export function actionState(role: Role, action: Action): ActionState {
 }
 
 /**
+ * Workflow ops whose command narrows the base roles by the record's state
+ * (lib/workflow/brief-program.ts, acceptance-commands.ts): once the scope,
+ * the program or the acceptance record is approved (the program: submitted
+ * or approved), only a Lead Auditor may change it. Each entry says when the
+ * narrowing applies and why, as the disabled control explains it.
+ */
+const narrowings = {
+  saveBrief: {
+    applies: (e: Engagement) => e.workflow?.brief?.status === "approved",
+    reason: "Only a Lead Auditor can revise an approved scope",
+  },
+  saveAcceptance: {
+    applies: (e: Engagement) => e.workflow?.acceptance?.status === "approved",
+    reason: "Only a Lead Auditor can revise an approved acceptance record",
+  },
+  saveProcedurePlan: {
+    applies: programLocked,
+    reason:
+      "Only a Lead Auditor can change the plans of a submitted or approved program",
+  },
+  bulkPlanProcedures: {
+    applies: programLocked,
+    reason:
+      "Only a Lead Auditor can change the plans of a submitted or approved program",
+  },
+  scopeProgramCandidates: {
+    applies: programLocked,
+    reason:
+      "Only a Lead Auditor can change the scope of a submitted or approved program",
+  },
+} as const satisfies Partial<
+  Record<
+    WorkspaceAction,
+    { applies: (e: Engagement) => boolean; reason: string }
+  >
+>;
+function programLocked(e: Engagement) {
+  const status = e.workflow?.program.status;
+  return !!status && status !== "draft";
+}
+
+/** The workflow ops whose roles narrow with the record's state. */
+export type NarrowedAction = keyof typeof narrowings;
+export const narrowedActions = Object.keys(narrowings) as NarrowedAction[];
+
+/**
  * The role check and the independence rule of a decision on one record, the
  * way its command checks them (lib/commands/**): a preparer, contributor or
- * reviewer of the work cannot also approve, close or sign it.
+ * reviewer of the work cannot also approve, close or sign it. For the
+ * narrowed actions it also applies the state-dependent narrowing, so an
+ * Auditor sees why an approved scope or a submitted program needs a Lead
+ * Auditor instead of meeting the server's 403.
  */
 export function decisionState(
   role: Role,
@@ -262,15 +338,26 @@ export function decisionState(
     | { action: "signPaper"; paper: Paper }
     | { action: "closeFinding"; finding: Finding }
     | { action: "approveClassification"; engagement: Engagement }
+    | { action: NarrowedAction; engagement: Engagement }
     | {
         action: Exclude<
           Action,
-          "reviewPaper" | "signPaper" | "closeFinding" | "approveClassification"
+          | "reviewPaper"
+          | "signPaper"
+          | "closeFinding"
+          | "approveClassification"
+          | NarrowedAction
         >;
       },
 ): ActionState {
   const reason = roleReason(role, decision.action);
   if (reason) return refused(reason, "role");
+  if (Object.hasOwn(narrowings, decision.action) && "engagement" in decision) {
+    const narrowing = narrowings[decision.action as NarrowedAction];
+    return narrowing.applies(decision.engagement) && !lead.includes(role)
+      ? refused(narrowing.reason, "state")
+      : allowed;
+  }
   switch (decision.action) {
     case "reviewPaper": {
       const p = decision.paper;
