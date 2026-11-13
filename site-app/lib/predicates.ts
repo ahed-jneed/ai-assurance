@@ -1,8 +1,7 @@
 // Three-valued fact logic shared by the rule pack (lib/rule-pack.ts) and the
 // guided classification (lib/domain/classification.ts): a fact is true, false
 // or unknown, and an unknown never counts as a pass or as "not applicable"
-// (the rule pack's predicateRule). Pure, without data imports, so the check
-// harnesses can load it through lib/domain.ts.
+// (the rule pack's predicateRule). Pure, without data imports.
 
 export type Predicate = {
   fact: string;

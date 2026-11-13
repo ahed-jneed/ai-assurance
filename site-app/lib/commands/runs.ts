@@ -2,7 +2,8 @@ import { z } from "zod";
 import { recordsById } from "../assurance-store";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain";
-import { getEngagement, now, save, sha256 } from "../engagement-repo";
+import { getEngagement, save } from "../engagement-repo";
+import { now, sha256 } from "../ids";
 import { cardDescribes } from "../dataset-card";
 import { describePlan } from "../hosted-statistics";
 import {

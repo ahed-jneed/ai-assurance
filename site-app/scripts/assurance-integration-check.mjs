@@ -5,9 +5,7 @@ import http from "node:http";
 import { spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { Miniflare } from "miniflare";
-const python =
-  process.env.ASSURANCE_TEST_PYTHON ??
-  "C:/Users/Ahedj/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe";
+import { python } from "./harness/env.mjs";
 const modules = [
   "index.js",
   ...(await fs.readdir("dist/server", { recursive: true })).filter(

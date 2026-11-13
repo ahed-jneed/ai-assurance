@@ -9,6 +9,7 @@
 // ops that create them are covered by assurance-integration-check.mjs);
 // everything else goes through the API.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";

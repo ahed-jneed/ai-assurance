@@ -38,8 +38,9 @@ const opinions = [
 const kinds = (e: Engagement, target: string) =>
   stageGates(e, target).map((g) => g.kind);
 
-// The fixtures of scripts/workflow-ux-check.mjs, whose lifecycle-gate and
-// final-issuance assertions the first two suites took over.
+// The fixtures of lib/workflow-ux.test.ts (formerly
+// scripts/workflow-ux-check.mjs), whose lifecycle-gate and final-issuance
+// assertions the first two suites took over.
 const evidence = artifact();
 const base = paper({
   id: "paper",
@@ -410,8 +411,8 @@ describe("structured engagements", () => {
     if (!p) throw new Error("Unknown template " + templateId);
     return p;
   };
-  // The work-items-check.mjs fixture: brief revision 2, program revision 3
-  // bound to it and procedure revision 4 executed against both, reviewed,
+  // The fixture of lib/work-items.test-fixture.ts: brief revision 2, program
+  // revision 3 bound to it and procedure revision 4 executed against both, reviewed,
   // with its compiled working paper (revision 2) signed.
   const signed = () => {
     const workflow = approvedWorkflow();

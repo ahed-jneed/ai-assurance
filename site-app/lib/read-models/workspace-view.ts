@@ -8,7 +8,8 @@ import {
 import { selectablePacks } from "../criteria/registry";
 import type { Engagement } from "../domain";
 import { parseReportSettings } from "../domain/report-model";
-import { db, getEngagement, storedSize } from "../engagement-repo";
+import { db } from "../bindings";
+import { getEngagement, storedSize } from "../engagement-repo";
 import {
   IntegrityError,
   integrityIncidents,

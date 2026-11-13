@@ -9,7 +9,7 @@ import {
   type ClassificationRules,
   type Classification,
 } from "../domain/classification";
-import { db } from "../engagement-repo";
+import { db } from "../bindings";
 import { ApiError } from "../http";
 import { now } from "../ids";
 import { asRulePack } from "../rule-pack";

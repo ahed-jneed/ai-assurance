@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
 import { roles, stageGates } from "../domain";
-import { db, now, sha256 } from "../engagement-repo";
+import { db } from "../bindings";
+import { now, sha256 } from "../ids";
 import {
   assertLegacyUnpin,
   explicitLegacyPin,

@@ -3,7 +3,7 @@
 // the app stores them (dehydrated, with their immutable parts in R2), and an
 // in-memory R2 bucket that counts every read. The app never imports this
 // module.
-import { env } from "cloudflare:workers";
+import { env } from "./bindings";
 import type { DatabaseSync } from "node:sqlite";
 import type { Engagement, Report, Role } from "./domain";
 import { dehydrate } from "./engagement-storage";

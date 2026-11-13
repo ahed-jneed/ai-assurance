@@ -4,6 +4,7 @@
 // legacy rows, then runs the adoption twice and checks what it adopted, what
 // it left alone and that a second run changes nothing.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import { Miniflare } from "miniflare";
 

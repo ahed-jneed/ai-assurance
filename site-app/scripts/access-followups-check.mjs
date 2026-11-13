@@ -10,6 +10,7 @@
 // stay retained and verifiable. Also drizzle 0013's email backfill and its
 // append-only triggers. Needs `npm run build` first.
 import assert from "node:assert/strict";
+import "./harness/env.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";

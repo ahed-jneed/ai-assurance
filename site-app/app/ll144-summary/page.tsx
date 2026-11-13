@@ -1,6 +1,7 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
 import { ll144SummaryView } from "@/lib/read-models/ll144-summary";
-import { ApiError, context } from "@/lib/store";
+import { ApiError } from "@/lib/http";
+import { context } from "@/lib/tenancy";
 import { summaryMarkup } from "./summary-markup";
 export const dynamic = "force-dynamic";
 /** /ll144-summary?tenantId&engagementId&auditId[&reportId]: the standalone LL144 summary. */

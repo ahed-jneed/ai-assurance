@@ -12,6 +12,16 @@ const workerRuntime: Plugin = {
     id === "\0cloudflare:workers" ? "export const env = {};" : undefined,
 };
 
+const include = [
+  "lib/**/*.test.ts",
+  "app/**/*.test.ts",
+  "app/**/*.test.tsx",
+  "build/**/*.test.ts",
+];
+// Tests of local-calendar defaults run in a time zone east of UTC, where
+// the local date changes before the UTC date does.
+const localCalendar = "**/*.local-calendar.test.ts";
+
 // Unit tests. Kept separate from vite.config.ts so tests do not load the
 // Vinext and Cloudflare plugins.
 export default defineConfig({
@@ -20,12 +30,21 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL(".", import.meta.url)) },
   },
   test: {
-    include: [
-      "lib/**/*.test.ts",
-      "app/**/*.test.ts",
-      "app/**/*.test.tsx",
-      "build/**/*.test.ts",
-    ],
     environment: "node",
+    projects: [
+      {
+        extends: true,
+        test: { name: "unit", include, exclude: [localCalendar] },
+      },
+      {
+        extends: true,
+        test: {
+          name: "local-calendar",
+          include: [localCalendar],
+          env: { TZ: "Europe/Vienna" },
+          pool: "forks",
+        },
+      },
+    ],
   },
 });

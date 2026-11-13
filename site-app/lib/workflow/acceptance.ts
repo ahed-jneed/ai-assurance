@@ -10,10 +10,6 @@
 // nobody outside the team it was made for joins the team. A disqualifying
 // relationship is not tied to a period: it stands, whatever the period, until
 // someone other than the declarant withdraws it.
-//
-// Keep this module free of runtime imports other than relative pure modules:
-// the check harnesses load lib/domain.ts, and so this file, through
-// scripts/ts-modules.mjs, which does not resolve packages.
 import type { AuditGate } from "../domain/gates";
 import type { Engagement } from "../domain/types";
 import type { Declaration, Workflow } from "../workflow-types";
