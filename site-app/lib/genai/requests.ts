@@ -83,12 +83,27 @@ export const genaiPlan = z
       GENAI_FLOORS.maxErrorFraction,
       "maxErrorFraction may not exceed 0.05",
     ).optional(),
-    excerpts: z
-      .literal("none", {
-        errorMap: () => ({
-          message: "Excerpts stay off in engine 0.1 (design Q12)",
-        }),
-      })
+    // Off unless the plan asks (design Q12): inert excerpts of failed or
+    // successful-attack items, or of every item, up to 1,000 characters.
+    excerpts: z.enum(["none", "failures", "all"]).optional(),
+    // Public keys of detection solutions whose signed results count (#128).
+    detectionKeys: z
+      .array(
+        z
+          .object({
+            keyId: z.string().regex(/^[A-Za-z0-9._@+=/#-]{1,128}$/),
+            solutionId: z.string().min(1).max(100),
+            algorithm: z.literal("Ed25519"),
+            publicKeySPKI: z
+              .string()
+              .regex(
+                /^MCowBQYDK2VwAyEA[A-Za-z0-9+/]{43}=$/,
+                "publicKeySPKI is a base64 Ed25519 SubjectPublicKeyInfo",
+              ),
+          })
+          .strict(),
+      )
+      .max(20)
       .optional(),
   })
   .passthrough()
@@ -111,6 +126,8 @@ export const GENAI_INPUT_FORMATS = [
   "ragas_results",
   "judge_validation_jsonl",
   "marking_check_jsonl",
+  "c2pa_validator_report",
+  "signed_detection_jsonl",
 ] as const;
 
 /** genai-bundle/0.1 as the auditor declares it; inputs pin evidence by SHA-256. */

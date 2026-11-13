@@ -372,9 +372,28 @@ describe("plans and manifests the workspace freezes", () => {
     expect(
       genaiPlan.safeParse({ ...plan, minimums: { sampleSize: 10 } }).success,
     ).toBe(false);
-    expect(genaiPlan.safeParse({ ...plan, excerpts: "all" }).success).toBe(
+    for (const excerpts of ["none", "failures", "all"])
+      expect(genaiPlan.safeParse({ ...plan, excerpts }).success).toBe(true);
+    expect(genaiPlan.safeParse({ ...plan, excerpts: "some" }).success).toBe(
       false,
     );
+    const key = {
+      keyId: "test-detector-key-1",
+      solutionId: "example-detector",
+      algorithm: "Ed25519",
+      publicKeySPKI: "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=",
+    };
+    expect(genaiPlan.safeParse({ ...plan, detectionKeys: [key] }).success).toBe(
+      true,
+    );
+    for (const bad of [
+      { ...key, algorithm: "RSA" },
+      { ...key, publicKeySPKI: "AAAA" },
+      { ...key, extra: 1 },
+    ])
+      expect(
+        genaiPlan.safeParse({ ...plan, detectionKeys: [bad] }).success,
+      ).toBe(false);
   });
   it("pins each manifest input once by SHA-256", () => {
     const input = {
