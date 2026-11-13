@@ -13,6 +13,20 @@ import {
 } from "./dataset-header";
 import { uploadHeader } from "./special-category";
 
+/**
+ * The CPU time in milliseconds this test process spends while `work` runs:
+ * the reader itself, its garbage collection and the zlib threads that
+ * inflate for it. Unlike wall-clock time, it does not grow while other
+ * processes load the machine (#174). Vitest runs each test file in its own
+ * process, one test at a time.
+ */
+async function cpuTime<T>(work: () => Promise<T>) {
+  const before = process.cpuUsage(),
+    result = await work(),
+    used = process.cpuUsage(before);
+  return { result, ms: (used.user + used.system) / 1000 };
+}
+
 describe("parquetColumns", () => {
   it("reads the leaf columns of a file pyarrow wrote, nested ones by path", () => {
     const b = pyarrowParquet();
@@ -272,6 +286,10 @@ describe("spreadsheetColumns", () => {
   it("reads malformed markup up to its limits in linear time", async () => {
     // Unclosed elements and quotes made regular expressions that retry from
     // every opening tag take time quadratic in the markup (#125 review).
+    // Each read is bounded by the CPU time this process spends on it, not
+    // by wall-clock time, so the bound holds while other processes load the
+    // machine (#174). A linear read takes about 250 ms of CPU; a quadratic
+    // one takes far longer than the bound.
     const limit = 4 * 1024 * 1024,
       fill = (unit: string, room = 256) =>
         unit.repeat(Math.floor((limit - room) / unit.length));
@@ -326,25 +344,31 @@ describe("spreadsheetColumns", () => {
         },
       ],
     ];
-    for (const [label, archive, expected] of cases) {
-      const b = await archive,
-        started = performance.now();
-      expect(await spreadsheetColumns(b), label).toEqual(expected);
-      expect(performance.now() - started, label).toBeLessThan(3000);
-    }
-    // [Content_Types].xml full of unclosed Override tags.
-    const types = await zipArchive([
+    cases.push([
+      "unclosed Override tags in [Content_Types].xml",
+      zipArchive([
         {
           name: "[Content_Types].xml",
           text: "<Types>spreadsheetml" + "<Override ".repeat(100_000),
         },
       ]),
-      started = performance.now();
-    expect(await spreadsheetColumns(types)).toEqual({
-      unreadable: "the workbook declares no worksheet",
-    });
-    expect(performance.now() - started).toBeLessThan(3000);
-  });
+      { unreadable: "the workbook declares no worksheet" },
+    ]);
+    // Every archive is built before the first read: deflating one while
+    // another is read would count toward the CPU time of the read.
+    const archives = await Promise.all(cases.map(([, archive]) => archive));
+    for (const [i, [label, , expected]] of cases.entries()) {
+      const { result, ms } = await cpuTime(() =>
+        spreadsheetColumns(archives[i]),
+      );
+      expect(result, label).toEqual(expected);
+      expect(ms, label).toBeLessThan(3000);
+    }
+    // Building the archives deflates about 30 MiB of markup and the reads
+    // inflate it again: about 2 s on an idle machine, past the default 5 s
+    // timeout under load (#174). The CPU bounds above are what this test
+    // checks; the timeout only ends a read that never finishes.
+  }, 60_000);
 
   it("reads each worksheet once, within one budget for the whole package", async () => {
     // The #125 review probe: one worksheet named by 64 Overrides, about
