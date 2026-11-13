@@ -543,7 +543,7 @@ class DossierTests(unittest.TestCase):
         with_evidence["manifest"]["scope"]["evidence"] = "included"
         self.assertTrue(verify_dossier(rehash(with_evidence))["valid"])
 
-    @unittest.skipUnless(HAS_CRYPTOGRAPHY, "Optional cryptography runtime unavailable")
+    @requires_cryptography
     def test_manifest_1_2_signature_covers_the_scope(self):
         with temporary_directory() as directory:
             key_path = Path(directory) / "fixture.pem"
