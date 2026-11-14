@@ -981,25 +981,44 @@ describe("external queue telemetry", () => {
       }),
       at(9),
     );
-    // The plan record, and records with the same id in another engagement
-    // and another tenant, which the subquery must not read.
+    // Records with the same id in another engagement and another tenant,
+    // inserted first, with earlier times and keys that sort first, so a
+    // subquery that dropped either scoping clause would read one of them.
+    sqlite
+      .prepare("INSERT INTO tenants(id,name,created_at) VALUES(?,?,?)")
+      .run("tenant-0", "Practice", at(0));
+    sqlite
+      .prepare(
+        "INSERT INTO clients(id,tenant_id,name,sector,created_at) VALUES('CL-1','tenant-0','Client','Finance',?)",
+      )
+      .run(at(0));
+    for (const [tenant, engagement] of [
+      ["tenant-1", "ENG-0"],
+      ["tenant-0", "ENG-1"],
+    ])
+      sqlite
+        .prepare(
+          "INSERT INTO engagements(id,tenant_id,client_id,title,version,body,last_command_id) VALUES(?,?,'CL-1','Audit',1,'{}','init')",
+        )
+        .run(engagement, tenant);
     await insert([
-      { id: "AS-plan", kind: "genai_plan", body: {}, at: at(5) },
       {
         id: "AS-plan",
         kind: "genai_plan",
         body: {},
-        at: at(6),
-        engagement: "ENG-2",
+        at: at(1),
+        engagement: "ENG-0",
       },
       {
         id: "AS-plan",
         kind: "genai_plan",
         body: {},
-        at: at(7),
-        tenant: "tenant-2",
+        at: at(2),
+        tenant: "tenant-0",
       },
     ]);
+    // The plan record itself.
+    await insert([{ id: "AS-plan", kind: "genai_plan", body: {}, at: at(5) }]);
     const listed = await jobs(ctx, "ENG-1");
     expect(listed.map((j) => j.id)).toEqual(["JOB-genai", "JOB-tabular"]);
     expect(listed[0]).toMatchObject({
