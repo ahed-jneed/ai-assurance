@@ -153,6 +153,9 @@ export function useWorkspaceNavigation({
         sort: url.sort,
       };
       const memory = viewMemory.current[label];
+      // Leaving an engagement that could not be opened clears its banner
+      // (#234 item 3).
+      if (!isAuditView(label)) workspace.leaveFailedEngagement();
       setView(label);
       if (label === "Evidence vault") {
         const selectedFilter = options.filter ?? memory?.filter ?? "all",

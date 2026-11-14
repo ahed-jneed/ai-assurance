@@ -170,6 +170,8 @@ export function useWorkspaceData() {
   });
   const listener = useRef<WorkspaceDataListener | null>(null),
     loadFailure = useRef<LoadFailure>(null),
+    // The banner text of the last failed load.
+    failureMessage = useRef(""),
     restoreRequest = useRef<RestoreRequest | null>(null),
     loadRequest = useRef<{
       generation: number;
@@ -257,11 +259,10 @@ export function useWorkspaceData() {
       )
         return null;
       loadFailure.current ??= "transient";
-      setError(
-        restoreRequest.current
-          ? "Your last engagement could not be loaded. Retry, or choose an engagement from the directory."
-          : errorMessage(error, "Workspace unavailable"),
-      );
+      failureMessage.current = restoreRequest.current
+        ? "Your last engagement could not be loaded. Retry, or choose an engagement from the directory."
+        : errorMessage(error, "Workspace unavailable");
+      setError(failureMessage.current);
       return null;
     } finally {
       if (generation === loadRequest.current.generation) setLoading(false);
@@ -401,6 +402,42 @@ export function useWorkspaceData() {
       retrySelection.current.engagementId,
     );
   }, [load]);
+  /**
+   * Opens the practice `tenantId` after its engagement `engagementId` was
+   * not found there (#234 item 2), so the not-found state, its banner and
+   * its directory link belong to the requested practice instead of the
+   * account's default one.
+   */
+  const loadMissingEngagement = useCallback(
+    async (tenantId: string, engagementId: string) => {
+      const message = failureMessage.current;
+      const body = await load(tenantId);
+      if (body && !body.engagement) {
+        loadFailure.current = "missing";
+        retrySelection.current = { tenantId, engagementId };
+        setError(message);
+      }
+      return body;
+    },
+    [load],
+  );
+  /**
+   * Leaving an engagement that could not be opened (#234 item 3): its banner
+   * goes, and a later Retry reloads the practice instead of re-requesting
+   * the engagement.
+   */
+  const leaveFailedEngagement = useCallback(() => {
+    const current = dataRef.current;
+    if (!current || current.engagement || !retrySelection.current.engagementId)
+      return;
+    retrySelection.current = { tenantId: current.tenantId };
+    loadFailure.current = null;
+    setError("");
+    if (current.engagementError)
+      setData((previous) =>
+        previous ? { ...previous, engagementError: undefined } : previous,
+      );
+  }, []);
   const getData = useCallback(() => dataRef.current, []);
   /** Registers the listener; call it from a layout effect of the shell. */
   const connect = useCallback((next: WorkspaceDataListener) => {
@@ -434,6 +471,8 @@ export function useWorkspaceData() {
     act,
     safeAct,
     retry,
+    loadMissingEngagement,
+    leaveFailedEngagement,
     getData,
     connect,
     requestRestore,
@@ -462,6 +501,7 @@ export function useWorkspaceBootstrap(
     requestRestore,
     lastFailure,
     abortLoad,
+    loadMissingEngagement,
   } = workspace;
   // The bootstrap applies a link and the view with the latest handlers.
   const applyLink = useEffectEvent(applyWorkspaceLink),
@@ -483,6 +523,18 @@ export function useWorkspaceBootstrap(
             linked.engagementId === first.engagement?.id
               ? first
               : await load(linked.tenantId, linked.engagementId || undefined);
+          // An engagement that is not in the linked practice: stay in that
+          // practice and show the not-found state there (#234 item 2).
+          if (
+            !target &&
+            active &&
+            linked.engagementId &&
+            linked.tenantId !== first.tenantId &&
+            lastFailure() === "missing"
+          ) {
+            await loadMissingEngagement(linked.tenantId, linked.engagementId);
+            return;
+          }
           if (target)
             applyLink(
               target,
@@ -566,6 +618,7 @@ export function useWorkspaceBootstrap(
     requestRestore,
     lastFailure,
     abortLoad,
+    loadMissingEngagement,
   ]);
 }
 
