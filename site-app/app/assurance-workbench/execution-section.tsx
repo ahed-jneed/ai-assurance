@@ -25,7 +25,6 @@ export function ExecutionSection({
   initialProcedure,
   open,
   act,
-  onExecutionMode,
   onSystems,
   onNavigate,
   onHosted,
@@ -40,7 +39,6 @@ export function ExecutionSection({
   initialProcedure?: string;
   open: OpenForm;
   act: Act;
-  onExecutionMode: (mode: string) => void;
   onSystems: () => void;
   onNavigate: (s: string) => void;
   onHosted: (procedureId: string, cardId: string) => void;
@@ -56,11 +54,8 @@ export function ExecutionSection({
         role={role}
         records={records}
         workers={snapshot.workers}
-        onPlan={(v) => {
-          const { mode, ...values } = v;
-          open("queueExternal", null, { ...values, mode });
-          onExecutionMode(mode);
-        }}
+        // open() starts the form in the plan's execution mode.
+        onPlan={(v) => open("queueExternal", null, v)}
         onHosted={onHosted}
         initialProcedure={initialProcedure}
       />
