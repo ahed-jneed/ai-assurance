@@ -173,6 +173,22 @@ export function jobName(
 }
 
 /**
+ * The Cancel execution select's options: the queued and running requests,
+ * each named as the execution requests name it, with its id (#221).
+ */
+export function activeJobOptions(
+  jobs: (Parameters<typeof jobName>[0] & Pick<ExecutionJob, "id" | "state">)[],
+  procedures: Parameters<typeof jobName>[1],
+) {
+  return jobs
+    .filter((j) => ["queued", "running"].includes(j.state))
+    .map((j) => ({
+      value: j.id,
+      label: jobName(j, procedures) + " · " + j.id,
+    }));
+}
+
+/**
  * The external queue's telemetry line: totals by state and, when the list is
  * cut short, how many of the most recent requests it shows.
  */

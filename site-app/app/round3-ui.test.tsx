@@ -2,7 +2,8 @@
 // the banner of a captured final package, the Revoke control of a client
 // request grant, the Access log's superseded invitations and the GenAI
 // members count. The real clicks are in e2e/round3-ui.spec.ts; the job and
-// option labels are in genai-ingest-labels.test.ts.
+// option labels are in genai-ingest-labels.test.ts, and the components that
+// show them in round3-ui-wiring.test.tsx.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { accessEventText } from "@/lib/access-events";

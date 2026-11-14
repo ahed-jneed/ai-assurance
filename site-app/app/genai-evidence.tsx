@@ -146,7 +146,49 @@ export function membersHeading(c: {
   );
 }
 
-function ResultCard({
+const procedureOption = (p: {
+  id: string;
+  templateId: string;
+  title: string;
+}) => ({
+  value: p.id,
+  label: p.templateId + " · " + p.title,
+});
+
+/**
+ * The Queue ingest dialog's fields: the procedure, and the frozen plans and
+ * declared bundles by readable labels that tell same-day records apart
+ * (#211, #221).
+ */
+export function queueIngestFields(
+  procedures: { id: string; templateId: string; title: string }[],
+  view: Pick<GenaiView, "plans" | "bundles"> | null,
+): Form["fields"] {
+  return [
+    {
+      name: "procedureId",
+      label: "Procedure",
+      type: "select",
+      options: procedures.map(procedureOption),
+    },
+    {
+      name: "planRecordId",
+      label: "Frozen plan",
+      type: "select",
+      options: distinctOptions(view?.plans ?? [], (p) =>
+        planOptionLabel(p, procedures),
+      ),
+    },
+    {
+      name: "bundleRecordId",
+      label: "Declared bundle",
+      type: "select",
+      options: distinctOptions(view?.bundles ?? [], bundleOptionLabel),
+    },
+  ];
+}
+
+export function ResultCard({
   result,
   reviewer,
   busy,
@@ -475,10 +517,7 @@ export function GenaiEvidence({
       (p) =>
         p.selected && ["applicable", "readiness"].includes(p.applicability),
     ),
-    procedureOptions = procedures.map((p) => ({
-      value: p.id,
-      label: p.templateId + " · " + p.title,
-    })),
+    procedureOptions = procedures.map(procedureOption),
     imported = new Set(view?.results.map((r) => r.artifactId) ?? []),
     envelopes = e.artifacts.filter(
       (a) =>
@@ -590,28 +629,7 @@ export function GenaiEvidence({
       description:
         "An enrolled worker recomputes the statistics from the pinned logs. It runs no harness and executes nothing the logs name.",
       action: "Queue ingest",
-      fields: [
-        {
-          name: "procedureId",
-          label: "Procedure",
-          type: "select",
-          options: procedureOptions,
-        },
-        {
-          name: "planRecordId",
-          label: "Frozen plan",
-          type: "select",
-          options: distinctOptions(view?.plans ?? [], (p) =>
-            planOptionLabel(p, procedures),
-          ),
-        },
-        {
-          name: "bundleRecordId",
-          label: "Declared bundle",
-          type: "select",
-          options: distinctOptions(view?.bundles ?? [], bundleOptionLabel),
-        },
-      ],
+      fields: queueIngestFields(procedures, view),
       save: (v) => run("queueGenaiIngest", v),
     });
   const importEnvelope = () =>
