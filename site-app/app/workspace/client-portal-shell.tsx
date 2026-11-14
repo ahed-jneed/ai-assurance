@@ -1,9 +1,10 @@
 "use client";
 // The client portal's header (#36, F-72): Client Viewers and Contributors
 // get their own shell instead of the practice sidebar. It names the audit
-// practice and the client, offers the portal's four destinations in client
-// words, and never shows practice navigation (Clients, Engagements, Members
-// & access, Switch practice), search or auditor shortcuts.
+// practice and the client, offers the destinations the person may open in
+// client words (a Client Contributor has no Findings, #182), and never shows
+// practice navigation (Clients, Engagements, Members & access, Switch
+// practice), search or auditor shortcuts.
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   clientPortalRoutes,
+  clientPortalRoutesFor,
   type NavigationRoute,
 } from "@/lib/navigation-preferences";
 import { canSee } from "@/lib/permissions";
@@ -58,6 +60,10 @@ export function ClientPortalHeader({
   const client = data.clients.find((c) => c.id === e?.clientId)?.name;
   // Only engagements the client may open are listed; a choice needs two.
   const switchable = data.engagements.length > 1;
+  const allowed = clientPortalRoutesFor(data.identity.role);
+  const routes = clientPortalRoutes.filter(([route]) =>
+    allowed.includes(route),
+  );
   return (
     <header className="client-portal-header">
       <div className="client-portal-bar">
@@ -97,7 +103,7 @@ export function ClientPortalHeader({
           aria-label="Client portal navigation"
         >
           <ul>
-            {clientPortalRoutes.map(([route, label]) => {
+            {routes.map(([route, label]) => {
               const Icon = icons[route];
               return (
                 <li key={route}>
