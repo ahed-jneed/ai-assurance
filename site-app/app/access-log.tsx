@@ -20,6 +20,7 @@ import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { accessLogCsvHref, accessLogQuery } from "@/lib/event-log-queries";
 import {
   accessEventLabel,
+  accessEventText,
   signInGapHours,
   signInRetentionDays,
 } from "@/lib/access-events";
@@ -113,7 +114,7 @@ export function AccessLog({ data }: { data: WorkspaceData }) {
                   <TableCell>
                     <EventTime at={event.created_at} />
                   </TableCell>
-                  <TableCell>{accessEventLabel(event.action)}</TableCell>
+                  <TableCell>{accessEventText(event)}</TableCell>
                   <TableCell>{event.actor_name}</TableCell>
                   <TableCell>{event.subject_name ?? "—"}</TableCell>
                   <TableCell>{event.role ?? "—"}</TableCell>

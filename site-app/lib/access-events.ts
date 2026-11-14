@@ -48,3 +48,24 @@ export function accessEventLabel(action: string) {
     ? accessEventLabels[action as AccessEventType]
     : action;
 }
+
+/**
+ * An Access log row's event: its name and what the details add to it. A
+ * re-invitation says how many expired invitations it replaced (#221):
+ * "Invitation sent (replaced 1 expired invitation)".
+ */
+export function accessEventText(event: {
+  action: string;
+  details: Record<string, unknown> | null;
+}) {
+  const replaced = event.details?.expiredInvitations,
+    n = Array.isArray(replaced) ? replaced.length : 0;
+  return (
+    accessEventLabel(event.action) +
+    (event.action === "inviteMember" && n > 0
+      ? " (replaced " +
+        n.toLocaleString() +
+        (n === 1 ? " expired invitation)" : " expired invitations)")
+      : "")
+  );
+}

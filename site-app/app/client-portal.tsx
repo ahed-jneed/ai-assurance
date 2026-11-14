@@ -671,7 +671,8 @@ export function RequestAccess({
             busy={busy}
             onAcknowledge={acknowledge}
           />
-          {g.active && (
+          {/* An expired or lapsed grant gives no access left to revoke. */}
+          {requestGrantStatus(g, lapsed, at) === "Active" && (
             <Button
               variant="ghost"
               size="sm"
