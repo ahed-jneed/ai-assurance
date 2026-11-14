@@ -316,9 +316,10 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       sha256: r.clientSha256!,
       snapshot: r.clientSnapshot!,
       // The client sees which reports a released report replaced, and a
-      // superseded report stays readable, labelled with its successor.
+      // superseded report stays readable, labelled with its successor. A
+      // predecessor withdrawn since is no longer named (#201).
       replaces: e.reports
-        .filter((q) => q.release?.supersededBy === r.id)
+        .filter((q) => q.release?.supersededBy === r.id && isClientVisible(q))
         .map((q) => q.id),
       // A successor the client cannot read (withdrawn after release) is not
       // named.
