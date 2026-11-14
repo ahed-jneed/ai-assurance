@@ -12,6 +12,7 @@ import { withResponseStatus } from "@/lib/response-status";
 import { archivedMessage } from "@/lib/tenancy";
 import ReportForbidden from "./forbidden";
 import ReportPage from "./page";
+import { reportMarkup, type ReportSnapshot } from "./report-markup";
 import { printRefusal } from "@/app/print-refusal";
 
 const state = vi.hoisted(() => ({
@@ -42,10 +43,20 @@ vi.mock("@/lib/tenancy", async (importOriginal) => ({
 vi.mock("@/lib/engagement-repo", () => ({
   getEngagement: vi.fn(async () => ({})),
 }));
+// A released report as the client projection shows it, with every field
+// reportMarkup reads, so that a test fails only where its snapshot does.
+const projected = vi.hoisted(() => () => ({
+  id: "RPT-1",
+  kind: "final" as const,
+  createdAt: "2026-11-05T10:00:00.000Z",
+  releasedAt: "2026-11-05T10:00:00.000Z",
+  actor: "",
+  sha256: "client-sha",
+  replaces: [],
+  snapshot: state.snapshot as Record<string, unknown>,
+}));
 vi.mock("@/lib/client-projection", () => ({
-  sanitize: vi.fn(() => ({
-    reports: [{ id: "RPT-1", snapshot: state.snapshot }],
-  })),
+  sanitize: vi.fn(() => ({ reports: [projected()] })),
 }));
 // A request-scoped store, as vinext keeps one per request.
 vi.mock("@/app/print-refusal", () => {
@@ -89,9 +100,19 @@ describe("the /report print view", () => {
     // reportMarkup itself reads this snapshot; only its CriteriaPackLine
     // child fails, on the null framework list.
     state.snapshot = {
-      engagement: { title: "Credit scoring audit" },
+      engagement: { id: "ENG-1", title: "Credit scoring audit" },
       criteriaPack: { packId: "eu-ai-act", packVersion: "1", frameworks: null },
+      papers: [],
+      findings: [],
+      evidence: [],
     };
+    // reportMarkup returns its element tree without throwing: the failure
+    // happens only when the child component renders.
+    const tree = reportMarkup(
+      projected(),
+      state.snapshot as unknown as ReportSnapshot,
+    );
+    expect(() => renderToStaticMarkup(tree)).toThrow(TypeError);
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const response = await withResponseStatus(async () => {
       const page = await ReportPage({ searchParams: params });
