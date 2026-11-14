@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   authorizedLink,
   linkQuery,
+  practiceLanding,
   readWorkspaceLink,
   type WorkspaceLink,
 } from "./workspace-links";
@@ -46,6 +47,35 @@ describe("workspace links", () => {
     expect(
       readWorkspaceLink("?view=Overview&record=" + "x".repeat(301)),
     ).toBeNull();
+  });
+
+  // #225 item 3: a practice-only link honours the practice.
+  it("opens a practice link without a view at the Overview", () => {
+    const practiceOnly = readWorkspaceLink("?practice=tenant-2");
+    expect(practiceOnly).toEqual({
+      tenantId: "tenant-2",
+      engagementId: "",
+      module: "Overview",
+      kind: "",
+      recordId: "",
+      section: "",
+    });
+    expect(
+      readWorkspaceLink("?practice=tenant-2&engagement=eng-9")?.module,
+    ).toBe("Overview");
+    expect(readWorkspaceLink("?engagement=eng-9")).toBeNull();
+    // Without an engagement to show, the practice opens at its directory;
+    // a link that names its view keeps it.
+    expect(
+      practiceLanding(practiceOnly!, "?practice=tenant-2", false).module,
+    ).toBe("Engagements");
+    expect(
+      practiceLanding(practiceOnly!, "?practice=tenant-2", true).module,
+    ).toBe("Overview");
+    const named = readWorkspaceLink("?practice=tenant-2&view=Overview")!;
+    expect(
+      practiceLanding(named, "?practice=tenant-2&view=Overview", false),
+    ).toBe(named);
   });
 
   it("keeps internal records and views away from client roles", () => {

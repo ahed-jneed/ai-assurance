@@ -79,27 +79,31 @@ export function DevPersonaSignIn() {
 /**
  * The account menu in the sidebar footer. It is there whenever the account is
  * signed in, also when the workspace refused it (revoked or no practice
- * access): then it has no identity to show, but still offers Sign out and,
- * on the development server, another persona.
+ * access): then it shows the signed-in name the refusal named (#225), and
+ * still offers Sign out and, on the development server, another persona.
  */
 export function AccountMenu({
   data,
   signedIn = !!data,
+  accountName = "",
   side = "right",
 }: {
   data: WorkspaceData | null;
+  /** The signed-in name or email when there is no workspace data. */
+  accountName?: string;
   /** Signed in without workspace data, for example after a revocation. */
   signedIn?: boolean;
   /** Where the menu opens: beside the sidebar, or below the portal header. */
   side?: "right" | "bottom";
 }) {
   if (!data && !signedIn) return null;
+  const name = data ? data.identity.name : accountName;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           className="nav-preferences-trigger"
-          aria-label={"Account" + (data ? ": " + data.identity.name : "")}
+          aria-label={"Account" + (name ? ": " + name : "")}
           title="Account"
         >
           <UserRound size={16} aria-hidden="true" />
@@ -111,7 +115,7 @@ export function AccountMenu({
         side={side}
         sideOffset={8}
       >
-        <AccountMenuItems data={data} />
+        <AccountMenuItems data={data} accountName={accountName} />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -121,7 +125,13 @@ export function AccountMenu({
  * Rendered when the menu opens, so the links return to the location at that
  * moment: the workspace rewrites the URL after it renders.
  */
-function AccountMenuItems({ data }: { data: WorkspaceData | null }) {
+function AccountMenuItems({
+  data,
+  accountName,
+}: {
+  data: WorkspaceData | null;
+  accountName: string;
+}) {
   const practice = data?.memberships.find(
     (m) => m.tenant_id === data.tenantId,
   )?.name;
@@ -142,7 +152,7 @@ function AccountMenuItems({ data }: { data: WorkspaceData | null }) {
         ) : (
           <>
             <span className="text-[13px] font-medium text-[#edf3ff]">
-              Signed in
+              {accountName || "Signed in"}
             </span>
             <span>No practice access</span>
           </>

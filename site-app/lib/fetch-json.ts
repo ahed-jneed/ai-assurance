@@ -21,6 +21,8 @@ export class FetchError extends Error {
     /** The HTTP status, or 0 when no response arrived. */
     public status: number,
     public kind: FailureKind,
+    /** The failed response's JSON body, when it had one. */
+    public body?: unknown,
   ) {
     super(message);
     this.name = "FetchError";
@@ -114,6 +116,7 @@ export async function fetchJson<T>(
       typeof own === "string" && own ? own : statusMessage(response.status),
       response.status,
       failureKind(response.status),
+      body,
     );
   }
   if (body === undefined)
