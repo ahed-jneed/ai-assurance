@@ -33,11 +33,40 @@ Product and technical decisions for the platform, oldest first. Each entry links
 | D-23 | 5 Nov 2026 | Identity denies by default: with `IDENTITY_MODE` unset, empty or unknown, every request is anonymous and the API answers 401. The Sites build compiles `sites` in as its default, which applies only while `IDENTITY_MODE` is unset, so an explicit value wins. Dev personas exist only on the dev server and are compiled out of builds. | Setting `sites` for every build would leave F-02, forged identity headers, open on any non-Sites deployment. The compiled-in default keeps the Site working even if the publisher does not apply `vars`, which nobody had verified. | [PR #55, round-1 response, item 2][c55]; proposed in the [PR #55 review][c55r] |
 | D-24 | 6 Nov 2026 | [#70] owns retiring the `lib/store.ts` barrel: moving its remaining importers and deleting it. [#37]'s barrel item is narrowed to `lib/domain.ts` and `lib/workflow-service.ts`. | #70 already scopes the `lib/store.ts` importers, and it runs in a quiet window after [#12], [#16] and [#17], which change them. | [#37, comment][c37b] |
 | D-25 | 6 Nov 2026 | Replaces D-22: `queueExternal` no longer refuses a binary performance protocol whose performance positive class differs from the favourable label. The worker (translation 2.1.0) records the class as the engine's `performancePositiveLabel`, and the engine measures recall, precision and F1 on it. | [#65] ported the performance positive class to the engine, so the refusal no longer protects anything. Statistics 1.0.0 decides hosted and external runs alike, and a shared golden file pins one decision per case. | [PR #98] |
+| D-26 | 6 Nov 2026 | Extends D-19 to explicit plans: an explicit (non-derived) hosted performance plan also carries a chance baseline by default (balanced accuracy of at least 0.5 for binary data; macro recall above 1/k for k classes). Normalisation inserts it unless the plan records a rationale for leaving it out, and the approval screen shows when it was left out. Implemented with [#22]. | Without a baseline, an accuracy-only explicit plan passes a constant predictor: the F-06 failure that [#15] fixed for derived plans. | [#22, comment][c22c]; [PR #101]; [#38, comments][c38b] |
+| D-27 | 6 Nov 2026 | Final packages captured before report model v2 cannot be released; they must be captured again. No issued snapshot is rewritten. | Report model v2 ([#20]) adds the engagement type, assurance level and ISAE 3000 conclusion type that the released report states, and an issued snapshot keeps the content it was issued with. | [PR #100]; [#38, comment][c38c] |
+| D-28 | 6 Nov 2026 | Disqualifying relationships (employment, financial interest, system involvement) declared in the independence gate carry across engagement periods until someone other than the declarant withdraws them. | No safeguard resolves a disqualifying relationship, so neither renewing a declaration nor moving the period clears it; only a Lead Auditor or Reviewer other than the declarant can withdraw one declared in error, with a reason that stays on the declaration ([#23]). | [PR #99]; [#38, comment][c38c] |
+| D-29 | 6 Nov 2026 | Accepted departure in the engine: a constant predictor is inconclusive rather than fail, and it never passes. | A constant predictor's balanced accuracy sits exactly on the chance bound, so the interval rule reports it inconclusive (for example `below_minimum_class_count` or `estimate_on_band_boundary`) and it never passes (statistics design section 5.2; [#65]). | [PR #98]; [#38, comment][c38c] |
+| D-30 | 6 Nov 2026 | Regression criteria must beat the mean-prediction baseline on RMSE, on both the hosted and the external runner. | Without the baseline, a constant (mean) predictor could pass on MAE and RMSE alone ([#68]). | [PR #117]; [#38, comment][c38d] |
+| D-31 | 6 Nov 2026 | The Engagement Quality Reviewer edits nothing except their own quality review and sign-off. Every new command is refused to the EQR by default, until its roles admit the EQR explicitly. | The EQR stands outside the engagement team ([#24]). Refusing the role centrally, instead of leaving it out of each op's role list, makes new ops safe by default and answers 403 rather than a validation 400. | [PR #115]; [#38, comment][c38d] |
+| D-32 | 6 Nov 2026 | Extends D-11: special-category fairness data runs without a recorded basis only as a client-local job, on a client-held SHA-256 pin. The platform never receives the bytes. | D-11's reason (LR-06, pending legal review) applies to any upload of such data; a client-local job keeps the bytes with the client, and the platform holds only the SHA-256 pin ([#102]). | [PR #126]; [#38, comment][c38e] |
+| D-33 | 6 Nov 2026 | Client-held results withhold groups below the minimum group size, including rows with no group value. Secondary suppression stops a withheld group from being worked out by subtraction, and coverage row counts are blanked. Comparing results across runs to recover a group remains a stated limitation. | Approved aggregates must not reveal small groups of special-category data ([#102]). | [PR #126]; [#38, comment][c38e] |
+| D-34 | 12 Nov 2026 | The NYC Local Law 144 pack ships released with its legal review marked pending, as D-17 allowed for the AI Act pack. | Its legal points (LR-LL144-01 to LR-LL144-08) wait for the owner's legal review in [#57], and holding the release back would block [#30] on an owner action. | [PR #142]; [#38, comment][c38f]; [#57, comment][c57ll] |
+| D-35 | 12 Nov 2026 | The GenAI workspace ([#33]) merges before the `genai_ingest` worker job ([#128]) and says so in the product. | Intake, evidence levels and the readiness gate did not depend on the worker job. `genai_ingest` later merged with [PR #160]. | [PR #143]; [#38, comment][c38f] |
+| D-36 | 12 Nov 2026 | A High or Critical internal-only finding that matches no procedure opens its own client criterion row, with the status 'exceptions'. Lower severities do not. | A serious exception reaches the client's results by criterion even when no selected procedure carries it, while an internal Low or Medium finding adds no row to the client report ([#61]). | [PR #140]; [#38, comment][c38f] |
+| D-37 | 12 Nov 2026 | Applies D-03: pack #2 (EN 18286 and ISO/IEC 42001, [#28]) ships as drafts until the owner actions in [#57] are done. | Its clause numbers and Annex ZA scope must be confirmed against licensed copies, and counsel has not yet confirmed the citation policy. | [PR #141]; [#38, comment][c38f]; [#57, comment][c57ll] |
+| D-38 | 14 Nov 2026 | The practice Access log is open only to practice administrators who hold a staff role (least privilege, the same as the admin-only rule for management events). Lead Auditors without the admin flag are refused. There is no Partner role. | Least privilege: the same rule already limits management events to practice administrators ([#181], [#185]). | [PR #184], [PR #189]; [#38, comment][c38g] |
+| D-39 | 14 Nov 2026 | Client Contributors do not see the Findings destination; the client projection gives them none. | The client projection carries no findings for a Contributor, so the destination would always be empty ([#36], [#182]). | [PR #180], [PR #183]; [#38, comment][c38g] |
+| D-40 | 14 Nov 2026 | No practice switch for client users. | No current flow puts a client in two practices ([#36], [#182]). | [#38, comment][c38g] |
+| D-41 | 14 Nov 2026 | A sign-in is recorded as a member's first request to a practice after an 8-hour gap (`signInGapHours` in `site-app/lib/access-events.ts`). | No identity mode reports a session start, and identity is resolved on every request ([#181]). Exact recording is on the watch list. | [PR #184]; [#38, comment][c38g] |
+| D-42 | 14 Nov 2026 | Recorded sign-ins (`sign_in_events`) are kept for 400 days and pruned when a new one is recorded; management events are kept. | A year plus a margin covers an annual audit cycle ([#185]). | [PR #189]; [#38, comment][c38g] |
+| D-43 | 14 Nov 2026 | [#64] is split into [#186], [#187] and [#188], one file each, so they could run in parallel; [#193] finishes it. | One file per issue let the three splits run in parallel. | [#38, comment][c38g]; [#64, comment][c64] |
+| D-44 | 14 Nov 2026 | Keep the Sites connector runtime (`build/sites-worker.ts`, the connector-preview build pieces, `lib/connector-context.ts` and `lib/connector-contract.mts`), although the app has no connectors. Whether to drop it is the hosting owner's call. | These files are part of the Sites hosting contract: the worker entry wraps every request in the connector binding ([#37]). | [PR #196]; [#38, comment][c38h] |
 
 [c18]: https://github.com/ahed-jneed/ai-assurance/issues/18#issuecomment-6666623902
 [c21]: https://github.com/ahed-jneed/ai-assurance/issues/21#issuecomment-6666624939
 [c22]: https://github.com/ahed-jneed/ai-assurance/issues/22#issuecomment-6666625399
 [c22b]: https://github.com/ahed-jneed/ai-assurance/issues/22#issuecomment-6680839160
+[c22c]: https://github.com/ahed-jneed/ai-assurance/issues/22#issuecomment-6681483015
+[c38b]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6681965139
+[c38c]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6688173153
+[c38d]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6691700278
+[c38e]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6697597891
+[c38f]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6835424081
+[c38g]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6871453274
+[c38h]: https://github.com/ahed-jneed/ai-assurance/issues/38#issuecomment-6872938082
+[c57ll]: https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6835423621
+[c64]: https://github.com/ahed-jneed/ai-assurance/issues/64
 [c27]: https://github.com/ahed-jneed/ai-assurance/issues/27#issuecomment-6666626278
 [c27b]: https://github.com/ahed-jneed/ai-assurance/issues/27#issuecomment-6680839690
 [c28]: https://github.com/ahed-jneed/ai-assurance/issues/28#issuecomment-6666626807
@@ -64,6 +93,22 @@ Product and technical decisions for the platform, oldest first. Each entry links
 [PR #49]: https://github.com/ahed-jneed/ai-assurance/pull/49
 [PR #54]: https://github.com/ahed-jneed/ai-assurance/pull/54
 [PR #98]: https://github.com/ahed-jneed/ai-assurance/pull/98
+[PR #99]: https://github.com/ahed-jneed/ai-assurance/pull/99
+[PR #100]: https://github.com/ahed-jneed/ai-assurance/pull/100
+[PR #101]: https://github.com/ahed-jneed/ai-assurance/pull/101
+[PR #115]: https://github.com/ahed-jneed/ai-assurance/pull/115
+[PR #117]: https://github.com/ahed-jneed/ai-assurance/pull/117
+[PR #126]: https://github.com/ahed-jneed/ai-assurance/pull/126
+[PR #140]: https://github.com/ahed-jneed/ai-assurance/pull/140
+[PR #141]: https://github.com/ahed-jneed/ai-assurance/pull/141
+[PR #142]: https://github.com/ahed-jneed/ai-assurance/pull/142
+[PR #143]: https://github.com/ahed-jneed/ai-assurance/pull/143
+[PR #160]: https://github.com/ahed-jneed/ai-assurance/pull/160
+[PR #180]: https://github.com/ahed-jneed/ai-assurance/pull/180
+[PR #183]: https://github.com/ahed-jneed/ai-assurance/pull/183
+[PR #184]: https://github.com/ahed-jneed/ai-assurance/pull/184
+[PR #189]: https://github.com/ahed-jneed/ai-assurance/pull/189
+[PR #196]: https://github.com/ahed-jneed/ai-assurance/pull/196
 [#3]: https://github.com/ahed-jneed/ai-assurance/issues/3
 [#12]: https://github.com/ahed-jneed/ai-assurance/issues/12
 [#15]: https://github.com/ahed-jneed/ai-assurance/issues/15
@@ -81,3 +126,22 @@ Product and technical decisions for the platform, oldest first. Each entry links
 [#60]: https://github.com/ahed-jneed/ai-assurance/issues/60
 [#65]: https://github.com/ahed-jneed/ai-assurance/issues/65
 [#70]: https://github.com/ahed-jneed/ai-assurance/issues/70
+[#20]: https://github.com/ahed-jneed/ai-assurance/issues/20
+[#22]: https://github.com/ahed-jneed/ai-assurance/issues/22
+[#23]: https://github.com/ahed-jneed/ai-assurance/issues/23
+[#24]: https://github.com/ahed-jneed/ai-assurance/issues/24
+[#28]: https://github.com/ahed-jneed/ai-assurance/issues/28
+[#30]: https://github.com/ahed-jneed/ai-assurance/issues/30
+[#36]: https://github.com/ahed-jneed/ai-assurance/issues/36
+[#61]: https://github.com/ahed-jneed/ai-assurance/issues/61
+[#64]: https://github.com/ahed-jneed/ai-assurance/issues/64
+[#68]: https://github.com/ahed-jneed/ai-assurance/issues/68
+[#102]: https://github.com/ahed-jneed/ai-assurance/issues/102
+[#128]: https://github.com/ahed-jneed/ai-assurance/issues/128
+[#181]: https://github.com/ahed-jneed/ai-assurance/issues/181
+[#182]: https://github.com/ahed-jneed/ai-assurance/issues/182
+[#185]: https://github.com/ahed-jneed/ai-assurance/issues/185
+[#186]: https://github.com/ahed-jneed/ai-assurance/issues/186
+[#187]: https://github.com/ahed-jneed/ai-assurance/issues/187
+[#188]: https://github.com/ahed-jneed/ai-assurance/issues/188
+[#193]: https://github.com/ahed-jneed/ai-assurance/issues/193
