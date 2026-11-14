@@ -9,7 +9,7 @@ import { addRecord } from "../../assurance-store";
 import { bucket } from "../../bindings";
 import { parseCSV } from "../../diagnostics";
 import { datasetCSV } from "../../evaluation-service";
-import { ApiError } from "../../http";
+import { ApiError, parseJsonFile } from "../../http";
 import { platformKey } from "../../special-category";
 import { sha256 } from "../../ids";
 import { substantivePlan } from "../../workflow/command";
@@ -54,9 +54,7 @@ export const sources: AssuranceModule = defineCommands({
       const bytes = await o.arrayBuffer();
       if ((await sha256(bytes)) !== source.sha256)
         throw new ApiError(409, "Packet integrity mismatch");
-      const summary = packetSummary(
-        JSON.parse(new TextDecoder().decode(bytes)),
-      );
+      const summary = packetSummary(parseJsonFile(bytes, "assurance packet"));
       return {
         record: await addRecord(
           ctx,
