@@ -17,14 +17,6 @@ import {
 } from "./readiness";
 import type { GenaiCustody, GenaiSummary } from "./summary";
 
-export const GENAI_KINDS = [
-  "genai_plan",
-  "genai_bundle",
-  "genai_result",
-  "genai_acknowledgement",
-  "genai_rerun_attestation",
-] as const;
-
 const select =
   "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND ";
 

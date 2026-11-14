@@ -162,7 +162,6 @@ export const attestationInput = z
       .optional(),
   })
   .strict();
-export type AttestationInput = z.infer<typeof attestationInput>;
 
 /** What the audit event records for an attested decision. */
 export type AttestationRecord = {

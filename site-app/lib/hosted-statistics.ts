@@ -989,10 +989,3 @@ export function requestedCriteria(frozen: {
           : "group_comparison",
   }));
 }
-
-/** The threshold library entries a hosted plan may reference (section 10.1), for the plan step. */
-export const HOSTED_LIBRARY = Object.fromEntries(
-  Object.entries(LIBRARY).filter(([, entry]) =>
-    ["group_comparison", "performance"].includes(entry.kind),
-  ),
-);

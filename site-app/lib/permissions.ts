@@ -386,12 +386,6 @@ function refused(
   return { allowed: false, reason, refusal };
 }
 
-/** The role check alone, for an action without an independence rule. */
-export function actionState(role: Role, action: Action): ActionState {
-  const reason = roleReason(role, action);
-  return reason ? refused(reason, "role") : allowed;
-}
-
 /**
  * Workflow ops whose command narrows the base roles by the record's state
  * (lib/workflow/brief-program.ts, acceptance-commands.ts): once the scope,
