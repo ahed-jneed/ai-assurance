@@ -615,6 +615,14 @@ describe("practices with issued work", () => {
         "INSERT INTO dossier_keys(tenant_id,id,public_key,active,created_at) VALUES('t-report','KEY-1','MCowBQYDK2VwAyEA',1,?)",
       )
       .run(old);
+    // INV-1 (seeded) expired long ago; INV-2 is still open. Only the open
+    // one is pending, counted and cancelled; the expired one is closed as
+    // expired (#216, as #209 decided).
+    sqlite
+      .prepare(
+        "INSERT INTO invitations(tenant_id,id,email,role,invited_by,created_at,expires_at) VALUES('t-report','INV-2','open@example.test','Auditor','u',?,'2027-01-05T00:00:00.000Z')",
+      )
+      .run(old);
     const before = Object.fromEntries(
       tables.map((table) => [table, count(sqlite, table, "t-report")]),
     );
@@ -640,10 +648,13 @@ describe("practices with issued work", () => {
     expect(
       sqlite
         .prepare(
-          "SELECT status,closed_at FROM invitations WHERE tenant_id='t-report'",
+          "SELECT id,status,closed_at FROM invitations WHERE tenant_id='t-report' ORDER BY id",
         )
         .all(),
-    ).toEqual([{ status: "cancelled", closed_at: at }]);
+    ).toEqual([
+      { id: "INV-1", status: "expired", closed_at: at },
+      { id: "INV-2", status: "cancelled", closed_at: at },
+    ]);
     expect(
       sqlite.prepare("SELECT active FROM runner_workers WHERE id='W-1'").get(),
     ).toEqual({ active: 0 });

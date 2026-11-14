@@ -519,7 +519,9 @@ export type ArchiveResult = {
  * `archivePractice` operator event is written first, under the same guard in
  * SQL, then the practice is marked archived, its active memberships become
  * 'archived' (every access check requires 'active'), its pending invitations
- * are cancelled and its runner workers deactivated. Nothing else changes:
+ * are cancelled (one already past its expiry is marked expired instead and
+ * not counted, as in #209: an expired invitation is no longer pending) and
+ * its runner workers deactivated. Nothing else changes:
  * its engagements, snapshots, records, audit trails and stored objects stay,
  * and migration 0015 keeps it archived and closed to new members.
  */
@@ -555,14 +557,19 @@ export async function archivePractice(
         abandonedAfterDays +
         " days can be archived.",
     );
-  const count = async (sql: string) =>
-    (await db.prepare(sql).bind(request.tenantId).first<{ n: number }>())?.n ??
-    0;
+  const count = async (sql: string, ...extra: string[]) =>
+    (
+      await db
+        .prepare(sql)
+        .bind(request.tenantId, ...extra)
+        .first<{ n: number }>()
+    )?.n ?? 0;
   const members = await count(
     "SELECT COUNT(*) AS n FROM memberships WHERE tenant_id=? AND status='active'",
   );
   const invitations = await count(
-    "SELECT COUNT(*) AS n FROM invitations WHERE tenant_id=? AND status='pending'",
+    "SELECT COUNT(*) AS n FROM invitations WHERE tenant_id=? AND status='pending' AND expires_at>?",
+    at,
   );
   const workers = await count(
     "SELECT COUNT(*) AS n FROM runner_workers WHERE tenant_id=? AND active=1",
@@ -603,9 +610,14 @@ export async function archivePractice(
       .bind(request.tenantId, event.id),
     db
       .prepare(
-        `UPDATE invitations SET status='cancelled',closed_at=? WHERE tenant_id=? AND status='pending' AND ${recorded}`,
+        `UPDATE invitations SET status='cancelled',closed_at=? WHERE tenant_id=? AND status='pending' AND expires_at>? AND ${recorded}`,
       )
-      .bind(at, request.tenantId, event.id),
+      .bind(at, request.tenantId, at, event.id),
+    db
+      .prepare(
+        `UPDATE invitations SET status='expired',closed_at=? WHERE tenant_id=? AND status='pending' AND expires_at<=? AND ${recorded}`,
+      )
+      .bind(at, request.tenantId, at, event.id),
     db
       .prepare(
         `UPDATE runner_workers SET active=0 WHERE tenant_id=? AND active=1 AND ${recorded}`,
@@ -623,7 +635,7 @@ export async function archivePractice(
     archivedAt: at,
     members: results[2]?.meta.changes ?? members,
     invitations: results[3]?.meta.changes ?? invitations,
-    workers: results[4]?.meta.changes ?? workers,
+    workers: results[5]?.meta.changes ?? workers,
   };
 }
 
