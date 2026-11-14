@@ -1,7 +1,11 @@
 import type { Engagement, Report, Role } from "./domain/types";
 import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
-import { withdrawnSuccessorOf } from "./workflow-state";
+import {
+  clientSupersededBy,
+  withdrawnSuccessor,
+  withdrawnSuccessorOf,
+} from "./workflow-state";
 import { conclusionTypes, snapshotTerms } from "./domain/report-model";
 
 /**
@@ -58,6 +62,21 @@ export function packageStatusLabel(report: Report, clientView = false) {
   return labels[state] ?? "Internal package";
 }
 
+/**
+ * What a released report's supersession says (#234 item 4), from the
+ * successor the client projection names on it (clientSupersededBy): nothing
+ * while it is the latest released report, its successor once superseded,
+ * and that it is current again once that successor was withdrawn. The
+ * client's release notices and the staff guidance both use it, so neither
+ * calls the latest released report superseded.
+ */
+export function supersessionText(supersededBy: string | undefined) {
+  if (!supersededBy) return "";
+  return supersededBy === withdrawnSuccessor
+    ? "Its successor was withdrawn, so it is the current report again"
+    : "It has since been superseded by " + supersededBy;
+}
+
 /** What the client sees of a superseded report whose successor was withdrawn. */
 const withdrawnSuccessorNotice = (successor: string) =>
   "Its successor " +
@@ -102,8 +121,15 @@ export function packageGuidance(report: Report, engagement?: Engagement) {
         ? "Both package versions are approved. " + refusal.message + "."
         : "Both package versions are approved. A Lead Auditor other than the approver authorizes the client release.";
     }
-    case "released":
-      return "Released to the client. A newer released report supersedes it; a Lead Auditor can withdraw it.";
+    case "released": {
+      // What the client reads of it, from the client projection's answer.
+      const supersession = supersessionText(
+        clientSupersededBy(engagement?.reports ?? [report], report),
+      );
+      return supersession
+        ? "Released to the client. " + supersession + "."
+        : "Released to the client as its current report. A Lead Auditor can withdraw it.";
+    }
     case "superseded": {
       const withdrawn =
         engagement && withdrawnSuccessorOf(engagement.reports, report);
@@ -187,7 +213,7 @@ export function clientNotices(reports: Report[]) {
         " was released to " +
         (n.recipients || "your organisation") +
         (r.replaces?.length ? "; it replaces " + r.replaces.join(", ") : "") +
-        (r.supersededBy ? ". It has since been superseded" : "") +
+        (r.supersededBy ? ". " + supersessionText(r.supersededBy) : "") +
         ".",
     }))
     .sort((a, b) => b.at.localeCompare(a.at));

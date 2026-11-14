@@ -7,6 +7,7 @@ import {
 import { caller, stored } from "./commands/test-fixtures";
 import type { Report } from "./domain/types";
 import {
+  clientNotices,
   clientStillReads,
   packageGuidance,
   packageStatusLabel,
@@ -158,6 +159,56 @@ describe("client projection of released reports", () => {
       "Superseded by a newer released report. It stays readable as it was issued.",
     );
     expect(clientStillReads(e.reports)).toBeUndefined();
+  });
+
+  it("never calls the latest released report superseded (#234 item 4)", () => {
+    const notify = { actor: "user-lead", at, action: "notify_client" as const };
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "superseded",
+        releasedAt: at,
+        supersededBy: "REPORT-2",
+        recipientScope: "Acme board",
+        history: [{ ...notify, reason: "" }],
+      }),
+      report("REPORT-2", {
+        state: "released",
+        releasedAt: at,
+        supersedes: "REPORT-1",
+        recipientScope: "Acme board",
+        history: [{ ...notify, reason: "" }],
+      }),
+    ];
+    e.reports[1].createdAt = "2026-11-06T10:00:00.000Z";
+    // The latest released report: the staff guidance and the client's
+    // notice say it is current, not that a newer report supersedes it.
+    expect(packageGuidance(e.reports[1], e)).toBe(
+      "Released to the client as its current report. A Lead Auditor can withdraw it.",
+    );
+    const notices = (reports: Report[]) =>
+      clientNotices(reports).map((n) => [n.reportId, n.text]);
+    expect(
+      notices(sanitize(e, caller("Client Viewer", false)).reports),
+    ).toEqual([
+      ["REPORT-1", expect.stringContaining("superseded by REPORT-2")],
+      [
+        "REPORT-2",
+        "Report REPORT-2 was released to Acme board; it replaces REPORT-1.",
+      ],
+    ]);
+    // Its successor withdrawn, REPORT-1 is the client's latest released
+    // report again: its notice no longer says it has been superseded.
+    e.reports[1].release!.state = "withdrawn";
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(notices(client.reports)).toEqual([
+      [
+        "REPORT-1",
+        "Report REPORT-1 was released to Acme board. Its successor was withdrawn, so it is the current report again.",
+      ],
+    ]);
+    for (const text of notices(client.reports).map(([, t]) => t))
+      expect(text).not.toMatch(/has since been superseded/);
   });
 
   it("keeps the predecessor client-visible after a later release (#226 review)", () => {

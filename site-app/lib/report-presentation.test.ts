@@ -98,7 +98,7 @@ describe("client release notices (#94)", () => {
       {
         reportId: "REPORT-1",
         at: "2026-11-02T09:00:00.000Z",
-        text: "Report REPORT-1 was released to Acme board. It has since been superseded.",
+        text: "Report REPORT-1 was released to Acme board. It has since been superseded by REPORT-2.",
       },
     ]);
   });

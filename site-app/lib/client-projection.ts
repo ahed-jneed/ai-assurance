@@ -14,9 +14,9 @@ import type { Classification } from "./domain/classification";
 import { paperCurrent } from "./domain/gates";
 import type { Context } from "./tenancy";
 import {
+  clientSupersededBy,
   isClientRole,
   isClientVisible,
-  withdrawnSuccessorOf,
 } from "./workflow-state";
 import type { Brief, ClientGrant, Submission } from "./workflow-types";
 
@@ -258,8 +258,7 @@ export function clientMessage(m: Message, viewer: string): Message {
   };
 }
 
-/** How a client sees a successor that was withdrawn after its release. */
-export const withdrawnSuccessor = "a later report, since withdrawn";
+export { withdrawnSuccessor } from "./workflow-state";
 
 /**
  * The live engagement as the caller may see it: internal roles get the full
@@ -328,10 +327,8 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
         .map((q) => q.id),
       // A successor the client cannot read (withdrawn after release) is not
       // named.
-      ...(r.release?.supersededBy && {
-        supersededBy: withdrawnSuccessorOf(e.reports, r)
-          ? withdrawnSuccessor
-          : r.release.supersededBy,
+      ...(clientSupersededBy(e.reports, r) && {
+        supersededBy: clientSupersededBy(e.reports, r),
       }),
       ...(clientNotification(r) && { notification: clientNotification(r) }),
     })),

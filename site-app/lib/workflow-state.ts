@@ -49,6 +49,23 @@ export function withdrawnSuccessorOf(
     ? undefined
     : successor;
 }
+/** How a client sees a successor that was withdrawn after its release. */
+export const withdrawnSuccessor = "a later report, since withdrawn";
+/**
+ * The successor the client projection names on a released report: none
+ * while it is the latest released report, the successor's id once a later
+ * released report superseded it, and `withdrawnSuccessor` when that
+ * successor was withdrawn after its release. The client projection, the
+ * client's release notices and the staff guidance all read it (#234 item 4).
+ */
+export function clientSupersededBy(
+  reports: readonly Report[],
+  report: Report,
+): string | undefined {
+  const successor = report.release?.supersededBy;
+  if (!successor) return undefined;
+  return withdrawnSuccessorOf(reports, report) ? withdrawnSuccessor : successor;
+}
 /**
  * Whether a Lead Auditor may withdraw the report: an approved or released
  * package, and a superseded one the client can still read (#201). Once its
