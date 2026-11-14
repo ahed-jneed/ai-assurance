@@ -5,11 +5,9 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const projectRoot = fileURLToPath(new URL("../", import.meta.url));
-// The harnesses resolve their inputs relative to the project root.
-process.chdir(projectRoot);
+// Moves to the project root, where the harnesses resolve their inputs, and
+// picks the short Windows temp directory once for every harness it starts.
+import "./harness/env.mjs";
 
 if (!existsSync("dist/server/index.js")) {
   console.error("dist/server/index.js is missing; run `npm run build` first.");
