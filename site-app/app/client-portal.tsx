@@ -11,7 +11,7 @@ import {
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
 import { requestLabel } from "@/lib/evidence-requests";
-import type { Submission } from "@/lib/workflow-types";
+import type { ClientGrant, Submission } from "@/lib/workflow-types";
 /** Where focus goes next in a request; see data-portal-focus below. */
 type PortalFocus =
   "summary" | "submit-button" | "submit-field" | "reply-button" | "reply-field";
@@ -450,17 +450,36 @@ export function RequestAccess({
       ],
       save: (v) => act("acknowledgeClientSubmission", { submissionId, ...v }),
     });
+  const clarify = (grantId: string) =>
+    setForm({
+      title: "Send client-facing clarification",
+      action: "Publish clarification",
+      description: "This message is visible to the assigned contributor.",
+      fields: [
+        {
+          name: "text",
+          label: "Client-facing message",
+          type: "area",
+        },
+      ],
+      save: (v) => act("publishClientClarification", { grantId, ...v }),
+    });
   if (!e.workflow) return null;
   const role = data.identity.role;
-  // Receipt acknowledgment follows the permission map (#210): every role
-  // holding acknowledgeClientSubmission sees it; the grant controls stay
-  // with the Lead Auditor.
+  // Receipt acknowledgment (#210) and client clarifications (#216) follow
+  // the permission map: every role holding acknowledgeClientSubmission or
+  // publishClientClarification sees them; the grant controls stay with the
+  // Lead Auditor.
+  const acknowledges = can(role, "acknowledgeClientSubmission"),
+    clarifies = can(role, "publishClientClarification");
   if (!can(role, "grantClientRequest"))
-    return can(role, "acknowledgeClientSubmission") ? (
+    return acknowledges || clarifies ? (
       <ClientSubmissions
         data={data}
         busy={busy}
-        onAcknowledge={acknowledge}
+        now={now}
+        onAcknowledge={acknowledges ? acknowledge : undefined}
+        onClarify={clarifies ? clarify : undefined}
         dialog={
           <WorkflowDialog
             form={form}
@@ -639,45 +658,12 @@ export function RequestAccess({
               Update client instructions
             </Button>
           )}
-          {!!g.communications?.length && (
-            <div className="communication-thread">
-              {g.communications.map((m) => (
-                <article key={m.id}>
-                  <small>
-                    {m.kind === "reply" ? "Client reply" : "Audit team"} ·{" "}
-                    {new Date(m.at).toLocaleString()}
-                  </small>
-                  <p>{m.text}</p>
-                </article>
-              ))}
-            </div>
-          )}
-          {g.active && Date.parse(g.expiresAt) > now && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() =>
-                setForm({
-                  title: "Send client-facing clarification",
-                  action: "Publish clarification",
-                  description:
-                    "This message is visible to the assigned contributor.",
-                  fields: [
-                    {
-                      name: "text",
-                      label: "Client-facing message",
-                      type: "area",
-                    },
-                  ],
-                  save: (v) =>
-                    act("publishClientClarification", { grantId: g.id, ...v }),
-                })
-              }
-            >
-              Send clarification
-            </Button>
-          )}
+          <ClarificationThread
+            grant={g}
+            busy={busy}
+            active={requestGrantStatus(g, lapsed, at) === "Active"}
+            onClarify={clarifies ? clarify : undefined}
+          />
           <SubmissionReceipts
             submissions={e.workflow!.submissions.filter(
               (s) => s.grantId === g.id,
@@ -721,6 +707,51 @@ export function RequestAccess({
   );
 }
 
+/**
+ * A grant's conversation with the client, and Send clarification while the
+ * grant is active (publishClientClarification refuses an expired, revoked or
+ * lapsed grant).
+ */
+function ClarificationThread({
+  grant,
+  busy,
+  active,
+  onClarify,
+}: {
+  grant: ClientGrant;
+  busy: boolean;
+  active: boolean;
+  onClarify?: (grantId: string) => void;
+}) {
+  return (
+    <>
+      {!!grant.communications?.length && (
+        <div className="communication-thread">
+          {grant.communications.map((m) => (
+            <article key={m.id}>
+              <small>
+                {m.kind === "reply" ? "Client reply" : "Audit team"} ·{" "}
+                {new Date(m.at).toLocaleString()}
+              </small>
+              <p>{m.text}</p>
+            </article>
+          ))}
+        </div>
+      )}
+      {active && onClarify && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onClarify(grant.id)}
+        >
+          Send clarification
+        </Button>
+      )}
+    </>
+  );
+}
+
 /** A grant's client packages, each acknowledged or with Acknowledge receipt. */
 function SubmissionReceipts({
   submissions,
@@ -729,7 +760,7 @@ function SubmissionReceipts({
 }: {
   submissions: Submission[];
   busy: boolean;
-  onAcknowledge: (submissionId: string) => void;
+  onAcknowledge?: (submissionId: string) => void;
 }) {
   return submissions.map((s) => (
     <div className="comment-box" key={s.id}>
@@ -743,37 +774,50 @@ function SubmissionReceipts({
           Receipt acknowledged · {new Date(s.receipt.at).toLocaleString()}
         </p>
       ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => onAcknowledge(s.id)}
-        >
-          Acknowledge receipt
-        </Button>
+        onAcknowledge && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy}
+            onClick={() => onAcknowledge(s.id)}
+          >
+            Acknowledge receipt
+          </Button>
+        )
       )}
     </div>
   ));
 }
 
 /**
- * The client packages of every request grant, for a role that acknowledges
- * receipts without administering the grants (the Auditor, #210).
+ * The client request grants for a writer who does not administer them (the
+ * Auditor): each active grant's conversation with Send clarification (#216)
+ * and each client package with Acknowledge receipt (#210). Only the actions
+ * the role holds are offered.
  */
 export function ClientSubmissions({
   data,
   busy,
+  now,
   onAcknowledge,
+  onClarify,
   dialog,
 }: {
   data: WorkspaceData;
   busy: boolean;
-  onAcknowledge: (submissionId: string) => void;
+  now: number;
+  onAcknowledge?: (submissionId: string) => void;
+  onClarify?: (grantId: string) => void;
   dialog?: React.ReactNode;
 }) {
   const w = data.engagement!.workflow!,
-    grants = w.clientGrants.filter((g) =>
-      w.submissions.some((s) => s.grantId === g.id),
+    lapsed = new Set(data.lapsedClientGrants ?? []),
+    active = (g: ClientGrant) =>
+      requestGrantStatus(g, lapsed, now) === "Active",
+    grants = w.clientGrants.filter(
+      (g) =>
+        (onClarify && active(g)) ||
+        w.submissions.some((s) => s.grantId === g.id),
     ),
     awaiting = w.submissions.filter((s) => !s.receipt).length;
   return (
@@ -783,8 +827,9 @@ export function ClientSubmissions({
         <span className="subtle">{awaiting} awaiting acknowledgment</span>
       </summary>
       <p className="subtle">
-        Acknowledge each package the client submitted. A Lead Auditor assigns
-        and revokes client request access.
+        Send clarifications to the assigned contributors and acknowledge each
+        package the client submitted. A Lead Auditor assigns and revokes client
+        request access.
       </p>
       {grants.map((g) => (
         <div className="comment-box" key={g.id}>
@@ -793,6 +838,12 @@ export function ClientSubmissions({
               "Inactive contributor"}{" "}
             · {g.prompt}
           </b>
+          <ClarificationThread
+            grant={g}
+            busy={busy}
+            active={active(g)}
+            onClarify={onClarify}
+          />
           <SubmissionReceipts
             submissions={w.submissions.filter((s) => s.grantId === g.id)}
             busy={busy}
@@ -801,7 +852,9 @@ export function ClientSubmissions({
         </div>
       ))}
       {!grants.length && (
-        <p className="empty-result">No client packages have been submitted.</p>
+        <p className="empty-result">
+          No client request is active and no package has been submitted.
+        </p>
       )}
       {dialog}
     </details>

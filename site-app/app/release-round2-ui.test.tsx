@@ -152,6 +152,80 @@ describe("Acknowledge receipt follows the permission map", () => {
   });
 });
 
+describe("Send clarification follows the permission map (#216)", () => {
+  const grant = (id: string, overrides: object = {}) => ({
+    id,
+    userId: "contributor",
+    requestId: "REQ-" + id,
+    prompt: "Prompt " + id,
+    instructions: "Upload it",
+    category: "Model",
+    handlingBasis: "synthetic" as const,
+    expiresAt: "2099-01-01T00:00:00.000Z",
+    active: true,
+    actor: "lead",
+    at,
+    ...overrides,
+  });
+  const workflow: Workflow = {
+    ...approvedWorkflow(),
+    clientGrants: [
+      grant("GRANT-1", {
+        communications: [
+          {
+            id: "MSG-1",
+            actor: "lead",
+            at,
+            kind: "clarification",
+            text: "Include the version history",
+          },
+        ],
+      }),
+      grant("GRANT-2", { active: false }),
+      grant("GRANT-3"),
+    ],
+    submissions: [],
+  };
+  const html = (role: Role) =>
+    renderToStaticMarkup(
+      <RequestAccess
+        data={
+          {
+            identity: { id: "user", role },
+            members: [],
+            engagement: engagement({ workflow }),
+            lapsedClientGrants: ["GRANT-3"],
+          } as unknown as WorkspaceData
+        }
+        busy={false}
+        act={async () => ({ engagement: {} as never })}
+        onEditing={() => {}}
+      />,
+    );
+  const sends = (out: string) =>
+    out.match(/>Send clarification<\/button>/g)?.length ?? 0;
+
+  it("is offered to the Auditor for each active grant, with its thread", () => {
+    const out = html("Auditor");
+    // Only GRANT-1: GRANT-2 was revoked and GRANT-3 lapsed, which the server
+    // refuses.
+    expect(sends(out)).toBe(1);
+    expect(out).toContain("Prompt GRANT-1");
+    expect(out).not.toContain("Prompt GRANT-2");
+    expect(out).not.toContain("Prompt GRANT-3");
+    expect(out).toContain("Include the version history");
+    expect(out).not.toContain("Assign request");
+    expect(out).not.toContain("Update client instructions");
+  });
+  it("stays in the Lead Auditor's grant panel, for active grants only", () => {
+    expect(sends(html("Lead Auditor"))).toBe(1);
+  });
+  it("is not offered to a Reviewer or a client", () => {
+    for (const role of ["Reviewer", "Client Viewer"] as Role[])
+      expect(html(role)).toBe("");
+  });
+});
+
 describe("the client's release time", () => {
   const releasedAt = "2026-11-03T08:30:00.000Z";
   it("is labelled Released on the record sheet", () => {
