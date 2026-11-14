@@ -27,7 +27,10 @@ function build(files: Record<string, string | null> = {}) {
     "server/_next/static/page-B2.js": "export default 1;",
     "server/ssr/index.js": 'export*from"../_next/static/shared-A1.js";',
     "server/__vite_rsc_assets_manifest.js":
-      'export default {"js":["/_next/static/chunks/index-C3.js"]};',
+      // The escaped shape of the real manifest's bootstrapScriptContent.
+      'export default {"bootstrapScriptContent":' +
+      '"import(\\"/_next/static/chunks/index-C3.js\\")",' +
+      '"js":["/_next/static/chunks/index-C3.js"]};',
     "client/_next/static/chunks/index-C3.js": "",
     "client/favicon.svg": "<svg/>",
     ...files,

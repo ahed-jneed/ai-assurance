@@ -14,8 +14,11 @@ import path from "node:path";
 // reach every module in dist/server from the entry.
 const relativeImport =
   /(?:\bfrom|\bimport)\s*\(?\s*(["'`])(\.{1,2}\/[^"'`$\n]+?\.m?js)\1/g;
-// A client asset path in the RSC assets manifest.
-const clientAsset = /"(\/_next\/static\/[^"\n]+?)"/g;
+// A client asset path in the RSC assets manifest. Backslashes end the path:
+// in `"bootstrapScriptContent":"import(\"/_next/static/x.js\")"` it sits
+// between escaped quotes, and the `\` before the closing quote is not part of
+// it (on POSIX it would be a literal character of the file name).
+const clientAsset = /"(\/_next\/static\/[^"\\\n]+?)\\?"/g;
 
 const isFile = (file) => existsSync(file) && statSync(file).isFile();
 
