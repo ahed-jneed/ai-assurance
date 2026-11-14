@@ -2,7 +2,7 @@
 // client portal; the audit team sees the submission. The portal offers no
 // internal work, and the API refuses it.
 import { expectAccessible } from "./a11y";
-import { DEMO, expect, test, unique } from "./fixtures";
+import { DEMO, expect, test, unique, workspacePath } from "./fixtures";
 
 test("the Client Contributor answers an evidence request", async ({
   signIn,
@@ -38,6 +38,11 @@ test("the Client Contributor answers an evidence request", async ({
   await expect(nav.getByRole("button", { name: "Audit program" })).toHaveCount(
     0,
   );
+  // A contributor is shown no findings, so the portal offers no Findings
+  // destination (#182); the page has one main landmark.
+  await expect(nav.getByRole("button", { name: "Findings" })).toHaveCount(0);
+  await expect(page.getByText("Findings & remediation")).toHaveCount(0);
+  await expect(page.getByRole("main")).toHaveCount(1);
   await expectAccessible(page, "Client portal");
 
   const note = `Lineage summary for model 3.2 (${unique()}).`;
@@ -74,6 +79,20 @@ test("the Client Contributor answers an evidence request", async ({
         s.note === note && s.requestId === request.id,
     ),
   ).toBe(true);
+});
+
+test("the portal refuses a Findings link to a Client Contributor", async ({
+  signIn,
+  demo,
+}) => {
+  const page = await signIn("qa-contrib");
+  await page.goto(workspacePath(demo, "Findings"));
+  await expect(
+    page.getByText("This page is outside your current access."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Findings", level: 1 }),
+  ).toHaveCount(0);
 });
 
 test("a Client Contributor cannot run internal audit commands", async ({

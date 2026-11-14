@@ -5,6 +5,7 @@ import { assuranceModules } from "@/lib/commands/assurance";
 import { managementModules } from "@/lib/commands/management";
 import { caller, stored } from "@/lib/commands/test-fixtures";
 import { roles, type Engagement, type Finding, type Paper } from "@/lib/domain";
+import { qualityReviewerRole } from "@/lib/domain/quality-review";
 import { ApiError } from "@/lib/http";
 import {
   assignableRoles,
@@ -411,6 +412,11 @@ describe("assignments and mode narrowings match the server's checks", () => {
       "engagementAccess",
       sorted(access![1].split(",").map((r) => r.trim().slice(1, -1))),
     );
+    // appointQualityReviewer accepts exactly the qualityReviewerRole member.
+    expect(server("commands/quality-review.ts")).toMatch(
+      /member\.role !== qualityReviewerRole/,
+    );
+    add("qualityReviewer", [qualityReviewerRole]);
     expect(Object.keys(found).sort()).toEqual(
       Object.keys(assignableRoles).sort(),
     );

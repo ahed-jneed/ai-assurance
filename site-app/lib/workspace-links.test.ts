@@ -67,6 +67,30 @@ describe("workspace links", () => {
     ).toBe(false);
   });
 
+  it("refuses Findings links to a Client Contributor, who is shown no findings", () => {
+    const finding = { ...link, module: "Findings", kind: "finding" };
+    expect(authorizedLink(finding, "Client Viewer", true)).toBe(true);
+    expect(authorizedLink(finding, "Client Contributor", true)).toBe(false);
+    expect(
+      authorizedLink({ ...finding, kind: "" }, "Client Contributor", true),
+    ).toBe(false);
+    expect(
+      authorizedLink(
+        { ...link, module: "Evidence vault", kind: "evidence" },
+        "Client Contributor",
+        true,
+      ),
+    ).toBe(true);
+    expect(permittedNavigationRoutes("Client Contributor", true)).toEqual([
+      "Overview",
+      "Evidence vault",
+      "Reports & sign-off",
+    ]);
+    expect(permittedNavigationRoutes("Client Viewer", true)).toContain(
+      "Findings",
+    );
+  });
+
   it("allows engagement views only when an engagement is open", () => {
     expect(authorizedLink(link, "Lead Auditor", false)).toBe(false);
     expect(permittedNavigationRoutes("Lead Auditor", false)).toEqual([

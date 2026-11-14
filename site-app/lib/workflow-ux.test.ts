@@ -217,6 +217,13 @@ describe("workflow guidance (ported from workflow-ux-check)", () => {
       permittedAuditView("Reports & sign-off", "Client Viewer"),
       "Reports & sign-off",
     );
+    // A Client Contributor's portal has no Findings (#182).
+    assert.equal(permittedAuditView("Findings", "Client Viewer"), "Findings");
+    assert.equal(
+      permittedAuditView("Findings", "Client Contributor"),
+      "Overview",
+    );
+    assert.equal(permittedAuditView("Findings", "Auditor"), "Findings");
     assert.notEqual(resumeKey("person-a"), resumeKey("person-b"));
   });
 
@@ -298,13 +305,14 @@ describe("workflow guidance (ported from workflow-ux-check)", () => {
     );
     for (const role of ["Client Viewer", "Client Contributor"]) {
       const allowed = permittedNavigationRoutes(role, true);
-      // The client portal shell (#36): no practice navigation at all.
-      assert.deepEqual(allowed, [
-        "Overview",
-        "Evidence vault",
-        "Findings",
-        "Reports & sign-off",
-      ]);
+      // The client portal shell (#36): no practice navigation at all, and no
+      // Findings for a Client Contributor, who is shown none (#182).
+      assert.deepEqual(
+        allowed,
+        role === "Client Viewer"
+          ? ["Overview", "Evidence vault", "Findings", "Reports & sign-off"]
+          : ["Overview", "Evidence vault", "Reports & sign-off"],
+      );
       assert.deepEqual(permittedNavigationRoutes(role, false), []);
       assert(!allowed.includes("Working papers"));
       assert(!allowed.includes("Testing lab"));
