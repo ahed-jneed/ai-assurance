@@ -70,6 +70,12 @@ const staff = [
 ];
 const token = (id: string) => "staff-id-" + id + "-q7x";
 const email = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+/**
+ * A staff email the seed writes into staff-written paper fields no client
+ * projection carries (a review comment and an internal body field of a
+ * client memo), so the email check has something to catch.
+ */
+const staffEmail = "second.auditor@practice.invalid";
 
 /** Renames every staff id, as a string value or as a key, to its token. */
 function renameStaff<T>(value: T): T {
@@ -175,8 +181,22 @@ async function seeded(): Promise<Engagement> {
       status: "signed",
       authorId: "second-auditor",
       reviews: [{ userId: "second-reviewer", revision: 1, at }],
+      comments: [
+        {
+          id: "C-1",
+          authorId: "second-reviewer",
+          text: "Ask " + staffEmail + " for the sample",
+          resolved: true,
+          createdAt: at,
+          responses: [{ actor: "second-auditor", at, text: "Asked" }],
+        },
+      ],
       signatures: [{ userId: "lead", revision: 1, at, hash: "h" }],
-      body: { conclusion: "Shared judgement", conclusionStatus: "supported" },
+      body: {
+        conclusion: "Shared judgement",
+        conclusionStatus: "supported",
+        procedure: "Walkthrough with " + staffEmail,
+      },
     }),
   );
   // A client request: granted by the Lead, clarified by an auditor, answered
@@ -319,6 +339,7 @@ describe("client projections carry no staff user id or email (#201)", () => {
     for (const id of ["lead", "auditor", "reviewer", "quality-reviewer"])
       expect(internal, id).toContain(token(id));
     expect(internal).toContain(token(caller().user.userId));
+    expect(internal).toContain(staffEmail);
   });
 
   it("strips them from every projection", async () => {

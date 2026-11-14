@@ -23,7 +23,7 @@ const query = z
     cursor: z.string().max(600).optional(),
     actor: z.string().max(256).optional(),
     // Assurance records write "assurance:<kind>" events. Each log then
-    // refuses an event type it does not record (unknownEventType).
+    // refuses an event type it does not record (refuseUnknownAction).
     action: z
       .string()
       .regex(/^[A-Za-z][A-Za-z0-9_:]{0,63}$/, "Unknown event type")
