@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRight, ClipboardCheck, Clock3, FileCheck2 } from "lucide-react";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import {
   evidenceRequestCounts,
   localEvidenceDay,

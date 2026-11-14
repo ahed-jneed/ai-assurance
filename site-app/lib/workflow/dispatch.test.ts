@@ -1,17 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import * as service from "./workflow-service";
-import {
-  WorkflowError,
-  workflowCommand,
-  workflowOps,
-} from "./workflow-service";
+import * as service from "./dispatch";
+import { WorkflowError, calendarDate } from "./command";
+import { workflowCommand, workflowOps } from "./dispatch";
 import {
   command,
   engagement,
   expectFailure,
   structuredEngagement,
-} from "./workflow/test-fixtures";
+} from "./test-fixtures";
 
 const writerOnly = [
   403,
@@ -103,8 +100,6 @@ async function expectFirstFailure(
 describe("workflow command dispatch", () => {
   it("exports the same public API", () => {
     expect(Object.keys(service).sort()).toEqual([
-      "WorkflowError",
-      "calendarDate",
       "workflowCommand",
       "workflowOps",
     ]);
@@ -214,7 +209,6 @@ describe("workflow command dispatch", () => {
 
 describe("calendarDate", () => {
   it("accepts only real ISO calendar dates", () => {
-    const { calendarDate } = service;
     for (const date of ["2026-11-05", "2028-02-29"])
       expect(calendarDate.parse(date)).toBe(date);
     for (const date of [

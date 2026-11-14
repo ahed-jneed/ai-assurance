@@ -4,7 +4,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { tests } from "@/lib/evaluation";
-import type { Engagement, EvaluationConfig } from "@/lib/domain";
+import type { Engagement, EvaluationConfig } from "@/lib/domain/types";
 import type { PlanForm } from "@/lib/hosted-statistics";
 import { specialCategoryGroupFloor } from "@/lib/special-category";
 import { ProtocolDeclaration } from "../special-category";

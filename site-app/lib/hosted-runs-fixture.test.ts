@@ -11,7 +11,7 @@ import { env } from "cloudflare:workers";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { evaluate } from "./diagnostics";
-import type { Artifact, Engagement, Model, Run } from "./domain";
+import type { Artifact, Engagement, Model, Run } from "./domain/types";
 import {
   executionCSV,
   queueEvaluation,

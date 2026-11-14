@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Finding } from "@/lib/domain";
+import type { Finding } from "@/lib/domain/types";
 
 export function getForm(form: HTMLFormElement) {
   return Object.fromEntries(new FormData(form).entries()) as Record<

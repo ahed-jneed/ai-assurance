@@ -7,7 +7,7 @@ import {
   type AttestationRecord,
   type AttestedOp,
 } from "../attestation";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { ApiError } from "../http";
 import { refuseQualityReviewer, requireRole, type Context } from "../tenancy";
 import { classification } from "./classification";

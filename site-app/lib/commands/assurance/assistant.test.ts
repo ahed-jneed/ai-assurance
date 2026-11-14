@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Paper } from "../../domain";
+import type { Paper } from "../../domain/types";
 import { ApiError } from "../../http";
 import { engagement, paper } from "../../workflow/test-fixtures";
 import { caller } from "../test-fixtures";

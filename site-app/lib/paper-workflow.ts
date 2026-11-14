@@ -1,5 +1,5 @@
-import type { Artifact, Paper, Role } from "./domain";
-import { canWrite, isReleaseTimeRecord } from "./domain";
+import { canWrite, type Artifact, type Paper, type Role } from "./domain/types";
+import { isReleaseTimeRecord } from "./domain/gates";
 import { can } from "./permissions";
 export type PaperTarget =
   | "objective"

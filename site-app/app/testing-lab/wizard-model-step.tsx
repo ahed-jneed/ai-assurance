@@ -1,6 +1,6 @@
 "use client";
 // Evaluation setup, step 1 (Model): the model version and the protocol.
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { emptyDraft, profileDraft } from "./drafts";
 import { SelectField } from "./lab-ui";
 import type { LabSetup } from "./use-lab-setup";

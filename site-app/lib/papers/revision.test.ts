@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import catalog from "../catalog.json";
-import type { Engagement, Paper } from "../domain";
+import type { Engagement, Paper } from "../domain/types";
 import {
   approvedWorkflow,
   artifact,

@@ -6,7 +6,7 @@ import { env } from "cloudflare:workers";
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resolveNew } from "../../criteria/pin";
-import type { Artifact, Engagement } from "../../domain";
+import type { Artifact, Engagement } from "../../domain/types";
 import { getEngagement } from "../../engagement-repo";
 import { freshEngagement } from "../../factories";
 import {

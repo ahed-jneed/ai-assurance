@@ -15,10 +15,9 @@ import {
   finalReportGates,
   paperCurrent,
   type AuditGate,
-  type Engagement,
-  type Role,
-} from "@/lib/domain";
-import type { GateFeatures } from "@/lib/domain";
+  type GateFeatures,
+} from "@/lib/domain/gates";
+import type { Engagement, Role } from "@/lib/domain/types";
 import {
   assuranceLevelIds,
   assuranceLevels,

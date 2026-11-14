@@ -1,4 +1,4 @@
-import type { Run } from "./domain";
+import type { Run } from "./domain/types";
 import { assertSuite, fairnessSelected } from "./evaluation";
 import {
   evaluateHostedPlan,

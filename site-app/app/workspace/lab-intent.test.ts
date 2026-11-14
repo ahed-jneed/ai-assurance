@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Engagement, EvaluationProfile, Model, Run } from "@/lib/domain";
+import type {
+  Engagement,
+  EvaluationProfile,
+  Model,
+  Run,
+} from "@/lib/domain/types";
 import type { Workflow } from "@/lib/workflow-types";
 import {
   labIntentReducer,

@@ -1,7 +1,7 @@
 // Engagement-level criteria: the pack an engagement is pinned to, what that
 // pack switches on, and the projections the commands and read models use
 // (docs/design/criteria-model.md sections 7, 10 and 11.4). Server-only.
-import type { Engagement, RulePackStamp } from "../domain";
+import type { Engagement, RulePackStamp } from "../domain/types";
 import type { CriteriaLookup } from "../domain/report-gates";
 import { ApiError } from "../http";
 import {

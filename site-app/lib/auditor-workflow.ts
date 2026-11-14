@@ -1,11 +1,5 @@
-import {
-  paperCurrent,
-  stages,
-  type Artifact,
-  type Engagement,
-  type Paper,
-  type Role,
-} from "./domain";
+import { paperCurrent, stages } from "./domain/gates";
+import type { Artifact, Engagement, Paper, Role } from "./domain/types";
 import { personalPaperQueue } from "./paper-workflow";
 
 export function auditStageIndex(stage: string) {

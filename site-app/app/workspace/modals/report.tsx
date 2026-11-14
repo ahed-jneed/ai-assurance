@@ -1,7 +1,7 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { finalReportGates, type FinalReport } from "@/lib/domain";
+import { finalReportGates, type FinalReport } from "@/lib/domain/gates";
 import { packFeatures } from "../../workspace-types";
 import {
   assuranceLevelIds,

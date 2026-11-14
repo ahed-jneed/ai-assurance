@@ -3,8 +3,8 @@
 // engagement exactly as it was.
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import type { Engagement, EvidenceRequest } from "../domain";
-import { workflowCommand } from "../workflow-service";
+import type { Engagement, EvidenceRequest } from "../domain/types";
+import { workflowCommand } from "./dispatch";
 import type { ClientGrant, Submission } from "../workflow-types";
 import {
   approvedWorkflow,

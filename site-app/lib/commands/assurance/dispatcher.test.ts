@@ -25,7 +25,7 @@ import {
   type EvaluationProfile,
   type Model,
   type Role,
-} from "@/lib/domain";
+} from "@/lib/domain/types";
 import { getEngagement, loadEngagement, save } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import { sha256 } from "@/lib/ids";

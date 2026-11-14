@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { legacyPackageMessage } from "../client-projection";
-import { releaseChecklist, type Report } from "../domain";
+import { releaseChecklist } from "../domain/gates";
+import type { Report } from "../domain/types";
 import { seedWorkflow } from "../workflow-seed";
 import {
   approvedWorkflow,

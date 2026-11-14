@@ -5,7 +5,7 @@
 // evaluated criterion to a hosted 1.4 result (section 11.4, hosted names).
 // It mirrors engine/criteria.py, so a hosted run and the engine report on
 // the same rows carry the same decisions.
-import type { Metric, Result } from "./domain";
+import type { Metric, Result } from "./domain/types";
 import {
   LIBRARY,
   StatisticsError,

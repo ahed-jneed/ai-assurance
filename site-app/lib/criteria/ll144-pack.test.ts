@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { reports } from "../commands/reports";
 import { caller } from "../commands/test-fixtures";
-import { stageGates } from "../domain";
+import { stageGates } from "../domain/gates";
 import { freshEngagement, templatePaper } from "../factories";
 import { criteriaView, packFeatures, resolveNew } from "./pin";
 

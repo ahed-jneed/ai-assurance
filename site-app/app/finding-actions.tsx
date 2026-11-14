@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { findingWorkflow } from "@/lib/finding-workflow";
-import type { Artifact, Finding, Role } from "@/lib/domain";
+import type { Artifact, Finding, Role } from "@/lib/domain/types";
 
 export function FindingActions({
   finding,

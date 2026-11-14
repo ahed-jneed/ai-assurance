@@ -5,7 +5,7 @@
 // this map with every one of them, so a button is shown exactly to the roles
 // the server lets through, and hidden or disabled with the server's reason
 // for everyone else.
-import type { Engagement, Finding, Paper, Role } from "./domain";
+import type { Engagement, Finding, Paper, Role } from "./domain/types";
 import { qualityReviewerOps } from "./domain/quality-review";
 
 const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
