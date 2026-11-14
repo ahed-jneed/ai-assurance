@@ -91,6 +91,12 @@ const people: Record<string, Record<string, unknown>> = {
     admin: 0,
     email: "eve@example.test",
   },
+  "user-q": {
+    role: "Engagement Quality Reviewer",
+    status: "active",
+    client_id: null,
+    admin: 0,
+  },
   "user-v": {
     role: "Client Viewer",
     status: "active",
@@ -622,7 +628,7 @@ describe("practice administration (F-43)", () => {
       [
         "user-v",
         400,
-        "Practice administration needs an internal role (Auditor, Lead Auditor or Reviewer)",
+        "Practice administration needs an internal role (Auditor, Lead Auditor, Reviewer or Engagement Quality Reviewer)",
       ],
       ["user-4", 409, "This member already administers the practice"],
       ["nobody", 404, "Select an active member of this practice"],
@@ -631,6 +637,15 @@ describe("practice administration (F-43)", () => {
         await refusal(await post("grantAdmin", { userId })),
         userId,
       ).toEqual({ status, error });
+  });
+
+  it("lets an Engagement Quality Reviewer administer the practice (#209)", async () => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("grantAdmin", { userId: "user-q" });
+    expect(response.status).toBe(200);
+    expect(tables(own(d1))).toEqual(["practice_admins"]);
+    expect(own(d1)[0].args.slice(0, 2)).toEqual(["tenant-1", "user-q"]);
   });
 
   it("transfers the caller's administration to another member", async () => {
@@ -700,7 +715,9 @@ describe("invitations and practice settings (F-44)", () => {
       ),
     ).toEqual({ status: 400, error: "You cannot invite yourself" });
     const d1 = fakeD1((sql) =>
-      sql.startsWith("SELECT 1 FROM invitations") ? { 1: 1 } : null,
+      sql.startsWith("SELECT id,expires_at FROM invitations")
+        ? [{ id: "INV-1", expires_at: "2999-01-01T00:00:00.000Z" }]
+        : null,
     );
     env.DB = d1.db;
     expect(
@@ -710,6 +727,35 @@ describe("invitations and practice settings (F-44)", () => {
       error:
         "An invitation for this email is already pending. Cancel it to invite again.",
     });
+  });
+
+  it("closes an expired invitation as expired when the email is invited again (#209)", async () => {
+    const d1 = fakeD1((sql, args) => {
+      if (sql.startsWith("SELECT id,expires_at FROM invitations"))
+        return args[1] === "nia@example.test"
+          ? [{ id: "INV-OLD", expires_at: "2026-01-01T00:00:00.000Z" }]
+          : [];
+      return null;
+    });
+    env.DB = d1.db;
+    signIn(caller());
+    const response = await post("inviteMember", valid.inviteMember);
+    expect(response.status).toBe(200);
+    expect((await reply(response)).details).toMatchObject({
+      email: "nia@example.test",
+      expiredInvitations: ["INV-OLD"],
+    });
+    // The expired row is closed before the new one is inserted, in the same
+    // guarded batch as the version bump and the inviteMember event.
+    const [close, insert] = d1.batches[0].slice(1, -1);
+    expect(close.sql).toMatch(
+      /^UPDATE invitations SET status='expired',closed_at=\? WHERE tenant_id=\? AND email=\? AND status='pending' AND expires_at<=\? AND /,
+    );
+    expect(close.args.slice(1, 3)).toEqual(["tenant-1", "nia@example.test"]);
+    expect(close.args[0]).toBe(close.args[3]);
+    expect(insert.sql).toMatch(/^INSERT INTO invitations/);
+    expect(d1.batches[0].at(-1)!.sql).toMatch(/management_events/);
+    expect(d1.batches).toHaveLength(1);
   });
 
   it("refuses to invite the recorded email of an active member (#95)", async () => {
