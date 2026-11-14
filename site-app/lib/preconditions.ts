@@ -25,6 +25,25 @@ export function packageApprovalRefusal(
     : null;
 }
 
+/**
+ * Why `approverId` may not approve work they prepared or contributed to
+ * (#234 item 1): the workflow commands' independence check (approveBrief,
+ * approveProgram, reviewProcedure, closeMonitoringCase) refuses with 403 and
+ * this message, and the workspace shows the same reason on the disabled
+ * "Approve scope" and "Approve program". Null when the rule admits them.
+ */
+export function ownWorkRefusal(
+  contributors: readonly string[],
+  approverId: string,
+): Refusal | null {
+  return contributors.includes(approverId)
+    ? {
+        status: 403,
+        message: "A preparer or contributor cannot approve their own work",
+      }
+    : null;
+}
+
 export const releaseApprovalMessage =
   "A different independent approver must approve both exact packages before release";
 

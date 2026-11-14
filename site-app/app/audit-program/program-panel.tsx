@@ -139,8 +139,12 @@ export function ProgramPanel({
           )}
           {reviewer && w.program.status === "submitted" && (
             <>
-              <Button
-                disabled={busy || w.program.contributors.includes(uid)}
+              <DecisionButton
+                state={decisionState(role, uid, {
+                  action: "approveProgram",
+                  engagement: e,
+                })}
+                disabled={busy}
                 onClick={() =>
                   command(
                     "Approve program revision " + w.program.revision,
@@ -152,7 +156,7 @@ export function ProgramPanel({
                 }
               >
                 Approve program
-              </Button>
+              </DecisionButton>
               <Button
                 variant="outline"
                 disabled={busy}

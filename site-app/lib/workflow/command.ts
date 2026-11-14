@@ -4,6 +4,7 @@
 import { z } from "zod";
 import type { Engagement, Paper, Role } from "../domain/types";
 import type { GenaiReadiness } from "../genai/readiness";
+import { ownWorkRefusal } from "../preconditions";
 import { procedureWorkRevisions, revisionLimits } from "../workflow-state";
 import type {
   Procedure,
@@ -148,8 +149,8 @@ export function commandScope(e: Engagement, c: Context) {
   };
   const independent = (contributors: string[]) => {
     reviewer();
-    if (contributors.includes(c.userId))
-      fail(403, "A preparer or contributor cannot approve their own work");
+    const refusal = ownWorkRefusal(contributors, c.userId);
+    if (refusal) fail(refusal.status, refusal.message);
   };
   const authorized = async (userId: string, roles: Role[]) => {
     const m = await c.member(userId);

@@ -7,7 +7,7 @@
 // for everyone else.
 import type { Engagement, Finding, Paper, Report, Role } from "./domain/types";
 import { qualityReviewerOps } from "./domain/quality-review";
-import { packageApprovalRefusal } from "./preconditions";
+import { ownWorkRefusal, packageApprovalRefusal } from "./preconditions";
 
 const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   reviewers: readonly Role[] = ["Reviewer", "Lead Auditor"],
@@ -461,6 +461,7 @@ export function decisionState(
     | { action: "approveClassification"; engagement: Engagement }
     | { action: "approveReportPackage"; report: Report }
     | { action: NarrowedAction; engagement: Engagement }
+    | { action: "approveBrief" | "approveProgram"; engagement: Engagement }
     | {
         action: Exclude<
           Action,
@@ -469,6 +470,8 @@ export function decisionState(
           | "closeFinding"
           | "approveClassification"
           | "approveReportPackage"
+          | "approveBrief"
+          | "approveProgram"
           | NarrowedAction
         >;
       },
@@ -524,6 +527,17 @@ export function decisionState(
     }
     case "approveReportPackage": {
       const refusal = packageApprovalRefusal(decision.report, userId);
+      return refusal ? refused(refusal.message) : allowed;
+    }
+    case "approveBrief":
+    case "approveProgram": {
+      const w = decision.engagement.workflow;
+      const refusal = ownWorkRefusal(
+        (decision.action === "approveBrief"
+          ? w?.brief?.contributors
+          : w?.program.contributors) ?? [],
+        userId,
+      );
       return refusal ? refused(refusal.message) : allowed;
     }
     default:

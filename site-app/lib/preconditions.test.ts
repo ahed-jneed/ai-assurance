@@ -4,19 +4,26 @@
 import { describe, expect, it } from "vitest";
 import type { Engagement, Report } from "./domain/types";
 import { releaseChecklist } from "./domain/gates";
+import { decisionState } from "./permissions";
 import {
   monitoringClosureRefusal,
+  ownWorkRefusal,
   packageApprovalRefusal,
   releaseRefusal,
 } from "./preconditions";
 import {
+  approveScope,
   approvedWorkflow,
   artifact,
   at,
+  briefInput,
   command,
   completedQualityReview,
   engagement,
   expectFailure,
+  planProgram,
+  structuredEngagement,
+  workflowOf,
 } from "./workflow/test-fixtures";
 
 function approvedReport(): Report {
@@ -250,5 +257,65 @@ describe("the follow-up closure precondition", () => {
     expect(monitoringClosureRefusal(e, caseOf(e, id))).toBeNull();
     await close(e, id);
     expect(caseOf(e, id).state).toBe("closed");
+  });
+});
+
+describe("the own-work approval precondition (#234 item 1)", () => {
+  it("refuses a contributor to the scope as the command does, on Approve scope", async () => {
+    const e = structuredEngagement();
+    await command(e, "saveBrief", briefInput, "lead");
+    await command(e, "submitBrief", {}, "lead");
+    const contributors = workflowOf(e).brief!.contributors;
+    const refusal = ownWorkRefusal(contributors, "lead");
+    expect(refusal).toEqual({
+      status: 403,
+      message: "A preparer or contributor cannot approve their own work",
+    });
+    expect(
+      decisionState("Lead Auditor", "lead", {
+        action: "approveBrief",
+        engagement: e,
+      }),
+    ).toEqual({
+      allowed: false,
+      reason: refusal!.message,
+      refusal: "independence",
+    });
+    await refusedAlike(
+      refusal,
+      command(e, "approveBrief", { revision: 1, reason: "Own" }, "lead"),
+    );
+    expect(ownWorkRefusal(contributors, "reviewer")).toBeNull();
+    expect(
+      decisionState("Reviewer", "reviewer", {
+        action: "approveBrief",
+        engagement: e,
+      }),
+    ).toEqual({ allowed: true });
+  });
+
+  it("refuses a contributor to the program alike, on Approve program", async () => {
+    const e = structuredEngagement();
+    await approveScope(e);
+    await planProgram(e);
+    await command(e, "submitProgram", {}, "auditor");
+    const program = workflowOf(e).program;
+    const contributor = program.contributors[0];
+    const refusal = ownWorkRefusal(program.contributors, contributor);
+    expect(
+      decisionState("Lead Auditor", contributor, {
+        action: "approveProgram",
+        engagement: e,
+      }).reason,
+    ).toBe(refusal?.message);
+    await refusedAlike(
+      refusal,
+      command(
+        e,
+        "approveProgram",
+        { revision: program.revision, reason: "Own" },
+        contributor,
+      ),
+    );
   });
 });

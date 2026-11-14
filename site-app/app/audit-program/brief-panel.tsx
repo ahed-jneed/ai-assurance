@@ -129,8 +129,12 @@ export function BriefPanel({ scope }: { scope: ProgramScope }) {
         )}
         {reviewer && b?.status === "submitted" && (
           <>
-            <Button
-              disabled={busy || b.contributors.includes(uid)}
+            <DecisionButton
+              state={decisionState(role, uid, {
+                action: "approveBrief",
+                engagement: e,
+              })}
+              disabled={busy}
               onClick={() =>
                 command(
                   "Approve scope revision " + b.revision,
@@ -142,7 +146,7 @@ export function BriefPanel({ scope }: { scope: ProgramScope }) {
               }
             >
               Approve scope
-            </Button>
+            </DecisionButton>
             <Button
               variant="outline"
               disabled={busy}
