@@ -4,7 +4,10 @@ import { can, canBeAssigned } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkflowDialog, type WorkflowAct } from "./audit-program";
+import {
+  WorkflowDialog,
+  type WorkflowAct,
+} from "./audit-program/workflow-dialog";
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
 import { requestLabel } from "@/lib/evidence-requests";
