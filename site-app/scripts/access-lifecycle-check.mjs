@@ -122,6 +122,8 @@ for (const [label, bindings, allowed] of [
           body: {
             error:
               "You have no practice membership or pending invitation. Ask a practice administrator to invite visitor@fixture.invalid.",
+            // The signed-in account, for the minimal shell (#225).
+            account: { name: "Visitor" },
           },
         },
         label,
