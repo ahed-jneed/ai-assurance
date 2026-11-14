@@ -5,6 +5,7 @@
 // one view, a paper or a form re-renders only what reads the change.
 import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Role } from "@/lib/domain/types";
 import { clientPortalRoutesFor } from "@/lib/navigation-preferences";
 import { canSeeAccessLog, decisionState } from "@/lib/permissions";
@@ -280,12 +281,24 @@ export const WorkspaceViews = memo(function WorkspaceViews({
         title="This engagement cannot be opened"
         text="Choose another engagement from the directory. The banner above says what is wrong with this one."
       />
-    ) : (
+    ) : viewer ? (
       <Empty
         icon={Building2}
         title="No engagement is assigned"
         text="Ask your Lead Auditor to assign client access."
       />
+    ) : (
+      // An internal role reaches this with an engagement id that does not
+      // exist in this practice or that they can no longer open (#225).
+      <Empty
+        icon={Building2}
+        title="Engagement not available"
+        text="This engagement does not exist in this practice or you no longer have access."
+      >
+        <Button variant="outline" onClick={() => nav.navigate("Engagements")}>
+          Open the Engagements directory
+        </Button>
+      </Empty>
     );
   // A client opens only its portal's destinations: a Client Contributor's
   // portal has no Findings (#182), so a stale link or saved view is refused
