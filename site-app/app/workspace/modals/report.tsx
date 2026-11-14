@@ -1,7 +1,8 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { finalReportGates, type FinalReport } from "@/lib/domain";
+import { captureGates } from "@/lib/domain/capture-gates";
+import type { FinalReport } from "@/lib/domain/gates";
 import { packFeatures } from "../../workspace-types";
 import {
   assuranceLevelIds,
@@ -62,7 +63,7 @@ function ReportFields({
     report = formReport(choices, settings),
     type = engagementTypes[report.engagementType],
     conclusion = conclusionTypes[report.conclusion],
-    gates = e ? finalReportGates(e, report, packFeatures(data)) : [];
+    gates = e ? captureGates(e, report, packFeatures(data)) : [];
   /** Changes one term and keeps the others valid for it. */
   const pick = (key: string, value: string) => {
     const t = normalizeTerms({ ...report, [key]: value });
@@ -287,7 +288,7 @@ const finalBlocked = ({
 }: Pick<ModalFieldsProps, "choices" | "engagement" | "data">) =>
   choices.kind === "final" &&
   !!e &&
-  !!finalReportGates(
+  !!captureGates(
     e,
     formReport(choices, data?.reportSettings),
     packFeatures(data),

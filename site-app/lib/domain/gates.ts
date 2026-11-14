@@ -45,7 +45,8 @@ export type AuditGate = {
     | "acceptance"
     | "report"
     | "quality_review"
-    | "management_system";
+    | "management_system"
+    | "ll144";
   recordId?: string;
   title: string;
   message: string;

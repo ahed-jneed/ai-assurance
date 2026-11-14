@@ -11,8 +11,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { paperAudience } from "@/lib/client-projection";
+import { captureGates } from "@/lib/domain/capture-gates";
 import {
-  finalReportGates,
   paperCurrent,
   type AuditGate,
   type Engagement,
@@ -80,6 +80,7 @@ export function AuditGateList({
     "Report elements",
     "Quality review",
     "Management system",
+    "LL144 bias audits",
     "Engagement stage",
   ];
   const group = (g: AuditGate) =>
@@ -102,6 +103,7 @@ export function AuditGateList({
           report: "Report elements",
           quality_review: "Quality review",
           management_system: "Management system",
+          ll144: "LL144 bias audits",
         }[g.kind];
   function row(g: AuditGate) {
     const p = ["paper", "conclusion"].includes(g.kind)
@@ -172,6 +174,7 @@ export function AuditGateList({
             : "Edit report terms",
           quality_review: "Open quality review",
           management_system: "Open management system",
+          ll144: "Open LL144 audit",
         }[g.kind];
     const content = (
       <>
@@ -341,7 +344,7 @@ export function ReportReadiness({
   const signed = e.papers.filter(
     (p) => paperCurrent(p) && p.status === "signed",
   );
-  const gates = finalReportGates(e, terms, features),
+  const gates = captureGates(e, terms, features),
     exceptions = e.findings.filter(
       (f) => f.status !== "closed" && ["High", "Critical"].includes(f.severity),
     ).length;

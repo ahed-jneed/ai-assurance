@@ -19,20 +19,17 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import {
-  finalReportGates,
-  type Engagement,
-  type Report,
-  type Role,
-} from "@/lib/domain";
+import { type Engagement, type Report, type Role } from "@/lib/domain";
 import type { GateFeatures } from "@/lib/domain";
 import {
   opinionLabel,
   termsLabel,
   type ReportTerms,
 } from "@/lib/domain/report-model";
+import { captureGates } from "@/lib/domain/capture-gates";
 import { reportRows, type RegisterQuery } from "@/lib/register-views";
 import {
+  packageGuidance,
   packageOpenLabel,
   packageStatus,
   packageStatusLabel,
@@ -91,7 +88,7 @@ export function ReportWorkspace({
   const clientView = isClientRole(role),
     lead = can(role, "createReport"),
     qualityReviewer = can(role, "saveQualityReview");
-  const gates = clientView ? [] : finalReportGates(e, terms, features);
+  const gates = clientView ? [] : captureGates(e, terms, features);
   const next =
     gates.find((g) => g.kind === "workflow") ??
     gates.find((g) => g.kind !== "stage") ??
@@ -430,21 +427,27 @@ export function ReportWorkspace({
             <span className={"badge " + (gates.length ? "amber" : "green")}>
               {gates.length
                 ? "Final capture blocked"
-                : "Final capture available"}
+                : !needsPackage && latest && state !== "internal"
+                  ? packageStatusLabel(latest)
+                  : "Final capture available"}
             </span>
             <h2>
               {gates.length
                 ? next.title
                 : state === "released"
                   ? "The latest final package is released"
-                  : !needsPackage && latest
-                    ? packageStatusLabel(latest)
-                    : "The audit is ready for a final snapshot"}
+                  : state === "approved"
+                    ? "The final package awaits client release"
+                    : !needsPackage && latest
+                      ? packageStatusLabel(latest)
+                      : "The audit is ready for a final snapshot"}
             </h2>
             <p>
               {gates.length
                 ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${termsLabel(terms).toLowerCase()}. Draft snapshots are available throughout the audit.`
-                : "Package approval and client release remain separate recorded decisions."}
+                : !needsPackage && latest && state !== "internal"
+                  ? packageGuidance(latest)
+                  : "Package approval and client release remain separate recorded decisions."}
             </p>
           </div>
           <div className="row-actions">

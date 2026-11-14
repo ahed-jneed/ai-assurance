@@ -267,6 +267,8 @@ export function useWorkspaceNavigation({
       navigate("Reports & sign-off");
     } else if (gate.kind === "management_system")
       navigate("Regulatory mapping");
+    // The LL144 audits are approved in the Testing lab's LL144 panel.
+    else if (gate.kind === "ll144") navigate("Testing lab");
     else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
       if (record) viewRecord(record.title, record);
