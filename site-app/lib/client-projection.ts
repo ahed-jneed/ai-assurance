@@ -14,7 +14,7 @@ import type {
 import { paperCurrent } from "./domain/gates";
 import type { Context } from "./tenancy";
 import { isClientRole, isClientVisible } from "./workflow-state";
-import type { Brief } from "./workflow-types";
+import type { Brief, ClientGrant, Submission } from "./workflow-types";
 
 /**
  * The classification as the client sees it: the label and answers without the
@@ -214,6 +214,46 @@ export function clientNotification(r: Report) {
     : undefined;
 }
 
+/**
+ * A contributor's own submission as the portal shows it (#201): when and
+ * with what note the audit team acknowledged it, not which auditor did. The
+ * fields are listed, so new internal fields never reach the client.
+ */
+export function clientSubmission(s: Submission): Submission {
+  return {
+    id: s.id,
+    requestId: s.requestId,
+    grantId: s.grantId,
+    // The contributor's own user id: `sanitize` passes only its own.
+    actor: s.actor,
+    at: s.at,
+    evidenceIds: [...s.evidenceIds],
+    note: s.note,
+    delivery: s.delivery,
+    remaining: s.remaining,
+    ...(s.deliveredItems ? { deliveredItems: [...s.deliveredItems] } : {}),
+    ...(s.receipt
+      ? { receipt: { actor: "", at: s.receipt.at, note: s.receipt.note } }
+      : {}),
+  };
+}
+
+type Message = NonNullable<ClientGrant["communications"]>[number];
+/**
+ * A message of a request thread as the contributor sees it: the audit team's
+ * clarifications without the auditor's user id; the contributor's own
+ * replies keep theirs.
+ */
+export function clientMessage(m: Message, viewer: string): Message {
+  return {
+    id: m.id,
+    actor: m.actor === viewer ? m.actor : "",
+    at: m.at,
+    kind: m.kind,
+    text: m.text,
+  };
+}
+
 /** How a client sees a successor that was withdrawn after its release. */
 export const withdrawnSuccessor = "a later report, since withdrawn";
 
@@ -305,8 +345,12 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
               status: r?.status ?? "open",
               grantId: g.id,
               requestedItems: g.requestedItems ?? [],
-              communications: g.communications ?? [],
-              submissions: own.filter((s) => s.grantId === g.id),
+              communications: (g.communications ?? []).map((m) =>
+                clientMessage(m, ctx.user.userId),
+              ),
+              submissions: own
+                .filter((s) => s.grantId === g.id)
+                .map(clientSubmission),
             };
           }),
         }
