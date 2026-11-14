@@ -3,7 +3,11 @@
 // the headers to send, since /signin-with-chatgpt does not exist there.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { personaHeaders, signInInstructions } from "./seed-sign-in.mjs";
+import {
+  personaHeaders,
+  refusalHint,
+  signInInstructions,
+} from "./seed-sign-in.mjs";
 
 const { personas } = JSON.parse(
   readFileSync(
@@ -57,6 +61,23 @@ describe("seed:demo sign-in instructions", () => {
       `curl -H "oai-authenticated-user-id: ${personas[0].userId}" -H "oai-authenticated-user-email: ${personas[0].email}" "http://127.0.0.1:8787/api/workspace"`,
     );
     expect(text).toContain("http://127.0.0.1:8787" + deepLink);
+  });
+
+  it("names SELF_SIGNUP when a trusted-headers Worker has no membership for the persona", () => {
+    const refusal = {
+      status: 403,
+      error:
+        "You have no practice membership or pending invitation. Ask a practice administrator to invite qa-lead@personas.test.",
+      trustedHeaders: true,
+      email: "qa-lead@personas.test",
+    };
+    expect(refusalHint(refusal)).toBe(
+      "Start the Worker with --var SELF_SIGNUP:open (or --var SELF_SIGNUP:@personas.test, the persona domain) so the personas may provision their practices, then run seed:demo again.",
+    );
+    // Other refusals, and the dev server's persona sign-in, add nothing.
+    expect(refusalHint({ ...refusal, trustedHeaders: false })).toBeNull();
+    expect(refusalHint({ ...refusal, status: 409 })).toBeNull();
+    expect(refusalHint({ ...refusal, error: "Forbidden" })).toBeNull();
   });
 
   it("prints the same identity headers the seed sends", () => {

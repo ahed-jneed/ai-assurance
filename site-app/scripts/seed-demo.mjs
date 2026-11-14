@@ -23,7 +23,11 @@
 // (scripts/seed-sign-in.mjs).
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
-import { personaHeaders, signInInstructions } from "./seed-sign-in.mjs";
+import {
+  personaHeaders,
+  refusalHint,
+  signInInstructions,
+} from "./seed-sign-in.mjs";
 
 const args = process.argv.slice(2);
 const trustedHeaders = args.includes("--trusted-headers");
@@ -90,10 +94,18 @@ async function api(who, path, body) {
   } catch {
     value = { error: text.slice(0, 300) };
   }
-  if (!response.ok)
+  if (!response.ok) {
+    const hint = refusalHint({
+      status: response.status,
+      error: value.error ?? "",
+      trustedHeaders,
+      email: who.email,
+    });
     throw new Error(
-      `${who.id}: ${body?.op ?? "GET"} ${path.split("?")[0]} answered ${response.status}: ${value.error ?? ""}`,
+      `${who.id}: ${body?.op ?? "GET"} ${path.split("?")[0]} answered ${response.status}: ${value.error ?? ""}` +
+        (hint ? "\n" + hint : ""),
     );
+  }
   return value;
 }
 
