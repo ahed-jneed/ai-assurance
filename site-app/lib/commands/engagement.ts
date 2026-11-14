@@ -79,6 +79,9 @@ export const engagement = defineCommands({
           400,
           "Model binaries stay quarantined until a trusted adapter and security review are available",
         );
+      // Accepting twice would attest a second Accept Evidence event.
+      if (a.status === "accepted")
+        throw new ApiError(409, "This evidence is already accepted");
       a.status = "accepted";
       return { details: { artifactId: a.id, sha256: a.sha256 } };
     },

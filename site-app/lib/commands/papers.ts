@@ -252,6 +252,8 @@ export const papers = defineCommands({
     roles: ["Lead Auditor"],
     async handle(e, d, ctx) {
       const p = workingPaper(e, d.paperId);
+      if (p.status === "signed")
+        throw new ApiError(409, "This paper is already signed");
       if (
         p.status !== "reviewed" ||
         !p.reviews.some(
