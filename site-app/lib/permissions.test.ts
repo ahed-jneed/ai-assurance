@@ -14,6 +14,7 @@ import {
   canBeAssigned,
   canQueueAuditorModel,
   canSee,
+  canSeeAccessLog,
   decisionState,
   duties,
   fallbackRole,
@@ -331,6 +332,14 @@ describe("canSee", () => {
     expect(roles.filter((role) => canSee(role, "clientFindings"))).toEqual([
       "Client Viewer",
     ]);
+  });
+
+  it("shows the Access log to a Lead Auditor and to practice administrators", () => {
+    expect(roles.filter((role) => canSeeAccessLog({ role }))).toEqual([
+      "Lead Auditor",
+    ]);
+    for (const role of roles)
+      expect(canSeeAccessLog({ role, practiceAdmin: true }), role).toBe(true);
   });
 
   it("names only known roles", () => {

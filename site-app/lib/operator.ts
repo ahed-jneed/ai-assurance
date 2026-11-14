@@ -64,7 +64,8 @@ export const abandonedBefore = (at: string) =>
  * The practice's latest recorded activity, for tenants aliased `t`: its
  * creation and the newest management or audit event, snapshot, assurance
  * record, execution job, invitation, preference, draft, membership grant
- * and runner heartbeat. Sign-ins that change nothing are not recorded.
+ * and runner heartbeat. Sign-ins (sign_in_events, for the Access log) change
+ * nothing and do not count.
  */
 const lastActivitySql = `MAX(t.created_at,${[
   ["management_events", "created_at"],
@@ -247,6 +248,7 @@ const practiceTables = [
   "dossier_keys",
   "personal_preferences",
   "management_events",
+  "sign_in_events",
   "tenants",
 ] as const;
 type PracticeTable = (typeof practiceTables)[number];

@@ -3,8 +3,10 @@
 // practice-administration permissions. A user without a membership first
 // accepts their pending invitations (lib/invitations.ts); a user with neither
 // may provision a practice of their own only where self-signup is allowed
-// (lib/access-policy.ts). Apart from those, and recording the member's identity
-// email once when it is new or changed, resolving the caller only reads.
+// (lib/access-policy.ts). Apart from those, recording the member's identity
+// email once when it is new or changed, and recording a sign-in for the
+// practice's Access log at most once per signInGapHours, resolving the caller
+// only reads.
 import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
 import type { Role } from "./domain";
@@ -17,7 +19,7 @@ import { resolveNew } from "./criteria/pin";
 import { freshEngagement } from "./factories";
 import { ApiError } from "./http";
 import { currentUser } from "./identity";
-import { now, sha256 } from "./ids";
+import { id, now, sha256 } from "./ids";
 import { acceptInvitations, normalizeEmail } from "./invitations";
 export type Context = {
   user: { userId: string; displayName: string; email: string };
@@ -64,6 +66,48 @@ async function recordEmail(
     )
     .bind(email, tenantId, user.userId, email)
     .run();
+}
+/**
+ * How long a member may go without a recorded sign-in to a practice before
+ * their next request to it is recorded as one (#181). Identity is resolved
+ * on every request (lib/identity.ts) and no mode reports a session start,
+ * so the Access log records the first request after a gap instead.
+ */
+export const signInGapHours = 8;
+/**
+ * Records the member's sign-in to the practice for its Access log, with the
+ * role they hold, unless one is recorded within signInGapHours: one read on
+ * each request and a write at most once per gap. The guarded insert keeps
+ * concurrent first requests to one event. A failure to record never refuses
+ * the request; it is logged instead.
+ */
+async function recordSignIn(tenantId: string, userId: string, role: Role) {
+  try {
+    const at = now(),
+      since = new Date(Date.parse(at) - signInGapHours * 3600000).toISOString();
+    const recent =
+      "SELECT 1 FROM sign_in_events WHERE tenant_id=? AND user_id=? AND created_at>?";
+    if (
+      await db()
+        .prepare(recent + " LIMIT 1")
+        .bind(tenantId, userId, since)
+        .first()
+    )
+      return;
+    await db()
+      .prepare(
+        "INSERT INTO sign_in_events(tenant_id,id,user_id,role,created_at) SELECT ?,?,?,?,? WHERE NOT EXISTS(" +
+          recent +
+          ")",
+      )
+      .bind(tenantId, id("SI"), userId, role, at, tenantId, userId, since)
+      .run();
+  } catch (error) {
+    console.warn(
+      "Access log: the sign-in could not be recorded: " +
+        (error instanceof Error ? error.message : String(error)),
+    );
+  }
 }
 /**
  * Why a member of an archived practice is refused (#151): the platform
@@ -137,6 +181,7 @@ export async function context(tenantId?: string): Promise<Context> {
     )
     .bind(tenantId, user.userId)
     .first());
+  await recordSignIn(tenantId, user.userId, member.role);
   return {
     user,
     tenantId,

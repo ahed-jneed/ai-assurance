@@ -202,6 +202,12 @@ export const viewAccess = {
    * projection gives a Client Contributor none (lib/client-projection.ts).
    */
   clientFindings: clientViewer,
+  /**
+   * The practice's Access log (#181): membership, role and sign-in events.
+   * A Lead Auditor sees it by role; a practice administrator of any role
+   * sees it too (canSeeAccessLog). GET /api/access-log checks the same.
+   */
+  accessLog: lead,
 } as const satisfies Record<string, readonly Role[]>;
 
 export type View = keyof typeof viewAccess;
@@ -209,6 +215,17 @@ export type View = keyof typeof viewAccess;
 /** Whether `role` may see `view`. */
 export function canSee(role: Role | string, view: View) {
   return (viewAccess[view] as readonly string[]).includes(role);
+}
+
+/**
+ * Whether the caller may open the practice's Access log: a Lead Auditor (the
+ * practice's partner), or a practice administrator whatever their role.
+ */
+export function canSeeAccessLog(identity: {
+  role: Role | string;
+  practiceAdmin?: boolean;
+}) {
+  return !!identity.practiceAdmin || canSee(identity.role, "accessLog");
 }
 
 /**
