@@ -17,7 +17,8 @@ npx playwright show-report           # the HTML report of the last run
 `playwright.config.ts` starts `e2e/server.mjs` on `127.0.0.1:8790` (set
 `E2E_PORT` for another port). The server deletes `.wrangler/e2e-state`, applies
 every migration with `npm run db:migrate:local -- --persist-to
-.wrangler/e2e-state`, and starts the built Worker with
+.wrangler/e2e-state`, and starts the built Worker in Miniflare (with the
+bindings and assets of `dist/server/wrangler.json`) with
 `IDENTITY_MODE=trusted-headers`, `IDENTITY_TRUSTED_HEADERS=loopback-tests` and
 `SELF_SIGNUP=@personas.test` (`docs/security/identity.md`): self-signup is off
 outside the development server, so only the persona domain may provision the
@@ -26,7 +27,23 @@ so the dossier and signing-key specs can seal (`docs/security/signing-keys.md`);
 the keys it wraps live only in the run's database. One suite runs per checkout
 at a time: a second server would delete the first one's `.wrangler/e2e-state`.
 It never touches `.wrangler/state`, which
-`npm run dev` and `npm start` use. Each persona's browser context and API client
+`npm run dev` and `npm start` use.
+
+The server is not `wrangler dev` (#194). `wrangler dev` watches `dist/server`,
+and on every change it pauses its proxy, queues each request until the Worker
+has reloaded and replays only GET and HEAD. A build in the same checkout
+during a run (`npm run check` beside `npm run test:e2e`) deletes and rewrites
+`dist/`: a request that arrives while a reload is pending waits until the
+reload completes (forever, if it fails), and a request the reload cuts off
+fails with a 503 or `Network connection lost`. That matches the
+`report-release.spec.ts` failure of #194: a request that timed out after the
+API client's 15 s, while the proxy's hop to the Worker logged
+`Network connection lost`. The e2e server loads the build once, at start, and
+serves it on one hop without watching files. Still, do not build while the suite runs: the server keeps
+`dist/client` open, so on Windows the build fails with `EBUSY` after it has
+deleted part of `dist/server`, and the next server start finds no build.
+
+Each persona's browser context and API client
 send that persona's `oai-authenticated-user-*` headers; the Worker trusts them
 only for loopback requests in this mode.
 
