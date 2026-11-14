@@ -107,8 +107,10 @@ export function ReportWorkspace({
   const state = latest ? packageStatus(latest) : "";
   const needsPackage = !latest || ["withdrawn", "superseded"].includes(state);
   // After a successor's withdrawal the client still reads its predecessor
-  // (#226 item 6), until a new release supersedes it: the banner says
-  // which, as the client projection does.
+  // (#226 item 6), and the banner says which, as the client projection does.
+  // A later release does not end this: releaseReport supersedes only reports
+  // in state "released", so the predecessor stays readable (and named here)
+  // until a Lead Auditor withdraws it.
   const stillRead = clientStillReads(e.reports);
   // Once a final package is captured, the handoff follows that package: the
   // capture gates of the terms selected below are about a new capture, not

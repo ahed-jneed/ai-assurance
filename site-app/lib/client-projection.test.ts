@@ -160,6 +160,43 @@ describe("client projection of released reports", () => {
     expect(clientStillReads(e.reports)).toBeUndefined();
   });
 
+  it("keeps the predecessor client-visible after a later release (#226 review)", () => {
+    // R1 released, R2 released (superseding R1), R2 withdrawn, R3 released.
+    // releaseReport supersedes only reports in state "released", so R1, which
+    // is already "superseded", keeps supersededBy = R2 and stays readable: the
+    // client holds R1 and R3, R3 names no replaced report, and the notice
+    // stays on R1.
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "superseded",
+        releasedAt: at,
+        supersededBy: "REPORT-2",
+        history: [],
+      }),
+      report("REPORT-2", {
+        state: "withdrawn",
+        releasedAt: at,
+        supersedes: "REPORT-1",
+        history: [],
+      }),
+      report("REPORT-3", { state: "released", releasedAt: at, history: [] }),
+    ];
+    e.reports[1].createdAt = "2026-11-06T10:00:00.000Z";
+    e.reports[2].createdAt = "2026-11-07T10:00:00.000Z";
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(
+      client.reports.map((r) => [r.id, r.supersededBy, r.replaces]),
+    ).toEqual([
+      ["REPORT-1", withdrawnSuccessor, []],
+      ["REPORT-3", undefined, []],
+    ]);
+    expect(clientStillReads(e.reports)?.notice).toBe(
+      "REPORT-1: Its successor REPORT-2 was withdrawn. The client still reads this report.",
+    );
+    expect(isWithdrawable(e.reports[0])).toBe(true);
+  });
+
   it("does not name a predecessor withdrawn after it was superseded (#201)", () => {
     const e = stored();
     e.reports = [
