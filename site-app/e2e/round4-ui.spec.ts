@@ -226,8 +226,42 @@ test("Tab out of the toaster returns into the open paper sheet, and a refused sa
   // returns into the sheet, never to the page behind the modal.
   const sheet = '[data-slot="sheet-content"]',
     toaster = "[data-sonner-toaster]";
-  await second.keyboard.press("Alt+T");
-  await expect.poll(() => focusWithin(second, toaster)).toBe(true);
+  // Focus starts on <body> before each Alt+T, as after a disabled Save drops
+  // it there. From the alert, Radix's own trap already sends Tab back into
+  // the sheet; only from <body> does Tab depend on the toaster's handling.
+  const altT = async () => {
+    await second.evaluate(() =>
+      (document.activeElement as HTMLElement | null)?.blur(),
+    );
+    expect(
+      await second.evaluate(() => document.activeElement === document.body),
+    ).toBe(true);
+    await second.keyboard.press("Alt+T");
+    await expect.poll(() => focusWithin(second, toaster)).toBe(true);
+  };
+  /** Whether the sheet's first (or last) tabbable control has focus. */
+  const atSheetEdge = (edge: "first" | "last") =>
+    second.evaluate(
+      ([s, edge]) => {
+        const root = document.querySelector(s);
+        const controls = [
+          ...(root?.querySelectorAll<HTMLElement>(
+            "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])",
+          ) ?? []),
+        ].filter(
+          (el) =>
+            el.tabIndex >= 0 &&
+            !(el as HTMLButtonElement).disabled &&
+            el.getClientRects().length > 0,
+        );
+        const want = edge === "first" ? controls[0] : controls.at(-1);
+        return !!want && document.activeElement === want;
+      },
+      [sheet, edge] as const,
+    );
+
+  // Tab past the toaster's last control: the sheet's first control.
+  await altT();
   let returned = false;
   for (let i = 0; i < 8 && !returned; i++) {
     await second.keyboard.press("Tab");
@@ -235,18 +269,20 @@ test("Tab out of the toaster returns into the open paper sheet, and a refused sa
     if (!returned) expect(await focusWithin(second, toaster)).toBe(true);
   }
   expect(returned).toBe(true);
+  expect(await atSheetEdge("first")).toBe(true);
   await expect(editorOf(second)).toBeVisible();
 
-  // Shift+Tab from the start of the toaster does the same.
-  await second.keyboard.press("Alt+T");
-  await expect.poll(() => focusWithin(second, toaster)).toBe(true);
+  // Shift+Tab from the list Alt+T focuses: the sheet's last control.
+  await altT();
   await second.keyboard.press("Shift+Tab");
   await expect.poll(() => focusWithin(second, sheet)).toBe(true);
+  expect(await atSheetEdge("last")).toBe(true);
   // Shift+Tab from the toast's first control as well.
-  await second.keyboard.press("Alt+T");
+  await altT();
   await second.keyboard.press("Tab");
   await expect.poll(() => focusWithin(second, toaster)).toBe(true);
   await second.keyboard.press("Shift+Tab");
   await expect.poll(() => focusWithin(second, sheet)).toBe(true);
+  expect(await atSheetEdge("last")).toBe(true);
   await expect(editorOf(second)).toBeVisible();
 });
