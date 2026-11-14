@@ -4,6 +4,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { enrolmentFormats } from "../../../app/assurance-workbench/types";
 import { getEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { engagementWithParts, member, practice } from "../../test-storage";
@@ -61,6 +62,37 @@ describe("enrollWorker", () => {
         "Enter the image digest as sha256: followed by 64 lowercase hexadecimal characters",
       ]);
     }
+  });
+
+  it("accepts exactly the capabilities the Enroll runner dialog offers (#211)", async () => {
+    const sqlite = await setup();
+    // GenAI ingest and client-local runners can be enrolled from the UI.
+    expect(enrolmentFormats).toEqual(
+      expect.arrayContaining(["genai_ingest", "client_local"]),
+    );
+    // Every offered capability, alone and all together, enrols.
+    for (const formats of [
+      ...enrolmentFormats.map((f) => [f]),
+      [...enrolmentFormats],
+    ]) {
+      const enrolled = (await op("enrollWorker", {
+        ...enrollment,
+        formats,
+      })) as Response;
+      expect(enrolled.status, formats.join(",")).toBe(200);
+    }
+    expect(
+      sqlite
+        .prepare("SELECT capabilities FROM runner_workers ORDER BY created_at")
+        .all()
+        .map((r) => JSON.parse(String(r.capabilities))),
+    ).toEqual(expect.arrayContaining([["genai_ingest"], ["client_local"]]));
+    // A capability the dialog does not offer is refused.
+    expect(
+      await refusal(
+        op("enrollWorker", { ...enrollment, formats: ["TensorFlow"] }),
+      ),
+    ).toBeInstanceOf(z.ZodError);
   });
 });
 

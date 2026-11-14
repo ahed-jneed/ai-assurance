@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { ReviewQueueSummary } from "@/lib/assurance-search";
 import type { ObligationOptions } from "@/lib/criteria/types";
+import {
+  runnerCapabilities,
+  runnerCapabilityInfo,
+  type RunnerCapability,
+} from "@/lib/runner-capabilities";
 import type { WorkspaceData } from "../workspace-types";
 import type { ExternalJobFields } from "../external-job-detail";
 
@@ -130,29 +135,44 @@ export type Exclusion = { recordId: string; reason: string };
 export const label = (s: string) =>
   s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
 
+/** "1 request", "2 requests" (#211). */
+const count = (n: number, one: string, many = one + "s") =>
+  n.toLocaleString() + " " + (n === 1 ? one : many);
+
 /**
- * Display names of the worker adapter formats (lib/commands/assurance/
- * workers.ts): label() would spell acronyms out ("O N N X") (#202).
+ * The external queue's telemetry line: totals by state and, when the list is
+ * cut short, how many of the most recent requests it shows.
  */
-const adapterFormatNames: Record<string, string> = {
-  provided_predictions: "Provided predictions",
-  client_local: "Client-local worker",
-  ONNX: "ONNX",
-  XGBoost: "XGBoost",
-  LightGBM: "LightGBM",
-  PMML: "PMML",
-  genai_ingest: "GenAI evidence ingest",
-};
+export function telemetryText(t: Snapshot["telemetry"], listed: number) {
+  return (
+    [
+      count(t.total, "request"),
+      t.queued.toLocaleString() + " queued",
+      t.running.toLocaleString() + " running",
+      count(t.stalled, "expired lease"),
+    ].join(" · ") +
+    (t.total > listed
+      ? " · listing the " +
+        (listed === 1
+          ? "most recent"
+          : listed.toLocaleString() + " most recent")
+      : "")
+  );
+}
+
+/**
+ * Display name of a worker capability (lib/runner-capabilities.ts): label()
+ * would spell acronyms out ("O N N X") (#202).
+ */
 export const adapterFormatLabel = (format: string) =>
-  adapterFormatNames[format] ?? label(format);
-/** The formats offered when enrolling a worker, in display order. */
-export const enrolmentFormats = [
-  "provided_predictions",
-  "ONNX",
-  "XGBoost",
-  "LightGBM",
-  "PMML",
-] as const;
+  Object.hasOwn(runnerCapabilityInfo, format)
+    ? runnerCapabilityInfo[format as RunnerCapability].name
+    : label(format);
+/**
+ * The capabilities offered when enrolling a worker, in display order: every
+ * one the server accepts, from the same list (#211).
+ */
+export const enrolmentFormats = runnerCapabilities;
 
 /**
  * A prediction lineage record as a picker option: its input dataset, model

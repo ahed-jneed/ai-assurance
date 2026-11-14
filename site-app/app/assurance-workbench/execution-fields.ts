@@ -217,7 +217,7 @@ export function executionFields({
       {
         name: "imageDigest",
         label: "Approved container image digest",
-        help: "sha256: followed by 64 hexadecimal characters.",
+        help: "sha256: followed by the 64-character digest in lowercase hexadecimal (0-9, a-f).",
         required: true,
       },
       {
