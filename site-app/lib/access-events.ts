@@ -11,6 +11,13 @@
 export const signInGapHours = 8;
 
 /**
+ * How long a recorded sign-in is kept (#185): a year plus a margin for an
+ * annual audit cycle. Older sign-ins are pruned when a new one is recorded
+ * (pruneSignIns in lib/tenancy.ts); management events are kept.
+ */
+export const signInRetentionDays = 400;
+
+/**
  * The Access log's event types, in the order its filter offers them: members'
  * sign-ins, then the management events about membership, roles and practice
  * administration (lib/commands/management/members.ts, invitations.ts,
