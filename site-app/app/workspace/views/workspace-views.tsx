@@ -7,7 +7,7 @@ import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
 import { clientPortalRoutesFor } from "@/lib/navigation-preferences";
-import { decisionState } from "@/lib/permissions";
+import { canSeeAccessLog, decisionState } from "@/lib/permissions";
 import { reportTermsFor, type ReportTerms } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
 import { normalizeWorkbenchQuery } from "@/lib/workbench-presentation";
@@ -28,6 +28,7 @@ import { uploadDefaults } from "../modals/upload";
 import { isManagementView } from "../modules";
 import type { EditingReporter, EditingSource } from "../navigation-guards";
 import {
+  AccessLog,
   AssuranceWorkbench,
   AuditProgram,
   ManagementViews,
@@ -239,6 +240,19 @@ export const WorkspaceViews = memo(function WorkspaceViews({
           onCopyLink={on.copyLink}
         />
       </Suspense>
+    );
+  // The practice's Access log (#181), for practice administrators only.
+  if (view === "Access log")
+    return canSeeAccessLog(data.identity) ? (
+      <Suspense fallback={panelFallback}>
+        <AccessLog data={data} />
+      </Suspense>
+    ) : (
+      <Empty
+        icon={Building2}
+        title="The Access log is not available to you"
+        text="Only practice administrators see the practice's Access log."
+      />
     );
   // The practice directories are not part of the client portal (#36).
   if (isManagementView(view) && !viewer)
@@ -516,7 +530,6 @@ export const WorkspaceViews = memo(function WorkspaceViews({
           register={url.register}
           writer={writer}
           busy={busy}
-          resolve={resolve}
           onDetail={onDetail}
           onUseTemplate={nav.createPaperFromTemplate}
         />

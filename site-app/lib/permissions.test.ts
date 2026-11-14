@@ -15,6 +15,7 @@ import {
   canBeAssigned,
   canQueueAuditorModel,
   canSee,
+  canSeeAccessLog,
   decisionState,
   duties,
   fallbackRole,
@@ -332,6 +333,18 @@ describe("canSee", () => {
     expect(roles.filter((role) => canSee(role, "clientFindings"))).toEqual([
       "Client Viewer",
     ]);
+  });
+
+  it("shows the Access log to practice administrators of a staff role only", () => {
+    // The role/admin matrix (#181): a role alone, a Lead Auditor's included,
+    // never admits it; administration admits every staff role and no client.
+    for (const role of roles) {
+      expect(canSeeAccessLog({ role }), role).toBe(false);
+      expect(canSeeAccessLog({ role, practiceAdmin: false }), role).toBe(false);
+      expect(canSeeAccessLog({ role, practiceAdmin: true }), role).toBe(
+        !isClientRole(role),
+      );
+    }
   });
 
   it("names only known roles", () => {

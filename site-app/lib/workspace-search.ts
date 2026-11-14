@@ -1,6 +1,6 @@
 import type { WorkspaceData } from "@/app/workspace-types";
 import { opinionLabel } from "./domain/report-model";
-import { isClientRole } from "./permissions";
+import { canSeeAccessLog, isClientRole } from "./permissions";
 
 export type SearchItem = {
   kind:
@@ -37,6 +37,7 @@ const pages = [
   "Reports & sign-off",
   "Methodology",
   "Users & access",
+  "Access log",
 ];
 
 const normalize = (value: string) =>
@@ -54,9 +55,16 @@ export function workspaceSearch(
     items: SearchItem[] = [];
 
   for (const page of pages) {
+    if (page === "Access log" && !canSeeAccessLog(data.identity)) continue;
     if (
       !engagement &&
-      !["My work", "Clients", "Engagements", "Users & access"].includes(page)
+      ![
+        "My work",
+        "Clients",
+        "Engagements",
+        "Users & access",
+        "Access log",
+      ].includes(page)
     )
       continue;
     if (

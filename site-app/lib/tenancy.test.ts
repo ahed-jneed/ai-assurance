@@ -1,7 +1,8 @@
 import { env } from "cloudflare:workers";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/http";
 import { runWithIdentity, type Identity } from "@/lib/identity";
+import { signInGapHours } from "@/lib/access-events";
 import { archivedMessage, context } from "@/lib/tenancy";
 
 // A D1 stand-in that answers context()'s lookups from `rows` and records every
@@ -62,9 +63,14 @@ const lea: Identity = {
 function as<T>(identity: Identity | null, run: () => Promise<T>) {
   return runWithIdentity(identity, run);
 }
+/**
+ * Answers lookups from `answers`; unless they say otherwise, the member
+ * signed in recently, so context() records no sign-in (#181).
+ */
 function rows(answers: [RegExp, Row][]) {
+  const all: [RegExp, Row][] = [...answers, [/FROM sign_in_events/, { 1: 1 }]];
   d1.state.lookup = (sql) =>
-    answers.find(([pattern]) => pattern.test(sql))?.[1] ?? null;
+    all.find(([pattern]) => pattern.test(sql))?.[1] ?? null;
 }
 
 beforeEach(() => {
@@ -107,6 +113,63 @@ describe("context", () => {
       tenantId: "tenant-1",
     });
     expect(d1.state.writes).toEqual([]);
+  });
+
+  it("records a sign-in for the Access log only after a gap without one (#181)", async () => {
+    const member: [RegExp, Row][] = [
+      [
+        /SELECT role,client_id,access_since,email FROM memberships/,
+        { role: "Reviewer", client_id: null, email: "lea@practice.example" },
+      ],
+    ];
+    rows([[/FROM sign_in_events/, null], ...member]);
+    const before = Date.now();
+    await as(lea, () => context("tenant-1"));
+    expect(d1.state.writes).toHaveLength(1);
+    const { sql, args } = d1.state.writes[0];
+    expect(sql).toMatch(
+      /^INSERT INTO sign_in_events\(tenant_id,id,user_id,role,created_at\) SELECT \?,\?,\?,\?,\? WHERE NOT EXISTS\(SELECT 1 FROM sign_in_events WHERE tenant_id=\? AND user_id=\? AND created_at>\?\)$/,
+    );
+    expect(args[0]).toBe("tenant-1");
+    expect(args[1]).toMatch(/^SI-/);
+    expect(args.slice(2, 4)).toEqual(["user-lea", "Reviewer"]);
+    expect(args.slice(5, 7)).toEqual(["tenant-1", "user-lea"]);
+    // The guard looks back signInGapHours from the sign-in's own time.
+    expect(Date.parse(args[4] as string) - Date.parse(args[7] as string)).toBe(
+      signInGapHours * 3600000,
+    );
+    expect(Date.parse(args[4] as string)).toBeGreaterThanOrEqual(before);
+
+    // Within the gap nothing is written.
+    d1.state.writes = [];
+    rows(member);
+    await as(lea, () => context("tenant-1"));
+    expect(d1.state.writes).toEqual([]);
+  });
+
+  it("never refuses a request when the sign-in cannot be recorded", async () => {
+    rows([
+      [
+        /SELECT role,client_id,access_since,email FROM memberships/,
+        { role: "Auditor", client_id: null, email: "lea@practice.example" },
+      ],
+    ]);
+    const lookup = d1.state.lookup;
+    d1.state.lookup = (sql, args) => {
+      if (/sign_in_events/.test(sql)) throw new Error("D1 unavailable");
+      return lookup(sql, args);
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(as(lea, () => context("tenant-1"))).resolves.toMatchObject({
+        role: "Auditor",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        "Access log: the sign-in could not be recorded: D1 unavailable",
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("records a member's identity email once when it is missing or changed (#95)", async () => {
@@ -156,6 +219,8 @@ describe("context", () => {
     try {
       const ctx = await as(lea, () => context());
       expect(ctx).toMatchObject({ role: "Lead Auditor", practiceAdmin: true });
+      // The founder's first sign-in is recorded for the Access log (#181).
+      expect(d1.state.writes.pop()!.sql).toMatch(/^INSERT INTO sign_in_events/);
       const tables = d1.state.writes.map(
         ({ sql }) => /INSERT OR IGNORE INTO (\w+)/.exec(sql)?.[1],
       );
@@ -305,6 +370,7 @@ describe("context", () => {
         "engagement_access",
         "tenants",
         "management_events",
+        "sign_in_events",
       ]);
       // A revoked membership comes back with the invited role only.
       expect(d1.state.writes[1].sql).toContain(

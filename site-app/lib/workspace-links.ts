@@ -47,9 +47,10 @@ export function authorizedLink(
   link: WorkspaceLink,
   role: Role,
   hasEngagement: boolean,
+  practiceAdmin = false,
 ) {
   return (
-    permittedNavigationRoutes(role, hasEngagement).includes(
+    permittedNavigationRoutes(role, hasEngagement, practiceAdmin).includes(
       link.module as NavigationRoute,
     ) &&
     (!isClientRole(role) ||

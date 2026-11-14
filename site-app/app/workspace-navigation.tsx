@@ -18,6 +18,7 @@ import {
   BookOpen,
   ClipboardList,
   UsersRound,
+  ScrollText,
   ChevronDown,
   ChevronRight,
   LayoutDashboard,
@@ -98,6 +99,7 @@ const practiceModules: readonly (readonly [
   ["My work", LayoutDashboard, "My work"],
   ["Clients", Building2, "Clients"],
   ["Engagements", FolderOpen, "Engagements"],
+  ["Access log", ScrollText, "Access log"],
 ];
 const allModules = [
   ...auditModules,
@@ -156,7 +158,11 @@ export function WorkspaceNavigation({
     ? navigationPreferenceKey(data.identity.id, data.tenantId)
     : "";
   const allowed = data
-    ? permittedNavigationRoutes(data.identity.role, !!e)
+    ? permittedNavigationRoutes(
+        data.identity.role,
+        !!e,
+        data.identity.practiceAdmin,
+      )
     : [];
   const visibleAudit = auditModules.filter(([route]) =>
     allowed.includes(route),

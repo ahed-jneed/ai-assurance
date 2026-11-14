@@ -136,7 +136,36 @@ export const managementEvents = sqliteTable(
     hash: text("hash").notNull(),
     createdAt: text("created_at").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.tenantId, t.id] })],
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.id] }),
+    // The Access log pages the practice's events in (created_at, id) order
+    // (lib/read-models/access-log.ts).
+    index("idx_management_events_order").on(t.tenantId, t.createdAt, t.id),
+  ],
+);
+/**
+ * Members' sign-ins to a practice, for its Access log (#181): the first
+ * request a member makes to the practice after signInGapHours without one
+ * (recordSignIn in lib/tenancy.ts), with the role they held. Never updated;
+ * deleted only with the practice (lib/operator.ts). Not practice activity:
+ * a sign-in that changes nothing keeps no practice from being abandoned.
+ */
+export const signInEvents = sqliteTable(
+  "sign_in_events",
+  {
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    id: text("id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.tenantId, t.id] }),
+    index("idx_sign_in_events_order").on(t.tenantId, t.createdAt, t.id),
+    index("idx_sign_in_events_user").on(t.tenantId, t.userId, t.createdAt),
+  ],
 );
 export const clients = sqliteTable(
   "clients",
@@ -209,6 +238,9 @@ export const events = sqliteTable(
       foreignColumns: [engagements.tenantId, engagements.id],
     }),
     index("idx_events_engagement").on(t.tenantId, t.engagementId),
+    // The engagement audit trail pages in (created_at, id) order
+    // (lib/read-models/audit-trail.ts).
+    index("idx_events_order").on(t.tenantId, t.engagementId, t.createdAt, t.id),
   ],
 );
 export const assuranceRecords = sqliteTable(

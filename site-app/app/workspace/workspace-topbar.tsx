@@ -28,19 +28,18 @@ export function WorkspaceTopbar({
   onClient: (clientId: string) => void;
 }) {
   const e = data?.engagement,
-    management = isManagementView(view);
-  const selectedClient =
-    view === "Users & access"
-      ? undefined
-      : data?.clients.find(
-          (c) => c.id === (management ? clientId : e?.clientId),
-        );
+    management = isManagementView(view),
+    // Practice pages outside the client and engagement hierarchy.
+    standalone = view === "Users & access" || view === "Access log";
+  const selectedClient = standalone
+    ? undefined
+    : data?.clients.find((c) => c.id === (management ? clientId : e?.clientId));
   return (
     <header className="topbar">
       <div className="workspace-breadcrumbs">
         <SidebarTrigger />
-        {view === "Users & access" ? (
-          <span>Members & access</span>
+        {standalone ? (
+          <span>{view === "Users & access" ? "Members & access" : view}</span>
         ) : (
           <>
             <button className="crumb" onClick={() => onNavigate("Clients")}>
