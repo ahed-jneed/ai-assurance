@@ -49,11 +49,21 @@ The development server simulates sign-in only for loopback requests, and the Wor
 
 The sign-in cookie is named for the port (`__sites_local_auth_<port>`), so development servers on different ports keep separate sign-ins. Personas are compiled out of builds.
 
-With the development server running and the local migrations applied (`npm run db:migrate:local`, below; without them every API call answers 500 with `no such table` and the seed stops), `npm run seed:demo` provisions a demo practice through the app's own API: qa-lead's practice with the client "Acme", a structured engagement, each persona's membership and engagement grant, and an evidence request that `qa-contrib` can answer in the client portal; `qa-lead2` also leads a practice of their own and `qa-outsider` stays outside. Run it before signing in as a persona, since a first sign-in without a membership provisions a separate practice. It prints a sign-in link per persona and is safe to run again. Pass another URL (`npm run seed:demo -- http://127.0.0.1:5184`), or `--trusted-headers` for a built Worker in `trusted-headers` mode; that server has no `/signin-with-chatgpt` route, so the seed then prints the `oai-authenticated-user-id` and `oai-authenticated-user-email` headers to send as each persona instead of links.
+With the development server running and the local migrations applied (`npm run db:migrate:local`, below; without them every API call answers 500 with `no such table` and the seed stops), `npm run seed:demo` provisions a demo practice through the app's own API: qa-lead's practice with the client "Acme", a structured engagement, each persona's membership and engagement grant, and an evidence request that `qa-contrib` can answer in the client portal; `qa-lead2` also leads a practice of their own and `qa-outsider` stays outside. Run it before signing in as a persona, since a first sign-in without a membership provisions a separate practice. It prints a sign-in link per persona and is safe to run again. Pass another URL (`npm run seed:demo -- http://127.0.0.1:5184`), or `--trusted-headers` with the URL for a built Worker in `trusted-headers` mode (`npm run seed:demo -- --trusted-headers http://127.0.0.1:8787`, after starting it with `SELF_SIGNUP` as below); that server has no `/signin-with-chatgpt` route, so the seed then prints the `oai-authenticated-user-id` and `oai-authenticated-user-email` headers to send as each persona instead of links.
 
 A server-rendering error in the development server is printed to its log as `[ssr] Server rendering error; ...` with its stack (`build/ssr-error-log.ts`): Vinext otherwise answers such a page with a silent 500 and lets the browser render it.
 
-`npm start` serves the built Worker without a sign-in simulation: outside a Sites checkout the build trusts no identity and the API answers 401. For local end-to-end tests pass `npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests` and send the `oai-authenticated-user-*` headers from the test client. Local previews use Miniflare's placeholder `Request.cf` metadata; set `CLOUDFLARE_CF_FETCH_ENABLED=true` to fetch it. Wrangler metrics are off unless `WRANGLER_SEND_METRICS=true`.
+`npm start` serves the built Worker without a sign-in simulation: outside a Sites checkout the build trusts no identity and the API answers 401. For local end-to-end tests and the seeded personas, stop the development server (both use `.wrangler/state`) and start the built Worker in the loopback-only `trusted-headers` mode, then send the `oai-authenticated-user-*` headers from the test client:
+
+```sh
+npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests --var SELF_SIGNUP:open
+# in another terminal, while it runs (http://127.0.0.1:8787)
+npm run seed:demo -- --trusted-headers http://127.0.0.1:8787
+```
+
+Outside the development server self-signup is off unless `SELF_SIGNUP` allows it ([docs/security/identity.md](../docs/security/identity.md#who-gets-a-practice-invitations-and-self-signup)), so without `--var SELF_SIGNUP:open` (or `--var SELF_SIGNUP:@personas.test`, the persona domain) a fresh database answers the seed's first persona with 403 "You have no practice membership or pending invitation", and the seed stops and names the setting.
+
+Local previews use Miniflare's placeholder `Request.cf` metadata; set `CLOUDFLARE_CF_FETCH_ENABLED=true` to fetch it. Wrangler metrics are off unless `WRANGLER_SEND_METRICS=true`.
 
 ## Identity
 
