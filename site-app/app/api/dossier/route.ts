@@ -23,7 +23,13 @@ export async function POST(request: Request) {
           tenantId: z.string(),
           engagementId: z.string(),
           reportId: z.string().optional(),
-          audience: z.enum(["internal", "client"]).default("internal"),
+          // A seal is for a named audience; a missing one is never assumed
+          // to be internal (#226 item 2).
+          audience: z.enum(["internal", "client"], {
+            errorMap: () => ({
+              message: "Choose who the dossier is for (internal or client)",
+            }),
+          }),
           // Signing keys are practice-wide: rotation is the management op
           // rotateSigningKey, for practice administrators only (#25).
           op: z
