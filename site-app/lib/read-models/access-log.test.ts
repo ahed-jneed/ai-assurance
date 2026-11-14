@@ -192,9 +192,26 @@ describe("accessLogPage", () => {
         ),
       ),
     ).toEqual(["M4", "S2", "M2"]);
-    expect(
-      ids(await accessLogPage(lead(), q({ action: "renamePractice" }))),
-    ).toEqual([]);
+  });
+
+  it("refuses an event type the Access log does not record (#201)", async () => {
+    await seeded();
+    // renamePractice is a management event, but not an access event.
+    for (const action of ["renamePractice", "bogus"]) {
+      await expect(
+        accessLogPage(lead(), q({ action })),
+        action,
+      ).rejects.toMatchObject({
+        status: 400,
+        message:
+          "action: Unknown event type " +
+          JSON.stringify(action) +
+          "; choose one of the event types this log offers",
+      });
+      await expect(accessLogCsv(lead(), q({ action })), action).rejects.toThrow(
+        /Unknown event type/,
+      );
+    }
   });
 
   it("filters by the person involved: who acted or was acted on (#185)", async () => {

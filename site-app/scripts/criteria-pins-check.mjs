@@ -217,6 +217,15 @@ try {
     assert(csvLines.length > 1 && csvLines.length < coverage.summary.total);
     assert(csvLines.slice(1).every((l) => l.includes("Provider")));
     await request(exportPath, { user: viewer, status: 403 });
+    // #201: an unknown filter value is 400, never a header-only export.
+    for (const bad of [{ state: "bogus" }, { actor: "Bogus" }])
+      await request(
+        "/api/coverage?" +
+          scope +
+          "&" +
+          new URLSearchParams({ framework: packKey, format: "csv", ...bad }),
+        { status: 400 },
+      );
     // A rule-pack stamp the index does not know fails closed.
     await testDb
       .prepare(
