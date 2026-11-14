@@ -1,8 +1,12 @@
 // The audit program's location: the open tab, register filter and search,
 // remembered per member and engagement for this page load, and the selected
-// procedure and section, kept in step with the workspace URL.
+// procedure and section, kept in step with the workspace URL. With no
+// procedure open, the URL's section is the open tab (#227), as the
+// Assurance workbench writes its own, so reload, Copy page link and
+// Back/Forward keep it.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { Workflow } from "@/lib/workflow-types";
+import { procedureSections, programSections } from "./program-sections";
 
 const programViewMemory = new Map<
   string,
@@ -13,14 +17,6 @@ const programViewMemory = new Map<
     section: string;
   }
 >();
-const procedureSections = ["plan", "execute", "evaluate", "review"];
-const programSections = [
-  "acceptance",
-  "brief",
-  "program",
-  "review",
-  "followup",
-];
 
 export function useProgramLocation({
   memoryKey,
@@ -70,8 +66,9 @@ export function useProgramLocation({
   const restoringLocation = useRef<{
     id: string | undefined;
     section: string;
+    tab: string;
   } | null>(null);
-  const reportLocation = useEffectEvent((id: string, at: string) =>
+  const reportLocation = useEffectEvent((id: string | undefined, at: string) =>
     onLocation(id, at),
   );
   // An incoming procedure link is applied when the linked procedure, section
@@ -81,6 +78,7 @@ export function useProgramLocation({
     restoringLocation.current = {
       id: availableInitialProcedure,
       section: requestedProcedureSection ?? section,
+      tab: requestedProgramTab ?? tab,
     };
     setSelected(availableInitialProcedure);
     if (requestedProcedureSection) setSection(requestedProcedureSection);
@@ -98,12 +96,15 @@ export function useProgramLocation({
     const restoring = restoringLocation.current;
     if (
       restoring &&
-      (restoring.id !== selected || restoring.section !== section)
+      (restoring.id !== selected ||
+        restoring.section !== section ||
+        restoring.tab !== tab)
     )
       return;
     restoringLocation.current = null;
     if (selected) reportLocation(selected, section);
-  }, [selected, section, availableInitialProcedure, initialSection, form]);
+    else reportLocation(undefined, tab);
+  }, [selected, section, tab, availableInitialProcedure, initialSection, form]);
   return {
     tab,
     setTab,

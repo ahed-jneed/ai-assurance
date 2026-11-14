@@ -12,6 +12,7 @@ import {
   type WorkbenchQuery,
 } from "@/lib/workbench-presentation";
 import { linkQuery } from "@/lib/workspace-links";
+import { programSections } from "../audit-program/program-sections";
 import { recordKind } from "./records";
 
 export type WorkspaceLocation = {
@@ -87,7 +88,11 @@ export function workspaceParams(location: WorkspaceLocation) {
               ? location.workbenchQuery.section
               : kind === "procedure"
                 ? (location.procedureSection ?? "")
-                : "",
+                : view === "Audit program" &&
+                    !kind &&
+                    programSections.includes(location.procedureSection ?? "")
+                  ? (location.procedureSection as string)
+                  : "",
   });
   const params = new URLSearchParams(query);
   if (view === "My work")
@@ -150,9 +155,10 @@ const searchableViews = [
 /**
  * Whether a location change replaces the current history entry or pushes a
  * new one. Typing a search (in the same view of the same practice and
- * engagement), switching sections of the same open paper,
- * restoring a link from back/forward and the first write replace; every
- * other change is a new entry.
+ * engagement), switching sections of the same open paper, the first section
+ * a view states for itself (the audit program's open tab, once it mounts,
+ * #227), restoring a link from back/forward and the first write replace;
+ * every other change is a new entry.
  */
 export function historyMethod({
   previousUrl,
@@ -185,7 +191,21 @@ export function historyMethod({
     previousParams.get("record") === recordId &&
     previousParams.get("view") === view &&
     previousParams.get("section") !== params.get("section");
-  return !previousUrl || restoring || searchChanged || paperSectionChanged
+  const sectionStated =
+    !kind &&
+    !previousParams.get("kind") &&
+    sameScope &&
+    !previousParams.get("section") &&
+    !!params.get("section") &&
+    [...params].every(
+      ([name, value]) =>
+        name === "section" || previousParams.get(name) === value,
+    );
+  return !previousUrl ||
+    restoring ||
+    searchChanged ||
+    paperSectionChanged ||
+    sectionStated
     ? "replaceState"
     : "pushState";
 }

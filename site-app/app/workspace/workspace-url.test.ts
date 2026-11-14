@@ -99,6 +99,21 @@ describe("workspaceParams", () => {
     );
   });
 
+  it("writes the audit program's open tab when no procedure is open (#227)", () => {
+    for (const tab of ["program", "acceptance", "brief", "review", "followup"])
+      expect(query({ view: "Audit program", procedureSection: tab })).toBe(
+        "practice=t1&engagement=e1&view=Audit+program&section=" + tab,
+      );
+    // A procedure's own section is not a tab.
+    expect(query({ view: "Audit program", procedureSection: "plan" })).toBe(
+      "practice=t1&engagement=e1&view=Audit+program",
+    );
+    // Another view does not carry the program's tab.
+    expect(query({ view: "Findings", procedureSection: "acceptance" })).toBe(
+      "practice=t1&engagement=e1&view=Findings",
+    );
+  });
+
   it("adds each view's own filters", () => {
     expect(
       query({
@@ -262,6 +277,26 @@ describe("historyMethod", () => {
       // Typing on in the same engagement still replaces.
       expect(change(previous, { view, search: "dat" })).toBe("replaceState");
     }
+  });
+
+  it("replaces when the audit program first states its tab, then pushes tab changes (#227)", () => {
+    const view = "Audit program";
+    const bare = "/?practice=t1&engagement=e1&view=Audit+program";
+    // The tab the program opens on, written once it mounts.
+    expect(change(bare, { view, procedureSection: "program" })).toBe(
+      "replaceState",
+    );
+    // A tab change is a new entry, so Back returns to the previous tab.
+    expect(
+      change(bare + "&section=program", { view, procedureSection: "review" }),
+    ).toBe("pushState");
+    // Arriving from another view is a new entry too.
+    expect(
+      change("/?practice=t1&engagement=e1&view=Findings", {
+        view,
+        procedureSection: "program",
+      }),
+    ).toBe("pushState");
   });
 
   it("replaces when moving between sections of the same paper", () => {
