@@ -1,12 +1,16 @@
 // The GenAI intake buttons and the vault's level badges (#145): "Queue
 // ingest" only while a worker is enrolled with genai_ingest, the re-run
 // attestation button, and a level badge on each GenAI file of the register.
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Artifact } from "@/lib/domain/types";
+import { readGenaiEnvelope } from "@/lib/genai/envelope";
 import { genaiArtifactLevels } from "@/lib/genai/evidence-levels";
+import { genaiReadiness } from "@/lib/genai/readiness";
+import { genaiSummary } from "@/lib/genai/summary";
 import { EvidenceRegister } from "./audit-registers";
-import { IntakeActions } from "./genai-evidence";
+import { IntakeActions, ResultCard } from "./genai-evidence";
 
 const noop = () => {};
 const actions = (
@@ -103,5 +107,64 @@ describe("EvidenceRegister", () => {
 
   it("shows no level without the GenAI view", () => {
     expect(html()).not.toContain("data-genai-file-level");
+  });
+});
+
+describe("ResultCard", () => {
+  it("shows a pairwise judge's position-consistency bound and pair count (#233)", async () => {
+    const text = readFileSync(
+      "../schemas/fixtures/genai-result.example.json",
+      "utf8",
+    );
+    const { envelope, computation } = await readGenaiEnvelope(text);
+    const summary = genaiSummary(computation, {
+      computationSha256: envelope.computationSha256,
+      itemsSha256: envelope.itemsSha256,
+    });
+    const run = summary.runs[0],
+      judge = run.judges[0],
+      validation = summary.judgeValidation[0];
+    const card = () =>
+      renderToStaticMarkup(
+        <ResultCard
+          result={
+            {
+              id: "AS-1",
+              createdAt: "2026-11-05T00:00:00.000Z",
+              custody: "worker",
+              authenticatedBy: null,
+              attested: false,
+              summary,
+              readiness: genaiReadiness({
+                recordId: "AS-1",
+                artifactId: "JOB-1",
+                custody: "worker",
+                acknowledgements: [],
+                attested: false,
+                summary,
+              }),
+            } as never
+          }
+          reviewer={false}
+          busy={false}
+          onAcknowledge={noop}
+        />,
+      );
+    // A grader shows kappa only.
+    expect(card()).toContain("kappa ");
+    expect(card()).not.toContain("position consistency");
+    judge.role = "pairwise_judge";
+    Object.assign(validation, {
+      positionConsistencyLower: 0.85123,
+      pairs: 40,
+      bindings: [
+        { ...validation.bindings[0], runKey: run.runKey, judgeRef: judge.ref },
+      ],
+    });
+    expect(card()).toContain(
+      "position consistency lower bound 0.851 on 40 swapped pairs",
+    );
+    validation.pairs = 0;
+    expect(card()).toContain("position consistency: no swapped (AB/BA) pairs");
   });
 });

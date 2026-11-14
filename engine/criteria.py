@@ -497,6 +497,9 @@ WITHHELD_ROWS_NOTE = ("The dataset is held by the client: the rows of groups bel
     "plan groups by, and the rows with no value in such a column when there are fewer than the minimum group size of "
     "them, are left out of every criterion, performance and calibration included, and of the reported row count.These results therefore describe only the other rows and can differ from a run on every row. The number of "
     "rows left out and the group comparisons' coverage counts are not reported; whether coverage met its minimum still decides.")
+MISSING_GROUP_NOTE = ("The dataset is held by the client: rows with no value in a column the plan groups by were left out "
+    "and count as withheld for a missing group value: they are in no reported figure, and the group comparisons count them "
+    "towards their coverage population as rows of unknown group.")
 WITHHELD_NOTE = ("The dataset is held by the client: groups and calibration bins below the minimum group size are withheld: "
     "only their labels are reported, without their row counts, rates, intervals or comparisons.")
 WITHHELD_BIN_NOTE = ("The calibration figures over all bins (sample size, coverage, expected calibration error and Brier score) "
@@ -518,21 +521,22 @@ def _withhold_metric(m):
     m["details"].update(counts=None, direction="none", smallCell=False, fisherExactP=None, chanceExactP=None)
 
 
-def withhold_small_groups(results, plan, rows_withheld=False):
+def withhold_small_groups(results, plan, rows_withheld=False, missing_group=False):
     """For a run on a client-held dataset, withhold every value that describes a group or calibration bin below
     the plan's minimum group size: its slice keeps only the label (n null, "withheld": true), each comparison
     involving it loses its estimate, counts and interval, and decision.suppressedGroups no longer states its n.
     rows_withheld: the run left the rows of such groups out (withheld_strata), so every result says so and a
     group comparison's coverage, whose population counts those rows, is not reported. Suppressed groups never
     decide (section 4.3). A calibration subgroup below the minimum group size that is also below the minimum
-    sample size (so nothing decides) withholds all its estimates. Results are changed in place."""
+    sample size (so nothing decides) withholds all its estimates. missing_group: rows were left out because their
+    group value was missing, so every result says so too. Results are changed in place."""
     minimum = plan["minimums"]["groupSize"]
     criteria = {c["id"]: c for c in plan["criteria"]}
     for result in results:
         decision = result.get("decision")
         if decision is None:
             continue
-        notes = [WITHHELD_ROWS_NOTE] if rows_withheld else []
+        notes = ([WITHHELD_ROWS_NOTE] if rows_withheld else []) + ([MISSING_GROUP_NOTE] if missing_group else [])
         kind = decision["kind"]
         if kind in ("group_comparison", "calibration"):
             criterion = criteria.get(result["testId"], {})

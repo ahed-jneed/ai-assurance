@@ -359,6 +359,159 @@ describe("the GenAI readiness gate", () => {
   });
 });
 
+// A C2PA-only envelope like engine/tests/fixtures/genai/marking/
+// c2pa_reports.jsonl: 34 trusted marks, 3 signed by an untrusted credential
+// (Valid), 3 failed (Invalid), 10 stripped and 30 human-made outputs. The
+// engine gives marking criteria runKeys [] (#233).
+const C2PA_RUN = "c2pa:0123456789abcdef";
+function c2paRecord(i: number, groundTruth: string, state: string | null) {
+  const present = state !== null;
+  return {
+    checkId: "img-" + i,
+    runKey: C2PA_RUN,
+    groundTruth,
+    stratum: { model: "gen-a" },
+    transformation: null,
+    watermark: null,
+    metadata: {
+      standard: "C2PA",
+      present,
+      validationStatus: [],
+      signer: present ? "Example Provider Signing CA" : null,
+      signatureClaimed: present ? state !== "Invalid" : null,
+      signatureVerifiedByEngine: false,
+    },
+    c2pa: {
+      validationState: state,
+      trusted: state === "Trusted",
+      failureCodes: state === "Invalid" ? ["assertion.dataHash.mismatch"] : [],
+      aiAssertion: present,
+    },
+  };
+}
+function presence(id: string, x: number) {
+  return {
+    id,
+    kind: "genai_marking",
+    outcome: "pass",
+    runKeys: [],
+    scoreKinds: {},
+    flags: [],
+    decision: {
+      role: "confirmatory" as const,
+      confidenceLevel: 0.95,
+      pValue: 0.001,
+      adjustedPValue: 0.002,
+      sampleSize: 50,
+      reasons: [],
+    },
+    members: [
+      {
+        memberId: "marking_presence",
+        metric: "marking_presence",
+        subject: C2PA_RUN,
+        estimate: x / 50,
+        interval: { level: 0.95, lower: 0.5, upper: 0.8, method: "wilson" },
+        seIid: 0.06,
+        status: "pass",
+        direction: "pass",
+        pValue: 0.001,
+        reasons: [],
+        band: { lower: 0.5 },
+        counts: { n: 50, x },
+      },
+    ],
+  };
+}
+const c2paEnvelope = (requireTrustedSigner: boolean) =>
+  variant((c) => {
+    const records = [
+      ...Array.from({ length: 34 }, (_, i) =>
+        c2paRecord(i, "marked", "Trusted"),
+      ),
+      ...[34, 35, 36].map((i) => c2paRecord(i, "marked", "Valid")),
+      ...[37, 38, 39].map((i) => c2paRecord(i, "marked", "Invalid")),
+      ...Array.from({ length: 10 }, (_, i) =>
+        c2paRecord(40 + i, "marked", null),
+      ),
+      ...Array.from({ length: 30 }, (_, i) =>
+        c2paRecord(50 + i, "human_made", null),
+      ),
+    ];
+    c.runs = [];
+    c.judgeValidation = [];
+    c.marking = [
+      {
+        runKey: C2PA_RUN,
+        format: "c2pa_validator_report",
+        inputSha256: "a".repeat(64),
+        evidenceLevel: "L2",
+        count: records.length,
+        records,
+      },
+    ];
+    c.criteria = [presence("presence", 35), presence("presence-trusted", 32)];
+    Object.assign(c.plan.normalized, {
+      criteria: [
+        { id: "presence", kind: "genai_marking", metric: "marking_presence" },
+        {
+          id: "presence-trusted",
+          kind: "genai_marking",
+          metric: "marking_presence",
+          ...(requireTrustedSigner ? { requireTrustedSigner: true } : {}),
+        },
+      ],
+    });
+  });
+
+describe("the GenAI readiness gate on marking evidence (#233)", () => {
+  it("gates a C2PA-only result on the evidence held, not as L0 with no runs", async () => {
+    const worker = await context(await c2paEnvelope(true));
+    const r = genaiReadiness(worker);
+    expect(r.effectiveLevel).toBe("L2");
+    expect(r.runs).toEqual([{ runKey: C2PA_RUN, effectiveLevel: "L2" }]);
+    expect(worker.summary.criteria.map((k) => k.trustedSigner)).toEqual([
+      undefined,
+      { untrusted: 3 },
+    ]);
+    // The untrusted signers are an unmet requirement of presence-trusted only.
+    expect(r.blockers).toEqual([
+      expect.objectContaining({
+        code: "genai_marking_requirement_unmet",
+        criterionId: "presence-trusted",
+        detail:
+          "3 metadata marks without a trusted signer (requireTrustedSigner)",
+      }),
+    ]);
+    const scope = r.claimScope.join("\n");
+    expect(scope).toContain(
+      "say nothing about the quality, accuracy or safety of those outputs",
+    );
+    expect(scope).toContain("trusted against the validator's own trust list");
+    expect(scope).toContain("the platform did not verify the signatures");
+  });
+
+  it("caps an imported marking envelope at L1 like any upload", async () => {
+    const uploaded = await context(await c2paEnvelope(false), {
+      custody: "uploaded",
+    });
+    const r = genaiReadiness(uploaded);
+    expect(r.effectiveLevel).toBe("L1");
+    expect(codes(uploaded)).toEqual(["genai_level_below_l2"]);
+    expect(r.claimScope.join("\n")).not.toContain("trusted signer");
+    expect(codes({ ...uploaded, authenticatedBy: "AS-worker" })).toEqual([]);
+  });
+
+  it("gates a marking summary stored before trusted-signer counts", async () => {
+    const stored = await context(await c2paEnvelope(true), {
+      custody: "uploaded",
+    });
+    for (const k of stored.summary.criteria) delete k.trustedSigner;
+    expect(genaiReadiness(stored).effectiveLevel).toBe("L1");
+    expect(codes(stored)).toEqual(["genai_level_below_l2"]);
+  });
+});
+
 describe("plans and manifests the workspace freezes", () => {
   const plan = {
     schemaVersion: "genai-plan/0.1",

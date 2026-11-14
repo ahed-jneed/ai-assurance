@@ -953,6 +953,31 @@ describe("external queue telemetry", () => {
     expect(await pendingJobCount(ctx, "ENG-3")).toBe(0);
   });
 
+  it("lists each job's real attempts, not its lease fence (#233)", async () => {
+    job("JOB-1", "running");
+    job("JOB-2", "queued");
+    job("JOB-3", "succeeded");
+    // JOB-1 was leased once and then cancelled: the cancel moved the fence
+    // to 2. JOB-3 was leased twice (the first lease expired).
+    sqlite
+      .prepare("UPDATE execution_jobs SET state='cancelled',fence=? WHERE id=?")
+      .run(2, "JOB-1");
+    const attempt = sqlite.prepare(
+      "INSERT INTO execution_attempts(job_id,fence,id,worker_id,state,started_at,details) VALUES(?,?,?,'W-1',?,?,'{}')",
+    );
+    attempt.run("JOB-1", 1, "ATT-1", "cancelled", at(1));
+    attempt.run("JOB-3", 1, "ATT-2", "expired", at(1));
+    attempt.run("JOB-3", 2, "ATT-3", "succeeded", at(2));
+    const listed = Object.fromEntries(
+      (await jobs(ctx, "ENG-1")).map((j) => [j.id, [j.fence, j.attempts]]),
+    );
+    expect(listed).toEqual({
+      "JOB-1": [2, 1],
+      "JOB-2": [0, 0],
+      "JOB-3": [0, 2],
+    });
+  });
+
   it("lists what a GenAI ingest job's plan label is made of (#221)", async () => {
     const insertJob = sqlite.prepare(
       "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at) VALUES(?,?,?,?,?,'x','user-lead',?)",

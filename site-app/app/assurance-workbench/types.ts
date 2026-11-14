@@ -21,6 +21,8 @@ export type ExecutionJob = ExternalJobFields & {
   /** Null for a GenAI ingest job, which names no system. */
   system_name: string | null;
   fence: number;
+  /** Leased attempts of the job; the fence also moves on a cancel (#233). */
+  attempts: number;
   created_at: string;
   /** A GenAI ingest job's frozen plan: its record, procedure, criteria and time. */
   plan_id?: string | null;
@@ -225,6 +227,16 @@ export function telemetryText(t: Snapshot["telemetry"], listed: number) {
       : "")
   );
 }
+
+/**
+ * How many attempts a job has had: the leased attempts the runner recorded,
+ * never the lease fence, which a cancel also moves (#233). A row from an
+ * older server without the count shows none.
+ */
+export const attemptsLabel = (attempts: number | undefined) =>
+  typeof attempts === "number" && attempts > 0
+    ? count(attempts, "attempt")
+    : "not yet attempted";
 
 /**
  * Display name of a worker capability (lib/runner-capabilities.ts): label()

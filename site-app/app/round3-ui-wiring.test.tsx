@@ -49,7 +49,9 @@ const job = (over: Partial<Snapshot["jobs"][number]>) =>
     state: "queued",
     mode: "genai_ingest",
     system_name: null,
-    fence: 1,
+    // Cancelled-and-requeued fences move on; the row shows real attempts (#233).
+    fence: 2,
+    attempts: 1,
     created_at: "2026-11-05T09:00:00.000Z",
     model_format: null,
     positive_label: null,
@@ -101,8 +103,9 @@ describe("the execution requests name a GenAI ingest job by its plan", () => {
         />,
       ),
     );
-    expect(out).toContain(planName + " GenAI ingest · attempt 1");
-    expect(out).toContain("Credit model Auditor model · attempt 1");
+    expect(out).toContain(planName + " GenAI ingest · 1 attempt");
+    expect(out).toContain("Credit model Auditor model · 1 attempt");
+    expect(out).not.toContain("attempt 2");
     expect(out).not.toContain("null");
   });
 

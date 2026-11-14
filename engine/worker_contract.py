@@ -441,7 +441,10 @@ def translate_config(request, rows):
     absent = [name for name in required if not rows or name not in rows[0]]
     if absent:
         raise EngineError("missing_column", "Required mapped input columns are absent: "+", ".join(map(repr, absent)))
-    if any(not str(row.get(name, "")).strip() for row in rows for name in required):
+    # A client-held run leaves the rows with no group value out and counts them as withheld for a missing group
+    # value (D-33, #233; criteria.withheld_strata); every other mapped cell must still be filled.
+    complete = [name for name in required if not (client_held(request) and name == columns.get("protected"))]
+    if any(not str(row.get(name, "")).strip() for row in rows for name in complete):
         raise EngineError("missing_value", "Mapped inputs cannot silently drop missing values")
     for row_number, row in enumerate(rows, 2):
         if task == "regression":

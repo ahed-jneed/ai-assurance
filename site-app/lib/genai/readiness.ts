@@ -95,6 +95,8 @@ export const GENAI_BLOCKERS = {
     "Post-run edits, a tool-aggregate mismatch, a declaration or family conflict, or a deterministic declaration awaits a reviewer's acknowledgement",
   genai_plan_floor_lowered:
     "The plan lowers a floor of the methodology (D-10, D-16 or the sample minimums)",
+  genai_marking_requirement_unmet:
+    "A marking criterion requires a trusted signer, and metadata marks in its sample were not signed by a signer the C2PA validator trusts",
 } as const;
 export type GenaiBlockerCode = keyof typeof GENAI_BLOCKERS;
 export type GenaiBlocker = {
@@ -198,7 +200,15 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
 
   const deciding = s.criteria.filter((k) => k.role === "confirmatory");
   if (!deciding.length) block("genai_no_deciding_criterion");
-  const runKeys = new Set(deciding.flatMap((k) => k.runKeys));
+  // A marking criterion names no run (the engine gives it runKeys []): it is
+  // computed from every marking block, so those blocks are its runs and pass
+  // the gate like any other (#233).
+  const markingRuns = s.runs
+    .filter((x) => x.kind === "marking")
+    .map((x) => x.runKey);
+  const runsOf = (k: GenaiSummary["criteria"][number]) =>
+    k.kind === "genai_marking" && !k.runKeys.length ? markingRuns : k.runKeys;
+  const runKeys = new Set(deciding.flatMap(runsOf));
   const runs = s.runs.filter((x) => runKeys.has(x.runKey));
   const levels = runs.map((x) => ({
     runKey: x.runKey,
@@ -228,6 +238,13 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
       block("genai_below_minimum_items", { criterionId: k.id });
     if (reasons.has("run_incomplete"))
       block("genai_run_incomplete", { criterionId: k.id });
+    if (k.trustedSigner?.untrusted)
+      block("genai_marking_requirement_unmet", {
+        criterionId: k.id,
+        detail:
+          k.trustedSigner.untrusted +
+          " metadata marks without a trusted signer (requireTrustedSigner)",
+      });
     // Every deciding member needs an interval and a standard error (design
     // 12.3): the engine gives each criterion kind one (seIid, or sePaired).
     if (
@@ -319,6 +336,15 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
   }
 
   const claimScope = [...new Set(runs.flatMap((x) => x.claimScope))];
+  const marking = deciding.filter((k) => k.kind === "genai_marking");
+  if (marking.length)
+    claimScope.push(
+      "The marking criteria show whether the sampled outputs carry a machine-readable mark, or are detected as AI-generated; they say nothing about the quality, accuracy or safety of those outputs.",
+    );
+  if (marking.some((k) => k.trustedSigner))
+    claimScope.push(
+      "Where a criterion requires a trusted signer, a metadata mark counts only when the C2PA validator reported its signer as trusted against the validator's own trust list.",
+    );
   const marked = runs.filter((x) =>
     x.warnings.includes("marking_signature_unverified"),
   );

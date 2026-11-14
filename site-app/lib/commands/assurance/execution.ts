@@ -11,6 +11,7 @@ import {
   frozenLabelPair,
 } from "../../external-worker-contract";
 import { pinned, recordVersions, roleTemplate } from "../../criteria/pin";
+import { item, type Resolved } from "../../criteria/projection";
 import { templatePaper } from "../../factories";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
@@ -25,6 +26,7 @@ import { aggregate, planSha256, type Plan } from "../../statistics";
 import { requireRole } from "../../tenancy";
 import { substantivePlan } from "../../workflow/command";
 import { planPinsCurrent } from "../../workflow-state";
+import type { Procedure } from "../../workflow-types";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -55,6 +57,28 @@ export function importedOutcome(
       .filter((r) => !decided || r?.decision?.role !== "exploratory")
       .map((r) => (OUTCOMES.has(r?.outcome) ? r.outcome : "inconclusive")),
   );
+}
+/**
+ * The draft paper an external execution compiles into: filed under the
+ * procedure the job is bound to, with that procedure's template criteria and
+ * its objective (#233). Only a procedure whose template the pinned pack does
+ * not hold falls back to the pack's externalExecutionPaper template.
+ */
+export function externalExecutionPaper(
+  resolved: Pick<Resolved, "pack" | "frameworks">,
+  procedure: Pick<Procedure, "templateId" | "objective">,
+  userId: string,
+) {
+  const own = !!item(resolved.pack, procedure.templateId);
+  const p = templatePaper(
+    resolved,
+    own
+      ? procedure.templateId
+      : roleTemplate(resolved.pack, "externalExecutionPaper"),
+    userId,
+  );
+  if (own && procedure.objective) p.body.objective = procedure.objective;
+  return p;
 }
 // Columns of a succeeded execution_jobs row as importJob reads them.
 type SucceededJobRow = {
@@ -471,12 +495,7 @@ export const execution: AssuranceModule = defineCommands({
           409,
           "The procedure's plan or scope changed after this job was queued; queue it again",
         );
-      const resolved = pinned(e),
-        p = templatePaper(
-          resolved,
-          roleTemplate(resolved.pack, "externalExecutionPaper"),
-          ctx.user.userId,
-        );
+      const p = externalExecutionPaper(pinned(e), procedure, ctx.user.userId);
       p.required = false;
       p.title = "External execution — " + v.jobId;
       // Worker 1.2.0 copies the engine's statistics 1.0.0 decision into every
