@@ -9,18 +9,31 @@
 // and qa-outsider provision the practices the specs expect, and any other
 // identity is still refused.
 //
+// The Worker runs in Miniflare directly, as the check harnesses run it
+// (scripts/harness/worker.mjs), not under `wrangler dev` (#194). `wrangler dev`
+// is a development server: it watches dist/server, and on any change it
+// pauses its proxy, queues every request until the reload completes and then
+// replays only GET and HEAD. A build in the same checkout during a run (for
+// example `npm run check` beside `npm run test:e2e`) deletes and rewrites
+// dist/, so a request was held across the reload or never answered, and the
+// proxy's extra hop to the Worker reported `Network connection lost`. The
+// suite tests a fixed build, so the server loads it once and serves it on one
+// hop: a request is answered by the Worker or fails, never queued.
+//
 //   npm run build && node e2e/server.mjs [port]
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
-const port = process.argv[2] ?? process.env.E2E_PORT ?? "8790";
+const port = Number(process.argv[2] ?? process.env.E2E_PORT ?? "8790");
 const state = ".wrangler/e2e-state";
+const server = path.join(projectRoot, "dist/server");
+const config = path.join(server, "wrangler.json");
 
-if (!existsSync(path.join(projectRoot, "dist/server/wrangler.json"))) {
+if (!existsSync(config)) {
   console.error("dist/server is missing; run `npm run build` first.");
   process.exit(1);
 }
@@ -32,39 +45,61 @@ const migrate = spawnSync(
 );
 if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 
-const worker = spawn(
-  process.execPath,
-  [
-    "--import",
-    "./scripts/sites-env.mjs",
-    "./node_modules/wrangler/bin/wrangler.js",
-    "dev",
-    "--config",
-    "dist/server/wrangler.json",
-    "--local",
-    "--persist-to",
-    state,
-    "--ip",
-    "127.0.0.1",
-    "--port",
-    port,
-    "--inspector-port",
-    "0",
-    "--show-interactive-dev-session=false",
-    "--var",
-    "IDENTITY_MODE:trusted-headers",
-    "--var",
-    "IDENTITY_TRUSTED_HEADERS:loopback-tests",
-    "--var",
-    "SELF_SIGNUP:@personas.test",
+// The same environment `wrangler dev` gets from sites-env.mjs (no metrics or
+// log files in the checkout); importing it also moves to the project root.
+await import("../scripts/sites-env.mjs");
+const { Log, LogLevel, Miniflare } = await import("miniflare");
+const { unstable_getMiniflareWorkerOptions } = await import("wrangler");
+
+// The bindings, compatibility settings and static assets of the build's
+// wrangler.json, read the way `wrangler dev` reads them.
+const options = unstable_getMiniflareWorkerOptions(config);
+const { workerOptions } = options;
+const main = path
+  .relative(server, path.resolve(server, options.main))
+  .replaceAll("\\", "/");
+// Every module of the build, entry first: the build is not bundled
+// (no_bundle) and loads its chunks dynamically, so each one is attached, as
+// `wrangler dev` attaches them.
+const modules = [
+  main,
+  ...readdirSync(server, { recursive: true })
+    .map((file) => String(file).replaceAll("\\", "/"))
+    .filter((file) => file !== main && /\.m?js$/.test(file)),
+];
+
+const mf = new Miniflare({
+  ...workerOptions,
+  name: "ai-assurance-workspace-e2e",
+  modules: modules.map((file) => ({
+    type: "ESModule",
+    path: path.join(server, file),
+  })),
+  modulesRoot: server,
+  bindings: {
+    ...workerOptions.bindings,
+    IDENTITY_MODE: "trusted-headers",
+    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    SELF_SIGNUP: "@personas.test",
     // A throwaway key-encryption key for this run's practice signing keys,
     // so the dossier specs can seal (docs/security/signing-keys.md). The
     // database it wraps keys in is deleted at the next start.
-    "--var",
-    "DOSSIER_KEK:" + randomBytes(32).toString("base64"),
-  ],
-  { cwd: projectRoot, stdio: "inherit" },
-);
+    DOSSIER_KEK: randomBytes(32).toString("base64"),
+  },
+  // The D1 database and R2 bucket that db-migrate-local.mjs migrated, at the
+  // path `wrangler dev --persist-to` uses.
+  defaultPersistRoot: path.join(projectRoot, state, "v3"),
+  host: "127.0.0.1",
+  port,
+  log: new Log(LogLevel.WARN),
+});
+const url = await mf.ready;
+console.log(`E2E Worker ready on ${url.origin}`);
+
+let closing = false;
 for (const signal of ["SIGINT", "SIGTERM"])
-  process.on(signal, () => worker.kill(signal));
-worker.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+  process.on(signal, () => {
+    if (closing) return;
+    closing = true;
+    mf.dispose().finally(() => process.exit(0));
+  });
