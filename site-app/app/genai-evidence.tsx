@@ -44,7 +44,11 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
-import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
+import {
+  bundleOptionLabel,
+  count,
+  planOptionLabel,
+} from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
 
@@ -735,10 +739,13 @@ export function GenaiEvidence({
         )}
         {view && (
           <p className="subtle">
-            {view.plans.length} frozen plans · {view.bundles.length} declared
-            bundles · {view.jobs.length} ingest jobs ·{" "}
-            {view.acknowledgements.length} acknowledgements ·{" "}
-            {view.attestations.length} re-run attestations
+            {[
+              count(view.plans.length, "frozen plan"),
+              count(view.bundles.length, "declared bundle"),
+              count(view.jobs.length, "ingest job"),
+              count(view.acknowledgements.length, "acknowledgement"),
+              count(view.attestations.length, "re-run attestation"),
+            ].join(" · ")}
           </p>
         )}
         {writer && view && !ingestAvailable && (

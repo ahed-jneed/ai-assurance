@@ -6,7 +6,8 @@ import type { GenaiView } from "@/lib/read-models/genai-view";
 type Procedure = { id: string; templateId: string; title: string };
 
 const day = (at: string) => String(at ?? "").slice(0, 10);
-const count = (n: number, one: string, many = one + "s") =>
+/** "1 frozen plan", "2 frozen plans". */
+export const count = (n: number, one: string, many = one + "s") =>
   n + " " + (n === 1 ? one : many);
 
 /** "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03". */

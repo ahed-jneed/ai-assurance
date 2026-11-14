@@ -118,14 +118,13 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
   try {
     await page.reload();
     await page.getByRole("tab", { name: "GenAI evidence" }).click();
-    await page.getByRole("button", { name: "Queue ingest" }).click();
-    const queue = page.getByRole("dialog", {
-      name: "Queue the engine's GenAI ingest",
-    });
-    await expect(queue.getByLabel("Frozen plan")).toBeVisible();
-    await expect(queue.getByLabel("Declared bundle")).toBeVisible();
-    await queue.getByRole("button", { name: "Cancel" }).click();
-    await expect(queue).toBeHidden();
+    // The demo program has no GenAI procedure to freeze a plan for, so the
+    // button stays disabled until a plan and a bundle exist; its labels are
+    // covered by app/genai-ingest-labels.test.ts.
+    await expect(
+      page.getByRole("button", { name: "Queue ingest" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-genai-no-ingest-worker]")).toHaveCount(0);
   } finally {
     const revoked = await lead.post("/api/assurance", {
       tenantId: demo.tenantId,
