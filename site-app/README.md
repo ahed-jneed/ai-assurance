@@ -37,7 +37,7 @@ The AI Assurance workspace: a React 19 single-page app and its API in one Cloudf
 | `npm run check` | Everything the CI `web` job runs: `format:check`, `typecheck`, `lint`, `test` (Vitest), `check:sync`, `check:build`, `check:harnesses`, `check:fixtures` |
 | `npm run test:e2e` | The Playwright persona suite against the built Worker (CI runs it in the `e2e` job) |
 
-The harnesses that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `../engine/requirements-dev.txt` installed. On Windows the harnesses need a short temp directory (workerd cannot open an SQLite path past 260 characters): when `TEMP` is longer than 100 characters, `scripts/harness/env.mjs` switches them to `%LOCALAPPDATA%\Tempa-harness` (else `%SystemDrive%a-harness-tmp`), and `ASSURANCE_HARNESS_TEMP` chooses another short directory. `package-lock.json` is maintained with npm 11: change dependencies only with `npx npm@11 install ...`.
+The harnesses that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `../engine/requirements-dev.txt` installed. On Windows the harnesses need a short temp directory (workerd cannot open an SQLite path past 260 characters): when `TEMP` is longer than 100 characters, `scripts/harness/env.mjs` switches them to `%LOCALAPPDATA%\Temp\aa-harness` (else `%SystemDrive%\aa-harness-tmp`), and `ASSURANCE_HARNESS_TEMP` chooses another short directory. `package-lock.json` is maintained with npm 11: change dependencies only with `npx npm@11 install ...`.
 
 ## Local development and sign-in
 

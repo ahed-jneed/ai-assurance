@@ -150,7 +150,7 @@ Merge dates are UTC, all in November 2026. Titles are the issues' own.
 | [#201] | Release verification: server-side defects (client projection leak, missing guards, refusal messages) | **Open.** [PR #205] in review: no staff ids in client projections, 409 and 404 guards, clearer refusals, strict filters (D-46), withdrawal of a superseded client-visible report (D-45), #19's label confirmed (D-47) |
 | [#202] | Release verification: UI defects (revoked screen, labels, guidance, LL144 checklist, compile draft) | **Open.** [PR #208] in review: the eleven items, one capture-gate list for UI and server (D-48), and Withdraw for a superseded client-visible report |
 | [#203] | Release verification: keyboard focus in record sheets and the client portal | **Open.** [PR #206] in review: focus returns to the opener from every dialog and sheet; the portal forms take and return focus |
-| [#204] | Release verification: dev server returns 500 on server-rendered pages; local setup docs | **Open.** [PR #207] in review: SSR errors logged on the dev server, a short harness temp directory on Windows, the migration step in Run locally |
+| [#204] | Release verification: dev server returns 500 on server-rendered pages; local setup docs | **Open.** [PR #207] in review: SSR errors logged on the dev server, a short harness temp directory on Windows, the migration step in the README Quick start |
 
 ## Placed on 5 Nov 2026
 
