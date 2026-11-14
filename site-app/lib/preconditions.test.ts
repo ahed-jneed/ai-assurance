@@ -3,7 +3,12 @@
 // command itself, and compares them.
 import { describe, expect, it } from "vitest";
 import type { Engagement, Report } from "./domain/types";
-import { monitoringClosureRefusal, releaseRefusal } from "./preconditions";
+import { releaseChecklist } from "./domain/gates";
+import {
+  monitoringClosureRefusal,
+  packageApprovalRefusal,
+  releaseRefusal,
+} from "./preconditions";
 import {
   approvedWorkflow,
   artifact,
@@ -110,6 +115,48 @@ describe("the release precondition", () => {
     const e = released();
     e.reports[0].release = { state: "internal", history: [] };
     await refusedAlike(releaseRefusal(e, e.reports[0], "lead"), release(e));
+  });
+});
+
+describe("the package approval precondition (#226 item 5)", () => {
+  const internal = () => {
+    const r = approvedReport();
+    r.snapshot = { ...r.snapshot, workflow: approvedWorkflow() };
+    r.release = { state: "internal", history: [] };
+    return released({ reports: [r] });
+  };
+  const approve = (e: Engagement, userId: string) =>
+    command(
+      e,
+      "approveReportPackage",
+      {
+        reportId: "R1",
+        internalHash: "R1-internal",
+        clientHash: "R1-client",
+        reason: "Both packages reviewed",
+        checklist: Object.fromEntries(
+          releaseChecklist.map((i) => [i.id, "confirmed"]),
+        ),
+      },
+      userId,
+    );
+
+  it("refuses the report's creator with the command's 403 and message", async () => {
+    const e = internal();
+    e.reports[0].actor = "reviewer";
+    const refusal = packageApprovalRefusal(e.reports[0], "reviewer");
+    expect(refusal).toEqual({
+      status: 403,
+      message: "The report creator cannot approve its package",
+    });
+    await refusedAlike(refusal, approve(e, "reviewer"));
+  });
+
+  it("admits a reviewer who did not create the package", async () => {
+    const e = internal();
+    expect(packageApprovalRefusal(e.reports[0], "reviewer")).toBeNull();
+    await approve(e, "reviewer");
+    expect(e.reports[0].release?.state).toBe("approved");
   });
 });
 

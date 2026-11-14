@@ -6,7 +6,12 @@ import {
 } from "./client-projection";
 import { caller, stored } from "./commands/test-fixtures";
 import type { Report } from "./domain/types";
-import { packageStatusLabel } from "./report-presentation";
+import {
+  clientStillReads,
+  packageGuidance,
+  packageStatusLabel,
+} from "./report-presentation";
+import { isWithdrawable } from "./workflow-state";
 import { paper } from "./workflow/test-fixtures";
 
 const at = "2026-11-05T10:00:00.000Z";
@@ -114,6 +119,45 @@ describe("client projection of released reports", () => {
     expect(packageStatusLabel(client.reports[0], true)).toBe(
       "Superseded by a later report, since withdrawn",
     );
+  });
+
+  it("tells staff what the client sees once the successor is withdrawn (#226)", () => {
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "superseded",
+        releasedAt: at,
+        supersededBy: "REPORT-2",
+        history: [],
+      }),
+      report("REPORT-2", {
+        state: "withdrawn",
+        releasedAt: at,
+        supersedes: "REPORT-1",
+        history: [],
+      }),
+    ];
+    e.reports[1].createdAt = "2026-11-06T10:00:00.000Z";
+    // The client still reads REPORT-1 ...
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(client.reports.map((r) => r.id)).toEqual(["REPORT-1"]);
+    // ... and the record sheet and the banner say so, not "superseded by a
+    // newer released report".
+    const notice =
+      "Its successor REPORT-2 was withdrawn. The client still reads this report.";
+    expect(packageGuidance(e.reports[0], e)).toBe(notice);
+    expect(clientStillReads(e.reports)).toEqual({
+      report: e.reports[0],
+      notice: "REPORT-1: " + notice,
+    });
+    expect(isWithdrawable(e.reports[0])).toBe(true);
+    // While the successor is released, the client reads the successor.
+    e.reports[1].release!.state = "released";
+    e.reports[1].release!.supersedes = undefined;
+    expect(packageGuidance(e.reports[0], e)).toBe(
+      "Superseded by a newer released report. It stays readable as it was issued.",
+    );
+    expect(clientStillReads(e.reports)).toBeUndefined();
   });
 
   it("does not name a predecessor withdrawn after it was superseded (#201)", () => {

@@ -9,6 +9,7 @@ import {
   type Engagement,
   type Finding,
   type Paper,
+  type Report,
 } from "@/lib/domain/types";
 import { qualityReviewerRole } from "@/lib/domain/quality-review";
 import { ApiError } from "@/lib/http";
@@ -527,6 +528,32 @@ describe("decisionState", () => {
       decisionState("Reviewer", "c", { action: "closeFinding", finding })
         .allowed,
     ).toBe(true);
+  });
+
+  it("approves a report package only for someone other than its creator (#226)", () => {
+    const report = { actor: "creator" } as unknown as Report;
+    expect(
+      decisionState("Reviewer", "creator", {
+        action: "approveReportPackage",
+        report,
+      }),
+    ).toEqual({
+      allowed: false,
+      reason: "The report creator cannot approve its package",
+      refusal: "independence",
+    });
+    expect(
+      decisionState("Lead Auditor", "other", {
+        action: "approveReportPackage",
+        report,
+      }),
+    ).toEqual({ allowed: true });
+    expect(
+      decisionState("Auditor", "other", {
+        action: "approveReportPackage",
+        report,
+      }).refusal,
+    ).toBe("role");
   });
 
   it("approves a classification only for someone other than its classifier", () => {

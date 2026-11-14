@@ -1,6 +1,7 @@
 import type { Engagement, Report, Role } from "./domain/types";
 import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
+import { withdrawnSuccessorOf } from "./workflow-state";
 import { conclusionTypes, snapshotTerms } from "./domain/report-model";
 
 /**
@@ -57,6 +58,33 @@ export function packageStatusLabel(report: Report, clientView = false) {
   return labels[state] ?? "Internal package";
 }
 
+/** What the client sees of a superseded report whose successor was withdrawn. */
+const withdrawnSuccessorNotice = (successor: string) =>
+  "Its successor " +
+  successor +
+  " was withdrawn. The client still reads this report.";
+
+/**
+ * The report the client still reads because its successor was withdrawn
+ * after release (#226 item 6), for the Reports & sign-off banner: the
+ * newest such report and what the client sees, or undefined. It uses the
+ * client projection's own answer (withdrawnSuccessorOf).
+ */
+export function clientStillReads(reports: readonly Report[]) {
+  const report = reports
+    .filter((r) => withdrawnSuccessorOf(reports, r))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return report
+    ? {
+        report,
+        notice:
+          report.id +
+          ": " +
+          withdrawnSuccessorNotice(withdrawnSuccessorOf(reports, report)!),
+      }
+    : undefined;
+}
+
 /**
  * What comes next for a captured package, by its state (#202): the
  * pre-release guidance only while a final package awaits approval. With the
@@ -76,8 +104,13 @@ export function packageGuidance(report: Report, engagement?: Engagement) {
     }
     case "released":
       return "Released to the client. A newer released report supersedes it; a Lead Auditor can withdraw it.";
-    case "superseded":
-      return "Superseded by a newer released report. It stays readable as it was issued.";
+    case "superseded": {
+      const withdrawn =
+        engagement && withdrawnSuccessorOf(engagement.reports, report);
+      return withdrawn
+        ? withdrawnSuccessorNotice(withdrawn)
+        : "Superseded by a newer released report. It stays readable as it was issued.";
+    }
     case "withdrawn":
       return "Withdrawn. Capture a new final package to report again.";
     default:

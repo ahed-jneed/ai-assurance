@@ -68,3 +68,55 @@ describe("Withdraw in the release controls", () => {
     expect(html(report("superseded", true), "Reviewer")).not.toMatch(withdraw);
   });
 });
+
+describe("Approve package in the release controls (#226 item 5)", () => {
+  const internal = (actor: string) =>
+    report("internal", false, {
+      actor,
+      snapshot: { workflow: {} } as unknown as Report["snapshot"],
+    });
+  it("is disabled for the report's creator with the server's reason", () => {
+    const markup = html(internal("user-lead"));
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>Approve package/);
+    expect(markup).toContain(
+      ">The report creator cannot approve its package</small>",
+    );
+  });
+  it("is enabled for a reviewer who did not create the package", () => {
+    const markup = html(internal("user-auditor"));
+    expect(markup).toMatch(/Approve package/);
+    expect(markup).not.toMatch(/<button[^>]*disabled=""[^>]*>Approve package/);
+    expect(markup).not.toContain("cannot approve its package");
+  });
+});
+
+describe("the sheet of a superseded report whose successor was withdrawn (#226 item 6)", () => {
+  it("says the client still reads it and offers Withdraw", () => {
+    const r = report("superseded", true, {
+      release: {
+        state: "superseded",
+        releasedAt: "2026-11-02T09:00:00.000Z",
+        supersededBy: "R-2",
+        history: [],
+      },
+    } as Partial<Report>);
+    const successor = report("withdrawn", true, { id: "R-2" });
+    const markup = renderToStaticMarkup(
+      <ReportRelease
+        report={r}
+        reports={[r, successor]}
+        engagement={{ reports: [r, successor] } as never}
+        role="Lead Auditor"
+        userId="user-lead"
+        busy={false}
+        act={async () => ({ engagement: {} as never })}
+        onEditing={() => {}}
+      />,
+    );
+    expect(markup).toContain(
+      "Its successor R-2 was withdrawn. The client still reads this report.",
+    );
+    expect(markup).not.toContain("Superseded by a newer released report");
+    expect(markup).toMatch(withdraw);
+  });
+});

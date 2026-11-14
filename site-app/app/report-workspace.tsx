@@ -30,6 +30,7 @@ import { captureGates } from "@/lib/domain/capture-gates";
 import { reportRows, type RegisterQuery } from "@/lib/register-views";
 import {
   awaitingApproval,
+  clientStillReads,
   packageGuidance,
   reportTime,
   packageOpenLabel,
@@ -105,6 +106,10 @@ export function ReportWorkspace({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const state = latest ? packageStatus(latest) : "";
   const needsPackage = !latest || ["withdrawn", "superseded"].includes(state);
+  // After a successor's withdrawal the client still reads its predecessor
+  // (#226 item 6), until a new release supersedes it: the banner says
+  // which, as the client projection does.
+  const stillRead = clientStillReads(e.reports);
   // Once a final package is captured, the handoff follows that package: the
   // capture gates of the terms selected below are about a new capture, not
   // about it (#202, R1-19). They apply only before capture.
@@ -468,6 +473,9 @@ export function ReportWorkspace({
                     ? packageGuidance(latest, e)
                     : "Package approval and client release remain separate recorded decisions."}
             </p>
+            {stillRead && (
+              <p data-testid="client-still-reads">{stillRead.notice}</p>
+            )}
           </div>
           <div className="row-actions">
             {blocked ? (

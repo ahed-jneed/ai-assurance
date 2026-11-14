@@ -5,8 +5,9 @@
 // this map with every one of them, so a button is shown exactly to the roles
 // the server lets through, and hidden or disabled with the server's reason
 // for everyone else.
-import type { Engagement, Finding, Paper, Role } from "./domain/types";
+import type { Engagement, Finding, Paper, Report, Role } from "./domain/types";
 import { qualityReviewerOps } from "./domain/quality-review";
+import { packageApprovalRefusal } from "./preconditions";
 
 const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   reviewers: readonly Role[] = ["Reviewer", "Lead Auditor"],
@@ -454,6 +455,7 @@ export function decisionState(
     | { action: "signPaper"; paper: Paper }
     | { action: "closeFinding"; finding: Finding }
     | { action: "approveClassification"; engagement: Engagement }
+    | { action: "approveReportPackage"; report: Report }
     | { action: NarrowedAction; engagement: Engagement }
     | {
         action: Exclude<
@@ -462,6 +464,7 @@ export function decisionState(
           | "signPaper"
           | "closeFinding"
           | "approveClassification"
+          | "approveReportPackage"
           | NarrowedAction
         >;
       },
@@ -514,6 +517,10 @@ export function decisionState(
             "An independent reviewer must approve a completed classification",
           )
         : allowed;
+    }
+    case "approveReportPackage": {
+      const refusal = packageApprovalRefusal(decision.report, userId);
+      return refusal ? refused(refusal.message) : allowed;
     }
     default:
       return allowed;
