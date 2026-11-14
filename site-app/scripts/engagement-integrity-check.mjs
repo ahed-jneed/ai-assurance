@@ -77,6 +77,7 @@ try {
   });
   const second = created.details.engagementId;
   // A draft report in each engagement stores an immutable snapshot in R2.
+  const reportIds = {};
   const engagementOf = async (id) =>
     (
       await call(
@@ -103,6 +104,48 @@ try {
     // the workspace applies it without reloading.
     assert.equal(saved.events[0].action, "createReport");
     assert.equal(typeof saved.metadataBytes, "number");
+    reportIds[id] = (await engagementOf(id)).reports.at(-1).id;
+  }
+  // #220: the print views answer a damaged record with the status their JSON
+  // API gives (409 mismatch or unreadable, 503 missing), with their own
+  // "could not be loaded" fallback, never 404 or 200.
+  async function printViewsAnswer(id, status, kind) {
+    const query = new URLSearchParams({
+      tenantId,
+      engagementId: id,
+      reportId: reportIds[id],
+      auditId: "LL144-any",
+    });
+    for (const [page, api, fallback] of [
+      ["/report", "/api/report-package", /The report could not be loaded/],
+      [
+        "/ll144-summary",
+        "/api/ll144-summary",
+        /The summary could not be loaded/,
+      ],
+    ]) {
+      const headers = {
+        "oai-authenticated-user-id": owner,
+        "oai-authenticated-user-email": owner + "@fixture.invalid",
+      };
+      const json = await mf.dispatchFetch(base + api + "?" + query, {
+        headers,
+      });
+      assert.equal(json.status, status, api + " " + kind);
+      assert.match((await json.json()).error, new RegExp(kind));
+      const html = await mf.dispatchFetch(base + page + "?" + query, {
+        headers,
+      });
+      assert.equal(html.status, status, page + " " + kind);
+      // The rendered page without its scripts: the RSC payload also carries
+      // the segment's not-found and forbidden fallbacks.
+      const text = (await html.text()).replace(
+        /<script\b[\s\S]*?<\/script>/g,
+        "",
+      );
+      assert.match(text, fallback);
+      assert.doesNotMatch(text, /has not been (released|published)/);
+    }
   }
   const partsOf = async (id) =>
     (await bucket.list({ prefix: tenantId + "/" + id + "/immutable/" }))
@@ -150,6 +193,10 @@ try {
     "/api/assurance?" + new URLSearchParams({ tenantId, engagementId: second }),
   );
   console.log("PASS a missing blob isolates its engagement only");
+  await printViewsAnswer(second, 503, "missing");
+  console.log(
+    "PASS the print views answer a missing blob with 503 like their API",
+  );
 
   // A corrupt engagement record is listed with an integrity error, the
   // default selection skips it, and the inbox reports it beside the queue.
@@ -193,6 +240,10 @@ try {
     ),
   );
   console.log("PASS a corrupt record isolates its engagement and is recorded");
+  await printViewsAnswer(first.id, 409, "unreadable");
+  console.log(
+    "PASS the print views answer an unreadable record with 409 like their API",
+  );
 
   // F-54: a request body that is not JSON is a 400, not a 500.
   const malformed = await call("/api/workspace", {

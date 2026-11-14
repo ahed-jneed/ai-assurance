@@ -3521,6 +3521,44 @@ try {
   const forbiddenHtml = await forbiddenPrint.text();
   assert.match(forbiddenHtml, /You do not have access to this practice/);
   assert.doesNotMatch(forbiddenHtml, /You do not have access to this report/);
+  // #220: /ll144-summary answers refusals like /report and like
+  // /api/ll144-summary: 403 with the refusal's own message, 404 for a
+  // missing or unpublished summary.
+  for (const [user, query, status] of [
+    [other, { auditId: "LL144-missing" }, 403],
+    [viewer, { auditId: "LL144-missing" }, 404],
+    [owner, { auditId: "LL144-missing" }, 404],
+    [viewer, { auditId: "LL144-missing", reportId: internalFinal.id }, 404],
+  ]) {
+    const full = { tenantId, engagementId: e.id, ...query };
+    const label = user + " " + JSON.stringify(query);
+    assert.equal(
+      await refusedStatus("/api/ll144-summary", full, user),
+      status,
+      "LL144 API " + label,
+    );
+    assert.equal(
+      await refusedStatus("/ll144-summary", full, user),
+      status,
+      "LL144 page " + label,
+    );
+  }
+  const forbiddenSummary = await (
+    await transport(
+      base +
+        "/ll144-summary?" +
+        new URLSearchParams({
+          tenantId,
+          engagementId: e.id,
+          auditId: "LL144-missing",
+        }),
+      { headers: h(other) },
+    )
+  ).text();
+  assert.match(forbiddenSummary, /You do not have access to this practice/);
+  console.log(
+    "PASS the /ll144-summary page answers 403 or 404 like /api/ll144-summary",
+  );
   console.log(
     "PASS the /report print view answers 403 or 404 like /api/report-package, with the refusal's own message",
   );
