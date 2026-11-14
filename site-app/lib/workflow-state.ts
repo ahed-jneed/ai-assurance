@@ -33,6 +33,15 @@ export const isClientVisible = (report: Report) =>
   !!report.clientSnapshot &&
   !!report.clientSha256;
 /**
+ * Whether a Lead Auditor may withdraw the report: an approved or released
+ * package, and a superseded one the client can still read (#201). Once its
+ * successor is withdrawn, a superseded report is the client's only report and
+ * must remain withdrawable.
+ */
+export const isWithdrawable = (report: Report) =>
+  ["approved", "released"].includes(releaseState(report)) ||
+  (releaseState(report) === "superseded" && isClientVisible(report));
+/**
  * The user's live client request grants: active, unexpired and, given
  * `since` (the start of the user's current membership grant), issued at or
  * after it, so a revoked or re-roled contributor never regains old requests.
