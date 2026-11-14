@@ -8,6 +8,7 @@ import {
   identityConfig,
   runWithIdentity,
 } from "../lib/identity";
+import { withResponseStatus } from "../lib/response-status";
 
 /** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
 declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
@@ -59,9 +60,12 @@ export default {
       const caller = await authenticate(tracked.request, config);
       const route = authRoute(tracked.request, config, caller.identity);
       if (route) return route;
-      return await runWithIdentity(caller.identity, () =>
-        runWithConnectorBinding(binding, () =>
-          handler.fetch(caller.request, env, ctx),
+      // A page may record its own status (lib/response-status.ts, #216).
+      return await withResponseStatus(() =>
+        runWithIdentity(caller.identity, () =>
+          runWithConnectorBinding(binding, () =>
+            handler.fetch(caller.request, env, ctx),
+          ),
         ),
       );
     } finally {

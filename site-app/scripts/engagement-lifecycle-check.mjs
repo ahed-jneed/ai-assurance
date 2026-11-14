@@ -3505,8 +3505,24 @@ try {
     { headers: h(viewer) },
   );
   assert.match(await refusedPrint.text(), /Report unavailable/);
+  // #216: the 403 page shows the refusal's own message, which describes only
+  // the caller's own access.
+  const forbiddenPrint = await transport(
+    base +
+      "/report?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: internalFinal.id,
+      }),
+    { headers: h(other) },
+  );
+  assert.equal(forbiddenPrint.status, 403);
+  const forbiddenHtml = await forbiddenPrint.text();
+  assert.match(forbiddenHtml, /You do not have access to this practice/);
+  assert.doesNotMatch(forbiddenHtml, /You do not have access to this report/);
   console.log(
-    "PASS the /report print view answers 403 or 404 like /api/report-package",
+    "PASS the /report print view answers 403 or 404 like /api/report-package, with the refusal's own message",
   );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
