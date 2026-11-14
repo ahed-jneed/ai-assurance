@@ -1311,6 +1311,31 @@ try {
       bundleRecordId: genaiBundle.id,
       planRecordId: genaiPlan.id,
     });
+    // #221: jobs() carries what the workbench names an ingest job by: the
+    // procedure, the frozen plan's criteria count and the plan record's time.
+    const listedJob = (
+      await api(
+        "/api/assurance?" +
+          new URLSearchParams({ tenantId, engagementId: e.id }),
+      )
+    ).jobs.find((j) => j.id === genaiJob.jobId);
+    assert.deepEqual(
+      [
+        listedJob.mode,
+        listedJob.system_name,
+        listedJob.procedure_id,
+        listedJob.plan_criteria,
+        listedJob.plan_created_at,
+      ],
+      [
+        "genai_ingest",
+        null,
+        procedure.id,
+        genaiPlan.body.plan.criteria.length,
+        genaiPlan.createdAt,
+      ],
+    );
+    assert(listedJob.plan_criteria > 0 && listedJob.plan_created_at);
     // The tabular worker is not enrolled for genai_ingest and leaves both alone.
     assert.equal((await runWorker()).state, "idle");
     const failed = await runGenaiWorker();

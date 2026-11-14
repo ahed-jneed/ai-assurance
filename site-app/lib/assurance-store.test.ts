@@ -953,6 +953,71 @@ describe("external queue telemetry", () => {
     expect(await pendingJobCount(ctx, "ENG-3")).toBe(0);
   });
 
+  it("lists what a GenAI ingest job's plan label is made of (#221)", async () => {
+    const insertJob = sqlite.prepare(
+      "INSERT INTO execution_jobs(id,tenant_id,engagement_id,state,request,request_sha256,created_by,created_at) VALUES(?,?,?,?,?,'x','user-lead',?)",
+    );
+    insertJob.run(
+      "JOB-genai",
+      "tenant-1",
+      "ENG-1",
+      "queued",
+      JSON.stringify({
+        executionMode: "genai_ingest",
+        procedure: { id: "PRC-1", revision: 2 },
+        plan: { criteria: [{ id: "a" }, { id: "b" }, { id: "c" }] },
+        records: { bundle: "AS-bundle", plan: "AS-plan" },
+      }),
+      at(10),
+    );
+    insertJob.run(
+      "JOB-tabular",
+      "tenant-1",
+      "ENG-1",
+      "queued",
+      JSON.stringify({
+        executionMode: "classification",
+        system: { name: "Credit model" },
+      }),
+      at(9),
+    );
+    // The plan record, and records with the same id in another engagement
+    // and another tenant, which the subquery must not read.
+    await insert([
+      { id: "AS-plan", kind: "genai_plan", body: {}, at: at(5) },
+      {
+        id: "AS-plan",
+        kind: "genai_plan",
+        body: {},
+        at: at(6),
+        engagement: "ENG-2",
+      },
+      {
+        id: "AS-plan",
+        kind: "genai_plan",
+        body: {},
+        at: at(7),
+        tenant: "tenant-2",
+      },
+    ]);
+    const listed = await jobs(ctx, "ENG-1");
+    expect(listed.map((j) => j.id)).toEqual(["JOB-genai", "JOB-tabular"]);
+    expect(listed[0]).toMatchObject({
+      mode: "genai_ingest",
+      system_name: null,
+      procedure_id: "PRC-1",
+      plan_criteria: 3,
+      plan_created_at: at(5),
+    });
+    expect(listed[1]).toMatchObject({
+      mode: "classification",
+      system_name: "Credit model",
+      procedure_id: null,
+      plan_criteria: null,
+      plan_created_at: null,
+    });
+  });
+
   it("names the jobs already compiled into a draft paper", async () => {
     await insert([
       {
