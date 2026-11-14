@@ -6,14 +6,14 @@ The cycle was planned on 5 November 2026. The [product direction](docs/product/d
 
 ## Outcome
 
-Every roadmap issue in M0, M1 and M2 is closed with a merged PR. In M3, two issues remain open: [#37] (dead-code removal, [PR #196] in review) and [#38] (this refresh). Issues opened during the cycle as follow-ups were added to the milestone whose work they continued, so the issue counts below are larger than the plan's.
+Every roadmap issue in M0, M1 and M2 is closed with a merged PR. In M3, seven issues remain open, each with a PR in review: [#37] (dead-code removal, [PR #196]), the five release-verification issues [#204], [#199], [#201], [#203] and [#202] ([PR #207], [PR #200], [PR #205], [PR #206] and [PR #208]), and [#38] (this refresh, [PR #198]). The PRs are stacked to merge in that order, each on top of the one before. Issues opened during the cycle as follow-ups were added to the milestone whose work they continued, so the issue counts below are larger than the plan's.
 
 | Milestone | Goal | Issues | Open |
 |---|---|---|---|
 | [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene | 6 closed | none |
 | [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review | 46 closed | none |
 | [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion | 18 closed | none |
-| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification | 28 closed | [#37], [#38] |
+| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification | 28 closed | [#37], [#38], [#199], [#201], [#202], [#203], [#204] |
 
 [#57] (owner actions) has no milestone and is not a roadmap item; see [Owner actions](#owner-actions-outside-the-roadmap).
 
@@ -120,7 +120,7 @@ Merge dates are UTC, all in November 2026. Titles are the issues' own.
 | [#35] | UX: attestation dialogs, permission-aware actions and consistent error handling | [PR #177], merged 13 Nov |
 | [#36] | Accessibility fixes and a dedicated client portal shell | [PR #180], merged 14 Nov |
 | [#37] | Remove dead code, unused components and unused dependencies | **Open.** [PR #196] in review |
-| [#38] | Docs: capability matrix, README and status docs that match the code | **Open.** This refresh |
+| [#38] | Docs: capability matrix, README and status docs that match the code | **Open.** This refresh, [PR #198], stacked last |
 | [#39] | UI correctness: triage the 62 React Compiler lint disables and fix runtime React warnings | [PR #171], merged 13 Nov |
 | [#52] | Test: move pure-module harness checks into Vitest and unit-test commands covered only over HTTP | [PR #172], merged 13 Nov |
 | [#62] | Engine packaging: one supported Python version, cryptography in the runtime image, signature tests that cannot skip in CI | [PR #146], merged 13 Nov |
@@ -146,6 +146,11 @@ Merge dates are UTC, all in November 2026. Titles are the issues' own.
 | [#188] | Split app/testing-lab.tsx along its views (part of #64) | [PR #191], merged 14 Nov |
 | [#193] | Finish #64: split acceptance-panel.tsx and tidy the split modules | [PR #195], merged 14 Nov |
 | [#194] | Flaky e2e: workerd 'Network connection lost' in report-release.spec.ts | [PR #197], merged 14 Nov |
+| [#199] | Test the 50 MB evidence upload limit and harden the e2e server start | **Open.** [PR #200] in review: boundary tests for the evidence and client submission limits, and an e2e server that refuses an incomplete build |
+| [#201] | Release verification: server-side defects (client projection leak, missing guards, refusal messages) | **Open.** [PR #205] in review: no staff ids in client projections, 409 and 404 guards, clearer refusals, strict filters (D-46), withdrawal of a superseded client-visible report (D-45), #19's label confirmed (D-47) |
+| [#202] | Release verification: UI defects (revoked screen, labels, guidance, LL144 checklist, compile draft) | **Open.** [PR #208] in review: the eleven items, one capture-gate list for UI and server (D-48), and Withdraw for a superseded client-visible report |
+| [#203] | Release verification: keyboard focus in record sheets and the client portal | **Open.** [PR #206] in review: focus returns to the opener from every dialog and sheet; the portal forms take and return focus |
+| [#204] | Release verification: dev server returns 500 on server-rendered pages; local setup docs | **Open.** [PR #207] in review: SSR errors logged on the dev server, a short harness temp directory on Windows, the migration step in Run locally |
 
 ## Placed on 5 Nov 2026
 
@@ -248,7 +253,8 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 | What to watch | Why | Where |
 |---|---|---|
 | GitHub Actions billing | Every CI job is refused before it starts; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | [#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6872999518) |
-| `e2e/server.mjs` checks only that `dist/server/wrangler.json` exists | A build interrupted while the server ran (EBUSY on Windows) can leave `dist/server` incomplete, and the next start then fails without a clear message | `site-app/e2e/server.mjs`; [#194] |
+| Dev server SSR 500 on a cold start | Not reproduced in about 15 cold starts; server-rendering errors are now logged with their stack, so a recurrence names its cause. `build/ssr-error-log.ts` patches Vinext and its test fails if an upgrade moves the anchor | `site-app/build/ssr-error-log.ts`; [#204] |
+| Release does not recheck LL144 per-group runs | `assertReleasable` rechecks the report gates only; capture already refuses incomplete runs ([decision D-48](docs/product/decisions.md)) | `site-app/lib/workflow/report-release.ts`; [#202] |
 | Building beside a running e2e server | `npm run build` or `npm run check` in the same checkout as a running e2e server rewrites `dist/` mid-run | `site-app/e2e/README.md`; [#194] |
 | Sign-ins are recorded after an 8-hour gap, not at session start | The Access log shows first requests, not sessions ([decision D-41](docs/product/decisions.md)) | `site-app/lib/access-events.ts` |
 | `pruneSignIns` runs on the request path | Pruning happens when a sign-in is recorded; a scheduled handler would take it off the request path | `site-app/lib/tenancy.ts` |
@@ -368,6 +374,12 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 [PR #192]: https://github.com/ahed-jneed/ai-assurance/pull/192
 [PR #195]: https://github.com/ahed-jneed/ai-assurance/pull/195
 [PR #196]: https://github.com/ahed-jneed/ai-assurance/pull/196
+[PR #198]: https://github.com/ahed-jneed/ai-assurance/pull/198
+[PR #200]: https://github.com/ahed-jneed/ai-assurance/pull/200
+[PR #205]: https://github.com/ahed-jneed/ai-assurance/pull/205
+[PR #206]: https://github.com/ahed-jneed/ai-assurance/pull/206
+[PR #207]: https://github.com/ahed-jneed/ai-assurance/pull/207
+[PR #208]: https://github.com/ahed-jneed/ai-assurance/pull/208
 [PR #197]: https://github.com/ahed-jneed/ai-assurance/pull/197
 [#1]: https://github.com/ahed-jneed/ai-assurance/issues/1
 [#3]: https://github.com/ahed-jneed/ai-assurance/issues/3
@@ -470,3 +482,8 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 [#188]: https://github.com/ahed-jneed/ai-assurance/issues/188
 [#193]: https://github.com/ahed-jneed/ai-assurance/issues/193
 [#194]: https://github.com/ahed-jneed/ai-assurance/issues/194
+[#199]: https://github.com/ahed-jneed/ai-assurance/issues/199
+[#201]: https://github.com/ahed-jneed/ai-assurance/issues/201
+[#202]: https://github.com/ahed-jneed/ai-assurance/issues/202
+[#203]: https://github.com/ahed-jneed/ai-assurance/issues/203
+[#204]: https://github.com/ahed-jneed/ai-assurance/issues/204
