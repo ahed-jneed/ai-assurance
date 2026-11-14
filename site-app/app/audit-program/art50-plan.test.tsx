@@ -80,7 +80,7 @@ describe("the Art 50 suggestion panel", () => {
         onUse={() => {}}
       />,
     );
-    expect(html).toContain("Suggested: readiness");
+    expect(html).toContain("Suggested: Readiness");
     expect(html).toContain(
       "Timing for the engagement period 2026-09-01 to 2026-11-30:",
     );

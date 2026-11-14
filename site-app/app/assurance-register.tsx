@@ -10,7 +10,7 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { ReactNode } from "react";
 import type { SearchedRecord } from "@/lib/assurance-search";
 import { workbenchReviewState } from "@/lib/workbench-presentation";
-const words = (s: string) => s.replaceAll("_", " ").replace(/([A-Z])/g, " $1");
+import { humanLabel } from "@/lib/presentation";
 export const recordReviewState = workbenchReviewState;
 export function recordTitle(r: AssuranceRecord) {
   const b = r.body,
@@ -20,14 +20,17 @@ export function recordTitle(r: AssuranceRecord) {
         : r.kind === "sample"
           ? "Sample · " + (b.selected?.length ?? b.size ?? 0) + " records"
           : r.kind === "assistant"
-            ? "Evidence briefing · " + words(String(b.action ?? "summary"))
+            ? "Evidence briefing · " +
+              humanLabel(String(b.action ?? "summary")).toLowerCase()
             : r.kind === "registry"
               ? "Registry snapshot"
               : r.kind === "operational"
                 ? "Operational reconciliation"
                 : r.kind === "statistics"
                   ? "Population statistics"
-                  : words(r.kind);
+                  : r.kind === "access_event"
+                    ? "Access decision"
+                    : humanLabel(r.kind);
   return String(
     b.name ??
       b.label ??
@@ -161,7 +164,7 @@ export function AssuranceRegister({
                     : "neutral")
               }
             >
-              {words(String(state))}
+              {humanLabel(String(state))}
             </span>
             <ChevronRight
               size={15}

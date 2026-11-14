@@ -104,14 +104,9 @@ function PlainValue({
       <span className="record-text">
         {/(?:At|_at)$/.test(name)
           ? date(value)
-          : /Ids?$/.test(name) ||
-              [
-                "actor",
-                "author",
-                "approvedBy",
-                "closedBy",
-                "uploadedBy",
-              ].includes(name)
+          : // A person: an id field, or who did something ("frozenBy",
+            // "declaredBy", #227), shown by display name.
+            /(?:Ids?|By)$/.test(name) || ["actor", "author"].includes(name)
             ? resolve(value)
             : name === "results"
               ? readableResults(value)
@@ -542,6 +537,7 @@ export function RunDetails({
                 <section className="readable-section">
                   <h3>Special-category data</h3>
                   <SpecialCategoryRecord
+                    resolve={resolve}
                     declaration={run.manifest.profile.specialCategory}
                     acknowledgement={
                       run.manifest.specialCategoryAcknowledgement

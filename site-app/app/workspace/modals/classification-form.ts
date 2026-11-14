@@ -14,8 +14,24 @@ import {
 } from "@/lib/domain/classification";
 import type { Engagement } from "@/lib/domain/types";
 import { asRulePack } from "@/lib/rule-pack";
+import { count } from "@/lib/presentation";
 
 export const factChoice = (id: string) => "fact:" + id;
+
+/**
+ * The classification the answers derive, and how many facts still need
+ * information: "High-risk · 1 fact needs information" (#227).
+ */
+export const derivedSummary = (derived: {
+  label: string;
+  needsInformation: readonly unknown[];
+}) =>
+  derived.label +
+  (derived.needsInformation.length
+    ? " · " +
+      count(derived.needsInformation.length, "fact needs", "facts need") +
+      " information"
+    : "");
 
 /** The rules of the catalog the workspace API sent. */
 export function formRules(catalog: unknown): ClassificationRules {

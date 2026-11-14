@@ -74,7 +74,7 @@ test("a classified Art 50 engagement gets its papers suggested", async ({
   const page = await signIn("qa-lead");
   await page.goto(procedurePath(tenantId, engagementId, "PROC-WP-XC-07"));
   const suggestion = page.getByTestId("art50-suggestion-WP-XC-07");
-  await expect(suggestion).toContainText("Suggested: applicable");
+  await expect(suggestion).toContainText("Suggested: Applicable");
   await expect(suggestion).toContainText("A50-P-01");
   await expect(suggestion).toContainText("AIA-50-1 candidate");
   await expect(suggestion).toContainText(
@@ -116,7 +116,7 @@ test("a classified Art 50 engagement gets its papers suggested", async ({
   );
   await page.getByRole("button", { name: "Decisions needed" }).click();
   await expect(page.getByTestId("art50-suggested-WP-XC-10")).toHaveText(
-    "Suggested: not applicable",
+    "Suggested: Not applicable",
   );
   expect((await procedure("PROC-WP-XC-10")).applicability).toBe("pending");
 });

@@ -35,16 +35,45 @@ export function humanLabel(value: string) {
     rmse: "RMSE",
     r2: "R²",
     baseline_rmse: "Baseline RMSE (predicting the mean)",
+    maximum_tpr_fpr_gap: "Maximum TPR/FPR gap",
+    maximumTprFprGap: "Maximum TPR/FPR gap",
   };
+  // Sentence case (#227): "frozenBy" reads "Frozen by", not "Frozen By";
+  // a run of capitals ("modelURL") stays as written.
   return (
     names[value] ??
     value
+      .replace(
+        /([a-z0-9])([A-Z])(?=[a-z])/g,
+        (_, before: string, capital: string) =>
+          before + " " + capital.toLowerCase(),
+      )
       .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
       .replaceAll("_", " ")
       .replace(/\bsha256\b/gi, "SHA-256")
+      .replace(/\b(?:id|tpr|fpr|rmse|mae)\b/g, (w) => w.toUpperCase())
       .replace(/^./, (c) => c.toUpperCase())
   );
 }
+
+/**
+ * Readable labels for the coded values the workspace's forms and registers
+ * show (#227), where sentence case alone is not enough.
+ */
+const valueNames: Record<string, string> = {
+  true: "Yes",
+  false: "No",
+  one_off: "One-off",
+  follow_up: "Follow-up",
+};
+
+/**
+ * A coded value as the page shows it: "one_off" reads "One-off",
+ * "no_reassessment" "No reassessment", "true" "Yes". Every other value in
+ * sentence case, as humanLabel writes it.
+ */
+export const valueLabel = (value: string) =>
+  Object.hasOwn(valueNames, value) ? valueNames[value] : humanLabel(value);
 const PAIRWISE_SHOWN = 6;
 /** The metrics a narrative lists: all of them, except that a long list of pairwise comparisons keeps the deciding one and the first few. */
 function narrativeMetrics(result: Result) {

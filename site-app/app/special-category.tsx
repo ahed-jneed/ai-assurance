@@ -637,9 +637,12 @@ export function ProtocolDeclaration({
 export function SpecialCategoryRecord({
   declaration: d,
   acknowledgement,
+  resolve,
 }: {
   declaration: SpecialCategoryDeclaration;
   acknowledgement?: SpecialCategoryAcknowledgement;
+  /** A person's display name from their user id (#227). */
+  resolve: (id: string) => string;
 }) {
   return (
     <>
@@ -649,7 +652,7 @@ export function SpecialCategoryRecord({
           ? "special-category data, " +
             (d.route === "hosted" ? "hosted route" : "client-side route")
           : "declared not special-category data"}
-        . Declared by {d.declaredBy} on {d.declaredAt.slice(0, 10)}.
+        . Declared by {resolve(d.declaredBy)} on {d.declaredAt.slice(0, 10)}.
       </p>
       <p>
         {d.basis
@@ -659,7 +662,8 @@ export function SpecialCategoryRecord({
       </p>
       {acknowledgement && (
         <p>
-          Hosted processing acknowledged by {acknowledgement.acknowledgedBy} on{" "}
+          Hosted processing acknowledged by{" "}
+          {resolve(acknowledgement.acknowledgedBy)} on{" "}
           {acknowledgement.acknowledgedAt.slice(0, 10)}
           {acknowledgement.inheritedFrom
             ? ", carried over from run " + acknowledgement.inheritedFrom

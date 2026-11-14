@@ -65,9 +65,11 @@ export function AccessSection({
             <b>{w.name}</b>
             <small className="block subtle">
               {w.last_seen
-                ? "Last attempt connection " +
+                ? "Last connection attempt " +
                   new Date(w.last_seen).toLocaleString()
-                : "Awaiting first connection"}{" "}
+                : w.active
+                  ? "Awaiting first connection"
+                  : "Revoked before its first connection"}{" "}
               ·{" "}
               {(JSON.parse(w.capabilities) as string[])
                 .map(adapterFormatLabel)

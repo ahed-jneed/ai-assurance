@@ -38,7 +38,7 @@ export function FollowupPanel({
             <span>
               {m.title}
               <small className="block subtle">
-                {m.kind} · {name(m.ownerId)} · due {m.dueDate} ·{" "}
+                {label(m.kind)} · {name(m.ownerId)} · due {m.dueDate} ·{" "}
                 {label(m.cadence)}
               </small>
             </span>

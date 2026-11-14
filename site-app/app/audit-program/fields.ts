@@ -1,8 +1,9 @@
 // Field builders shared by the audit program's forms.
 import type { Engagement } from "@/lib/domain/types";
+import { valueLabel } from "@/lib/presentation";
 import type { Field, Option } from "./workflow-dialog";
-export const label = (s: string) =>
-  s.replaceAll("_", " ").replace(/([A-Z])/g, " $1");
+/** A coded value as the program shows it (#227): "one_off" reads "One-off". */
+export const label = valueLabel;
 export const options = (items: string[]) =>
   items.map((value) => ({ value, label: label(value) }));
 export const area = (

@@ -35,7 +35,9 @@ describe("humanLabel", () => {
   });
 
   it("turns camelCase and snake_case keys into sentence case", () => {
-    expect(humanLabel("riskScore")).toBe("Risk Score");
+    expect(humanLabel("riskScore")).toBe("Risk score");
+    expect(humanLabel("frozenBy")).toBe("Frozen by");
+    expect(humanLabel("modelId")).toBe("Model ID");
     expect(humanLabel("not_applicable")).toBe("Not applicable");
     expect(humanLabel("sha256")).toBe("SHA-256");
   });

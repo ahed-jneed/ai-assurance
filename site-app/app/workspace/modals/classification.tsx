@@ -20,6 +20,7 @@ import {
   factChoice,
   formDraft,
   formRules,
+  derivedSummary,
 } from "./classification-form";
 import type { ModalDefinition, ModalFieldsProps } from "./types";
 
@@ -245,12 +246,7 @@ function ClassificationFields({
       </label>
       <div className="classification-derived" aria-live="polite">
         <p>
-          <b>Derived now:</b> {derived.label}
-          {derived.needsInformation.length
-            ? " · " +
-              derived.needsInformation.length +
-              " facts need information"
-            : ""}
+          <b>Derived now:</b> {derivedSummary(derived)}
         </p>
         {problems.map((p) => (
           <p className="form-error" key={p}>

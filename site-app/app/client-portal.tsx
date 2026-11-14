@@ -10,6 +10,7 @@ import {
 } from "./audit-program/workflow-dialog";
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
+import { count } from "@/lib/presentation";
 import { requestLabel } from "@/lib/evidence-requests";
 import type { ClientGrant, Submission } from "@/lib/workflow-types";
 /** Where focus goes next in a request; see data-portal-focus below. */
@@ -506,12 +507,12 @@ export function RequestAccess({
       <summary>
         Client request access{" "}
         <span className="subtle">
-          {
+          {count(
             e.workflow.clientGrants.filter(
               (g) => requestGrantStatus(g, lapsed, at) === "Active",
-            ).length
-          }{" "}
-          active grants
+            ).length,
+            "active grant",
+          )}
           {lapsedCount ? " · " + lapsedCount + " lapsed" : ""}
         </span>
       </summary>

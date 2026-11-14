@@ -19,10 +19,10 @@ const suggestionLabels: Record<
   PaperSuggestion["applicability"],
   [string, string]
 > = {
-  applicable: ["Suggested: applicable", "blue"],
-  not_applicable: ["Suggested: not applicable", "neutral"],
+  applicable: ["Suggested: Applicable", "blue"],
+  not_applicable: ["Suggested: Not applicable", "neutral"],
   pending: ["Needs information", "amber"],
-  readiness: ["Suggested: readiness", "blue"],
+  readiness: ["Suggested: Readiness", "blue"],
 };
 const periodLabels: Record<
   NonNullable<PaperSuggestion["timing"]>["items"][number]["period"],
