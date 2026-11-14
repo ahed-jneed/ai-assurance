@@ -282,7 +282,7 @@ export function powerSentence(power: CriterionPower, target: number) {
   const needed =
     power.requiredNForPass ?? power.requiredGroupSizeForPass ?? null;
   const unit =
-    power.requiredGroupSizeForPass !== undefined ? "per group" : "rows";
+    power.requiredGroupSizeForPass !== undefined ? "rows per group" : "rows";
   const mde = power.failMdeDifference ?? power.failMdeTprDifference ?? null;
   return (
     `If the assumptions hold, a system meeting them would pass with ${probability}.` +

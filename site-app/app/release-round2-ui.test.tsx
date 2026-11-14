@@ -16,6 +16,7 @@ import {
   engagement,
 } from "@/lib/workflow/test-fixtures";
 import { FollowupPanel } from "./audit-program/followup-panel";
+import { procedureDueDate } from "./audit-program/program-panel";
 import type { ProgramScope } from "./audit-program/program-scope";
 import { ReportRelease } from "./audit-program/report-release";
 import { RequestAccess } from "./client-portal";
@@ -149,6 +150,20 @@ describe("Acknowledge receipt follows the permission map", () => {
   });
   it("is not offered to a Reviewer, who may not acknowledge", () => {
     expect(html("Reviewer")).toBe("");
+  });
+});
+
+describe("the program register's due date (#216)", () => {
+  it("says a due date is needed, a release-time record's time, or the date", () => {
+    expect(procedureDueDate({ dueDate: "", templateId: "WP-A15-01" })).toBe(
+      "Due date needed",
+    );
+    expect(procedureDueDate({ dueDate: "", templateId: "WP-RP-02" })).toBe(
+      "Recorded at release",
+    );
+    expect(
+      procedureDueDate({ dueDate: "2026-12-31", templateId: "WP-A15-01" }),
+    ).toBe("2026-12-31");
   });
 });
 

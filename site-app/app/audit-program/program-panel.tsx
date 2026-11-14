@@ -23,6 +23,20 @@ export function programEmptyStep(
       : "Start with the engagement brief, then assess methodology candidates.";
 }
 
+/**
+ * A procedure's due date in the register, or what stands in for it: a
+ * release-time record has none, and any other procedure still needs one
+ * (#216: the column is "Owner & due date", so it says "Due date needed").
+ */
+export function procedureDueDate(p: { dueDate: string; templateId: string }) {
+  return (
+    p.dueDate ||
+    (isReleaseTimeRecord(p.templateId)
+      ? "Recorded at release"
+      : "Due date needed")
+  );
+}
+
 /** The program tab: the procedure register with its filters and bulk actions. */
 export function ProgramPanel({
   scope,
@@ -292,12 +306,7 @@ export function ProgramPanel({
                 </td>
                 <td data-label="Owner & due date">
                   {name(p.ownerId)}
-                  <small className="subtle block">
-                    {p.dueDate ||
-                      (isReleaseTimeRecord(p.templateId)
-                        ? "Recorded at release"
-                        : "Deadline needed")}
-                  </small>
+                  <small className="subtle block">{procedureDueDate(p)}</small>
                 </td>
                 <td data-label="Next step">
                   <button

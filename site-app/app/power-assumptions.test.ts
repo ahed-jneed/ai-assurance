@@ -266,6 +266,18 @@ describe("the testing lab's power inputs", () => {
         0.8,
       ),
     ).toContain("would pass with probability between 40% and 60%.");
+    // A group criterion's required size counts rows in each group (#216).
+    expect(
+      powerSentence(
+        {
+          ...one,
+          passProbability: 0.4,
+          passProbabilityUpperBound: 0.4,
+          requiredGroupSizeForPass: 1200,
+        },
+        0.8,
+      ),
+    ).toContain("Reaching 80% needs about 1,200 rows per group.");
   });
 
   it("waits for the group sizes and needs two groups", () => {
