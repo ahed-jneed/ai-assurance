@@ -6,6 +6,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { useReturnFocus } from "@/hooks/use-return-focus"
+import { keepOpenForToasts } from "@/components/ui/toaster-layer"
 import { Button } from "@/components/ui/button"
 
 function Dialog({
@@ -54,6 +55,8 @@ function DialogContent({
   showCloseButton = true,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onPointerDownOutside,
+  onFocusOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
@@ -71,6 +74,9 @@ function DialogContent({
         )}
         {...props}
         {...returnFocus}
+        // Local change (#210): a toast action never dismisses the modal.
+        onPointerDownOutside={keepOpenForToasts(onPointerDownOutside)}
+        onFocusOutside={keepOpenForToasts(onFocusOutside)}
       >
         {children}
         {showCloseButton && (

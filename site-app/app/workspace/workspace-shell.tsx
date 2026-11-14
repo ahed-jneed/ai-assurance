@@ -427,6 +427,7 @@ export default function Workspace() {
             onAction={nav.paperAction}
             onProcedure={nav.openPaperProcedure}
             onDetail={sheet.viewDetail}
+            onReload={reloadView}
           />
         </ViewBoundary>
         <ViewBoundary label="dialog">

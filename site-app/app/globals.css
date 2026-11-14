@@ -4337,3 +4337,20 @@ button.audit-gate-row:hover {
     max-width: 100%;
   }
 }
+
+/* Toasts above a modal sheet or dialog (#210). The modal locks pointer events
+   on <body>; a toast's buttons (Retry, Reload, Undo, close) take them back,
+   while the rest of the toast lets clicks through to the sheet beneath. With
+   a right-hand sheet open, toasts move to the free left-hand side so they do
+   not cover the sheet's actions. */
+[data-sonner-toaster] [data-button],
+[data-sonner-toaster] [data-close-button] {
+  pointer-events: auto;
+}
+@media (min-width: 601px) {
+  body:has([data-slot="sheet-content"][data-side="right"][data-state="open"])
+    [data-sonner-toaster][data-x-position="right"] {
+    right: auto;
+    left: var(--offset-left);
+  }
+}

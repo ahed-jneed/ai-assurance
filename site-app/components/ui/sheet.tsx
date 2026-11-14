@@ -6,6 +6,7 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { useReturnFocus } from "@/hooks/use-return-focus"
+import { keepOpenForToasts } from "@/components/ui/toaster-layer"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -52,6 +53,8 @@ function SheetContent({
   showCloseButton = true,
   onOpenAutoFocus,
   onCloseAutoFocus,
+  onPointerDownOutside,
+  onFocusOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -64,6 +67,7 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        data-side={side}
         className={cn(
           "fixed z-50 flex flex-col gap-4 bg-background shadow-lg transition ease-in-out data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:animate-in data-[state=open]:duration-500",
           side === "right" &&
@@ -78,6 +82,9 @@ function SheetContent({
         )}
         {...props}
         {...returnFocus}
+        // Local change (#210): a toast action never dismisses the modal.
+        onPointerDownOutside={keepOpenForToasts(onPointerDownOutside)}
+        onFocusOutside={keepOpenForToasts(onFocusOutside)}
       >
         {children}
         {showCloseButton && (

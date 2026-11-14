@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { can, fallbackRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { isAttestedOp } from "@/lib/attestation";
+import { FetchError, errorMessage } from "@/lib/fetch-json";
 import type { AuditGate } from "@/lib/domain/gates";
 import type { EvidenceRequest, Paper } from "@/lib/domain/types";
 import { normalizeEvidenceQuery } from "@/lib/evidence-presentation";
@@ -132,7 +133,12 @@ export function useWorkspaceNavigation({
       attest(op, values);
       return;
     }
-    void act(op, values).catch(() => {});
+    // A stale save is offered a reload inside the open paper as well as in
+    // the toast, which a keyboard user reaches only with Alt+T (#210).
+    void act(op, values).catch((error: unknown) => {
+      if (error instanceof FetchError && error.kind === "conflict")
+        paper.setSaveConflict(errorMessage(error, "Save failed"));
+    });
   }
   function navigate(
     label: string,

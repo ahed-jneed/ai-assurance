@@ -12,7 +12,15 @@ import {
   run,
   submittedBrief,
 } from "./engagement";
-import { expect, runCommand, test, unique, workspacePath } from "./fixtures";
+import type { Page } from "@playwright/test";
+import {
+  expect,
+  paperPath,
+  runCommand,
+  test,
+  unique,
+  workspacePath,
+} from "./fixtures";
 
 test("a decision on a changed engagement is refused until the page reloads", async ({
   signIn,
@@ -184,4 +192,111 @@ test("a practice change against a stale directory version is refused", async ({
     (i: { email: string }) => i.email === first,
   ).id;
   await lead.manage(demo.tenantId, "cancelInvitation", { invitationId: id });
+});
+
+// #210: the stale-version toast sits outside the modal paper sheet. Its
+// Reload must work with a real click and from the keyboard (Alt+T), and the
+// sheet offers the same reload itself; each leads to the newer-revision
+// dialog, which keeps the local changes.
+test("a stale paper save is reloaded from the toast or the sheet into the newer-revision dialog", async ({
+  signIn,
+  api,
+  demo,
+}) => {
+  const lead = await api("qa-lead");
+  const auditor = await api("qa-auditor");
+  const e = await newEngagement(
+    lead,
+    demo.tenantId,
+    demo.clientId,
+    "E2E stale paper",
+  );
+  await joinTeam(lead, e, ["qa-auditor"]);
+  const { paperId } = await run(auditor, e, "createPaper", {
+    templateId: "WP-A15-01",
+  });
+
+  const first = await signIn("qa-auditor");
+  const second = await signIn("qa-auditor");
+  const editorOf = (page: Page) =>
+    page.getByRole("dialog", {
+      name: /Performance, calibration and validation/,
+    });
+  const results = (page: Page) =>
+    editorOf(page).getByRole("textbox", { name: "Results & exceptions" });
+  const save = (page: Page, status = 200) =>
+    runCommand(
+      page,
+      "editPaper",
+      () =>
+        editorOf(page).getByRole("button", { name: "Save revision" }).click(),
+      { status },
+    );
+  for (const page of [first, second]) {
+    await page.goto(paperPath(e, paperId));
+    await expect(results(page)).toBeVisible();
+  }
+  const newerRevision = second.getByRole("dialog", {
+    name: "This paper has a newer revision",
+  });
+  const toastReload = second
+    .getByRole("region", { name: /Notifications/ })
+    .getByRole("button", { name: "Reload" });
+  /** The first tab saves a revision; the second then saves its own edit. */
+  async function staleSave(round: number) {
+    await results(first).fill(`Saved first, round ${round} (synthetic).`);
+    await save(first);
+    await results(second).fill(`Edited in the second tab, round ${round}.`);
+    await save(second, 409);
+    await expect(toastReload).toBeVisible();
+  }
+  async function resolveConflict() {
+    await expect(newerRevision).toBeVisible();
+    await expect(
+      newerRevision.getByRole("button", { name: "Export local changes" }),
+    ).toBeVisible();
+    await newerRevision
+      .getByRole("button", { name: "Load saved revision" })
+      .click();
+    await expect(newerRevision).toBeHidden();
+    // The sheet stayed open behind the toast and the dialog.
+    await expect(editorOf(second)).toBeVisible();
+  }
+
+  // A real mouse click on the toast's Reload, with the sheet open.
+  await staleSave(1);
+  await expect(
+    editorOf(second).getByRole("alert").filter({ hasText: "Reload" }),
+  ).toBeVisible();
+  await expectAccessible(second, "Stale paper save with its reload choices");
+  await toastReload.click();
+  await resolveConflict();
+  await expect(results(second)).toHaveValue(
+    "Saved first, round 1 (synthetic).",
+  );
+
+  // The keyboard: Alt+T reaches the toaster out of the sheet's focus trap,
+  // Tab reaches Reload and Enter runs it.
+  await staleSave(2);
+  await second.keyboard.press("Alt+T");
+  for (let i = 0; i < 5; i++) {
+    if (await toastReload.evaluate((el) => el === document.activeElement))
+      break;
+    await second.keyboard.press("Tab");
+  }
+  await expect(toastReload).toBeFocused();
+  await second.keyboard.press("Enter");
+  await resolveConflict();
+
+  // Escape leaves the toaster for the sheet without closing it.
+  await staleSave(3);
+  await second.keyboard.press("Alt+T");
+  await second.keyboard.press("Escape");
+  await expect(editorOf(second)).toBeVisible();
+  // The sheet's own Reload, independent of the toast.
+  await editorOf(second)
+    .getByRole("alert")
+    .getByRole("button", { name: "Reload" })
+    .click();
+  await resolveConflict();
 });
