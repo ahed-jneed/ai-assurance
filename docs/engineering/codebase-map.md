@@ -186,7 +186,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 ## 2. Main user flows
 
-> **Checked against the release candidate on 14 Nov 2026** ([#212]): the top of the approved PR stack (`2f0beb2`, PRs [#196][PR #196], [#200][PR #200], [#205][PR #205], [#206][PR #206], [#207][PR #207], [#208][PR #208] and [#198][PR #198]) plus the approved round-2 fixes [PR #213] ([#209]), [PR #215] ([#210]) and [PR #214] ([#211]) and the round-2 follow-ups [PR #218] ([#216]), described as they behave once merged. Where this section and the code disagree, the code wins.
+> **Checked against the code on 14 Nov 2026** ([#212], [#228]): the top of the approved PR stack (`3aadcc5`), described as it behaves once merged. The stack is the release candidate [PR #196], [PR #207], [PR #200], [PR #205], [PR #206], [PR #208] and [PR #198]; the round-2 fixes [PR #213] ([#209]), [PR #215] ([#210]) and [PR #214] ([#211]) and follow-ups [PR #218] ([#216]); the first refresh of this section, [PR #217] ([#212]); [PR #222] ([#219]); the round-3 fixes [PR #223] ([#220]) and [PR #224] ([#221]); and the round-4 fixes [PR #230] ([#225]), [PR #229] ([#226]) and [PR #231] ([#227]). Where this section and the code disagree, the code wins.
 
 ### 2.0 Local environment, sign-in and personas
 
@@ -201,7 +201,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 1. Start `npm run dev` (port 5173 by default; pass `-- --port <port> --strictPort` for another). A server-rendering error is printed to the dev log as `[ssr] Server rendering error; ...` instead of a silent 500 ([#204]).
 2. In another terminal, run `npm run seed:demo` (or `npm run seed:demo -- http://127.0.0.1:<port>`). It provisions qa-lead's practice through the app's own API: the client Acme, the structured engagement "Acme credit scoring model audit" with working paper WP-A10-01 and an evidence request granted to `qa-contrib`, a second engagement "Acme credit scoring model evaluation" with an approved scope and program, a registered model and linked prediction lineage, and every persona's membership and grant. `qa-lead2` also leads a practice of their own. It is safe to run again, and it prints a sign-in link per persona.
 3. Sign in with `/signin-with-chatgpt?return_to=/` as `local_seedy` (Seedy, seedy@sites.test), or with `/signin-with-chatgpt?as=<persona>&return_to=/` as a persona from `site-app/fixtures/dev-personas.json`. The signed-out screen also lists the personas. Run the seed before a persona's first sign-in: a first sign-in without a membership provisions a separate practice.
-4. The account menu in the sidebar footer offers Sign out and, on the development server only, Switch persona. It also appears on the revoked and no-access screens, so a refused user can still sign out or switch ([#202]). `/signout-with-chatgpt?return_to=/` signs out too.
+4. The account menu in the sidebar footer offers Sign out and, on the development server only, Switch persona. It also appears in the minimal shell that an account without an active practice role gets (flow 3), so a refused user can still sign out or switch ([#202], [#225]). `/signout-with-chatgpt?return_to=/` signs out too.
 
 The sign-in cookie is named for the port (`__sites_local_auth_<port>`), so development servers on different ports keep separate sign-ins. In this mode, unset `SELF_SIGNUP` means open, so any new identity provisions its own practice.
 
@@ -212,7 +212,7 @@ The sign-in cookie is named for the port (`__sites_local_auth_<port>`), so devel
    - **Playwright:** `npm run test:e2e` runs the persona suite with axe checks against its own built Worker on port 8790 and a fresh database ([site-app/e2e/README.md](../../site-app/e2e/README.md)). It uses one browser context per persona, with `extraHTTPHeaders`.
    - **Manual QA:** one browser profile per persona, with a header-injection extension limited to `http://127.0.0.1:8787/*`. Mode A is simpler.
    - **API calls:** curl with the headers. POSTs also need `Origin: http://127.0.0.1:8787` (checked by `checkOrigin`) and `Content-Type: application/json`. A POST that `checkOrigin` or the runner's bearer check refuses no longer leaves its body unread, so the next request on the same connection works ([#209]).
-4. Seed the personas with `npm run seed:demo -- --trusted-headers http://127.0.0.1:8787`, or bootstrap them by hand:
+4. Seed the personas with `npm run seed:demo -- --trusted-headers http://127.0.0.1:8787`. This server has no `/signin-with-chatgpt` route (it answers 401), so the seed prints each persona's `oai-authenticated-user-id` and `oai-authenticated-user-email` headers, a curl example and the deep link to the seeded engagement instead of sign-in links ([#220]). Without `SELF_SIGNUP` the seed's first request answers 403, and the seed stops and says to start the Worker with `--var SELF_SIGNUP:open` (or `@personas.test`) ([#226]). Or bootstrap the personas by hand:
    1. Load `/` as `persona-qa-lead`. This creates qa-lead's own practice, with qa-lead as Lead Auditor and practice admin.
    2. Create a client "Acme" and a structured engagement for it (flow 2).
    3. In **Members & access**, either use **Invite by email** (the invitee joins on their first request), or **Add member** and enter the persona's user id as the "Signed-in account ID". `grantMember` does not require the user to exist. For internal personas, tick the Acme engagement in the Audit access step; for client personas, choose client Acme.
@@ -225,7 +225,7 @@ The sign-in cookie is named for the port (`__sites_local_auth_<port>`), so devel
 | `qa-auditor` | `persona-qa-auditor` | Auditor | Brief and program preparation, procedures, classification, evidence, findings, receipt acknowledgment |
 | `qa-reviewer` | `persona-qa-reviewer` | Reviewer | Independent approvals: brief, program, procedure review, classification, retest and closure, report package, follow-up closure |
 | `qa-lead2` | `persona-qa-lead2` | Lead Auditor; also leads a practice of their own | A second signer or releaser when qa-lead prepared the content; practice switching |
-| `qa-eqr` | `persona-qa-eqr` | Engagement Quality Reviewer | Quality review checklist and package sign-off; never edits audit work |
+| `qa-eqr` | `persona-qa-eqr` | Engagement Quality Reviewer; holds an engagement grant like other staff ([#225]) | Quality review checklist and package sign-off; never edits audit work |
 | `qa-contrib` | `persona-qa-contrib` | Client Contributor (Acme) | Client portal submissions |
 | `qa-viewer` | `persona-qa-viewer` | Client Viewer (Acme) | Released reports; isolation checks |
 | `qa-outsider` | `persona-qa-outsider` | Never granted | Cross-tenant isolation checks |
@@ -239,27 +239,32 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
    2. Expect the sidebar to show "<name> practice" (for example "Seedy practice"), the engagement switcher on "Example client / New AI assurance engagement", and the account menu with the name and "Lead Auditor". Overview shows the legacy engagement (no audit program yet) with a paper sign-off counter of 0 / 33 and "Set up audit program".
    3. `GET /api/workspace` returns `identity.role:"Lead Auditor"`, `identity.practiceAdmin:true` and `engagement.id:"ENG-default"`.
    4. Reload. The `tenantId` is unchanged.
-   - **Negative:** on the built Worker without an identity mode or without identity headers, the request returns 401. With self-signup off (mode B without `SELF_SIGNUP`), a new identity without a membership or invitation gets 403 "You have no practice membership or pending invitation…".
+   - **Negative:** on the built Worker without an identity mode or without identity headers, the request returns 401. With self-signup off (mode B without `SELF_SIGNUP`), a new identity without a membership or invitation gets 403 "You have no practice membership or pending invitation…", and the browser shows the minimal no-access shell described in flow 3.
 
 2. **Practice setup** (qa-lead)
    1. Clients → New client → Create client.
    2. On the client page: New engagement → Create engagement. A structured engagement opens on Overview at stage Planning.
    3. Gear icon "Engagement settings" → Save engagement (`renameEngagement`).
    4. The new engagement appears in the engagement switcher and in the Engagements directory.
+   5. A link with only `?practice=<id>` and no `view` opens that practice at Overview, or at the Engagements directory when no engagement opens (`readWorkspaceLink` and `practiceLanding` in `lib/workspace-links.ts`, [#225]).
    - **API:** `POST /api/management {tenantId, expectedVersion: managementVersion, op: createClient|createEngagement, data}`.
    - **Negative:** repeating a call with the old `managementVersion` returns 409 "Client or access settings changed. Reload before saving.".
 
 3. **Staff onboarding and revocation** (qa-lead, qa-auditor)
    1. Members & access → Add member. Identity step: display name, Signed-in account ID `persona-qa-auditor`, tick "Site access has been arranged". Role step: Auditor. Audit access step: tick engagement E. Then Review → Confirm access. Alternatively, Invite by email.
-   2. As qa-auditor, only E is listed. `GET /api/workspace?tenantId=T&engagementId=<another>` returns 404.
-   3. As qa-lead: Revoke → Revoke access (`revokeMember`). Revocation also withdraws the member's engagement grants and cancels their pending invitations. qa-auditor's next request for the practice returns 403 "You do not have access to this practice"; a fresh load without a practice returns 403 "Your practice access has been revoked. Contact a practice administrator." The revoked screen shows no role and keeps the account menu ([#202]).
+   2. As qa-auditor, only E is listed. `GET /api/workspace?tenantId=T&engagementId=<another>` returns 404, and a link to it shows "This engagement does not exist in this practice or you no longer have access." with an **Open the Engagements directory** button (internal roles; client roles keep their own wording, [#225]).
+   3. As qa-lead: Revoke → Revoke access (`revokeMember`). Revocation also withdraws the member's engagement grants and cancels their pending invitations. qa-auditor's next request for the practice returns 403 "You do not have access to this practice"; a fresh load without a practice returns 403 "Your practice access has been revoked. Contact a practice administrator."
+   4. A refused workspace load (403 with no workspace: never a member, revoked staff or a revoked client member) renders a minimal shell (`app/workspace/no-access-shell.tsx`) with no sidebar, breadcrumb or search: the signed-in name, "No practice access", the server's reason, Try again and the account menu. The 403 body carries `account: { name }`, the caller's own display name and nothing else ([#225], F-72).
+   5. Edit access (Members & access) lists the engagements for every staff role, the Engagement Quality Reviewer included. Without a role change it only adds: engagements the member already holds stay ticked and disabled, a note points to Team & runtime for withdrawing one, and the form sends only the newly ticked ones; changing the role withdraws them all ([#225]).
    - **F-24 (fixed in [#12], [PR #84]):** Restore access no longer gives back earlier grants. A restore without listed engagements is refused with 400 "List the engagements to grant again; earlier grants are not restored", and an empty list restores none.
-   - **Negative:** after an invitation expires, inviting the same email again supersedes it instead of returning 409 ([#209]).
+   - **Negative:** after an invitation expires, inviting the same email again supersedes it instead of returning 409 ([#209]); the Access log then reads, for example, "Invitation sent (replaced 1 expired invitation)" ([#221]).
 
 4. **Engagement access** (qa-lead, qa-reviewer)
    1. Assurance workbench → Team & runtime → Manage access. Deactivate qa-reviewer with a reason (`setAccess active:false`).
-   2. qa-reviewer gets 404 for that engagement, and an `access_event` record appears in the workbench.
+   2. qa-reviewer gets 404 for that engagement, and an `access_event` record titled "Access decision" appears in the workbench ([#227]).
    3. Reactivate qa-reviewer.
+   4. Manage access lists every active staff member, the Engagement Quality Reviewer included: `setAccess` admits every staff role (`assignableRoles.engagementAccess` in `lib/permissions.ts`), so qa-lead can grant or withdraw qa-eqr's engagement access here. The EQR's actions stay limited to the quality review ([#225]).
+   - **Negative:** `setAccess` for someone who is not an active staff member returns 400 "Select an active staff member".
 
 5. **Scope: brief and program** (qa-auditor prepares, qa-reviewer approves)
    1. Audit program → Engagement brief → Complete brief → Save scope draft → Submit for review (`saveBrief`, `submitBrief`).
@@ -267,7 +272,9 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
    3. qa-reviewer: Request changes (`returnBrief`). qa-auditor resubmits. qa-reviewer: Approve scope (`approveBrief`).
    4. Program tab → Assess candidates → Save scope decisions (`scopeProgramCandidates`). To keep later flows short, mark 2–3 procedures applicable and the rest not applicable with a rationale. WP-RP-02 is a release-time record and never gates capture (F-30, fixed in [#14]).
    5. Select the rows → Assign & schedule: preparer qa-auditor, reviewer qa-reviewer, due date (`bulkPlanProcedures`) → Submit program → qa-reviewer: Approve program (`approveProgram`).
-   - **Expect:** execution is refused until both brief and program are approved. Once the brief is approved, the program's empty state names the next real step ([#202]).
+   6. Audit program → Acceptance: a writer records acceptance and continuance with the engagement team (Record acceptance, `saveAcceptance`), each Auditor, Lead Auditor and Reviewer on the team declares independence (`saveDeclaration`), and qa-lead approves (Approve acceptance, `approveAcceptance`; Lead Auditor only). A structured engagement leaves Planning only with an approved acceptance record (`acceptanceGates` in `lib/workflow/acceptance.ts`).
+   - **Expect:** execution is refused until both brief and program are approved.
+   - **Disqualifying relationships (decision D-28, [#221]):** the Approve acceptance button and `approveAcceptance` share one precondition, `approvalRefusal` in `lib/workflow/acceptance.ts`. While a team member has declared a disqualifying relationship or an unresolved threat, the button is disabled with the server's reason, which names the person ("QA Reviewer declared a disqualifying relationship with the engagement; remove them from the team before accepting it"), and the API answers 409 with the same message. The Revise acceptance team checklist marks that person ("Cannot be assigned: declared a disqualifying relationship"), and `saveAcceptance` answers 400 naming them. Once the brief is approved, the program's empty state names the next real step ([#202]).
    - **F-04 (fixed in [#13], [PR #54]):** work is bound to its procedure's plan hash, so a later due-date edit no longer invalidates every execution.
    - **F-29 (fixed in [#13], [PR #54]):** program history keeps only submissions, so draft saves no longer use up the revision cap.
 
@@ -276,13 +283,14 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
    2. While a fact that decides the risk class (route, Art 5, Art 50 triggers and exclusions) is unknown, the label reads "Needs information". Facts required for approval that cannot change the class (GPAI roles, SME status, and Art 50 facts on a high-risk route) leave the label at, for example, "High risk" (decision D-47, [#201]). Either way "Approve independently" stays disabled and lists what the approval waits for ([#19]).
    3. qa-auditor sees no "Approve independently" button (`approveClassification` admits Reviewers and Lead Auditors; F-45, fixed in [#35]).
    4. qa-reviewer approves through the attestation dialog (`approveClassification`). Status becomes "approved".
+   - **Negative:** approving an approved classification again returns 409 "This classification is already approved", before the independence check; no second approval is attested and the recorded approver and time stay ([#226]).
    - **F-31 (fixed in [#19]):** an "Unassessed" route reads "Unassessed" and blocks approval; contradictory route and fact combinations are rejected.
 
 7. **Evidence custody** (qa-auditor)
    1. Evidence vault → Files → Upload evidence, using `public/example-predictions.csv`, category Dataset, and a handling basis → Upload for acceptance. The row shows "Awaiting acceptance" and the response contains the SHA-256.
    2. Open the record → Accept evidence, then give a rationale in the attestation dialog (`acceptEvidence`).
    3. Preview file (UTF-8 text up to 256 KB) and Download file. The `X-Evidence-SHA256` header must equal the upload hash.
-   - **Negative:** a stale `expectedVersion` returns 409; a file over 50 MB is rejected with 400; accepting evidence that is already accepted returns 409 "This evidence is already accepted" ([#201]).
+   - **Negative:** a stale `expectedVersion` returns 409; a file over 50 MB is rejected with 400; accepting evidence that is already accepted returns 409 "This evidence is already accepted" ([#201]). In the Assurance workbench, importing an accepted file that is not JSON as an assurance packet or briefing (`importPacket`, `importBriefing`) returns 400 "This assurance packet file is not valid JSON" or "This briefing file is not valid JSON" (`parseJsonFile` in `lib/http.ts`, [#220]); valid JSON that is not a packet returns 400 "This file is not a supported assurance packet (expected packet version 1.0)", followed by the first missing field when one is missing (`packetRefusal` in `lib/assurance-packet.ts`, [#226]).
 
 8. **Procedure execution, review and sign-off** (qa-auditor, qa-reviewer, qa-lead)
    1. Open the procedure sheet. Execute: Record work performed (`recordProcedureExecution`).
@@ -306,19 +314,19 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
       Then Save protocol & run (`createEvaluationProfile`, `queueRun`, `executeRun`).
    4. Evaluations → Results show per-test outcomes, the overall outcome, group tables and auto-drafted Article 10/15 papers.
    - **F-07 (fixed in [#15], [PR #56]):** a later evaluation after Workbench → Review & run evaluation no longer returns 409. Confirmed in code: the lab picks the dataset card per run with `datasetCardFor` (`lib/dataset-card.ts`, called from `app/testing-lab/use-lab-setup.ts`), which uses the handed-over card only when its artifact id and SHA-256 match the evaluated bytes, and `lib/dataset-card.test.ts` pins that a hand-off card never leaks into another dataset's evaluation. [#67] ([PR #114]) keeps the card pin on retries and planned evaluations.
-   - **F-33 (fixed in [#15], [PR #56], and [#67], [PR #114]):** the lab hand-off is a one-shot intent, so the wizard no longer reopens and queues duplicates; a second queued run bound to the same procedure returns 409, and "Queue planned evaluation" opens the queued run instead.
+   - **F-33 (fixed in [#15], [PR #56], and [#67], [PR #114]):** the lab hand-off is a one-shot intent, so the wizard no longer reopens and queues duplicates, and a second queued run bound to the same procedure returns 409. On a procedure sheet, "Queue planned evaluation" (`queueRun`) opens the Testing lab with the queued run's dialog; since [#226] the shell's navigation guard reads whether a command is in flight from a ref (`isBusy` in `app/workspace/use-workspace-data.ts` and `navigation-guards.ts`), so the stale `busy` of the last committed render no longer drops the hand-off. While the run is queued or running, the button is disabled and "Open queued evaluation" (or "Open running evaluation") shows it.
    - **F-06 (fixed in [#15], [PR #56], for hosted runs and [#65], [PR #98], for external runs):** a constant predictor fails or is inconclusive against the majority baseline.
 
 10. **Evidence requests and client contributor portal** (qa-auditor, qa-lead, qa-contrib)
     1. qa-auditor: Requests → Request evidence → Create request (`createEvidenceRequest`).
     2. qa-lead: Client request access → Assign request to qa-contrib with an expiry (`grantClientRequest`). The grant list shows the stored expiry date in UTC ([#202]).
     3. qa-contrib: Overview → Your evidence requests → Submit evidence package (1–10 files, at most 10 MB in total; `POST /api/client-submission`). The package shows "Awaiting receipt acknowledgment". Ask a question → Send reply. Focus moves into each portal form and back to its button on cancel ([#203]).
-    4. qa-auditor: Acknowledge receipt (`acknowledgeClientSubmission`) → Assess evidence (`assessEvidenceRequest`). Acknowledge receipt is offered to every role that holds the op (Auditors and Lead Auditors), outside the Lead-only access panel ([#210]). The Auditor's "Client submissions" panel also shows each active grant's thread with Send clarification (`publishClientClarification`); both panels offer it only for an active grant, since the server refuses expired, revoked and lapsed grants ([#216]).
-    5. qa-lead: Revoke (`revokeClientRequest`). The contributor's next submission returns 403 and the engagement returns 404.
+    4. qa-auditor: Acknowledge receipt (`acknowledgeClientSubmission`) → Assess evidence (`assessEvidenceRequest`). Acknowledge receipt is offered to every role that holds the op (Auditors and Lead Auditors), outside the Lead-only access panel ([#210]). The Auditor's "Client submissions" panel also shows each active grant's thread with Send clarification (`publishClientClarification`); both panels offer it only for an active grant, since the server refuses expired, revoked and lapsed grants ([#216]). Both panels name each contributor by display name, adding "(access revoked)" when the membership is no longer active; "Inactive contributor" appears only when no membership exists (`grantHolderLabel` in `app/client-portal.tsx`, fed by the writers-only `clientGrantHolders` of the workspace read model, [#225]).
+    5. qa-lead: Revoke (`revokeClientRequest`), offered only on an active grant ([#221]). The contributor's next submission returns 403 and the engagement returns 404.
     6. qa-lead: Record limitation (`closeEvidenceRequest`; this creates a limitation memo) → Reopen request (`reopenEvidenceRequest`).
     - **Negative:** the contributor's projection carries no staff user id or email, including the receipt's actor ([#201]).
     - **F-62 (fixed in [#14], [PR #85]):** reopening a closed request retires its limitation memo, so it is no longer required, and closing it again revises that memo instead of creating a second one.
-    - **F-72 (fixed in [#36], [PR #180]):** clients get a dedicated portal shell without practice navigation.
+    - **F-72 (fixed in [#36], [PR #180]):** clients get a dedicated portal shell without practice navigation; since [#225] ([PR #230]) an account with no active role, including a revoked client member, gets the minimal no-access shell instead (flow 3).
 
 11. **Findings and remediation** (qa-auditor, qa-reviewer, qa-lead)
     1. New finding, with the calculated risk preview → Record finding (`createFinding`).
@@ -334,15 +342,15 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
       - Every selected applicable procedure is reviewed and signed.
       - No run is queued or running, and no LL144 per-group run is incomplete. The completion checklist and "Outstanding at capture" list exactly the server's capture blockers (`captureGates`, decision D-48, [#202]).
     1. Overview → Move to Fieldwork → … → Sign-off (`setStage`; Lead Auditor only). Skipping a stage or moving backwards is blocked.
-    2. Reports & sign-off → Prepare final snapshot (`createReport kind:"final"`).
+    2. Reports & sign-off → Prepare final snapshot (`createReport kind:"final"`). Once captured, the sign-off banner reads, for example, "Captured (Qualified), awaiting approval" (the conclusion type's label, without a trailing "(not assurance)") and gives each viewer their next step: an approver who did not capture it reviews and approves, the capturer is told someone else approves, an EQR is told to sign off in Quality review, and other roles are told who approves. "Final capture blocked" applies only while a new package is needed (`awaitingApproval` in `lib/report-presentation.ts`, R1-19, [#221]).
     3. Integrity & downloads → Verify captured content. `GET /api/report-package` returns `proof.valid:true`. Also use Preview exact client package.
-    4. qa-lead, who captured the package, sees Approve package disabled (the creator cannot approve). qa-reviewer answers the completion checklist and approves (`approveReportPackage` with both hashes).
-    5. If an Engagement Quality Reviewer is appointed (`appointQualityReviewer`), qa-eqr completes the quality review and signs off (`saveQualityReview`, `signOffQualityReview`) before release. Until then the package guidance names the outstanding sign-off in the server's words, and Release to client stays disabled with that reason; the UI and `releaseReport` share one precondition, `releaseRefusal` in `lib/preconditions.ts` ([#210]).
+    4. qa-lead, who captured the package, sees Approve package disabled with the reason "The report creator cannot approve its package" below it; the button and `approveReportPackage`'s 403 share `packageApprovalRefusal` in `lib/preconditions.ts` ([#226]). qa-reviewer answers the completion checklist and approves (`approveReportPackage` with both hashes).
+    5. If an Engagement Quality Reviewer is appointed (`appointQualityReviewer`), qa-eqr, who reaches the engagement through an engagement grant (the seed grants one; otherwise Team & runtime or Edit access, [#225]), completes the quality review and signs off (`saveQualityReview`, `signOffQualityReview`) before release. Until then the package guidance names the outstanding sign-off in the server's words, and Release to client stays disabled with that reason; the UI and `releaseReport` share one precondition, `releaseRefusal` in `lib/preconditions.ts` ([#210]).
     6. qa-reviewer has no Release to client button (`releaseReport` is Lead Auditor only; the API answers 403). qa-lead: Release to client (`releaseReport`).
     7. qa-viewer sees the package, labelled with its release time ("Released", [#210]), and can Print (`/report?tenantId&engagementId&reportId`). `/api/report-package?download=1` returns `proof.valid:true`.
     8. qa-lead: Withdraw (`withdrawReport`). The client loses access.
-    - **Expect:** a second release supersedes the first automatically and records a client notification (F-32, fixed in [#14]); WP-RP-02 and MEM-SO-01 never gate capture (F-30). A superseded report that the client can still read can also be withdrawn (decision D-45, [#201], [#202]).
-    - **Negative:** `/report` answers 403 when access is denied and 404 for a missing, withdrawn or unreleased report, as `/api/report-package` does ([#209]). A render failure answers 500 with the "could not be loaded" fallback (the page sets the status through `lib/response-status.ts`, applied by `build/sites-worker.ts`), and the 403 page shows the refusal's own message, for example "You do not have access to this practice" ([#216]).
+    - **Expect:** a second release supersedes the first automatically and records a client notification (F-32, fixed in [#14]); WP-RP-02 and MEM-SO-01 never gate capture (F-30). A superseded report that the client can still read can also be withdrawn (decision D-45, [#201], [#202]). When a release's successor is withdrawn, the client reads the predecessor again; its sheet says "Its successor REPORT-… was withdrawn. The client still reads this report." and the Reports & sign-off banner names it the same way (`withdrawnSuccessorOf` in `lib/workflow-state.ts`, [#226]). A later release does not end this: `releaseReport` supersedes only reports in state "released", so the predecessor stays client-visible, and named in the banner, until a Lead Auditor withdraws it.
+    - **Negative:** the print views `/report` and `/ll144-summary` answer like their APIs (`/api/report-package`, `/api/ll144-summary`) through one mapping, `answerPrintFailure` in `app/print-failure.ts` ([#209], [#216], [#220]): 403 when access is denied, with the refusal's own message on the 403 page (for example "You do not have access to this practice"); 404 for a missing, withdrawn or unreleased report or an unpublished summary; 409 for an integrity mismatch or an unreadable record; 503 for a missing or unavailable blob; and 500 for a render failure. The last three show the "could not be loaded" fallback and are logged ("The /report print view could not be rendered: …"); the page sets the status through `lib/response-status.ts`, applied by `build/sites-worker.ts`.
 
 13. **Client and tenant isolation** (qa-viewer, qa-outsider)
     1. qa-viewer sees only Acme engagements in the client portal shell; client-visible accepted evidence only; no Requests tab.
@@ -352,7 +360,8 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
 14. **Dossier sealing and verification** (qa-lead, qa-viewer)
     1. On the captured report: Seal internal dossier (`POST /api/dossier {tenantId, engagementId, reportId, op:"seal", audience:"internal"}`). After release, also seal the client audience. A scoped internal export is sealed separately ("Seal scoped internal export").
     2. Download with `GET /api/dossier?tenantId&engagementId&reportId&audience=…`, then run `python -m engine.assurance verify --dossier dossier.json`. Add `--trusted-keys trust.json --require-trusted-signature` to check against a pinned key. Flip one byte and confirm verification rejects it.
-    3. Before the client dossier is sealed, the client sees no download link (`?sealed=1` answers whether it is sealed). A direct download returns 409 "Ask the audit lead to seal this audience's dossier first", and 404 while the report is not client-visible.
+    3. Before the client dossier is sealed, the client sees no download link (`?sealed=1` answers whether it is sealed). A direct download returns 409 "Ask the audit lead to seal this audience’s dossier first", and 404 while the report is not client-visible.
+    - **Negative:** a `POST /api/dossier` without an audience, or with one other than `internal` or `client`, returns 400 "Choose who the dossier is for (internal or client)" before anything is read or sealed; it no longer falls back to internal ([#226]).
     - **F-71 (fixed in [#35], [PR #177]):** the client dossier link is hidden until the dossier is sealed, and fetch errors go through one status-mapping helper.
     - **F-17 (fixed in [#62], [PR #146]):** `cryptography` is declared wherever signatures are verified (`engine/requirements-image.txt`, `engine/requirements-dev.txt`), and the signature tests cannot skip in CI.
 
@@ -361,16 +370,17 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
     2. qa-auditor: Execution → Review external execution plan → Freeze execution request (`queueExternal`). The prediction lineage is labelled by name, version and date, not by record id ([#202]).
     3. Operator, with Python 3.12: set `ASSURANCE_SITE_ORIGIN` (HTTPS only), `ASSURANCE_WORKER_TOKEN`, `ASSURANCE_WORKER_ID` and `ASSURANCE_WORKER_IMAGE_DIGEST=sha256:<64 hex>`, then run `python -m engine.worker --workspace jobs --once`. Expect `{"state":"completed"}`. A client's own worker adds `--client-data-dir` for client-local jobs.
     4. qa-auditor: Compile draft paper (`importJob`). The compiled paper opens ([#202]). Expect run contract 1.5 (worker 1.2.0 attaches the statistics decision to every result; results without decisions compile to the frozen 1.2 projection) and a supplementary draft paper.
-    5. With a `genai_ingest` runner enrolled, the GenAI tab offers Queue ingest, whose plans and bundles carry readable labels ([#211]).
+    5. With a `genai_ingest` runner enrolled, the GenAI tab offers Queue ingest, whose plans and bundles carry readable labels ([#211]): the time to the minute, in the viewer's local time, with a short id suffix only where two labels would read the same ([#221], [#227]). The execution request rows and the Cancel execution options name an ingest job by the same plan label (`jobNames`), its mode reads "GenAI ingest", and a job without a system reads "External execution", never null or a bare id.
     - **Locally:** the worker refuses `http://`. Use `ASSURANCE_TEST_PYTHON=<python> node scripts/assurance-integration-check.mjs`, which runs its own loopback proxy, or put a TLS proxy in front of `npm start`.
-    - **Negative:** `cancelJob` while the job runs makes the worker's later complete return 409. Revoking an unknown runner returns 404 ([#201]).
+    - **Negative:** `cancelJob` while the job runs makes the worker's later complete return 409. `cancelJob` for an unknown job, or for another engagement's job, returns 404 "Job not found"; a finished or cancelled job of this engagement returns 409 "Job already completed or cancelled" ([#220]). Revoking an unknown runner returns 404 ([#201]); a runner revoked before it ever connected reads "Revoked before its first connection" ([#227]).
     - **F-34 and F-36 (fixed in [#10], [PR #47]):** bad jobs and clock skew no longer crash the worker, and transfers use an idle timeout plus a size-scaled budget instead of one fixed 15 s deadline.
 
 16. **My work, search, navigation, drafts** (qa-auditor, qa-lead)
-    1. My work: views, filters, snooze with Undo, and the Lead-only "Team workload" scope. `GET /api/work-inbox?tenantId&page=0` lists only granted engagements, and the last page has `nextPage:null`.
-    2. Ctrl/Cmd+K search; Back/Forward restores the view and filters. Closing a record sheet or dialog returns focus to the element that opened it ([#203]).
-    3. Recovery draft: edit a paper, reload, then Restore draft. After another user saves a new revision, the draft reports `current:false`.
-    4. Two tabs edit the same paper: the second save gets 409. The editor shows the conflict with a Reload button in place, and the toast's Reload also works above the open sheet (mouse, or Alt+T for the keyboard); Reload leads to "This paper has a newer revision" ([#210]). If focus was on the page body before Alt+T, Escape returns it to the open sheet; with no modal open, Escape collapses an expanded toast stack and focus returns to where it was ([#216]).
+    1. My work: views, filters, snooze with Undo, and the Lead-only "Team workload" scope. After a snooze (or resume) removes a row, focus moves to the next row's link, else the previous row's, else the list heading (`lib/focus-order.ts`, [#227]). `GET /api/work-inbox?tenantId&page=0` lists only granted engagements, and the last page has `nextPage:null`.
+    2. Ctrl/Cmd+K search; Back/Forward restores the view and filters. The audit program writes its open tab to `section=` when no procedure is open (`app/audit-program/program-sections.ts`): the first write after it mounts replaces the history entry and later tab changes push one, so Back and Forward step between tabs, and reload and Copy page link keep the tab ([#227]). Closing a record sheet or dialog returns focus to the element that opened it ([#203]).
+    3. **Focus after a refusal** (`hooks/use-refusal-focus.ts`, wired into every dialog and sheet, [#227]): a form submit, or a click on a submit button outside a form (the paper sheet's Save revision), arms the rule; when a refusal then appears, focus moves to the first field marked `aria-invalid="true"`, else to the first `role="alert"`. Focus moves only when it was lost (on `<body>` or the modal) or is still on the submitter, never away from where the person moved it. Controls with an explicit `type="button"` (tabs, toggles, Add row) never arm it.
+    4. Recovery draft: edit a paper, reload, then Restore draft. After another user saves a new revision, the draft reports `current:false`.
+    5. Two tabs edit the same paper: the second save gets 409. The editor shows the conflict with a Reload button in place, and the toast's Reload also works above the open sheet (mouse, or Alt+T for the keyboard); Reload leads to "This paper has a newer revision" ([#210]). If focus was on the page body before Alt+T, Escape returns it to the open sheet; with no modal open, Escape collapses an expanded toast stack and focus returns to where it was ([#216]). With a modal open, Tab from the last toast control and Shift+Tab from the first (or from the list Alt+T focuses) return into the open sheet or dialog: to the element focused before Alt+T if it is in the modal, otherwise to the modal's first (Tab) or last (Shift+Tab) tabbable element (`useToasterFocus` in `components/ui/sonner.tsx`, [#227]).
 
 17. **Monitoring and follow-up** (qa-auditor, qa-reviewer, qa-lead)
     1. Audit program → Follow-up → New case (`createMonitoringCase`).
@@ -404,6 +414,13 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
 [#211]: https://github.com/ahed-jneed/ai-assurance/issues/211
 [#212]: https://github.com/ahed-jneed/ai-assurance/issues/212
 [#216]: https://github.com/ahed-jneed/ai-assurance/issues/216
+[#219]: https://github.com/ahed-jneed/ai-assurance/issues/219
+[#220]: https://github.com/ahed-jneed/ai-assurance/issues/220
+[#221]: https://github.com/ahed-jneed/ai-assurance/issues/221
+[#225]: https://github.com/ahed-jneed/ai-assurance/issues/225
+[#226]: https://github.com/ahed-jneed/ai-assurance/issues/226
+[#227]: https://github.com/ahed-jneed/ai-assurance/issues/227
+[#228]: https://github.com/ahed-jneed/ai-assurance/issues/228
 [PR #2]: https://github.com/ahed-jneed/ai-assurance/pull/2
 [PR #47]: https://github.com/ahed-jneed/ai-assurance/pull/47
 [PR #54]: https://github.com/ahed-jneed/ai-assurance/pull/54
@@ -425,7 +442,14 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
 [PR #213]: https://github.com/ahed-jneed/ai-assurance/pull/213
 [PR #214]: https://github.com/ahed-jneed/ai-assurance/pull/214
 [PR #215]: https://github.com/ahed-jneed/ai-assurance/pull/215
+[PR #217]: https://github.com/ahed-jneed/ai-assurance/pull/217
 [PR #218]: https://github.com/ahed-jneed/ai-assurance/pull/218
+[PR #222]: https://github.com/ahed-jneed/ai-assurance/pull/222
+[PR #223]: https://github.com/ahed-jneed/ai-assurance/pull/223
+[PR #224]: https://github.com/ahed-jneed/ai-assurance/pull/224
+[PR #229]: https://github.com/ahed-jneed/ai-assurance/pull/229
+[PR #230]: https://github.com/ahed-jneed/ai-assurance/pull/230
+[PR #231]: https://github.com/ahed-jneed/ai-assurance/pull/231
 
 ## 3. File-ownership map
 
