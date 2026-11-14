@@ -298,6 +298,14 @@ describe("workflow guidance (ported from workflow-ux-check)", () => {
     );
     for (const role of ["Client Viewer", "Client Contributor"]) {
       const allowed = permittedNavigationRoutes(role, true);
+      // The client portal shell (#36): no practice navigation at all.
+      assert.deepEqual(allowed, [
+        "Overview",
+        "Evidence vault",
+        "Findings",
+        "Reports & sign-off",
+      ]);
+      assert.deepEqual(permittedNavigationRoutes(role, false), []);
       assert(!allowed.includes("Working papers"));
       assert(!allowed.includes("Testing lab"));
       assert(allowed.includes("Evidence vault"));

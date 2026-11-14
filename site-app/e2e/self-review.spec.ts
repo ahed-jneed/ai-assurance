@@ -68,9 +68,7 @@ test("the preparer of a procedure cannot review it", async ({
   await dialog
     .getByLabel("Review decision and rationale")
     .fill("Execution, evidence and conclusion independently inspected.");
-  await expectAccessible(review, "Procedure review dialog", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(review, "Procedure review dialog");
   await runCommand(review, "reviewProcedure", () =>
     dialog.getByRole("button", { name: "Approve procedure" }).click(),
   );

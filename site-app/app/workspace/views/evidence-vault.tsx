@@ -4,7 +4,7 @@ import { Database, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Artifact, Engagement, EvidenceRequest, Role } from "@/lib/domain";
-import { canSee } from "@/lib/permissions";
+import { canSee, isClientRole } from "@/lib/permissions";
 import { evidenceRows as selectEvidence } from "@/lib/register-views";
 import { EvidenceRegister } from "../../audit-registers";
 import { DatabaseToolbar } from "../../database-toolbar";
@@ -68,7 +68,8 @@ export function EvidenceVault({
   const { search, setSearch, filter, setFilter, setFacet, setSort } = register;
   const evidenceRows = selectEvidence(e.artifacts, register.query);
   const genaiLevels = useGenaiLevels(data.tenantId, e, role),
-    requests = canSee(role, "evidenceRequests");
+    requests = canSee(role, "evidenceRequests"),
+    viewer = isClientRole(role);
   return (
     <>
       {canSee(role, "clientPortal") && (
@@ -124,18 +125,36 @@ export function EvidenceVault({
           <section className="panel evidence-files-panel">
             <DatabaseToolbar
               label="Evidence"
-              views={[
-                { value: "all", label: "All evidence" },
-                {
-                  value: "unverified",
-                  label: "Awaiting acceptance",
-                },
-                { value: "accepted", label: "Accepted" },
-                {
-                  value: "quarantined",
-                  label: "Quarantined",
-                },
-              ]}
+              views={
+                viewer
+                  ? // The client portal (#36): a client sees accepted,
+                    // shared evidence, and a contributor also its own
+                    // submissions; quarantine is the audit team's concern.
+                    [
+                      { value: "all", label: "All shared evidence" },
+                      ...(canSee(role, "clientPortal")
+                        ? [
+                            {
+                              value: "unverified",
+                              label: "Your submissions awaiting review",
+                            },
+                            { value: "accepted", label: "Accepted" },
+                          ]
+                        : []),
+                    ]
+                  : [
+                      { value: "all", label: "All evidence" },
+                      {
+                        value: "unverified",
+                        label: "Awaiting acceptance",
+                      },
+                      { value: "accepted", label: "Accepted" },
+                      {
+                        value: "quarantined",
+                        label: "Quarantined",
+                      },
+                    ]
+              }
               value={filter}
               onView={setFilter}
               search={search}
@@ -176,12 +195,16 @@ export function EvidenceVault({
                 <h3>
                   {e.artifacts.length
                     ? "No matching evidence"
-                    : "No evidence yet"}
+                    : viewer
+                      ? "No shared evidence yet"
+                      : "No evidence yet"}
                 </h3>
                 <p>
                   {e.artifacts.length
                     ? "No files match this view, category and search."
-                    : "Add the files supporting this engagement."}
+                    : viewer
+                      ? "Your auditor has not shared any accepted evidence yet."
+                      : "Add the files supporting this engagement."}
                 </p>
                 {e.artifacts.length ? (
                   <Button

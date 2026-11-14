@@ -86,7 +86,7 @@ test("the administrator manages invitations, administrators and the signing key"
   const invite = page.getByRole("dialog", { name: "Invite by email" });
   await invite.getByLabel("Email").fill(email);
   await invite.getByLabel("Name (optional)").fill("E2E Invitee");
-  await expectAccessible(page, "Invitation form", { include: "[role=dialog]" });
+  await expectAccessible(page, "Invitation form");
   await runCommand(
     page,
     "inviteMember",
@@ -106,9 +106,7 @@ test("the administrator manages invitations, administrators and the signing key"
 
   await row.getByRole("button", { name: "Cancel" }).click();
   const cancel = page.getByRole("dialog", { name: "Cancel invitation" });
-  await expectAccessible(page, "Cancel invitation", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Cancel invitation");
   await runCommand(
     page,
     "cancelInvitation",
@@ -124,9 +122,7 @@ test("the administrator manages invitations, administrators and the signing key"
   const grant = page.getByRole("dialog", {
     name: "Grant practice administration",
   });
-  await expectAccessible(page, "Grant administration", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Grant administration");
   await runCommand(
     page,
     "grantAdmin",
@@ -142,9 +138,7 @@ test("the administrator manages invitations, administrators and the signing key"
   const revoke = page.getByRole("dialog", {
     name: "Remove practice administration",
   });
-  await expectAccessible(page, "Remove administration", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Remove administration");
   await runCommand(
     page,
     "revokeAdmin",
@@ -161,9 +155,7 @@ test("the administrator manages invitations, administrators and the signing key"
   await page.getByRole("button", { name: "Rotate signing key" }).click();
   const rotate = page.getByRole("dialog", { name: "Rotate signing key" });
   await rotate.getByLabel("Reason").fill("Scheduled rotation (persona suite)");
-  await expectAccessible(page, "Signing key rotation", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Signing key rotation");
   await runCommand(
     page,
     "rotateSigningKey",

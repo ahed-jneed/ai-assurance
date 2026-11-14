@@ -340,7 +340,7 @@
 .register-title > svg {
   flex: none;
   margin-top: 3px;
-  color: #899080;
+  color: var(--text-secondary);
 }
 .register-title > div {
   min-width: 0;
@@ -372,7 +372,7 @@
   min-width: 34px;
   min-height: 34px;
   border-radius: 5px;
-  color: #737b68;
+  color: var(--text-secondary);
 }
 .register-download:hover {
   background: #e9eee1;

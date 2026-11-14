@@ -52,8 +52,9 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `lead-creates-engagement.spec.ts` | Lead Auditor creates an engagement for Acme; an Auditor's `createEngagement` is refused |
 | `auditor-prepares-paper.spec.ts` | Auditor creates a paper, records results and conclusion, links accepted evidence, saves and submits it |
 | `reviewer-reviews-paper.spec.ts` | Reviewer approves the review, the Lead Auditor signs the revision; the author's own review and an Auditor's review are refused |
-| `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the portal and the audit team sees it; internal commands are refused |
-| `client-viewer.spec.ts` | Client Viewer sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
+| `accessibility.spec.ts` | axe finds no serious or critical violation on any of the Lead Auditor's engagement and practice views or on any client portal view (Viewer and Contributor); keyboard-only use reaches the skip link, the content and the portal navigation |
+| `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the client portal shell (no practice navigation) and the audit team sees it; internal commands are refused |
+| `client-viewer.spec.ts` | Client Viewer gets the client portal shell without practice navigation or search, and sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
 | `self-approval.spec.ts` | The Lead Auditor who classified the system or prepared the engagement brief cannot approve it; the Reviewer's approval of the classification succeeds |
 | `quality-reviewer.spec.ts` | The Lead Auditor appoints `qa-eqr` as Engagement Quality Reviewer (an Auditor cannot be appointed); the reviewer records a stand-back checklist item in the Quality review tab; the reviewer's paper edits and the Lead's checklist save are refused |
 | `report-settings.spec.ts` | The Lead Auditor, a practice administrator, saves the practice's report settings; the report form shows them for blank fields, and a readiness draft with gaps asks for the gaps and is captured as not assurance with the settings; an Auditor's `setReportSettings` is refused |
@@ -64,7 +65,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `coverage-filters.spec.ts` | Auditor filters the coverage heatmap by actor and applicability date, the filters survive a reload (workspace preferences), the drawer marks rule-pack dates as derived and not reviewed, and the CSV export follows the filters; a Client Viewer's export is refused (403) |
 | `isolation.spec.ts` | An outsider is refused the demo practice in the UI and API; no cross-practice reads; practice switching for `qa-lead2`; a stale engagement version is refused |
 | `scope-and-program.spec.ts` | The Lead Auditor completes and submits the engagement brief, the Reviewer approves it; the Auditor submits the audit program, the Reviewer approves it; the preparers' own approvals are refused |
-| `classification.spec.ts` | The Lead Auditor answers the guided classification of an Annex III deployer in Regulatory mapping; their own approval is refused in the UI; the Reviewer approves it. Its axe checks cover the Risk classification panel: the criteria coverage grid below it loads on its own schedule and has untracked violations (follow-up for #36) |
+| `classification.spec.ts` | The Lead Auditor answers the guided classification of an Annex III deployer in Regulatory mapping; their own approval is refused in the UI; the Reviewer approves it. Its axe checks cover the whole page once the criteria coverage grid below the panel has loaded |
 | `testing-lab.spec.ts` | The Auditor registers a saved-predictions model version from an accepted dataset, starts a queued evaluation and reads its results |
 | `evidence-requests.spec.ts` | The Auditor requests evidence for a paper, the Lead grants it to `qa-contrib` (the contributor cannot grant it), the contributor submits a complete package in the portal, the Auditor accepts the files and assesses the request as sufficient |
 | `report-release.spec.ts` | On an engagement in Sign-off, the Reviewer approves both exact packages of a final report, answering the completion checklist (MEM-SO-01), and the Lead releases it; a second release supersedes it, and the client reads both, linked; release before approval, the creator's approval and a stale package digest are refused |
@@ -122,19 +123,22 @@ an anonymous test timeout.
 ## Accessibility
 
 `expectAccessible(page, label)` (`a11y.ts`) runs axe with the WCAG 2.x A and AA
-rules and fails on serious or critical violations. Known violations are listed
-in `TRACKED_EXCEPTIONS` with the issue that fixes them; they appear as
-`a11y-exception` annotations in the report instead of failing. Each exception is
-scoped: `maxNodes` caps the failing elements one check may have, and an optional
-`selector` names the elements it covers, so a new violation of the same rule
-elsewhere still fails. Never skip a
-check: add an exception with its issue, or fix the violation. A check of a
-modal dialog passes `{ include: "[role=dialog]" }`: the page behind it is
-checked on its own, and counting its elements again would push a tracked
-exception past its `maxNodes`. To review every
+rules on the whole page, an open dialog and the page behind it included, and
+fails on serious or critical violations. `TRACKED_EXCEPTIONS` is empty since
+#36: a known violation may be listed there only with the issue that fixes it,
+a reason and a scope (`maxNodes` caps the failing elements one check may have,
+and an optional `selector` names the elements it covers, so a new violation of
+the same rule elsewhere still fails); it then appears as an `a11y-exception`
+annotation in the report instead of failing. Never skip a check: fix the
+violation, or add a scoped exception with its issue. To review every
 violation, including tracked ones, run with `E2E_A11Y_SURVEY=1`: the survey
-prints them instead of failing. #36 fixes the tracked violations and empties
-the list.
+prints them instead of failing.
+
+Each persona's browser context prefers reduced motion (`fixtures.ts`), so
+toasts and dialogs appear without a fade and axe measures their final colours,
+never a half-transparent frame of the animation. Wait for a region that loads
+on its own schedule before the check (the classification spec waits for the
+criteria coverage grid), so axe sees the loaded page and not its skeleton.
 
 ## In CI
 

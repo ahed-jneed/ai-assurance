@@ -380,11 +380,12 @@ export function WorkspaceNavigation({
         key={route}
         className="nav-quick-page"
         disabled={navigationDisabled}
+        aria-current={route === view ? "page" : undefined}
         onClick={() => go(route)}
       >
         <Icon size={16} aria-hidden="true" />
         <span>{entry[2]}</span>
-        {route === view && <Check size={14} aria-label="Current page" />}
+        {route === view && <Check size={14} aria-hidden="true" />}
       </button>
     );
   }
@@ -404,7 +405,9 @@ export function WorkspaceNavigation({
                 <button
                   className="nav-workspace"
                   disabled={navigationDisabled}
-                  aria-label={"Workspace: " + practiceName}
+                  // The visible text names the button (WCAG 2.5.3); the
+                  // compact rail hides it, so the label stands in there.
+                  aria-label={compact ? "Assurance " + practiceName : undefined}
                 >
                   <span className="nav-brand-symbol">
                     <ShieldCheck size={19} aria-hidden="true" />
@@ -485,7 +488,8 @@ export function WorkspaceNavigation({
               <button
                 className="nav-search"
                 disabled={searchDisabled}
-                aria-label="Search workspace"
+                aria-label={compact ? "Search workspace" : undefined}
+                aria-keyshortcuts="Control+K"
                 onClick={() => {
                   setOpenMobile(false);
                   onSearch();
@@ -586,7 +590,11 @@ export function WorkspaceNavigation({
                 <button
                   className="nav-engagement"
                   disabled={navigationDisabled}
-                  aria-label={"Switch engagement: " + e.title}
+                  aria-label={
+                    (clientName ? clientName + " " : "") +
+                    e.title +
+                    ", switch engagement"
+                  }
                   onClick={() => {
                     if (onSwitch() === "opened") setOpenMobile(false);
                   }}
@@ -597,8 +605,7 @@ export function WorkspaceNavigation({
                     aria-hidden="true"
                   />
                   <span className="nav-engagement-copy">
-                    <small>{clientName}</small>
-                    <b>{e.title}</b>
+                    <small>{clientName}</small> <b>{e.title}</b>
                   </span>
                   <ChevronDown
                     size={14}

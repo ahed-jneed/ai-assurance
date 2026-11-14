@@ -40,9 +40,7 @@ async function releaseInUi(page: Page, e: Engagement, r: Report) {
   await release
     .getByLabel("Review decision and rationale")
     .fill("The approved packages are released to the Acme board.");
-  await expectAccessible(page, "Client release dialog", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Client release dialog");
   await runCommand(page, "releaseReport", () =>
     release.getByRole("button", { name: "Release to client" }).click(),
   );
@@ -125,9 +123,7 @@ test("a released report is superseded by the next release", async ({
   await approval
     .getByLabel("Review decision and rationale")
     .fill("Internal report and client preview reviewed against the work.");
-  await expectAccessible(review, "Package approval dialog", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(review, "Package approval dialog");
   await runCommand(review, "approveReportPackage", () =>
     approval.getByRole("button", { name: "Approve package" }).click(),
   );

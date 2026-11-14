@@ -236,10 +236,11 @@ export function ExecutionPlanner({
         {r.checks.map((c) => (
           <li key={c.label}>
             {c.done ? (
-              <CheckCircle2 size={16} color="#477a59" />
+              <CheckCircle2 size={16} color="#477a59" aria-hidden="true" />
             ) : (
-              <Circle size={16} color="#9298a1" />
+              <Circle size={16} color="#6f757d" aria-hidden="true" />
             )}
+            <span className="sr-only">{c.done ? "Done: " : "Not done: "}</span>
             {c.label}
           </li>
         ))}

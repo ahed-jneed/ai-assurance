@@ -3,6 +3,7 @@
 // own approval is refused, and the independent Reviewer approves it. It runs
 // on an engagement of its own, so the demo engagement's classification
 // stays as the other specs expect.
+import type { Page } from "@playwright/test";
 import { expectAccessible } from "./a11y";
 import {
   CLASSIFICATION,
@@ -20,12 +21,19 @@ import {
 } from "./fixtures";
 
 // The Risk classification panel, the first panel of the Classification tab.
-// The checks cover it only: the criteria coverage grid below it loads on its
-// own schedule and has untracked violations of its own (its cell buttons'
-// aria-labels omit their visible text), so a page-wide check would depend on
-// whether the grid had loaded. Checking that grid is a follow-up for #36.
 const classificationPanel =
   '[role="tabpanel"][data-state="active"] > section.panel:first-child';
+
+/**
+ * Waits for the criteria coverage grid below the panel, which loads on its
+ * own schedule, so the page-wide axe check covers the loaded grid and never
+ * its skeleton (#36).
+ */
+async function coverageLoaded(page: Page) {
+  await expect(
+    page.locator(".coverage-filter-status").filter({ hasText: /Showing/ }),
+  ).toBeVisible();
+}
 
 test("the Lead classifies the system and the Reviewer approves it", async ({
   signIn,
@@ -49,9 +57,8 @@ test("the Lead classifies the system and the Reviewer approves it", async ({
       .locator(classificationPanel)
       .getByRole("heading", { name: "Risk classification" }),
   ).toBeVisible();
-  await expectAccessible(page, "Unclassified classification panel", {
-    include: classificationPanel,
-  });
+  await coverageLoaded(page);
+  await expectAccessible(page, "Unclassified classification");
   await page.getByRole("button", { name: "Assess classification" }).click();
   const form = page.getByRole("dialog", {
     name: "Guided regulatory classification",
@@ -92,9 +99,7 @@ test("the Lead classifies the system and the Reviewer approves it", async ({
     .fill(CLASSIFICATION.rationale);
   await expect(form.getByText("Derived now:")).toBeVisible();
   await expect(form.getByText(/facts need information/)).toHaveCount(0);
-  await expectAccessible(page, "Guided classification form", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Guided classification form");
   await runCommand(page, "classify", () =>
     form.getByRole("button", { name: "Save classification" }).click(),
   );
@@ -123,9 +128,8 @@ test("the Lead classifies the system and the Reviewer approves it", async ({
   await review.goto(workspacePath(e, "Regulatory mapping"));
   const approve = review.getByRole("button", { name: "Approve independently" });
   await expect(approve).toBeEnabled();
-  await expectAccessible(review, "Classification awaiting approval", {
-    include: classificationPanel,
-  });
+  await coverageLoaded(review);
+  await expectAccessible(review, "Classification awaiting approval");
   // Approval opens the attestation dialog; its statement and the reviewer's
   // rationale are recorded in the audit event.
   await approve.click();

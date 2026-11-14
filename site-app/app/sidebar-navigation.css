@@ -736,7 +736,7 @@
 }
 .engagement-picker .picker-header [data-slot="dialog-description"] {
   font-size: 12px;
-  color: #6d7888;
+  color: var(--text-secondary);
 }
 .picker-options {
   display: flex;
@@ -746,7 +746,7 @@
   padding: 12px 22px;
   border-bottom: 1px solid #e9edf2;
   font-size: 11px;
-  color: #727d8d;
+  color: var(--text-secondary);
 }
 .picker-options label {
   display: flex;
@@ -766,7 +766,7 @@
 }
 .engagement-picker [data-slot="command-group-heading"] {
   font-size: 11px;
-  color: #748195;
+  color: var(--text-secondary);
 }
 .engagement-picker [data-slot="command-item"] {
   min-height: 60px;

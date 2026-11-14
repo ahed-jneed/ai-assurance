@@ -204,6 +204,9 @@ async function newPersonaPage(browser: Browser, id: PersonaId, url: string) {
     extraHTTPHeaders: identityHeaders(persona(id)),
     locale: "en-GB",
     timezoneId: "UTC",
+    // Toasts and dialogs then appear without a fade, so axe measures their
+    // final colours, never a half-transparent frame of the animation (#36).
+    reducedMotion: "reduce",
   });
   return { context, page: await context.newPage() };
 }

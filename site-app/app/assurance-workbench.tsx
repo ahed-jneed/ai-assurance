@@ -1430,7 +1430,13 @@ export function AssuranceWorkbench({
         <Tabs value={tab} onValueChange={selectSection}>
           <TabsList aria-label="Assurance workbench sections">
             {workbenchSections.map(([value, title]) => (
-              <TabsTrigger key={value} value={value}>
+              <TabsTrigger
+                key={value}
+                value={value}
+                // The section renders below the bar, outside these tabs, so
+                // each tab controls that panel; while it loads, none (#36).
+                aria-controls={snapshot ? "workbench-section-panel" : undefined}
+              >
                 {title}
               </TabsTrigger>
             ))}
@@ -1639,7 +1645,15 @@ export function AssuranceWorkbench({
         </div>
       )}
       {snapshot && (
-        <div className="workbench-section-content" aria-busy={refreshing}>
+        <div
+          className="workbench-section-content"
+          id="workbench-section-panel"
+          role="tabpanel"
+          aria-label={
+            workbenchSections.find(([value]) => value === tab)?.[1] ?? tab
+          }
+          aria-busy={refreshing}
+        >
           {tab === "systems" && (
             <>
               <div className="section-toolbar">

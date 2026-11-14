@@ -34,7 +34,7 @@ async function sealInUi(
   const dialog = page.getByRole("dialog", { name: dialogName });
   await expect(dialog).toBeVisible();
   await configure?.(dialog);
-  await expectAccessible(page, dialogName, { include: "[role=dialog]" });
+  await expectAccessible(page, dialogName);
   const sealed = page.waitForResponse(
     (r) =>
       r.request().method() === "POST" &&

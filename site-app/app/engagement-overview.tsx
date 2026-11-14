@@ -293,7 +293,7 @@ export function EngagementOverview({
                 />
               ) : (
                 <div className="queue-empty">
-                  <CheckCircle2 size={18} />
+                  <CheckCircle2 size={18} aria-hidden="true" />
                   <span>Stage requirements met.</span>
                 </div>
               )}

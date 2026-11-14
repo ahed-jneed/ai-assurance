@@ -53,10 +53,13 @@ export function ProcedureContext({
             {readiness.checks.map(([text, done]) => (
               <li key={text}>
                 {done ? (
-                  <CheckCircle2 size={16} color="#477a59" />
+                  <CheckCircle2 size={16} color="#477a59" aria-hidden="true" />
                 ) : (
-                  <Circle size={16} color="#9298a1" />
+                  <Circle size={16} color="#6f757d" aria-hidden="true" />
                 )}
+                <span className="sr-only">
+                  {done ? "Done: " : "Not done: "}
+                </span>
                 <span>{text}</span>
               </li>
             ))}
@@ -68,10 +71,13 @@ export function ProcedureContext({
           <ul>
             <li>
               {readiness.recorded ? (
-                <CheckCircle2 size={16} color="#477a59" />
+                <CheckCircle2 size={16} color="#477a59" aria-hidden="true" />
               ) : (
-                <Circle size={16} color="#9298a1" />
+                <Circle size={16} color="#6f757d" aria-hidden="true" />
               )}
+              <span className="sr-only">
+                {readiness.recorded ? "Done: " : "Not done: "}
+              </span>
               <span>{readiness.text}</span>
             </li>
           </ul>

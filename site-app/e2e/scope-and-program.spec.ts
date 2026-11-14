@@ -52,9 +52,7 @@ test("the Reviewer approves the scope and the program the team prepared", async 
     ["Access, data rights and engagement constraints", BRIEF.constraints],
   ])
     await form.getByLabel(label, { exact: true }).fill(value);
-  await expectAccessible(page, "Engagement brief form", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(page, "Engagement brief form");
   await runCommand(page, "saveBrief", () =>
     form.getByRole("button", { name: "Save scope draft" }).click(),
   );
@@ -93,9 +91,7 @@ test("the Reviewer approves the scope and the program the team prepared", async 
   await approval
     .getByLabel("Review decision and rationale")
     .fill("Boundary, period and responsibilities reviewed.");
-  await expectAccessible(review, "Scope approval dialog", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(review, "Scope approval dialog");
   await runCommand(review, "approveBrief", () =>
     approval.getByRole("button", { name: "Approve scope" }).click(),
   );
@@ -134,9 +130,7 @@ test("the Reviewer approves the scope and the program the team prepared", async 
   await programApproval
     .getByLabel("Review decision and rationale")
     .fill("Selection, criteria, sample and assignments reviewed.");
-  await expectAccessible(review, "Program approval dialog", {
-    include: "[role=dialog]",
-  });
+  await expectAccessible(review, "Program approval dialog");
   await runCommand(review, "approveProgram", () =>
     programApproval.getByRole("button", { name: "Approve program" }).click(),
   );

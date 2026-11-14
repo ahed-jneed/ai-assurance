@@ -1,6 +1,7 @@
 "use client";
 import { AlertTriangle } from "lucide-react";
 import type { Engagement, Finding, Role } from "@/lib/domain";
+import { isClientRole } from "@/lib/permissions";
 import { findingRows as selectFindings } from "@/lib/register-views";
 import { FindingRegister } from "../../audit-registers";
 import { DatabaseToolbar } from "../../database-toolbar";
@@ -30,6 +31,8 @@ export function Findings({
   onNew: () => void;
 }) {
   const findingRows = selectFindings(e.findings, register.query);
+  // The client portal's words (#36).
+  const client = isClientRole(role);
   return (
     <section className="panel">
       <DatabaseToolbar
@@ -74,12 +77,18 @@ export function Findings({
         <Empty
           icon={AlertTriangle}
           title={
-            e.findings.length ? "No matching findings" : "No findings recorded"
+            e.findings.length
+              ? "No matching findings"
+              : client
+                ? "No shared findings"
+                : "No findings recorded"
           }
           text={
             e.findings.length
               ? "Change the view or clear the search."
-              : "Add a finding to track its risk and remediation."
+              : client
+                ? "Your auditor has not shared any findings with you yet."
+                : "Add a finding to track its risk and remediation."
           }
         />
       )}

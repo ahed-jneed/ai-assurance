@@ -1484,10 +1484,12 @@ export function TestingLab({
               {["Model", "Data", "Procedures", "Review"].map((label, i) => (
                 <li
                   className={step === i ? "active" : step > i ? "complete" : ""}
+                  aria-current={step === i ? "step" : undefined}
                   key={label}
                 >
-                  <span>{i + 1}</span>
+                  <span aria-hidden="true">{i + 1}</span>
                   {label}
+                  {step > i && <span className="sr-only">, complete</span>}
                 </li>
               ))}
             </ol>

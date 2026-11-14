@@ -21,7 +21,7 @@
   justify-content: flex-end;
 }
 .work-inbox-context time {
-  color: #818793;
+  color: var(--text-secondary);
 }
 .work-scope-switch {
   display: flex;
@@ -93,7 +93,7 @@
 .work-search > svg {
   position: absolute;
   left: 12px;
-  color: #8a9099;
+  color: var(--text-secondary);
   pointer-events: none;
 }
 .work-search > input {
@@ -112,7 +112,7 @@
 }
 .work-sort select,
 .work-filter-popover select {
-  border: 1px solid #e4e6e9;
+  border: 1px solid var(--border-strong);
   border-radius: 5px;
   min-height: 38px;
   padding: 7px 10px;
@@ -288,7 +288,7 @@
   align-items: center;
   font-size: 11px;
   line-height: 1.5;
-  color: #747c87;
+  color: var(--text-secondary);
 }
 .work-priority {
   color: #a23d30;
@@ -325,7 +325,7 @@
   width: 38px;
   height: 38px;
   flex-shrink: 0;
-  color: #7e8793;
+  color: var(--text-secondary);
 }
 .business-task-row > button:hover {
   color: #37638d;
@@ -350,7 +350,7 @@
   border-block: 1px solid #e4e6e9;
 }
 .work-empty > svg {
-  color: #8b96a4;
+  color: var(--text-secondary);
 }
 .work-empty h2 {
   font-size: 17px;
