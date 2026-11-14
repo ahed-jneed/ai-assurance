@@ -75,7 +75,7 @@ CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushe
 | `npm run format:check` | Verify Prettier formatting (`npm run format` applies it) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint; any warning fails |
-| `npm test` | Vitest unit tests (`lib/**/*.test.ts`, `app/**/*.test.ts`); `*.local-calendar.test.ts` files run in a project of their own with `TZ=Europe/Vienna` (`vitest.config.ts`) |
+| `npm test` | Vitest unit tests (`*.test.ts` under `lib/`, `app/`, `build/`, `hooks/`, `components/`, `e2e/` and `scripts/`, plus `app/**/*.test.tsx`, as listed in `vitest.config.ts`); `*.local-calendar.test.ts` files run in a project of their own with `TZ=Europe/Vienna` |
 | `npm run check:sync` | Generated files match their canonical sources (see below) |
 | `npm run check:build` | Production Worker build (`npm run build`), failing if the output reports any warning |
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness against the built Worker in Miniflare; needs a build first. A harness never loads TypeScript sources or rewrites import paths: a check of a pure module is a Vitest test |
@@ -85,17 +85,24 @@ The harnesses run from any working directory (`scripts/harness/env.mjs` moves th
 
 The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`. Do not run `npm run build` or `npm run check` in the same checkout while the e2e server runs: the build rewrites `dist/` under it (see the e2e README).
 
-The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
+The `engine` job runs these commands from the repository root (the validators load Ajv from `site-app/node_modules`, so run `npm ci` in `site-app/` first):
 
 ```powershell
 python -m pip install -r engine/requirements-dev.txt
 python -m unittest discover -s engine/tests -v
+node schemas/validate-rule-pack.mjs
+node schemas/validate-art50-research.mjs
+node schemas/validate-criteria.mjs
 node schemas/validate-run-schema.mjs
 node schemas/validate-procedure-schema.mjs
 node schemas/validate-working-paper-schema.mjs
-python schemas/generate-external-fixtures.py --output tmp/external-runs.v1.2.json
-node schemas/validate-run-schema.mjs --external-fixtures tmp/external-runs.v1.2.json
+node schemas/validate-dataset-card-schema.mjs
+node schemas/validate-genai-schema.mjs
+python schemas/generate-external-fixtures.py --output tmp/external-runs.v1.5.json
+node schemas/validate-run-schema.mjs --external-fixtures-1.5 tmp/external-runs.v1.5.json
 ```
+
+The last two recompute the external-run fixtures with the current engine (run contract 1.5) and validate them; `tmp/` is ignored by Git. CI also sets `GENAI_REQUIRE_ZSTD=1` and `ENGINE_REQUIRE_CRYPTOGRAPHY=1` for the unit tests, so the Inspect `.eval` and Ed25519 signature tests fail instead of skipping, passes `--base <commit>` to `validate-criteria.mjs` to check the criteria index history against the base branch, and builds the compute image from `engine/Dockerfile`.
 
 ## Canonical sources and generated copies
 
@@ -140,7 +147,7 @@ At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has
 |---|---|
 | [docs/capabilities.md](docs/capabilities.md) | What `main` does, with code and tests per capability |
 | [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md) | The November 2026 cycle's outcome, deferred work, watch list and owner actions; merged PRs |
-| [docs/product/direction.md](docs/product/direction.md), [docs/product/decisions.md](docs/product/decisions.md) | Who we serve and why; the decision log (D-01 to D-44) |
+| [docs/product/direction.md](docs/product/direction.md), [docs/product/decisions.md](docs/product/decisions.md) | Who we serve and why; the decision log (D-01 to D-48) |
 | [docs/engineering/codebase-map.md](docs/engineering/codebase-map.md) | Components, data flow, storage, identity, module layout and file ownership |
 | [docs/audit-methodology.md](docs/audit-methodology.md) | The audit methodology and the regulatory snapshot |
 | [docs/design/](docs/design/) | Statistics, criteria-model and GenAI-evidence designs |
