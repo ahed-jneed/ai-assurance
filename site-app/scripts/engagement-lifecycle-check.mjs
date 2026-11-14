@@ -112,6 +112,16 @@ try {
   workspace = await request("/api/workspace");
   e = workspace.engagement;
   tenantId = workspace.tenantId;
+  // The practice's latest management event, read from D1: the workspace
+  // load no longer lists them (#185), and the Access log lists only the
+  // events about access.
+  const latestManagementEvent = async () =>
+    await testDb
+      .prepare(
+        "SELECT action,details FROM management_events WHERE tenant_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
+      )
+      .bind(tenantId)
+      .first();
   await request("/api/workspace", { status: 200, user: other });
   await command("grantMember", {
     userId: reviewer,
@@ -2169,10 +2179,15 @@ try {
     role: "Engagement Quality Reviewer",
     engagementIds: [e.id],
   });
-  assert.equal(
-    workspace.managementEvents[0].action,
-    "grantMember",
-    "The role grant is a recorded management event",
+  assert.deepEqual(
+    (
+      await request(
+        "/api/access-log?" +
+          new URLSearchParams({ tenantId, action: "grantMember", limit: "1" }),
+      )
+    ).events.map((event) => [event.subject, event.role]),
+    [[quality, "Engagement Quality Reviewer"]],
+    "The role grant is a recorded management event in the Access log",
   );
   const unreviewed = await command(
     "createReport",
@@ -2260,11 +2275,9 @@ try {
     coolingOffDays: 1095,
     reason: "Firm policy: three years for assurance clients",
   });
+  const policyEvent = await latestManagementEvent();
   assert.deepEqual(
-    [
-      workspace.managementEvents[0].action,
-      JSON.parse(workspace.managementEvents[0].details),
-    ],
+    [policyEvent.action, JSON.parse(policyEvent.details)],
     [
       "setQualityReviewPolicy",
       {
@@ -2351,9 +2364,10 @@ try {
     location: reportParticulars.location,
     qualityStatement: practiceStatement,
   });
-  assert.equal(workspace.managementEvents[0].action, "setReportSettings");
+  const settingsEvent = await latestManagementEvent();
+  assert.equal(settingsEvent.action, "setReportSettings");
   assert.equal(
-    JSON.parse(workspace.managementEvents[0].details).qualityStatement,
+    JSON.parse(settingsEvent.details).qualityStatement,
     practiceStatement,
   );
   await command("createReport", {

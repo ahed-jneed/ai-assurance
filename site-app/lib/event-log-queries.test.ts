@@ -18,6 +18,9 @@ describe("event log queries (#181)", () => {
         "c",
       ),
     ).toEqual({ actor: "u-1", to: "2026-11-05", cursor: "c" });
+    expect(eventLogParams({ ...noEventFilters, involved: "u-2" })).toEqual({
+      involved: "u-2",
+    });
   });
 
   it("make one query object per page, so the cache shares it", () => {

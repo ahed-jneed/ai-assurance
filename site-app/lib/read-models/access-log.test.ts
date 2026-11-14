@@ -108,7 +108,7 @@ async function seeded() {
   return sqlite;
 }
 const q = (params: Record<string, string> = {}): EventQuery =>
-  parseEventQuery(new URLSearchParams(params));
+  parseEventQuery(new URLSearchParams(params), { involved: true });
 const ids = (page: { events: { id: string }[] }) =>
   page.events.map((e) => e.id);
 // The Access log is for practice administrators only (#181): `lead` is a Lead
@@ -145,6 +145,11 @@ describe("accessLogPage", () => {
     // Damaged details are listed without them.
     expect(byId.M5).toMatchObject({ subject: null, details: null });
     expect(page.actors).toEqual([
+      { id: "auditor", name: "auditor" },
+      { id: "lead", name: "lead" },
+    ]);
+    // The person involved filter offers everyone who acted or was acted on.
+    expect(page.people).toEqual([
       { id: "auditor", name: "auditor" },
       { id: "lead", name: "lead" },
     ]);
@@ -190,6 +195,54 @@ describe("accessLogPage", () => {
     expect(
       ids(await accessLogPage(lead(), q({ action: "renamePractice" }))),
     ).toEqual([]);
+  });
+
+  it("filters by the person involved: who acted or was acted on (#185)", async () => {
+    await seeded();
+    // The auditor signed in, was granted membership and received
+    // administration; the actor filter finds only their sign-in.
+    expect(
+      ids(await accessLogPage(lead(), q({ involved: "auditor" }))),
+    ).toEqual(["M4", "S2", "M2"]);
+    expect(ids(await accessLogPage(lead(), q({ involved: "lead" })))).toEqual([
+      "M5",
+      "M4",
+      "M2",
+      "S1",
+      "M1",
+    ]);
+    // It combines with the other filters and pages with the cursor.
+    expect(
+      ids(
+        await accessLogPage(
+          lead(),
+          q({ involved: "auditor", actor: "lead", action: "grantMember" }),
+        ),
+      ),
+    ).toEqual(["M2"]);
+    const first = await accessLogPage(
+      lead(),
+      q({ involved: "auditor", limit: "2" }),
+    );
+    expect(ids(first)).toEqual(["M4", "S2"]);
+    expect(
+      ids(
+        await accessLogPage(
+          lead(),
+          q({ involved: "auditor", limit: "2", cursor: first.next! }),
+        ),
+      ),
+    ).toEqual(["M2"]);
+    expect(ids(await accessLogPage(lead(), q({ involved: "x" })))).toEqual([]);
+    // The export applies it too.
+    const { csv } = await accessLogCsv(lead(), q({ involved: "auditor" }));
+    expect(
+      csv
+        .trimEnd()
+        .split("\r\n")
+        .slice(1)
+        .map((line) => line.split(",")[1]),
+    ).toEqual(["M4", "S2", "M2"]);
   });
 
   it("is for practice administrators only", async () => {

@@ -85,6 +85,35 @@ test("the practice administrator filters the Access log and exports it as CSV", 
   expect(lines.length).toBeGreaterThan(1);
   for (const line of lines.slice(1)) expect(line.split(",")[2]).toBe("signIn");
   expect(csv).toContain(persona("qa-lead").userId);
+
+  // The person involved filter (#185) lists the events about the auditor:
+  // the seed's membership grant names them as the member acted on.
+  await page.getByRole("button", { name: "Clear filters" }).click();
+  await expect(page.locator(".loading-grid")).toHaveCount(0);
+  const auditor = persona("qa-auditor");
+  const involved = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/access-log" &&
+      new URL(r.url()).searchParams.get("involved") === auditor.userId,
+  );
+  await filters.getByLabel("Person involved").selectOption(auditor.userId);
+  expect((await involved).status()).toBe(200);
+  await expect(page.locator(".loading-grid")).toHaveCount(0);
+  await expect(
+    table
+      .getByRole("row")
+      .filter({ hasText: "Member granted" })
+      .filter({ hasText: auditor.name })
+      .first(),
+  ).toBeVisible();
+  for (const text of (await table.getByRole("row").allInnerTexts()).slice(1))
+    expect(text).toContain(auditor.name);
+  expect(
+    await page
+      .getByRole("link", { name: "Export filtered CSV" })
+      .getAttribute("href"),
+  ).toContain("involved=" + encodeURIComponent(auditor.userId));
+  await expectAccessible(page, "Access log filtered by person involved");
 });
 
 test("only practice administrators read the Access log; others are refused", async ({

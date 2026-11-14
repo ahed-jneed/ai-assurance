@@ -5,9 +5,10 @@
 // may provision a practice of their own only where self-signup is allowed
 // (lib/access-policy.ts). Apart from those, recording the member's identity
 // email once when it is new or changed, and recording a sign-in for the
-// practice's Access log at most once per signInGapHours, resolving the caller
-// only reads.
-import { signInGapHours } from "./access-events";
+// practice's Access log at most once per signInGapHours (pruning that
+// practice's sign-ins older than signInRetentionDays when it does), resolving
+// the caller only reads.
+import { signInGapHours, signInRetentionDays } from "./access-events";
 import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
 import type { Role } from "./domain";
@@ -68,12 +69,35 @@ async function recordEmail(
     .bind(email, tenantId, user.userId, email)
     .run();
 }
+/** The most expired sign-ins one recorded sign-in prunes. */
+export const signInPruneBatch = 500;
+/**
+ * Deletes up to signInPruneBatch of the practice's sign-ins recorded more
+ * than signInRetentionDays before `at`, oldest first (#185), and returns how
+ * many it deleted. There is no scheduled maintenance path, so a recorded
+ * sign-in prunes its own practice: each one adds a row and removes up to a
+ * batch, which keeps every practice within the period without one large
+ * delete. Management events are not touched.
+ */
+export async function pruneSignIns(tenantId: string, at: string) {
+  const before = new Date(
+    Date.parse(at) - signInRetentionDays * 86400000,
+  ).toISOString();
+  const result = await db()
+    .prepare(
+      "DELETE FROM sign_in_events WHERE tenant_id=? AND id IN (SELECT id FROM sign_in_events WHERE tenant_id=? AND created_at<? ORDER BY created_at,id LIMIT ?)",
+    )
+    .bind(tenantId, tenantId, before, signInPruneBatch)
+    .run();
+  return result.meta?.changes ?? 0;
+}
 /**
  * Records the member's sign-in to the practice for its Access log (#181), with the
  * role they hold, unless one is recorded within signInGapHours: one read on
  * each request and a write at most once per gap. The guarded insert keeps
- * concurrent first requests to one event. A failure to record never refuses
- * the request; it is logged instead.
+ * concurrent first requests to one event; a recorded sign-in then prunes the
+ * practice's expired ones (pruneSignIns). A failure to record or prune never
+ * refuses the request; it is logged instead.
  */
 async function recordSignIn(tenantId: string, userId: string, role: Role) {
   try {
@@ -88,7 +112,7 @@ async function recordSignIn(tenantId: string, userId: string, role: Role) {
         .first()
     )
       return;
-    await db()
+    const inserted = await db()
       .prepare(
         "INSERT INTO sign_in_events(tenant_id,id,user_id,role,created_at) SELECT ?,?,?,?,? WHERE NOT EXISTS(" +
           recent +
@@ -96,6 +120,15 @@ async function recordSignIn(tenantId: string, userId: string, role: Role) {
       )
       .bind(tenantId, id("SI"), userId, role, at, tenantId, userId, since)
       .run();
+    if (!inserted.meta?.changes) return;
+    try {
+      await pruneSignIns(tenantId, at);
+    } catch (error) {
+      console.warn(
+        "Access log: expired sign-ins could not be pruned: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
   } catch (error) {
     console.warn(
       "Access log: the sign-in could not be recorded: " +

@@ -11,7 +11,7 @@ import {
   tenantId,
 } from "../test-storage";
 import { auditTrailPage } from "./audit-trail";
-import { parseEventQuery, type EventQuery } from "./event-pages";
+import { eventFilters, parseEventQuery, type EventQuery } from "./event-pages";
 
 afterEach(() => {
   delete env.DB;
@@ -255,7 +255,23 @@ describe("parseEventQuery", () => {
       { limit: "0" },
       { limit: "201" },
       { action: "edit paper; DROP" },
+      // The audit trail names no member acted on (#185).
+      { involved: "lead" },
     ])
       expect(() => q(params), JSON.stringify(params)).toThrow(ApiError);
+  });
+
+  it("reads the person involved only for a log that names the member acted on", () => {
+    const params = new URLSearchParams({ involved: "lead" });
+    expect(parseEventQuery(params, { involved: true })).toEqual({
+      involved: "lead",
+      limit: 50,
+    });
+    expect(() => eventFilters({ involved: "lead", limit: 1 })).toThrow(
+      ApiError,
+    );
+    expect(
+      eventFilters({ involved: "lead", limit: 1 }, "actor", "subject"),
+    ).toEqual({ sql: " AND (actor=? OR subject=?)", args: ["lead", "lead"] });
   });
 });

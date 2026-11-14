@@ -1,6 +1,6 @@
 // GET /api/access-log (#181): the practice's Access log in cursor pages,
-// newest first, filtered by actor, event type and date range
-// (event-pages.ts), and its CSV export. It lists who was given, changed or
+// newest first, filtered by actor, the person involved (who acted or was
+// acted on), event type and date range (event-pages.ts), and its CSV export. It lists who was given, changed or
 // lost membership, a role or practice administration, the invitations behind
 // them, and members' sign-ins (sign_in_events, recorded by lib/tenancy.ts).
 // Only the practice's administrators, of any staff role, read it
@@ -41,9 +41,14 @@ export type AccessEvent = {
   details: Record<string, unknown> | null;
 };
 
-/** A page of the log, with the people its actor filter can choose from. */
+/**
+ * A page of the log, with the people its actor filter and its person
+ * involved filter can choose from.
+ */
 export type AccessLogPage = EventPage<AccessEvent> & {
   actors: { id: string; name: string }[];
+  /** Everyone who acted or was acted on: the person involved filter. */
+  people: { id: string; name: string }[];
   actions: readonly string[];
 };
 
@@ -68,7 +73,7 @@ function refuse(ctx: Context) {
 }
 
 async function rows(ctx: Context, q: EventQuery): Promise<Row[]> {
-  const filters = eventFilters(q);
+  const filters = eventFilters(q, "actor", "subject");
   return (
     await db()
       .prepare(
@@ -105,7 +110,7 @@ export async function accessLogPage(
   q: EventQuery,
 ): Promise<AccessLogPage> {
   refuse(ctx);
-  const [page, actors] = await Promise.all([
+  const [page, actors, people] = await Promise.all([
     rows(ctx, q),
     db()
       .prepare(
@@ -113,12 +118,23 @@ export async function accessLogPage(
       )
       .bind(ctx.tenantId, ...eventArgs(ctx.tenantId))
       .all<{ id: string; name: string }>(),
+    db()
+      .prepare(
+        `SELECT person AS id,COALESCE(${name("person")},person) AS name FROM (SELECT actor AS person FROM (${events}) UNION SELECT subject FROM (${events}) WHERE subject IS NOT NULL) ORDER BY name`,
+      )
+      .bind(
+        ctx.tenantId,
+        ...eventArgs(ctx.tenantId),
+        ...eventArgs(ctx.tenantId),
+      )
+      .all<{ id: string; name: string }>(),
   ]);
   const { events: found, next } = toPage(page, q.limit);
   return {
     events: found.map((e) => ({ ...e, details: parseDetails(e.details) })),
     next,
     actors: actors.results,
+    people: people.results,
     actions: accessEventTypes,
   };
 }

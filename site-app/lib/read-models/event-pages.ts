@@ -36,11 +36,23 @@ const query = z
       .default(defaultPageSize),
   })
   .strict();
+/**
+ * A log whose events name the member acted on as well (the Access log) also
+ * takes `involved`: the member who acted or was acted on.
+ */
+const involvedQuery = query.extend({
+  involved: z.string().max(256).optional(),
+});
 
 /** A page request: its filters, where it starts and how many events. */
 export type EventQuery = {
   /** The user id of who acted. */
   actor?: string;
+  /**
+   * The user id of a member who either acted or was acted on; only a log
+   * parsed with `{ involved: true }` has it.
+   */
+  involved?: string;
   /** The event type (the command or event action). */
   action?: string;
   /** The first day (UTC) included. */
@@ -88,14 +100,18 @@ function decodeCursor(cursor: string): EventQuery["after"] {
 
 /**
  * The page a request's query string asks for. Empty parameters are absent;
- * an unknown parameter, a malformed date or cursor, or a range that ends
- * before it starts is 400.
+ * an unknown parameter (`involved` too, unless `options.involved` says the
+ * log names the member acted on), a malformed date or cursor, or a range
+ * that ends before it starts is 400.
  */
-export function parseEventQuery(params: URLSearchParams): EventQuery {
+export function parseEventQuery(
+  params: URLSearchParams,
+  options: { involved?: boolean } = {},
+): EventQuery {
   const raw: Record<string, string> = {};
   for (const [key, value] of params)
     if (!scopeParams.has(key) && value !== "") raw[key] = value;
-  const parsed = query.safeParse(raw);
+  const parsed = (options.involved ? involvedQuery : query).safeParse(raw);
   if (!parsed.success)
     throw new ApiError(
       400,
@@ -116,18 +132,26 @@ function dayAfter(day: string) {
 
 /**
  * The SQL conditions of the query's filters and cursor over columns
- * `created_at`, `id`, `action` and `actorColumn`, each prefixed by
- * " AND ", with their arguments in order.
+ * `created_at`, `id`, `action`, `actorColumn` and, for `involved`,
+ * `subjectColumn` (the member acted on), each prefixed by " AND ", with
+ * their arguments in order.
  */
 export function eventFilters(
   q: EventQuery,
   actorColumn = "actor",
+  subjectColumn?: string,
 ): { sql: string; args: string[] } {
   let sql = "";
   const args: string[] = [];
   if (q.actor) {
     sql += ` AND ${actorColumn}=?`;
     args.push(q.actor);
+  }
+  if (q.involved) {
+    if (!subjectColumn)
+      throw new ApiError(400, "This log cannot be filtered by person involved");
+    sql += ` AND (${actorColumn}=? OR ${subjectColumn}=?)`;
+    args.push(q.involved, q.involved);
   }
   if (q.action) {
     sql += " AND action=?";

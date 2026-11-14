@@ -1,12 +1,13 @@
 import { env } from "cloudflare:workers";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Engagement, Report, Role } from "../domain";
+import { roles, type Engagement, type Report, type Role } from "../domain";
 import {
   qualityReviewReleaseProblem,
   standBackChecklist,
 } from "../domain/quality-review";
 import { ApiError } from "../http";
+import { canBeAssigned } from "../permissions";
 import type { Context } from "../tenancy";
 import { sqliteD1 } from "../test-d1";
 import {
@@ -280,6 +281,27 @@ describe("appointing the engagement quality reviewer", () => {
     expect(
       await refusal(appoint(e, "eqr", as("auditor", "Auditor"))),
     ).toMatchObject({ status: 403 });
+  });
+
+  it("accepts exactly the members the browser's reviewer picker offers", async () => {
+    // Parity with app/quality-review-panel.tsx, which offers the members
+    // canBeAssigned(role, "qualityReviewer") admits: every other role is
+    // refused for the role, before any access or independence check.
+    for (const role of roles) {
+      const userId = "member-" + role.replace(/\W/g, "-");
+      member(userId, role);
+      const e = engagement();
+      if (canBeAssigned(role, "qualityReviewer"))
+        expect(await appoint(e, userId), role).toMatchObject({
+          details: { reviewerId: userId },
+        });
+      else
+        expect(await refusal(appoint(e, userId)), role).toEqual({
+          status: 400,
+          message:
+            "Select an active member with the Engagement Quality Reviewer role",
+        });
+    }
   });
 
   it("applies the cooling-off period to the client's other engagements", async () => {

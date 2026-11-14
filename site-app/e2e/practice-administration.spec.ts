@@ -150,8 +150,37 @@ test("the administrator manages invitations, administrators and the signing key"
     (await members(lead, demo.tenantId)).find((m) => m.user_id === lead2.userId)
       ?.practice_admin,
   ).toBeFalsy();
+  // The Access log records both, about the second Lead (#185: the person
+  // involved filter matches the member acted on, not only who acted).
+  const involved = await lead.http.get(
+    "/api/access-log?" +
+      new URLSearchParams({
+        tenantId: demo.tenantId,
+        involved: lead2.userId,
+        limit: "50",
+      }),
+  );
+  expect(involved.status(), await involved.text()).toBe(200);
+  const about = (await involved.json()).events as {
+    action: string;
+    actor: string;
+    subject: string | null;
+  }[];
+  for (const e of about)
+    expect([e.actor, e.subject], e.action).toContain(lead2.userId);
+  expect(
+    about
+      .filter((e) => e.action.endsWith("Admin"))
+      .slice(0, 2)
+      .map((e) => [e.action, e.actor, e.subject]),
+  ).toEqual([
+    ["revokeAdmin", persona("qa-lead").userId, lead2.userId],
+    ["grantAdmin", persona("qa-lead").userId, lead2.userId],
+  ]);
 
   // Rotate the practice's signing key.
+  const beforeRotation = (await lead.workspace(demo.tenantId))
+    .managementVersion as number;
   await page.getByRole("button", { name: "Rotate signing key" }).click();
   const rotate = page.getByRole("dialog", { name: "Rotate signing key" });
   await rotate.getByLabel("Reason").fill("Scheduled rotation (persona suite)");
@@ -163,6 +192,9 @@ test("the administrator manages invitations, administrators and the signing key"
     management,
   );
   await expect(rotate).toBeHidden();
-  const events = (await lead.workspace(demo.tenantId)).managementEvents;
-  expect(events[0].action).toBe("rotateSigningKey");
+  // The rotation is a management change (the workspace load no longer lists
+  // management events, and the Access log lists only access events).
+  expect(
+    (await lead.workspace(demo.tenantId)).managementVersion,
+  ).toBeGreaterThan(beforeRotation);
 });

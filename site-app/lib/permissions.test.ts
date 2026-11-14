@@ -414,9 +414,10 @@ describe("assignments and mode narrowings match the server's checks", () => {
       "engagementAccess",
       sorted(access![1].split(",").map((r) => r.trim().slice(1, -1))),
     );
-    // appointQualityReviewer accepts exactly the qualityReviewerRole member.
+    // appointQualityReviewer asks the permission map itself, the rule the
+    // browser's picker uses (behavioural parity in quality-review.test.ts).
     expect(server("commands/quality-review.ts")).toMatch(
-      /member\.role !== qualityReviewerRole/,
+      /!canBeAssigned\(member\.role, "qualityReviewer"\)/,
     );
     add("qualityReviewer", [qualityReviewerRole]);
     expect(Object.keys(found).sort()).toEqual(

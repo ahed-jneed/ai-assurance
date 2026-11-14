@@ -2,8 +2,14 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/http";
 import { runWithIdentity, type Identity } from "@/lib/identity";
-import { signInGapHours } from "@/lib/access-events";
-import { archivedMessage, context } from "@/lib/tenancy";
+import { signInGapHours, signInRetentionDays } from "@/lib/access-events";
+import {
+  archivedMessage,
+  context,
+  pruneSignIns,
+  signInPruneBatch,
+} from "@/lib/tenancy";
+import { sqliteD1 } from "@/lib/test-d1";
 
 // A D1 stand-in that answers context()'s lookups from `rows` and records every
 // statement that would write. Each test installs it as the DB binding.
@@ -20,6 +26,16 @@ function fakeD1() {
       void sql;
       void args;
       return [];
+    },
+    /** Whether running the statement fails. */
+    failRun: (sql: string): boolean => {
+      void sql;
+      return false;
+    },
+    /** The rows a write changed: none unless a test says otherwise. */
+    changes: (sql: string): number => {
+      void sql;
+      return 0;
     },
   };
   const write = (sql: string) =>
@@ -38,7 +54,8 @@ function fakeD1() {
       },
       async run() {
         if (write(sql)) state.writes.push({ sql, args });
-        return { meta: {} };
+        if (state.failRun(sql)) throw new Error("D1 busy");
+        return { meta: { changes: state.changes(sql) } };
       },
     };
   }
@@ -77,6 +94,8 @@ beforeEach(() => {
   env.DB = d1.db as unknown as D1Database;
   d1.state.writes = [];
   d1.state.list = () => [];
+  d1.state.changes = () => 0;
+  d1.state.failRun = () => false;
   rows([]);
 });
 afterEach(() => {
@@ -145,6 +164,60 @@ describe("context", () => {
     rows(member);
     await as(lea, () => context("tenant-1"));
     expect(d1.state.writes).toEqual([]);
+  });
+
+  it("prunes the practice's expired sign-ins when it records one (#185)", async () => {
+    rows([
+      [/FROM sign_in_events/, null],
+      [
+        /SELECT role,client_id,access_since,email FROM memberships/,
+        { role: "Auditor", client_id: null, email: "lea@practice.example" },
+      ],
+    ]);
+    // The guarded insert wrote the sign-in.
+    d1.state.changes = (sql) =>
+      /^INSERT INTO sign_in_events/.test(sql) ? 1 : 0;
+    await as(lea, () => context("tenant-1"));
+    expect(d1.state.writes.map((w) => w.sql.split(" ")[0])).toEqual([
+      "INSERT",
+      "DELETE",
+    ]);
+    const [insert, prune] = d1.state.writes;
+    expect(prune.sql).toMatch(/^DELETE FROM sign_in_events WHERE tenant_id=\?/);
+    expect(prune.args.slice(0, 2)).toEqual(["tenant-1", "tenant-1"]);
+    expect(
+      Date.parse(insert.args[4] as string) -
+        Date.parse(prune.args[2] as string),
+    ).toBe(signInRetentionDays * 86400000);
+    expect(prune.args[3]).toBe(signInPruneBatch);
+
+    // A prune that fails still lets the request through.
+    d1.state.writes = [];
+    d1.state.failRun = (sql) => /^DELETE FROM sign_in_events/.test(sql);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await expect(as(lea, () => context("tenant-1"))).resolves.toMatchObject({
+        role: "Auditor",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        "Access log: expired sign-ins could not be pruned: D1 busy",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("records no prune when the guarded insert wrote nothing", async () => {
+    rows([
+      [/FROM sign_in_events/, null],
+      [
+        /SELECT role,client_id,access_since,email FROM memberships/,
+        { role: "Auditor", client_id: null, email: "lea@practice.example" },
+      ],
+    ]);
+    // A concurrent request recorded the sign-in first.
+    await as(lea, () => context("tenant-1"));
+    expect(d1.state.writes.map((w) => w.sql.split(" ")[0])).toEqual(["INSERT"]);
   });
 
   it("never refuses a request when the sign-in cannot be recorded", async () => {
@@ -507,5 +580,76 @@ describe("context", () => {
         /memberships|engagement_access/.test(sql.split(" WHERE ")[0]),
       ),
     ).toBe(false);
+  });
+});
+
+describe("pruneSignIns (#185)", () => {
+  it("deletes one practice's sign-ins past the retention period, oldest first, in bounded batches", async () => {
+    const { db, sqlite } = sqliteD1();
+    env.DB = db as unknown as D1Database;
+    for (const t of ["tenant-1", "tenant-2"])
+      sqlite
+        .prepare("INSERT INTO tenants(id,name,created_at) VALUES(?,?,?)")
+        .run(t, t, "2024-01-01T00:00:00.000Z");
+    const at = "2026-11-05T12:00:00.000Z",
+      cutoff = Date.parse(at) - signInRetentionDays * 86400000,
+      iso = (ms: number) => new Date(ms).toISOString();
+    const insert = sqlite.prepare(
+      "INSERT INTO sign_in_events(tenant_id,id,user_id,role,created_at) VALUES(?,?,?,?,?)",
+    );
+    const expired = signInPruneBatch + 3;
+    sqlite.exec("BEGIN");
+    // More expired sign-ins than one batch.
+    for (let i = 0; i < expired; i++)
+      insert.run(
+        "tenant-1",
+        "OLD-" + String(i).padStart(4, "0"),
+        "lea",
+        "Auditor",
+        iso(cutoff - 86400000 - (expired - i) * 1000),
+      );
+    insert.run("tenant-1", "EDGE", "lea", "Auditor", iso(cutoff));
+    insert.run("tenant-1", "NEW", "lea", "Auditor", iso(cutoff + 1));
+    insert.run("tenant-2", "OTHER", "lea", "Auditor", iso(cutoff - 86400000));
+    sqlite.exec("COMMIT");
+    sqlite
+      .prepare(
+        "INSERT INTO management_events(tenant_id,id,actor,action,details,hash,created_at) VALUES('tenant-1','M1','lea','grantMember','{}','h',?)",
+      )
+      .run(iso(cutoff - 86400000));
+    const left = () =>
+      (
+        sqlite
+          .prepare(
+            "SELECT id FROM sign_in_events WHERE tenant_id='tenant-1' ORDER BY created_at,id",
+          )
+          .all() as { id: string }[]
+      ).map((r) => r.id);
+    try {
+      expect(await pruneSignIns("tenant-1", at)).toBe(signInPruneBatch);
+      // The oldest batch went; the newest expired ones wait for the next.
+      expect(left()).toEqual([
+        "OLD-0500",
+        "OLD-0501",
+        "OLD-0502",
+        "EDGE",
+        "NEW",
+      ]);
+      expect(await pruneSignIns("tenant-1", at)).toBe(3);
+      // A sign-in exactly the retention period old is kept.
+      expect(left()).toEqual(["EDGE", "NEW"]);
+      expect(await pruneSignIns("tenant-1", at)).toBe(0);
+      // Another practice's sign-ins and the management events stay.
+      expect(
+        sqlite
+          .prepare("SELECT id FROM sign_in_events WHERE tenant_id='tenant-2'")
+          .all(),
+      ).toEqual([{ id: "OTHER" }]);
+      expect(
+        sqlite.prepare("SELECT COUNT(*) AS n FROM management_events").get(),
+      ).toEqual({ n: 1 });
+    } finally {
+      sqlite.close();
+    }
   });
 });

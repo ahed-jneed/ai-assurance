@@ -9,6 +9,7 @@ import {
 import { db } from "../bindings";
 import { now } from "../ids";
 import { ApiError } from "../http";
+import { canBeAssigned } from "../permissions";
 import {
   onRecordedTeam,
   recordedCoolingOffConflicts,
@@ -83,10 +84,12 @@ export const qualityReview = defineCommands({
           display_name: string | null;
           access: number;
         }>();
+      // The same rule the browser's reviewer picker applies
+      // (app/quality-review-panel.tsx): lib/permissions.ts assignableRoles.
       if (
         !member ||
         member.status !== "active" ||
-        member.role !== qualityReviewerRole
+        !canBeAssigned(member.role, "qualityReviewer")
       )
         throw new ApiError(
           400,
