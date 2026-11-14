@@ -3,7 +3,12 @@ import { Suspense } from "react";
 import { Database, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Artifact, Engagement, EvidenceRequest, Role } from "@/lib/domain";
+import type {
+  Artifact,
+  Engagement,
+  EvidenceRequest,
+  Role,
+} from "@/lib/domain/types";
 import { canSee, isClientRole } from "@/lib/permissions";
 import { evidenceRows as selectEvidence } from "@/lib/register-views";
 import { EvidenceRegister } from "../../audit-registers";

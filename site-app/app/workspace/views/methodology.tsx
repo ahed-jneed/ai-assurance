@@ -144,7 +144,11 @@ export function Methodology({
       </TabsContent>
       <TabsContent value="trail">
         {data.engagement && (
+          // Keyed by engagement so its filters start empty in another
+          // engagement: the trail refuses an event type that engagement
+          // has not recorded (#201).
           <AuditTrail
+            key={data.engagement.id}
             tenantId={data.tenantId}
             engagementId={data.engagement.id}
             version={data.engagement.version}

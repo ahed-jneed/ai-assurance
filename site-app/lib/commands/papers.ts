@@ -1,10 +1,6 @@
 import { z } from "zod";
-import {
-  isReleaseTimeRecord,
-  releaseTimeMessage,
-  type Engagement,
-  type Paper,
-} from "../domain";
+import { isReleaseTimeRecord, releaseTimeMessage } from "../domain/gates";
+import type { Engagement, Paper } from "../domain/types";
 import { id, now, sha256 } from "../ids";
 import { managementSystemView, pinned } from "../criteria/pin";
 import { earlierPhasePapers } from "../domain/management-system";
@@ -252,6 +248,8 @@ export const papers = defineCommands({
     roles: ["Lead Auditor"],
     async handle(e, d, ctx) {
       const p = workingPaper(e, d.paperId);
+      if (p.status === "signed")
+        throw new ApiError(409, "This paper is already signed");
       if (
         p.status !== "reviewed" ||
         !p.reviews.some(

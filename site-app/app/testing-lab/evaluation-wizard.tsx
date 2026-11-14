@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { LabSetup } from "./use-lab-setup";
 import { ModelStep } from "./wizard-model-step";
 import { DataStep } from "./wizard-data-step";

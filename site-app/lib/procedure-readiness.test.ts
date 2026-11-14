@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import { procedureReadiness } from "./procedure-readiness";
 import { seedWorkflow } from "./workflow-seed";
 import { approvedWorkflow, at, engagement } from "./workflow/test-fixtures";

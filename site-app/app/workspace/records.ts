@@ -1,6 +1,6 @@
 // Pure helpers for the records the workspace opens: how a record in the
 // record sheet is recognised, looked up by link kind, titled and refreshed.
-import type { Engagement, Finding, Report } from "@/lib/domain";
+import type { Engagement, Finding, Report } from "@/lib/domain/types";
 import type { WorkspaceData } from "../workspace-types";
 
 /** Engagement records that open in the record sheet and have a link kind. */

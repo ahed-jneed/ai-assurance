@@ -9,7 +9,7 @@ import { caller } from "@/lib/commands/test-fixtures";
 import { resolveNew, injectRegistry } from "@/lib/criteria/pin";
 import { registry } from "@/lib/criteria/registry";
 import { withSamplePack } from "@/lib/criteria/test-bundles";
-import type { Engagement, Report } from "@/lib/domain";
+import type { Engagement, Report } from "@/lib/domain/types";
 import { freshEngagement } from "@/lib/factories";
 import { FrozenReportDetails } from "../report-details";
 import { reportMarkup, type ReportSnapshot } from "./report-markup";

@@ -1,4 +1,4 @@
-import type { Result } from "./domain";
+import type { Result } from "./domain/types";
 /**
  * A finding's primary reference as the registers show it: "Article 10" for
  * an AI Act article, otherwise the citation as recorded, e.g. "ISO/IEC 42001

@@ -1,7 +1,10 @@
 // The audit program's forms: each opens the workflow dialog for one command.
 import type { Dispatch, SetStateAction } from "react";
 import type { WorkspaceData } from "../workspace-types";
-import { isReleaseTimeRecord, releaseTimeAssignmentNote } from "@/lib/domain";
+import {
+  isReleaseTimeRecord,
+  releaseTimeAssignmentNote,
+} from "@/lib/domain/gates";
 import { opinionLabel } from "@/lib/domain/report-model";
 import type { PaperSuggestion } from "@/lib/domain/art50-papers";
 import type {

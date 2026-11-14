@@ -3,7 +3,7 @@ import { useState } from "react";
 import { errorMessage, fetchJson } from "@/lib/fetch-json";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
-import type { Engagement, Report, Role } from "@/lib/domain";
+import type { Engagement, Report, Role } from "@/lib/domain/types";
 import { DossierControls } from "./dossier-controls";
 import { ExportedPapers, type ExportedPaperItem } from "./exported-papers";
 export function PackageIntegrity({

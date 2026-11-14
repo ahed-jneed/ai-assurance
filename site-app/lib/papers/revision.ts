@@ -6,7 +6,13 @@ import { paperAudience } from "../client-projection";
 import { pinned } from "../criteria/pin";
 import { packRulePack } from "../criteria/projection";
 import type { CatalogItem } from "../criteria/types";
-import type { Artifact, Engagement, Finding, Paper, Run } from "../domain";
+import type {
+  Artifact,
+  Engagement,
+  Finding,
+  Paper,
+  Run,
+} from "../domain/types";
 import type { QualityReview } from "../domain/quality-review";
 import { sha256 } from "../ids";
 import type { Acceptance, Declaration, Release } from "../workflow-types";

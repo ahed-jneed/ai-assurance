@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../http";
 import { papers } from "./papers";
+import { paper } from "../workflow/test-fixtures";
 import { caller, stored } from "./test-fixtures";
 
 async function status(run: () => unknown) {
@@ -65,5 +66,42 @@ describe("release-time records in the paper commands", () => {
     );
     expect(code).toBe(400);
     expect(message).toContain("Record results");
+  });
+});
+
+describe("signPaper on a signed paper (#201)", () => {
+  const signed = () =>
+    paper({
+      id: "WP-S",
+      status: "signed",
+      authorId: "user-auditor",
+      reviews: [{ userId: "user-reviewer", revision: 1, at: "2026-11-05" }],
+      signatures: [
+        { userId: "user-lead", revision: 1, at: "2026-11-05", hash: "h" },
+      ],
+    });
+
+  it("says the paper is already signed and changes nothing", async () => {
+    const e = stored();
+    e.papers = [signed()];
+    const before = structuredClone(e);
+    expect(
+      await status(() =>
+        papers.run(e, "signPaper", { paperId: "WP-S" }, caller()),
+      ),
+    ).toEqual([409, "This paper is already signed"]);
+    expect(e).toEqual(before);
+  });
+
+  it("still asks for independent review of an unreviewed paper", async () => {
+    const e = stored();
+    e.papers = [
+      { ...signed(), status: "in_review", reviews: [], signatures: [] },
+    ];
+    expect(
+      await status(() =>
+        papers.run(e, "signPaper", { paperId: "WP-S" }, caller()),
+      ),
+    ).toEqual([400, "Independent review of the current revision is required"]);
   });
 });

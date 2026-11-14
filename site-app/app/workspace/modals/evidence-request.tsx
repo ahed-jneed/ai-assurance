@@ -1,5 +1,5 @@
 "use client";
-import type { Engagement, EvidenceRequest, Paper } from "@/lib/domain";
+import type { Engagement, EvidenceRequest, Paper } from "@/lib/domain/types";
 import { EvidenceRequestForm } from "../../evidence-request-form";
 import type {
   ModalDefinition,

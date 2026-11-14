@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { assertEngagementQuota } from "../../access-policy";
 import { db } from "../../bindings";
-import { roles } from "../../domain";
+import { roles } from "../../domain/types";
 import { resolveNew } from "../../criteria/pin";
 import { freshEngagement } from "../../factories";
 import { ApiError } from "../../http";

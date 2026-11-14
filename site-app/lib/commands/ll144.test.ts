@@ -3,7 +3,7 @@
 // the preparer, the publishable summary and who can read it.
 import { env } from "cloudflare:workers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Artifact, Engagement, Report } from "../domain";
+import type { Artifact, Engagement, Report } from "../domain/types";
 import { getEngagement } from "../engagement-repo";
 import { sha256 } from "../ids";
 import {

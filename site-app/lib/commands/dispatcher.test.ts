@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/workspace/route";
 import { commandModules, dispatch } from "@/lib/commands";
-import { roles, type Engagement, type Role, type Run } from "@/lib/domain";
+import {
+  roles,
+  type Engagement,
+  type Role,
+  type Run,
+} from "@/lib/domain/types";
 import { qualityReviewerOps } from "@/lib/domain/quality-review";
 import { getEngagement, save } from "@/lib/engagement-repo";
 import { evidenceRequestOps } from "@/lib/evidence-requests";
 import { ApiError } from "@/lib/http";
 import { context } from "@/lib/tenancy";
-import { workflowOps } from "@/lib/workflow-service";
+import { workflowOps } from "@/lib/workflow/dispatch";
 import { caller, postRequest, stored } from "./test-fixtures";
 
 // Identity and persistence are faked per test.

@@ -19,7 +19,7 @@ import type {
   Paper,
   Report,
   Role,
-} from "@/lib/domain";
+} from "@/lib/domain/types";
 import { EvidenceDetails } from "../evidence-details";
 import { PackageIntegrity } from "../package-integrity";
 import { RecordDetails } from "../record-details";

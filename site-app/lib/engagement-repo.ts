@@ -1,7 +1,7 @@
 // Engagement persistence: loading and saving an engagement with its snapshot
 // and audit event.
 import { db } from "./bindings";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { migrateClassification } from "./domain/classification";
 import {
   dehydrate,

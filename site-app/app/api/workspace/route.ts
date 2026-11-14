@@ -9,7 +9,7 @@ import {
   workspaceView,
 } from "@/lib/read-models/workspace-view";
 import { context, refuseReadOnly, type Context } from "@/lib/tenancy";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {

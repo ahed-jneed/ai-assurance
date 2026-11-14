@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { ManagementSystemView } from "@/lib/criteria/types";
-import type { Engagement, Finding } from "@/lib/domain";
+import type { Engagement, Finding, SoaEntry } from "@/lib/domain/types";
 import {
   gradeSummary,
   implementationStates,
@@ -19,7 +19,6 @@ import {
   soaSummary,
   type SoaRow,
 } from "@/lib/domain/management-system";
-import type { SoaEntry } from "@/lib/domain/types";
 
 type Act = (op: string, values: Record<string, unknown>) => void;
 type Implementation = NonNullable<SoaEntry["implementation"]>;

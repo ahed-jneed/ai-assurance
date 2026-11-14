@@ -9,6 +9,8 @@ const ci = !!process.env.CI;
 
 export default defineConfig({
   testDir: "e2e",
+  // e2e/*.test.ts are Vitest unit tests of the e2e tooling (vitest.config.ts).
+  testIgnore: /\.test\.ts$/,
   // The specs share one seeded practice and its engagement versions, so they
   // run one at a time, in file order, for a deterministic result.
   fullyParallel: false,

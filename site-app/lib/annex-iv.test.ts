@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import annexMap from "./annex-iv-map.json";
 import { annexIVIndex } from "./annex-iv";
 import { annexIvMapOf, resolveNew } from "./criteria/pin";
-import type { Engagement, Paper } from "./domain";
+import type { Engagement, Paper } from "./domain/types";
 import { artifact, engagement, templatePaper } from "./workflow/test-fixtures";
 
 const section = (e: Engagement, number: number) =>

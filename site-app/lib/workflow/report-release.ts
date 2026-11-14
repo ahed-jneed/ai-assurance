@@ -19,7 +19,7 @@ import {
   currentClientSnapshot,
   legacyPackageMessage,
 } from "../client-projection";
-import { releaseState } from "../workflow-state";
+import { isWithdrawable, releaseState } from "../workflow-state";
 import {
   fail,
   optional,
@@ -212,8 +212,11 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
       r =
         e.reports.find((r) => r.id === a.reportId) ??
         fail(404, "Report not found");
-    if (!["released", "approved"].includes(releaseState(r)))
-      fail(409, "Only an approved or released report can be withdrawn");
+    if (!isWithdrawable(r))
+      fail(
+        409,
+        "Only an approved or released report, or a superseded report the client can still read, can be withdrawn",
+      );
     r.release!.state = "withdrawn";
     r.release!.history.push({
       actor: c.userId,

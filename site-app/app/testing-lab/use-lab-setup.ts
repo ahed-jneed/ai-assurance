@@ -16,7 +16,7 @@ import type {
   Model,
   ModelCard,
   Run,
-} from "@/lib/domain";
+} from "@/lib/domain/types";
 import type { PlanForm } from "@/lib/hosted-statistics";
 import {
   basisFor,

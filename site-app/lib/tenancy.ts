@@ -11,8 +11,7 @@
 import { signInGapHours, signInRetentionDays } from "./access-events";
 import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
-import type { Role } from "./domain";
-import { roles } from "./domain";
+import { roles, type Role } from "./domain/types";
 import {
   qualityReviewerOps,
   qualityReviewerRole,

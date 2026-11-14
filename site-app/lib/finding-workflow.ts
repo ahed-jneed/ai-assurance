@@ -1,5 +1,9 @@
-import { canWrite } from "./domain";
-import type { Artifact, Finding, Role } from "./domain";
+import {
+  canWrite,
+  type Artifact,
+  type Finding,
+  type Role,
+} from "./domain/types";
 import { can } from "./permissions";
 
 export function findingWorkflow(

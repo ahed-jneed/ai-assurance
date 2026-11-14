@@ -1,4 +1,4 @@
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import type { PaperRevision } from "./papers/revision";
 
 /** A working-paper contract document as a leaf of the package proof (#137). */

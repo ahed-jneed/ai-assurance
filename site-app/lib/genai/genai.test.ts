@@ -14,7 +14,7 @@ import {
 } from "../criteria/registry";
 import { criteriaRegistry, pinned, resolveNew } from "../criteria/pin";
 import { coverageFor, offeredViews } from "../criteria/views";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { freshEngagement } from "../factories";
 import { sha256 } from "../ids";
 import {

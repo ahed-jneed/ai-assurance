@@ -1,6 +1,6 @@
 "use client";
 import { AlertTriangle } from "lucide-react";
-import type { Engagement, Finding, Role } from "@/lib/domain";
+import type { Engagement, Finding, Role } from "@/lib/domain/types";
 import { isClientRole } from "@/lib/permissions";
 import { findingRows as selectFindings } from "@/lib/register-views";
 import { FindingRegister } from "../../audit-registers";

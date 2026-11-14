@@ -14,7 +14,7 @@ vi.mock("../ids", () => ({
 }));
 
 import { digest } from "../../../schemas/validate-criteria.mjs";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { freshEngagement, templatePaper } from "../factories";
 import { seedWorkflow } from "../workflow-seed";
 import golden from "./legacy-golden.json";

@@ -28,7 +28,7 @@ import {
   type AttestationSubject,
   type AttestedOp,
 } from "@/lib/attestation";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { errorMessage, FetchError } from "@/lib/fetch-json";
 import type { WorkspaceAct } from "./types";
 

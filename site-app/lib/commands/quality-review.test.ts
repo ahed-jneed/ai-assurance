@@ -1,7 +1,12 @@
 import { env } from "cloudflare:workers";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { roles, type Engagement, type Report, type Role } from "../domain";
+import {
+  roles,
+  type Engagement,
+  type Report,
+  type Role,
+} from "../domain/types";
 import {
   qualityReviewReleaseProblem,
   standBackChecklist,

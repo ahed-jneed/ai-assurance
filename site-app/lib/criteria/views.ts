@@ -2,7 +2,7 @@
 // sections 9.6, 10 and 15.2): which views it offers, and each view computed
 // from the pinned documents, the engagement's sources and the current
 // crosswalks. Server-only (it reads the registry).
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import {
   crosswalkEvaluation,
   evaluate,

@@ -5,7 +5,7 @@ import {
   type EvidenceRequest,
   type Paper,
   type Role,
-} from "./domain";
+} from "./domain/types";
 
 export const evidenceRequestOps = [
   "createEvidenceRequest",

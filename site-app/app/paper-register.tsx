@@ -17,8 +17,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import type { Engagement, Paper, Role } from "@/lib/domain";
-import { isReleaseTimeRecord } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
+import { isReleaseTimeRecord } from "@/lib/domain/gates";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import {
   paperViews,

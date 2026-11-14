@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { Engagement, Paper } from "@/lib/domain";
+import type { Engagement, Paper } from "@/lib/domain/types";
 import { readableResults } from "@/lib/presentation";
 
 /** A copy of a saved paper for editing, with readable result text. */

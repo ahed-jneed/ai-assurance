@@ -3,7 +3,7 @@ import catalog from "./catalog.json";
 import { classification } from "./commands/classification";
 import { reports } from "./commands/reports";
 import { caller } from "./commands/test-fixtures";
-import type { Engagement, Report, RulePackStamp } from "./domain";
+import type { Engagement, Report, RulePackStamp } from "./domain/types";
 import { freshEngagement } from "./factories";
 import { sha256 } from "./ids";
 import { engagementRulePack } from "./rule-pack";

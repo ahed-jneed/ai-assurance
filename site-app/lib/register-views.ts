@@ -1,4 +1,4 @@
-import type { Artifact, Finding, Paper, Report } from "./domain";
+import type { Artifact, Finding, Paper, Report } from "./domain/types";
 import { opinionLabel } from "./domain/report-model";
 export type RegisterQuery = {
   view: string;

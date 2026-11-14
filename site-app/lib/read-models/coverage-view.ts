@@ -9,6 +9,7 @@ import { currentObligations } from "../assurance-store";
 import {
   coverageCsv,
   defaultCoverageFilters,
+  unknownFilters,
   type CoverageFilters,
 } from "../criteria/coverage-filters";
 import { criteriaRegistry, pinned } from "../criteria/pin";
@@ -61,9 +62,12 @@ export async function coverageExport(
   if (!framework) throw new ApiError(400, "Choose a coverage view to export");
   const view = await coverageView(ctx, engagementId, framework);
   if (!("cells" in view)) throw new ApiError(400, "Choose a coverage view");
+  const chosen = { ...defaultCoverageFilters, ...filters },
+    problems = unknownFilters(view, chosen);
+  if (problems.length) throw new ApiError(400, problems.join("; "));
   const safe = (s: string) => s.replace(/[^A-Za-z0-9.-]+/g, "_");
   return {
     filename: `coverage-${safe(engagementId)}-${safe(framework)}.csv`,
-    csv: coverageCsv(view, { ...defaultCoverageFilters, ...filters }),
+    csv: coverageCsv(view, chosen),
   };
 }

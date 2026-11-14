@@ -5,7 +5,7 @@
 // one view, a paper or a form re-renders only what reads the change.
 import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
-import type { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain/types";
 import { clientPortalRoutesFor } from "@/lib/navigation-preferences";
 import { canSeeAccessLog, decisionState } from "@/lib/permissions";
 import { reportTermsFor, type ReportTerms } from "@/lib/domain/report-model";

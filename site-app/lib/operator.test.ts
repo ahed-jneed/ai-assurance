@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report } from "./domain/types";
 import { dehydrate } from "./engagement-storage";
 import { ApiError } from "./http";
 import type { Identity } from "./identity";

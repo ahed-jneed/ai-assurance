@@ -4,7 +4,12 @@ import { commandModules, dispatch } from "@/lib/commands";
 import { assuranceModules } from "@/lib/commands/assurance";
 import { managementModules } from "@/lib/commands/management";
 import { caller, stored } from "@/lib/commands/test-fixtures";
-import { roles, type Engagement, type Finding, type Paper } from "@/lib/domain";
+import {
+  roles,
+  type Engagement,
+  type Finding,
+  type Paper,
+} from "@/lib/domain/types";
 import { qualityReviewerRole } from "@/lib/domain/quality-review";
 import { ApiError } from "@/lib/http";
 import {
@@ -40,11 +45,8 @@ import {
   workflowOf,
   context as workflowContext,
 } from "@/lib/workflow/test-fixtures";
-import {
-  WorkflowError,
-  workflowCommand,
-  workflowOps,
-} from "@/lib/workflow-service";
+import { WorkflowError } from "@/lib/workflow/command";
+import { workflowCommand, workflowOps } from "@/lib/workflow/dispatch";
 
 // The role refusals the server's guards answer with. Any other 403 is a
 // check this test does not know: add its message here once it is a role

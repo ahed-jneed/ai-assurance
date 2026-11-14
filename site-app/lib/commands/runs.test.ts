@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AssuranceRecord } from "../assurance-core";
-import type { Artifact, Engagement, Model } from "../domain";
+import type { Artifact, Engagement, Model } from "../domain/types";
 import { registerProfile, verifyFrozenInputs } from "../evaluation-service";
 import { ApiError } from "../http";
 import { sha256 } from "../ids";

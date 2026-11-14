@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { compareFields } from "@/lib/revision-comparison";
-import type { Paper } from "@/lib/domain";
+import type { Paper } from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 function Comparison({
   history,

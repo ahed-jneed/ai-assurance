@@ -1,7 +1,7 @@
 // Keep runtime imports to small leaf modules (./domain/release-time,
 // ./permissions): the work queue and the paper register run it in the
 // browser.
-import type { Engagement, Report, Run } from "./domain";
+import type { Engagement, Report, Run } from "./domain/types";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import type {
   Brief,
@@ -32,6 +32,15 @@ export const isClientVisible = (report: Report) =>
   !!report.release?.releasedAt &&
   !!report.clientSnapshot &&
   !!report.clientSha256;
+/**
+ * Whether a Lead Auditor may withdraw the report: an approved or released
+ * package, and a superseded one the client can still read (#201). Once its
+ * successor is withdrawn, a superseded report is the client's only report and
+ * must remain withdrawable.
+ */
+export const isWithdrawable = (report: Report) =>
+  ["approved", "released"].includes(releaseState(report)) ||
+  (releaseState(report) === "superseded" && isClientVisible(report));
 /**
  * The user's live client request grants: active, unexpired and, given
  * `since` (the start of the user's current membership grant), issued at or
