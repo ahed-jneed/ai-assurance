@@ -26,7 +26,10 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
   const [hasPendingComment, setHasPendingComment] = useState(false),
     [commentReset, setCommentReset] = useState(0);
   const [discardPaper, setDiscardPaper] = useState(false),
-    [paperConflict, setPaperConflict] = useState(false);
+    [paperConflict, setPaperConflict] = useState(false),
+    // A command from the editor refused as stale (409): the editor offers a
+    // reload in place, beside the toast (#210).
+    [saveConflict, setSaveConflict] = useState("");
   // The saved revision the open draft is compared with, and the selected
   // paper it was last advanced to.
   const [savedPaper, setSavedPaper] = useState<Paper | undefined>(undefined),
@@ -47,6 +50,7 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
   // flagged as a conflict when the revision moved.
   if (selectedPaper !== seenPaper) {
     setSeenPaper(selectedPaper);
+    setSaveConflict("");
     if (selectedPaper) {
       setSavedPaper(selectedPaper);
       if (savedPaper?.id === selectedPaper.id && paperDirty) {
@@ -70,16 +74,19 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
     setSavedPaper(saved);
     setPaperDraft(editableDraft(saved));
     setPaperConflict(false);
+    setSaveConflict("");
   }, []);
   function showPaper(paper: Paper, draft: Paper) {
     setSavedPaper(paper);
     setPaperId(paper.id);
     setPaperDraft(draft);
     setPaperConflict(false);
+    setSaveConflict("");
   }
   function clearPaper() {
     setPaperId(null);
     setPaperDraft(null);
+    setSaveConflict("");
   }
   function forgetSavedPaper() {
     setSavedPaper(undefined);
@@ -116,6 +123,8 @@ export function usePaperEditor(engagement: Engagement | null | undefined) {
     navigationDirty,
     paperConflict,
     setPaperConflict,
+    saveConflict,
+    setSaveConflict,
     hasPendingComment,
     setHasPendingComment,
     commentReset,

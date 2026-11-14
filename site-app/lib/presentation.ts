@@ -1,5 +1,11 @@
 import type { Result } from "./domain/types";
 /**
+ * A count with its noun: "1 request", "2 requests", "1,200 criteria" (with
+ * `many` for an irregular plural). The one pluraliser of the workspace (#216).
+ */
+export const count = (n: number, one: string, many = one + "s") =>
+  n.toLocaleString() + " " + (n === 1 ? one : many);
+/**
  * A finding's primary reference as the registers show it: "Article 10" for
  * an AI Act article, otherwise the citation as recorded, e.g. "ISO/IEC 42001
  * 8.4" on a management-system pack (#144).

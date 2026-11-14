@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  runnerCapabilities,
+  runnerCapabilityInfo,
+} from "@/lib/runner-capabilities";
+import { executionFields } from "./execution-fields";
+import {
   adapterFormatLabel,
   enrolmentFormats,
   predictionOptionLabel,
+  telemetryText,
 } from "./types";
 
 describe("workbench labels (#202)", () => {
@@ -13,9 +19,53 @@ describe("workbench labels (#202)", () => {
       "XGBoost",
       "LightGBM",
       "PMML",
+      "GenAI evidence ingest",
+      "Client-local worker",
     ]);
     expect(adapterFormatLabel("client_local")).toBe("Client-local worker");
     expect(adapterFormatLabel("genai_ingest")).toBe("GenAI evidence ingest");
+    expect(adapterFormatLabel("someFormat")).toBe("some Format");
+  });
+
+  it("offers every capability the server accepts, each with help text (#211)", () => {
+    // The dialog's list is the server's list (lib/runner-capabilities.ts),
+    // which lib/commands/assurance/workers.test.ts enrols one by one.
+    expect(enrolmentFormats).toBe(runnerCapabilities);
+    for (const f of enrolmentFormats)
+      expect(runnerCapabilityInfo[f].help.length, f).toBeGreaterThan(20);
+  });
+
+  it("says the runner image digest is lowercase hexadecimal (#211)", () => {
+    const digest = executionFields({
+      lead: true,
+      artifactOptions: () => [],
+      models: [],
+      profiles: [],
+      procedures: [],
+      options: () => [],
+      members: [],
+      workers: [],
+      activeJobs: [],
+    } as never).enrollWorker.find((f) => f.name === "imageDigest");
+    expect(digest?.help).toBe(
+      "sha256: followed by the 64-character digest in lowercase hexadecimal (0-9, a-f).",
+    );
+  });
+
+  it("pluralises the execution telemetry (#211)", () => {
+    expect(
+      telemetryText({ total: 1, queued: 1, running: 0, stalled: 1 }, 1),
+    ).toBe("1 request · 1 queued · 0 running · 1 expired lease");
+    expect(
+      telemetryText({ total: 1200, queued: 3, running: 2, stalled: 0 }, 50),
+    ).toBe(
+      "1,200 requests · 3 queued · 2 running · 0 expired leases · listing the 50 most recent",
+    );
+    expect(
+      telemetryText({ total: 2, queued: 0, running: 0, stalled: 2 }, 1),
+    ).toBe(
+      "2 requests · 0 queued · 0 running · 2 expired leases · listing the most recent",
+    );
   });
 
   it("labels a prediction lineage by dataset, model version and date, not its id", () => {

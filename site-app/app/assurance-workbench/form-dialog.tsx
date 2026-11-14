@@ -21,6 +21,7 @@ import {
   saveLabels,
 } from "./form-config";
 import { SourceRelations } from "./source-relations";
+import { runnerCapabilityInfo } from "@/lib/runner-capabilities";
 import { adapterFormatLabel, enrolmentFormats, type Field } from "./types";
 import type { WorkbenchForm } from "./use-workbench-form";
 
@@ -218,8 +219,18 @@ export function FormDialog({
                       name="formats"
                       value={f}
                       defaultChecked={f === "provided_predictions"}
+                      aria-label={adapterFormatLabel(f)}
+                      aria-describedby={"capability-help-" + f}
                     />
-                    {adapterFormatLabel(f)}
+                    <span>
+                      {adapterFormatLabel(f)}
+                      <small
+                        className="block subtle"
+                        id={"capability-help-" + f}
+                      >
+                        {runnerCapabilityInfo[f].help}
+                      </small>
+                    </span>
                   </label>
                 ))}
               </section>

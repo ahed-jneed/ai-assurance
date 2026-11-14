@@ -20,7 +20,9 @@ import { clientScope } from "./members";
  * (lib/invitations.ts), whether or not self-signup is allowed. An email that
  * belongs to an active member of this practice (memberships.email) is
  * refused: their access is edited in Members & access. An administrator may
- * cancel a pending invitation, and revoking a member cancels theirs.
+ * cancel a pending invitation, and revoking a member cancels theirs. An
+ * invitation past its expiry is no longer pending: inviting the email again
+ * closes it as 'expired' and records its id in the new invitation's event.
  */
 export const invitations: ManagementModule = defineCommands({
   inviteMember: {
@@ -58,17 +60,38 @@ export const invitations: ManagementModule = defineCommands({
       const clientId = await clientScope(ctx.tenantId, a.role, a.clientId);
       const ids = isClientRole(a.role) ? [] : (a.engagementIds ?? []);
       await checkAssignable(ctx, a.role, a.engagementIds ?? []);
-      if (
+      // An expired invitation is no longer pending (#209): inviting the
+      // email again closes it as expired in the same batch, which frees the
+      // pending-email index for the new one.
+      const open = (
         await db()
           .prepare(
-            "SELECT 1 FROM invitations WHERE tenant_id=? AND email=? AND status='pending'",
+            "SELECT id,expires_at FROM invitations WHERE tenant_id=? AND email=? AND status='pending' ORDER BY created_at",
           )
           .bind(ctx.tenantId, email)
-          .first()
-      )
+          .all<{ id: string; expires_at: string }>()
+      ).results;
+      if (open.some((row) => row.expires_at > timestamp))
         throw new ApiError(
           409,
           "An invitation for this email is already pending. Cancel it to invite again.",
+        );
+      const expiredInvitations = open.map((row) => row.id);
+      if (expiredInvitations.length)
+        statements.push(
+          db()
+            .prepare(
+              "UPDATE invitations SET status='expired',closed_at=? WHERE tenant_id=? AND email=? AND status='pending' AND expires_at<=? AND " +
+                guard,
+            )
+            .bind(
+              timestamp,
+              ctx.tenantId,
+              email,
+              timestamp,
+              ctx.tenantId,
+              commandId,
+            ),
         );
       const invitationId = id("INV"),
         expiresAt = new Date(
@@ -102,6 +125,7 @@ export const invitations: ManagementModule = defineCommands({
         clientId,
         engagementIds: ids,
         expiresAt,
+        ...(expiredInvitations.length ? { expiredInvitations } : {}),
       };
     },
   },

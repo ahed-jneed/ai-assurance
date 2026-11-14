@@ -254,6 +254,12 @@ export function isInternalRole(role: Role | string) {
 }
 
 /**
+ * The engagement staff roles as a sentence lists them, in the permission
+ * map's order: "A, B, C or D".
+ */
+export const staffRoleList = `${staff.slice(0, -1).join(", ")} or ${staff.at(-1)}`;
+
+/**
  * Who may be assigned to work or given access, as the server checks each
  * assignee (lib/workflow/brief-program.ts, monitoring.ts,
  * acceptance-commands.ts, client-grants.ts and

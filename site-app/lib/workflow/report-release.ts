@@ -10,15 +10,14 @@ import { z } from "zod";
 import {
   releaseChecklist,
   releaseChecklistAnswers,
-  releaseRequirements,
   releaseTimeTemplates,
   type ReleaseChecklistRecord,
 } from "../domain/gates";
-import { qualityReviewReleaseProblem } from "../domain/quality-review";
 import {
   currentClientSnapshot,
   legacyPackageMessage,
 } from "../client-projection";
+import { releaseRefusal } from "../preconditions";
 import { isWithdrawable, releaseState } from "../workflow-state";
 import {
   fail,
@@ -122,22 +121,12 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
         .parse(data),
       r =
         e.reports.find((r) => r.id === a.reportId) ??
-        fail(404, "Report not found"),
-      release = r.release;
-    if (
-      release?.state !== "approved" ||
-      release.approval?.internalHash !== r.sha256 ||
-      release.approval.clientHash !== r.clientSha256 ||
-      release.approval.userId === c.userId
-    )
-      fail(
-        409,
-        "A different independent approver must approve both exact packages before release",
-      );
-    if (releaseRequirements(e).length)
-      fail(409, "Resolve current scope/program completion before release");
-    const qualityReview = qualityReviewReleaseProblem(e, r);
-    if (qualityReview) fail(409, qualityReview);
+        fail(404, "Report not found");
+    // The workspace disables Release with the same refusal (#210).
+    const refusal = releaseRefusal(e, r, c.userId);
+    if (refusal) fail(refusal.status, refusal.message);
+    const release = r.release!,
+      approval = release.approval!;
     // Every released report is superseded, so the client never holds two
     // released opinions. A named predecessor must be one of them; without
     // one, the latest is recorded as the predecessor.
@@ -166,14 +155,14 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
       releasedAt: c.at,
       completion: {
         templateIds: [...releaseTimeTemplates],
-        internalHash: release.approval.internalHash,
-        clientHash: release.approval.clientHash,
-        approvedBy: release.approval.userId,
-        approvedAt: release.approval.at,
+        internalHash: approval.internalHash,
+        clientHash: approval.clientHash,
+        approvedBy: approval.userId,
+        approvedAt: approval.at,
         releasedBy: c.userId,
         releasedAt: c.at,
-        ...(release.approval.checklist && {
-          checklist: structuredClone(release.approval.checklist),
+        ...(approval.checklist && {
+          checklist: structuredClone(approval.checklist),
         }),
       },
     });

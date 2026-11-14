@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Result } from "./domain/types";
 import {
+  count,
   diagnosticNarrative,
   humanLabel,
   readableResults,
 } from "./presentation";
+
+describe("count (#216: the one pluraliser)", () => {
+  it("pluralises regular and irregular nouns and groups digits", () => {
+    expect(count(1, "frozen plan")).toBe("1 frozen plan");
+    expect(count(0, "declared bundle")).toBe("0 declared bundles");
+    expect(count(2, "criterion", "criteria")).toBe("2 criteria");
+    expect(count(1200, "request")).toBe("1,200 requests");
+  });
+});
 
 const result: Result = {
   testId: "parity",

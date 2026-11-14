@@ -38,6 +38,18 @@ import {
   type CommandScope,
   type WorkflowHandler,
 } from "./command";
+
+/**
+ * What a procedure still lacks, in words ("sampling and a due date"): a
+ * refusal names only the missing parts, so a set due date is never asked for
+ * again (#211).
+ */
+function lacking(parts: [missing: boolean, name: string][]) {
+  const names = parts.filter(([missing]) => missing).map(([, name]) => name);
+  return names.length > 1
+    ? names.slice(0, -1).join(", ") + " and " + names.at(-1)
+    : names[0];
+}
 const briefFields = z
   .object({
     systemName: short,
@@ -156,7 +168,12 @@ async function revisePlans(
       fail(
         400,
         p.templateId +
-          ": approved work needs a preparer, a reviewer and a deadline",
+          ": approved work needs " +
+          lacking([
+            [!next.ownerId, "a preparer"],
+            [!next.reviewerId, "a reviewer"],
+            [!next.dueDate, "a due date"],
+          ]),
       );
   }
   if (!revisions.length) return;
@@ -471,7 +488,13 @@ export const briefProgramCommands: Record<string, WorkflowHandler> = {
         if (!p.population.trim() || !p.sampling.trim() || !p.dueDate)
           fail(
             400,
-            p.templateId + ": record population, sampling and deadline",
+            p.templateId +
+              ": record " +
+              lacking([
+                [!p.population.trim(), "population"],
+                [!p.sampling.trim(), "sampling"],
+                [!p.dueDate, "a due date"],
+              ]),
           );
         await authorized(p.ownerId, ["Auditor", "Lead Auditor"]);
         await authorized(p.reviewerId, ["Reviewer", "Lead Auditor"]);

@@ -82,6 +82,62 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
   );
   await expect(page.locator("[data-genai-no-ingest-worker]")).toBeVisible();
 
+  // #211: the Lead Auditor enrols a GenAI ingest runner from the Enroll
+  // runner dialog, which offers every capability the server accepts; the
+  // tab then offers Queue ingest. The runner is revoked again afterwards so
+  // the demo engagement keeps no ingest worker.
+  const leadPage = await signIn("qa-lead");
+  await leadPage.goto(
+    workspacePath(demo, "Assurance workbench") + "&section=access",
+  );
+  await leadPage.getByRole("button", { name: "Enroll runner" }).click();
+  const enrol = leadPage.getByRole("dialog", {
+    name: "Enroll a scoped runner",
+  });
+  for (const name of ["GenAI evidence ingest", "Client-local worker"])
+    await expect(enrol.getByRole("checkbox", { name })).toBeVisible();
+  await expect(enrol).toContainText("lowercase hexadecimal");
+  await enrol.getByLabel("Runner name").fill(`GenAI runner ${run}`);
+  await enrol
+    .getByLabel("Approved container image digest")
+    .fill("sha256:" + "e".repeat(64));
+  await enrol
+    .getByLabel("Isolation, egress, resource limits and adapter validation")
+    .fill("Reviewed: no egress, read-only logs, parsers only.");
+  await enrol.getByRole("checkbox", { name: "Provided predictions" }).uncheck();
+  await enrol.getByRole("checkbox", { name: "GenAI evidence ingest" }).check();
+  await enrol.getByRole("button", { name: "Enroll runner" }).click();
+  const credential = leadPage.getByRole("dialog", {
+    name: "Runner credential",
+  });
+  await expect(credential).toBeVisible();
+  const workerId = (await credential.getByText(/^Worker: /).innerText())
+    .replace("Worker: ", "")
+    .trim();
+  const lead = await api("qa-lead");
+  try {
+    await page.reload();
+    await page.getByRole("tab", { name: "GenAI evidence" }).click();
+    // The demo program has no GenAI procedure to freeze a plan for, so the
+    // button stays disabled until a plan and a bundle exist; its labels are
+    // covered by app/genai-ingest-labels.test.ts.
+    await expect(
+      page.getByRole("button", { name: "Queue ingest" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-genai-no-ingest-worker]")).toHaveCount(0);
+  } finally {
+    const revoked = await lead.post("/api/assurance", {
+      tenantId: demo.tenantId,
+      engagementId: demo.engagementId,
+      op: "revokeWorker",
+      data: { workerId, reason: "End of the e2e GenAI ingest check" },
+    });
+    expect(revoked.status(), await revoked.text()).toBe(200);
+  }
+  await page.reload();
+  await page.getByRole("tab", { name: "GenAI evidence" }).click();
+  await expect(page.locator("[data-genai-no-ingest-worker]")).toBeVisible();
+
   // #145: the re-run attestation form pins both inputs of the envelope.
   await page.getByRole("button", { name: "Attest a re-run" }).click();
   const rerun = page.getByRole("dialog", { name: "Attest an auditor re-run" });

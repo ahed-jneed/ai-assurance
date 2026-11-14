@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, parseJsonBody, readJson, responseError } from "./http";
+import {
+  ApiError,
+  parseJsonBody,
+  readBounded,
+  readJson,
+  responseError,
+  trackRequestBody,
+} from "./http";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -87,5 +94,58 @@ describe("request body JSON", () => {
     expect(await response.json()).toEqual({
       error: "The request body is not valid JSON",
     });
+  });
+});
+
+describe("request bodies the app leaves unread (#209)", () => {
+  /** A POST whose body arrives in `chunks` pieces, counting the reads. */
+  function upload(chunks: number) {
+    let delivered = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (delivered === chunks) return controller.close();
+        delivered++;
+        controller.enqueue(new Uint8Array(1024));
+      },
+    });
+    const request = new Request("http://local/api/workspace", {
+      method: "POST",
+      body,
+      duplex: "half",
+    } as RequestInit);
+    return { request, delivered: () => delivered };
+  }
+
+  it("reads nothing until the app asks, then passes the body through", async () => {
+    const source = upload(3);
+    const tracked = trackRequestBody(source.request);
+    expect(source.delivered()).toBeLessThanOrEqual(1);
+    expect((await readBounded(tracked.request, 1 << 20)).byteLength).toBe(3072);
+    await tracked.settle();
+    expect(source.delivered()).toBe(3);
+  });
+
+  it("drains a body the app never read", async () => {
+    const source = upload(5);
+    const tracked = trackRequestBody(source.request);
+    await tracked.settle();
+    expect(source.delivered()).toBe(5);
+  });
+
+  it("drains the rest of a body the app stopped reading with 413", async () => {
+    const source = upload(8);
+    const tracked = trackRequestBody(source.request);
+    await expect(readBounded(tracked.request, 2048)).rejects.toMatchObject({
+      status: 413,
+    });
+    await tracked.settle();
+    expect(source.delivered()).toBe(8);
+  });
+
+  it("leaves a request without a body as it is", async () => {
+    const request = new Request("http://local/api/workspace");
+    const tracked = trackRequestBody(request);
+    expect(tracked.request).toBe(request);
+    await tracked.settle();
   });
 });

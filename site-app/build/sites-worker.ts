@@ -1,12 +1,14 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { trackRequestBody } from "../lib/http";
 import {
   authRoute,
   authenticate,
   identityConfig,
   runWithIdentity,
 } from "../lib/identity";
+import { withResponseStatus } from "../lib/response-status";
 
 /** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
 declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
@@ -51,13 +53,23 @@ export default {
       devServer: import.meta.env.DEV,
       defaultMode: __SITES_IDENTITY_DEFAULT__,
     });
-    const caller = await authenticate(request, config);
-    const route = authRoute(request, config, caller.identity);
-    if (route) return route;
-    return runWithIdentity(caller.identity, () =>
-      runWithConnectorBinding(binding, () =>
-        handler.fetch(caller.request, env, ctx),
-      ),
-    );
+    // Whatever answers, a request body left unread is discarded before the
+    // response goes out, so the connection stays usable (#209).
+    const tracked = trackRequestBody(request);
+    try {
+      const caller = await authenticate(tracked.request, config);
+      const route = authRoute(tracked.request, config, caller.identity);
+      if (route) return route;
+      // A page may record its own status (lib/response-status.ts, #216).
+      return await withResponseStatus(() =>
+        runWithIdentity(caller.identity, () =>
+          runWithConnectorBinding(binding, () =>
+            handler.fetch(caller.request, env, ctx),
+          ),
+        ),
+      );
+    } finally {
+      await tracked.settle();
+    }
   },
 };

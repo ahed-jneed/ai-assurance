@@ -222,6 +222,7 @@ export function RecordSheet({
                       <ReportRelease
                         reports={e?.reports ?? []}
                         report={liveDetail as Report}
+                        engagement={e}
                         role={role}
                         userId={data?.identity.id ?? ""}
                         busy={busy}

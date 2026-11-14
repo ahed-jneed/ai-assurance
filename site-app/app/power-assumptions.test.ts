@@ -205,6 +205,81 @@ describe("the testing lab's power inputs", () => {
     );
   });
 
+  it("states one probability when the bounds are equal, and why a pass is blocked (#211)", () => {
+    const plan = (groupSizes: Record<string, number>) =>
+      power(
+        labPlan("Binary classification", ["demographic_parity"], {
+          demographic_parity: { groupSizes, baselineRate: 0.5 },
+        }),
+      );
+    // One comparison: the lower and upper bounds are the same number.
+    const one = plan({ A: 500, B: 500 });
+    expect(one.passProbability).toBe(one.passProbabilityUpperBound);
+    expect(one.passProbability!).toBeGreaterThan(0);
+    const sentence = powerSentence(one, 0.8);
+    expect(sentence).toMatch(
+      /^If the assumptions hold, a system meeting them would pass with probability \d+%\./,
+    );
+    expect(sentence).not.toContain("between");
+    expect(sentence).not.toContain("cannot pass");
+    // 20 planned rows: below the minimum sample size of 30, and neither group
+    // reaches the minimum group size, so no pair is compared (no members,
+    // null bounds) and the reasons block the pass. It passes with
+    // probability 0, and the sentence says why.
+    const blocked = plan({ A: 10, B: 10 });
+    expect(blocked.status).toBe("computed");
+    expect(blocked.members).toEqual([]);
+    expect([
+      blocked.passProbability,
+      blocked.passProbabilityUpperBound,
+    ]).toEqual([null, null]);
+    expect(blocked.reasons).toEqual(
+      expect.arrayContaining([
+        "below_minimum_sample_size",
+        "insufficient_groups",
+      ]),
+    );
+    const words = powerSentence(blocked, 0.8);
+    expect(words).toContain("would pass with probability 0%.");
+    expect(words).not.toContain("between 0% and 0%");
+    expect(words).toContain(
+      "It cannot pass at the planned size because the planned rows are fewer than the minimum sample size, the groups large enough to compare cover less of the data than the criterion requires and fewer than two groups (or not the reference group) reach the minimum group size.",
+    );
+    // A blocked pass with members (bounds exactly 0) reads the same way.
+    expect(
+      powerSentence(
+        {
+          ...one,
+          passProbability: 0,
+          passProbabilityUpperBound: 0,
+          reasons: ["below_minimum_sample_size"],
+        },
+        0.8,
+      ),
+    ).toContain(
+      "would pass with probability 0%. It cannot pass at the planned size because the planned rows are fewer than the minimum sample size.",
+    );
+    // Distinct bounds still read as a range.
+    expect(
+      powerSentence(
+        { ...one, passProbability: 0.4, passProbabilityUpperBound: 0.6 },
+        0.8,
+      ),
+    ).toContain("would pass with probability between 40% and 60%.");
+    // A group criterion's required size counts rows in each group (#216).
+    expect(
+      powerSentence(
+        {
+          ...one,
+          passProbability: 0.4,
+          passProbabilityUpperBound: 0.4,
+          requiredGroupSizeForPass: 1200,
+        },
+        0.8,
+      ),
+    ).toContain("Reaching 80% needs about 1,200 rows per group.");
+  });
+
   it("waits for the group sizes and needs two groups", () => {
     const [c] = labPlan("Binary classification", ["disparate_impact"]).criteria;
     expect(assumptionsFor(c, { baselineRate: "0.5" }, planned())).toEqual({
@@ -272,7 +347,7 @@ describe("the testing lab's power inputs", () => {
       ["macro_f1", "computed"],
     ]);
     expect(powerSentence(result, 0.8)).toMatch(
-      /^If the assumptions hold, a system meeting them would pass with probability between \d+% and \d+%\.( Reaching 80% needs about [\d,]+ rows\.)? For macro F1 the check assumes that each class's errors are spread evenly over the other classes\.$/,
+      /^If the assumptions hold, a system meeting them would pass with probability (between \d+% and )?\d+%\.( Reaching 80% needs about [\d,]+ rows\.)? For macro F1 the check assumes that each class's errors are spread evenly over the other classes\.$/,
     );
   });
 

@@ -237,7 +237,7 @@ export function reportMarkup(
         </p>
         <h1>{s.engagement.title}</h1>
         <p className="report-meta">
-          {report.id} · Created{" "}
+          {report.id} · {report.releasedAt ? "Released" : "Created"}{" "}
           {new Date(report.createdAt).toLocaleString("en-GB", {
             timeZone: "Europe/Vienna",
           })}{" "}

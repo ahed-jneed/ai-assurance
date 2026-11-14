@@ -44,6 +44,8 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
+import { count } from "@/lib/presentation";
+import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
 
@@ -583,11 +585,7 @@ export function GenaiEvidence({
           type: "select",
           options: (view?.plans ?? []).map((p) => ({
             value: p.id,
-            label:
-              p.id +
-              " · " +
-              (procedures.find((q) => q.id === p.procedureId)?.templateId ??
-                p.procedureId),
+            label: planOptionLabel(p, procedures),
           })),
         },
         {
@@ -596,7 +594,7 @@ export function GenaiEvidence({
           type: "select",
           options: (view?.bundles ?? []).map((b) => ({
             value: b.id,
-            label: b.id + " · " + b.inputArtifactIds.length + " inputs",
+            label: bundleOptionLabel(b),
           })),
         },
       ],
@@ -738,10 +736,13 @@ export function GenaiEvidence({
         )}
         {view && (
           <p className="subtle">
-            {view.plans.length} frozen plans · {view.bundles.length} declared
-            bundles · {view.jobs.length} ingest jobs ·{" "}
-            {view.acknowledgements.length} acknowledgements ·{" "}
-            {view.attestations.length} re-run attestations
+            {[
+              count(view.plans.length, "frozen plan"),
+              count(view.bundles.length, "declared bundle"),
+              count(view.jobs.length, "ingest job"),
+              count(view.acknowledgements.length, "acknowledgement"),
+              count(view.attestations.length, "re-run attestation"),
+            ].join(" · ")}
           </p>
         )}
         {writer && view && !ingestAvailable && (

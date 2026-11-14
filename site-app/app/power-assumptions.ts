@@ -217,6 +217,31 @@ const METRIC_WORDS: Record<string, string> = {
   macro_precision: "macro precision",
 };
 
+/**
+ * Why a computed criterion cannot pass at all, in words: lib/statistics.ts
+ * summarize() sets the pass probability to 0 when the plan blocks a pass, and
+ * a member below its minimum size passes with probability 0.
+ */
+const BLOCKED: Record<string, string> = {
+  below_minimum_sample_size:
+    "the planned rows are fewer than the minimum sample size",
+  insufficient_groups:
+    "fewer than two groups (or not the reference group) reach the minimum group size",
+  insufficient_planned_coverage:
+    "the groups large enough to compare cover less of the data than the criterion requires",
+  undecidable_metric:
+    "the criterion includes a metric that cannot decide a pass",
+  planned_below_minimum:
+    "a planned group or class is below the minimum size for its metric",
+};
+function blockedReasons(power: CriterionPower) {
+  const reasons = new Set([
+    ...power.reasons,
+    ...power.members.flatMap((m) => m.reasons),
+  ]);
+  return [...reasons].flatMap((r) => (BLOCKED[r] ? [BLOCKED[r]] : []));
+}
+
 /** The plain-language result of a criterion's power check. */
 export function powerSentence(power: CriterionPower, target: number) {
   if (power.status !== "computed") {
@@ -244,14 +269,30 @@ export function powerSentence(power: CriterionPower, target: number) {
     );
   }
   const low = power.passProbability ?? 0,
-    high = power.passProbabilityUpperBound ?? 0;
+    high = power.passProbabilityUpperBound ?? low;
+  // One member, or a pass the plan blocks, gives equal bounds: state the one
+  // value rather than "between 0% and 0%" (#211). A group criterion with no
+  // pair of groups large enough to compare has no members and null bounds;
+  // its reasons block the pass, so it passes with probability 0.
+  const probability =
+    share(low) === share(high)
+      ? `probability ${share(low)}`
+      : `probability between ${share(low)} and ${share(high)}`;
+  const blocked = high === 0 ? blockedReasons(power) : [];
   const needed =
     power.requiredNForPass ?? power.requiredGroupSizeForPass ?? null;
   const unit =
-    power.requiredGroupSizeForPass !== undefined ? "per group" : "rows";
+    power.requiredGroupSizeForPass !== undefined ? "rows per group" : "rows";
   const mde = power.failMdeDifference ?? power.failMdeTprDifference ?? null;
   return (
-    `If the assumptions hold, a system meeting them would pass with probability between ${share(low)} and ${share(high)}.` +
+    `If the assumptions hold, a system meeting them would pass with ${probability}.` +
+    (blocked.length
+      ? ` It cannot pass at the planned size because ${
+          blocked.length > 1
+            ? blocked.slice(0, -1).join(", ") + " and " + blocked.at(-1)
+            : blocked[0]
+        }.`
+      : "") +
     (low < target
       ? needed
         ? ` Reaching ${share(target)} needs about ${needed.toLocaleString()} ${unit}.`

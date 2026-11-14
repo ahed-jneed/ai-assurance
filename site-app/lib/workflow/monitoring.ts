@@ -7,6 +7,7 @@
 // follow-up decision may be recorded first and its evidence in a later
 // assessment, before closure.
 import { z } from "zod";
+import { monitoringClosureRefusal } from "../preconditions";
 import type { MonitoringCase } from "../workflow-types";
 import {
   calendarDate,
@@ -16,6 +17,10 @@ import {
   uid,
   type WorkflowHandler,
 } from "./command";
+/** The refusal for assessing or closing a case that is already closed. */
+const closedCase =
+  "This case is already closed. Create a new case for subsequent work";
+
 export const monitoringCommands: Record<string, WorkflowHandler> = {
   async createMonitoringCase({ e, c, writer, authorized, w }, data) {
     writer();
@@ -101,8 +106,7 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
       m =
         w().monitoring.find((q) => q.id === a.caseId) ??
         fail(404, "Follow-up case not found");
-    if (m.state === "closed")
-      fail(409, "Create a new case for subsequent work");
+    if (m.state === "closed") fail(409, closedCase);
     if (a.decision === "no_reassessment" && !a.evidenceIds.length)
       fail(
         400,
@@ -124,31 +128,19 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
     });
     return { caseId: m.id };
   },
-  async closeMonitoringCase({ c, independent, w, accepted }, data) {
+  async closeMonitoringCase({ e, c, independent, w }, data) {
     const a = z.object({ caseId: short, closure: text }).strict().parse(data),
       m =
         w().monitoring.find((q) => q.id === a.caseId) ??
         fail(404, "Follow-up case not found");
+    // A closed case is refused before independence is checked: nobody may
+    // close it again (#209).
+    if (m.state === "closed") fail(409, closedCase);
     independent([...m.contributors, m.ownerId]);
-    if (
-      m.state === "closed" ||
-      m.decision === "not_assessed" ||
-      !m.assessment.trim()
-    )
-      fail(409, "Assess the case before independent closure");
-    if (m.decision === "reassessment_required") {
-      if (!m.successorEngagementId)
-        fail(
-          400,
-          "Open a successor engagement before closing the reassessment case",
-        );
-      if (m.evidenceIds.length) accepted(m.evidenceIds);
-    } else if (!m.evidenceIds.length)
-      fail(
-        400,
-        "Record an assessment with the accepted evidence before independent closure",
-      );
-    else accepted(m.evidenceIds);
+    // One closure rule, which the workspace also shows (#216, as
+    // releaseReport does with releaseRefusal).
+    const refusal = monitoringClosureRefusal(e, m);
+    if (refusal) fail(refusal.status, refusal.message);
     m.history.push({
       at: c.at,
       actor: c.userId,

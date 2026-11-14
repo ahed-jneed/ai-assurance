@@ -8,6 +8,7 @@ import { ExecutionPlanner } from "../testing-readiness";
 import type { Role } from "@/lib/domain/types";
 import {
   label,
+  telemetryText,
   type Act,
   type Engagement,
   type OpenForm,
@@ -63,14 +64,7 @@ export function ExecutionSection({
       <div className="section-toolbar">
         <h2>Execution requests</h2>
         <span className="subtle external-queue-telemetry">
-          {snapshot.telemetry.total.toLocaleString()} requests ·{" "}
-          {snapshot.telemetry.queued.toLocaleString()} queued ·{" "}
-          {snapshot.telemetry.running.toLocaleString()} running ·{" "}
-          {snapshot.telemetry.stalled.toLocaleString()} expired leases
-          {snapshot.telemetry.total > snapshot.jobs.length &&
-            " · listing the " +
-              snapshot.jobs.length.toLocaleString() +
-              " most recent"}
+          {telemetryText(snapshot.telemetry, snapshot.jobs.length)}
         </span>
       </div>
       <div className="assurance-register">

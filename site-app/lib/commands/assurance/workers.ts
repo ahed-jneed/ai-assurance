@@ -4,6 +4,7 @@ import { db } from "../../bindings";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
+import { runnerCapabilities } from "../../runner-capabilities";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
@@ -24,24 +25,11 @@ export const workers: AssuranceModule = defineCommands({
               /^sha256:[a-f0-9]{64}$/,
               "Enter the image digest as sha256: followed by 64 lowercase hexadecimal characters",
             ),
-          // "client_local": the client's own worker, which reads client-held
-          // datasets in the client's environment (#102).
+          // The one capability list the Enroll runner dialog also offers.
           formats: z
-            .array(
-              z.enum([
-                "provided_predictions",
-                "client_local",
-                "ONNX",
-                "XGBoost",
-                "LightGBM",
-                "PMML",
-                // The engine's GenAI ingest (docs/design/genai-evidence.md
-                // section 10.2): parses pinned logs, executes nothing.
-                "genai_ingest",
-              ]),
-            )
+            .array(z.enum(runnerCapabilities))
             .min(1)
-            .max(7),
+            .max(runnerCapabilities.length),
           securityReview: note,
         })
         .strict()

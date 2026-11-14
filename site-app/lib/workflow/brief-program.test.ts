@@ -770,11 +770,16 @@ describe("procedure planning", () => {
   it("keeps approved work assigned and scheduled", async () => {
     const e = structuredEngagement({ artifacts: [artifact()] });
     await approveProgram(e);
-    for (const change of [{ ownerId: "" }, { reviewerId: "" }, { dueDate: "" }])
+    for (const [change, missing] of [
+      [{ ownerId: "" }, "a preparer"],
+      [{ reviewerId: "" }, "a reviewer"],
+      [{ dueDate: "" }, "a due date"],
+      [{ ownerId: "", dueDate: "" }, "a preparer and a due date"],
+    ] as const)
       await expectFailure(
         save(e, change, "lead"),
         400,
-        "WP-A10-01: approved work needs a preparer, a reviewer and a deadline",
+        "WP-A10-01: approved work needs " + missing,
       );
     // A program back in draft can be incomplete until it is submitted.
     await save(e, { dueDate: "", sampling: "Stratified sample of 40" }, "lead");
@@ -1127,10 +1132,25 @@ describe("program submission", () => {
     );
   });
 
-  it("needs population, sampling, a deadline and assigned people for work in scope", async () => {
-    const incomplete = "WP-A10-01: record population, sampling and deadline";
-    for (const plan of [{ population: " " }, { sampling: "" }, { dueDate: "" }])
-      await expectFailure(submit(await prepared(plan)), 400, incomplete);
+  it("needs population, sampling, a due date and assigned people for work in scope", async () => {
+    // The refusal names only what is missing: a set due date is never asked
+    // for again (#211).
+    for (const [plan, missing] of [
+      [{ population: " " }, "population"],
+      [{ sampling: "" }, "sampling"],
+      [{ dueDate: "" }, "a due date"],
+      [{ population: "", sampling: "" }, "population and sampling"],
+      [{ sampling: "", dueDate: "" }, "sampling and a due date"],
+      [
+        { population: "", sampling: "", dueDate: "" },
+        "population, sampling and a due date",
+      ],
+    ] as const)
+      await expectFailure(
+        submit(await prepared(plan)),
+        400,
+        "WP-A10-01: record " + missing,
+      );
     await expectFailure(
       submit(await prepared({ reviewerId: "" })),
       400,
@@ -1182,7 +1202,7 @@ describe("program submission", () => {
     await expectFailure(
       command(e, "saveProcedurePlan", planSave(e, { dueDate: "" }), "lead"),
       400,
-      "WP-A10-01: approved work needs a preparer, a reviewer and a deadline",
+      "WP-A10-01: approved work needs a due date",
     );
   });
 

@@ -128,5 +128,5 @@ test("retired and release-time records explain why they do not change", async ({
   await page.getByRole("button", { name: "Decisions needed" }).click();
   const row = page.getByRole("row").filter({ hasText: "WP-RP-02" });
   await expect(row).toContainText("Recorded at release");
-  await expect(row).not.toContainText("Deadline needed");
+  await expect(row).not.toContainText("Due date needed");
 });

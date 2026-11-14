@@ -1,5 +1,6 @@
-import type { Report, Role } from "./domain/types";
+import type { Engagement, Report, Role } from "./domain/types";
 import { can, isClientRole } from "./permissions";
+import { releaseRefusal } from "./preconditions";
 
 /**
  * The date a captured report states: its report date element, else the
@@ -16,6 +17,20 @@ export function reportDate(snapshot: Record<string, unknown>) {
     element?.value ||
     (typeof snapshot.createdAt === "string" ? snapshot.createdAt : "")
   );
+}
+
+/**
+ * The time a report row shows and its label (#210): the client projection
+ * carries the release time, which the client sees as "Released"; a staff
+ * record shows its capture time.
+ */
+export function reportTime(report: {
+  createdAt?: string;
+  releasedAt?: string;
+}) {
+  return report.releasedAt
+    ? { label: "Released", at: report.releasedAt }
+    : { label: "Captured", at: report.createdAt ?? "" };
 }
 
 export function packageStatus(report: Report, clientView = false) {
@@ -43,14 +58,21 @@ export function packageStatusLabel(report: Report, clientView = false) {
 
 /**
  * What comes next for a captured package, by its state (#202): the
- * pre-release guidance only while a final package awaits approval.
+ * pre-release guidance only while a final package awaits approval. With the
+ * engagement, an approved package that the server would still refuse to
+ * release (an Engagement Quality Reviewer's sign-off outstanding, open
+ * completion work) names what it awaits, in the server's words (#210).
  */
-export function packageGuidance(report: Report) {
+export function packageGuidance(report: Report, engagement?: Engagement) {
   switch (packageStatus(report)) {
     case "draft":
       return "Drafts are internal review snapshots.";
-    case "approved":
-      return "Both package versions are approved. A Lead Auditor other than the approver authorizes the client release.";
+    case "approved": {
+      const refusal = engagement && releaseRefusal(engagement, report);
+      return refusal
+        ? "Both package versions are approved. " + refusal.message + "."
+        : "Both package versions are approved. A Lead Auditor other than the approver authorizes the client release.";
+    }
     case "released":
       return "Released to the client. A newer released report supersedes it; a Lead Auditor can withdraw it.";
     case "superseded":
