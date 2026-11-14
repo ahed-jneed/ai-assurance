@@ -105,6 +105,10 @@ export const classification = defineCommands({
     roles: ["Reviewer", "Lead Auditor"],
     async handle(e, d, ctx) {
       requireFeature(e, "aiActClassification");
+      // Approving twice would attest a second approval event and overwrite
+      // who approved and when (#226 item 1).
+      if (e.classification.status === "approved")
+        throw new ApiError(409, "This classification is already approved");
       const classifiedEvent = await db()
         .prepare(
           "SELECT actor FROM audit_events WHERE tenant_id=? AND engagement_id=? AND action=? ORDER BY created_at DESC LIMIT 1",
