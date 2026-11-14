@@ -86,7 +86,11 @@ describe("the protocol form's plan", () => {
       "disparate_impact",
     ]);
     expect(describePlan(plan).join("\n")).toMatch(
-      /disparate_impact: selection-rate ratio within \[0\.8, 1\.25\].*screening heuristic/,
+      /Disparate impact: selection-rate ratio within \[0\.8, 1\.25\].*\[(?:Confirmatory|Exploratory)\].*screening heuristic/,
+    );
+    // No criterion id or role reaches the text as a code (#234 item 6).
+    expect(describePlan(plan).join("\n")).not.toMatch(
+      /\b[a-z]+_[a-z_]+\b|\[(?:confirmatory|exploratory)\]/,
     );
   });
 

@@ -20,6 +20,7 @@ import {
   protocolConfigKeys,
 } from "@/lib/evaluation";
 import {
+  fieldValue,
   findingReference,
   humanLabel,
   readableResults,
@@ -110,17 +111,8 @@ function PlainValue({
             ? resolve(value)
             : name === "results"
               ? readableResults(value)
-              : [
-                    "action",
-                    "status",
-                    "state",
-                    "kind",
-                    "outcome",
-                    "conclusionStatus",
-                    "automationMode",
-                  ].includes(name)
-                ? humanLabel(value)
-                : value}
+              : // A coded value (an outcome, a policy source) by its label.
+                fieldValue(name, value)}
       </span>
     );
   if (Array.isArray(value)) {

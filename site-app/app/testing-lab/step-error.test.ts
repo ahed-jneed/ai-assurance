@@ -121,6 +121,11 @@ describe("step 1: the dataset", () => {
       "Inspect the dataset before continuing.",
     );
   });
+  it("keeps the server's reason when the dataset could not be inspected (#234 item 7)", () => {
+    const reason =
+      "Interactive diagnostics accept at most 10,000 rows; use the Python worker for larger datasets";
+    expect(step1({ inspect: null, inspectError: reason })).toBe(reason);
+  });
   it("needs each required column mapped to a present column", () => {
     expect(step1({ inspect: inspection([{ name: "actual" }]) })).toBe(
       "Map each required column.",

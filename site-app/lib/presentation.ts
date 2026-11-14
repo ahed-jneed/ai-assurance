@@ -74,6 +74,42 @@ const valueNames: Record<string, string> = {
  */
 export const valueLabel = (value: string) =>
   Object.hasOwn(valueNames, value) ? valueNames[value] : humanLabel(value);
+
+/**
+ * The fields whose string values are coded (an outcome, a method, a policy
+ * source), which a record or a revision comparison shows by their label
+ * (#234 item 6).
+ */
+export const codedFields: ReadonlySet<string> = new Set([
+  "action",
+  "applicability",
+  "automationMode",
+  "conclusion",
+  "conclusionStatus",
+  "decision",
+  "kind",
+  "method",
+  "outcome",
+  "source",
+  "split",
+  "state",
+  "status",
+]);
+/**
+ * Whether a value is a code: one word, or words joined by underscores or in
+ * camel case, starting in lower case ("supported", "internal_policy").
+ */
+export const isCode = (value: string) =>
+  /^[a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)*$/.test(value);
+/**
+ * A field's value as the page shows it: a boolean as Yes or No, and a coded
+ * field's code by its label (valueLabel). Free text stays as written.
+ */
+export function fieldValue(key: string, value: unknown) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  const text = String(value);
+  return codedFields.has(key) && isCode(text) ? valueLabel(text) : text;
+}
 const PAIRWISE_SHOWN = 6;
 /** The metrics a narrative lists: all of them, except that a long list of pairwise comparisons keeps the deciding one and the first few. */
 function narrativeMetrics(result: Result) {

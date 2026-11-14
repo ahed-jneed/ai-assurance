@@ -10,6 +10,8 @@ export type StepState = {
   model: Model | undefined;
   draft: Draft;
   inspect: Inspection | null;
+  /** Why the dataset could not be inspected, as the server said. */
+  inspectError?: string;
   /** The suite holds a fairness test. */
   fair: boolean;
   /** A saved protocol is reused, so its criteria are frozen. */
@@ -25,6 +27,7 @@ export function stepError({
   model,
   draft,
   inspect,
+  inspectError,
   fair,
   locked,
   planned,
@@ -42,7 +45,8 @@ export function stepError({
           ? "Protocol and model tasks must match."
           : "";
   if (step === 1) {
-    if (!inspect) return "Inspect the dataset before continuing.";
+    if (!inspect)
+      return inspectError || "Inspect the dataset before continuing.";
     const required = [
       draft.config.labelColumn,
       draft.config.predictionColumn,

@@ -44,7 +44,7 @@ export function ProcedurePlan({
         </div>
         <div>
           <dt>Method</dt>
-          <dd>{p.method}</dd>
+          <dd>{label(p.method)}</dd>
         </div>
       </dl>
       {[

@@ -11,6 +11,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
+import { valueLabel } from "@/lib/presentation";
 import type { Draft } from "./drafts";
 import { Field, SelectField } from "./lab-ui";
 import type { LabSetup } from "./use-lab-setup";
@@ -22,8 +23,17 @@ const contextFields = {
 } as const;
 
 export function DataStep({ setup }: { setup: LabSetup }) {
-  const { inspect, inspecting, draft, setDraft, config, locked, model, cols } =
-    setup;
+  const {
+    inspect,
+    inspecting,
+    inspectError,
+    draft,
+    setDraft,
+    config,
+    locked,
+    model,
+    cols,
+  } = setup;
   return (
     <>
       {inspect ? (
@@ -99,10 +109,14 @@ export function DataStep({ setup }: { setup: LabSetup }) {
           </details>
         </>
       ) : (
-        <p className="subtle">
+        <p className={inspectError && !inspecting ? "form-error" : "subtle"}>
           {inspecting
             ? "Inspecting dataset…"
-            : "Dataset inspection is unavailable."}
+            : // The server's reason (a row or column limit), not a generic
+              // line, once the step-1 alert is gone (#234 item 7).
+              inspectError
+              ? "Dataset inspection is unavailable: " + inspectError
+              : "Dataset inspection is unavailable."}
         </p>
       )}
       <SelectField
@@ -120,7 +134,7 @@ export function DataStep({ setup }: { setup: LabSetup }) {
         }
         options={["test", "validation", "training", "unknown"].map((v) => ({
           value: v,
-          label: v,
+          label: valueLabel(v),
         }))}
       />
       {(Object.keys(contextFields) as (keyof typeof contextFields)[]).map(

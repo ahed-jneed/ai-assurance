@@ -79,6 +79,9 @@ export function useLabSetup({
     [draft, setDraft] = useState<Draft>(emptyDraft()),
     [inspect, setInspect] = useState<Inspection | null>(null),
     [inspecting, setInspecting] = useState(false),
+    // Why the dataset could not be inspected, in the server's words (a row
+    // or column limit, #234 item 7), kept for the Data step.
+    [inspectError, setInspectError] = useState(""),
     [error, setError] = useState(""),
     [saveOnly, setSaveOnly] = useState(false),
     [discard, setDiscard] = useState<null | "registration" | "wizard">(null),
@@ -179,6 +182,7 @@ export function useLabSetup({
     [inspectedFor, setInspectedFor] = useState("");
   if (inspectedFor !== inspectKey) {
     setInspectedFor(inspectKey);
+    setInspectError("");
     if (inspectKey) {
       setInspect(null);
       setInspecting(true);
@@ -227,7 +231,9 @@ export function useLabSetup({
         if (active) applyInspection(value);
       })
       .catch((err) => {
-        if (active) setError(err.message);
+        if (!active) return;
+        setError(err.message);
+        setInspectError(err.message);
       })
       .finally(() => {
         if (active) setInspecting(false);
@@ -294,6 +300,7 @@ export function useLabSetup({
       model,
       draft,
       inspect,
+      inspectError,
       fair,
       locked,
       planned,
@@ -409,6 +416,7 @@ export function useLabSetup({
     config,
     planForm,
     inspect,
+    inspectError,
     inspecting,
     saveOnly,
     setSaveOnly,

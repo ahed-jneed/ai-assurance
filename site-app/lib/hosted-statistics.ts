@@ -6,6 +6,7 @@
 // It mirrors engine/criteria.py, so a hosted run and the engine report on
 // the same rows carry the same decisions.
 import type { Metric, Result } from "./domain/types";
+import { humanLabel, valueLabel } from "./presentation";
 import {
   LIBRARY,
   StatisticsError,
@@ -727,7 +728,8 @@ export function describePlan(plan: Plan) {
           );
     const library = c.libraryEntry ? LIBRARY[c.libraryEntry.id] : null;
     return (
-      `${c.id}: ${terms.join(", ") || "no threshold"} [${c.role}]` +
+      // The criterion and its role by their labels (#234 item 6).
+      `${humanLabel(c.id)}: ${terms.join(", ") || "no threshold"} [${valueLabel(c.role)}]` +
       (library
         ? ` — ${c.libraryEntry!.id}@${c.libraryEntry!.version} (${library.legalStatus.replaceAll("_", " ")})`
         : "")
