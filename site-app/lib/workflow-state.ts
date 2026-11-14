@@ -1,6 +1,7 @@
-// Keep runtime imports to small leaf modules (./domain/release-time): the
-// work queue and the paper register run it in the browser.
-import type { Engagement, Report, Role, Run } from "./domain";
+// Keep runtime imports to small leaf modules (./domain/release-time,
+// ./permissions): the work queue and the paper register run it in the
+// browser.
+import type { Engagement, Report, Run } from "./domain";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import type {
   Brief,
@@ -10,15 +11,9 @@ import type {
   Workflow,
 } from "./workflow-types";
 import type { DraftKind } from "./workspace-state";
-export const isClientRole = (role: Role | string) =>
-  role === "Client Viewer" || role === "Client Contributor";
-export const isInternalRole = (role: Role | string) =>
-  [
-    "Auditor",
-    "Lead Auditor",
-    "Reviewer",
-    "Engagement Quality Reviewer",
-  ].includes(role);
+// The role groups live in the permission map; re-exported for the server
+// code that has always read them from here.
+export { isClientRole, isInternalRole } from "./permissions";
 export const releaseState = (report: Report) =>
   report.release?.state ?? "internal";
 export const isReleased = (report: Report) =>

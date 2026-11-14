@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { postJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { WorkflowDialog } from "./audit-program";
@@ -127,24 +128,16 @@ export function DatasetRegistry({
         setBusy(true);
         try {
           const { baselineDatasetRecordId, ...rest } = values;
-          const r = await fetch("/api/assurance", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                tenantId,
-                engagementId: e.id,
-                op: "registerDataset",
-                data: {
-                  schemaVersion: "1.0",
-                  ...rest,
-                  ...(baselineDatasetRecordId
-                    ? { baselineDatasetRecordId }
-                    : {}),
-                },
-              }),
-            }),
-            v = (await r.json()) as { error?: string };
-          if (!r.ok) throw Error(v.error);
+          await postJson<unknown>("/api/assurance", {
+            tenantId,
+            engagementId: e.id,
+            op: "registerDataset",
+            data: {
+              schemaVersion: "1.0",
+              ...rest,
+              ...(baselineDatasetRecordId ? { baselineDatasetRecordId } : {}),
+            },
+          });
           await refreshAfterMutation(
             { tenantId, engagementId: e.id },
             onRefresh,

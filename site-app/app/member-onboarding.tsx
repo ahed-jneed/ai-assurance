@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { canAssignEngagementAccess } from "@/lib/permissions";
+import {
+  canAssignEngagementAccess,
+  canBeAssigned,
+  isClientRole,
+} from "@/lib/permissions";
 import {
   Dialog,
   DialogContent,
@@ -56,7 +60,8 @@ export function MemberOnboarding({
     onEditing(open);
     return () => onEditing(false);
   }, [open, onEditing]);
-  const client = ["Client Viewer", "Client Contributor"].includes(role),
+  const client = isClientRole(role),
+    requestHolder = canBeAssigned(role, "clientRequest"),
     canAssign = canAssignEngagementAccess(data.identity),
     e = data.engagement;
   function close() {
@@ -340,12 +345,12 @@ export function MemberOnboarding({
                 explicitly shared material.
               </p>
             )}
-            {role === "Client Contributor" && byEmail && (
+            {requestHolder && byEmail && (
               <p className="subtle">
                 Assign evidence requests after they accept the invitation.
               </p>
             )}
-            {role === "Client Contributor" && !byEmail && (
+            {requestHolder && !byEmail && (
               <>
                 <h3>Evidence requests</h3>
                 {(!canAssign || !e?.workflow || e.clientId !== clientId) && (
@@ -474,7 +479,7 @@ export function MemberOnboarding({
               <div className="business-alert">
                 {!siteReady
                   ? "Application access is configured. Site sharing remains pending."
-                  : role === "Client Contributor" && !requests.length
+                  : requestHolder && !requests.length
                     ? "Membership is configured. Assign an evidence request to enable contributions."
                     : !client && !engagements.length
                       ? "Membership is configured. A Lead must assign an engagement."

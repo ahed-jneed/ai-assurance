@@ -1,3 +1,5 @@
+import { isClientRole } from "./permissions";
+
 export const navigationRoutes = [
   "My work",
   "Overview",
@@ -33,7 +35,7 @@ export const permittedNavigationRoutes = (
   role: string,
   hasEngagement: boolean,
 ): NavigationRoute[] => {
-  const client = ["Client Viewer", "Client Contributor"].includes(role);
+  const client = isClientRole(role);
   return navigationRoutes.filter((route) =>
     route === "My work"
       ? !client

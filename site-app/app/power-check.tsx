@@ -7,6 +7,7 @@
 // recorded acknowledgement, not a block.
 import { useEffect, useEffectEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { fetchJson } from "@/lib/fetch-json";
 import { Textarea } from "@/components/ui/textarea";
 import { criterionPower, type Plan } from "@/lib/statistics";
 import {
@@ -46,7 +47,6 @@ export function powerShortfalls(plan: Plan) {
 type Inspection = {
   values?: Record<string, string[] | null>;
   counts?: Record<string, { value: string; count: number }[] | null>;
-  error?: string;
 };
 
 /** Sends the assumptions the inputs and planned sizes give per criterion. */
@@ -128,12 +128,9 @@ export function PowerCheck({
     const query = new URLSearchParams({ tenantId, engagementId, artifactId });
     if (groupColumn) query.append("counts", groupColumn);
     if (labelColumn) query.append("values", labelColumn);
-    fetch("/api/evaluation/dataset?" + query, { signal: controller.signal })
-      .then(async (r) => {
-        const value = (await r.json()) as Inspection;
-        if (!r.ok) throw Error(value.error ?? "Dataset inspection failed");
-        return value;
-      })
+    fetchJson<Inspection>("/api/evaluation/dataset?" + query, {
+      signal: controller.signal,
+    })
       .then((value) => {
         if (!active) return;
         const counts = groupColumn ? value.counts?.[groupColumn] : undefined,

@@ -1,4 +1,5 @@
 import type { Report, Role } from "./domain";
+import { can, isClientRole } from "./permissions";
 
 /**
  * The date a captured report states: its report date element, else the
@@ -41,19 +42,18 @@ export function packageStatusLabel(report: Report, clientView = false) {
 }
 
 export function packageOpenLabel(report: Report, role: Role, userId: string) {
-  if (["Client Viewer", "Client Contributor"].includes(role))
-    return "View report";
+  if (isClientRole(role)) return "View report";
   const state = packageStatus(report);
   if (
     state === "internal" &&
-    ["Reviewer", "Lead Auditor"].includes(role) &&
+    can(role, "approveReportPackage") &&
     report.actor !== userId &&
     report.snapshot.workflow
   )
     return "Review approval";
   if (
     state === "approved" &&
-    role === "Lead Auditor" &&
+    can(role, "releaseReport") &&
     report.release?.approval?.userId !== userId
   )
     return "Review release";

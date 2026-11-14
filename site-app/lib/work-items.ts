@@ -4,6 +4,7 @@ import {
   qualityReviewSignedOff,
 } from "./domain/quality-review";
 import { isReleaseTimeRecord } from "./domain/release-time";
+import { duties, isClientRole } from "./permissions";
 import { currentExecution } from "./workflow-state";
 import { stagePaperQueue } from "./auditor-workflow";
 import { paperNextAction } from "./paper-workflow";
@@ -168,13 +169,14 @@ export function engagementWork(
   today = localWorkDay(),
   options: EngagementWorkOptions = {},
 ): WorkItem[] {
-  if (["Client Viewer", "Client Contributor"].includes(role)) return [];
+  if (isClientRole(role)) return [];
   const { rules } = options,
     nameOf = options.nameOf ?? (() => undefined);
   const result: WorkItem[] = [],
-    lead = role === "Lead Auditor",
-    reviewer = ["Reviewer", "Lead Auditor"].includes(role),
-    writer = ["Auditor", "Lead Auditor"].includes(role);
+    duty = duties(role),
+    lead = duty.authorize,
+    reviewer = duty.review,
+    writer = duty.prepare;
   const add = (
     kind: WorkItem["kind"],
     recordId: string,
@@ -678,12 +680,8 @@ export function engagementWork(
   // The engagement quality review is the appointed reviewer's own work, and
   // the only work an Engagement Quality Reviewer sees: they change nothing else.
   const eqr = e.qualityReview;
-  if (role === "Engagement Quality Reviewer") result.length = 0;
-  if (
-    eqr &&
-    role === "Engagement Quality Reviewer" &&
-    eqr.reviewerId === userId
-  ) {
+  if (duty.qualityReview) result.length = 0;
+  if (eqr && duty.qualityReview && eqr.reviewerId === userId) {
     const problem = checklistProblem(eqr),
       unsigned = e.reports.filter(
         (r) =>

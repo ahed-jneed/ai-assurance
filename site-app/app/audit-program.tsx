@@ -51,7 +51,12 @@ import {
   runBindsProcedure,
 } from "@/lib/workflow-state";
 import type { WorkspaceData } from "./workspace-types";
-import { can, decisionState } from "@/lib/permissions";
+import {
+  can,
+  canBeAssigned,
+  decisionState,
+  type Assignment,
+} from "@/lib/permissions";
 import { useAttest } from "./workspace/attestation-dialog";
 import { DecisionButton } from "./workspace/decision-button";
 import { FrozenReportDetails } from "./report-details";
@@ -445,7 +450,16 @@ export function AuditProgram({
     // Coarse flags for the program's sections; decisions check their own op.
     writer = can(role, "recordProcedureExecution"),
     lead = can(role, "approveAcceptance"),
-    reviewer = can(role, "reviewProcedure");
+    reviewer = can(role, "reviewProcedure"),
+    // Planning narrows to a Lead Auditor once the program is submitted.
+    planState = decisionState(role, uid, {
+      action: "saveProcedurePlan",
+      engagement: e,
+    }),
+    bulkPlan = decisionState(role, uid, {
+      action: "bulkPlanProcedures",
+      engagement: e,
+    });
   const attest = useAttest();
   const memoryKey = data.tenantId + ":" + uid + ":" + e.id,
     memory = programViewMemory.get(memoryKey);
@@ -516,9 +530,11 @@ export function AuditProgram({
     if (selected) reportLocation(selected, section);
   }, [selected, section, availableInitialProcedure, initialSection, form]);
   const p = w?.procedures.find((p) => p.id === selected),
-    people = (allowed: Role[]) =>
+    people = (assignment: Assignment) =>
       data.people
-        .filter((m) => m.status === "active" && allowed.includes(m.role))
+        .filter(
+          (m) => m.status === "active" && canBeAssigned(m.role, assignment),
+        )
         .map((m) => ({
           value: m.user_id,
           label: m.display_name + " · " + m.role,
@@ -644,18 +660,12 @@ export function AuditProgram({
         p.sampling,
         releaseTime,
       ),
-      choice(
-        "ownerId",
-        "Preparer",
-        people(["Auditor", "Lead Auditor"]),
-        p.ownerId,
-        releaseTime,
-      ),
+      choice("ownerId", "Preparer", people("preparer"), p.ownerId, releaseTime),
       choice(
         "reviewerId",
         "Independent reviewer",
         // Saving makes you a contributor, so you cannot review it either.
-        people(["Reviewer", "Lead Auditor"]).filter(
+        people("reviewer").filter(
           (x) =>
             x.value !== p.ownerId &&
             x.value !== uid &&
@@ -875,17 +885,11 @@ export function AuditProgram({
       description:
         "Only the fields you choose will change. The program approval and recorded work stay valid; reviewed work keeps its reviewer.",
       fields: [
-        choice(
-          "ownerId",
-          "Preparer",
-          people(["Auditor", "Lead Auditor"]),
-          "",
-          true,
-        ),
+        choice("ownerId", "Preparer", people("preparer"), "", true),
         choice(
           "reviewerId",
           "Independent reviewer",
-          people(["Reviewer", "Lead Auditor"]).filter((x) => x.value !== uid),
+          people("reviewer").filter((x) => x.value !== uid),
           "",
           true,
         ),
@@ -914,11 +918,7 @@ export function AuditProgram({
         ),
         { name: "title", label: "Subject" },
         area("description", "Trigger, risk and work needed"),
-        choice(
-          "ownerId",
-          "Responsible auditor",
-          people(["Auditor", "Lead Auditor"]),
-        ),
+        choice("ownerId", "Responsible auditor", people("preparer")),
         { name: "dueDate", label: "Due date", type: "date" },
         choice(
           "cadence",
@@ -1182,13 +1182,18 @@ export function AuditProgram({
               </p>
             )}
             <div className="row-actions">
-              {writer &&
-                b?.status !== "submitted" &&
-                (b?.status !== "approved" || lead) && (
-                  <Button disabled={busy} onClick={brief}>
-                    {b ? "Revise scope" : "Complete brief"}
-                  </Button>
-                )}
+              {b?.status !== "submitted" && (
+                <DecisionButton
+                  state={decisionState(role, uid, {
+                    action: "saveBrief",
+                    engagement: e,
+                  })}
+                  disabled={busy}
+                  onClick={brief}
+                >
+                  {b ? "Revise scope" : "Complete brief"}
+                </DecisionButton>
+              )}
               {writer && b?.status === "draft" && (
                 <Button
                   variant="outline"
@@ -1243,11 +1248,17 @@ export function AuditProgram({
                 </small>
               </div>
               <div className="row-actions">
-                {writer && (w.program.status === "draft" || lead) && (
-                  <Button variant="outline" disabled={busy} onClick={bulk}>
-                    Assess candidates
-                  </Button>
-                )}
+                <DecisionButton
+                  state={decisionState(role, uid, {
+                    action: "scopeProgramCandidates",
+                    engagement: e,
+                  })}
+                  variant="outline"
+                  disabled={busy}
+                  onClick={bulk}
+                >
+                  Assess candidates
+                </DecisionButton>
                 {writer && w.program.status === "draft" && (
                   <Button
                     disabled={busy || b?.status !== "approved"}
@@ -1366,18 +1377,15 @@ export function AuditProgram({
                   Select visible procedures
                 </label>
                 <span>{batchIds.length} selected</span>
-                <Button
+                <DecisionButton
                   size="sm"
                   variant="outline"
-                  disabled={
-                    busy ||
-                    !batchIds.length ||
-                    (w.program.status !== "draft" && !lead)
-                  }
+                  state={bulkPlan}
+                  disabled={busy || !batchIds.length}
                   onClick={staffing}
                 >
                   Assign & schedule
-                </Button>
+                </DecisionButton>
                 {!!batchIds.length && (
                   <Button
                     size="sm"
@@ -1913,11 +1921,7 @@ export function AuditProgram({
                         <Art50Suggestion
                           suggestion={s}
                           current={p.applicability}
-                          canUse={
-                            writer &&
-                            (w.program.status === "draft" || lead) &&
-                            !busy
-                          }
+                          canUse={planState.allowed && !busy}
                           onUse={(s) => planForm(p, s)}
                         />
                       ) : null;
@@ -1931,11 +1935,13 @@ export function AuditProgram({
                         ) ?? []
                       }
                     />
-                    {writer && (w.program.status === "draft" || lead) && (
-                      <Button disabled={busy} onClick={() => planForm(p)}>
-                        Edit plan
-                      </Button>
-                    )}
+                    <DecisionButton
+                      state={planState}
+                      disabled={busy}
+                      onClick={() => planForm(p)}
+                    >
+                      Edit plan
+                    </DecisionButton>
                   </TabsContent>
                   <TabsContent value="execute">
                     <details className="captured-record" open={!p.execution}>

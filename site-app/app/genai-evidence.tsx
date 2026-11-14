@@ -8,6 +8,7 @@
 // acknowledgements. The workspace never parses, runs or renders an ingested
 // log: it shows the engine's verified summary only.
 import { useState } from "react";
+import { postJson } from "@/lib/fetch-json";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,14 +62,12 @@ async function post(
   op: string,
   data: Record<string, unknown>,
 ) {
-  const r = await fetch("/api/assurance", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tenantId, engagementId, op, data }),
+  return postJson<Record<string, unknown>>("/api/assurance", {
+    tenantId,
+    engagementId,
+    op,
+    data,
   });
-  const v = (await r.json().catch(() => ({}))) as { error?: string };
-  if (!r.ok) throw new Error(v.error ?? "The command failed");
-  return v;
 }
 
 function parseJson(text: string, what: string) {

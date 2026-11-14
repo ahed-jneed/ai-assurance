@@ -17,6 +17,7 @@ import {
 import { db } from "./bindings";
 import type { Role } from "./domain";
 import { ApiError } from "./http";
+import { can } from "./permissions";
 import type { Context } from "./tenancy";
 
 export const reviewStates = [
@@ -299,8 +300,9 @@ export const queueStates = [
   "revisable",
 ] as const;
 export type QueueState = (typeof queueStates)[number];
-const canReview = (role: Role) => ["Lead Auditor", "Reviewer"].includes(role),
-  canRevise = (role: Role) => ["Lead Auditor", "Auditor"].includes(role);
+// The workbench queues: reviewing an assessment, or revising a returned one.
+const canReview = (role: Role) => can(role, "reviewAssertion"),
+  canRevise = (role: Role) => can(role, "addAssertion");
 /**
  * One page of a review queue for the caller: current assessments awaiting
  * review or returned for revision; `reviewable` leaves out the caller's own

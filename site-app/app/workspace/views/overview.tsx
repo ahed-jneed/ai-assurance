@@ -2,6 +2,7 @@
 import { lazy, Suspense } from "react";
 import type { AuditGate, Engagement, Paper, Role } from "@/lib/domain";
 import type { PaperTarget } from "@/lib/paper-workflow";
+import { canSee } from "@/lib/permissions";
 import type { WorkItem } from "@/lib/work-items";
 import { EngagementOverview } from "../../engagement-overview";
 import type { WorkspaceData } from "../../workspace-types";
@@ -47,7 +48,7 @@ export function Overview({
 }) {
   return (
     <>
-      {viewer && role === "Client Contributor" && (
+      {canSee(role, "clientPortal") && (
         <Suspense fallback={panelFallback}>
           <ClientPortal
             data={data}

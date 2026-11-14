@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useEffect, useState, type ReactNode } from "react";
-import { can } from "@/lib/permissions";
+import { can, canBeAssigned } from "@/lib/permissions";
+import { errorMessage, postJson } from "@/lib/fetch-json";
 
 import { Button } from "@/components/ui/button";
 
@@ -106,11 +107,7 @@ const systemRecords = recordsQuery("system"),
   predictionRecords = recordsQuery("prediction"),
   datasetRecords = recordsQuery("dataset"),
   obligationQuery = recordsQuery("obligation"),
-  workbenchView = viewQuery<Omit<Snapshot, "records">>(
-    "workbench",
-    {},
-    "Workbench unavailable",
-  );
+  workbenchView = viewQuery<Omit<Snapshot, "records">>("workbench", {});
 
 type Snapshot = {
   // Records of formKinds (and obligation assessments where the pack has
@@ -140,7 +137,6 @@ type Snapshot = {
 // Fields of the POST /api/assurance response that the workbench reads; each
 // operation returns only some of them.
 type ActResult = {
-  error?: string;
   record?: AssuranceRecord;
   packet?: unknown;
   trust?: unknown;
@@ -319,27 +315,19 @@ export function AssuranceWorkbench({
     setBusy(true);
     setError("");
     try {
-      const r = await fetch("/api/assurance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenantId: data.tenantId,
-            engagementId: e.id,
-            op,
-            data: values,
-          }),
-        }),
-        v = (await r.json()) as ActResult;
-      if (!r.ok) throw Error(v.error);
+      const v = await postJson<ActResult>("/api/assurance", {
+        tenantId: data.tenantId,
+        engagementId: e.id,
+        op,
+        data: values,
+      });
       await refreshAfterMutation(
         { tenantId: data.tenantId, engagementId: e.id },
         onRefresh,
       );
       return v;
     } catch (x) {
-      setError(
-        x instanceof Error ? x.message : "Action could not be completed",
-      );
+      setError(errorMessage(x, "Action could not be completed"));
       throw x;
     } finally {
       setBusy(false);
@@ -921,9 +909,7 @@ export function AssuranceWorkbench({
         name: "userId",
         label: "Internal practice member",
         options: (snapshot?.eligibleMembers ?? data.people)
-          .filter((p) =>
-            ["Auditor", "Lead Auditor", "Reviewer"].includes(p.role),
-          )
+          .filter((p) => canBeAssigned(p.role, "engagementAccess"))
           .map((p) => ({
             value: p.user_id,
             label: p.display_name + " · " + p.role,

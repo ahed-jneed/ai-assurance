@@ -1,5 +1,6 @@
 import type { Artifact, Paper, Role } from "./domain";
 import { canWrite, isReleaseTimeRecord } from "./domain";
+import { can } from "./permissions";
 export type PaperTarget =
   | "objective"
   | "scope"
@@ -118,8 +119,8 @@ export function paperNextAction({
   pendingComment?: boolean;
 }): PaperAction {
   const writer = canWrite(role),
-    lead = role === "Lead Auditor",
-    reviewer = lead || role === "Reviewer";
+    lead = can(role, "signPaper"),
+    reviewer = can(role, "reviewPaper");
   // The server refuses every change to these papers, so none is offered.
   const notice = paperHistoryNotice(saved);
   if (notice)

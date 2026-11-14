@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { commandModules, dispatch } from "@/lib/commands";
 import { assuranceModules } from "@/lib/commands/assurance";
@@ -6,18 +7,35 @@ import { caller, stored } from "@/lib/commands/test-fixtures";
 import { roles, type Engagement, type Finding, type Paper } from "@/lib/domain";
 import { ApiError } from "@/lib/http";
 import {
+  assignableRoles,
   assuranceActions,
   can,
   canAssignEngagementAccess,
+  canBeAssigned,
+  canQueueAuditorModel,
+  canSee,
   decisionState,
+  duties,
+  fallbackRole,
+  isClientRole,
+  isInternalRole,
   manageState,
   managementReferrals,
+  narrowedActions,
   roleReason,
+  viewAccess,
   workspaceActions,
   type Action,
+  type Assignment,
+  type NarrowedAction,
 } from "@/lib/permissions";
 import {
+  acceptanceInput,
   approvedWorkflow,
+  briefInput,
+  planSave,
+  structuredEngagement,
+  workflowOf,
   context as workflowContext,
 } from "@/lib/workflow/test-fixtures";
 import {
@@ -43,14 +61,14 @@ const roleRefusals = new Set([
 
 /**
  * An engagement with an approved scope, so each workflow command reaches its
- * role check before it asks for missing state. With `program`, the program
- * is in that status: planning a draft program is the engagement team's,
- * while changing a submitted or approved one needs a Lead Auditor.
+ * role check before it asks for missing state. Its program is a draft:
+ * planning a draft program is the engagement team's, while changing a
+ * submitted or approved one needs a Lead Auditor (see the narrowing test).
  */
-function probed(program: "draft" | "approved" = "draft"): Engagement {
+function probed(): Engagement {
   const e = stored();
   e.workflow = approvedWorkflow();
-  if (program === "draft") e.workflow.program.status = "draft";
+  e.workflow.program.status = "draft";
   return e;
 }
 
@@ -172,18 +190,70 @@ describe("client permissions match the server's role checks", () => {
 
   // The map holds each op's base role check. Some commands narrow it by
   // state: changing the plans of a submitted or approved program, like
-  // saving an approved scope, needs a Lead Auditor.
-  it("leaves state-dependent narrowing to the commands", async () => {
-    for (const op of ["bulkPlanProcedures", "scopeProgramCandidates"]) {
-      expect(can("Auditor", op as Action), op).toBe(true);
-      await expect(
-        dispatch(probed("approved"), op, {}, caller("Auditor")),
-        op,
-      ).rejects.toMatchObject({
-        status: 403,
-        message: "A Lead Auditor must authorize this decision",
-      });
-    }
+  // saving an approved scope, needs a Lead Auditor. decisionState explains
+  // the narrowing (#178); the commands still enforce it.
+  it("narrows by state exactly where the commands do", async () => {
+    const payloads: Record<NarrowedAction, (e: Engagement) => unknown> = {
+      saveBrief: () => ({ ...briefInput, changeImpact: "Period extended" }),
+      saveAcceptance: () => ({
+        ...acceptanceInput,
+        changeReason: "Engagement letter renewed",
+      }),
+      saveProcedurePlan: (e) => planSave(e),
+      bulkPlanProcedures: () => ({}),
+      scopeProgramCandidates: () => ({}),
+    };
+    expect(Object.keys(payloads).sort()).toEqual([...narrowedActions].sort());
+    const asUser = { Auditor: "auditor", "Lead Auditor": "lead" } as const;
+    const outcomes: string[] = [],
+      expected: string[] = [];
+    // A draft engagement; one whose scope and acceptance are approved and
+    // whose program is submitted; and one whose program is approved too.
+    for (const program of ["draft", "submitted", "approved"] as const)
+      for (const action of narrowedActions)
+        for (const role of ["Auditor", "Lead Auditor"] as const) {
+          const e = structuredEngagement();
+          if (program !== "draft") {
+            e.workflow = approvedWorkflow(workflowOf(e).procedures);
+            e.workflow.program.status = program;
+          }
+          const state = decisionState(role, asUser[role], {
+            action,
+            engagement: e,
+          });
+          const outcome = await workflowCommand(
+            e,
+            action,
+            payloads[action](e),
+            workflowContext(asUser[role]),
+          ).then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+          const narrowed =
+            outcome instanceof WorkflowError &&
+            outcome.status === 403 &&
+            outcome.message === "A Lead Auditor must authorize this decision";
+          const label = `${action} as ${role} (${program} program)`;
+          outcomes.push(label + (narrowed ? ": Lead required" : ": open"));
+          expected.push(
+            label + (state.refusal === "state" ? ": Lead required" : ": open"),
+          );
+          if (state.refusal === "state") expect(state.reason).toMatch(/Lead/);
+        }
+    expect(outcomes).toEqual(expected);
+    // An Auditor meets the narrowing on each approved record, and on the
+    // plans and scope of a program once it is submitted.
+    expect(outcomes.filter((o) => o.endsWith("Lead required")).sort()).toEqual(
+      ["submitted", "approved"]
+        .flatMap((program) =>
+          narrowedActions.map(
+            (action) =>
+              `${action} as Auditor (${program} program): Lead required`,
+          ),
+        )
+        .sort(),
+    );
   });
 
   it("refuses the ops referred to management for every role that writes", async () => {
@@ -236,6 +306,119 @@ describe("client permissions match the server's role checks", () => {
     expect(
       canAssignEngagementAccess({ role: "Lead Auditor", practiceAdmin: true }),
     ).toBe(true);
+  });
+});
+
+describe("canSee", () => {
+  it("shows the team's work to a Lead Auditor only", () => {
+    expect(roles.filter((role) => canSee(role, "teamWork"))).toEqual([
+      "Lead Auditor",
+    ]);
+  });
+
+  it("shows evidence requests to the practice's staff, never to client roles", () => {
+    for (const role of roles)
+      expect(canSee(role, "evidenceRequests"), role).toBe(!isClientRole(role));
+  });
+
+  it("shows the client portal to a Client Contributor only", () => {
+    expect(roles.filter((role) => canSee(role, "clientPortal"))).toEqual([
+      "Client Contributor",
+    ]);
+  });
+
+  it("names only known roles", () => {
+    for (const [view, admitted] of Object.entries(viewAccess))
+      for (const role of admitted) expect(roles, view).toContain(role);
+  });
+});
+
+describe("role groups", () => {
+  it("splits every role into the practice's staff or a client", () => {
+    for (const role of roles)
+      expect(isClientRole(role), role).toBe(!isInternalRole(role));
+    expect(roles.filter(isClientRole)).toEqual([
+      "Client Viewer",
+      "Client Contributor",
+    ]);
+  });
+
+  it("assumes the least privileged role before the identity loads", () => {
+    expect(isClientRole(fallbackRole)).toBe(true);
+    for (const op of Object.keys(workspaceActions) as Action[])
+      expect(can(fallbackRole, op), op).toBe(false);
+  });
+
+  it("groups duties by the action map's base roles", () => {
+    for (const role of roles) {
+      const duty = duties(role);
+      expect(duty.prepare, role).toBe(can(role, "submitProcedure"));
+      expect(duty.review, role).toBe(can(role, "reviewProcedure"));
+      expect(duty.authorize, role).toBe(can(role, "releaseReport"));
+      expect(duty.qualityReview, role).toBe(can(role, "signOffQualityReview"));
+    }
+  });
+});
+
+describe("assignments and mode narrowings match the server's checks", () => {
+  const server = (path: string) =>
+    readFileSync(new URL("./" + path, import.meta.url), "utf8");
+  const sorted = (list: readonly string[]) => [...list].sort();
+  /** The role lists each `authorized(<assignee>, [...])` call checks. */
+  function assigneeChecks(path: string) {
+    return [
+      ...server(path).matchAll(/authorized\(\s*([^,]+),\s*\[([^\]]+)\]/g),
+    ].map(([, assignee, list]) => ({
+      assignee,
+      roles: sorted(list.split(",").map((r) => JSON.parse(r.trim()))),
+    }));
+  }
+
+  it("offers each picker exactly the members the commands accept", () => {
+    const found: Record<string, string[][]> = {};
+    const add = (assignment: Assignment, roles: string[]) =>
+      (found[assignment] ??= []).push(roles);
+    for (const { assignee, roles } of [
+      ...assigneeChecks("workflow/brief-program.ts"),
+      ...assigneeChecks("workflow/monitoring.ts"),
+    ])
+      add(/review/i.test(assignee) ? "reviewer" : "preparer", roles);
+    for (const { roles } of assigneeChecks("workflow/acceptance-commands.ts"))
+      add("team", roles);
+    for (const { roles } of assigneeChecks("workflow/client-grants.ts"))
+      add("clientRequest", roles);
+    const access = server("commands/assurance/access.ts").match(
+      /role IN \(([^)]+)\)/,
+    );
+    add(
+      "engagementAccess",
+      sorted(access![1].split(",").map((r) => r.trim().slice(1, -1))),
+    );
+    expect(Object.keys(found).sort()).toEqual(
+      Object.keys(assignableRoles).sort(),
+    );
+    for (const [assignment, checks] of Object.entries(found))
+      for (const roles of checks)
+        expect(roles, assignment).toEqual(
+          sorted(assignableRoles[assignment as Assignment]),
+        );
+    for (const role of roles)
+      expect(canBeAssigned(role, "preparer"), role).toBe(
+        assignableRoles.preparer.includes(role),
+      );
+  });
+
+  it("narrows the auditor_model mode as queueExternal does", () => {
+    const narrowed = server("commands/assurance/execution.ts").match(
+      /v\.mode === "auditor_model"\) \{\s*requireRole\(ctx, \[([^\]]+)\]\)/,
+    );
+    expect(narrowed, "the auditor_model role check").not.toBeNull();
+    const admitted = narrowed![1].split(",").map((r) => JSON.parse(r.trim()));
+    expect(roles.filter(canQueueAuditorModel)).toEqual(
+      roles.filter(
+        (role) => admitted.includes(role) && can(role, "queueExternal"),
+      ),
+    );
   });
 });
 

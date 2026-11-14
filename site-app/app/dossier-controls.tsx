@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
 import type { Engagement, Report, Role } from "@/lib/domain";
-import { fetchJson } from "@/lib/fetch-json";
+import { errorMessage, fetchJson, postJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
 import { isClientRole } from "@/lib/workflow-state";
 import { describeScope, type DossierScope } from "@/lib/dossier-scope";
@@ -175,27 +175,21 @@ export function DossierControls({
               evidence: draft.withholdEvidence ? "withheld" : "included",
             }
           : undefined;
-      const r = await fetch("/api/dossier", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenantId,
-            engagementId,
-            reportId,
-            audience: scoped ? "internal" : audience,
-            withheld: Object.entries(withheld).map(([id, reason]) => ({
-              id,
-              reason,
-            })),
-            ...(scope ? { scope } : {}),
-          }),
-        }),
-        v = (await r.json()) as { error?: string };
-      if (!r.ok) throw Error(v.error);
+      await postJson<unknown>("/api/dossier", {
+        tenantId,
+        engagementId,
+        reportId,
+        audience: scoped ? "internal" : audience,
+        withheld: Object.entries(withheld).map(([id, reason]) => ({
+          id,
+          reason,
+        })),
+        ...(scope ? { scope } : {}),
+      });
       setAudience("");
       await refreshAfterMutation({ tenantId, engagementId }, onRefresh);
     } catch (x) {
-      setError(x instanceof Error ? x.message : "Dossier could not be sealed");
+      setError(errorMessage(x, "Dossier could not be sealed"));
     } finally {
       setBusy(false);
     }

@@ -4,6 +4,7 @@
 // GET /api/coverage. Coverage is reviewed evidence per requirement: it never
 // shows partial coverage as full, and papers signed are progress, not coverage.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { fetchJson } from "@/lib/fetch-json";
 import {
   Sheet,
   SheetContent,
@@ -55,7 +56,7 @@ async function fetchCoverage<T>(
   engagementId: string,
   framework?: string,
 ): Promise<T> {
-  const response = await fetch(
+  return fetchJson<T>(
     "/api/coverage?" +
       new URLSearchParams({
         tenantId,
@@ -64,10 +65,6 @@ async function fetchCoverage<T>(
       }),
     { headers: { accept: "application/json" } },
   );
-  const body = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok)
-    throw new Error(body.error ?? "Coverage could not be loaded");
-  return body as T;
 }
 /** One coverage view, refetched when the engagement changes (its version). */
 function useCoverage(

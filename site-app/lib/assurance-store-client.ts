@@ -1,5 +1,6 @@
 import type { AssuranceRecord } from "./assurance-core";
 import type { AssuranceRecordPage } from "./assurance-store";
+import { fetchJson } from "./fetch-json";
 export function currentAssessments(all: AssuranceRecord[]) {
   const superseded = new Set(
     all
@@ -50,15 +51,10 @@ export async function assuranceRecords(
     });
     if (scope.kind) params.set("kind", scope.kind);
     if (cursor) params.set("cursor", cursor);
-    const response = await fetch("/api/assurance?" + params, {
-        cache: "no-store",
-        signal,
-      }),
-      page = (await response.json()) as AssuranceRecordPage & {
-        error?: string;
-      };
-    if (!response.ok)
-      throw Error(page.error ?? "Assurance records unavailable");
+    const page = await fetchJson<AssuranceRecordPage>(
+      "/api/assurance?" + params,
+      { cache: "no-store", signal },
+    );
     records.push(...page.records);
     onProgress?.(records.length);
     cursor = page.nextCursor;
