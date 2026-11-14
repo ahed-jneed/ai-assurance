@@ -234,7 +234,14 @@ export function useUrlSync({
   const linkRestoring = useRef(false),
     lastLink = useRef("");
   function applyWorkspaceLink(current: WorkspaceData, link: WorkspaceLink) {
-    if (!authorizedLink(link, current.identity.role, !!current.engagement)) {
+    if (
+      !authorizedLink(
+        link,
+        current.identity.role,
+        !!current.engagement,
+        current.identity.practiceAdmin,
+      )
+    ) {
       // A linked engagement that failed to load intact keeps its own message.
       setError(
         current.engagementError?.error ??

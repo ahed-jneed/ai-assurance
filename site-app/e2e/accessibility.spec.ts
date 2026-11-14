@@ -31,6 +31,7 @@ const leadViews: [string, string | undefined][] = [
   ["Clients", undefined],
   ["Engagements", undefined],
   ["Users & access", undefined],
+  ["Access log", "Access log"],
 ];
 
 test("the Lead Auditor's main views have no serious axe violations", async ({

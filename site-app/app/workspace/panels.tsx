@@ -14,6 +14,7 @@ const panelModules = [
   () => import("../assurance-workbench"),
   () => import("../testing-lab"),
   () => import("../report-workspace"),
+  () => import("../access-log"),
 ] as const;
 const [
   loadWorkInbox,
@@ -24,6 +25,7 @@ const [
   loadAssuranceWorkbench,
   loadTestingLab,
   loadReportWorkspace,
+  loadAccessLog,
 ] = panelModules;
 export const WorkInbox = memo(
   lazy(() => loadWorkInbox().then((m) => ({ default: m.WorkInbox }))),
@@ -66,6 +68,9 @@ export const ReportWorkspace = memo(
   lazy(() =>
     loadReportWorkspace().then((m) => ({ default: m.ReportWorkspace })),
   ),
+);
+export const AccessLog = memo(
+  lazy(() => loadAccessLog().then((m) => ({ default: m.AccessLog }))),
 );
 export const panelFallback = (
   <div className="loading-grid" role="status" aria-label="Loading">

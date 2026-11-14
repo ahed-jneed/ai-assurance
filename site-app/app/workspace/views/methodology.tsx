@@ -1,5 +1,4 @@
 "use client";
-import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -10,7 +9,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { humanLabel } from "@/lib/presentation";
+import { AuditTrail } from "../../audit-trail";
 import { DatabaseToolbar } from "../../database-toolbar";
 import type { CatalogItem, WorkspaceData } from "../../workspace-types";
 import type { ViewDetail } from "../types";
@@ -49,7 +48,6 @@ export function Methodology({
   register,
   writer,
   busy,
-  resolve,
   onDetail,
   onUseTemplate,
 }: {
@@ -57,7 +55,6 @@ export function Methodology({
   register: Register;
   writer: boolean;
   busy: boolean;
-  resolve: (id: string) => string;
   onDetail: ViewDetail;
   onUseTemplate: (templateId: string) => void;
 }) {
@@ -146,44 +143,14 @@ export function Methodology({
         </section>
       </TabsContent>
       <TabsContent value="trail">
-        <section className="panel">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Time</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead>Person</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.events.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell>
-                    {new Date(event.created_at).toLocaleString()}
-                  </TableCell>
-                  <TableCell>{humanLabel(event.action)}</TableCell>
-                  <TableCell>{resolve(event.actor)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDetail("Audit event", event)}
-                    >
-                      Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {!data.events.length && (
-            <div className="empty-state">
-              <History size={28} />
-              <h3>No audit activity yet</h3>
-            </div>
-          )}
-        </section>
+        {data.engagement && (
+          <AuditTrail
+            tenantId={data.tenantId}
+            engagementId={data.engagement.id}
+            version={data.engagement.version}
+            onDetail={onDetail}
+          />
+        )}
       </TabsContent>
     </Tabs>
   );

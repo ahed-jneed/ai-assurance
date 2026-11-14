@@ -7,6 +7,7 @@
 // email once when it is new or changed, and recording a sign-in for the
 // practice's Access log at most once per signInGapHours, resolving the caller
 // only reads.
+import { signInGapHours } from "./access-events";
 import { selfSignupAllowed } from "./access-policy";
 import { db } from "./bindings";
 import type { Role } from "./domain";
@@ -68,14 +69,7 @@ async function recordEmail(
     .run();
 }
 /**
- * How long a member may go without a recorded sign-in to a practice before
- * their next request to it is recorded as one (#181). Identity is resolved
- * on every request (lib/identity.ts) and no mode reports a session start,
- * so the Access log records the first request after a gap instead.
- */
-export const signInGapHours = 8;
-/**
- * Records the member's sign-in to the practice for its Access log, with the
+ * Records the member's sign-in to the practice for its Access log (#181), with the
  * role they hold, unless one is recorded within signInGapHours: one read on
  * each request and a write at most once per gap. The guarded insert keeps
  * concurrent first requests to one event. A failure to record never refuses

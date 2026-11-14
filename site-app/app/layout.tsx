@@ -14,6 +14,7 @@ import "./management-system.css";
 import "./paper-workspace.css";
 import "./ll144.css";
 import "./client-portal.css";
+import "./event-log.css";
 
 export const viewport: Viewport = {
   width: "device-width",

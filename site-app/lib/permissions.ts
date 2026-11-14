@@ -219,13 +219,17 @@ export function canSee(role: Role | string, view: View) {
 
 /**
  * Whether the caller may open the practice's Access log: a Lead Auditor (the
- * practice's partner), or a practice administrator whatever their role.
+ * practice's partner), or a practice administrator of any staff role. Client
+ * roles never see it, whatever else they hold.
  */
 export function canSeeAccessLog(identity: {
   role: Role | string;
   practiceAdmin?: boolean;
 }) {
-  return !!identity.practiceAdmin || canSee(identity.role, "accessLog");
+  return (
+    !isClientRole(identity.role) &&
+    (!!identity.practiceAdmin || canSee(identity.role, "accessLog"))
+  );
 }
 
 /**

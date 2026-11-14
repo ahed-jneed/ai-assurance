@@ -143,7 +143,11 @@ export async function POST(request: Request) {
         })
         .strict()
         .parse(raw);
-      const allowed = permittedNavigationRoutes(ctx.role, true);
+      const allowed = permittedNavigationRoutes(
+        ctx.role,
+        true,
+        ctx.practiceAdmin,
+      );
       if (
         a.preferences.views.some(
           (v) =>

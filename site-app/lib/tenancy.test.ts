@@ -2,7 +2,8 @@ import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/http";
 import { runWithIdentity, type Identity } from "@/lib/identity";
-import { archivedMessage, context, signInGapHours } from "@/lib/tenancy";
+import { signInGapHours } from "@/lib/access-events";
+import { archivedMessage, context } from "@/lib/tenancy";
 
 // A D1 stand-in that answers context()'s lookups from `rows` and records every
 // statement that would write. Each test installs it as the DB binding.

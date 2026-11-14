@@ -1,0 +1,64 @@
+/* The paged event logs (#181): the engagement audit trail and the practice
+   Access log (app/event-log.tsx). */
+.event-log {
+  display: grid;
+  gap: 12px;
+}
+.event-log-intro {
+  margin: 0 0 12px;
+  max-width: 72ch;
+}
+.event-log-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+}
+.event-log-filter {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.event-log-filter select,
+.event-log-filter input {
+  min-height: 28px;
+  max-width: 100%;
+}
+.event-log-export {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+  font-size: 14px;
+}
+.event-log-error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.event-log-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+.event-log-pager p {
+  margin: 0;
+  font-size: 13px;
+}
+.event-log-pager-actions {
+  display: flex;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .event-log-filter {
+    flex: 1 1 100%;
+    justify-content: space-between;
+  }
+  .event-log-export {
+    margin-left: 0;
+  }
+}

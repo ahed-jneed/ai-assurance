@@ -5,6 +5,7 @@
 // them, and members' sign-ins (sign_in_events, recorded by lib/tenancy.ts).
 // A Lead Auditor and the practice's administrators read it
 // (canSeeAccessLog in lib/permissions.ts); client roles never do.
+import { accessEventTypes } from "../access-events";
 import { csvCell } from "../criteria/coverage-filters";
 import { db } from "../bindings";
 import { ApiError } from "../http";
@@ -18,26 +19,8 @@ import {
   type EventQuery,
 } from "./event-pages";
 
-/**
- * The management events about membership, roles and practice
- * administration (lib/commands/management/members.ts, invitations.ts,
- * admins.ts and lib/invitations.ts), in the order the log's filter offers
- * them, then the sign-ins.
- */
-export const accessLogActions = [
-  "signIn",
-  "grantMember",
-  "updateMember",
-  "revokeMember",
-  "inviteMember",
-  "cancelInvitation",
-  "acceptInvitation",
-  "supersedeInvitation",
-  "grantAdmin",
-  "revokeAdmin",
-  "transferAdmin",
-] as const;
-const managementActions = accessLogActions.filter((a) => a !== "signIn");
+/** The management events the log lists: every type but the sign-ins. */
+const managementActions = accessEventTypes.filter((a) => a !== "signIn");
 
 /** One event of the Access log. */
 export type AccessEvent = {
@@ -139,7 +122,7 @@ export async function accessLogPage(
     events: found.map((e) => ({ ...e, details: parseDetails(e.details) })),
     next,
     actors: actors.results,
-    actions: accessLogActions,
+    actions: accessEventTypes,
   };
 }
 

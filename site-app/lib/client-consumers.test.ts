@@ -13,7 +13,9 @@ const source = (path: string) =>
 // a 502 page as JSON again.
 const fetchJsonConsumers = [
   "app/assurance-record-search.tsx",
+  "app/access-log.tsx",
   "app/assurance-workbench.tsx",
+  "app/audit-trail.tsx",
   "app/dataset-registry.tsx",
   "app/dossier-controls.tsx",
   "app/evidence-details.tsx",
@@ -26,6 +28,7 @@ const fetchJsonConsumers = [
   "app/workspace/views/criteria-coverage.tsx",
   "lib/assurance-query.ts",
   "lib/assurance-store-client.ts",
+  "lib/event-log-queries.ts",
 ];
 
 // Role names belong to lib/permissions.ts. The browser code below asks it

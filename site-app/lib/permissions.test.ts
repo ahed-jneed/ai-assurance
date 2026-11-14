@@ -339,7 +339,9 @@ describe("canSee", () => {
       "Lead Auditor",
     ]);
     for (const role of roles)
-      expect(canSeeAccessLog({ role, practiceAdmin: true }), role).toBe(true);
+      expect(canSeeAccessLog({ role, practiceAdmin: true }), role).toBe(
+        !isClientRole(role),
+      );
   });
 
   it("names only known roles", () => {
