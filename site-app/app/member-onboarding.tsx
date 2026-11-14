@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceData } from "./workspace-types";
-import type { WorkflowAct } from "./audit-program";
+import type { WorkflowAct } from "./audit-program/workflow-dialog";
 export function MemberOnboarding({
   open,
   onClose,

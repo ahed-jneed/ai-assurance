@@ -29,7 +29,7 @@ import {
   type ExclusionKind,
   type ThreatKind,
 } from "@/lib/workflow-types";
-import type { Field, Form, WorkflowAct } from "../audit-program";
+import type { Field, Form, WorkflowAct } from "./workflow-dialog";
 import type { WorkspaceData } from "../workspace-types";
 
 // Our own short titles; no standards text is reproduced (D-03).

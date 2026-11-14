@@ -43,7 +43,7 @@ import {
   art50CriteriaSource,
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
-import { WorkflowDialog, type Form } from "./audit-program";
+import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
 
 type Result = GenaiView["results"][number];
 
