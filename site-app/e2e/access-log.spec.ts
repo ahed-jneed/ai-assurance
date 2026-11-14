@@ -1,8 +1,9 @@
 // The practice Access log and the paged engagement audit trail (#181): the
 // Lead Auditor, who administers the demo practice, opens the Access log from
-// the sidebar, filters it and exports it as CSV; a Lead Auditor who does not
-// administer the practice reads it too; an Auditor and the client roles are
-// refused. The engagement's audit history pages and filters through
+// the sidebar, filters it and exports it as CSV. The log is for practice
+// administrators only: a Lead Auditor who does not administer the practice,
+// an Auditor and the client roles are refused (no sidebar entry, a refused
+// deep link, 403 from GET /api/access-log including format=csv). The engagement's audit history pages and filters through
 // GET /api/audit-trail.
 import type { Page } from "@playwright/test";
 import { expectAccessible } from "./a11y";
@@ -19,7 +20,7 @@ async function accessLogShown(page: Page) {
   ).toBeVisible();
 }
 
-test("the Lead Auditor filters the Access log and exports it as CSV", async ({
+test("the practice administrator filters the Access log and exports it as CSV", async ({
   signIn,
   demo,
 }) => {
@@ -86,17 +87,17 @@ test("the Lead Auditor filters the Access log and exports it as CSV", async ({
   expect(csv).toContain(persona("qa-lead").userId);
 });
 
-test("Lead Auditors and administrators read the Access log; others are refused", async ({
+test("only practice administrators read the Access log; others are refused", async ({
   api,
   signIn,
   demo,
 }) => {
-  // qa-lead2 leads engagements in the demo practice but does not administer it.
-  const lead2 = await api("qa-lead2");
-  expect((await lead2.workspace(demo.tenantId)).identity.practiceAdmin).toBe(
-    false,
+  // qa-lead administers the demo practice and pages through the log.
+  const lead = await api("qa-lead");
+  expect((await lead.workspace(demo.tenantId)).identity.practiceAdmin).toBe(
+    true,
   );
-  const page = await lead2.http.get(
+  const page = await lead.http.get(
     "/api/access-log?" +
       new URLSearchParams({ tenantId: demo.tenantId, limit: "2" }),
   );
@@ -105,7 +106,7 @@ test("Lead Auditors and administrators read the Access log; others are refused",
   expect(first.events).toHaveLength(2);
   expect(first.next).toBeTruthy();
   const second = await (
-    await lead2.http.get(
+    await lead.http.get(
       "/api/access-log?" +
         new URLSearchParams({
           tenantId: demo.tenantId,
@@ -118,7 +119,14 @@ test("Lead Auditors and administrators read the Access log; others are refused",
     first.events[0].id,
   );
 
+  // qa-lead2 leads engagements in the demo practice but does not administer
+  // it: a Lead Auditor's role alone does not open the Access log.
+  const lead2 = await api("qa-lead2");
+  expect((await lead2.workspace(demo.tenantId)).identity.practiceAdmin).toBe(
+    false,
+  );
   for (const id of [
+    "qa-lead2",
     "qa-auditor",
     "qa-reviewer",
     "qa-viewer",
@@ -136,17 +144,28 @@ test("Lead Auditors and administrators read the Access log; others are refused",
       expect(refused.status(), id + " " + format).toBe(403);
     }
   }
-  // The Auditor's sidebar has no Access log.
-  const auditor = await signIn("qa-auditor");
-  await auditor.goto(workspacePath(demo, "Overview"));
-  await expect(
-    auditor.getByRole("heading", { level: 1 }).first(),
-  ).toBeVisible();
-  await expect(
-    auditor
-      .getByRole("navigation", { name: "Audit workspace navigation" })
-      .getByRole("button", { name: "Access log" }),
-  ).toHaveCount(0);
+  // Neither the non-administrator Lead Auditor's nor the Auditor's sidebar
+  // has an Access log, and a deep link to it is refused.
+  for (const id of ["qa-lead2", "qa-auditor"] as const) {
+    const who = await signIn(id);
+    await who.goto(workspacePath(demo, "Overview"));
+    await expect(who.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect(
+      who
+        .getByRole("navigation", { name: "Audit workspace navigation" })
+        .getByRole("button", { name: "Access log" }),
+    ).toHaveCount(0);
+    await who.goto(workspacePath(demo, "Access log"));
+    await expect(
+      who.getByText("This page is outside your current access."),
+    ).toBeVisible();
+    await expect(
+      who.getByRole("heading", { name: "Access log", level: 1 }),
+    ).toHaveCount(0);
+    await expect(who.getByRole("table", { name: "Access events" })).toHaveCount(
+      0,
+    );
+  }
 });
 
 test("the engagement audit history pages and filters", async ({

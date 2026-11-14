@@ -31,13 +31,21 @@ const leadViews: [string, string | undefined][] = [
   ["Clients", undefined],
   ["Engagements", undefined],
   ["Users & access", undefined],
+  // The Access log is for practice administrators only (#181): qa-lead
+  // administers the demo practice (scripts/seed-demo.mjs).
   ["Access log", "Access log"],
 ];
 
 test("the Lead Auditor's main views have no serious axe violations", async ({
+  api,
   signIn,
   demo,
 }) => {
+  // The practice pages, the Access log among them, need administration.
+  expect(
+    (await (await api("qa-lead")).workspace(demo.tenantId)).identity
+      .practiceAdmin,
+  ).toBe(true);
   const page = await signIn("qa-lead");
   for (const [view, heading] of leadViews) {
     await page.goto(workspacePath(demo, view));

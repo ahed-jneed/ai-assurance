@@ -111,7 +111,9 @@ const q = (params: Record<string, string> = {}): EventQuery =>
   parseEventQuery(new URLSearchParams(params));
 const ids = (page: { events: { id: string }[] }) =>
   page.events.map((e) => e.id);
-const lead = () => member("lead", "Lead Auditor"),
+// The Access log is for practice administrators only (#181): `lead` is a Lead
+// Auditor who administers the practice, `admin` an Auditor who does.
+const lead = () => ({ ...member("lead", "Lead Auditor"), practiceAdmin: true }),
   admin = () => ({ ...member("auditor", "Auditor"), practiceAdmin: true });
 
 describe("accessLogPage", () => {
@@ -190,17 +192,19 @@ describe("accessLogPage", () => {
     ).toEqual([]);
   });
 
-  it("is for Lead Auditors and practice administrators", async () => {
+  it("is for practice administrators only", async () => {
     await seeded();
     expect(ids(await accessLogPage(admin(), q({ limit: "1" })))).toEqual([
       "M5",
     ]);
     for (const refused of [
+      member("lead", "Lead Auditor"),
       member("auditor", "Auditor"),
       member("reviewer", "Reviewer"),
       member("eqr", "Engagement Quality Reviewer"),
       member("viewer", "Client Viewer", "CL-1"),
       member("contributor", "Client Contributor", "CL-1"),
+      { ...member("viewer", "Client Viewer", "CL-1"), practiceAdmin: true },
     ]) {
       await expect(accessLogPage(refused, q())).rejects.toMatchObject({
         status: 403,

@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/access-log?tenantId[&actor][&action][&from][&to][&cursor][&limit]:
  * a page of the practice's Access log, newest first (#181). With
- * `format=csv`, every event the filters match as CSV. Lead Auditors and
- * practice administrators only; everyone else gets 403.
+ * `format=csv`, every event the filters match as CSV. Practice
+ * administrators only, of any staff role; everyone else, a Lead Auditor who
+ * is not an administrator included, gets 403.
  */
 export async function GET(request: Request) {
   try {

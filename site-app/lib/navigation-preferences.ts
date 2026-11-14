@@ -63,8 +63,8 @@ const practiceRoutes: readonly NavigationRoute[] = [
   "Users & access",
 ];
 /**
- * The pages the caller may open. The Access log (#181) is for Lead
- * Auditors and practice administrators (canSeeAccessLog).
+ * The pages the caller may open. The Access log (#181) is for practice
+ * administrators only (canSeeAccessLog).
  */
 export const permittedNavigationRoutes = (
   role: string,

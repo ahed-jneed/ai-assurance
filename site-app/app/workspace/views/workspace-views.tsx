@@ -241,8 +241,7 @@ export const WorkspaceViews = memo(function WorkspaceViews({
         />
       </Suspense>
     );
-  // The practice's Access log (#181), for Lead Auditors and practice
-  // administrators.
+  // The practice's Access log (#181), for practice administrators only.
   if (view === "Access log")
     return canSeeAccessLog(data.identity) ? (
       <Suspense fallback={panelFallback}>
@@ -252,7 +251,7 @@ export const WorkspaceViews = memo(function WorkspaceViews({
       <Empty
         icon={Building2}
         title="The Access log is not available to you"
-        text="Lead Auditors and practice administrators see the practice's Access log."
+        text="Only practice administrators see the practice's Access log."
       />
     );
   // The practice directories are not part of the client portal (#36).

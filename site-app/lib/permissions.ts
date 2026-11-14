@@ -204,10 +204,12 @@ export const viewAccess = {
   clientFindings: clientViewer,
   /**
    * The practice's Access log (#181): membership, role and sign-in events.
-   * A Lead Auditor sees it by role; a practice administrator of any role
-   * sees it too (canSeeAccessLog). GET /api/access-log checks the same.
+   * Practice administrators only, of any staff role (canSeeAccessLog): the
+   * same admin-only rule as the management events and invitations the
+   * workspace view returns (lib/read-models/workspace-view.ts). A role alone
+   * never admits it. GET /api/access-log checks the same.
    */
-  accessLog: lead,
+  accessLog: staff,
 } as const satisfies Record<string, readonly Role[]>;
 
 export type View = keyof typeof viewAccess;
@@ -218,18 +220,16 @@ export function canSee(role: Role | string, view: View) {
 }
 
 /**
- * Whether the caller may open the practice's Access log: a Lead Auditor (the
- * practice's partner), or a practice administrator of any staff role. Client
- * roles never see it, whatever else they hold.
+ * Whether the caller may open the practice's Access log: practice
+ * administrators only, of any staff role (least privilege). A Lead Auditor
+ * who is not an administrator does not see it, and client roles never do,
+ * whatever else they hold.
  */
 export function canSeeAccessLog(identity: {
   role: Role | string;
   practiceAdmin?: boolean;
 }) {
-  return (
-    !isClientRole(identity.role) &&
-    (!!identity.practiceAdmin || canSee(identity.role, "accessLog"))
-  );
+  return !!identity.practiceAdmin && canSee(identity.role, "accessLog");
 }
 
 /**

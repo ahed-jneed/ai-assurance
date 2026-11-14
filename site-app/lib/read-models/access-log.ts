@@ -3,7 +3,7 @@
 // (event-pages.ts), and its CSV export. It lists who was given, changed or
 // lost membership, a role or practice administration, the invitations behind
 // them, and members' sign-ins (sign_in_events, recorded by lib/tenancy.ts).
-// A Lead Auditor and the practice's administrators read it
+// Only the practice's administrators, of any staff role, read it
 // (canSeeAccessLog in lib/permissions.ts); client roles never do.
 import { accessEventTypes } from "../access-events";
 import { csvCell } from "../criteria/coverage-filters";
@@ -64,10 +64,7 @@ const eventArgs = (tenantId: string) => [
 
 function refuse(ctx: Context) {
   if (!canSeeAccessLog(ctx))
-    throw new ApiError(
-      403,
-      "The Access log is for Lead Auditors and practice administrators",
-    );
+    throw new ApiError(403, "The Access log is for practice administrators");
 }
 
 async function rows(ctx: Context, q: EventQuery): Promise<Row[]> {

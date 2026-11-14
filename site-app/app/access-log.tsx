@@ -3,8 +3,8 @@
 // membership, a role or practice administration, the invitations behind
 // that, and members' sign-ins, newest first in pages of GET /api/access-log
 // (through the query cache, lib/event-log-queries.ts), filtered by person,
-// event type and date, and exported as CSV. For Lead Auditors and practice
-// administrators (canSeeAccessLog); the server checks the same.
+// event type and date, and exported as CSV. For practice administrators
+// only, of any staff role (canSeeAccessLog); the server checks the same.
 import { useMemo } from "react";
 import { Download, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";

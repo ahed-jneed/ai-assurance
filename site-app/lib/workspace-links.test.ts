@@ -98,17 +98,21 @@ describe("workspace links", () => {
       "Clients",
       "Engagements",
       "Users & access",
-      "Access log",
     ]);
   });
 
-  it("opens the Access log to Lead Auditors and practice administrators only (#181)", () => {
+  it("opens the Access log to practice administrators only (#181)", () => {
     const access = { ...link, module: "Access log", engagementId: "" };
     expect(readWorkspaceLink("?view=Access+log")?.module).toBe("Access log");
-    expect(authorizedLink(access, "Lead Auditor", false)).toBe(true);
+    expect(authorizedLink(access, "Lead Auditor", false)).toBe(false);
+    expect(authorizedLink(access, "Lead Auditor", true)).toBe(false);
+    expect(authorizedLink(access, "Lead Auditor", false, true)).toBe(true);
     expect(authorizedLink(access, "Auditor", true)).toBe(false);
     expect(authorizedLink(access, "Auditor", false, true)).toBe(true);
     expect(authorizedLink(access, "Client Viewer", true, true)).toBe(false);
+    expect(permittedNavigationRoutes("Lead Auditor", true)).not.toContain(
+      "Access log",
+    );
     expect(permittedNavigationRoutes("Reviewer", false, true)).toContain(
       "Access log",
     );

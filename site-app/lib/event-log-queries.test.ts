@@ -54,8 +54,7 @@ describe("event log queries (#181)", () => {
       vi.fn(async () =>
         Response.json(
           {
-            error:
-              "The Access log is for Lead Auditors and practice administrators",
+            error: "The Access log is for practice administrators",
           },
           { status: 403 },
         ),
