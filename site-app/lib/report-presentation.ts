@@ -3,6 +3,7 @@ import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
 import {
   clientSupersededBy,
+  isClientVisible,
   withdrawnSuccessor,
   withdrawnSuccessorOf,
 } from "./workflow-state";
@@ -63,18 +64,66 @@ export function packageStatusLabel(report: Report, clientView = false) {
 }
 
 /**
+ * The report the client reads as its current one, from what the client
+ * projection names on each report it shows: the newest report with no
+ * successor, else the newest whose successor was withdrawn after release
+ * (#234 review). `entries` are the client-visible reports with the
+ * successor the client projection names (clientSupersededBy) and their
+ * release time.
+ */
+function clientCurrent(
+  entries: readonly { id: string; supersededBy?: string; at: string }[],
+) {
+  const newest = (xs: typeof entries) =>
+    [...xs].sort((a, b) => b.at.localeCompare(a.at))[0]?.id;
+  return (
+    newest(entries.filter((x) => !x.supersededBy)) ??
+    newest(entries.filter((x) => x.supersededBy === withdrawnSuccessor))
+  );
+}
+
+/** The client's current report, from the stored report records. */
+const storedClientCurrent = (reports: readonly Report[]) =>
+  clientCurrent(
+    reports.filter(isClientVisible).map((r) => ({
+      id: r.id,
+      supersededBy: clientSupersededBy(reports, r),
+      at: r.release!.releasedAt!,
+    })),
+  );
+
+/** The client's current report, from the client projection's reports. */
+const projectedClientCurrent = (reports: readonly Report[]) =>
+  clientCurrent(
+    reports.map((r) => ({
+      id: r.id,
+      supersededBy: r.supersededBy,
+      at: r.releasedAt ?? r.createdAt,
+    })),
+  );
+
+/**
  * What a released report's supersession says (#234 item 4), from the
  * successor the client projection names on it (clientSupersededBy): nothing
- * while it is the latest released report, its successor once superseded,
- * and that it is current again once that successor was withdrawn. The
- * client's release notices and the staff guidance both use it, so neither
- * calls the latest released report superseded.
+ * while it is the latest released report, its successor once superseded.
+ * Once that successor was withdrawn, it says the report is current again
+ * only while it is the client's current report (`current`); when a later
+ * release has become current since, it names that report instead (#234
+ * review). The client's release notices and the staff guidance both use it,
+ * so neither calls the latest released report superseded, nor an older
+ * report current.
  */
-export function supersessionText(supersededBy: string | undefined) {
+export function supersessionText(
+  supersededBy: string | undefined,
+  reportId?: string,
+  current?: string,
+) {
   if (!supersededBy) return "";
-  return supersededBy === withdrawnSuccessor
-    ? "Its successor was withdrawn, so it is the current report again"
-    : "It has since been superseded by " + supersededBy;
+  if (supersededBy !== withdrawnSuccessor)
+    return "It has since been superseded by " + supersededBy;
+  return current && current !== reportId
+    ? "Its successor was withdrawn; the current report is " + current
+    : "Its successor was withdrawn, so it is the current report again";
 }
 
 /** What the client sees of a superseded report whose successor was withdrawn. */
@@ -123,8 +172,11 @@ export function packageGuidance(report: Report, engagement?: Engagement) {
     }
     case "released": {
       // What the client reads of it, from the client projection's answer.
+      const reports = engagement?.reports ?? [report];
       const supersession = supersessionText(
-        clientSupersededBy(engagement?.reports ?? [report], report),
+        clientSupersededBy(reports, report),
+        report.id,
+        storedClientCurrent(reports),
       );
       return supersession
         ? "Released to the client. " + supersession + "."
@@ -202,6 +254,7 @@ export function packageOpenLabel(report: Report, role: Role, userId: string) {
  * now superseded.
  */
 export function clientNotices(reports: Report[]) {
+  const current = projectedClientCurrent(reports);
   return reports
     .flatMap((r) => (r.notification ? [{ r, n: r.notification }] : []))
     .map(({ r, n }) => ({
@@ -213,7 +266,9 @@ export function clientNotices(reports: Report[]) {
         " was released to " +
         (n.recipients || "your organisation") +
         (r.replaces?.length ? "; it replaces " + r.replaces.join(", ") : "") +
-        (r.supersededBy ? ". " + supersessionText(r.supersededBy) : "") +
+        (r.supersededBy
+          ? ". " + supersessionText(r.supersededBy, r.id, current)
+          : "") +
         ".",
     }))
     .sort((a, b) => b.at.localeCompare(a.at));

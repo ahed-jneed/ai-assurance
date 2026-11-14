@@ -211,6 +211,73 @@ describe("client projection of released reports", () => {
       expect(text).not.toMatch(/has since been superseded/);
   });
 
+  it("does not call an older report current once a later one is released (#234 review)", () => {
+    // R1 released, R2 released (superseding R1), R2 withdrawn, R3 released:
+    // R1 keeps supersededBy = R2, but R3 is the client's current report.
+    const notice = (day: string) => ({
+      actor: "user-lead",
+      at: "2026-11-0" + day + "T10:00:00.000Z",
+      action: "notify_client" as const,
+      reason: "",
+    });
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "superseded",
+        releasedAt: "2026-11-05T10:00:00.000Z",
+        supersededBy: "REPORT-2",
+        recipientScope: "Acme board",
+        history: [notice("5")],
+      }),
+      report("REPORT-2", {
+        state: "withdrawn",
+        releasedAt: "2026-11-06T10:00:00.000Z",
+        supersedes: "REPORT-1",
+        recipientScope: "Acme board",
+        history: [notice("6")],
+      }),
+      report("REPORT-3", {
+        state: "released",
+        releasedAt: "2026-11-07T10:00:00.000Z",
+        recipientScope: "Acme board",
+        history: [notice("7")],
+      }),
+    ];
+    e.reports[1].createdAt = "2026-11-06T10:00:00.000Z";
+    e.reports[2].createdAt = "2026-11-07T10:00:00.000Z";
+    const notices = (reports: Report[]) =>
+      clientNotices(reports).map((n) => [n.reportId, n.text]);
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(notices(client.reports)).toEqual([
+      ["REPORT-3", "Report REPORT-3 was released to Acme board."],
+      [
+        "REPORT-1",
+        "Report REPORT-1 was released to Acme board. Its successor was withdrawn; the current report is REPORT-3.",
+      ],
+    ]);
+    for (const text of notices(client.reports).map(([, t]) => t))
+      expect(text).not.toMatch(/current report again/);
+    // The staff guidance on a report still in state "released" whose
+    // successor was withdrawn says the same.
+    e.reports[0].release!.state = "released";
+    expect(packageGuidance(e.reports[0], e)).toBe(
+      "Released to the client. Its successor was withdrawn; the current report is REPORT-3.",
+    );
+    // Without the later release, REPORT-1 is current again.
+    e.reports.pop();
+    expect(packageGuidance(e.reports[0], e)).toBe(
+      "Released to the client. Its successor was withdrawn, so it is the current report again.",
+    );
+    expect(
+      notices(sanitize(e, caller("Client Viewer", false)).reports),
+    ).toEqual([
+      [
+        "REPORT-1",
+        "Report REPORT-1 was released to Acme board. Its successor was withdrawn, so it is the current report again.",
+      ],
+    ]);
+  });
+
   it("keeps the predecessor client-visible after a later release (#226 review)", () => {
     // R1 released, R2 released (superseding R1), R2 withdrawn, R3 released.
     // releaseReport supersedes only reports in state "released", so R1, which
