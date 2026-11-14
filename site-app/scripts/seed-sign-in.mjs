@@ -70,3 +70,23 @@ export function signInInstructions({
     ),
   ];
 }
+
+/**
+ * What to do when a request of seed:demo is refused (#226 item 7): a built
+ * Worker in trusted-headers mode that answers 403 "no practice membership"
+ * does not let the personas provision their practices, so the seed names the
+ * SELF_SIGNUP setting to start it with. Null when there is nothing to add.
+ * @param {{ status: number, error: string, trustedHeaders: boolean, email: string }} refusal
+ *   `email` is the address of the persona that was refused.
+ * @returns {string | null}
+ */
+export function refusalHint({ status, error, trustedHeaders, email }) {
+  if (
+    !trustedHeaders ||
+    status !== 403 ||
+    !/no practice membership/.test(error)
+  )
+    return null;
+  const domain = email.slice(email.lastIndexOf("@"));
+  return `Start the Worker with --var SELF_SIGNUP:open (or --var SELF_SIGNUP:${domain}, the persona domain) so the personas may provision their practices, then run seed:demo again.`;
+}

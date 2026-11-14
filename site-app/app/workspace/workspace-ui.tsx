@@ -75,16 +75,20 @@ export function Empty({
   icon: Icon,
   title,
   text,
+  children,
 }: {
   icon: React.ComponentType<{ size?: number }>;
   title: string;
   text: string;
+  /** A way on from the empty state, such as a link to a directory. */
+  children?: React.ReactNode;
 }) {
   return (
     <div className="empty-state">
       <Icon size={28} />
       <h3>{title}</h3>
       <p>{text}</p>
+      {children}
     </div>
   );
 }

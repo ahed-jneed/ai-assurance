@@ -13,9 +13,15 @@ export type WorkspaceLink = {
   recordId: string;
   section: string;
 };
+/**
+ * The workspace location a URL names. A link that names a practice without a
+ * view (`?practice=<id>`) opens that practice at the Overview (#225);
+ * useWorkspaceBootstrap opens the Engagements directory instead when the
+ * practice has no engagement to show.
+ */
 export function readWorkspaceLink(search: string): WorkspaceLink | null {
   const q = new URLSearchParams(search),
-    view = q.get("view");
+    view = q.get("view") ?? (q.get("practice") ? "Overview" : null);
   if (!view) return null;
   if (!navigationRoutes.includes(view as NavigationRoute)) return null;
   const value = {
@@ -42,6 +48,19 @@ export function readWorkspaceLink(search: string): WorkspaceLink | null {
   )
     return null;
   return value;
+}
+/**
+ * A practice link without a view (readWorkspaceLink) opens the Overview, or
+ * the Engagements directory when no engagement opened.
+ */
+export function practiceLanding(
+  link: WorkspaceLink,
+  search: string,
+  hasEngagement: boolean,
+): WorkspaceLink {
+  return !hasEngagement && !new URLSearchParams(search).has("view")
+    ? { ...link, module: "Engagements" }
+    : link;
 }
 export function authorizedLink(
   link: WorkspaceLink,

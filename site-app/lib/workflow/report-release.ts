@@ -17,7 +17,7 @@ import {
   currentClientSnapshot,
   legacyPackageMessage,
 } from "../client-projection";
-import { releaseRefusal } from "../preconditions";
+import { packageApprovalRefusal, releaseRefusal } from "../preconditions";
 import { isWithdrawable, releaseState } from "../workflow-state";
 import {
   fail,
@@ -86,8 +86,9 @@ export const reportReleaseCommands: Record<string, WorkflowHandler> = {
         "Prepare a current final package capturing the approved scope and audit program",
       );
     if (!currentClientSnapshot(r)) fail(409, legacyPackageMessage);
-    if (r.actor === c.userId)
-      fail(403, "The report creator cannot approve its package");
+    // The record sheet disables Approve package with the same refusal.
+    const independence = packageApprovalRefusal(r, c.userId);
+    if (independence) fail(independence.status, independence.message);
     if (r.sha256 !== a.internalHash || r.clientSha256 !== a.clientHash)
       fail(409, "Review both exact package hashes");
     r.release ??= { state: "internal", history: [] };

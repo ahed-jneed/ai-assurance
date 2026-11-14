@@ -13,14 +13,30 @@ const clientRole = isClientRole;
 
 /** The engagement checkboxes' flag names: "engagement:<id>". */
 const engagementFlag = "engagement:";
+/**
+ * The engagements the member already held when the form opened:
+ * "granted:<id>". An edit that keeps the role keeps them ticked; withdrawing
+ * one is Team & runtime's work.
+ */
+const grantedFlag = "granted:";
+const flagged = (checks: Record<string, boolean>, prefix: string) =>
+  Object.keys(checks)
+    .filter((key) => key.startsWith(prefix) && checks[key])
+    .map((key) => key.slice(prefix.length));
 /** The engagements ticked in a form that lists them. */
 export const checkedEngagements = (checks: Record<string, boolean>) =>
-  Object.keys(checks)
-    .filter((key) => key.startsWith(engagementFlag) && checks[key])
-    .map((key) => key.slice(engagementFlag.length));
-/** Pre-ticks the given engagements when a form opens. */
+  flagged(checks, engagementFlag);
+/**
+ * Pre-ticks the given engagements when a form opens, and remembers them as
+ * the member's current grants.
+ */
 export const engagementFlags = (ids: string[]) =>
-  Object.fromEntries(ids.map((id) => [engagementFlag + id, true]));
+  Object.fromEntries(
+    ids.flatMap((id) => [
+      [engagementFlag + id, true],
+      [grantedFlag + id, true],
+    ]),
+  );
 
 /**
  * Whether the form starts a fresh grant, which withdraws every earlier
@@ -38,8 +54,14 @@ export function EngagementChecks({
   checks,
   check,
   legend,
+  keepGranted = false,
 }: Pick<ModalFieldsProps, "data" | "checks" | "check"> & {
   legend: string;
+  /**
+   * The member's current grants stay ticked and cannot be cleared here: an
+   * edit that keeps the role only adds engagements (F-24).
+   */
+  keepGranted?: boolean;
 }) {
   const engagements = data?.engagements ?? [],
     assign = !!data && canAssignEngagementAccess(data.identity);
@@ -52,11 +74,18 @@ export function EngagementChecks({
           Assurance workbench → Team & runtime.
         </p>
       )}
+      {assign && keepGranted && (
+        <p className="subtle">
+          Tick engagements to add. To withdraw access to one, use Assurance
+          workbench → Team & runtime; changing the role withdraws all of them
+          and the runner workers this member sponsored.
+        </p>
+      )}
       {engagements.map((g) => (
         <label key={g.id}>
           <input
             type="checkbox"
-            disabled={!assign}
+            disabled={!assign || (keepGranted && !!checks[grantedFlag + g.id])}
             checked={!!checks[engagementFlag + g.id]}
             onChange={(ev) => check(engagementFlag + g.id, ev.target.checked)}
           />
@@ -126,23 +155,22 @@ function MemberFields(props: ModalFieldsProps) {
             onChange={(v) => choice("clientId", v)}
           />
         </label>
-      ) : freshGrant(kind, choices) ? (
+      ) : (
+        // Every staff role, the Engagement Quality Reviewer included, holds
+        // engagement grants (#225), with or without a change of role.
         <EngagementChecks
           {...props}
+          keepGranted={!freshGrant(kind, choices)}
           legend={
-            kind === "memberEdit"
-              ? "Engagements kept with the new role (all others are withdrawn)"
-              : restoring
-                ? "Engagements to grant again"
-                : "Engagement access"
+            !freshGrant(kind, choices)
+              ? "Engagement access"
+              : kind === "memberEdit"
+                ? "Engagements kept with the new role (all others are withdrawn)"
+                : restoring
+                  ? "Engagements to grant again"
+                  : "Engagement access"
           }
         />
-      ) : (
-        <p className="subtle">
-          Assign this member to specific engagements in Assurance workbench →
-          Team & runtime. Changing the role withdraws their engagement access
-          and the runner workers they sponsored.
-        </p>
       )}
       <p className="subtle">
         Site sharing must also allow this person to open the platform.
@@ -158,6 +186,24 @@ function validateMember({ choices }: ModalSubmitContext) {
         : "Choose a role for this member.",
     );
 }
+/**
+ * The engagements a membership form sends. A fresh grant lists them all
+ * explicitly and nothing earlier is restored (F-24); an edit that keeps the
+ * role sends only those ticked that the member did not already hold, which
+ * the server adds to the kept grants.
+ */
+function engagementGrant(
+  kind: string,
+  choices: Record<string, string>,
+  checks: Record<string, boolean>,
+) {
+  if (clientRole(choices.role)) return {};
+  if (freshGrant(kind, choices))
+    return { engagementIds: checkedEngagements(checks) };
+  const held = new Set(flagged(checks, grantedFlag)),
+    added = checkedEngagements(checks).filter((id) => !held.has(id));
+  return added.length ? { engagementIds: added } : {};
+}
 const saveMember =
   (op: "grantMember" | "updateMember") =>
   ({ manage, choices, checks, values: v, kind }: ModalSubmitContext) =>
@@ -166,11 +212,7 @@ const saveMember =
       displayName: v.displayName,
       role: choices.role,
       clientId: clientRole(choices.role) ? choices.clientId || null : null,
-      // A fresh grant lists its engagements explicitly; nothing earlier is
-      // restored (F-24).
-      ...(!clientRole(choices.role) && freshGrant(kind, choices)
-        ? { engagementIds: checkedEngagements(checks) }
-        : {}),
+      ...engagementGrant(kind, choices, checks),
     });
 export const memberModal: ModalDefinition = {
   title: "Add member",

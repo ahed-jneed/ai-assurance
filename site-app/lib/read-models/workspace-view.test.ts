@@ -537,3 +537,62 @@ describe("engagement loading", () => {
     expect(missing.startsWith(tenantId + "/ENG-C/immutable/")).toBe(true);
   });
 });
+
+// #225 item 5: the Client submissions panel names the contributors who hold
+// grants on the engagement, for the roles that write audit work, with
+// nothing beyond their name and whether their membership is active.
+describe("the client grant holders", () => {
+  it("names each holder and their state for writers only", async () => {
+    const engagements = three();
+    for (const [id, userId] of [
+      ["GR-1", "contributor"],
+      ["GR-2", "contributor"],
+      ["GR-3", "former"],
+      ["GR-4", "gone"],
+    ])
+      engagements[0].workflow!.clientGrants.push({
+        id,
+        userId,
+        requestId: "REQ-" + id,
+        active: true,
+        at: "2026-11-01T00:00:00.000Z",
+        expiresAt: "2099-01-01T00:00:00.000Z",
+      } as never);
+    const { sqlite } = await practice(engagements);
+    sqlite
+      .prepare(
+        "INSERT INTO memberships(tenant_id,user_id,role,client_id,display_name,status,email) VALUES(?,'former','Client Contributor','CL-1','Former Contributor','revoked','former@client.invalid')",
+      )
+      .run(tenantId);
+    sqlite
+      .prepare(
+        "UPDATE memberships SET display_name='Casey Contributor',email='casey@client.invalid' WHERE user_id='contributor'",
+      )
+      .run();
+    const holders = [
+      {
+        user_id: "contributor",
+        display_name: "Casey Contributor",
+        active: true,
+      },
+      { user_id: "former", display_name: "Former Contributor", active: false },
+    ];
+    for (const ctx of [lead(), auditor()]) {
+      const view = await workspaceView(ctx, "ENG-A");
+      expect(view.clientGrantHolders, ctx.role).toEqual(holders);
+      expect(JSON.stringify(view.clientGrantHolders)).not.toContain("@");
+    }
+    for (const ctx of [
+      member("reviewer", "Reviewer"),
+      member("contributor", "Client Contributor", "CL-1"),
+    ])
+      expect(
+        (await workspaceView(ctx, null)).clientGrantHolders,
+        ctx.role,
+      ).toEqual([]);
+    // Without grants there are no holders.
+    expect((await workspaceView(lead(), "ENG-B")).clientGrantHolders).toEqual(
+      [],
+    );
+  });
+});

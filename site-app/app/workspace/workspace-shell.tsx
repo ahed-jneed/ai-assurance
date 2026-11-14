@@ -31,6 +31,7 @@ import { AttestProvider, useAttestation } from "./attestation-dialog";
 import { ClientPortalHeader as ClientPortalHeaderView } from "./client-portal-shell";
 import { useLabIntent } from "./lab-intent";
 import { ModalHost } from "./modal-host";
+import { NoAccessShell } from "./no-access-shell";
 import { useModelContextTools } from "./model-context-tools";
 import {
   navigationGuard,
@@ -123,7 +124,11 @@ export default function Workspace() {
     viewer = isClientRole(role),
     // A loaded client account gets the client portal shell instead of the
     // practice sidebar (#36, F-72).
-    portal = !!data && viewer;
+    portal = !!data && viewer,
+    // A signed-in account with no active role (never a member, revoked staff
+    // or a revoked client member) gets the minimal shell: no navigation,
+    // breadcrumb or search, only who is signed in and Sign out (#225).
+    noAccess = !data && workspace.accessDenied;
   const editing = useEditingRegistry();
   const url = useUrlState(data);
   const modal = useModalState();
@@ -161,6 +166,7 @@ export default function Workspace() {
     : "files";
   const guarded = navigationGuard({
     busy,
+    isBusy: workspace.isBusy,
     loading,
     bootstrapping,
     modal: modal.modal,
@@ -265,10 +271,11 @@ export default function Workspace() {
         <AccountMenu
           data={data}
           signedIn={signedIn}
-          side={portal ? "bottom" : "right"}
+          accountName={workspace.deniedAccount}
+          side={portal || noAccess ? "bottom" : "right"}
         />
       ),
-      [data, signedIn, portal],
+      [data, signedIn, portal, noAccess, workspace.deniedAccount],
     ),
     identityStatus = data
       ? data.identity.role
@@ -281,6 +288,15 @@ export default function Workspace() {
             : "Signing in…";
   const attest = handlers.attest;
   if (workspace.signedOut) return <SignedOut />;
+  if (noAccess)
+    return (
+      <NoAccessShell
+        name={workspace.deniedAccount}
+        error={workspace.error}
+        account={account}
+        onRetry={workspace.retry}
+      />
+    );
   // Reloading a failed view reloads the open engagement, then renders it
   // again; the rest of the workspace and its unsaved entries are kept.
   const reloadView = () => workspace.load(data?.tenantId, e?.id);

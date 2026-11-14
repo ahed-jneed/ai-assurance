@@ -3,6 +3,7 @@ import { sanitize } from "@/lib/client-projection";
 import { dispatch } from "@/lib/commands";
 import { short } from "@/lib/commands/fields";
 import { getEngagement, save } from "@/lib/engagement-repo";
+import { currentUser } from "@/lib/identity";
 import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
 import {
   engagementTrail,
@@ -20,8 +21,21 @@ export async function GET(request: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    return responseError(error);
+    return refusedWorkspace(error) ?? responseError(error);
   }
+}
+/**
+ * A refused workspace (no active role: never a member, revoked or archived)
+ * still names the signed-in account, so the minimal shell shows who is
+ * signed in (#225). Only the caller's own display name is sent.
+ */
+function refusedWorkspace(error: unknown) {
+  const user = currentUser();
+  if (!(error instanceof ApiError) || error.status !== 403 || !user) return;
+  return Response.json(
+    { error: error.message, account: { name: user.displayName } },
+    { status: 403, headers: { "Cache-Control": "no-store" } },
+  );
 }
 /**
  * The saved engagement's audit trail and stored size, or nothing when they

@@ -724,7 +724,13 @@ await withWorker(
     ])
       assert.deepEqual(
         await call(url, gone),
-        { status: 403, body: { error: archivedMessage } },
+        {
+          status: 403,
+          // The workspace refusal also names the signed-in account (#225).
+          body: url.startsWith("/api/workspace")
+            ? { error: archivedMessage, account: { name: "Gone" } }
+            : { error: archivedMessage },
+        },
         url,
       );
     // Its issued records stay retained and verifiable.

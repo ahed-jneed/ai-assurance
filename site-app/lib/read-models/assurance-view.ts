@@ -16,6 +16,7 @@ import {
 import { db } from "../bindings";
 import { loadEngagement } from "../engagement-repo";
 import { ApiError } from "../http";
+import { assignableRoles } from "../permissions";
 import type { Context } from "../tenancy";
 import { isClientRole } from "../workflow-state";
 // Client roles never read the assurance workbench. The workbench needs the
@@ -31,7 +32,8 @@ async function internalEngagement(ctx: Context, engagementId: string) {
  * records: only how many the engagement holds in all and of each kind, its
  * 100 most recent external
  * jobs (each marked when already compiled into a draft paper), enrolled
- * workers and access grants, the members a Lead Auditor may grant access to,
+ * workers and access grants, the members a Lead Auditor may grant access to
+ * (every active staff member, the Engagement Quality Reviewer included),
  * the caller's review queue (counts and the next assessment of each), what
  * the platform can and cannot attest, and the external queue's telemetry over
  * every job. Client roles are refused. The workbench reads records by search,
@@ -76,9 +78,12 @@ export async function assuranceView(ctx: Context, engagementId: string) {
         ? (
             await db()
               .prepare(
-                "SELECT user_id,display_name,role FROM memberships WHERE tenant_id=? AND status='active' AND role IN ('Lead Auditor','Auditor','Reviewer')",
+                "SELECT user_id,display_name,role FROM memberships WHERE tenant_id=? AND status='active' AND role IN (SELECT value FROM json_each(?))",
               )
-              .bind(ctx.tenantId)
+              .bind(
+                ctx.tenantId,
+                JSON.stringify(assignableRoles.engagementAccess),
+              )
               .all()
           ).results
         : [],

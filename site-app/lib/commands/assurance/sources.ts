@@ -4,7 +4,7 @@ import {
   sampleRecords,
   sampleSchema,
 } from "../../assurance-core";
-import { packetSummary } from "../../assurance-packet";
+import { packetRefusal, packetSummary } from "../../assurance-packet";
 import { addRecord } from "../../assurance-store";
 import { bucket } from "../../bindings";
 import { parseCSV } from "../../diagnostics";
@@ -54,7 +54,15 @@ export const sources: AssuranceModule = defineCommands({
       const bytes = await o.arrayBuffer();
       if ((await sha256(bytes)) !== source.sha256)
         throw new ApiError(409, "Packet integrity mismatch");
-      const summary = packetSummary(parseJsonFile(bytes, "assurance packet"));
+      const packet = parseJsonFile(bytes, "assurance packet");
+      let summary: ReturnType<typeof packetSummary>;
+      try {
+        summary = packetSummary(packet);
+      } catch (error) {
+        if (error instanceof z.ZodError)
+          throw new ApiError(400, packetRefusal(error));
+        throw error;
+      }
       return {
         record: await addRecord(
           ctx,

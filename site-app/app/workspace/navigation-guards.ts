@@ -76,6 +76,14 @@ export function useEditingRegistry() {
 
 export type NavigationGuardState = {
   busy: boolean;
+  /**
+   * Whether a workspace command is in flight when the guard runs; it wins
+   * over `busy`. The shell's handlers are stable and call the guard of the
+   * render committed last, so a handler run when a command resolves, such
+   * as opening the run "Queue planned evaluation" queued (#226 item 3),
+   * would otherwise still see that render's `busy`.
+   */
+  isBusy?: () => boolean;
   loading: boolean;
   bootstrapping: boolean;
   /** The open form dialog, "" when none. */
@@ -101,7 +109,12 @@ export type NavigationGuardState = {
  */
 export function navigationGuard(state: NavigationGuardState) {
   return function guarded(next: () => void): NavigationResult {
-    if (state.busy || state.loading || state.bootstrapping) return "busy";
+    if (
+      (state.isBusy ? state.isBusy() : state.busy) ||
+      state.loading ||
+      state.bootstrapping
+    )
+      return "busy";
     if (state.modal && !state.isModalSubmitting()) {
       toast.info("Finish or cancel this form before changing workspace.");
       return "editor_open";

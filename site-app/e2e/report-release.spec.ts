@@ -17,7 +17,14 @@ import {
   run,
   type Engagement,
 } from "./engagement";
-import { expect, recordPath, runCommand, test, type Api } from "./fixtures";
+import {
+  expect,
+  recordPath,
+  runCommand,
+  test,
+  workspacePath,
+  type Api,
+} from "./fixtures";
 
 type Report = { id: string; sha256: string; clientSha256: string };
 
@@ -107,6 +114,18 @@ test("a released report is superseded by the next release", async ({
     }),
   ).toEqual({ status: 409, error: "Review both exact package hashes" });
 
+  // The creator's record sheet shows Approve package disabled with the
+  // server's reason (#226 item 5).
+  const page = await signIn("qa-lead");
+  await page.goto(reportPath(e, first));
+  const own = page.getByRole("dialog");
+  await expect(
+    own.getByRole("button", { name: "Approve package" }),
+  ).toBeDisabled();
+  await expect(
+    own.getByText("The report creator cannot approve its package"),
+  ).toBeVisible();
+
   // The Reviewer approves both exact packages in the report's record sheet.
   const review = await signIn("qa-reviewer");
   await review.goto(reportPath(e, first));
@@ -138,7 +157,6 @@ test("a released report is superseded by the next release", async ({
   });
 
   // The Lead Auditor releases it; the client sees it.
-  const page = await signIn("qa-lead");
   await releaseInUi(page, e, first);
   const released = await releaseOf(lead, e, first);
   expect(released.state).toBe("released");
@@ -184,4 +202,37 @@ test("a released report is superseded by the next release", async ({
       ),
   ).toBeVisible();
   await expectAccessible(clientPage, "Superseded report for the client");
+
+  // The Lead withdraws the successor: the client reads the first report
+  // again, and the first report's sheet and the Reports & sign-off banner
+  // say so, from the client projection's answer (#226 item 6).
+  await page.goto(reportPath(e, second));
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  const withdrawal = page.getByRole("dialog", {
+    name: "Withdraw report package",
+  });
+  await withdrawal
+    .getByLabel("Review decision and rationale")
+    .fill("The amended report is withdrawn pending correction.");
+  await runCommand(page, "withdrawReport", () =>
+    withdrawal.getByRole("button", { name: "Withdraw package" }).click(),
+  );
+  await expect(withdrawal).toBeHidden();
+  expect(
+    (await engagementOf(viewer, e)).reports.map((r: { id: string }) => r.id),
+  ).toEqual([first.id]);
+  const notice = `Its successor ${second.id} was withdrawn. The client still reads this report.`;
+  await page.goto(reportPath(e, first));
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText(notice)).toBeVisible();
+  await expect(
+    sheet.getByText("Superseded by a newer released report"),
+  ).toHaveCount(0);
+  await expect(
+    sheet.getByRole("button", { name: "Withdraw", exact: true }),
+  ).toBeEnabled();
+  await page.goto(workspacePath(e, "Reports & sign-off"));
+  await expect(page.getByTestId("client-still-reads")).toHaveText(
+    `${first.id}: ${notice}`,
+  );
 });

@@ -14,7 +14,8 @@ import { opinionLabel } from "@/lib/domain/report-model";
 import { packageGuidance, packageStatusLabel } from "@/lib/report-presentation";
 import { releaseApprovalMessage, releaseRefusal } from "@/lib/preconditions";
 import { isWithdrawable, releaseState } from "@/lib/workflow-state";
-import { can } from "@/lib/permissions";
+import { can, decisionState } from "@/lib/permissions";
+import { DecisionButton } from "../workspace/decision-button";
 import { FrozenReportDetails } from "../report-details";
 import { area, checklistOptions, choice, label, reason } from "./fields";
 import { WorkflowDialog, type Form, type WorkflowAct } from "./workflow-dialog";
@@ -77,8 +78,14 @@ export function ReportRelease({
         {reviewer &&
           r.kind === "final" &&
           ["internal", "approved"].includes(state) && (
-            <Button
-              disabled={busy || r.actor === userId || !r.snapshot.workflow}
+            <DecisionButton
+              // Disabled for the report's creator with the reason the server
+              // refuses them with (#226 item 5).
+              state={decisionState(role, userId, {
+                action: "approveReportPackage",
+                report: r,
+              })}
+              disabled={busy || !r.snapshot.workflow}
               title={
                 !r.snapshot.workflow
                   ? "Prepare a current final package capturing the approved scope and program"
@@ -127,7 +134,7 @@ export function ReportRelease({
               }
             >
               Approve package
-            </Button>
+            </DecisionButton>
           )}
         {lead && state === "approved" && (
           <Button

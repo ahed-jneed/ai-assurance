@@ -51,13 +51,21 @@ const engagement = (id: string) => {
   return e;
 };
 /** Two engagements of one practice; ENG-A holds a malformed JSON file. */
-async function seed() {
+async function seed(extra: Record<string, string> = {}) {
   const a = engagement("ENG-A"),
     b = engagement("ENG-B");
-  const file = await artifact("ENG-A", "EV-BAD", "packet.json", broken);
-  a.artifacts.push(file);
+  const files = [
+    await artifact("ENG-A", "EV-BAD", "packet.json", broken),
+    ...(await Promise.all(
+      Object.entries(extra).map(([id, text]) =>
+        artifact("ENG-A", id, id + ".json", text),
+      ),
+    )),
+  ];
+  a.artifacts.push(...files);
   store = await practice([a, b]);
-  await env.BUCKET!.put(file.key, broken);
+  await env.BUCKET!.put(files[0].key, broken);
+  for (const f of files.slice(1)) await env.BUCKET!.put(f.key, extra[f.id]);
 }
 async function op(
   engagementId: string,
@@ -114,6 +122,55 @@ describe("importing a file that is not JSON", () => {
     );
     expect(error.status).toBe(400);
     expect(error.message).toBe("This briefing file is not valid JSON");
+  });
+});
+
+describe("importing valid JSON that is not an assurance packet (#226 item 4)", () => {
+  const packetRefusal = async (text: string) => {
+    await seed({ "EV-JSON": text });
+    const error = await refusal(
+      op("ENG-A", "importPacket", {
+        artifactId: "EV-JSON",
+        assessment: "Not a packet fixture",
+      }),
+    );
+    return [error.status, error.message];
+  };
+  const unsupported =
+    "This file is not a supported assurance packet (expected packet version 1.0)";
+
+  it("names the supported version and the first missing field in plain words", async () => {
+    expect(await packetRefusal(JSON.stringify({ hello: "world" }))).toEqual([
+      400,
+      unsupported +
+        ". The first missing field is the packet version (schemaVersion)",
+    ]);
+    expect(
+      await packetRefusal(JSON.stringify({ schemaVersion: "1.0" })),
+    ).toEqual([
+      400,
+      unsupported + ". The first missing field is the packet type (type)",
+    ]);
+  });
+
+  it("names a missing field of a known packet type", async () => {
+    expect(
+      await packetRefusal(
+        JSON.stringify({ schemaVersion: "1.0", type: "registry_snapshot" }),
+      ),
+    ).toEqual([
+      400,
+      unsupported + ". The first missing field is the provider (provider)",
+    ]);
+  });
+
+  it("says only that the file is unsupported when no field is missing", async () => {
+    expect(
+      await packetRefusal(
+        JSON.stringify({ schemaVersion: "2.0", type: "sampling" }),
+      ),
+    ).toEqual([400, unsupported]);
+    expect(await packetRefusal("[1, 2]")).toEqual([400, unsupported]);
   });
 });
 

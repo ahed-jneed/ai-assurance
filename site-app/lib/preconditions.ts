@@ -8,7 +8,22 @@ import type { Engagement, Report } from "./domain/types";
 import type { MonitoringCase } from "./workflow-types";
 
 /** Why a decision is refused: the server's status and message. */
-export type Refusal = { status: 400 | 409; message: string };
+export type Refusal = { status: 400 | 403 | 409; message: string };
+
+/**
+ * Why `approverId` may not approve this captured package (#226 item 5):
+ * approveReportPackage refuses its creator with 403 and this message, and
+ * the report record sheet shows the same reason on its disabled "Approve
+ * package". Null when the independence rule admits them.
+ */
+export function packageApprovalRefusal(
+  r: Pick<Report, "actor">,
+  approverId: string,
+): Refusal | null {
+  return r.actor === approverId
+    ? { status: 403, message: "The report creator cannot approve its package" }
+    : null;
+}
 
 export const releaseApprovalMessage =
   "A different independent approver must approve both exact packages before release";

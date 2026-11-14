@@ -33,6 +33,23 @@ export const isClientVisible = (report: Report) =>
   !!report.clientSnapshot &&
   !!report.clientSha256;
 /**
+ * The successor of a superseded report that the client can no longer read
+ * (withdrawn after its release), or undefined. The client projection then
+ * no longer names that successor, and the client still reads this report as
+ * its current one (#201); the report record sheet and the Reports & sign-off
+ * banner say so from the same answer (#226 item 6).
+ */
+export function withdrawnSuccessorOf(
+  reports: readonly Report[],
+  report: Report,
+): string | undefined {
+  const successor = report.release?.supersededBy;
+  if (!successor || !isClientVisible(report)) return undefined;
+  return reports.some((q) => q.id === successor && isClientVisible(q))
+    ? undefined
+    : successor;
+}
+/**
  * Whether a Lead Auditor may withdraw the report: an approved or released
  * package, and a superseded one the client can still read (#201). Once its
  * successor is withdrawn, a superseded report is the client's only report and

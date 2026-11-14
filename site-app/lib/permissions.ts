@@ -5,8 +5,9 @@
 // this map with every one of them, so a button is shown exactly to the roles
 // the server lets through, and hidden or disabled with the server's reason
 // for everyone else.
-import type { Engagement, Finding, Paper, Role } from "./domain/types";
+import type { Engagement, Finding, Paper, Report, Role } from "./domain/types";
 import { qualityReviewerOps } from "./domain/quality-review";
+import { packageApprovalRefusal } from "./preconditions";
 
 const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   reviewers: readonly Role[] = ["Reviewer", "Lead Auditor"],
@@ -273,8 +274,12 @@ export const assignableRoles = {
   reviewer: reviewers,
   /** A member of the engagement team in the acceptance record. */
   team: internal,
-  /** An internal member a Lead Auditor grants engagement access (setAccess). */
-  engagementAccess: internal,
+  /**
+   * A staff member a Lead Auditor grants engagement access (setAccess), the
+   * Engagement Quality Reviewer included (#225): access lets them open the
+   * engagement, and the action map still keeps them to the quality review.
+   */
+  engagementAccess: staff,
   /** A client member granted one evidence request (grantClientRequest). */
   clientRequest: clientContributor,
   /**
@@ -454,6 +459,7 @@ export function decisionState(
     | { action: "signPaper"; paper: Paper }
     | { action: "closeFinding"; finding: Finding }
     | { action: "approveClassification"; engagement: Engagement }
+    | { action: "approveReportPackage"; report: Report }
     | { action: NarrowedAction; engagement: Engagement }
     | {
         action: Exclude<
@@ -462,6 +468,7 @@ export function decisionState(
           | "signPaper"
           | "closeFinding"
           | "approveClassification"
+          | "approveReportPackage"
           | NarrowedAction
         >;
       },
@@ -514,6 +521,10 @@ export function decisionState(
             "An independent reviewer must approve a completed classification",
           )
         : allowed;
+    }
+    case "approveReportPackage": {
+      const refusal = packageApprovalRefusal(decision.report, userId);
+      return refusal ? refused(refusal.message) : allowed;
     }
     default:
       return allowed;

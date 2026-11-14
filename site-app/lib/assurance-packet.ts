@@ -19,6 +19,36 @@ const base = z
     assumptions: z.array(z.string().max(10000)).max(100).optional(),
   })
   .passthrough();
+const fieldWords: Record<string, string> = {
+  schemaVersion: "packet version",
+  type: "packet type",
+};
+/**
+ * What the auditor reads when a JSON file is not a packet this platform
+ * imports (#226 item 4): the supported version and at most the first missing
+ * field in plain words, never the validator's own text.
+ */
+export function packetRefusal(error: z.ZodError): string {
+  const missing = error.issues.find(
+    (i) =>
+      i.path.length > 0 &&
+      ((i.code === "invalid_type" && i.received === "undefined") ||
+        (i.code === "invalid_literal" && i.received === undefined)),
+  );
+  const field = missing?.path.map(String).join(".") ?? "";
+  const words =
+    fieldWords[field] ??
+    field
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/\./g, " ")
+      .toLowerCase();
+  return (
+    "This file is not a supported assurance packet (expected packet version 1.0)" +
+    (missing
+      ? ". The first missing field is the " + words + " (" + field + ")"
+      : "")
+  );
+}
 export function packetSummary(value: unknown) {
   const p = base.parse(value),
     common = {

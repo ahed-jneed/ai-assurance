@@ -150,6 +150,20 @@ describe("navigationGuard", () => {
     ).toBe("editor_open");
   });
 
+  it("reads whether a command is in flight as it is now, ahead of the render (#226)", () => {
+    // "Queue planned evaluation" opens the queued run when queueRun
+    // resolves: the stable handler calls the guard of the render committed
+    // last, which still holds busy, while the command itself has finished.
+    const next = vi.fn();
+    expect(
+      navigationGuard({ ...clear, busy: true, isBusy: () => false })(next),
+    ).toBe("opened");
+    expect(next).toHaveBeenCalledOnce();
+    expect(navigationGuard({ ...clear, isBusy: () => true })(vi.fn())).toBe(
+      "busy",
+    );
+  });
+
   it("asks to discard unsaved paper edits and defers the change", () => {
     const next = vi.fn(),
       confirmDiscard = vi.fn();

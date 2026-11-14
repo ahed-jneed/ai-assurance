@@ -13,7 +13,11 @@ import type {
 import type { Classification } from "./domain/classification";
 import { paperCurrent } from "./domain/gates";
 import type { Context } from "./tenancy";
-import { isClientRole, isClientVisible } from "./workflow-state";
+import {
+  isClientRole,
+  isClientVisible,
+  withdrawnSuccessorOf,
+} from "./workflow-state";
 import type { Brief, ClientGrant, Submission } from "./workflow-types";
 
 /**
@@ -325,11 +329,9 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       // A successor the client cannot read (withdrawn after release) is not
       // named.
       ...(r.release?.supersededBy && {
-        supersededBy: e.reports.some(
-          (q) => q.id === r.release!.supersededBy && isClientVisible(q),
-        )
-          ? r.release.supersededBy
-          : withdrawnSuccessor,
+        supersededBy: withdrawnSuccessorOf(e.reports, r)
+          ? withdrawnSuccessor
+          : r.release.supersededBy,
       }),
       ...(clientNotification(r) && { notification: clientNotification(r) }),
     })),
