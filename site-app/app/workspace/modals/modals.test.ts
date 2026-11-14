@@ -21,6 +21,7 @@ import { requestFormDefaults } from "./evidence-request";
 import { procedureFindingDefaults } from "./finding";
 import { remediationDefaults } from "./finding-edit";
 import { modalDefinition, modalKinds } from "./index";
+import { engagementFlags } from "./member";
 import type { ModalFieldsProps, ModalSubmitContext } from "./types";
 
 const draftPaper = {
@@ -306,7 +307,7 @@ describe("form submission", () => {
     });
     const rename = context("memberEdit", {
       choices: { userId: "u9", role: "Auditor", originalRole: "Auditor" },
-      checks: { "engagement:e1": true },
+      checks: engagementFlags(["e1"]),
       values: { displayName: "Avery B." },
     });
     await submit("memberEdit", rename);
@@ -315,6 +316,25 @@ describe("form submission", () => {
       displayName: "Avery B.",
       role: "Auditor",
       clientId: null,
+    });
+    // #225: an edit that keeps the role adds the engagements ticked beyond
+    // the member's current grants, for every staff role.
+    const add = context("memberEdit", {
+      choices: {
+        userId: "u8",
+        role: "Engagement Quality Reviewer",
+        originalRole: "Engagement Quality Reviewer",
+      },
+      checks: { ...engagementFlags(["e1"]), "engagement:e2": true },
+      values: { displayName: "Quinn" },
+    });
+    await submit("memberEdit", add);
+    expect(add.manage).toHaveBeenCalledWith("updateMember", {
+      userId: "u8",
+      displayName: "Quinn",
+      role: "Engagement Quality Reviewer",
+      clientId: null,
+      engagementIds: ["e2"],
     });
     const promote = context("memberEdit", {
       choices: { userId: "u9", role: "Reviewer", originalRole: "Auditor" },

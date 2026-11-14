@@ -9,8 +9,9 @@ import { defineCommands } from "../command";
 import { note, short } from "../fields";
 import type { AssuranceModule } from "./target";
 /**
- * Who may open the engagement: a Lead Auditor grants or revokes an internal
- * member's access and records the reason.
+ * Who may open the engagement: a Lead Auditor grants or revokes a staff
+ * member's access (lib/permissions.ts assignableRoles.engagementAccess, the
+ * Engagement Quality Reviewer included) and records the reason.
  */
 export const access: AssuranceModule = defineCommands({
   setAccess: {
@@ -25,12 +26,12 @@ export const access: AssuranceModule = defineCommands({
       if (
         !(await db()
           .prepare(
-            "SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='active' AND role IN ('Auditor','Lead Auditor','Reviewer')",
+            "SELECT 1 FROM memberships WHERE tenant_id=? AND user_id=? AND status='active' AND role IN ('Auditor','Lead Auditor','Reviewer','Engagement Quality Reviewer')",
           )
           .bind(ctx.tenantId, v.userId)
           .first())
       )
-        throw new ApiError(400, "Select an active internal member");
+        throw new ApiError(400, "Select an active staff member");
       // A grant applies the conflict that refuses assigning the person to
       // the team (lib/workflow/acceptance.ts); a revocation never waits.
       const conflict = v.active && accessConflict(e, v.userId);
