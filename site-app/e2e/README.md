@@ -20,10 +20,10 @@ build (`e2e/build-files.mjs`: the entry, every module it imports, the assets
 directory and the client assets the RSC manifest names) and, if an interrupted
 build left files out, names them and exits with "run `npm run build`" before
 it touches the database. `e2e/*.test.ts` are Vitest unit tests of this tooling;
-Playwright runs only `e2e/*.spec.ts`. The server then deletes `.wrangler/e2e-state`, applies
-every migration with `npm run db:migrate:local -- --persist-to
-.wrangler/e2e-state`, and starts the built Worker in Miniflare (with the
-bindings and assets of `dist/server/wrangler.json`) with
+Playwright runs only `e2e/*.spec.ts`. The server then deletes
+`.wrangler/e2e-state`, applies every migration with `npm run db:migrate:local
+-- --persist-to .wrangler/e2e-state`, and starts the built Worker in Miniflare
+(with the bindings and assets of `dist/server/wrangler.json`) with
 `IDENTITY_MODE=trusted-headers`, `IDENTITY_TRUSTED_HEADERS=loopback-tests` and
 `SELF_SIGNUP=@personas.test` (`docs/security/identity.md`): self-signup is off
 outside the development server, so only the persona domain may provision the
