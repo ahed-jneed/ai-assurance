@@ -107,7 +107,9 @@ describe("the Reports & sign-off banner after approval and release", () => {
   it("follows a released package", () => {
     const text = banner("released");
     expect(text).not.toContain("Final capture blocked");
-    expect(text).toContain("Released to the client.");
+    expect(text).toContain("Released to the client as its current report.");
+    // The latest released report is never called superseded (#234 item 4).
+    expect(text).not.toMatch(/supersedes it/);
   });
 });
 
