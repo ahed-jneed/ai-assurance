@@ -119,6 +119,7 @@ export function WorkspaceNavigation({
   width,
   onWidthChange,
   account,
+  identityStatus,
 }: {
   data: WorkspaceData | null;
   view: string;
@@ -136,6 +137,11 @@ export function WorkspaceNavigation({
   onWidthChange: (width: number) => void;
   /** The account menu (app/account-menu.tsx), beside the signed-in identity. */
   account?: ReactNode;
+  /**
+   * The line under the name: the role, or while no identity is loaded
+   * "Signing in…", the refusal or the failure (#202).
+   */
+  identityStatus?: string;
 }) {
   const { open, setOpen, openMobile, setOpenMobile, isMobile, toggleSidebar } =
     useSidebar();
@@ -665,7 +671,9 @@ export function WorkspaceNavigation({
             </span>
             <div>
               <b>{data?.identity.name ?? "Audit workspace"}</b>
-              <small>{data?.identity.role ?? "Signing in…"}</small>
+              <small>
+                {data?.identity.role ?? identityStatus ?? "Signing in…"}
+              </small>
             </div>
             {account}
             <Popover>

@@ -130,6 +130,26 @@ describe("navigationGuard", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("reads the editors as last reported, ahead of the render (#202)", () => {
+    // A workbench action that has finished reports the workbench idle and
+    // opens the compiled paper in the same effect: the guard built by the
+    // earlier render still holds editorOpen, the report does not.
+    const next = vi.fn();
+    expect(
+      navigationGuard({
+        ...clear,
+        editorOpen: true,
+        view: "Assurance workbench",
+        isEditorOpen: () => false,
+      })(next),
+    ).toBe("opened");
+    expect(next).toHaveBeenCalledOnce();
+    expect(info).not.toHaveBeenCalled();
+    expect(
+      navigationGuard({ ...clear, isEditorOpen: () => true })(vi.fn()),
+    ).toBe("editor_open");
+  });
+
   it("asks to discard unsaved paper edits and defers the change", () => {
     const next = vi.fn(),
       confirmDiscard = vi.fn();

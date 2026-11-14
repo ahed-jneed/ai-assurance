@@ -21,7 +21,8 @@ export function WorkspaceTopbar({
   view: string;
   /** The client selected in the practice-management views. */
   clientId: string | null;
-  role: Role;
+  /** The account's role, or null until (or unless) an identity loads. */
+  role: Role | null;
   searchDisabled: boolean;
   onSearch: () => void;
   onNavigate: (view: string) => void;
@@ -97,10 +98,12 @@ export function WorkspaceTopbar({
           <span>Search</span>
           <kbd>Ctrl K</kbd>
         </Button>
-        <span className="topbar-access">
-          <LockKeyhole size={13} aria-hidden="true" />
-          {role}
-        </span>
+        {role && (
+          <span className="topbar-access">
+            <LockKeyhole size={13} aria-hidden="true" />
+            {role}
+          </span>
+        )}
       </div>
     </header>
   );

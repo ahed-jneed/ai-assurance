@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { RefreshCw } from "lucide-react";
 import { can, canBeAssigned } from "@/lib/permissions";
 import { errorMessage, postJson } from "@/lib/fetch-json";
@@ -32,7 +39,7 @@ import { SamplingSection } from "./sampling-section";
 import { downloadPacket, submitValues } from "./submit-values";
 import { SystemsSection } from "./systems-section";
 import { TokenDialog } from "./token-dialog";
-import type { ActResult } from "./types";
+import { predictionOptionLabel, type ActResult } from "./types";
 import { useWorkbenchData } from "./use-workbench-data";
 import { useWorkbenchForm } from "./use-workbench-form";
 import { RecordFilters, WorkbenchBar } from "./workbench-bar";
@@ -145,6 +152,19 @@ export function AssuranceWorkbench({
     onEditing(dirty || busy);
     return () => onEditing(false);
   }, [dirty, busy, onEditing]);
+  // A compiled draft paper opens once the action has settled (the effect
+  // above has reported the workbench idle) and the refreshed engagement
+  // holds it (#202). The compile records it before that render commits.
+  const compiledPaper = useRef<string | null>(null);
+  const compiled = useCallback((paperId: string) => {
+    compiledPaper.current = paperId;
+  }, []);
+  useEffect(() => {
+    const id = compiledPaper.current;
+    if (!id || busy || !e.papers.some((p) => p.id === id)) return;
+    compiledPaper.current = null;
+    onPaper(id);
+  }, [busy, e.papers, onPaper]);
   // Selecting another record clears the unsaved-review flag.
   const [dirtyRecord, setDirtyRecord] = useState(location.recordId);
   if (dirtyRecord !== location.recordId) {
@@ -186,8 +206,10 @@ export function AssuranceWorkbench({
       kind(k).map((r) => ({
         value: r.id,
         label:
-          (r.body.name ?? r.body.label ?? r.body.statement ?? r.id) +
-          (r.body.version ? " · " + r.body.version : ""),
+          r.kind === "prediction"
+            ? predictionOptionLabel(r, e)
+            : (r.body.name ?? r.body.label ?? r.body.statement ?? r.id) +
+              (r.body.version ? " · " + r.body.version : ""),
       })),
     artifacts = e.artifacts.filter((a) => a.status === "accepted"),
     artifactOptions = (category?: string) =>
@@ -435,7 +457,7 @@ export function AssuranceWorkbench({
               onSystems={() => selectSection("systems")}
               onNavigate={onNavigate}
               onHosted={onHosted}
-              onPaper={onPaper}
+              onCompiled={compiled}
             />
           )}
           {tab === "evidence" && (

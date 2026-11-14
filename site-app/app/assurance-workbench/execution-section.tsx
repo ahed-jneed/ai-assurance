@@ -28,7 +28,7 @@ export function ExecutionSection({
   onSystems,
   onNavigate,
   onHosted,
-  onPaper,
+  onCompiled,
 }: {
   snapshot: Snapshot;
   records: AssuranceRecord[];
@@ -42,7 +42,8 @@ export function ExecutionSection({
   onSystems: () => void;
   onNavigate: (s: string) => void;
   onHosted: (procedureId: string, cardId: string) => void;
-  onPaper: (id: string) => void;
+  /** A draft paper was compiled; the workbench opens it once settled. */
+  onCompiled: (paperId: string) => void;
 }) {
   return (
     <>
@@ -113,7 +114,7 @@ export function ExecutionSection({
                     void act("importJob", { jobId: j.id })
                       .then((result) => {
                         if (result.record?.body.paperId)
-                          onPaper(result.record.body.paperId);
+                          onCompiled(result.record.body.paperId);
                       })
                       .catch(() => {})
                   }
