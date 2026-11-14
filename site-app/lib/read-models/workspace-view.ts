@@ -6,7 +6,7 @@ import {
   pinnedCatalog,
 } from "../criteria/pin";
 import { selectablePacks } from "../criteria/registry";
-import type { Engagement } from "../domain/types";
+import { canWrite, type Engagement } from "../domain/types";
 import { parseReportSettings } from "../domain/report-model";
 import { db } from "../bindings";
 import { getEngagement, storedSize } from "../engagement-repo";
@@ -136,6 +136,31 @@ export async function lapsedGrants(
   return grants
     .filter((g) => clientGrantLapsed(g, holders.get(g.userId)))
     .map((g) => g.id);
+}
+/**
+ * The client members who hold request grants on the engagement, for the
+ * roles that write audit work (#225): each one's display name and whether
+ * their membership is still active, so the Client submissions panel names
+ * them. Nothing else about them is sent (no email, role or client).
+ */
+export async function grantHolders(
+  ctx: Context,
+  e: Engagement | null,
+): Promise<{ user_id: string; display_name: string; active: boolean }[]> {
+  const ids = [...new Set(e?.workflow?.clientGrants.map((g) => g.userId))];
+  if (!canWrite(ctx.role) || !ids.length) return [];
+  return (
+    await db()
+      .prepare(
+        "SELECT user_id,display_name,status FROM memberships WHERE tenant_id=? AND user_id IN (SELECT value FROM json_each(?)) ORDER BY user_id",
+      )
+      .bind(ctx.tenantId, JSON.stringify(ids))
+      .all<{ user_id: string; display_name: string; status: string }>()
+  ).results.map((m) => ({
+    user_id: m.user_id,
+    display_name: m.display_name,
+    active: m.status === "active",
+  }));
 }
 /** A revocation that cancelled pending invitations, as Members & access lists it. */
 export type RevocationCancellation = {
@@ -305,6 +330,7 @@ export async function workspaceView(
   // has since been revoked or re-granted (clientGrantLapsed): the Lead's
   // request views show them as lapsed rather than active.
   const lapsedClientGrants = await lapsedGrants(ctx, e);
+  const clientGrantHolders = await grantHolders(ctx, e);
   const tenant = (await db()
     .prepare(
       "SELECT version,eqr_cooling_off_days AS cooling_off_days,report_settings FROM tenants WHERE id=?",
@@ -356,6 +382,7 @@ export async function workspaceView(
     members,
     invitations,
     lapsedClientGrants,
+    clientGrantHolders,
     people,
     managementVersion,
     qualityReviewPolicy,

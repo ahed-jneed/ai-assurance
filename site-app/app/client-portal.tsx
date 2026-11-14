@@ -408,6 +408,25 @@ export function ClientPortal({
   );
 }
 /**
+ * The contributor a client request grant was issued to, as the audit team
+ * sees them: their name, marked when their membership is no longer active
+ * (#225). The workspace read model sends writers the grant holders
+ * (clientGrantHolders); an administrator's member list is the fallback.
+ */
+export function grantHolderLabel(data: WorkspaceData, userId: string) {
+  const holder = data.clientGrantHolders?.find((m) => m.user_id === userId);
+  if (holder)
+    return holder.active
+      ? holder.display_name
+      : holder.display_name + " (access revoked)";
+  const member = data.members.find((m) => m.user_id === userId);
+  if (member)
+    return member.status === "active"
+      ? member.display_name
+      : member.display_name + " (access revoked)";
+  return "Inactive contributor";
+}
+/**
  * How the Lead sees a client request grant: active, lapsed with the
  * contributor's membership (revoked or re-granted since it was issued, so
  * the contributor can no longer use it), or inactive once revoked or expired.
@@ -609,9 +628,7 @@ export function RequestAccess({
       {e.workflow.clientGrants.map((g) => (
         <div className="comment-box" key={g.id}>
           <b>
-            {data.members.find((m) => m.user_id === g.userId)?.display_name ??
-              "Inactive contributor"}{" "}
-            · {g.prompt}
+            {grantHolderLabel(data, g.userId)} · {g.prompt}
           </b>
           <p>
             {requestGrantStatus(g, lapsed, at)} · expires{" "}
@@ -835,9 +852,7 @@ export function ClientSubmissions({
       {grants.map((g) => (
         <div className="comment-box" key={g.id}>
           <b>
-            {data.members.find((m) => m.user_id === g.userId)?.display_name ??
-              "Inactive contributor"}{" "}
-            · {g.prompt}
+            {grantHolderLabel(data, g.userId)} · {g.prompt}
           </b>
           <ClarificationThread
             grant={g}
