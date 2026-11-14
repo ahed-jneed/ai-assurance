@@ -7,14 +7,51 @@ import type { GenaiView } from "@/lib/read-models/genai-view";
 
 type Procedure = { id: string; templateId: string; title: string };
 
+/** How a label states its time: the viewer's local time, to the minute. */
+export const stampFormat: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
 /**
- * When a record was made, to the minute: "2026-11-03 09:15" (UTC, as the
- * record's ISO time states it), so that two records of one day differ.
+ * When a record was made, to the minute, so that two records of one day
+ * differ: in the viewer's local time and format, like the other times of
+ * the workspace (#227), never UTC without a zone. Empty when unknown.
  */
-export const stamp = (at: string) =>
-  String(at ?? "")
-    .slice(0, 16)
-    .replace("T", " ");
+export function stamp(at: string | null | undefined) {
+  const time = at ? new Date(at) : null;
+  return time && !Number.isNaN(time.getTime())
+    ? time.toLocaleString(undefined, stampFormat)
+    : "";
+}
+
+/**
+ * Names that tell records apart, as distinctOptions does for options: a
+ * name that records of different keys share ends in a short suffix of each
+ * key ("· aaaaaa"); records of one key share their name.
+ */
+export function distinctNames<T>(
+  records: T[],
+  name: (record: T) => string,
+  key: (record: T) => string | null | undefined,
+): string[] {
+  const names = records.map(name),
+    keys = new Map<string, Set<string>>();
+  records.forEach((r, i) => {
+    const k = key(r);
+    if (!k) return;
+    keys.set(names[i], (keys.get(names[i]) ?? new Set()).add(k));
+  });
+  return records.map((r, i) => {
+    const k = key(r);
+    return k && (keys.get(names[i])?.size ?? 0) > 1
+      ? names[i] + " · " + k.slice(-6)
+      : names[i];
+  });
+}
 
 /** "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03 09:15". */
 export function planOptionLabel(
@@ -88,14 +125,6 @@ export function distinctOptions<T extends { id: string }>(
   records: T[],
   label: (record: T) => string,
 ): { value: string; label: string }[] {
-  const labels = records.map(label),
-    seen = new Map<string, number>();
-  for (const l of labels) seen.set(l, (seen.get(l) ?? 0) + 1);
-  return records.map((r, i) => ({
-    value: r.id,
-    label:
-      (seen.get(labels[i]) ?? 0) > 1
-        ? labels[i] + " · " + r.id.slice(-6)
-        : labels[i],
-  }));
+  const labels = distinctNames(records, label, (r) => r.id);
+  return records.map((r, i) => ({ value: r.id, label: labels[i] }));
 }

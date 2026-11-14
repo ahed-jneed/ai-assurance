@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { jobName, modeLabel } from "./assurance-workbench/types";
+import { jobName, jobNames, modeLabel } from "./assurance-workbench/types";
 import {
   bundleOptionLabel,
   distinctOptions,
   planOptionLabel,
+  stamp,
 } from "./genai-ingest-labels";
 
 const procedures = [
@@ -18,18 +19,20 @@ describe("Queue ingest labels (#211)", () => {
       plan: { criteria: [{ id: "C1" }, { id: "C2" }] },
     };
     expect(planOptionLabel(plan, procedures)).toBe(
-      "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03 09:00",
+      `WP-GA-01 Accuracy of answers · 2 criteria · ${stamp("2026-11-03T09:00:00.000Z")}`,
     );
     expect(
       planOptionLabel(
         { ...plan, plan: { criteria: [{ id: "C1" }] } },
         procedures,
       ),
-    ).toBe("WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-03 09:00");
+    ).toBe(
+      `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-03T09:00:00.000Z")}`,
+    );
     // A procedure no longer in scope still reads as a label.
     expect(
       planOptionLabel({ ...plan, procedureId: "PROC-X" }, procedures),
-    ).toBe("GenAI plan · 2 criteria · 2026-11-03 09:00");
+    ).toBe(`GenAI plan · 2 criteria · ${stamp("2026-11-03T09:00:00.000Z")}`);
   });
 
   it("labels a declared bundle by its input names and date, not its id", () => {
@@ -40,14 +43,18 @@ describe("Queue ingest labels (#211)", () => {
         inputs: [{ name: "judged_qa_30.eval" }, { name: "judge.jsonl" }],
         inputArtifactIds: ["EV-1", "EV-2"],
       }),
-    ).toBe("judged_qa_30.eval, judge.jsonl · 2026-11-04 10:00");
+    ).toBe(
+      `judged_qa_30.eval, judge.jsonl · ${stamp("2026-11-04T10:00:00.000Z")}`,
+    );
     expect(
       bundleOptionLabel({
         createdAt: at,
         inputs: [{ name: "a.eval" }, { name: "b.eval" }, { name: "c.jsonl" }],
         inputArtifactIds: ["EV-1", "EV-2", "EV-3"],
       }),
-    ).toBe("a.eval, b.eval and 1 more input · 2026-11-04 10:00");
+    ).toBe(
+      `a.eval, b.eval and 1 more input · ${stamp("2026-11-04T10:00:00.000Z")}`,
+    );
     // Unnamed inputs: the count.
     expect(
       bundleOptionLabel({
@@ -55,7 +62,7 @@ describe("Queue ingest labels (#211)", () => {
         inputs: [{ sha256: "a" }, { sha256: "b" }],
         inputArtifactIds: ["EV-1", "EV-2"],
       }),
-    ).toBe("2 inputs · 2026-11-04 10:00");
+    ).toBe(`2 inputs · ${stamp("2026-11-04T10:00:00.000Z")}`);
     expect(
       bundleOptionLabel({
         createdAt: at,
@@ -85,11 +92,11 @@ describe("same-day Queue ingest labels (#221)", () => {
     expect(options).toEqual([
       {
         value: "GP-aaaaaa111111",
-        label: "WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-03 09:00",
+        label: `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-03T09:00:00.000Z")}`,
       },
       {
         value: "GP-bbbbbb222222",
-        label: "WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-03 14:30",
+        label: `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-03T14:30:00.000Z")}`,
       },
     ]);
   });
@@ -105,9 +112,9 @@ describe("same-day Queue ingest labels (#221)", () => {
       (p) => planOptionLabel(p, procedures),
     );
     expect(options.map((o) => o.label)).toEqual([
-      "WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-03 09:00 · 111111",
-      "WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-03 09:00 · 222222",
-      "WP-GA-01 Accuracy of answers · 1 criterion · 2026-11-04 08:00",
+      `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-03T09:00:00.000Z")} · 111111`,
+      `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-03T09:00:00.000Z")} · 222222`,
+      `WP-GA-01 Accuracy of answers · 1 criterion · ${stamp("2026-11-04T08:00:00.000Z")}`,
     ]);
     const bundle = (id: string) => ({
       id,
@@ -121,8 +128,8 @@ describe("same-day Queue ingest labels (#221)", () => {
         bundleOptionLabel,
       ).map((o) => o.label),
     ).toEqual([
-      "a.eval · 2026-11-03 09:00 · aaaaaa",
-      "a.eval · 2026-11-03 09:00 · bbbbbb",
+      `a.eval · ${stamp("2026-11-03T09:00:00.000Z")} · aaaaaa`,
+      `a.eval · ${stamp("2026-11-03T09:00:00.000Z")} · bbbbbb`,
     ]);
   });
 });
@@ -137,7 +144,7 @@ describe("GenAI ingest job names (#221)", () => {
   };
   it("names an ingest job by its plan's label, never null or a bare id", () => {
     expect(jobName(job, procedures)).toBe(
-      "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03 09:15",
+      `WP-GA-01 Accuracy of answers · 2 criteria · ${stamp("2026-11-03T09:15:00.000Z")}`,
     );
     expect(
       jobName(
@@ -159,6 +166,78 @@ describe("GenAI ingest job names (#221)", () => {
         [],
       ),
     ).toBe("Credit");
-    expect(modeLabel("provided_predictions")).toBe("provided predictions");
+    expect(modeLabel("provided_predictions")).toBe("Provided predictions");
+  });
+});
+
+describe("label times and execution request names (#227)", () => {
+  it("states label times in the viewer's local time and format, not UTC", () => {
+    const at = "2026-11-03T09:15:00.000Z";
+    expect(stamp(at)).toBe(
+      new Date(at).toLocaleString(undefined, {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    );
+    // Never the record's raw ISO time.
+    expect(stamp(at)).not.toContain("2026-11-03");
+    expect(stamp("")).toBe("");
+    expect(stamp(null)).toBe("");
+    expect(stamp("not a time")).toBe("");
+  });
+
+  it("tells execution requests of different plans apart like the dialog does", () => {
+    const ingest = (id: string, planId: string) => ({
+      id,
+      mode: "genai_ingest",
+      system_name: null,
+      plan_id: planId,
+      procedure_id: "PROC-1",
+      plan_criteria: 2,
+      plan_created_at: "2026-11-03T09:15:00.000Z",
+    });
+    const rows = [
+      ingest("JOB-1", "AS-plan-aaaaaa"),
+      ingest("JOB-2", "AS-plan-bbbbbb"),
+      // A second job of the first plan reads as that plan.
+      ingest("JOB-3", "AS-plan-aaaaaa"),
+      {
+        ...ingest("JOB-4", ""),
+        mode: "provided_predictions",
+        system_name: "Credit",
+      },
+    ];
+    const plan = `WP-GA-01 Accuracy of answers · 2 criteria · ${stamp("2026-11-03T09:15:00.000Z")}`;
+    expect(jobNames(rows, procedures)).toEqual([
+      plan + " · aaaaaa",
+      plan + " · bbbbbb",
+      plan + " · aaaaaa",
+      "Credit",
+    ]);
+    // The labels the Queue ingest dialog gives the same two plans.
+    expect(
+      distinctOptions(
+        [
+          {
+            id: "AS-plan-aaaaaa",
+            procedureId: "PROC-1",
+            createdAt: "2026-11-03T09:15:00.000Z",
+            plan: { criteria: [1, 2] },
+          },
+          {
+            id: "AS-plan-bbbbbb",
+            procedureId: "PROC-1",
+            createdAt: "2026-11-03T09:15:00.000Z",
+            plan: { criteria: [1, 2] },
+          },
+        ],
+        (p) => planOptionLabel(p, procedures),
+      ).map((o) => o.label),
+    ).toEqual([plan + " · aaaaaa", plan + " · bbbbbb"]);
+    // A single plan keeps its plain label.
+    expect(jobNames([rows[0], rows[2]], procedures)).toEqual([plan, plan]);
   });
 });

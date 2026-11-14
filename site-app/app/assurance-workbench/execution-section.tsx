@@ -7,7 +7,7 @@ import { ExternalJobDetail } from "../external-job-detail";
 import { ExecutionPlanner } from "../testing-readiness";
 import type { Role } from "@/lib/domain/types";
 import {
-  jobName,
+  jobNames,
   label,
   modeLabel,
   telemetryText,
@@ -48,6 +48,7 @@ export function ExecutionSection({
   /** A draft paper was compiled; the workbench opens it once settled. */
   onCompiled: (paperId: string) => void;
 }) {
+  const names = jobNames(snapshot.jobs, engagement.workflow?.procedures ?? []);
   return (
     <>
       <ExecutionPlanner
@@ -70,10 +71,10 @@ export function ExecutionSection({
         </span>
       </div>
       <div className="assurance-register">
-        {snapshot.jobs.map((j) => (
+        {snapshot.jobs.map((j, i) => (
           <div className="execution-row" key={j.id}>
             <div>
-              <b>{jobName(j, engagement.workflow?.procedures ?? [])}</b>
+              <b>{names[i]}</b>
               <small className="block subtle">
                 {modeLabel(j.mode)} · attempt {j.fence} ·{" "}
                 {new Date(j.created_at).toLocaleString()}

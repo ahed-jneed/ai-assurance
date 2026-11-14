@@ -16,6 +16,7 @@ import {
   type Snapshot,
 } from "./assurance-workbench/types";
 import { queueIngestFields, ResultCard } from "./genai-evidence";
+import { stamp } from "./genai-ingest-labels";
 import type { WorkspaceData } from "./workspace-types";
 
 // The Access log reads its page through the query cache; here it is given.
@@ -72,7 +73,7 @@ const ingest = job({}),
     plan_created_at: null,
   }),
   finished = job({ id: "JOB-3", state: "succeeded" });
-const planName = "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03 09:15";
+const planName = `WP-GA-01 Accuracy of answers · 2 criteria · ${stamp("2026-11-03T09:15:00.000Z")}`;
 
 describe("the execution requests name a GenAI ingest job by its plan", () => {
   it("shows the plan label and 'GenAI ingest', never null", () => {
@@ -101,7 +102,7 @@ describe("the execution requests name a GenAI ingest job by its plan", () => {
       ),
     );
     expect(out).toContain(planName + " GenAI ingest · attempt 1");
-    expect(out).toContain("Credit model auditor model · attempt 1");
+    expect(out).toContain("Credit model Auditor model · attempt 1");
     expect(out).not.toContain("null");
   });
 
@@ -258,12 +259,12 @@ describe("the GenAI result card and the Queue ingest dialog", () => {
       planRecordId: [
         planName + " · aaaaaa",
         planName + " · bbbbbb",
-        "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03 14:02",
+        `WP-GA-01 Accuracy of answers · 2 criteria · ${stamp("2026-11-03T14:02:00.000Z")}`,
       ],
       bundleRecordId: [
-        "judged_qa_30.eval · 2026-11-03 09:15 · 111111",
-        "judged_qa_30.eval · 2026-11-03 09:15 · 333333",
-        "judged_qa_30.eval · 2026-11-03 10:40",
+        `judged_qa_30.eval · ${stamp("2026-11-03T09:15:00.000Z")} · 111111`,
+        `judged_qa_30.eval · ${stamp("2026-11-03T09:15:00.000Z")} · 333333`,
+        `judged_qa_30.eval · ${stamp("2026-11-03T10:40:00.000Z")}`,
       ],
     });
   });

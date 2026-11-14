@@ -1024,6 +1024,7 @@ describe("external queue telemetry", () => {
     expect(listed[0]).toMatchObject({
       mode: "genai_ingest",
       system_name: null,
+      plan_id: "AS-plan",
       procedure_id: "PRC-1",
       plan_criteria: 3,
       plan_created_at: at(5),

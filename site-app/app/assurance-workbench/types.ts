@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { ReviewQueueSummary } from "@/lib/assurance-search";
 import type { ObligationOptions } from "@/lib/criteria/types";
-import { count } from "@/lib/presentation";
+import { count, valueLabel } from "@/lib/presentation";
 import {
   runnerCapabilities,
   runnerCapabilityInfo,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/runner-capabilities";
 import type { WorkspaceData } from "../workspace-types";
 import type { ExternalJobFields } from "../external-job-detail";
-import { planLabel } from "../genai-ingest-labels";
+import { distinctNames, planLabel } from "../genai-ingest-labels";
 
 export type Engagement = NonNullable<WorkspaceData["engagement"]>;
 
@@ -22,7 +22,8 @@ export type ExecutionJob = ExternalJobFields & {
   system_name: string | null;
   fence: number;
   created_at: string;
-  /** A GenAI ingest job's frozen plan: its procedure, criteria and time. */
+  /** A GenAI ingest job's frozen plan: its record, procedure, criteria and time. */
+  plan_id?: string | null;
   procedure_id?: string | null;
   plan_criteria?: number | null;
   plan_created_at?: string | null;
@@ -139,8 +140,8 @@ export const emptyRelation = (): Relation => ({
 
 export type Exclusion = { recordId: string; reason: string };
 
-export const label = (s: string) =>
-  s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
+/** A coded value as the workbench shows it, in sentence case (#227). */
+export const label = valueLabel;
 
 /** An execution mode as the execution requests show it. */
 export const modeLabel = (mode: string) =>
@@ -173,19 +174,35 @@ export function jobName(
 }
 
 /**
+ * The execution requests' names, in order (#227): jobName, and for GenAI
+ * ingest jobs of different plans that would read the same, the plan's id
+ * suffix, as the Queue ingest dialog tells those plans apart.
+ */
+export function jobNames(
+  jobs: (Parameters<typeof jobName>[0] & Pick<ExecutionJob, "plan_id">)[],
+  procedures: Parameters<typeof jobName>[1],
+) {
+  return distinctNames(
+    jobs,
+    (j) => jobName(j, procedures),
+    (j) => (j.mode === "genai_ingest" ? j.plan_id : null),
+  );
+}
+
+/**
  * The Cancel execution select's options: the queued and running requests,
  * each named as the execution requests name it, with its id (#221).
  */
 export function activeJobOptions(
-  jobs: (Parameters<typeof jobName>[0] & Pick<ExecutionJob, "id" | "state">)[],
+  jobs: (Parameters<typeof jobNames>[0][number] &
+    Pick<ExecutionJob, "id" | "state">)[],
   procedures: Parameters<typeof jobName>[1],
 ) {
+  const names = jobNames(jobs, procedures);
   return jobs
-    .filter((j) => ["queued", "running"].includes(j.state))
-    .map((j) => ({
-      value: j.id,
-      label: jobName(j, procedures) + " · " + j.id,
-    }));
+    .map((j, i) => ({ j, name: names[i] }))
+    .filter(({ j }) => ["queued", "running"].includes(j.state))
+    .map(({ j, name }) => ({ value: j.id, label: name + " · " + j.id }));
 }
 
 /**

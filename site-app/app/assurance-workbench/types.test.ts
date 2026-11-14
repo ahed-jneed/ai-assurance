@@ -24,7 +24,7 @@ describe("workbench labels (#202)", () => {
     ]);
     expect(adapterFormatLabel("client_local")).toBe("Client-local worker");
     expect(adapterFormatLabel("genai_ingest")).toBe("GenAI evidence ingest");
-    expect(adapterFormatLabel("someFormat")).toBe("some Format");
+    expect(adapterFormatLabel("someFormat")).toBe("Some format");
   });
 
   it("offers every capability the server accepts, each with help text (#211)", () => {
