@@ -150,3 +150,35 @@ export function datasetCardFor<T extends CardRecord>(
   const matching = cards.filter((c) => cardDescribes(c, artifact));
   return matching.find((c) => c.id === preferred) ?? matching.at(-1);
 }
+
+/**
+ * A registered dataset card as the Dataset registry exports it (#234 item
+ * 9): the stored card in the canonical schema
+ * (schemas/dataset-card.schema.json `registeredCard`), with only the
+ * contract's fields in their stored order, and a file name from its name
+ * and version, like the paper and memo exports.
+ */
+export function datasetCardExport(record: { body: Record<string, unknown> }): {
+  fileName: string;
+  card: Partial<RegisteredDatasetCard>;
+} {
+  const fields = new Set(Object.keys(registeredDatasetCardFields.shape));
+  const card = Object.fromEntries(
+    Object.entries(record.body).filter(
+      ([key, value]) => fields.has(key) && value !== undefined,
+    ),
+  ) as Partial<RegisteredDatasetCard>;
+  const slug = (value: unknown) =>
+    String(value ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9.]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  return {
+    fileName:
+      ["dataset-card", slug(card.name), slug(card.version)]
+        .filter(Boolean)
+        .join("-") + ".json",
+    card,
+  };
+}

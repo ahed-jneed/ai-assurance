@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { Download } from "lucide-react";
 import { postJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,10 @@ import type { Engagement, Role } from "@/lib/domain/types";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
+import { datasetCardExport } from "@/lib/dataset-card";
+import { valueLabel } from "@/lib/presentation";
 import { ViewLoading } from "./view-loading";
+import { download } from "./workspace/workspace-ui";
 type Form = NonNullable<Parameters<typeof WorkflowDialog>[0]["form"]>;
 const datasetCards = recordsQuery("dataset");
 /**
@@ -64,7 +68,7 @@ export function DatasetRegistry({
             "test",
             "reference",
             "unknown",
-          ].map((v) => ({ value: v, label: v })),
+          ].map((v) => ({ value: v, label: valueLabel(v) })),
         },
         {
           name: "periodStart",
@@ -176,7 +180,9 @@ export function DatasetRegistry({
               <h3>
                 {r.body.name} · {r.body.version}
               </h3>
-              <span className="badge neutral">{r.body.split}</span>
+              <span className="badge neutral">
+                {valueLabel(String(r.body.split ?? "unknown"))}
+              </span>
             </header>
             <dl>
               {[
@@ -204,11 +210,27 @@ export function DatasetRegistry({
                 </div>
               ))}
             </dl>
-            {can(role, "registerDataset") && (
-              <Button variant="ghost" size="sm" onClick={() => register(r)}>
-                Create corrected version
+            <div className="row-actions">
+              {/* The stored card in the canonical schema (#234 item 9). */}
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={
+                  "Export dataset card " + r.body.name + " " + r.body.version
+                }
+                onClick={() => {
+                  const { fileName, card } = datasetCardExport(r);
+                  download(fileName, card);
+                }}
+              >
+                <Download size={14} aria-hidden="true" /> Export dataset card
               </Button>
-            )}
+              {can(role, "registerDataset") && (
+                <Button variant="ghost" size="sm" onClick={() => register(r)}>
+                  Create corrected version
+                </Button>
+              )}
+            </div>
             <details className="provenance">
               <summary>Immutable source pins</summary>
               <p className="hash-text">Card {r.sha256}</p>

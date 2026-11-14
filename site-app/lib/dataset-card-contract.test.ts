@@ -8,6 +8,7 @@ import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  datasetCardExport,
   datasetCardFields,
   datasetCardSchema,
   registeredCard,
@@ -304,6 +305,30 @@ describe("the card body registerDataset stores", () => {
       "artifactName",
       "artifactSize",
     ]);
+  });
+
+  it("is exported from the registry in the canonical schema (#234 item 9)", () => {
+    for (const body of [
+      registeredCard(declared, artifact),
+      registeredCard(
+        {
+          ...declared,
+          baselineDatasetRecordId: "AS-baseline",
+          baselineRationale: "The prior quarter in production",
+        },
+        artifact,
+        baseline,
+      ),
+    ]) {
+      // A record body with a field outside the contract keeps it out of
+      // the export.
+      const { fileName, card } = datasetCardExport({
+        body: { ...body, internalNote: "not part of the card" },
+      });
+      expect(validate(card)).toBe(true);
+      expect(card).toEqual(body);
+      expect(fileName).toBe("dataset-card-applicant-holdout-2026-q3.json");
+    }
   });
 
   it("refuses a body the contract rejects instead of storing it", () => {
