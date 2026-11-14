@@ -222,6 +222,66 @@ await withWorker(
       "PASS memberships record the identity email: revoking a member cancels their pending invitations and an active member cannot be invited",
     );
 
+    // An expired invitation is no longer pending (#209): the invitee is
+    // refused, and inviting the email again closes it as expired in the same
+    // batch instead of being refused by the pending-email index.
+    const dana = as("dana");
+    const lapsed = await manage("inviteMember", {
+      email: "dana@fixture.invalid",
+      role: "Auditor",
+    });
+    await rows(
+      "UPDATE invitations SET expires_at='2026-01-01T00:00:00.000Z' WHERE tenant_id=? AND id=?",
+      tenantId,
+      lapsed.invitationId,
+    );
+    assert.equal(
+      (await call("/api/workspace?tenantId=" + tenantId, dana)).status,
+      403,
+      "an expired invitation does not admit the invitee",
+    );
+    assert.deepEqual((await view()).invitations, []);
+    const renewed = await manage("inviteMember", {
+      email: "Dana@Fixture.invalid",
+      role: "Reviewer",
+    });
+    assert.deepEqual(renewed.expiredInvitations, [lapsed.invitationId]);
+    assert.deepEqual(
+      await rows(
+        "SELECT id,status,closed_at IS NOT NULL AS closed FROM invitations WHERE tenant_id=? AND email=? ORDER BY created_at",
+        tenantId,
+        "dana@fixture.invalid",
+      ),
+      [
+        { id: lapsed.invitationId, status: "expired", closed: 1 },
+        { id: renewed.invitationId, status: "pending", closed: 0 },
+      ],
+    );
+    assert.deepEqual(
+      (await view()).invitations.map((i) => i.id),
+      [renewed.invitationId],
+    );
+    assert.deepEqual(
+      (
+        await rows(
+          "SELECT json_extract(details,'$.expiredInvitations') AS expired FROM management_events WHERE tenant_id=? AND action='inviteMember' AND json_extract(details,'$.invitationId')=?",
+          tenantId,
+          renewed.invitationId,
+        )
+      ).map((r) => JSON.parse(r.expired)),
+      [[lapsed.invitationId]],
+      "the access log records the renewed invitation and the one it replaced",
+    );
+    assert.equal(
+      (await call("/api/workspace?tenantId=" + tenantId, dana)).body.identity
+        .role,
+      "Reviewer",
+      "the renewed invitation admits the invitee",
+    );
+    console.log(
+      "PASS inviting an email again closes its expired invitation and sends a new one",
+    );
+
     // Lapsed client request grants.
     const engagementId = first.engagement.id;
     const clientId = first.engagement.clientId;

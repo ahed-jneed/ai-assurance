@@ -3465,6 +3465,49 @@ try {
       }),
     { user: viewer, status: 404 },
   );
+  // #209: the print view refuses what the package refuses, with the same
+  // status: 404 for a withdrawn, unreleased or missing report, 403 for a
+  // caller outside the practice.
+  const refusedStatus = async (path, query, user) =>
+    (
+      await transport(base + path + "?" + new URLSearchParams(query), {
+        headers: h(user),
+      })
+    ).status;
+  for (const [user, reportId, status] of [
+    [viewer, internalFinal.id, 404],
+    [viewer, replacement.id, 404],
+    [viewer, "RPT-missing", 404],
+    [owner, "RPT-missing", 404],
+    [other, internalFinal.id, 403],
+  ]) {
+    const query = { tenantId, engagementId: e.id, reportId };
+    const label = user + " " + reportId;
+    assert.equal(
+      await refusedStatus("/api/report-package", query, user),
+      status,
+      "package " + label,
+    );
+    assert.equal(
+      await refusedStatus("/report", query, user),
+      status,
+      "print view " + label,
+    );
+  }
+  const refusedPrint = await transport(
+    base +
+      "/report?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: replacement.id,
+      }),
+    { headers: h(viewer) },
+  );
+  assert.match(await refusedPrint.text(), /Report unavailable/);
+  console.log(
+    "PASS the /report print view answers 403 or 404 like /api/report-package",
+  );
   console.log(
     "PASS exact package approval/release/withdrawal, independent retest, case assessment and atomic linked successor engagement",
   );

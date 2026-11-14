@@ -3,6 +3,7 @@ import { db } from "../../bindings";
 import { roles } from "../../domain/types";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
+import { staffRoleList } from "../../permissions";
 import { isInternalRole } from "../../workflow-state";
 import { defineCommands } from "../command";
 import { short } from "../fields";
@@ -24,7 +25,11 @@ async function adminState(ctx: Context, userId: string) {
     .first<{ role: string; status: string; admin: number }>();
   return row;
 }
-/** The target must be an active internal member who is not yet an admin. */
+/**
+ * The target must be an active internal member who is not yet an admin. Every
+ * staff role qualifies, the Engagement Quality Reviewer included (#209):
+ * administration is not audit work.
+ */
 async function checkCandidate(ctx: Context, userId: string) {
   const row = await adminState(ctx, userId);
   if (!row || row.status !== "active")
@@ -32,7 +37,7 @@ async function checkCandidate(ctx: Context, userId: string) {
   if (!isInternalRole(row.role))
     throw new ApiError(
       400,
-      "Practice administration needs an internal role (Auditor, Lead Auditor or Reviewer)",
+      `Practice administration needs an internal role (${staffRoleList})`,
     );
   if (row.admin)
     throw new ApiError(409, "This member already administers the practice");

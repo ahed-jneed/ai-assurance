@@ -16,6 +16,10 @@ import {
   uid,
   type WorkflowHandler,
 } from "./command";
+/** The refusal for assessing or closing a case that is already closed. */
+const closedCase =
+  "This case is already closed. Create a new case for subsequent work";
+
 export const monitoringCommands: Record<string, WorkflowHandler> = {
   async createMonitoringCase({ e, c, writer, authorized, w }, data) {
     writer();
@@ -101,8 +105,7 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
       m =
         w().monitoring.find((q) => q.id === a.caseId) ??
         fail(404, "Follow-up case not found");
-    if (m.state === "closed")
-      fail(409, "Create a new case for subsequent work");
+    if (m.state === "closed") fail(409, closedCase);
     if (a.decision === "no_reassessment" && !a.evidenceIds.length)
       fail(
         400,
@@ -129,12 +132,11 @@ export const monitoringCommands: Record<string, WorkflowHandler> = {
       m =
         w().monitoring.find((q) => q.id === a.caseId) ??
         fail(404, "Follow-up case not found");
+    // A closed case is refused before independence is checked: nobody may
+    // close it again (#209).
+    if (m.state === "closed") fail(409, closedCase);
     independent([...m.contributors, m.ownerId]);
-    if (
-      m.state === "closed" ||
-      m.decision === "not_assessed" ||
-      !m.assessment.trim()
-    )
+    if (m.decision === "not_assessed" || !m.assessment.trim())
       fail(409, "Assess the case before independent closure");
     if (m.decision === "reassessment_required") {
       if (!m.successorEngagementId)
