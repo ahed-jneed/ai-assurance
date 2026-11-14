@@ -1,6 +1,8 @@
 // Plain-language labels for the GenAI reason codes, levels and custody the
 // results view shows (docs/design/genai-evidence.md sections 8.9 and 12.2).
 // Pure; an unknown code is shown as it is.
+import type { GenaiRunSummary, GenaiSummary } from "./summary";
+
 export const REASON_LABELS: Record<string, string> = {
   below_minimum_sample_size: "fewer scored items than the plan's minimum",
   below_minimum_member_size: "fewer scored attacks than the member minimum",
@@ -71,3 +73,38 @@ export const fmt = (v: number | null | undefined, digits = 4) =>
   typeof v === "number" && Number.isFinite(v)
     ? String(Number(v.toFixed(digits)))
     : "—";
+
+type JudgeValidations = Pick<GenaiSummary, "judgeValidation">;
+type RunJudge = GenaiRunSummary["judges"][number];
+/**
+ * A judge's validation as the results view lists it (design section 12.2):
+ * kappa with its lower bound and n for every judge and, for a pairwise judge,
+ * the position-consistency bound and the number of swapped pairs (#233).
+ */
+export function judgeValidationText(
+  s: JudgeValidations,
+  runKey: string,
+  j: RunJudge,
+) {
+  const kappa =
+    "kappa " +
+    fmt(j.kappa, 3) +
+    ", lower bound " +
+    fmt(j.lower, 3) +
+    " on " +
+    (j.n ?? "—") +
+    " items";
+  if (j.role !== "pairwise_judge") return kappa;
+  const v =
+    s.judgeValidation.find((x) =>
+      x.bindings.some((b) => b.runKey === runKey && b.judgeRef === j.ref),
+    ) ?? s.judgeValidation.find((x) => x.judgeRef === j.ref);
+  return v?.pairs
+    ? kappa +
+        " · position consistency lower bound " +
+        fmt(v.positionConsistencyLower, 3) +
+        " on " +
+        v.pairs +
+        " swapped pairs"
+    : kappa + " · position consistency: no swapped (AB/BA) pairs";
+}

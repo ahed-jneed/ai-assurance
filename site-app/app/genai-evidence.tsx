@@ -25,6 +25,7 @@ import {
   LEVEL_LABELS,
   custodyLabel,
   fmt,
+  judgeValidationText,
   reasonLabel,
 } from "@/lib/genai/labels";
 import {
@@ -394,8 +395,8 @@ export function ResultCard({
               {run.judges.map((j) => (
                 <li key={j.ref}>
                   Judge {j.ref}: {j.model ?? "model undeclared"} (
-                  {j.family ?? "family undeclared"}) · kappa {fmt(j.kappa, 3)},
-                  lower bound {fmt(j.lower, 3)} on {j.n ?? "—"} items
+                  {j.family ?? "family undeclared"}) ·{" "}
+                  {judgeValidationText(s, run.runKey, j)}
                 </li>
               ))}
             </ul>
