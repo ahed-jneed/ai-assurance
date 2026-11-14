@@ -39,7 +39,10 @@ fails with a 503 or `Network connection lost`. That matches the
 `report-release.spec.ts` failure of #194: a request that timed out after the
 API client's 15 s, while the proxy's hop to the Worker logged
 `Network connection lost`. The e2e server loads the build once, at start, and
-serves it on one hop without watching files. Still, do not build while the suite runs: the server keeps
+serves it on one hop without watching files. Still, do not build in the same
+checkout while the suite or a kept-running `node e2e/server.mjs` runs (neither
+`npm run build` nor `npm run check`, which builds); use another worktree for
+that. The server keeps
 `dist/client` open, so on Windows the build fails with `EBUSY` after it has
 deleted part of `dist/server`, and the next server start finds no build.
 

@@ -1,45 +1,41 @@
 # AI Assurance & Audit Platform
 
-Implemented reference platform and enterprise architecture, delivered 5 October 2026.
+A workspace for independent AI auditors: plan an engagement, test an AI system, document the work in reviewed working papers, and issue a signed, verifiable report under the EU AI Act, ISO/IEC 42001 and EN 18286, NYC Local Law 144 and the NIST AI RMF.
 
-The private workspace provides actual persistence, evidence uploads, permission checks, working-paper revisions, independent review, findings, diagnostic execution and fixed report snapshots. The normalized production architecture and acceptance roadmap are separate from the deployed reference implementation. Do not describe this repository as a certified or fully hardened enterprise compliance service.
+It is a reference implementation. Do not describe it as a certified or fully hardened compliance service: a diagnostic result is evidence for the auditor's judgement, not a conformity decision, and the legal content is pending qualified legal review (see [Status](#status)).
 
-## Deliverables
+## Who it is for
 
-| Deliverable | File |
+Independent assessors: specialist AI-audit firms, the technology-assurance teams of audit and testing firms, and AI testing labs, who sign conclusions about AI systems and must defend them to reviewers, regulators and clients. The engagement team (Lead Auditor, Auditor, Reviewer and Engagement Quality Reviewer) works in the practice workspace; the client contributes evidence and reads released reports in a client portal. The [product direction](docs/product/direction.md) explains the choice.
+
+## What it does
+
+The [capability matrix](docs/capabilities.md) lists every capability with the code that implements it and the tests that cover it. In short:
+
+- **Practice and access.** Six roles (Auditor, Lead Auditor, Reviewer, Engagement Quality Reviewer, Client Viewer, Client Contributor) plus a practice-admin flag, all checked on the server. Internal roles need a grant per engagement; client roles see only their client's released projection. Invitations, revocation that cascades, a paged audit trail and an admin-only Access log with CSV export.
+- **Audit workflow.** Engagement brief and audit program with independent approval, an acceptance and independence gate before fieldwork, procedures bound to plan hashes, working papers with revisions and review, findings with independent retest, and stage gates from Planning to Sign-off. Separation of duties is enforced: no self-review, the signer differs from the reviewer, the report creator cannot approve it and the approver cannot release it. Key decisions are attested with a rationale and a content hash.
+- **Evidence.** Uploads of up to 50 MB to R2 with SHA-256 and an acceptance disposition; evidence requests answered by client contributors in packages of 1 to 10 files up to 10 MB in total.
+- **Regulatory content.** Rule pack 2026.11.2 with per-provision dates and the 2 Dec 2026 milestones, classification v2 (tri-state facts, Art 5 practices, GPAI roles, Art 50 triggers) and Art 50 working papers.
+- **Frameworks as data.** Criteria packs with typed crosswalks and coverage views: the EU AI Act pack, an EN 18286 + ISO/IEC 42001 management-system pack (draft), the NYC LL144 bias-audit pack and NIST AI RMF / AI 600-1 crosswalks.
+- **Testing.** Hosted diagnostics in the Worker (up to 10,000 rows, 200 columns and 50 groups) and an external Python worker for larger jobs, with statistics in which confidence intervals and exact tests decide outcomes. Special-category data needs a recorded legal basis, or runs client-local so the platform never receives it. GenAI evaluation evidence (Inspect, lm-eval-harness, promptfoo, garak, PyRIT exports) is ingested and recomputed, never executed.
+- **Reporting.** Report model v2 with engagement type, assurance level and ISAE 3000 conclusion types; fixed snapshots, approval, release, supersession and withdrawal; an Engagement Quality Reviewer sign-off; Ed25519-signed dossiers that verify offline.
+
+## Architecture
+
+A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), with D1 for records and R2 for evidence and immutable blobs. Identity comes from the host (Sites dispatch or Cloudflare Access) through an adapter that denies by default. The Python engine in `engine/` runs diagnostics, statistics and GenAI ingestion as an external worker and as offline tools. The [codebase map](docs/engineering/codebase-map.md) describes the components, data flow, storage and module layout; [docs/security/identity.md](docs/security/identity.md) and [docs/security/signing-keys.md](docs/security/signing-keys.md) cover identity and signing.
+
+| Folder | Contents |
 |---|---|
-| Components, data boundaries, diagrams, stack and operational design | `docs/system-architecture.md` |
-| Core relational schema; 43 tenant-scoped tables with FORCE RLS | `db/postgres.sql` |
-| Standard workspace, procedures, lifecycle and regulatory mapping | `docs/audit-methodology.md` |
-| 33 working papers, 12 memos and reusable narrative/JSON templates | `templates/catalog.json`, `templates/README.md` |
-| Annex IV nine-section evidence compiler map | `templates/annex-iv-map.json` |
-| Common working-paper / diagnostic contracts | `schemas/*.schema.json` |
-| CSV metrics, read-only SQL extraction, optional model/data adapters | `engine/README.md` |
-| Ingestion → queue → worker → paper → immutable report pipeline | `engine/ASYNC_INTEGRATION.md` |
-| What is implemented and production acceptance requirements | `docs/implementation-roadmap.md` |
-| Verified checks and their limits | `docs/validation-results.md` |
+| `site-app/` | The workspace: Worker, API, UI, D1 migrations, harnesses and the e2e suite ([site-app/README.md](site-app/README.md)) |
+| `engine/` | Python diagnostics, statistics, external worker, GenAI ingestion and assurance CLIs ([engine/README.md](engine/README.md)) |
+| `schemas/` | JSON Schema contracts for runs, procedures, working papers, dataset cards, criteria packs and GenAI evidence, with validators |
+| `templates/` | The methodology: 36 working papers and 12 memos in `templates/catalog.json`, the Annex IV map and the criteria packs in `templates/criteria/` ([templates/README.md](templates/README.md)) |
+| `docs/` | Product direction and decisions, designs, research, security notes, the capability matrix and the codebase map |
+| `db/postgres.sql` | A superseded v0 PostgreSQL design, kept for reference only (decision D-13) |
 
-## Workspace
+## Quick start
 
-The [workspace redesign](docs/ui-design.md) introduces Notion-inspired database views, document editing, a light sidebar, contextual creation, and Settings & members. Search and filters survive return navigation; unsaved papers are protected. The earlier [usability update](docs/usability-update.md) documents the underlying client and access-management changes.
-
-Source: `site-app/`. Stack: React, TypeScript, Vinext, Cloudflare Worker, D1 and R2. Enterprise target architecture uses PostgreSQL, an OIDC control plane and isolated Python jobs; that stack is specified rather than deployed.
-
-The four server-authorized roles are Auditor, Lead Auditor, Reviewer and Client Viewer. Each authenticated principal has explicit practice membership; client viewers are client-scoped and receive released report projections rather than internal aggregates. Client and engagement selection never grants access. The private Sites audience remains owner-only until deliberately shared through Sites access controls.
-
-Each engagement starts with the same 33-paper methodology. Two post-audit remediation/monitoring papers are supplementary until scoped into the program. Memos are instantiated from the 12-item memo library. Scope exclusions require a reasoned not-applicable conclusion and signed independent review before issue.
-
-Papers retain historical body, evidence, run links, contributors and approvals. Editing/reopening invalidates current approval. A prior substantive preparer cannot independently review their paper. The lead signer must differ from the approving reviewer. The same person may prepare and lead-sign after another qualified independent reviewer approves.
-
-Evidence up to 10 MB goes to R2 under engagement-scoped content-addressed keys, with SHA-256 and an acceptance disposition. Model binaries remain quarantined. Acceptance and evidence handling declarations are workflow records, not malware scans or legal authorization.
-
-The interactive binary prediction suite accepts up to 1 MB / 10,000 rows / 50 groups. It computes performance, demographic parity, impact ratio and equalized odds, preserves configured internal thresholds and automatically creates linked draft papers. Jobs have durable execution states; the browser initiates execution. An interrupted run can be recovered after two minutes and resubmitted as a new request. Distributed workers and leases are a documented production integration.
-
-Every report is a fixed snapshot. Final issuance requires signed required/excluded papers, independent classification approval, terminal jobs and Sign-off stage. Open high/critical findings block a positive readiness opinion; reviewed qualified/adverse/inability reports can disclose them. A separate hashed client projection excludes internal artifacts, detailed diagnostics and internal findings. Print layout and JSON export are implemented. Qualified signatures, external timestamping and WORM vaults are not yet integrated.
-
-## Run locally
-
-Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging). Install the web workspace from the lockfile with `npm ci` in `site-app/` (`npm run install:ci` remains available for the Sites tooling). Build the Worker with `npm run build`, apply the local D1 migrations with `npm run db:migrate:local` (idempotent; see `site-app/README.md`), then start `npm run dev` and use the loopback Sign in with ChatGPT simulation. To exercise several roles, run `npm run seed:demo` while the dev server is up and sign in as a test persona with `/signin-with-chatgpt?as=<persona>` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`); the account menu switches persona and signs out. Hosting uses dispatch-owned identity, not the local mock. The Worker trusts only the identity source that `IDENTITY_MODE` names (Sites dispatch, Cloudflare Access, or the loopback test and dev modes) and answers 401 when none is configured; see [`docs/security/identity.md`](docs/security/identity.md). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings.
+Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging).
 
 ```powershell
 cd site-app
@@ -47,13 +43,26 @@ npm ci
 npm run build
 npm run db:migrate:local
 npm run dev
-# in another terminal: the persona demo practice
+# in another terminal, while the dev server runs: the persona demo practice
 npm run seed:demo
 ```
 
-`npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. Hosting applies production migrations separately.
+Then open the URL the dev server prints (port 5173 by default) and sign in with the loopback simulation, `/signin-with-chatgpt?return_to=/`. To work as a persona, run `npm run seed:demo` first and sign in with `/signin-with-chatgpt?as=<persona>&return_to=/`:
 
-### Checks
+| Persona | Role in the demo practice |
+|---|---|
+| `qa-lead` | Lead Auditor and practice admin |
+| `qa-auditor` | Auditor |
+| `qa-reviewer` | Reviewer |
+| `qa-lead2` | A second Lead Auditor, who also leads a practice of their own |
+| `qa-eqr` | Engagement Quality Reviewer |
+| `qa-contrib` | Client Contributor for the client Acme |
+| `qa-viewer` | Client Viewer for Acme |
+| `qa-outsider` | No membership (isolation checks) |
+
+The seed creates the client Acme, a structured engagement, every persona's membership and grant, and an evidence request for `qa-contrib`; it is safe to run again. The account menu switches persona and signs out. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. Hosting applies production migrations separately and uses dispatch-owned identity, not the local mock: the Worker trusts only the identity source that `IDENTITY_MODE` names and answers 401 when none is configured ([docs/security/identity.md](docs/security/identity.md)). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings. [site-app/README.md](site-app/README.md) has the details, including `npm start` for the built Worker.
+
+## Checks
 
 CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushes to `main`. In `site-app/`, `npm run check` runs the same steps as the `web` job, in order:
 
@@ -70,7 +79,7 @@ CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushe
 
 The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
-The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`.
+The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`. Do not run `npm run build` or `npm run check` in the same checkout while the e2e server runs: the build rewrites `dist/` under it (see the e2e README).
 
 The `engine` job runs, from the repository root (the validators load Ajv from `site-app/node_modules`):
 
@@ -84,7 +93,7 @@ python schemas/generate-external-fixtures.py --output tmp/external-runs.v1.2.jso
 node schemas/validate-run-schema.mjs --external-fixtures tmp/external-runs.v1.2.json
 ```
 
-### Canonical sources and generated copies
+## Canonical sources and generated copies
 
 The root `docs/`, `engine/`, `schemas/` and `templates/` folders are canonical. These committed files are generated from them; edit the source, then run `npm run sync` in `site-app/` and commit both. CI fails when a copy drifts.
 
@@ -108,12 +117,32 @@ Formatting-only commits are listed in `.git-blame-ignore-revs`. Run `git config 
 
 ## Current legal snapshot
 
-Legal text: the consolidated version `02024R1689-20260727` of Regulation (EU) 2024/1689, in force since 27 July 2026 and still the latest consolidation. Rule pack: revision `2026.11.2` (2026.11.1 plus the Art 50 research edits), researched 5 November 2026 and pending qualified legal review. Chapter III Sections 1–3, except Article 6(5), apply from 2 December 2027 for Article 6(2)/Annex III systems and 2 August 2028 for Article 6(1)/Annex I systems, subject to actor/provision/sector/transitional analysis; under Article 111(2) as replaced, a system already on the market before its route's date is covered only after a significant design change, and legacy systems used by public authorities must comply by 2 August 2030. From 2 December 2026 the new Article 5(1)(ba) and (bb) prohibitions apply, and providers of generative systems placed on the market before 2 August 2026 must comply with Article 50(2) (Article 111(4)). Transparency can overlap with high-risk duties. EN 18286:2026 is the only harmonised AI Act standard cited in the Official Journal (Implementing Decision (EU) 2026/2274, OJ L 14.10.2026); ISO/IEC 42001 gives no presumption of conformity. Article 4a and data-protection requirements must be reviewed before sensitive-category bias processing; a selected upload label is not authorization.
+Legal text: the consolidated version `02024R1689-20260727` of Regulation (EU) 2024/1689, in force since 27 July 2026 and the latest consolidation at the research date (5 November 2026; not re-checked in the 14 November refresh). Rule pack: revision `2026.11.2` (2026.11.1 plus the Art 50 research edits), researched 5 November 2026 and pending qualified legal review. Chapter III Sections 1–3, except Article 6(5), apply from 2 December 2027 for Article 6(2)/Annex III systems and 2 August 2028 for Article 6(1)/Annex I systems, subject to actor/provision/sector/transitional analysis; under Article 111(2) as replaced, a system already on the market before its route's date is covered only after a significant design change, and legacy systems used by public authorities must comply by 2 August 2030. From 2 December 2026 the new Article 5(1)(ba) and (bb) prohibitions apply, and providers of generative systems placed on the market before 2 August 2026 must comply with Article 50(2) (Article 111(4)). Transparency can overlap with high-risk duties. EN 18286:2026 is the only harmonised AI Act standard cited in the Official Journal (Implementing Decision (EU) 2026/2274, OJ L 14.10.2026); ISO/IEC 42001 gives no presumption of conformity. Article 4a and data-protection requirements must be reviewed before sensitive-category bias processing; a selected upload label is not authorization.
 
 Sources and detailed applicability: `docs/audit-methodology.md` and the rule pack (`regulatorySnapshot` in `templates/catalog.json`). The authentic amendment is [Regulation (EU) 2026/1744](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744) (ELI `http://data.europa.eu/eli/reg/2026/1744/oj`).
 
-## Production limits
+## Status
 
-This reference uses bounded engagement aggregates with atomic version checks plus append-only history. It is not the normalized production store and limits each aggregate to 1.5 MB. Native model runtimes, SHAP/LIME, training reproduction/cross-validation, adversarial evaluations and operational inference-log connectors need additional integration and validation. The Python runner includes optional ONNX/PMML/native tree adapters, Parquet and trusted permutation/perturbation functions, but missing optional runtimes prevented golden-model tests.
+At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has two open issues: the dead-code sweep ([#37](https://github.com/ahed-jneed/ai-assurance/issues/37)) and this documentation refresh ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38)). See [ROADMAP.md](ROADMAP.md) for the outcome, the Later list, the watch list and the owner actions, and [CHANGELOG.md](CHANGELOG.md) for each merged PR.
 
-Complete the production acceptance roadmap before processing enterprise audit evidence: IdP/MFA/SCIM, normalized RLS deployment, engagement-level membership, malware scanning, customer-controlled sensitive-data computation, external queue workers, region/retention controls, immutable vaults/signatures, infrastructure observability, recovery exercises and an independent security assessment.
+- **Pending owner actions** ([#57](https://github.com/ahed-jneed/ai-assurance/issues/57)): qualified legal review of the rule pack, Art 50 and LL144 content (shown as pending review); licensed copies of EN 18286 and ISO/IEC 42001 and counsel's sign-off before pack #2 leaves draft; a practitioner review of the ISAE 3000 wording; and deploy settings such as the `DOSSIER_KEK` secret.
+- **GitHub CI** has been refused since 14 Nov 2026 because of an account billing problem only the owner can fix; until it runs again, changes are checked locally with the commands above.
+- **Not built:** upload malware scanning, retention and region controls, RFC 3161 timestamps, qualified signatures and WORM storage, per-practice SSO, MFA and SCIM through the host, native model runtimes in the default worker image, SHAP or LIME explanations, adversarial evaluations and inference-log connectors. These and the other deferred items are on the [Later list](ROADMAP.md#later).
+- **Production limits:** an engagement's metadata is capped at 1.5 MB, and hosted diagnostics accept at most 10,000 rows; larger datasets go to the external worker. Before processing real audit evidence, an operator still needs the deploy actions in [#57](https://github.com/ahed-jneed/ai-assurance/issues/57), infrastructure observability, recovery exercises and an independent security assessment.
+
+## Documentation
+
+| Document | Covers |
+|---|---|
+| [docs/capabilities.md](docs/capabilities.md) | What `main` does, with code and tests per capability |
+| [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md) | The November 2026 cycle's outcome, deferred work, watch list and owner actions; merged PRs |
+| [docs/product/direction.md](docs/product/direction.md), [docs/product/decisions.md](docs/product/decisions.md) | Who we serve and why; the decision log (D-01 to D-44) |
+| [docs/engineering/codebase-map.md](docs/engineering/codebase-map.md) | Components, data flow, storage, identity, module layout and file ownership |
+| [docs/audit-methodology.md](docs/audit-methodology.md) | The audit methodology and the regulatory snapshot |
+| [docs/design/](docs/design/) | Statistics, criteria-model and GenAI-evidence designs |
+| [docs/research/](docs/research/) | Verified research behind the rule pack, Art 50 and LL144, and the November 2026 research record |
+| [docs/security/](docs/security/) | Identity modes and dossier signing keys |
+| [site-app/e2e/README.md](site-app/e2e/README.md) | The Playwright persona suite |
+| [engine/README.md](engine/README.md) and the other `engine/*.md` files | The engine, worker, runtime package, GenAI ingestion and assurance CLIs |
+
+The dated documents in `docs/` from October 2026 (architecture, increments, UX updates, validation record) and `db/postgres.sql` describe earlier designs and are marked superseded; design and research documents cite file paths as they were when written ([docs/capabilities.md](docs/capabilities.md#older-documents-and-historical-paths) maps them to the current layout).

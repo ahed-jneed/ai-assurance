@@ -1,90 +1,67 @@
-# vinext-starter
+# Workspace (`site-app`)
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+The AI Assurance workspace: a React 19 single-page app and its API in one Cloudflare Worker, built with [Vinext](https://github.com/cloudflare/vinext), with D1 for records and R2 for evidence and immutable blobs. The [root README](../README.md) says what the platform does and how to run every check; the [capability matrix](../docs/capabilities.md) maps each capability to the code and tests below; the [codebase map](../docs/engineering/codebase-map.md) describes the architecture.
 
-## Prerequisites
+## Layout
 
-- Node.js `>=22.13.0`
-- Portable: Windows, macOS, or Linux; no Bash required
-- Managed Linux: managed Linux runtime with Bash, `flock`, `curl`, `sha256sum`, and GNU `timeout`
-- Git is required only for publishing
+| Path | Contents |
+|---|---|
+| `app/` | Pages and UI. `app/page.tsx` loads the workspace shell in `app/workspace/` (shell, hooks, modals, views, navigation guards); large screens live in `app/audit-program/`, `app/assurance-workbench/` and `app/testing-lab/`; `app/report/` is the server-rendered print view; `app/operator/` the platform operator console; `app/ll144-summary/` the publishable LL144 summary |
+| `app/api/*/route.ts` | HTTP routes: `workspace`, `assurance` and `management` (GET read models and POST commands), `evidence`, `client-submission`, `report-package`, `dossier` (and `dossier/keys`), `coverage`, `audit-trail`, `access-log`, `ll144-summary`, `work-inbox`, `workspace-state`, `evaluation/dataset`, `operator` and `runner` (bearer token, for the external worker) |
+| `lib/commands/` | Every POST op of `/api/workspace`, `/api/assurance` (`lib/commands/assurance/`) and `/api/management` (`lib/commands/management/`), each a `defineCommands({ op: { roles, handle } })` handler with required roles; the dispatcher tests pin each op set and its roles |
+| `lib/read-models/` | The GET read models (workspace, assurance, coverage, GenAI, LL144 summary, audit trail, Access log) |
+| `lib/domain/`, `lib/workflow/` | The audit domain (types, classification, gates, report model, quality review, Art 50 papers) and the workflow services; `lib/workflow/dispatch.ts` dispatches the workflow ops |
+| `lib/criteria/`, `lib/genai/`, `lib/papers/` | The criteria model and coverage, GenAI evidence, and paper revisions and exports |
+| `lib/http.ts`, `lib/tenancy.ts`, `lib/engagement-repo.ts`, `lib/factories.ts`, `lib/ids.ts`, `lib/bindings.ts` | HTTP helpers; identity-to-tenant context, `requireRole`, `requireAdmin` and provisioning; engagement persistence; record factories; ids, `now` and `sha256`; the `DB` and `BUCKET` bindings |
+| `lib/identity.ts`, `lib/permissions.ts` | The identity adapter, and the one permission map that the UI and the tests share |
+| `db/schema.ts`, `drizzle/` | The Drizzle declaration of every D1 table, and the SQL migrations (`0000` to `0017`; take the next free number) |
+| `build/`, `vite.config.ts` | The Worker entry (`build/sites-worker.ts`), the development sign-in plugin and the Sites build pieces |
+| `scripts/` | Build, sync, seed and migration scripts, and the Miniflare harnesses (`*-check.mjs`, sharing `scripts/harness/`) |
+| `e2e/` | The Playwright persona suite ([e2e/README.md](e2e/README.md)) |
+| `fixtures/dev-personas.json` | The loopback development personas |
+| `lib/catalog.json`, `lib/annex-iv-map.json`, `lib/obligation-subitems.json`, `lib/criteria/bundle.generated.json`, `public/tools/` | Generated copies of the root `templates/`, `docs/` and `engine/` sources: edit the source and run `npm run sync` |
 
-## Sites Lifecycle
+## Commands
 
-The Sites initializer copies the shared starter and selects managed-linux only when `SITES_MANAGED_LINUX_CONTAINER=1`; otherwise it selects portable. It saves the selection only in ignored `.sites-runtime/execution-profile.json`. Both profiles copy/configure first, then use the plugin's separate `install-dependencies.mjs` step to measure installation independently. Edit source under `app/` and follow the Sites skill for installation, preview, builds, and publishing.
+| Command | What it does |
+|---|---|
+| `npm ci` | Install from the lockfile (`npm run install:ci` does the same for the Sites tooling) |
+| `npm run dev` | The development server with hot reload and the loopback sign-in simulation (port 5173; pass `-- --port <port> --strictPort` for another) |
+| `npm run build` | Build the Worker into `dist/` |
+| `npm start` | Run the built Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with the development server; no sign-in simulation |
+| `npm run db:migrate:local` | Apply the pending D1 migrations to the local database (idempotent) |
+| `npm run seed:demo` | Seed the persona demo practice into a running development server |
+| `npm run db:generate` | Generate a Drizzle migration after a schema change |
+| `npm run sync` | Regenerate the generated copies from the root sources |
+| `npm run format` | Apply Prettier |
+| `npm run check` | Everything the CI `web` job runs: `format:check`, `typecheck`, `lint`, `test` (Vitest), `check:sync`, `check:build`, `check:harnesses`, `check:fixtures` |
+| `npm run test:e2e` | The Playwright persona suite against the built Worker (CI runs it in the `e2e` job) |
 
-Run `node <plugin-root>/scripts/configure-execution-profile.mjs` only when the profile is unknown for the current checkout and environment. Profile changes do not alter tracked source or require reinstalling otherwise-valid dependencies; restart an existing preview to use the new selection. Do not commit or upload `.sites-runtime/`.
+The harnesses that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `../engine/requirements-dev.txt` installed. `package-lock.json` is maintained with npm 11: change dependencies only with `npx npm@11 install ...`.
 
-This starter does not use `wrangler.jsonc`.
+## Local development and sign-in
 
-`install:ci` runs `npm ci` once against the shared lockfile, disables parent-workspace discovery, and includes required dev/optional dependencies despite production/omit settings. Sharp defaults to prebuilt binaries unless explicitly configured otherwise. Do not overlap installers.
+The development server simulates sign-in only for loopback requests, and the Worker trusts it only in `IDENTITY_MODE=dev`, which exists only on the development server:
 
-- **Portable:** Preserve host HOME, npm cache, registry, proxy, temporary paths, retry/concurrency settings, and lifecycle-script policy. Use `--prefer-offline --no-audit --no-fund`.
-- **Managed Linux:** Use the existing project-local HOME/cache/tmp setup and Linux install lock, tarball preflight, and timeout. Restore the image-seeded npm cache only when its lockfile hash matches; retain network fallback. Builds keep their existing timeout. These helpers are not invoked by the portable profile.
+- `/signin-with-chatgpt?return_to=/` signs in as `local_seedy` (`seedy@sites.test`, "Seedy");
+- `/signin-with-chatgpt?as=<persona>&return_to=/` signs in as a persona from `fixtures/dev-personas.json` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-eqr`, `qa-contrib`, `qa-viewer`, `qa-outsider`);
+- `/signout-with-chatgpt?return_to=/` signs out. The account menu in the sidebar footer offers Sign out and, on the development server, the persona switch.
 
-`scripts/sites-env.mjs` preserves the caller's HOME, npm cache, proxy, XDG, and temporary-directory configuration while defaulting Wrangler and Miniflare state to the checkout. If npm reports an unwritable cache, select a writable path with `npm_config_cache` for that install. The `dev` and `start` scripts also keep Wrangler logs inside the checkout. Generated `.sites-runtime/` and `.wrangler/` directories are disposable and ignored by Git.
+The sign-in cookie is named for the port (`__sites_local_auth_<port>`), so development servers on different ports keep separate sign-ins. Personas are compiled out of builds.
 
-On portable, `npm run dev` uses `vinext dev` with HMR, starting at port 5173. Vinext records the running server in ignored `.vinext/` state, rejects an ordinary duplicate launch, and recovers stale state after a stopped process; exactly simultaneous starts can race. Pass `--port <port>` or `--hostname <host>` after `npm run dev --` when needed; keep portable previews on loopback.
+With the development server running, `npm run seed:demo` provisions a demo practice through the app's own API: qa-lead's practice with the client "Acme", a structured engagement, each persona's membership and engagement grant, and an evidence request that `qa-contrib` can answer in the client portal; `qa-lead2` also leads a practice of their own and `qa-outsider` stays outside. Run it before signing in as a persona, since a first sign-in without a membership provisions a separate practice. It prints a sign-in link per persona and is safe to run again. Pass another URL (`npm run seed:demo -- http://127.0.0.1:5184`), or `--trusted-headers` for a built Worker in `trusted-headers` mode.
 
-For browser QA on managed Linux, use `sites-preview start`. The project's dev script runs Vite and accepts the supervisor's `--host 0.0.0.0 --port 4173 --strictPort` arguments. The internal browser uses `http://terminal.local:4173/`; it is not a user-facing URL. The supervisor owns the preview lifecycle. The ignored local profile survives the supervisor's cleared process environment.
+`npm start` serves the built Worker without a sign-in simulation: outside a Sites checkout the build trusts no identity and the API answers 401. For local end-to-end tests pass `npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests` and send the `oai-authenticated-user-*` headers from the test client. Local previews use Miniflare's placeholder `Request.cf` metadata; set `CLOUDFLARE_CF_FETCH_ENABLED=true` to fetch it. Wrangler metrics are off unless `WRANGLER_SEND_METRICS=true`.
 
-The portable profile simulates ChatGPT sign-in only for loopback development requests, and the Worker trusts it only in `IDENTITY_MODE=dev`, which exists only on the development server. Visit `/signin-with-chatgpt?return_to=/` to sign in as `local_seedy` (`seedy@sites.test`, display name `Seedy`), `/signin-with-chatgpt?as=<persona>&return_to=/` to sign in as one of the test personas in `fixtures/dev-personas.json` (`qa-lead`, `qa-auditor`, `qa-reviewer`, `qa-lead2`, `qa-contrib`, `qa-viewer`, `qa-outsider`), and `/signout-with-chatgpt?return_to=/` to sign out. The account menu in the sidebar footer offers Sign out and, on the development server, the persona switch; the signed-out screen lists the personas. The sign-in cookie is named for the dev server's port (`__sites_local_auth_<port>`), so dev servers on different ports keep separate sign-ins and never sign each other out; it preserves the identity across restarts on the same port. Mock auth is disabled in the managed-linux profile and is not included in production builds; hosted authentication remains dispatch-owned.
+## Identity
 
-With the dev server running, `npm run seed:demo` provisions a demo practice through the app's own API: qa-lead's practice with the client "Acme", a structured engagement, each persona's membership and engagement grant, and an evidence request that `qa-contrib` can answer in the client portal; `qa-lead2` also leads a practice of their own (practice switching) and `qa-outsider` stays outside. Run it before signing in as a persona, since a first sign-in without a membership provisions a separate practice. It prints a sign-in link per persona and is safe to run again. Pass the URL for another port (`npm run seed:demo -- http://127.0.0.1:5184`), or `--trusted-headers` for a built Worker in `trusted-headers` mode.
+`lib/identity.ts` resolves the caller at the Worker entry according to `IDENTITY_MODE`: `sites` (Sites dispatch headers), `cloudflare-access` (a verified Access token), or the loopback-only `trusted-headers` and `dev` modes. With no mode, every request is anonymous and the API answers 401 (decision D-23); the Sites build compiles `sites` in as its default. In every other mode the Worker entry removes inbound `oai-*` headers before the app runs, and app code reads the caller only through `currentUser()`. See [docs/security/identity.md](../docs/security/identity.md).
 
-The Worker uses `vinext/server/fetch-handler`, including Vinext's config-aware image handling. After building, `npm start` runs that Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with dev preview and local D1 migrations; it does not deploy the site or simulate sign-in. Use the URL printed by the server. Pass `npm start -- --port <port>` to select a different built-preview port. Outside a Sites checkout the build trusts no identity and the API answers 401; for local end-to-end tests pass `npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests` and send the `oai-authenticated-user-*` headers from the test client.
-
-Local previews use Miniflare's placeholder `Request.cf` metadata without a network lookup. Set `CLOUDFLARE_CF_FETCH_ENABLED=true` to opt into fetching preview metadata; this setting does not change hosted request metadata.
-
-Local tool usage metrics are disabled by default. Set `WRANGLER_SEND_METRICS=true` to opt in.
-
-## Included Shape
-
-- edit site code under `app/`
-- `lib/identity.ts` resolves the caller at the Worker entry according to `IDENTITY_MODE` (`sites`, `cloudflare-access`, `trusted-headers` or `dev`); with no mode the API answers 401. See [`docs/security/identity.md`](../docs/security/identity.md)
-- `app/chatgpt-auth.ts` provides `requireChatGPTUser()` for server-rendered pages; `lib/auth-paths.ts` builds sign-in and sign-out links
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings; it is checkout-local (ignored by Git), and builds without it use the `DB`/`BUCKET` bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/index.ts` reads the D1 binding from the Cloudflare Worker environment
-- `db/schema.ts` starts intentionally empty
-- `@cloudflare/workers-types` provides Worker types; `cloudflare-env.d.ts` declares optional `DB`/`BUCKET` bindings—update these declarations if binding names change
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-On Sites, dispatch sends signed-in visitors' identity in headers. In this workspace only the identity adapter (`lib/identity.ts`) reads them, and only in `sites` mode or in the loopback `trusted-headers` and `dev` modes; in every other mode the Worker entry removes inbound `oai-*` headers before the app runs. App code reads the caller with `currentUser()` from `lib/identity.ts` and never reads these headers itself.
-
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
-
-The user ID is stable for the same user on the same Site and different across Sites. Use it as the durable user key; use email and name for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive `oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty `name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by `oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-The adapter treats the full name as optional: `currentUser()` returns `{ userId, email, displayName, fullName }`, where `displayName` falls back to the email when no full name is present.
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Use these helpers when the site needs optional or required sign-in:
-
-- Use `currentUser()` from `lib/identity.ts` for optional signed-in UI in server code; it returns `null` for anonymous requests.
-- Use the returned `userId` as the stable user key for user-owned records; do not use email as a durable identifier.
-- Use `requireChatGPTUser(returnTo)` from `app/chatgpt-auth.ts` for server-rendered pages that should send anonymous visitors to sign-in. That module is server-only; do not import it into a Client Component.
-- Build links with `signInPath(returnTo)` and `signOutPath(returnTo)` from `lib/auth-paths.ts` (usable in Client Components too), for example `<a href={signInPath(returnTo)} target="_top">`.
-- Do not use `fetch`, XHR, a client-side router, or a framework link that can prefetch the sign-in route. SIWC must start as a top-level navigation.
-- Never request the AuthAPI authorization endpoint directly. The dispatch-owned `/signin-with-chatgpt` route must start the SIWC flow.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in or sign-out, normally the current location so that deep links survive. The helpers validate and safely encode it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because they depend on per-request identity.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies, and identity header injection. Do not implement app routes for those reserved paths. Outside Sites, the development server answers them in `dev` mode and the Worker entry answers them in the other modes: in `cloudflare-access` mode sign-in returns to the return path once Access has authenticated the request (401 otherwise) and sign-out redirects to `/cdn-cgi/access/logout`; without an interactive sign-in they answer 401. The workspace's sign-in button says "Sign in with ChatGPT" only in the Sites build and on the development server, and "Sign in" in every other build (`signInLabel()` in `lib/auth-paths.ts`). Routes that do not call the helpers remain anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the Sites hosting platform's access policy controls for workspace-wide restrictions, or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write actions tied to the current ChatGPT user. Leave public content anonymous.
+On Sites, dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the OAuth cookies and the identity headers (`oai-authenticated-user-id`, `-email`, and an optional percent-encoded `-full-name`). Do not implement app routes for those paths, and start sign-in only as a top-level navigation (build links with `signInPath()` and `signOutPath()` from `lib/auth-paths.ts`). Sign-in establishes identity only; practice membership and roles are checked on the server (`lib/tenancy.ts`).
 
 ## Local D1 migrations
 
-For a D1-backed local preview, generate SQL with `npm run db:generate`. Build once through the Sites skill's build entrypoint (or `npm run build` for standalone use) to generate `dist/server/wrangler.json`, rebuilding if bindings change. Then apply the pending migrations:
+Build once (`npm run build`) to generate `dist/server/wrangler.json`, rebuilding if bindings change, then apply the pending migrations:
 
 ```sh
 npm run db:migrate:local
@@ -94,25 +71,15 @@ npm run db:migrate:local
 
 ## End-to-end tests
 
-`npm run test:e2e` runs the Playwright persona suite with axe accessibility checks against the built Worker on a fresh database in `.wrangler/e2e-state` (run `npm run build` and, once, `npx playwright install chromium` first). See [`e2e/README.md`](e2e/README.md) for the flows, the tracked accessibility exceptions and the CI job.
+`npm run test:e2e` runs the Playwright persona suite with axe accessibility checks against the built Worker on a fresh database in `.wrangler/e2e-state` (run `npm run build` and, once, `npx playwright install chromium` first). Do not run `npm run build` or `npm run check` in the same checkout while the suite's server runs. See [e2e/README.md](e2e/README.md) for the flows, the tracked accessibility exceptions and the CI job.
 
-## Diagnostic Commands
+## Sites hosting
 
-- `npm run install:ci`: perform the one locked dependency install
-- `npm run dev`: start the Vite/Vinext development server
-- `npm run build`: build the deployable Sites artifact
-- `npm run start`: preview the built Worker locally with D1/R2 support
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-- `npm run seed:demo`: seed the persona demo practice into a running dev server
-- `npm run db:migrate:local`: apply the pending D1 migrations to the local database (idempotent)
-- `npm run test:e2e`: run the Playwright persona suite against the built Worker (not part of `npm run check`; CI runs it in the `e2e` job)
-- `npm run check`: run everything CI runs for this workspace (`format:check`, `typecheck`, `lint`, `test`, `build`, `check:harnesses`); each step is also its own script
+The workspace is hosted on Sites, which provisions D1 and R2, applies migrations and owns sign-in. `.openai/hosting.json` declares the optional Sites bindings; it is checkout-local (ignored by Git), and builds without it use the `DB` and `BUCKET` bindings declared in `cloudflare-env.d.ts`. The Sites connector runtime (`build/sites-worker.ts` wraps every request in the connector binding; `build/connector-preview-*.mjs`, `scripts/connector-preview/`, `lib/connector-context.ts`, `lib/connector-contract.mts`) is part of the hosting contract and stays although the app has no connectors (decision D-44).
 
-When using the Sites plugin, follow its skill instructions for installation, builds, and publishing. These npm commands remain available for standalone use.
+- **Execution profiles.** The Sites initializer selects the managed-Linux profile only when `SITES_MANAGED_LINUX_CONTAINER=1`, otherwise the portable one, and saves the choice in ignored `.sites-runtime/execution-profile.json`. Run `node <plugin-root>/scripts/configure-execution-profile.mjs` only when the profile is unknown for the checkout. Do not commit `.sites-runtime/`.
+- **Installs.** `install:ci` runs `npm ci` once against the lockfile, disables parent-workspace discovery and includes the required dev and optional dependencies. On managed Linux it uses the project-local HOME, cache and lock, a tarball preflight and a timeout (`scripts/install-ci.*`, `scripts/npm-install.mjs`); do not overlap installers.
+- **Environment.** `scripts/sites-env.mjs` keeps the caller's HOME, npm cache, proxy, XDG and temporary-directory settings while defaulting Wrangler and Miniflare state to the checkout; `.sites-runtime/`, `.wrangler/` and `.vinext/` are disposable and ignored.
+- **Builds and previews.** The portable build runs Vinext directly; the managed-Linux build uses `scripts/build-verified.sh` with `SITES_BUILD_TIMEOUT`. For browser QA on managed Linux, `sites-preview start` runs the dev script with `--host 0.0.0.0 --port 4173 --strictPort`, and the mock sign-in is disabled there. Vinext records a running development server in `.vinext/` and rejects an ordinary duplicate launch.
 
-The portable build runs Vinext directly without a host `timeout` command. The managed-linux build uses `scripts/build-verified.sh` and its existing `SITES_BUILD_TIMEOUT` setting.
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+When using the Sites plugin, follow its skill instructions for installation, builds and publishing; the npm commands above remain available for standalone use.
