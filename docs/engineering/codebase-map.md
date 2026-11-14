@@ -186,7 +186,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 ## 2. Main user flows
 
-> **Checked against the release candidate on 14 Nov 2026** ([#212]): the top of the approved PR stack (`2f0beb2`, PRs [#196][PR #196], [#200][PR #200], [#205][PR #205], [#206][PR #206], [#207][PR #207], [#208][PR #208] and [#198][PR #198]) plus the approved round-2 fixes [PR #213] ([#209]), [PR #215] ([#210]) and [PR #214] ([#211]), described as they behave once merged. Changes that [#216] (round-2 follow-ups, in progress) makes are named by its issue number. Where this section and the code disagree, the code wins.
+> **Checked against the release candidate on 14 Nov 2026** ([#212]): the top of the approved PR stack (`2f0beb2`, PRs [#196][PR #196], [#200][PR #200], [#205][PR #205], [#206][PR #206], [#207][PR #207], [#208][PR #208] and [#198][PR #198]) plus the approved round-2 fixes [PR #213] ([#209]), [PR #215] ([#210]) and [PR #214] ([#211]) and the round-2 follow-ups [PR #218] ([#216]), described as they behave once merged. Where this section and the code disagree, the code wins.
 
 ### 2.0 Local environment, sign-in and personas
 
@@ -313,7 +313,7 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
     1. qa-auditor: Requests → Request evidence → Create request (`createEvidenceRequest`).
     2. qa-lead: Client request access → Assign request to qa-contrib with an expiry (`grantClientRequest`). The grant list shows the stored expiry date in UTC ([#202]).
     3. qa-contrib: Overview → Your evidence requests → Submit evidence package (1–10 files, at most 10 MB in total; `POST /api/client-submission`). The package shows "Awaiting receipt acknowledgment". Ask a question → Send reply. Focus moves into each portal form and back to its button on cancel ([#203]).
-    4. qa-auditor: Acknowledge receipt (`acknowledgeClientSubmission`) → Assess evidence (`assessEvidenceRequest`). Acknowledge receipt is offered to every role that holds the op (Auditors and Lead Auditors), outside the Lead-only access panel ([#210]); [#216] does the same for publishing a client clarification (`publishClientClarification`).
+    4. qa-auditor: Acknowledge receipt (`acknowledgeClientSubmission`) → Assess evidence (`assessEvidenceRequest`). Acknowledge receipt is offered to every role that holds the op (Auditors and Lead Auditors), outside the Lead-only access panel ([#210]). The Auditor's "Client submissions" panel also shows each active grant's thread with Send clarification (`publishClientClarification`); both panels offer it only for an active grant, since the server refuses expired, revoked and lapsed grants ([#216]).
     5. qa-lead: Revoke (`revokeClientRequest`). The contributor's next submission returns 403 and the engagement returns 404.
     6. qa-lead: Record limitation (`closeEvidenceRequest`; this creates a limitation memo) → Reopen request (`reopenEvidenceRequest`).
     - **Negative:** the contributor's projection carries no staff user id or email, including the receipt's actor ([#201]).
@@ -342,7 +342,7 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
     7. qa-viewer sees the package, labelled with its release time ("Released", [#210]), and can Print (`/report?tenantId&engagementId&reportId`). `/api/report-package?download=1` returns `proof.valid:true`.
     8. qa-lead: Withdraw (`withdrawReport`). The client loses access.
     - **Expect:** a second release supersedes the first automatically and records a client notification (F-32, fixed in [#14]); WP-RP-02 and MEM-SO-01 never gate capture (F-30). A superseded report that the client can still read can also be withdrawn (decision D-45, [#201], [#202]).
-    - **Negative:** `/report` answers 403 when access is denied and 404 for a missing, withdrawn or unreleased report, as `/api/report-package` does ([#209]). [#216] makes a render failure answer 500 and the 403 page show the refusal's own message.
+    - **Negative:** `/report` answers 403 when access is denied and 404 for a missing, withdrawn or unreleased report, as `/api/report-package` does ([#209]). A render failure answers 500 with the "could not be loaded" fallback (the page sets the status through `lib/response-status.ts`, applied by `build/sites-worker.ts`), and the 403 page shows the refusal's own message, for example "You do not have access to this practice" ([#216]).
 
 13. **Client and tenant isolation** (qa-viewer, qa-outsider)
     1. qa-viewer sees only Acme engagements in the client portal shell; client-visible accepted evidence only; no Requests tab.
@@ -370,13 +370,13 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
     1. My work: views, filters, snooze with Undo, and the Lead-only "Team workload" scope. `GET /api/work-inbox?tenantId&page=0` lists only granted engagements, and the last page has `nextPage:null`.
     2. Ctrl/Cmd+K search; Back/Forward restores the view and filters. Closing a record sheet or dialog returns focus to the element that opened it ([#203]).
     3. Recovery draft: edit a paper, reload, then Restore draft. After another user saves a new revision, the draft reports `current:false`.
-    4. Two tabs edit the same paper: the second save gets 409. The editor shows the conflict with a Reload button in place, and the toast's Reload also works above the open sheet (mouse, or Alt+T for the keyboard); Reload leads to "This paper has a newer revision" ([#210]; [#216] refines the toaster's Escape handling).
+    4. Two tabs edit the same paper: the second save gets 409. The editor shows the conflict with a Reload button in place, and the toast's Reload also works above the open sheet (mouse, or Alt+T for the keyboard); Reload leads to "This paper has a newer revision" ([#210]). If focus was on the page body before Alt+T, Escape returns it to the open sheet; with no modal open, Escape collapses an expanded toast stack and focus returns to where it was ([#216]).
 
 17. **Monitoring and follow-up** (qa-auditor, qa-reviewer, qa-lead)
     1. Audit program → Follow-up → New case (`createMonitoringCase`).
     2. Record assessment (`assessMonitoringCase`): a decision, the assessment, the next due date and linked accepted evidence.
     3. For a case that requires reassessment, qa-lead: Open reassessment → Create linked engagement (`openFollowup`; Lead Auditor only). The case links to the successor engagement.
-    4. qa-reviewer (not the owner or a contributor): Review closure → Close case (`closeMonitoringCase`). Review closure is disabled with the server's reason while the case cannot close: not yet assessed, a reassessment case without its successor engagement, or another case without linked accepted evidence (`monitoringClosureRefusal` in `lib/preconditions.ts`, [#210]; [#216] makes `closeMonitoringCase` call the same function).
+    4. qa-reviewer (not the owner or a contributor): Review closure → Close case (`closeMonitoringCase`). Review closure is disabled with the server's reason while the case cannot close: not yet assessed, a reassessment case without its successor engagement, or another case without linked accepted evidence (`monitoringClosureRefusal` in `lib/preconditions.ts`, [#210]). `closeMonitoringCase` refuses with the same function ([#216]), after the already-closed check.
     5. For a recurring case (not one-off), a writer: Plan next cycle → Create next cycle (`createMonitoringCase` with the previous case).
     - **Negative:** closing a closed case returns 409 "This case is already closed. Create a new case for subsequent work" ([#209]).
     - **F-66 (fixed in [#14], [PR #85]):** a reassessment case closes without evidence once its successor engagement exists; other decisions need linked accepted evidence, so a case can no longer be stuck unclosable.
@@ -425,6 +425,7 @@ Each flow lists the steps, the expected results and the negative checks. **F-xx*
 [PR #213]: https://github.com/ahed-jneed/ai-assurance/pull/213
 [PR #214]: https://github.com/ahed-jneed/ai-assurance/pull/214
 [PR #215]: https://github.com/ahed-jneed/ai-assurance/pull/215
+[PR #218]: https://github.com/ahed-jneed/ai-assurance/pull/218
 
 ## 3. File-ownership map
 
