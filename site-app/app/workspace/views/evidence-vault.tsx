@@ -4,6 +4,7 @@ import { Database, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Artifact, Engagement, EvidenceRequest, Role } from "@/lib/domain";
+import { canSee } from "@/lib/permissions";
 import { evidenceRows as selectEvidence } from "@/lib/register-views";
 import { EvidenceRegister } from "../../audit-registers";
 import { DatabaseToolbar } from "../../database-toolbar";
@@ -27,7 +28,6 @@ export function EvidenceVault({
   data,
   engagement: e,
   role,
-  viewer,
   writer,
   busy,
   url,
@@ -44,7 +44,6 @@ export function EvidenceVault({
   data: WorkspaceData;
   engagement: Engagement;
   role: Role;
-  viewer: boolean;
   writer: boolean;
   busy: boolean;
   url: UrlState;
@@ -68,10 +67,11 @@ export function EvidenceVault({
   } = url;
   const { search, setSearch, filter, setFilter, setFacet, setSort } = register;
   const evidenceRows = selectEvidence(e.artifacts, register.query);
-  const genaiLevels = useGenaiLevels(data.tenantId, e, role);
+  const genaiLevels = useGenaiLevels(data.tenantId, e, role),
+    requests = canSee(role, "evidenceRequests");
   return (
     <>
-      {role === "Client Contributor" && (
+      {canSee(role, "clientPortal") && (
         <Suspense fallback={panelFallback}>
           <ClientPortal
             data={data}
@@ -111,7 +111,7 @@ export function EvidenceVault({
           <TabsTrigger value="files">
             Files <span className="view-count">{e.artifacts.length}</span>
           </TabsTrigger>
-          {!viewer && (
+          {requests && (
             <TabsTrigger value="requests">
               Requests{" "}
               <span className="view-count">
@@ -228,7 +228,7 @@ export function EvidenceVault({
             )}
           </section>
         </TabsContent>
-        {!viewer && (
+        {requests && (
           <TabsContent value="requests">
             <Suspense fallback={panelFallback}>
               <EvidenceRequests

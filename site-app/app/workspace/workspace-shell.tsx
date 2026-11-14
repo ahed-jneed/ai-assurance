@@ -15,7 +15,7 @@ import { RefreshCw, ShieldCheck } from "lucide-react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
-import { can } from "@/lib/permissions";
+import { can, canSee, fallbackRole, isClientRole } from "@/lib/permissions";
 import { selectPaperRegister } from "@/lib/paper-presentation";
 import {
   AccountMenu,
@@ -113,12 +113,12 @@ export default function Workspace() {
   const workspace = useWorkspaceData();
   const { data, busy, loading, bootstrapping, connect } = workspace;
   const e = data?.engagement,
-    role = data?.identity.role ?? "Client Viewer",
+    role = data?.identity.role ?? fallbackRole,
     // Coarse view flags; each action checks its own op with can().
     writer = can(role, "editPaper"),
     reviewer = can(role, "reviewPaper"),
     lead = can(role, "signPaper"),
-    viewer = ["Client Viewer", "Client Contributor"].includes(role),
+    viewer = isClientRole(role),
     // A loaded client account gets the client portal shell instead of the
     // practice sidebar (#36, F-72).
     portal = !!data && viewer;
@@ -154,7 +154,9 @@ export default function Workspace() {
       onPaperSaved: paper.acceptSavedRevision,
     });
   });
-  const displayedEvidenceTab = viewer ? "files" : url.evidenceTab;
+  const displayedEvidenceTab = canSee(role, "evidenceRequests")
+    ? url.evidenceTab
+    : "files";
   const guarded = navigationGuard({
     busy,
     loading,

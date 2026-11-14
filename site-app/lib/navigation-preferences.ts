@@ -1,3 +1,5 @@
+import { isClientRole } from "./permissions";
+
 export const navigationRoutes = [
   "My work",
   "Overview",
@@ -40,8 +42,6 @@ export const clientPortalRoutes = [
   ["Findings", "Findings"],
   ["Reports & sign-off", "Reports"],
 ] as const satisfies readonly (readonly [NavigationRoute, string])[];
-export const isClientRole = (role: string) =>
-  role === "Client Viewer" || role === "Client Contributor";
 /** The portal's name for a view, or the view itself outside the portal. */
 export const clientPortalTitle = (view: string) =>
   clientPortalRoutes.find(([route]) => route === view)?.[1] ?? view;

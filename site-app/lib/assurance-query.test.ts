@@ -235,3 +235,64 @@ describe("assurance query cache", () => {
     expect(state(cache, b.query).data).toBe(1);
   });
 });
+
+// The shared readers go through fetchJson (#178): the status is checked
+// before the body is parsed, so a non-JSON failure (a 502 page from the edge)
+// reads as the status's message instead of a JSON parse error.
+describe("assurance readers check the status first", () => {
+  const signal = new AbortController().signal;
+  const gateway = () =>
+    vi.fn(
+      async () =>
+        new Response("<html>Bad gateway</html>", {
+          status: 502,
+          headers: { "content-type": "text/html" },
+        }),
+    );
+
+  it("records: a non-JSON failure is a transient FetchError", async () => {
+    vi.stubGlobal("fetch", gateway());
+    await expect(
+      recordsQuery("system").read(engagement, signal),
+    ).rejects.toMatchObject({
+      name: "FetchError",
+      status: 502,
+      kind: "transient",
+      message: "The service is temporarily unavailable. Try again in a moment.",
+    });
+  });
+
+  it("views: a non-JSON failure is a transient FetchError", async () => {
+    vi.stubGlobal("fetch", gateway());
+    await expect(genaiQuery.read(engagement, signal)).rejects.toMatchObject({
+      name: "FetchError",
+      status: 502,
+      kind: "transient",
+    });
+  });
+
+  it("keeps the server's own error and its kind", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: "Engagement access required" }),
+            {
+              status: 403,
+            },
+          ),
+      ),
+    );
+    await expect(
+      recordsQuery("dataset").read(engagement, signal),
+    ).rejects.toMatchObject({
+      message: "Engagement access required",
+      kind: "forbidden",
+    });
+    await expect(genaiQuery.read(engagement, signal)).rejects.toMatchObject({
+      message: "Engagement access required",
+      kind: "forbidden",
+    });
+  });
+});

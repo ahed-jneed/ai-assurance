@@ -13,7 +13,7 @@ import {
   KeyRound,
   Scale,
 } from "lucide-react";
-import { manageState } from "@/lib/permissions";
+import { isClientRole, manageState } from "@/lib/permissions";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -431,9 +431,7 @@ export function ManagementViews({
                           )}
                           {m.status === "active" &&
                             !m.practice_admin &&
-                            !["Client Viewer", "Client Contributor"].includes(
-                              m.role,
-                            ) && (
+                            !isClientRole(m.role) && (
                               <>
                                 <Button
                                   variant="ghost"

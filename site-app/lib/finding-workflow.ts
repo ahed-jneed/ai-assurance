@@ -1,5 +1,6 @@
 import { canWrite } from "./domain";
 import type { Artifact, Finding, Role } from "./domain";
+import { can } from "./permissions";
 
 export function findingWorkflow(
   finding: Finding,
@@ -8,8 +9,7 @@ export function findingWorkflow(
   userId: string,
 ) {
   const showRetest =
-    ["Reviewer", "Lead Auditor"].includes(role) &&
-    finding.status === "ready_for_retest";
+    can(role, "recordFindingRetest") && finding.status === "ready_for_retest";
   const independent =
     finding.createdBy !== userId && finding.remediationBy !== userId;
   const evidenceReady =

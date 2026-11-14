@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { can } from "@/lib/permissions";
+import { can, canBeAssigned } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -383,7 +383,7 @@ export function RequestAccess({
   const contributors = data.members.filter(
     (m) =>
       m.status === "active" &&
-      m.role === "Client Contributor" &&
+      canBeAssigned(m.role, "clientRequest") &&
       m.client_id === e.clientId,
   );
   return (

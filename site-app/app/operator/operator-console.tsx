@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { errorMessage, fetchJson, postJson } from "@/lib/fetch-json";
 import type {
   IssuedWork,
   OperatorEvent,
@@ -76,20 +77,24 @@ export function OperatorConsole() {
     [confirmName, setConfirmName] = useState(""),
     [reason, setReason] = useState(""),
     [busy, setBusy] = useState(false);
-  const read = useCallback(async () => {
-    const response = await fetch("/api/operator" + (all ? "?all=1" : ""), {
-      cache: "no-store",
-    });
-    return {
-      ok: response.ok,
-      body: (await response.json()) as ConsoleData & { error?: string },
-    };
-  }, [all]);
-  const show = useCallback(({ ok, body }: Awaited<ReturnType<typeof read>>) => {
-    if (!ok) setError(body.error ?? "The console could not load");
+  const read = useCallback(
+    () =>
+      fetchJson<ConsoleData>("/api/operator" + (all ? "?all=1" : ""), {
+        cache: "no-store",
+      }).then(
+        (body) => ({ ok: true as const, body }),
+        (x: unknown) => ({
+          ok: false as const,
+          error: errorMessage(x, "The console could not load"),
+        }),
+      ),
+    [all],
+  );
+  const show = useCallback((result: Awaited<ReturnType<typeof read>>) => {
+    if (!result.ok) setError(result.error);
     else {
       setError("");
-      setData(body);
+      setData(result.body);
     }
   }, []);
   const load = async () => show(await read());
@@ -112,18 +117,19 @@ export function OperatorConsole() {
       afterId: data.next.id,
       ...(all ? { all: "1" } : {}),
     });
-    const response = await fetch("/api/operator?" + query, {
-      cache: "no-store",
-    });
-    const body = (await response.json()) as ConsoleData & { error?: string };
-    setBusy(false);
-    if (!response.ok) setError(body.error ?? "The next page could not load");
-    else {
+    try {
+      const body = await fetchJson<ConsoleData>("/api/operator?" + query, {
+        cache: "no-store",
+      });
       setError("");
       setData({
         ...body,
         practices: [...data.practices, ...body.practices],
       });
+    } catch (x) {
+      setError(errorMessage(x, "The next page could not load"));
+    } finally {
+      setBusy(false);
     }
   }
   function start(practice: PracticeSummary, op: Pending["op"]) {
@@ -135,46 +141,40 @@ export function OperatorConsole() {
   }
   async function showIssued(practice: PracticeSummary) {
     setPending(null);
-    const response = await fetch(
-      "/api/operator?tenantId=" + encodeURIComponent(practice.id),
-      { cache: "no-store" },
-    );
-    const body = (await response.json()) as {
-      error?: string;
-      issued?: IssuedWork;
-    };
-    if (!response.ok || !body.issued)
-      setError(body.error ?? "The issued work could not load");
-    else {
+    try {
+      const body = await fetchJson<{ issued?: IssuedWork }>(
+        "/api/operator?tenantId=" + encodeURIComponent(practice.id),
+        { cache: "no-store" },
+      );
+      if (!body.issued) throw new Error("The issued work could not load");
       setError("");
       setIssued(body.issued);
+    } catch (x) {
+      setError(errorMessage(x, "The issued work could not load"));
     }
   }
   async function submit() {
     if (!pending) return;
     const { practice, op } = pending;
     setBusy(true);
-    const response = await fetch("/api/operator", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    let body: { details?: { objects?: number; members?: number } };
+    try {
+      body = await postJson<typeof body>("/api/operator", {
         op,
         data: { tenantId: practice.id, confirmName, reason },
-      }),
-    });
-    const body = (await response.json()) as {
-      error?: string;
-      details?: { objects?: number; members?: number };
-    };
-    setBusy(false);
-    if (!response.ok) {
+      });
+    } catch (x) {
       setError(
-        body.error ??
-          (op === "archivePractice"
+        errorMessage(
+          x,
+          op === "archivePractice"
             ? "The practice was not archived"
-            : "The practice was not deleted"),
+            : "The practice was not deleted",
+        ),
       );
       return;
+    } finally {
+      setBusy(false);
     }
     setNotice(
       op === "archivePractice"

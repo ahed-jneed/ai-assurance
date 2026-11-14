@@ -71,6 +71,7 @@ import {
   permittedNavigationRoutes,
   type NavigationRoute,
 } from "@/lib/navigation-preferences";
+import { can, isClientRole } from "@/lib/permissions";
 import type { WorkspaceData } from "./workspace-types";
 
 const auditModules: readonly (readonly [
@@ -297,22 +298,14 @@ export function WorkspaceNavigation({
             filter: "",
           }
         : null;
-    if (
-      !e ||
-      !data ||
-      ["Client Viewer", "Client Contributor"].includes(data.identity.role)
-    )
-      return null;
+    if (!e || !data || isClientRole(data.identity.role)) return null;
     if (route === "Evidence vault")
       return {
         count: e.artifacts.filter((a) => a.status === "unverified").length,
         label: "awaiting acceptance",
         filter: "unverified",
       };
-    if (
-      route === "Working papers" &&
-      ["Reviewer", "Lead Auditor"].includes(data.identity.role)
-    )
+    if (route === "Working papers" && can(data.identity.role, "reviewPaper"))
       return {
         count: e.papers.filter((p) => p.status === "in_review").length,
         label: "awaiting review",

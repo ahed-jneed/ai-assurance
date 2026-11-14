@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { errorMessage, fetchJson } from "@/lib/fetch-json";
 import { Button } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 import type { Engagement, Report, Role } from "@/lib/domain";
@@ -31,18 +32,13 @@ export function PackageIntegrity({
     setChecking(true);
     setError("");
     try {
-      const response = await fetch("/api/report-package?" + query, {
-          cache: "no-store",
-        }),
-        v = (await response.json()) as {
-          valid: boolean;
-          items: ExportedPaperItem[];
-          error?: string;
-        };
-      if (!response.ok) throw Error(v.error);
+      const v = await fetchJson<{
+        valid: boolean;
+        items: ExportedPaperItem[];
+      }>("/api/report-package?" + query, { cache: "no-store" });
       setResult({ valid: v.valid, items: v.items });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not verify package");
+      setError(errorMessage(e, "Could not verify package"));
     } finally {
       setChecking(false);
     }

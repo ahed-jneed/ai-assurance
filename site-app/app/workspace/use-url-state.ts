@@ -6,6 +6,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { Role } from "@/lib/domain";
 import type { TermsChoice } from "@/lib/domain/report-model";
 import { readEvidenceQuery } from "@/lib/evidence-presentation";
+import { canSee } from "@/lib/permissions";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import {
   normalizePaperQuery,
@@ -96,7 +97,7 @@ export function useUrlState(data: WorkspaceData | null) {
     setInboxQuery((q) =>
       normalizeInboxQuery(
         q,
-        data.identity.role === "Lead Auditor",
+        canSee(data.identity.role, "teamWork"),
         data.engagements.map((e) => e.id),
       ),
     );
@@ -268,7 +269,7 @@ export function useUrlSync({
       url.setInboxQuery(
         readInboxQuery(
           window.location.search,
-          current.identity.role === "Lead Auditor",
+          canSee(current.identity.role, "teamWork"),
         ),
       );
     if (link.module === "Evidence vault") {
@@ -322,7 +323,7 @@ export function useUrlSync({
     else setError("This record is unavailable under your current access.");
     if (
       link.kind === "request" &&
-      !["Client Viewer", "Client Contributor"].includes(current.identity.role)
+      canSee(current.identity.role, "evidenceRequests")
     )
       url.setEvidenceTab("requests");
   }

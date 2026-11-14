@@ -1,5 +1,6 @@
 import type { WorkspaceData } from "@/app/workspace-types";
 import { opinionLabel } from "./domain/report-model";
+import { isClientRole } from "./permissions";
 
 export type SearchItem = {
   kind:
@@ -48,9 +49,7 @@ export function workspaceSearch(
   data: WorkspaceData,
   query: string,
 ): SearchItem[] {
-  const viewer = ["Client Viewer", "Client Contributor"].includes(
-      data.identity.role,
-    ),
+  const viewer = isClientRole(data.identity.role),
     engagement = data.engagement,
     items: SearchItem[] = [];
 

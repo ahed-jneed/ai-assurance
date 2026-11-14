@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { errorMessage, fetchJson } from "@/lib/fetch-json";
 
 import {
   Download,
@@ -395,7 +396,7 @@ function EvidenceFilePreview({
     const active = () =>
       !controller.signal.aborted && request.current === controller;
     try {
-      const response = await fetch(
+      const value = await fetchJson<{ text: string }>(
         "/api/evidence?" +
           new URLSearchParams({
             tenantId,
@@ -405,12 +406,9 @@ function EvidenceFilePreview({
           }),
         { cache: "no-store", signal: controller.signal },
       );
-      const value = (await response.json()) as { text: string; error?: string };
-      if (!response.ok) throw Error(value.error ?? "Preview unavailable");
       if (active()) setPreview(value.text);
     } catch (err) {
-      if (active())
-        setError(err instanceof Error ? err.message : "Preview unavailable");
+      if (active()) setError(errorMessage(err, "Preview unavailable"));
     } finally {
       if (active()) setBusy(false);
     }

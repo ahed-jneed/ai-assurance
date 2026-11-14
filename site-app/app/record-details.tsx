@@ -25,6 +25,7 @@ import {
   readableResults,
 } from "@/lib/presentation";
 import { describePlan } from "@/lib/hosted-statistics";
+import { fallbackRole } from "@/lib/permissions";
 import { StatisticsResult } from "./statistics-result";
 import { legacyConfig } from "@/lib/domain";
 import type {
@@ -845,7 +846,7 @@ export function RecordDetails({
   engagement,
   onPaper,
   resolve,
-  role = "Client Viewer",
+  role = fallbackRole,
   userId = "",
   busy = false,
   onRemediate,

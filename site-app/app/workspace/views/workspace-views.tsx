@@ -352,7 +352,6 @@ export const WorkspaceViews = memo(function WorkspaceViews({
           data={data}
           engagement={e}
           role={role}
-          viewer={viewer}
           writer={writer}
           busy={busy}
           url={url}

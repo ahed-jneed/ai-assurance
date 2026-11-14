@@ -1,6 +1,6 @@
 "use client";
 import { Input } from "@/components/ui/input";
-import { canAssignEngagementAccess } from "@/lib/permissions";
+import { canAssignEngagementAccess, isClientRole } from "@/lib/permissions";
 import { roles } from "@/lib/domain";
 import { Choice } from "../workspace-ui";
 import type {
@@ -9,8 +9,7 @@ import type {
   ModalSubmitContext,
 } from "./types";
 
-const clientRole = (role: string) =>
-  ["Client Viewer", "Client Contributor"].includes(role);
+const clientRole = isClientRole;
 
 /** The engagement checkboxes' flag names: "engagement:<id>". */
 const engagementFlag = "engagement:";

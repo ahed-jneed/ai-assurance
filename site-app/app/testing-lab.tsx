@@ -23,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
+import { fetchJson } from "@/lib/fetch-json";
 import { recordsQuery } from "@/lib/assurance-query";
 import {
   Table,
@@ -505,7 +506,7 @@ export function TestingLab({
     if (!wizard || artifactId === undefined) return;
     let active = true;
     const controller = new AbortController();
-    fetch(
+    fetchJson<Inspection>(
       "/api/evaluation/dataset?" +
         new URLSearchParams({
           tenantId,
@@ -514,13 +515,6 @@ export function TestingLab({
         }),
       { signal: controller.signal },
     )
-      .then(async (r) => {
-        const value = (await r.json()) as Inspection & {
-          error?: string;
-        };
-        if (!r.ok) throw Error(value.error ?? "Dataset inspection failed");
-        return value as Inspection;
-      })
       .then((value) => {
         if (active) applyInspection(value);
       })

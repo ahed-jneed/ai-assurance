@@ -1,5 +1,6 @@
 import type { EvidenceRequest, Role } from "./domain";
 import { requestClosed, requestOverdue } from "./evidence-requests";
+import { canSee } from "./permissions";
 
 export const evidenceFileViews = [
   "all",
@@ -21,9 +22,6 @@ export type EvidenceQuery = {
   facet: string;
   sort: string;
 };
-const clientRole = (role: Role) =>
-  role === "Client Viewer" || role === "Client Contributor";
-
 export function localEvidenceDay(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -84,7 +82,9 @@ export function normalizeEvidenceQuery(
   role: Role,
 ): EvidenceQuery {
   const tab =
-    input.tab === "requests" && !clientRole(role) ? "requests" : "files";
+    input.tab === "requests" && canSee(role, "evidenceRequests")
+      ? "requests"
+      : "files";
   const allowed = tab === "requests" ? evidenceRequestViews : evidenceFileViews;
   return {
     tab,

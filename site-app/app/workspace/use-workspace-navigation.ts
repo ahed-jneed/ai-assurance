@@ -2,7 +2,7 @@
 // practice, papers and records. Each change goes through `guarded` (see
 // navigation-guards.ts) so it cannot drop unsaved work.
 import { useRef } from "react";
-import { can } from "@/lib/permissions";
+import { can, fallbackRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { isAttestedOp } from "@/lib/attestation";
 import { type AuditGate, type EvidenceRequest, type Paper } from "@/lib/domain";
@@ -77,7 +77,7 @@ export function useWorkspaceNavigation({
   const viewMemory = useRef<Record<string, ViewMemory>>({});
   const { data, load, act } = workspace;
   const e = data?.engagement,
-    role = data?.identity.role ?? "Client Viewer",
+    role = data?.identity.role ?? fallbackRole,
     writer = can(role, "updateFinding");
   const { view, setView, setSearch, setFilter, setFacet, setSort } = url;
 
