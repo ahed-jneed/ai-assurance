@@ -15,7 +15,12 @@ npx playwright show-report           # the HTML report of the last run
 ```
 
 `playwright.config.ts` starts `e2e/server.mjs` on `127.0.0.1:8790` (set
-`E2E_PORT` for another port). The server deletes `.wrangler/e2e-state`, applies
+`E2E_PORT` for another port). It first checks that `dist/server` is a complete
+build (`e2e/build-files.mjs`: the entry, every module it imports, the assets
+directory and the client assets the RSC manifest names) and, if an interrupted
+build left files out, names them and exits with "run `npm run build`" before
+it touches the database. `e2e/*.test.ts` are Vitest unit tests of this tooling;
+Playwright runs only `e2e/*.spec.ts`. The server then deletes `.wrangler/e2e-state`, applies
 every migration with `npm run db:migrate:local -- --persist-to
 .wrangler/e2e-state`, and starts the built Worker in Miniflare (with the
 bindings and assets of `dist/server/wrangler.json`) with
