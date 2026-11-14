@@ -1,16 +1,18 @@
-// The /report print view's failure answers (#216): a report that cannot be
-// rendered answers 500 with the "could not be loaded" fallback and is logged;
-// an access refusal shows the refusal's own message on the 403 page. The
+// The /report print view's failure answers (#216, #220): a report that cannot
+// be rendered answers 500 and a damaged record 409 or 503, each with the
+// "could not be loaded" fallback and logged; an access refusal shows the
+// refusal's own message on the 403 page. The
 // Worker-level statuses are checked end to end in
 // scripts/engagement-lifecycle-check.mjs.
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError } from "@/lib/http";
+import { IntegrityError } from "@/lib/engagement-storage";
+import { ApiError, responseError } from "@/lib/http";
 import { withResponseStatus } from "@/lib/response-status";
 import { archivedMessage } from "@/lib/tenancy";
 import ReportForbidden from "./forbidden";
 import ReportPage from "./page";
-import { reportRefusal } from "./refusal";
+import { printRefusal } from "@/app/print-refusal";
 
 const state = vi.hoisted(() => ({
   refusal: undefined as unknown,
@@ -46,9 +48,9 @@ vi.mock("@/lib/client-projection", () => ({
   })),
 }));
 // A request-scoped store, as vinext keeps one per request.
-vi.mock("./refusal", () => {
+vi.mock("@/app/print-refusal", () => {
   const store: { message?: string } = {};
-  return { reportRefusal: () => store };
+  return { printRefusal: () => store };
 });
 
 const params = Promise.resolve({
@@ -60,7 +62,7 @@ const params = Promise.resolve({
 afterEach(() => {
   state.refusal = undefined;
   state.snapshot = undefined;
-  delete reportRefusal().message;
+  delete printRefusal().message;
   vi.restoreAllMocks();
 });
 
@@ -82,6 +84,34 @@ describe("the /report print view", () => {
       expect.any(TypeError),
     );
   });
+
+  it.each([
+    ["mismatch", 409],
+    ["unreadable", 409],
+    ["missing", 503],
+    ["unavailable", 503],
+  ] as const)(
+    "answers a %s record with %i like /api/report-package, not 404 (#220)",
+    async (kind, status) => {
+      const damaged = new IntegrityError("ENG-1", kind, "body");
+      state.refusal = damaged;
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      const response = await withResponseStatus(async () => {
+        const page = await ReportPage({ searchParams: params });
+        return new Response(renderToStaticMarkup(page));
+      });
+      expect(response.status).toBe(status);
+      // The same status the package endpoint answers for the same error.
+      expect(responseError(damaged).status).toBe(status);
+      const html = await response.text();
+      expect(html).toContain("The report could not be loaded.");
+      expect(html).not.toContain("has not been released");
+      expect(log).toHaveBeenCalledWith(
+        "The /report print view could not be rendered:",
+        damaged,
+      );
+    },
+  );
 
   it("shows the refusal's own message on the 403 page", async () => {
     state.refusal = new ApiError(403, archivedMessage);
@@ -111,6 +141,6 @@ describe("the /report print view", () => {
     expect((refused as { digest?: string }).digest).toBe(
       "NEXT_HTTP_ERROR_FALLBACK;404",
     );
-    expect(reportRefusal().message).toBeUndefined();
+    expect(printRefusal().message).toBeUndefined();
   });
 });
