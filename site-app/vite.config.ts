@@ -18,8 +18,6 @@ const { d1, r2 }: { d1?: string; r2?: string } = sitesProject
   ? JSON.parse(readFileSync(hostingConfigFile, "utf8"))
   : { d1: "DB", r2: "BUCKET" };
 
-// macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
-const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
 const localBindingConfig = {
@@ -96,9 +94,6 @@ export default defineConfig(async ({ command }) => {
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
-        : {}),
-      ...(isCodexSeatbeltSandbox
-        ? { watch: { useFsEvents: false, usePolling: true } }
         : {}),
     },
     plugins: [

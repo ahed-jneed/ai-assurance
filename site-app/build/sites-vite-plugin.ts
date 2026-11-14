@@ -1,4 +1,4 @@
-// Vendored from @openai/sites-vite-plugin 0.2.0 (openai/sites#9).
+// Vendored from @openai/sites-vite-plugin 0.2.0 (MIT, npmjs.com/package/@openai/sites-vite-plugin).
 // See sites-vite-plugin.LICENSE for the upstream MIT license.
 // Local changes: test personas (`/signin-with-chatgpt?as=<id>`) from
 // fixtures/dev-personas.json, a sign-in cookie per dev server port, shared

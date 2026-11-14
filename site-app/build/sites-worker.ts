@@ -59,12 +59,14 @@ export default {
     try {
       const caller = await authenticate(tracked.request, config);
       const route = authRoute(tracked.request, config, caller.identity);
-      if (route) return route;
+      if (route) return withSecurityHeaders(route);
       // A page may record its own status (lib/response-status.ts, #216).
-      return await withResponseStatus(() =>
-        runWithIdentity(caller.identity, () =>
-          runWithConnectorBinding(binding, () =>
-            handler.fetch(caller.request, env, ctx),
+      return withSecurityHeaders(
+        await withResponseStatus(() =>
+          runWithIdentity(caller.identity, () =>
+            runWithConnectorBinding(binding, () =>
+              handler.fetch(caller.request, env, ctx),
+            ),
           ),
         ),
       );
@@ -73,3 +75,26 @@ export default {
     }
   },
 };
+
+/**
+ * Baseline security headers on every Worker response; a header the app set
+ * itself (an evidence download's sandbox CSP, for one) is kept. Framing is not
+ * restricted because hosted previews may embed the app, and a script CSP needs
+ * nonces for the RSC bootstrap first.
+ */
+const securityHeaders: [string, string][] = [
+  ["X-Content-Type-Options", "nosniff"],
+  ["Referrer-Policy", "strict-origin-when-cross-origin"],
+  [
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  ],
+  ["Content-Security-Policy", "object-src 'none'; base-uri 'self'"],
+];
+function withSecurityHeaders(response: Response): Response {
+  if (response.status === 101) return response;
+  const secured = new Response(response.body, response);
+  for (const [name, value] of securityHeaders)
+    if (!secured.headers.has(name)) secured.headers.set(name, value);
+  return secured;
+}
