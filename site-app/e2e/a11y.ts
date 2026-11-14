@@ -31,6 +31,14 @@ export const TRACKED_EXCEPTIONS: Exception[] = [];
 
 const BLOCKING = new Set(["serious", "critical"]);
 
+// Landmark rules axe files under best practice rather than WCAG, with a
+// moderate impact. The workspace keeps exactly one top-level main landmark
+// (#182), so these run on every check and fail at any impact.
+export const LANDMARK_RULES = [
+  "landmark-no-duplicate-main",
+  "landmark-main-is-top-level",
+];
+
 /** Whether every failing element of a violation lies in the exception's scope. */
 async function inScope(page: Page, exception: Exception, targets: string[]) {
   if (targets.length > exception.maxNodes) return false;
@@ -45,17 +53,24 @@ async function inScope(page: Page, exception: Exception, targets: string[]) {
 
 /**
  * Runs axe on the whole page, an open dialog included, and fails on serious
- * or critical violations.
+ * or critical violations and on any violation of the landmark rules.
  */
 export async function expectAccessible(page: Page, label: string) {
-  const { violations } = await new AxeBuilder({ page })
+  const { violations: wcag } = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
+  const { violations: landmarks } = await new AxeBuilder({ page })
+    .withRules(LANDMARK_RULES)
+    .analyze();
+  const violations = [...wcag, ...landmarks];
+  // Landmark violations block whatever impact axe gives them.
+  const blocking = (v: (typeof violations)[number]) =>
+    BLOCKING.has(v.impact ?? "") || LANDMARK_RULES.includes(v.id);
   // E2E_A11Y_SURVEY=1 prints every blocking violation, tracked or not, without
   // failing, to review the exception list.
   const survey = !!process.env.E2E_A11Y_SURVEY;
   const untracked = [];
-  for (const v of violations.filter((v) => BLOCKING.has(v.impact ?? ""))) {
+  for (const v of violations.filter(blocking)) {
     const targets = v.nodes.map((n) => n.target.join(" "));
     const candidate = survey
       ? undefined
