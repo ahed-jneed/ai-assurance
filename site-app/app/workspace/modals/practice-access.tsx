@@ -1,7 +1,7 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { roles } from "@/lib/domain";
+import { roles } from "@/lib/domain/types";
 import { qualityStatement } from "@/lib/domain/report-model";
 import { isClientRole } from "@/lib/permissions";
 import { Choice } from "../workspace-ui";

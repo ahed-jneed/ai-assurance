@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Engagement, Paper } from "@/lib/domain";
+import type { Engagement, Paper } from "@/lib/domain/types";
 import { RunDetails } from "../record-details";
 import type { LabAct } from "./drafts";
 import type { LabSetup } from "./use-lab-setup";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { defaultInboxQuery } from "@/lib/work-inbox";
 import { defaultWorkbenchQuery } from "@/lib/workbench-presentation";
 import { readWorkspaceLink } from "@/lib/workspace-links";

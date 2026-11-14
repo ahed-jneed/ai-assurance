@@ -1,4 +1,4 @@
-import type { Engagement, Role } from "../domain";
+import type { Engagement, Role } from "../domain/types";
 import { ApiError } from "../http";
 import { requireRole, type Context } from "../tenancy";
 

@@ -8,8 +8,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Report, Role } from "@/lib/domain";
-import { releaseChecklist, releaseChecklistLines } from "@/lib/domain";
+import type { Report, Role } from "@/lib/domain/types";
+import { releaseChecklist, releaseChecklistLines } from "@/lib/domain/gates";
 import { opinionLabel } from "@/lib/domain/report-model";
 import { packageStatusLabel } from "@/lib/report-presentation";
 import { releaseState } from "@/lib/workflow-state";

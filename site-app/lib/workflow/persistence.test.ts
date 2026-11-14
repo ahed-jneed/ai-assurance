@@ -11,7 +11,7 @@ import {
   GET as readDraft,
   POST as saveDraft,
 } from "@/app/api/workspace-state/route";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { getEngagement } from "@/lib/engagement-repo";
 import { dehydrate } from "@/lib/engagement-storage";
 import { context, type Context } from "@/lib/tenancy";

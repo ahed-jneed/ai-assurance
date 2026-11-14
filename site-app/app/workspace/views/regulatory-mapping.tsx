@@ -3,7 +3,7 @@ import { BookOpen } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ActionState } from "@/lib/permissions";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import {
   asRulePack,
   isoToday,

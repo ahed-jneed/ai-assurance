@@ -15,7 +15,7 @@ import {
   type RecordSearchPage,
 } from "./assurance-search";
 import { caller } from "./commands/test-fixtures";
-import type { Role } from "./domain";
+import type { Role } from "./domain/types";
 import { ApiError } from "./http";
 import { sha256 } from "./ids";
 import { sqliteD1 } from "./test-d1";

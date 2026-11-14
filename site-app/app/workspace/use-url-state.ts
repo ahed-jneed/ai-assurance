@@ -3,7 +3,7 @@
 // effect in useUrlSync; URL → state is applyWorkspaceLink, used for the
 // first load and for back/forward.
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import type { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain/types";
 import type { TermsChoice } from "@/lib/domain/report-model";
 import { readEvidenceQuery } from "@/lib/evidence-presentation";
 import { canSee } from "@/lib/permissions";

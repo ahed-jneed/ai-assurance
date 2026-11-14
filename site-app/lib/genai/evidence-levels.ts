@@ -1,7 +1,7 @@
 // What the Evidence vault and the re-run attestation form need from the GenAI
 // results view (#145): the evidence level each GenAI file carries, and the
 // attestGenaiRerun payload built from the form. Pure and client-safe.
-import type { Artifact } from "../domain";
+import type { Artifact } from "../domain/types";
 import type { GenaiLevel } from "./summary";
 
 /**

@@ -8,7 +8,7 @@
 import { Button } from "@/components/ui/button";
 import { can, decisionState } from "@/lib/permissions";
 import { DecisionButton } from "../workspace/decision-button";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import {
   acceptancePrompt,
   currentDeclaration,

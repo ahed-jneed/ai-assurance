@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { completionGates, paperRequired, type Engagement } from "./domain";
+import { completionGates, paperRequired } from "./domain/gates";
+import type { Engagement } from "./domain/types";
 import { evidenceRequestCommand } from "./evidence-requests";
 import {
   approvedWorkflow,

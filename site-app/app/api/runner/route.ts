@@ -12,7 +12,7 @@ import { GenaiEnvelopeError, readGenaiEnvelope } from "@/lib/genai/envelope";
 import { claimResponse } from "@/lib/external-worker-contract";
 import { requestedCriteria } from "@/lib/hosted-statistics";
 import { assertPlatformBytes } from "@/lib/special-category";
-import type { Artifact } from "@/lib/domain";
+import type { Artifact } from "@/lib/domain/types";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 type WorkerRow = {

@@ -1,7 +1,7 @@
 """Reviewed adapter contracts, intentionally without unsafe model loaders.
 
-The registry accepts application-owned adapter instances. Never populate it
-from artifact imports, user-controlled Python packages, pickle, or joblib.
+Adapters are application-owned implementations. Never build them from
+artifact imports, user-controlled Python packages, pickle, or joblib.
 """
 from dataclasses import dataclass
 from typing import Protocol, Sequence
@@ -40,20 +40,3 @@ class ExplanationAdapter(Protocol):
 
     def explain(self, model: PredictionAdapter, records: Sequence[dict[str, object]], background: Sequence[dict[str, object]], seed: int) -> dict[str, object]: ...
 
-
-class AdapterRegistry:
-    def __init__(self) -> None:
-        self._adapters: dict[str, PredictionAdapter] = {}
-
-    def register(self, adapter_id: str, adapter: PredictionAdapter) -> None:
-        if not adapter_id or adapter_id in self._adapters:
-            raise ValueError("Adapter identifier must be nonempty and unique")
-        if adapter.descriptor.format.lower() in {"pickle", "pkl", "joblib"}:
-            raise ValueError("Unsafe serialized Python models are not accepted by this registry")
-        self._adapters[adapter_id] = adapter
-
-    def require(self, adapter_id: str, capability: str) -> PredictionAdapter:
-        adapter = self._adapters.get(adapter_id)
-        if adapter is None or capability not in adapter.capabilities:
-            raise ValueError("Required validated model adapter capability is unavailable")
-        return adapter

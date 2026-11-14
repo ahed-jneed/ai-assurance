@@ -3,7 +3,7 @@
 import { ChevronRight, LockKeyhole, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import type { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain/types";
 import type { WorkspaceData } from "../workspace-types";
 import { isManagementView } from "./modules";
 

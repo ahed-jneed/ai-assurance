@@ -6,7 +6,8 @@ import {
   pinned,
   primaryReferenceOf,
 } from "../criteria/pin";
-import { risk, type Finding } from "../domain";
+import { risk } from "../domain/risk";
+import type { Finding } from "../domain/types";
 import { id, now } from "../ids";
 import { ApiError } from "../http";
 import { defineCommands } from "./command";

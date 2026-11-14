@@ -5,7 +5,7 @@
 // endpoints can isolate it (recordIntegrityIncident) instead of failing for
 // every member.
 import { bucket, db } from "./bindings";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report } from "./domain/types";
 import { ApiError } from "./http";
 import { now, sha256 } from "./ids";
 import type { Context } from "./tenancy";

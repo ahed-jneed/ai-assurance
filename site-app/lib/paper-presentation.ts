@@ -1,5 +1,10 @@
-import type { Engagement, Paper, Role } from "./domain";
-import { canWrite, isReleaseTimeRecord, paperCurrent } from "./domain";
+import {
+  canWrite,
+  type Engagement,
+  type Paper,
+  type Role,
+} from "./domain/types";
+import { isReleaseTimeRecord, paperCurrent } from "./domain/gates";
 import {
   paperChecklist,
   paperNextAction,

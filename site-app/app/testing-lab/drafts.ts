@@ -1,12 +1,12 @@
 // The testing lab's form state: the protocol draft, its defaults and the
 // requests it becomes, plus the shapes the lab's dialogs share.
-import type {
-  Engagement,
-  EvaluationConfig,
-  EvaluationProfile,
-  ModelCard,
-} from "@/lib/domain";
-import { legacyConfig } from "@/lib/domain";
+import {
+  legacyConfig,
+  type Engagement,
+  type EvaluationConfig,
+  type EvaluationProfile,
+  type ModelCard,
+} from "@/lib/domain/types";
 import {
   defaultPlanForm,
   formFromPlan,

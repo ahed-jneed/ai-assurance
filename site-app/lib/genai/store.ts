@@ -5,7 +5,7 @@
 import type { AssuranceRecord } from "../assurance-core";
 import { parsed, type RecordRow } from "../assurance-store";
 import { db } from "../bindings";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import type { Context } from "../tenancy";
 import { GENAI_RESULT_CATEGORIES } from "./evidence-levels";
 import { genaiCoverageCandidates } from "./limitation";
@@ -16,14 +16,6 @@ import {
   type GenaiResultContext,
 } from "./readiness";
 import type { GenaiCustody, GenaiSummary } from "./summary";
-
-export const GENAI_KINDS = [
-  "genai_plan",
-  "genai_bundle",
-  "genai_result",
-  "genai_acknowledgement",
-  "genai_rerun_attestation",
-] as const;
 
 const select =
   "SELECT id,kind,body,sha256,created_at,actor FROM assurance_records WHERE tenant_id=? AND engagement_id=? AND ";

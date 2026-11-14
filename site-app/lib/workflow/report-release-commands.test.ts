@@ -4,7 +4,8 @@
 // report-release.test.ts covers superseding and the completion checklist.
 import { describe, expect, it } from "vitest";
 import { legacyPackageMessage } from "../client-projection";
-import { releaseChecklist, type Engagement, type Report } from "../domain";
+import { releaseChecklist } from "../domain/gates";
+import type { Engagement, Report } from "../domain/types";
 import {
   approvedWorkflow,
   at,

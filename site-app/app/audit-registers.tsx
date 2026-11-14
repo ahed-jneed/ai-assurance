@@ -10,7 +10,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import type { Artifact, Finding, Role } from "@/lib/domain";
+import type { Artifact, Finding, Role } from "@/lib/domain/types";
 import {
   genaiLevelBadge,
   type GenaiArtifactLevel,

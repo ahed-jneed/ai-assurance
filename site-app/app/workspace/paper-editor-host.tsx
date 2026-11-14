@@ -18,7 +18,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import { art50Suggestions } from "../audit-program/art50-suggestion";
 import { PaperEditor } from "../paper-editor";

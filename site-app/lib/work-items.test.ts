@@ -6,7 +6,7 @@ import { approvedWorkflow, at, engagement } from "./workflow/test-fixtures";
 import catalog from "./catalog.json";
 import { classificationRules } from "./classification-rules";
 import { migrateClassification } from "./domain/classification";
-import type { Engagement, Role } from "./domain";
+import type { Engagement, Role } from "./domain/types";
 import { freshEngagement } from "./factories";
 import { asRulePack } from "./rule-pack";
 import { workKindLabels } from "./work-inbox";

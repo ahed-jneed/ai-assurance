@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { paperChecklist, type PaperTarget } from "@/lib/paper-workflow";
 import { stagePaperQueue, auditStageIndex } from "@/lib/auditor-workflow";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 export function NextSteps({
   engagement: e,
   role,

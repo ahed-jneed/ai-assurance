@@ -1,10 +1,6 @@
 import { z } from "zod";
-import {
-  isReleaseTimeRecord,
-  releaseTimeMessage,
-  type Engagement,
-  type Paper,
-} from "../domain";
+import { isReleaseTimeRecord, releaseTimeMessage } from "../domain/gates";
+import type { Engagement, Paper } from "../domain/types";
 import { id, now, sha256 } from "../ids";
 import { managementSystemView, pinned } from "../criteria/pin";
 import { earlierPhasePapers } from "../domain/management-system";

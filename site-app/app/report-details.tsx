@@ -18,7 +18,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { requestLabel } from "@/lib/evidence-requests";
-import type { EvidenceRequest } from "@/lib/domain";
+import type { EvidenceRequest } from "@/lib/domain/types";
 import { opinionLabel, snapshotTerms } from "@/lib/domain/report-model";
 import {
   findingReference,

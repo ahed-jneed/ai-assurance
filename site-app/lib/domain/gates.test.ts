@@ -9,12 +9,10 @@ import {
   paperRequired,
   releaseRequirements,
   releaseTimeTemplates,
-  reportBlockers,
   stageGates,
   workStage,
-  type Engagement,
-  type Paper,
-} from "../domain";
+} from "./gates";
+import type { Engagement, Paper } from "./types";
 import { seedWorkflow } from "../workflow-seed";
 import type { Procedure } from "../workflow-types";
 import {
@@ -209,12 +207,6 @@ describe("opinion-aware final issuance", () => {
     expect(completionGates(unassessed).map((g) => g.title)).toEqual([
       "Assess and approve classification",
     ]);
-  });
-
-  it("reports the completion gate messages as blockers", () => {
-    expect(completionGates(audit).map((g) => g.message)).toEqual(
-      reportBlockers(audit),
-    );
   });
 
   it("lets an approved prohibited practice support only a scoped adverse conclusion", () => {

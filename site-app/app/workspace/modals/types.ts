@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { Engagement, Finding, Paper, Role } from "@/lib/domain";
+import type { Engagement, Finding, Paper, Role } from "@/lib/domain/types";
 import type { WorkspaceData } from "../../workspace-types";
 import type { WorkspaceAct, WorkspaceLoad, WorkspaceManage } from "../types";
 

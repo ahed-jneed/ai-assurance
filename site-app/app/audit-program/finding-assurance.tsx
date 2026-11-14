@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Engagement, Finding, Role } from "@/lib/domain";
+import type { Engagement, Finding, Role } from "@/lib/domain/types";
 import { can, decisionState } from "@/lib/permissions";
 import { useAttest } from "../workspace/attestation-dialog";
 import { DecisionButton } from "../workspace/decision-button";

@@ -1,23 +1,22 @@
 // The structured engagement workflow's commands, dispatched by name for the
-// workspace route. They live in lib/workflow/ by area: scope and program
+// workspace route. They live in this directory by area: scope and program
 // planning, acceptance and independence, procedure execution and review,
 // client request grants, report release, follow-up monitoring and finding
 // assurance.
-import type { Engagement } from "./domain";
-import { acceptanceCommands } from "./workflow/acceptance-commands";
-import { briefProgramCommands } from "./workflow/brief-program";
-import { clientGrantCommands } from "./workflow/client-grants";
+import type { Engagement } from "../domain/types";
+import { acceptanceCommands } from "./acceptance-commands";
+import { briefProgramCommands } from "./brief-program";
+import { clientGrantCommands } from "./client-grants";
 import {
   commandScope,
   fail,
   type Context,
   type WorkflowHandler,
-} from "./workflow/command";
-import { findingAssuranceCommands } from "./workflow/finding-assurance";
-import { monitoringCommands } from "./workflow/monitoring";
-import { procedureCommands } from "./workflow/procedures";
-import { reportReleaseCommands } from "./workflow/report-release";
-export { WorkflowError, calendarDate } from "./workflow/command";
+} from "./command";
+import { findingAssuranceCommands } from "./finding-assurance";
+import { monitoringCommands } from "./monitoring";
+import { procedureCommands } from "./procedures";
+import { reportReleaseCommands } from "./report-release";
 export const workflowOps = [
   "adoptWorkflow",
   "saveBrief",

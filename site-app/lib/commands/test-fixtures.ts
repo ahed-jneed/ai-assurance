@@ -1,5 +1,5 @@
 // Builders shared by the command bus tests; the app never imports this module.
-import type { Engagement, Role } from "../domain";
+import type { Engagement, Role } from "../domain/types";
 import { freshEngagement } from "../factories";
 import type { Context } from "../tenancy";
 import { resolveNew } from "../criteria/pin";

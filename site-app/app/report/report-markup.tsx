@@ -8,7 +8,7 @@ import type {
   Run,
   EvidenceRequest,
   RulePackStamp,
-} from "@/lib/domain";
+} from "@/lib/domain/types";
 import type { CriteriaStamp } from "@/lib/criteria/types";
 import type { Ll144Summary } from "@/lib/ll144-audit";
 import type { CriterionResult } from "@/lib/domain/report-gates";

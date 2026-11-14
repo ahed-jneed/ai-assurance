@@ -18,7 +18,12 @@ import {
   parquetColumns,
   spreadsheetColumns,
 } from "./dataset-header";
-import type { Artifact, Engagement, EvaluationProfile, Run } from "./domain";
+import type {
+  Artifact,
+  Engagement,
+  EvaluationProfile,
+  Run,
+} from "./domain/types";
 import { fairnessSelected } from "./evaluation";
 import { planGroupFields } from "./hosted-statistics";
 import { ApiError } from "./http";

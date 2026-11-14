@@ -1,7 +1,7 @@
 "use client";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Paper, Role } from "@/lib/domain";
+import type { Paper, Role } from "@/lib/domain/types";
 import type { Procedure, ProcedureChange } from "@/lib/workflow-types";
 import { decisionState } from "@/lib/permissions";
 import { useAttest } from "../workspace/attestation-dialog";

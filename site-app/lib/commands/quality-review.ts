@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import {
   checklistItemIds,
   checklistProblem,

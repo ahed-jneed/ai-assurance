@@ -1,42 +1,10 @@
 import { describe, expect, it } from "vitest";
-import * as domain from "./domain";
-import {
-  canWrite,
-  classify,
-  risk,
-  roles,
-  stages,
-  type Classification,
-} from "./domain";
+import { classify, type Classification } from "./classification";
+import { stages } from "./gates";
+import { risk } from "./risk";
+import { canWrite, roles } from "./types";
 
-describe("domain entry point", () => {
-  it("exports the same runtime API", () => {
-    // Type-only exports are checked by `tsc` through their importers.
-    expect(Object.keys(domain).sort()).toEqual([
-      "canWrite",
-      "classify",
-      "completionGates",
-      "finalReportGates",
-      "gatesStage",
-      "isReleaseTimeRecord",
-      "legacyConfig",
-      "paperCurrent",
-      "paperRequired",
-      "releaseChecklist",
-      "releaseChecklistLines",
-      "releaseRequirements",
-      "releaseTimeAssignmentNote",
-      "releaseTimeMessage",
-      "releaseTimeTemplates",
-      "reportBlockers",
-      "risk",
-      "roles",
-      "stageGates",
-      "stages",
-      "workStage",
-    ]);
-  });
-
+describe("domain model", () => {
   it("names the roles, lifecycle stages and high-risk requirement articles", () => {
     expect(roles).toEqual([
       "Auditor",

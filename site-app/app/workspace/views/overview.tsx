@@ -1,6 +1,7 @@
 "use client";
 import { lazy, Suspense } from "react";
-import type { AuditGate, Engagement, Paper, Role } from "@/lib/domain";
+import type { AuditGate } from "@/lib/domain/gates";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import { canSee } from "@/lib/permissions";
 import type { WorkItem } from "@/lib/work-items";

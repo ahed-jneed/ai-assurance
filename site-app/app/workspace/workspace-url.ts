@@ -1,8 +1,8 @@
 // Pure serialisation of the workspace location (view, open record, section
 // and filters) into the query string, and the history entry to write for it.
 // The inverse, applying a link to the workspace, is applyWorkspaceLink in
-// use-workspace-navigation.ts.
-import type { Engagement, Role } from "@/lib/domain";
+// use-url-state.ts.
+import type { Engagement, Role } from "@/lib/domain/types";
 import { evidenceQueryParams } from "@/lib/evidence-presentation";
 import type { PaperTarget } from "@/lib/paper-workflow";
 import { paperQueryParams } from "@/lib/paper-presentation";

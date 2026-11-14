@@ -3,7 +3,7 @@ import {
   permittedNavigationRoutes,
   type NavigationRoute,
 } from "./navigation-preferences";
-import type { Role } from "./domain";
+import type { Role } from "./domain/types";
 import { isClientRole } from "./permissions";
 export type WorkspaceLink = {
   tenantId: string;

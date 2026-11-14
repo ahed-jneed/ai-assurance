@@ -27,16 +27,16 @@ import {
 import { describePlan } from "@/lib/hosted-statistics";
 import { fallbackRole } from "@/lib/permissions";
 import { StatisticsResult } from "./statistics-result";
-import { legacyConfig } from "@/lib/domain";
-import type {
-  Engagement,
-  Run,
-  Result,
-  Metric,
-  Paper,
-  Finding,
-  Role,
-} from "@/lib/domain";
+import {
+  legacyConfig,
+  type Engagement,
+  type Run,
+  type Result,
+  type Metric,
+  type Paper,
+  type Finding,
+  type Role,
+} from "@/lib/domain/types";
 
 type RecordValue = Record<string, unknown>;
 const isRecord = (v: unknown): v is RecordValue =>

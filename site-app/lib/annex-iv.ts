@@ -3,7 +3,8 @@
 // mapped templates, the accepted candidate evidence and the explicit gaps a
 // human reviewer must still assess.
 import type { AnnexIvMap } from "./criteria/types";
-import { paperCurrent, paperRequired, type Engagement } from "./domain";
+import { paperCurrent, paperRequired } from "./domain/gates";
+import type { Engagement } from "./domain/types";
 
 /**
  * A section counts a mapped template's current papers: not superseded or

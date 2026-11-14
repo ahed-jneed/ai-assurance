@@ -8,7 +8,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Paper } from "@/lib/domain";
+import type { Paper } from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 import { currentExecution, procedureLabel } from "@/lib/workflow-state";
 import { ProcedureContext } from "../procedure-context";
