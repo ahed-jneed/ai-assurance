@@ -94,8 +94,11 @@ export function useRefusalFocus<E extends HTMLElement>() {
           (node.ownerDocument.activeElement as Element | null),
       );
     // An action without a form (Save revision in the paper sheet) is a
-    // submit button outside a form; type="button" controls (tabs, toggles,
-    // Add row) never arm the rule.
+    // submit button outside a form. components/ui/button.tsx sets no default
+    // type, so any untyped <Button> in the modal arms the rule too; only
+    // explicit type="button" controls (tabs, toggles, Add row) never do.
+    // That is harmless: a refusal already standing takes focus only once
+    // focus is lost (on <body> or the modal), never from where it was.
     const onClick = (event: Event) => {
       const button = (event.target as Element | null)?.closest?.("button");
       if (
