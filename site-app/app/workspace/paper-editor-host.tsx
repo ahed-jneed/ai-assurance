@@ -47,6 +47,7 @@ export function PaperEditorHost({
   onAction,
   onProcedure,
   onDetail,
+  onReload,
 }: {
   paper: PaperEditorState;
   /** The papers that previous/next step through. */
@@ -69,6 +70,8 @@ export function PaperEditorHost({
   onAction: (op: string, values: Record<string, unknown>) => void;
   onProcedure: (id: string) => void;
   onDetail: ViewDetail;
+  /** Reloads the open engagement after a stale save. */
+  onReload: () => void;
 }) {
   const { paperId, paperDraft, selectedPaper } = paper;
   const position = sequence.findIndex((p) => p.id === paperId);
@@ -77,6 +80,8 @@ export function PaperEditorHost({
       <PaperEditor
         onTargetChange={setPaperTarget}
         error={error}
+        conflict={paper.saveConflict}
+        onReload={onReload}
         onEvidence={(id) => {
           const artifact = engagement?.artifacts.find((a) => a.id === id);
           if (artifact) onOpenRecord(artifact.name, artifact);

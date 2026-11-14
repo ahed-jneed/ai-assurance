@@ -11,6 +11,7 @@ import {
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
 import { requestLabel } from "@/lib/evidence-requests";
+import type { Submission } from "@/lib/workflow-types";
 /** Where focus goes next in a request; see data-portal-focus below. */
 type PortalFocus =
   "summary" | "submit-button" | "submit-field" | "reply-button" | "reply-field";
@@ -434,8 +435,42 @@ export function RequestAccess({
     [form, setForm] =
       useState<Parameters<typeof WorkflowDialog>[0]["form"]>(null),
     now = useNow();
-  if (!can(data.identity.role, "grantClientRequest") || !e.workflow)
-    return null;
+  const acknowledge = (submissionId: string) =>
+    setForm({
+      title: "Acknowledge package receipt",
+      action: "Acknowledge receipt",
+      description:
+        "Receipt acknowledgment does not accept the files or conclude that evidence is sufficient.",
+      fields: [
+        {
+          name: "note",
+          label: "Client-facing receipt note",
+          type: "area",
+        },
+      ],
+      save: (v) => act("acknowledgeClientSubmission", { submissionId, ...v }),
+    });
+  if (!e.workflow) return null;
+  const role = data.identity.role;
+  // Receipt acknowledgment follows the permission map (#210): every role
+  // holding acknowledgeClientSubmission sees it; the grant controls stay
+  // with the Lead Auditor.
+  if (!can(role, "grantClientRequest"))
+    return can(role, "acknowledgeClientSubmission") ? (
+      <ClientSubmissions
+        data={data}
+        busy={busy}
+        onAcknowledge={acknowledge}
+        dialog={
+          <WorkflowDialog
+            form={form}
+            onClose={() => setForm(null)}
+            busy={busy}
+            onEditing={onEditing}
+          />
+        }
+      />
+    ) : null;
   const lapsed = new Set(data.lapsedClientGrants ?? []),
     at = now,
     lapsedCount = e.workflow.clientGrants.filter(
@@ -643,51 +678,13 @@ export function RequestAccess({
               Send clarification
             </Button>
           )}
-          {e
-            .workflow!.submissions.filter((s) => s.grantId === g.id)
-            .map((s) => (
-              <div className="comment-box" key={s.id}>
-                <b>
-                  Package · {s.evidenceIds.length} files ·{" "}
-                  {new Date(s.at).toLocaleString()}
-                </b>
-                <p>{s.note}</p>
-                {s.receipt ? (
-                  <p className="subtle">
-                    Receipt acknowledged ·{" "}
-                    {new Date(s.receipt.at).toLocaleString()}
-                  </p>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() =>
-                      setForm({
-                        title: "Acknowledge package receipt",
-                        action: "Acknowledge receipt",
-                        description:
-                          "Receipt acknowledgment does not accept the files or conclude that evidence is sufficient.",
-                        fields: [
-                          {
-                            name: "note",
-                            label: "Client-facing receipt note",
-                            type: "area",
-                          },
-                        ],
-                        save: (v) =>
-                          act("acknowledgeClientSubmission", {
-                            submissionId: s.id,
-                            ...v,
-                          }),
-                      })
-                    }
-                  >
-                    Acknowledge receipt
-                  </Button>
-                )}
-              </div>
-            ))}
+          <SubmissionReceipts
+            submissions={e.workflow!.submissions.filter(
+              (s) => s.grantId === g.id,
+            )}
+            busy={busy}
+            onAcknowledge={acknowledge}
+          />
           {g.active && (
             <Button
               variant="ghost"
@@ -720,6 +717,93 @@ export function RequestAccess({
         busy={busy}
         onEditing={onEditing}
       />
+    </details>
+  );
+}
+
+/** A grant's client packages, each acknowledged or with Acknowledge receipt. */
+function SubmissionReceipts({
+  submissions,
+  busy,
+  onAcknowledge,
+}: {
+  submissions: Submission[];
+  busy: boolean;
+  onAcknowledge: (submissionId: string) => void;
+}) {
+  return submissions.map((s) => (
+    <div className="comment-box" key={s.id}>
+      <b>
+        Package · {s.evidenceIds.length} files ·{" "}
+        {new Date(s.at).toLocaleString()}
+      </b>
+      <p>{s.note}</p>
+      {s.receipt ? (
+        <p className="subtle">
+          Receipt acknowledged · {new Date(s.receipt.at).toLocaleString()}
+        </p>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy}
+          onClick={() => onAcknowledge(s.id)}
+        >
+          Acknowledge receipt
+        </Button>
+      )}
+    </div>
+  ));
+}
+
+/**
+ * The client packages of every request grant, for a role that acknowledges
+ * receipts without administering the grants (the Auditor, #210).
+ */
+export function ClientSubmissions({
+  data,
+  busy,
+  onAcknowledge,
+  dialog,
+}: {
+  data: WorkspaceData;
+  busy: boolean;
+  onAcknowledge: (submissionId: string) => void;
+  dialog?: React.ReactNode;
+}) {
+  const w = data.engagement!.workflow!,
+    grants = w.clientGrants.filter((g) =>
+      w.submissions.some((s) => s.grantId === g.id),
+    ),
+    awaiting = w.submissions.filter((s) => !s.receipt).length;
+  return (
+    <details className="captured-record">
+      <summary>
+        Client submissions{" "}
+        <span className="subtle">{awaiting} awaiting acknowledgment</span>
+      </summary>
+      <p className="subtle">
+        Acknowledge each package the client submitted. A Lead Auditor assigns
+        and revokes client request access.
+      </p>
+      {grants.map((g) => (
+        <div className="comment-box" key={g.id}>
+          <b>
+            {data.members.find((m) => m.user_id === g.userId)?.display_name ??
+              "Inactive contributor"}{" "}
+            · {g.prompt}
+          </b>
+          <SubmissionReceipts
+            submissions={w.submissions.filter((s) => s.grantId === g.id)}
+            busy={busy}
+            onAcknowledge={onAcknowledge}
+          />
+        </div>
+      ))}
+      {!grants.length && (
+        <p className="empty-result">No client packages have been submitted.</p>
+      )}
+      {dialog}
     </details>
   );
 }

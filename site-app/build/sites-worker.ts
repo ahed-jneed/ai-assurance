@@ -1,6 +1,7 @@
 import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
+import { trackRequestBody } from "../lib/http";
 import {
   authRoute,
   authenticate,
@@ -51,13 +52,20 @@ export default {
       devServer: import.meta.env.DEV,
       defaultMode: __SITES_IDENTITY_DEFAULT__,
     });
-    const caller = await authenticate(request, config);
-    const route = authRoute(request, config, caller.identity);
-    if (route) return route;
-    return runWithIdentity(caller.identity, () =>
-      runWithConnectorBinding(binding, () =>
-        handler.fetch(caller.request, env, ctx),
-      ),
-    );
+    // Whatever answers, a request body left unread is discarded before the
+    // response goes out, so the connection stays usable (#209).
+    const tracked = trackRequestBody(request);
+    try {
+      const caller = await authenticate(tracked.request, config);
+      const route = authRoute(tracked.request, config, caller.identity);
+      if (route) return route;
+      return await runWithIdentity(caller.identity, () =>
+        runWithConnectorBinding(binding, () =>
+          handler.fetch(caller.request, env, ctx),
+        ),
+      );
+    } finally {
+      await tracked.settle();
+    }
   },
 };

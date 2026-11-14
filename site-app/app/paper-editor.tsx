@@ -151,6 +151,10 @@ type PaperEditorProps = {
   busy: boolean;
   dirty: boolean;
   error?: string;
+  /** Why the last command from the editor was refused as stale (409). */
+  conflict?: string;
+  /** Reloads the engagement after a stale save (#210). */
+  onReload?: () => void;
   onCommentDraftChange: (pending: boolean) => void;
   onClose: () => void;
   onAction: (op: string, data: Record<string, unknown>) => void;
@@ -189,6 +193,8 @@ export function PaperEditor({
   busy,
   dirty,
   error,
+  conflict,
+  onReload,
   onCommentDraftChange,
   onClose,
   onAction,
@@ -580,6 +586,25 @@ export function PaperEditor({
                   className="form-error paper-editor-error"
                 >
                   {visibleError}
+                </div>
+              )}
+              {conflict && (
+                <div
+                  role="alert"
+                  className="form-error paper-editor-error paper-save-conflict"
+                >
+                  <span>
+                    {conflict} Your changes are kept: reload to compare them
+                    with the saved revision.
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={onReload}
+                  >
+                    Reload
+                  </Button>
                 </div>
               )}
               <Tabs value={tab} onValueChange={changeTab}>

@@ -420,8 +420,16 @@ export function FrozenReportDetails({ value }: { value: Row }) {
               <dd>{opinionLabel(snapshot)}</dd>
             </div>
             <div>
-              <dt>Captured</dt>
-              <dd>{date(value.createdAt ?? snapshot.createdAt)}</dd>
+              <dt>
+                {typeof value.releasedAt === "string" ? "Released" : "Captured"}
+              </dt>
+              <dd>
+                {date(
+                  typeof value.releasedAt === "string"
+                    ? value.releasedAt
+                    : (value.createdAt ?? snapshot.createdAt),
+                )}
+              </dd>
             </div>
             {"stage" in audit && (
               <div>

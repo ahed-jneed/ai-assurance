@@ -294,7 +294,7 @@ describe("assessMonitoringCase", () => {
       e,
       () => assess(e),
       409,
-      "Create a new case for subsequent work",
+      "This case is already closed. Create a new case for subsequent work",
     );
   });
 
@@ -397,8 +397,25 @@ describe("closeMonitoringCase", () => {
     );
   });
 
+  it("refuses to close a closed case again, whoever asks (#209)", async () => {
+    for (const user of ["reviewer", "auditor"]) {
+      const e = withCase({ ...assessed, state: "closed" });
+      await refused(
+        e,
+        () =>
+          command(
+            e,
+            "closeMonitoringCase",
+            { caseId: "CASE-1", closure: "Closed again" },
+            user,
+          ),
+        409,
+        "This case is already closed. Create a new case for subsequent work",
+      );
+    }
+  });
+
   it.each([
-    ["a closed case", { ...assessed, state: "closed" }],
     ["an unassessed case", {}],
     ["a case with a blank assessment", { ...assessed, assessment: " " }],
   ] as const)("refuses %s", async (_, overrides) => {
