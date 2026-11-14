@@ -76,7 +76,7 @@ describe("the SSR error log", () => {
     const plugin = ssrErrorLog();
     expect(plugin.apply).toBe("serve");
     const warn = vi.fn();
-    const transform = plugin.transform as (
+    const transform = plugin.transform as unknown as (
       this: { warn: typeof warn },
       code: string,
       id: string,
