@@ -1848,6 +1848,11 @@ try {
   }
   await assurance("importJob", { jobId: clientJob.jobId });
   const clientRun = e.runs.find((r) => r.externalJobId === clientJob.jobId);
+  // #233: the draft paper is filed under the job's bound procedure
+  // (WP-A10-02), not the pack's default execution template.
+  const clientPaper = e.papers.find((p) => p.runIds.includes(clientJob.jobId));
+  assert.equal(clientPaper.templateId, "WP-A10-02");
+  assert.equal(clientPaper.body.objective, clientProcedure.objective);
   assert.equal(clientRun.manifest.executionMode, "client_local");
   assert.equal(clientRun.manifest.dataset.custody, "client");
   assert(

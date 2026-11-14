@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { item } from "../../criteria/projection";
+import { resolveNew } from "../../criteria/pin";
 import { ApiError } from "../../http";
-import { hostedResults, importedOutcome } from "./execution";
+import {
+  externalExecutionPaper,
+  hostedResults,
+  importedOutcome,
+} from "./execution";
 
 const results = (...outcomes: unknown[]) =>
   outcomes.map((outcome) => ({ outcome }) as { outcome: "pass" });
@@ -83,5 +89,45 @@ describe("importedOutcome", () => {
     expect(importedOutcome([decided("fail", "exploratory")], true)).toBe(
       "not_applicable",
     );
+  });
+});
+
+describe("externalExecutionPaper (#233)", () => {
+  const resolved = resolveNew();
+
+  it("files the paper under the job's bound procedure, not WP-A15-01", () => {
+    const template = item(resolved.pack, "WP-A10-02")!;
+    const p = externalExecutionPaper(
+      resolved,
+      {
+        templateId: "WP-A10-02",
+        objective: "Tailored data-governance objective",
+      },
+      "auditor",
+    );
+    expect(p.templateId).toBe("WP-A10-02");
+    expect(p.title).toBe(template.title);
+    expect(p.body.objective).toBe("Tailored data-governance objective");
+    const other = externalExecutionPaper(
+      resolved,
+      { templateId: "WP-A15-01", objective: "" },
+      "auditor",
+    );
+    // Each procedure's own template criteria, and its template objective
+    // when the procedure states none.
+    expect(p.body.criteria).not.toBe(other.body.criteria);
+    expect(other.body.objective).toBe(
+      item(resolved.pack, "WP-A15-01")!.objective,
+    );
+  });
+
+  it("falls back to the pack's execution template for an unknown procedure template", () => {
+    const p = externalExecutionPaper(
+      resolved,
+      { templateId: "WP-CUSTOM-99", objective: "Custom" },
+      "auditor",
+    );
+    expect(p.templateId).toBe(resolved.pack.roles?.externalExecutionPaper);
+    expect(p.body.objective).not.toBe("Custom");
   });
 });
