@@ -14,7 +14,9 @@ import { FocusScope } from "radix-ui/internal"
 import { Toaster as Sonner, useSonner, type ToasterProps } from "sonner"
 import {
   inToaster,
+  leavesToaster,
   openModal,
+  tabbables,
   toasterSelector,
 } from "@/components/ui/toaster-layer"
 
@@ -31,6 +33,8 @@ const preventAutoFocus = (event: Event) => event.preventDefault()
  * returns focus to where it was and resumes the trap; with a modal open,
  * Escape returns to the modal when focus was on <body> before (#216).
  * Without a modal, Escape is left to sonner, which collapses the stack.
+ * Tab from the last toast control, or Shift+Tab from the first, returns into
+ * the open modal the same way (#227) instead of reaching the page behind it.
  */
 function useToasterFocus(hotkey: string[]) {
   const [yielding, setYielding] = useState(false)
@@ -55,6 +59,27 @@ function useToasterFocus(hotkey: string[]) {
               : null
         // Before sonner's own hotkey listener focuses the list.
         flushSync(() => setYielding(true))
+      } else if (event.key === "Tab" && inToaster(active)) {
+        const modal = openModal(),
+          toaster = (active as Element).closest(toasterSelector)
+        if (
+          !modal ||
+          !toaster ||
+          !leavesToaster(tabbables(toaster), active, event.shiftKey)
+        )
+          return
+        const before = previous.current?.isConnected ? previous.current : null
+        const inside = tabbables(modal)
+        previous.current = null
+        event.preventDefault()
+        event.stopPropagation()
+        // Resume the modal's trap first, so its scope accepts the focus.
+        flushSync(() => setYielding(false))
+        ;(
+          (before && modal.contains(before) ? before : null) ??
+          (event.shiftKey ? inside[inside.length - 1] : inside[0]) ??
+          modal
+        ).focus()
       } else if (event.key === "Escape" && inToaster(active)) {
         const modal = openModal(),
           before = previous.current?.isConnected ? previous.current : null

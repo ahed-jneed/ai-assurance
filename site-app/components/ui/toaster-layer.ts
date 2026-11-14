@@ -43,3 +43,33 @@ export function keepOpenForToasts<
     if (inToaster(event.target)) event.preventDefault();
   };
 }
+
+const tabbableSelector =
+  "a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])";
+
+/** The elements Tab visits inside `root`, in document order. */
+export function tabbables(root: Element): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>(tabbableSelector)].filter(
+    (el) =>
+      el.tabIndex >= 0 &&
+      !(el as HTMLButtonElement).disabled &&
+      el.getClientRects().length > 0,
+  );
+}
+
+/**
+ * Whether Tab (or Shift+Tab) from `active` leaves the toaster's controls
+ * (#227): from the last control forwards, or from the first backwards. The
+ * list itself, which Alt+T focuses, comes before its controls. With a modal
+ * open, focus then returns into the modal instead of reaching the page
+ * behind it.
+ */
+export function leavesToaster<T>(
+  controls: readonly T[],
+  active: T,
+  backwards: boolean,
+) {
+  const at = controls.indexOf(active);
+  if (at < 0) return backwards || !controls.length;
+  return backwards ? at === 0 : at === controls.length - 1;
+}

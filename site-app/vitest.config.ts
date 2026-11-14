@@ -18,6 +18,7 @@ const include = [
   "app/**/*.test.tsx",
   "build/**/*.test.ts",
   "hooks/**/*.test.ts",
+  "components/**/*.test.ts",
   // Unit tests of the e2e tooling; Playwright runs only e2e/*.spec.ts.
   "e2e/**/*.test.ts",
   // Unit tests of the scripts' pure helpers (the harnesses run on their own).
