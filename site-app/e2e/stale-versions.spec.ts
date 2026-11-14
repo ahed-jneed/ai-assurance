@@ -288,15 +288,57 @@ test("a stale paper save is reloaded from the toast or the sheet into the newer-
   await second.keyboard.press("Enter");
   await resolveConflict();
 
-  // Escape leaves the toaster for the sheet without closing it.
+  // Escape leaves the toaster for the sheet without closing it, even when
+  // focus was on <body> before Alt+T, as it is after the focused button
+  // becomes disabled (#216).
   await staleSave(3);
+  await second.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await expect
+    .poll(() => second.evaluate(() => document.activeElement?.tagName))
+    .toBe("BODY");
   await second.keyboard.press("Alt+T");
+  await expect
+    .poll(() =>
+      second.evaluate(
+        () => !!document.activeElement?.closest("[data-sonner-toaster]"),
+      ),
+    )
+    .toBe(true);
   await second.keyboard.press("Escape");
   await expect(editorOf(second)).toBeVisible();
+  await expect
+    .poll(() =>
+      editorOf(second).evaluate((sheet) =>
+        sheet.contains(document.activeElement),
+      ),
+    )
+    .toBe(true);
   // The sheet's own Reload, independent of the toast.
   await editorOf(second)
     .getByRole("alert")
     .getByRole("button", { name: "Reload" })
     .click();
   await resolveConflict();
+});
+
+// #216: without a modal open, Escape in the toaster is left to sonner, which
+// collapses the stack Alt+T expanded, and focus returns to where it was.
+test("Escape collapses the expanded toast stack when no modal is open", async ({
+  signIn,
+  demo,
+}) => {
+  const page = await signIn("qa-lead");
+  await page.goto(workspacePath(demo, "Users & access"));
+  const copy = page.getByRole("button", { name: "Copy account ID" });
+  // Copying succeeds or falls back to a hint; either raises a toast.
+  await copy.click();
+  const toast = page.locator("[data-sonner-toast]").first();
+  await expect(toast).toBeVisible();
+  await page.mouse.move(0, 0);
+  await expect(toast).toHaveAttribute("data-expanded", "false");
+  await page.keyboard.press("Alt+T");
+  await expect(toast).toHaveAttribute("data-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(toast).toHaveAttribute("data-expanded", "false");
+  await expect(copy).toBeFocused();
 });

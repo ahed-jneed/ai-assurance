@@ -14,6 +14,22 @@ export const inToaster = (node: unknown) =>
   node instanceof Element &&
   !!node.closest(toasterSelector);
 
+/** An open modal sheet or dialog, as components/ui renders it. */
+const modalSelector = [
+  "dialog-content",
+  "sheet-content",
+  "alert-dialog-content",
+]
+  .map((slot) => `[data-slot="${slot}"][data-state="open"]`)
+  .join(",");
+
+/** The topmost open modal sheet or dialog, if one is open. */
+export function openModal(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  const open = document.querySelectorAll<HTMLElement>(modalSelector);
+  return open[open.length - 1] ?? null;
+}
+
 /**
  * Wraps a modal content's onPointerDownOutside / onFocusOutside /
  * onInteractOutside handler: an interaction inside the toaster never

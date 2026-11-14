@@ -12,7 +12,11 @@ import {
 import { useTheme } from "next-themes"
 import { FocusScope } from "radix-ui/internal"
 import { Toaster as Sonner, useSonner, type ToasterProps } from "sonner"
-import { inToaster, toasterSelector } from "@/components/ui/toaster-layer"
+import {
+  inToaster,
+  openModal,
+  toasterSelector,
+} from "@/components/ui/toaster-layer"
 
 const preventAutoFocus = (event: Event) => event.preventDefault()
 
@@ -24,7 +28,9 @@ const preventAutoFocus = (event: Event) => event.preventDefault()
  * reaches it from the keyboard: while the toaster holds focus an empty,
  * untrapped focus scope is mounted, which pauses the open modal's focus trap
  * (Radix pauses the scope below the newest one). Escape, or moving focus out,
- * returns focus to where it was and resumes the trap.
+ * returns focus to where it was and resumes the trap; with a modal open,
+ * Escape returns to the modal when focus was on <body> before (#216).
+ * Without a modal, Escape is left to sonner, which collapses the stack.
  */
 function useToasterFocus(hotkey: string[]) {
   const [yielding, setYielding] = useState(false)
@@ -40,16 +46,34 @@ function useToasterFocus(hotkey: string[]) {
           (key) => event[key as keyof KeyboardEvent] || event.code === key
         )
       if (hot && document.querySelector(toasterSelector)) {
+        // <body> is not a place to return to (focus falls there when the
+        // focused button becomes disabled, for example Save).
         if (!inToaster(active))
-          previous.current = active instanceof HTMLElement ? active : null
+          previous.current =
+            active instanceof HTMLElement && active !== document.body
+              ? active
+              : null
         // Before sonner's own hotkey listener focuses the list.
         flushSync(() => setYielding(true))
       } else if (event.key === "Escape" && inToaster(active)) {
-        // Escape leaves the toaster; it does not close the modal beneath.
-        event.stopPropagation()
-        event.preventDefault()
-        previous.current?.focus()
+        const modal = openModal(),
+          before = previous.current?.isConnected ? previous.current : null
+        previous.current = null
         setYielding(false)
+        if (modal) {
+          // Escape leaves the toaster for the open sheet or dialog (#216:
+          // the element focused before, else the modal itself); it does not
+          // close the modal beneath.
+          event.stopPropagation()
+          event.preventDefault()
+          ;(before && modal.contains(before) ? before : modal).focus()
+        } else {
+          // Without a modal, sonner's own Escape listener runs first and
+          // collapses an expanded stack (#216); focus returns afterwards.
+          setTimeout(() => {
+            if (inToaster(document.activeElement)) before?.focus()
+          })
+        }
       }
     }
     window.addEventListener("keydown", onKeyDown, true)
