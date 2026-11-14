@@ -4,7 +4,7 @@
 // engagement period. The audit program shows it on the paper's plan, and
 // the paper editor on the papers of engagements without a program. Pure.
 import { classificationRules } from "@/lib/classification-rules";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import {
   art50Dating,
   art50PaperSuggestion,

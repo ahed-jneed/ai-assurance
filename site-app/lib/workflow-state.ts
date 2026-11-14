@@ -1,7 +1,7 @@
 // Keep runtime imports to small leaf modules (./domain/release-time,
 // ./permissions): the work queue and the paper register run it in the
 // browser.
-import type { Engagement, Report, Run } from "./domain";
+import type { Engagement, Report, Run } from "./domain/types";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import type {
   Brief,

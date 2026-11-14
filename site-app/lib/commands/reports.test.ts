@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sanitize } from "../client-projection";
-import type { Engagement, Paper, Report } from "../domain";
+import type { Engagement, Paper, Report } from "../domain/types";
 import { ApiError } from "../http";
 import {
   artifact,

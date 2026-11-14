@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { sanitize } from "../client-projection";
 import { caller } from "../commands/test-fixtures";
-import { finalReportGates, type Engagement, type Report } from "../domain";
+import { finalReportGates } from "./gates";
+import type { Engagement, Report } from "./types";
 import { engagementWork } from "../work-items";
 import {
   acceptedRecord,

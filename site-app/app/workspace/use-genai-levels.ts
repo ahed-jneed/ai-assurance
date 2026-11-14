@@ -7,7 +7,7 @@
 import { useMemo } from "react";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { genaiQuery } from "@/lib/assurance-query";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import {
   GENAI_RESULT_CATEGORIES,
   genaiArtifactLevels,

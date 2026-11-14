@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { reports } from "@/lib/commands/reports";
 import { caller } from "@/lib/commands/test-fixtures";
 import { resolveNew } from "@/lib/criteria/pin";
-import type { Engagement, Report } from "@/lib/domain";
+import type { Engagement, Report } from "@/lib/domain/types";
 import { freshEngagement } from "@/lib/factories";
 import {
   computeAudit,

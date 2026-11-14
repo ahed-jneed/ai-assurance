@@ -9,7 +9,7 @@
 // Reviewer is team membership too (engagement_access_history), even if its
 // holder never recorded any work.
 import { db } from "./bindings";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import {
   coolingOffConflicts,
   engagementTeam,

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "../../bindings";
-import { roles } from "../../domain";
+import { roles } from "../../domain/types";
 import { ApiError } from "../../http";
 import { id } from "../../ids";
 import { invitationLifetimeDays, normalizeEmail } from "../../invitations";

@@ -5,7 +5,7 @@ import {
   withdrawnSuccessor,
 } from "./client-projection";
 import { caller, stored } from "./commands/test-fixtures";
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import { packageStatusLabel } from "./report-presentation";
 import { paper } from "./workflow/test-fixtures";
 

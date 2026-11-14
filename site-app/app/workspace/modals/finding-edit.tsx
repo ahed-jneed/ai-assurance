@@ -1,5 +1,5 @@
 "use client";
-import type { Finding } from "@/lib/domain";
+import type { Finding } from "@/lib/domain/types";
 import { RemediationForm } from "../../finding-forms";
 import type { ModalDefinition, ModalFieldsProps } from "./types";
 

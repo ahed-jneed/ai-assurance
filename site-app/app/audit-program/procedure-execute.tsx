@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import type { Paper } from "@/lib/domain";
-import { isReleaseTimeRecord } from "@/lib/domain";
+import type { Paper } from "@/lib/domain/types";
+import { isReleaseTimeRecord } from "@/lib/domain/gates";
 import type { Procedure } from "@/lib/workflow-types";
 import { currentExecution, executionPlanCurrent } from "@/lib/workflow-state";
 import { label, reason } from "./fields";

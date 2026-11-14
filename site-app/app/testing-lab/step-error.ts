@@ -1,5 +1,5 @@
 // Why the evaluation setup cannot leave its current step yet ("" when it can).
-import type { Model } from "@/lib/domain";
+import type { Model } from "@/lib/domain/types";
 import type { Plan } from "@/lib/statistics";
 import { powerShortfalls } from "../power-check";
 import type { Draft, Inspection } from "./drafts";

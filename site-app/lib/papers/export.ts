@@ -1,7 +1,7 @@
 // The papers an internal export carries as working-paper contract documents
 // (#51): the dossier files them under papers/, and the report package lists
 // them as workingPapers.
-import type { Engagement, Report } from "../domain";
+import type { Engagement, Report } from "../domain/types";
 import { completionMemo } from "./completion";
 import type { PaperRevision } from "./revision";
 

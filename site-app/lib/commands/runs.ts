@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { recordsById } from "../assurance-store";
 import { evaluate } from "../diagnostics";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { getEngagement, save } from "../engagement-repo";
 import { now, sha256 } from "../ids";
 import { cardDescribes } from "../dataset-card";

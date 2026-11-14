@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { legacyPackageMessage } from "../client-projection";
 import { isClientVisible } from "../workflow-state";
-import { releaseChecklist, type Engagement, type Report } from "../domain";
+import { releaseChecklist } from "../domain/gates";
+import type { Engagement, Report } from "../domain/types";
 import {
   approvedWorkflow,
   at,

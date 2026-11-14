@@ -6,7 +6,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { releaseChecklist, type Engagement, type Report } from "../domain";
+import { releaseChecklist } from "../domain/gates";
+import type { Engagement, Report } from "../domain/types";
 import {
   approvedWorkflow,
   at,

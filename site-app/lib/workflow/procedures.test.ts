@@ -4,8 +4,8 @@ import {
   completionGates,
   finalReportGates,
   paperRequired,
-  type Engagement,
-} from "../domain";
+} from "../domain/gates";
+import type { Engagement } from "../domain/types";
 import {
   currentExecution,
   procedureLabel,

@@ -1,7 +1,7 @@
 // Why the evaluation setup cannot leave its current step: each step's first
 // unmet condition, in the order the wizard checks them.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Model } from "@/lib/domain";
+import type { Model } from "@/lib/domain/types";
 import type { Plan } from "@/lib/statistics";
 import { emptyDraft, type Draft, type Inspection } from "./drafts";
 import { stepError, type StepState } from "./step-error";

@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { State } from "./lab-ui";
 import { download, modelCapability, modelMarkdown } from "./model-helpers";
 import type { LabSetup } from "./use-lab-setup";

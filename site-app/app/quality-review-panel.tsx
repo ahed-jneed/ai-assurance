@@ -8,7 +8,7 @@ import { can, canBeAssigned, duties } from "@/lib/permissions";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import {
   checklistProblem,
   engagementTeam,

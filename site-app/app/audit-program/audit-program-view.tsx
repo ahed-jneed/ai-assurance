@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import type { Paper } from "@/lib/domain";
+import type { Paper } from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 import { revisionWarnings } from "@/lib/workflow-state";
 import { can } from "@/lib/permissions";
