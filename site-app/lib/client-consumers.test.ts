@@ -23,7 +23,7 @@ const fetchJsonConsumers = [
   "app/operator/operator-console.tsx",
   "app/package-integrity.tsx",
   "app/power-check.tsx",
-  "app/testing-lab.tsx",
+  "app/testing-lab/use-lab-setup.ts",
   "app/work-inbox.tsx",
   "app/workspace/views/criteria-coverage.tsx",
   "lib/assurance-query.ts",
