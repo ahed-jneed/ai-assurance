@@ -481,7 +481,8 @@ def run(data_path: str | Path, config: dict[str, Any], reference_path: str | Pat
             plan = derived_plan(frozen, observations)
         if plan is not None:
             decided = statistical_results(observations, frozen, plan, omitted, withheld)[0]
-            diagnostics.extend(withhold(decided, plan, bool(withheld)) if withhold_small_groups else decided)
+            missing_group = any(None in labels for labels in strata.values())
+            diagnostics.extend(withhold(decided, plan, bool(withheld), missing_group) if withhold_small_groups else decided)
         if "fairness" in frozen["suite"] and frozen["task"] != "binary_classification":
             diagnostics.append(result("FAIR-SCOPE", "Binary outcome fairness suite", "10", [], ["These fairness definitions require a binary decision. A task-specific group-fairness protocol is required for regression or multiclass tasks."], "not_applicable"))
     from_predictions = list(diagnostics)

@@ -22,6 +22,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
+from engine.criteria import MISSING_GROUP_NOTE
 from engine.diagnostics import read_csv, run, sha256
 from engine.errors import EngineError
 from engine.worker import LeaseKeeper, LeaseLost, ProcessExecutor, ProtocolError, ServerClock, Transport, Worker, compute_failure_code, compute_job, compute_main, docker_control_env, job_failure_code, main as worker_main, stripped_compute_env, verify_result_bytes
@@ -1052,6 +1053,47 @@ class WorkerTests(unittest.TestCase):
         self.assertIn("insufficient_coverage", client["par-g"]["decision"]["reasons"])
         self.assertEqual([s["n"] for s in client["par-s"]["metrics"][0]["slices"]], [100, 100])
         self.assertTrue(all(s["n"] == 50 for s in client["par-gs"]["metrics"][0]["slices"]))
+
+    def test_client_held_job_leaves_out_rows_with_a_blank_group_cell(self):
+        # #233: a pinned client file whose mapped group cell is empty in a few rows. The client-local worker
+        # leaves those rows out and counts them as withheld for a missing group value (D-33), instead of
+        # failing with missing_value; the platform-held path and every other missing cell still fail.
+        data = BIG+b"1,0,\n0,0, \n"
+        folder = self.client_files(("data.csv", data))
+        with RunnerServer(client_request(data), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder).once()
+            self.assertEqual(result["state"], "completed", server.errors)
+        packet = json.loads(Path(result["resultFile"]).read_bytes())
+        without = {r["testId"]: r for r in hosted_results(run_request(self.root/"without-blank.csv", BIG, hosted_request(BIG)), hosted_request(BIG))}
+        self.assertEqual(packet["externalReport"]["provenance"]["inputs"]["data"]["rowCount"], 800)
+        for r in packet["hostedResults"]:
+            with self.subTest(r["testId"]):
+                self.assertIn(MISSING_GROUP_NOTE, r["limitations"])
+                self.assertEqual(r["decision"]["sampleSize"], 800)
+                if r["decision"]["kind"] == "group_comparison":
+                    # The two rows count towards coverage as unknown-group rows; coverage is not reported.
+                    self.assertIsNone(r["decision"]["coverage"])
+                    self.assertEqual([s["n"] for s in r["metrics"][0]["slices"]], [400, 400])
+                else:
+                    self.assertEqual(r["metrics"], without[r["testId"]]["metrics"])
+        # Without blank group cells, no result carries the note.
+        folder = self.client_files(("data.csv", BIG), directory="client-data-full")
+        with RunnerServer(client_request(BIG), capabilities=("provided_predictions", "client_local")) as server:
+            result = self.client_worker(server.transport(), folder, workspace="jobs-full").once()
+            self.assertEqual(result["state"], "completed", server.errors)
+        packet = json.loads(Path(result["resultFile"]).read_bytes())
+        self.assertFalse(any(MISSING_GROUP_NOTE in r["limitations"] for r in packet["hostedResults"]))
+        rows = lambda raw: (self.root/"blank.csv").write_bytes(raw) and read_csv(self.root/"blank.csv")[0]
+        # The platform-held path still refuses to drop rows silently.
+        with self.assertRaises(EngineError) as caught:
+            translate_config(hosted_request(data), rows(data))
+        self.assertEqual(caught.exception.code, "missing_value")
+        # Other mapped cells of a client-held file still fail as before.
+        for blank in (b"1,,A\n", b",1,A\n"):
+            raw = BIG+blank
+            with self.subTest(blank=blank), self.assertRaises(EngineError) as caught:
+                translate_config(client_request(raw), rows(raw))
+            self.assertEqual(caught.exception.code, "missing_value")
 
     def test_client_held_calibration_withholds_small_bins(self):
         from engine.criteria import withhold_small_groups

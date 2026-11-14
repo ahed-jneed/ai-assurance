@@ -1424,18 +1424,23 @@ try {
     baseCsv = renamedCsv + renamedCsv.slice(renamedCsv.indexOf("\n") + 1),
     [clientHeader, firstRow] = baseCsv.split("\n"),
     // One person in group-gamma: below the minimum group size, so the
-    // client's worker withholds that group's counts and rates.
+    // client's worker withholds that group's counts and rates. One person
+    // with a blank ethnicity cell: left out and counted as withheld for a
+    // missing group value, not a missing_value failure (#233).
     clientCsv = baseCsv.replace(
       clientHeader + "\n",
       clientHeader +
         "\n" +
         firstRow.replace("group-alpha", "group-gamma") +
+        "\n" +
+        firstRow.replace(",group-alpha,", ",,") +
         "\n",
     ),
     clientRows = clientCsv.trim().split("\n").slice(1),
     clientBytes = Buffer.from(clientCsv);
-  assert(clientRows.length >= 160 && clientRows[1].includes("group-alpha"));
+  assert(clientRows.length >= 160 && clientRows[2].includes("group-alpha"));
   assert(clientRows[0].includes("group-gamma"));
+  assert(!clientRows[1].includes("group-"));
   // Uploading the file is refused: its ethnicity column has no basis.
   const refusedUpload = new FormData();
   for (const [key, val] of Object.entries({
@@ -1809,8 +1814,9 @@ try {
       [null, null, null],
     );
   // The person's row is left out of every total too, so no total minus the
-  // eligible groups gives back group-gamma's size, label or prediction.
-  const withoutGamma = clientRows.length - 1;
+  // eligible groups gives back group-gamma's size, label or prediction; so is
+  // the row with a blank ethnicity cell, and every result says why (#233).
+  const withoutGamma = clientRows.length - 2;
   assert.equal(
     clientEnvelope.externalReport.provenance.inputs.data.rowCount,
     withoutGamma,
@@ -1833,6 +1839,12 @@ try {
         r.limitations.some((note) => note.includes("are left out of every")),
         r.testId,
       );
+    assert(
+      r.limitations.some((note) =>
+        note.includes("count as withheld for a missing group value"),
+      ),
+      r.testId,
+    );
   }
   await assurance("importJob", { jobId: clientJob.jobId });
   const clientRun = e.runs.find((r) => r.externalJobId === clientJob.jobId);
