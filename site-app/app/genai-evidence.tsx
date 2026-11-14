@@ -44,11 +44,8 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
-import {
-  bundleOptionLabel,
-  count,
-  planOptionLabel,
-} from "./genai-ingest-labels";
+import { count } from "@/lib/presentation";
+import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
 

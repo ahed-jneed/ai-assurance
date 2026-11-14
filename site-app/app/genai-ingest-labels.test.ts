@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  bundleOptionLabel,
-  count,
-  planOptionLabel,
-} from "./genai-ingest-labels";
-
-it("pluralises the GenAI tab's counts", () => {
-  expect(count(1, "frozen plan")).toBe("1 frozen plan");
-  expect(count(0, "declared bundle")).toBe("0 declared bundles");
-  expect(count(2, "criterion", "criteria")).toBe("2 criteria");
-});
+import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
 
 const procedures = [
   { id: "PROC-1", templateId: "WP-GA-01", title: "Accuracy of answers" },

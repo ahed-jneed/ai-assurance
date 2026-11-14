@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { ReviewQueueSummary } from "@/lib/assurance-search";
 import type { ObligationOptions } from "@/lib/criteria/types";
+import { count } from "@/lib/presentation";
 import {
   runnerCapabilities,
   runnerCapabilityInfo,
@@ -134,10 +135,6 @@ export type Exclusion = { recordId: string; reason: string };
 
 export const label = (s: string) =>
   s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
-
-/** "1 request", "2 requests" (#211). */
-const count = (n: number, one: string, many = one + "s") =>
-  n.toLocaleString() + " " + (n === 1 ? one : many);
 
 /**
  * The external queue's telemetry line: totals by state and, when the list is

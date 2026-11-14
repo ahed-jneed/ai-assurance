@@ -1,14 +1,12 @@
 // Readable labels for the frozen plans and declared bundles the GenAI tab's
 // "Queue ingest" dialog offers (#211), as #202 did for prediction lineage:
 // what the record is and when it was made, never its raw record id.
+import { count } from "@/lib/presentation";
 import type { GenaiView } from "@/lib/read-models/genai-view";
 
 type Procedure = { id: string; templateId: string; title: string };
 
 const day = (at: string) => String(at ?? "").slice(0, 10);
-/** "1 frozen plan", "2 frozen plans". */
-export const count = (n: number, one: string, many = one + "s") =>
-  n + " " + (n === 1 ? one : many);
 
 /** "WP-GA-01 Accuracy of answers · 2 criteria · 2026-11-03". */
 export function planOptionLabel(

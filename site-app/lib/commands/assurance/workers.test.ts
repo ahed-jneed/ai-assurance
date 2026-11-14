@@ -87,12 +87,21 @@ describe("enrollWorker", () => {
         .all()
         .map((r) => JSON.parse(String(r.capabilities))),
     ).toEqual(expect.arrayContaining([["genai_ingest"], ["client_local"]]));
-    // A capability the dialog does not offer is refused.
-    expect(
-      await refusal(
-        op("enrollWorker", { ...enrollment, formats: ["TensorFlow"] }),
-      ),
-    ).toBeInstanceOf(z.ZodError);
+    // A capability the dialog does not offer is refused, and the refusal
+    // names every capability the server accepts: exactly the dialog's set,
+    // so neither side offers or accepts one the other lacks (#216).
+    const refused = await refusal(
+      op("enrollWorker", { ...enrollment, formats: ["TensorFlow"] }),
+    );
+    expect(refused).toBeInstanceOf(z.ZodError);
+    const [issue] = (refused as z.ZodError).issues;
+    expect(issue).toMatchObject({
+      code: "invalid_enum_value",
+      path: ["formats", 0],
+    });
+    const accepted = (issue as z.ZodInvalidEnumValueIssue).options;
+    expect(new Set(accepted)).toEqual(new Set(enrolmentFormats));
+    expect(accepted).toHaveLength(enrolmentFormats.length);
   });
 });
 
