@@ -82,6 +82,15 @@ export type WorkspaceData = {
    * whose contributor's membership was since revoked or re-granted.
    */
   lapsedClientGrants?: string[];
+  /**
+   * The client members holding request grants on the selected engagement,
+   * for writers (#225): their name and whether their membership is active.
+   */
+  clientGrantHolders?: {
+    user_id: string;
+    display_name: string;
+    active: boolean;
+  }[];
   people: {
     user_id: string;
     display_name: string;

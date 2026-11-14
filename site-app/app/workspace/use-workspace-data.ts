@@ -19,7 +19,11 @@ import {
   retryable,
 } from "@/lib/fetch-json";
 import { isClientRole } from "@/lib/permissions";
-import { readWorkspaceLink, type WorkspaceLink } from "@/lib/workspace-links";
+import {
+  practiceLanding,
+  readWorkspaceLink,
+  type WorkspaceLink,
+} from "@/lib/workspace-links";
 import {
   auditViews,
   parseResume,
@@ -129,6 +133,15 @@ export function applySaved(
   };
 }
 
+/** The signed-in name a refused workspace load names, if any. */
+export function refusedAccountName(body: unknown) {
+  const name =
+    body && typeof body === "object" && "account" in body
+      ? (body as { account?: { name?: unknown } }).account?.name
+      : undefined;
+  return typeof name === "string" ? name.slice(0, 300) : "";
+}
+
 export function useWorkspaceData() {
   const [data, setData] = useState<WorkspaceData | null>(null),
     [error, setError] = useState(""),
@@ -136,6 +149,9 @@ export function useWorkspaceData() {
     // The account is signed in but the server refused the workspace: no
     // practice access (revoked, archived or never granted).
     [accessDenied, setAccessDenied] = useState(false),
+    // Who is signed in when the workspace was refused, as the refusal names
+    // them (GET /api/workspace), for the minimal shell (#225).
+    [deniedAccount, setDeniedAccount] = useState(""),
     [busy, setBusyState] = useState(false),
     [loading, setLoading] = useState(true),
     [bootstrapping, setBootstrapping] = useState(true);
@@ -200,6 +216,7 @@ export function useWorkspaceData() {
         }
         if (failure.kind === "forbidden") {
           setAccessDenied(true);
+          setDeniedAccount(refusedAccountName(failure.body));
           setData(null);
         } else if (tenantId || engagementId)
           setData((previous) =>
@@ -404,6 +421,7 @@ export function useWorkspaceData() {
     setError,
     signedOut,
     accessDenied,
+    deniedAccount,
     busy,
     isBusy,
     setBusy,
@@ -465,7 +483,15 @@ export function useWorkspaceBootstrap(
             linked.engagementId === first.engagement?.id
               ? first
               : await load(linked.tenantId, linked.engagementId || undefined);
-          if (target) applyLink(target, linked);
+          if (target)
+            applyLink(
+              target,
+              practiceLanding(
+                linked,
+                window.location.search,
+                !!target.engagement,
+              ),
+            );
           return;
         }
         let preference;

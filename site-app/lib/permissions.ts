@@ -274,8 +274,12 @@ export const assignableRoles = {
   reviewer: reviewers,
   /** A member of the engagement team in the acceptance record. */
   team: internal,
-  /** An internal member a Lead Auditor grants engagement access (setAccess). */
-  engagementAccess: internal,
+  /**
+   * A staff member a Lead Auditor grants engagement access (setAccess), the
+   * Engagement Quality Reviewer included (#225): access lets them open the
+   * engagement, and the action map still keeps them to the quality review.
+   */
+  engagementAccess: staff,
   /** A client member granted one evidence request (grantClientRequest). */
   clientRequest: clientContributor,
   /**
