@@ -1,3 +1,4 @@
+import { clientPortalRoutesFor } from "./navigation-preferences";
 import { isClientRole } from "./permissions";
 
 export const auditViews = [
@@ -41,12 +42,15 @@ export function parseResume(raw: string | null): ResumePreference | null {
     return null;
   }
 }
+/**
+ * The view `role` may open, or the Overview: a client opens only its portal's
+ * destinations, so a Client Contributor asking for Findings lands on the
+ * Overview (#182).
+ */
 export function permittedAuditView(view: string, role: string) {
   return auditViews.includes(view as (typeof auditViews)[number]) &&
     (!isClientRole(role) ||
-      ["Overview", "Evidence vault", "Findings", "Reports & sign-off"].includes(
-        view,
-      ))
+      (clientPortalRoutesFor(role) as string[]).includes(view))
     ? view
     : "Overview";
 }

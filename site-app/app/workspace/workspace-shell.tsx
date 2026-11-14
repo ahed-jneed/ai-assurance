@@ -12,7 +12,7 @@ import {
   type SetStateAction,
 } from "react";
 import { RefreshCw, ShieldCheck } from "lucide-react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { can, canSee, fallbackRole, isClientRole } from "@/lib/permissions";
@@ -294,7 +294,16 @@ export default function Workspace() {
             account={account}
           />
         )}
-        <SidebarInset className={portal ? "client-portal-inset" : undefined}>
+        {/* The vendored SidebarInset renders a <main>; the page has one main
+            landmark, #audit-main-content, so the inset is a plain container
+            with SidebarInset's slot and layout (#182). */}
+        <div
+          data-slot="sidebar-inset"
+          className={
+            "relative flex w-full flex-1 flex-col bg-background" +
+            (portal ? " client-portal-inset" : "")
+          }
+        >
           {portal ? (
             <ClientPortalHeader
               data={data}
@@ -354,7 +363,7 @@ export default function Workspace() {
                   </ViewBoundary>
                 )}
           </main>
-        </SidebarInset>
+        </div>
         {data && (
           <MemberOnboarding
             key={onboardingRun}

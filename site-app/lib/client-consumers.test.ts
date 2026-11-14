@@ -41,7 +41,12 @@ const serverCode = [
   // The domain types, which define the roles, and the map itself.
   /^lib\/domain\//,
   /^lib\/permissions\.ts$/,
-  // Repository, tenancy and request-service modules the browser never loads.
+  // Repository, tenancy and request-service modules. The browser never loads
+  // engagement-repo.ts, tenancy.ts or test-storage.ts. It does import pure
+  // helpers from evidence-requests.ts and client-projection.ts, but their
+  // role comparisons sit in server-side functions that take the request
+  // context (ctx.role): they guard commands and reads on the server and
+  // decide nothing in the browser.
   /^lib\/(client-projection|engagement-repo|evidence-requests|tenancy|test-storage)\.ts$/,
 ];
 // Role pickers and role descriptions: they name each role to offer it, not

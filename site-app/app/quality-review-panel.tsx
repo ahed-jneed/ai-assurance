@@ -4,7 +4,7 @@
 // exact final package (lib/domain/quality-review.ts). A Lead Auditor
 // appoints the reviewer; only the appointed reviewer records the review.
 import { useState } from "react";
-import { can } from "@/lib/permissions";
+import { can, canBeAssigned, duties } from "@/lib/permissions";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +14,6 @@ import {
   engagementTeam,
   qualityReviewReleaseProblem,
   qualityReviewRequired,
-  qualityReviewerRole,
   standBackChecklist,
   type QualityReviewItem,
 } from "@/lib/domain/quality-review";
@@ -53,11 +52,11 @@ export function QualityReviewPanel({
     team = engagementTeam(e),
     name = (id: string) =>
       people.find((p) => p.user_id === id)?.display_name || id,
-    own = !!q && role === qualityReviewerRole && q.reviewerId === userId,
+    own = !!q && duties(role).qualityReview && q.reviewerId === userId,
     required = qualityReviewRequired(e, terms.engagementType),
     candidates = people.filter(
       (p) =>
-        p.role === qualityReviewerRole &&
+        canBeAssigned(p.role, "qualityReviewer") &&
         p.status === "active" &&
         p.user_id !== q?.reviewerId &&
         !team.has(p.user_id),

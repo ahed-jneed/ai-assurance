@@ -6,6 +6,7 @@
 import { memo, Suspense } from "react";
 import { Building2 } from "lucide-react";
 import type { Role } from "@/lib/domain";
+import { clientPortalRoutesFor } from "@/lib/navigation-preferences";
 import { decisionState } from "@/lib/permissions";
 import { reportTermsFor, type ReportTerms } from "@/lib/domain/report-model";
 import type { PaperRegisterRow } from "@/lib/paper-presentation";
@@ -270,6 +271,17 @@ export const WorkspaceViews = memo(function WorkspaceViews({
         icon={Building2}
         title="No engagement is assigned"
         text="Ask your Lead Auditor to assign client access."
+      />
+    );
+  // A client opens only its portal's destinations: a Client Contributor's
+  // portal has no Findings (#182), so a stale link or saved view is refused
+  // here instead of showing an empty page.
+  if (viewer && !clientPortalRoutesFor(role).some((route) => route === view))
+    return (
+      <Empty
+        icon={Building2}
+        title="This page is not part of your portal"
+        text="Your access does not include it. Choose a destination from the portal navigation."
       />
     );
   const ll144 = ll144PanelAccess(on.features.ll144BiasAudit, e);

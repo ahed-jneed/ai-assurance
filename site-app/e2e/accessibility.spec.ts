@@ -49,12 +49,20 @@ test("the Lead Auditor's main views have no serious axe violations", async ({
   }
 });
 
-const portalViews: [string, string][] = [
-  ["Overview", DEMO.engagement],
-  ["Evidence vault", "Shared evidence"],
-  ["Findings", "Findings"],
-  ["Reports & sign-off", "Reports"],
-];
+// A Client Contributor's portal has no Findings (#182).
+const portalViews = {
+  "qa-viewer": [
+    ["Overview", DEMO.engagement],
+    ["Evidence vault", "Shared evidence"],
+    ["Findings", "Findings"],
+    ["Reports & sign-off", "Reports"],
+  ],
+  "qa-contrib": [
+    ["Overview", DEMO.engagement],
+    ["Evidence vault", "Shared evidence"],
+    ["Reports & sign-off", "Reports"],
+  ],
+} satisfies Record<string, [string, string][]>;
 
 for (const persona of ["qa-viewer", "qa-contrib"] as const)
   test(`the client portal has no serious axe violations (${persona})`, async ({
@@ -62,7 +70,7 @@ for (const persona of ["qa-viewer", "qa-contrib"] as const)
     demo,
   }) => {
     const page = await signIn(persona);
-    for (const [view, heading] of portalViews) {
+    for (const [view, heading] of portalViews[persona]) {
       await page.goto(workspacePath(demo, view));
       await loaded(page, heading);
       await expectAccessible(page, `Client portal ${heading} (${persona})`);

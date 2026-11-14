@@ -250,6 +250,11 @@ export const assignableRoles = {
   engagementAccess: internal,
   /** A client member granted one evidence request (grantClientRequest). */
   clientRequest: clientContributor,
+  /**
+   * The engagement quality reviewer a Lead Auditor appoints
+   * (appointQualityReviewer, lib/commands/quality-review.ts).
+   */
+  qualityReviewer,
 } as const satisfies Record<string, readonly Role[]>;
 
 export type Assignment = keyof typeof assignableRoles;

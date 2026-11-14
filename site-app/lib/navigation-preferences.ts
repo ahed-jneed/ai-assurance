@@ -1,4 +1,4 @@
-import { isClientRole } from "./permissions";
+import { canSee, isClientRole } from "./permissions";
 
 export const navigationRoutes = [
   "My work",
@@ -42,6 +42,15 @@ export const clientPortalRoutes = [
   ["Findings", "Findings"],
   ["Reports & sign-off", "Reports"],
 ] as const satisfies readonly (readonly [NavigationRoute, string])[];
+/**
+ * The portal destinations `role` may open. A Client Contributor has no
+ * Findings destination (#182): the client projection gives them no findings
+ * (lib/client-projection.ts), so the page would always be empty.
+ */
+export const clientPortalRoutesFor = (role: string): NavigationRoute[] =>
+  clientPortalRoutes
+    .map(([route]) => route)
+    .filter((route) => route !== "Findings" || canSee(role, "clientFindings"));
 /** The portal's name for a view, or the view itself outside the portal. */
 export const clientPortalTitle = (view: string) =>
   clientPortalRoutes.find(([route]) => route === view)?.[1] ?? view;
@@ -50,7 +59,7 @@ export const permittedNavigationRoutes = (
   hasEngagement: boolean,
 ): NavigationRoute[] => {
   if (isClientRole(role))
-    return hasEngagement ? clientPortalRoutes.map(([route]) => route) : [];
+    return hasEngagement ? clientPortalRoutesFor(role) : [];
   return navigationRoutes.filter(
     (route) =>
       route === "My work" ||
