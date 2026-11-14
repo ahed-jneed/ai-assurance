@@ -161,6 +161,7 @@ export default function Workspace() {
     : "files";
   const guarded = navigationGuard({
     busy,
+    isBusy: workspace.isBusy,
     loading,
     bootstrapping,
     modal: modal.modal,

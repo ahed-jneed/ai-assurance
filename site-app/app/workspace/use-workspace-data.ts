@@ -136,9 +136,17 @@ export function useWorkspaceData() {
     // The account is signed in but the server refused the workspace: no
     // practice access (revoked, archived or never granted).
     [accessDenied, setAccessDenied] = useState(false),
-    [busy, setBusy] = useState(false),
+    [busy, setBusyState] = useState(false),
     [loading, setLoading] = useState(true),
     [bootstrapping, setBootstrapping] = useState(true);
+  // Whether a command is in flight now, for a handler that runs before the
+  // render that clears `busy` (navigation-guards.ts, isBusy).
+  const busyRef = useRef(false);
+  const setBusy = useCallback((value: boolean) => {
+    busyRef.current = value;
+    setBusyState(value);
+  }, []);
+  const isBusy = useCallback(() => busyRef.current, []);
   // The committed data, for callbacks and async handlers.
   const dataRef = useRef(data);
   useLayoutEffect(() => {
@@ -299,7 +307,7 @@ export function useWorkspaceData() {
         setBusy(false);
       }
     },
-    [load, reportFailure],
+    [load, reportFailure, setBusy],
   );
   const act = useCallback(
     async function act(
@@ -361,7 +369,7 @@ export function useWorkspaceData() {
         setBusy(false);
       }
     },
-    [load, reportFailure],
+    [load, reportFailure, setBusy],
   );
   /** Runs a command whose failure is already reported by act(). */
   const safeAct = useCallback(
@@ -397,6 +405,7 @@ export function useWorkspaceData() {
     signedOut,
     accessDenied,
     busy,
+    isBusy,
     setBusy,
     loading,
     setLoading,
