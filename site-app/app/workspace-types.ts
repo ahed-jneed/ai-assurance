@@ -98,14 +98,6 @@ export type WorkspaceData = {
   qualityReviewPolicy?: { coolingOffDays: number; practiceSet: boolean } | null;
   /** The practice's report settings, for internal roles. */
   reportSettings?: PracticeReportSettings | null;
-  managementEvents: {
-    id: string;
-    action: string;
-    actor: string;
-    created_at: string;
-    hash: string;
-    details: string;
-  }[];
   /**
    * The practice's latest revocations that cancelled pending invitations,
    * with the emails (#151), for practice administrators.

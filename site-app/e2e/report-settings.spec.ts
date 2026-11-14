@@ -33,13 +33,17 @@ test("the Lead Auditor sets report settings that a new report states", async ({
     })
     .fill(settings.qualityStatement);
   await expectAccessible(page, "Report settings dialog");
+  const lead = await api("qa-lead");
+  const before = (await lead.workspace(demo.tenantId))
+    .managementVersion as number;
   await dialog.getByRole("button", { name: "Save report settings" }).click();
   await expect(dialog).toBeHidden();
 
-  const lead = await api("qa-lead");
+  // Saved as one management change (the workspace load no longer lists
+  // management events; the Access log lists only access events).
   const saved = await lead.workspace(demo.tenantId);
   expect(saved.reportSettings).toEqual(settings);
-  expect(saved.managementEvents[0].action).toBe("setReportSettings");
+  expect(saved.managementVersion).toBeGreaterThan(before);
 
   // The report form states the settings for fields left blank.
   await page.goto(workspacePath(demo, "Reports & sign-off"));

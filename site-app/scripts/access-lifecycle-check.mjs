@@ -146,6 +146,16 @@ await withWorker(
     assert.equal(view.identity.practiceAdmin, true);
     const load = async (who = lead) =>
       (view = (await call("/api/workspace?tenantId=" + tenantId, who)).body);
+    // The practice's Access log, newest first (#181, #185): the workspace
+    // load no longer carries management events.
+    const accessLog = async (who = lead) => {
+      const response = await call(
+        "/api/access-log?" + new URLSearchParams({ tenantId, limit: "50" }),
+        who,
+      );
+      assert.equal(response.status, 200, JSON.stringify(response.body));
+      return response.body.events;
+    };
     const manage = async (op, data, status = 200, who = lead) => {
       const fresh = (await call("/api/workspace?tenantId=" + tenantId, who))
         .body;
@@ -223,7 +233,10 @@ await withWorker(
     );
     await load();
     assert.equal(view.managementVersion, versionBefore + 1);
-    assert.equal(view.managementEvents[0].action, "acceptInvitation");
+    assert.equal(
+      (await accessLog()).find((e) => e.action !== "signIn").action,
+      "acceptInvitation",
+    );
     assert.equal(
       view.members.find((m) => m.user_id === "user-auditor").display_name,
       "Avery Auditor",
@@ -388,7 +401,10 @@ await withWorker(
       [{ status: "revoked", role: "Reviewer", grants: 0 }],
     );
     await load();
-    assert.equal(view.managementEvents[0].action, "supersedeInvitation");
+    assert.equal(
+      (await accessLog()).find((e) => e.action !== "signIn").action,
+      "supersedeInvitation",
+    );
     assert.deepEqual(
       view.invitations.map((i) => i.email),
       ["viewer@fixture.invalid"],
@@ -425,9 +441,8 @@ await withWorker(
       (await manage("revokeAdmin", { userId: "user-lead" }, 409)).error,
       "A practice needs at least one active administrator. Grant or transfer administration first.",
     );
-    await load();
     assert.deepEqual(
-      view.managementEvents
+      (await accessLog())
         .map((e) => e.action)
         .filter((a) => a.endsWith("Admin"))
         .reverse(),

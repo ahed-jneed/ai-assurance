@@ -329,16 +329,6 @@ export async function workspaceView(
   const reportSettings = isInternalRole(ctx.role)
     ? parseReportSettings(tenant.report_settings)
     : null;
-  const managementEvents = ctx.practiceAdmin
-    ? (
-        await db()
-          .prepare(
-            "SELECT id,actor,action,details,hash,created_at FROM management_events WHERE tenant_id=? ORDER BY created_at DESC LIMIT 30",
-          )
-          .bind(ctx.tenantId)
-          .all()
-      ).results
-    : [];
   // Damaged engagement records found by any member (#16), for the practice's
   // administrators; read after this request recorded its own.
   const incidents = ctx.practiceAdmin ? await integrityIncidents(ctx) : null;
@@ -369,7 +359,6 @@ export async function workspaceView(
     people,
     managementVersion,
     qualityReviewPolicy,
-    managementEvents,
     revocationCancellations: revocations,
     integrityIncidents: incidents,
     reportSettings,
