@@ -127,4 +127,17 @@ describe("report renderers", () => {
       expect(html).not.toContain("Assessed against");
     }
   });
+
+  it("label the client's release time Released in the print header (#210)", async () => {
+    const r = await captured();
+    const releasedAt = "2026-11-06T09:00:00.000Z";
+    const header = (report: Report) =>
+      printed(report, r.clientSnapshot!).match(
+        /<p class="report-meta">[^<]*/,
+      )![0];
+    expect(header({ ...r, createdAt: releasedAt, releasedAt })).toMatch(
+      / · Released /,
+    );
+    expect(header(r)).toMatch(/ · Created /);
+  });
 });

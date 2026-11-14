@@ -503,6 +503,12 @@ export type Report = {
    * Set on the client projection, which shows no release history.
    */
   notification?: { at: string; recipients: string };
+  /**
+   * When the report was released to the client. Set on the client
+   * projection, whose createdAt is this release time, so the client sees it
+   * labelled "Released" (#210).
+   */
+  releasedAt?: string;
 };
 export type Engagement = {
   workflow?: Workflow;

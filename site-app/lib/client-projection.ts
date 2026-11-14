@@ -312,6 +312,7 @@ export function sanitize(e: Engagement, ctx: Context): Engagement {
       id: r.id,
       kind: r.kind,
       createdAt: r.release!.releasedAt!,
+      releasedAt: r.release!.releasedAt!,
       actor: "",
       sha256: r.clientSha256!,
       snapshot: r.clientSnapshot!,
