@@ -15,15 +15,20 @@ import { fetchJson } from "./fetch-json";
 import type { AccessLogPage } from "./read-models/access-log";
 import type { TrailPage } from "./read-models/audit-trail";
 
-/** The filters a person sets on an event log; "" is unset. */
+/**
+ * The filters a person sets on an event log; "" is unset. `involved` (a
+ * member who acted or was acted on) is the Access log's only.
+ */
 export type EventLogFilters = {
   actor: string;
+  involved: string;
   action: string;
   from: string;
   to: string;
 };
 export const noEventFilters: EventLogFilters = {
   actor: "",
+  involved: "",
   action: "",
   from: "",
   to: "",

@@ -2,8 +2,8 @@
 // The practice's Access log (#181): who was given, changed or lost
 // membership, a role or practice administration, the invitations behind
 // that, and members' sign-ins, newest first in pages of GET /api/access-log
-// (through the query cache, lib/event-log-queries.ts), filtered by person,
-// event type and date, and exported as CSV. For practice administrators
+// (through the query cache, lib/event-log-queries.ts), filtered by who acted,
+// the person involved (who acted or was acted on), event type and date, and exported as CSV. For practice administrators
 // only, of any staff role (canSeeAccessLog); the server checks the same.
 import { useMemo } from "react";
 import { Download, ScrollText } from "lucide-react";
@@ -18,7 +18,11 @@ import {
 } from "@/components/ui/table";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { accessLogCsvHref, accessLogQuery } from "@/lib/event-log-queries";
-import { accessEventLabel, signInGapHours } from "@/lib/access-events";
+import {
+  accessEventLabel,
+  signInGapHours,
+  signInRetentionDays,
+} from "@/lib/access-events";
 import {
   EventLogFilterBar,
   EventLogPager,
@@ -60,13 +64,16 @@ export function AccessLog({ data }: { data: WorkspaceData }) {
       <p className="subtle event-log-intro">
         Membership, role and practice administration changes, the invitations
         behind them, and sign-ins. A sign-in is recorded on a member&apos;s
-        first visit to the practice after {signInGapHours} hours without one.
+        first visit to the practice after {signInGapHours} hours without one,
+        and kept for {signInRetentionDays} days.
       </p>
       <section className="panel event-log" aria-label="Access events">
         <EventLogFilterBar
           log={log}
           label="Filter the Access log"
+          actorLabel="Acted by"
           actors={facets.actors}
+          people={facets.people ?? []}
           actions={facets.actions}
           actionLabel={accessEventLabel}
         >

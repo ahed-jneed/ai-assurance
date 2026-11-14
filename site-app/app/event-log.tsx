@@ -1,7 +1,8 @@
 "use client";
 // What the engagement audit trail (app/audit-trail.tsx) and the practice
 // Access log (app/access-log.tsx) share (#181): the filters (actor, event
-// type, an inclusive UTC date range), the page position, and the pager.
+// type, an inclusive UTC date range, and for the Access log the person
+// involved), the page position, and the pager.
 // Pages are cursors from the server (lib/read-models/event-pages.ts): the
 // pager keeps the cursors of the pages before the current one, so Newer goes
 // back exactly to the page that was shown.
@@ -43,6 +44,8 @@ export type EventLog = ReturnType<typeof useEventLog>;
 
 type Facets = {
   actors: { id: string; name: string }[];
+  /** Everyone who acted or was acted on, for a log that names both. */
+  people?: { id: string; name: string }[];
   actions: readonly string[];
 };
 /**
@@ -51,19 +54,30 @@ type Facets = {
  */
 export function useFacets(page: Facets | undefined): Facets {
   const [last, setLast] = useState<Facets>({ actors: [], actions: [] });
-  if (page && (page.actors !== last.actors || page.actions !== last.actions))
-    setLast({ actors: page.actors, actions: page.actions });
+  if (
+    page &&
+    (page.actors !== last.actors ||
+      page.people !== last.people ||
+      page.actions !== last.actions)
+  )
+    setLast({
+      actors: page.actors,
+      people: page.people,
+      actions: page.actions,
+    });
   return page ?? last;
 }
 
 export const filtered = (f: EventLogFilters) =>
-  !!(f.actor || f.action || f.from || f.to);
+  !!(f.actor || f.involved || f.action || f.from || f.to);
 
 /** The filter controls of an event log. */
 export function EventLogFilterBar({
   log,
   label,
+  actorLabel = "Person",
   actors,
+  people,
   actions,
   actionLabel,
   children,
@@ -71,7 +85,14 @@ export function EventLogFilterBar({
   log: EventLog;
   /** What the group filters, read out by assistive technology. */
   label: string;
+  /** The name of the filter by who acted. */
+  actorLabel?: string;
   actors: { id: string; name: string }[];
+  /**
+   * When given, a "Person involved" filter: events where the person either
+   * acted or was acted on.
+   */
+  people?: { id: string; name: string }[];
   actions: readonly string[];
   actionLabel: (action: string) => string;
   /** Controls after the filters, such as an export. */
@@ -82,7 +103,7 @@ export function EventLogFilterBar({
   return (
     <div className="event-log-filters" role="group" aria-label={label}>
       <span className="event-log-filter">
-        <label htmlFor={ids + "-actor"}>Person</label>
+        <label htmlFor={ids + "-actor"}>{actorLabel}</label>
         <select
           id={ids + "-actor"}
           value={filters.actor}
@@ -96,6 +117,23 @@ export function EventLogFilterBar({
           ))}
         </select>
       </span>
+      {people && (
+        <span className="event-log-filter">
+          <label htmlFor={ids + "-involved"}>Person involved</label>
+          <select
+            id={ids + "-involved"}
+            value={filters.involved}
+            onChange={(event) => log.change({ involved: event.target.value })}
+          >
+            <option value="">Anyone</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </span>
+      )}
       <span className="event-log-filter">
         <label htmlFor={ids + "-action"}>Event</label>
         <select
