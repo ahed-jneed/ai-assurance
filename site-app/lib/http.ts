@@ -58,6 +58,19 @@ export function parseJsonBody(bytes: Uint8Array): unknown {
     throw new ApiError(400, "The request body is not valid JSON");
   }
 }
+/**
+ * Decode an accepted evidence file the caller asked to import as JSON, for
+ * example an assurance packet or a cited-model briefing. A file that is not
+ * JSON is the caller's choice of file to correct (400 naming the file kind),
+ * not a server fault (#220).
+ */
+export function parseJsonFile(bytes: ArrayBuffer, kind: string): unknown {
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new ApiError(400, `This ${kind} file is not valid JSON`);
+  }
+}
 /** Read a bounded request body and decode it as JSON (see parseJsonBody). */
 export async function readJson(request: Request, limit: number) {
   return parseJsonBody(await readBounded(request, limit));

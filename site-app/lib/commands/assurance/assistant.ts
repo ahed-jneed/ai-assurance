@@ -9,7 +9,7 @@ import { bucket } from "../../bindings";
 import { activeSigningKey, sign } from "../../signing-keys";
 import { isReleaseTimeRecord, paperCurrent } from "../../domain/gates";
 import { save } from "../../engagement-repo";
-import { ApiError } from "../../http";
+import { ApiError, parseJsonFile } from "../../http";
 import { platformKey } from "../../special-category";
 import { now, sha256 } from "../../ids";
 import { defineCommands } from "../command";
@@ -136,7 +136,7 @@ export const assistant: AssuranceModule = defineCommands({
       const bytes = await o.arrayBuffer();
       if ((await sha256(bytes)) !== artifact.sha256)
         throw new ApiError(409, "Briefing bytes changed");
-      const raw = JSON.parse(new TextDecoder().decode(bytes)),
+      const raw = parseJsonFile(bytes, "briefing"),
         draft = z
           .object({
             schemaVersion: z.literal("1.0"),
@@ -221,7 +221,8 @@ export const assistant: AssuranceModule = defineCommands({
           })
           .passthrough()
           .parse(raw);
-      const { draftSha256, ...captured } = raw;
+      // The bytes as imported, which the parse above found to be an object.
+      const { draftSha256, ...captured } = raw as Record<string, unknown>;
       if (
         (await sha256(canonical(captured))) !== draftSha256 ||
         draft.tenantId !== ctx.tenantId ||

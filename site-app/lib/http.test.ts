@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   parseJsonBody,
+  parseJsonFile,
   readBounded,
   readJson,
   responseError,
@@ -95,6 +96,34 @@ describe("request body JSON", () => {
       error: "The request body is not valid JSON",
     });
   });
+});
+
+describe("imported JSON files (#220)", () => {
+  const bytes = (s: string) => new TextEncoder().encode(s).buffer;
+
+  it("decodes a JSON file", () => {
+    expect(parseJsonFile(bytes('{"type":"x"}'), "packet")).toEqual({
+      type: "x",
+    });
+  });
+
+  it.each(["{not json", "", '{"a":1}\n{"b":2}'])(
+    "answers a file that is not JSON (%j) with 400 naming the file kind",
+    async (text) => {
+      let caught: unknown;
+      try {
+        parseJsonFile(bytes(text), "briefing");
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught).toBeInstanceOf(ApiError);
+      const response = responseError(caught);
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "This briefing file is not valid JSON",
+      });
+    },
+  );
 });
 
 describe("request bodies the app leaves unread (#209)", () => {

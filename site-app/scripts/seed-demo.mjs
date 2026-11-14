@@ -17,9 +17,13 @@
 // started in trusted-headers mode (docs/security/identity.md) with
 // SELF_SIGNUP=open, so that qa-lead and qa-lead2 may provision their
 // practices (npm start -- --var SELF_SIGNUP:open ...); otherwise each
-// persona signs in through /signin-with-chatgpt?as=<id> like a browser.
+// persona signs in through /signin-with-chatgpt?as=<id> like a browser. At
+// the end it prints how to sign in as each persona on that server: the
+// dev-server links, or with --trusted-headers the headers to send
+// (scripts/seed-sign-in.mjs).
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
+import { personaHeaders, signInInstructions } from "./seed-sign-in.mjs";
 
 const args = process.argv.slice(2);
 const trustedHeaders = args.includes("--trusted-headers");
@@ -49,13 +53,7 @@ const DAY = 86_400_000;
 const sessions = new Map();
 /** The request headers that identify `who`. */
 async function identify(who) {
-  if (trustedHeaders)
-    return {
-      "oai-authenticated-user-id": who.userId,
-      "oai-authenticated-user-email": who.email,
-      "oai-authenticated-user-full-name": encodeURIComponent(who.name),
-      "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
-    };
+  if (trustedHeaders) return personaHeaders(who);
   if (!sessions.has(who.id)) {
     const response = await fetch(
       base +
@@ -585,13 +583,15 @@ try {
       },
     )}\n`,
   );
-  console.log("Sign in as a persona (loopback development server):");
-  for (const who of fixture.personas)
-    console.log(
-      `  ${who.id.padEnd(12)} ${(who.role ?? "none").padEnd(28)} ${base}/signin-with-chatgpt?${new URLSearchParams(
-        { as: who.id, return_to: who.role ? deepLink : "/" },
-      )}`,
-    );
+  // A built Worker in trusted-headers mode has no persona sign-in route, so
+  // it gets the headers to send instead of the dev-server links (#220).
+  for (const line of signInInstructions({
+    base,
+    personas: fixture.personas,
+    trustedHeaders,
+    deepLink,
+  }))
+    console.log(line);
 } catch (error) {
   console.error(
     "seed:demo failed:",

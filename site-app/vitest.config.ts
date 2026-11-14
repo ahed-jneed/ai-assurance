@@ -20,6 +20,8 @@ const include = [
   "hooks/**/*.test.ts",
   // Unit tests of the e2e tooling; Playwright runs only e2e/*.spec.ts.
   "e2e/**/*.test.ts",
+  // Unit tests of the scripts' pure helpers (the harnesses run on their own).
+  "scripts/**/*.test.ts",
 ];
 // Tests of local-calendar defaults run in a time zone east of UTC, where
 // the local date changes before the UTC date does.
@@ -34,6 +36,12 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // lib/test-d1.ts backs fake D1 bindings with node:sqlite, and Node 22
+    // prints "SQLite is an experimental feature" once per worker that loads
+    // it. Production never loads node:sqlite, so the warning is noise here.
+    // This hides ExperimentalWarning only in test workers; every other
+    // warning type still prints.
+    execArgv: ["--disable-warning=ExperimentalWarning"],
     projects: [
       {
         extends: true,

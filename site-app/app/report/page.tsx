@@ -1,11 +1,9 @@
-import { forbidden, notFound } from "next/navigation";
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
+import { answerPrintFailure } from "@/app/print-failure";
 import { sanitize } from "@/lib/client-projection";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
-import { setResponseStatus } from "@/lib/response-status";
 import { context } from "@/lib/tenancy";
-import { reportRefusal } from "./refusal";
 import { reportMarkup, type ReportSnapshot } from "./report-markup";
 export const dynamic = "force-dynamic";
 export default async function ReportPage({
@@ -27,7 +25,6 @@ async function reportBody(params: Record<string, string | undefined>) {
         ),
       ),
   );
-  let refusal: ApiError;
   try {
     const ctx = await context(params.tenantId),
       engagement = await getEngagement(ctx, params.engagementId ?? ""),
@@ -42,28 +39,16 @@ async function reportBody(params: Record<string, string | undefined>) {
       ctx.tenantId,
     );
   } catch (error) {
-    if (!(error instanceof ApiError)) {
-      // A report that cannot be rendered is a server failure, not a refusal
-      // (#216): log it and answer 500 with the same fallback.
-      console.error("The /report print view could not be rendered:", error);
-      setResponseStatus(500);
-      return unavailable();
-    }
-    refusal = error;
+    // The status /api/report-package gives for the same inputs (#209, #216,
+    // #220): 403 and 404 render the segment's forbidden.tsx and
+    // not-found.tsx; a damaged record (409, 503) or a report that cannot be
+    // rendered (500) is logged and answered with the fallback below.
+    answerPrintFailure(error, "/report");
+    return unavailable();
   }
-  // A refused report answers with the status /api/report-package gives for
-  // the same inputs (#209): 403 when access is denied, 404 for a missing,
-  // withdrawn or unreleased report. Both throw, so they stay outside the
-  // try block above; the segment's forbidden.tsx and not-found.tsx render.
-  // The 403 page shows the refusal's own message (#216).
-  if (refusal.status === 403) {
-    reportRefusal().message = refusal.message;
-    forbidden();
-  }
-  notFound();
 }
 
-/** The fallback for a report that exists but could not be rendered. */
+/** The fallback for a report that exists but could not be loaded. */
 function unavailable() {
   return (
     <main className="print-report">

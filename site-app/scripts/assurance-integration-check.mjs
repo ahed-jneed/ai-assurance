@@ -616,6 +616,24 @@ try {
     owner,
     409,
   );
+  // #220: an accepted .json file that is not JSON is the caller's file to
+  // correct (400 naming the file kind), not a server failure.
+  const notJsonId = await upload("not-json.json", "{not json", "Governance");
+  for (const [op, kind] of [
+    ["importBriefing", "briefing"],
+    ["importPacket", "assurance packet"],
+  ])
+    assert.equal(
+      (
+        await assurance(
+          op,
+          { artifactId: notJsonId, assessment: "Malformed JSON fixture" },
+          owner,
+          400,
+        )
+      ).error,
+      `This ${kind} file is not valid JSON`,
+    );
   console.log(
     "PASS assessment successor history, return/confirm decisions, signed source-packet compatibility and bounded unverified cited draft import",
   );
@@ -1623,10 +1641,33 @@ try {
     ).error,
     /stays in the client's environment/,
   );
+  // #220: an unknown job is not found; only a finished one is a conflict.
+  assert.equal(
+    (
+      await assurance(
+        "cancelJob",
+        { jobId: "JOB-missing", reason: "Unknown job fixture" },
+        owner,
+        404,
+      )
+    ).error,
+    "Job not found",
+  );
   await assurance("cancelJob", {
     jobId: firstClientJob.jobId,
     reason: "Download refusal fixture",
   });
+  assert.equal(
+    (
+      await assurance(
+        "cancelJob",
+        { jobId: firstClientJob.jobId, reason: "Second cancel fixture" },
+        owner,
+        409,
+      )
+    ).error,
+    "Job already completed or cancelled",
+  );
   const clientData = path.resolve("../tmp/client-data-fixture");
   await fs.rm(clientData, { recursive: true, force: true });
   await fs.rm(path.resolve("../tmp/assurance-client-worker-fixture"), {

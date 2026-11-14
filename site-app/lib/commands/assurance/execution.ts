@@ -378,13 +378,18 @@ export const execution: AssuranceModule = defineCommands({
     roles: ["Auditor", "Lead Auditor"],
     async handle({ e }, d, ctx) {
       const v = z.object({ jobId: short, reason: note }).strict().parse(d);
+      // A job id this engagement does not hold, whether unknown or another
+      // engagement's, is not found (404); only a job of this engagement that
+      // really is finished or cancelled is a conflict (409) (#220).
       const job = await db()
         .prepare(
-          "SELECT 1 FROM execution_jobs WHERE id=? AND tenant_id=? AND engagement_id=? AND state IN ('queued','running')",
+          "SELECT state FROM execution_jobs WHERE id=? AND tenant_id=? AND engagement_id=?",
         )
         .bind(v.jobId, ctx.tenantId, e.id)
-        .first();
-      if (!job) throw new ApiError(409, "Job already completed or cancelled");
+        .first<{ state: string }>();
+      if (!job) throw new ApiError(404, "Job not found");
+      if (job.state !== "queued" && job.state !== "running")
+        throw new ApiError(409, "Job already completed or cancelled");
       const log = await recordStatement(ctx, e.id, "execution_cancel", v);
       await save(
         ctx,

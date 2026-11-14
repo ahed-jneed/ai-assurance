@@ -1,6 +1,6 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
+import { answerPrintFailure } from "@/app/print-failure";
 import { ll144SummaryView } from "@/lib/read-models/ll144-summary";
-import { ApiError } from "@/lib/http";
 import { context } from "@/lib/tenancy";
 import { summaryMarkup } from "./summary-markup";
 export const dynamic = "force-dynamic";
@@ -11,6 +11,11 @@ export default async function Ll144SummaryPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const params = await searchParams;
+  // Called, not rendered as an element: a refusal then throws while the page
+  // itself renders, so the response status is set before anything streams.
+  return await summaryBody(params);
+}
+async function summaryBody(params: Record<string, string | undefined>) {
   const query = new URLSearchParams(
     Object.fromEntries(
       Object.entries(params).filter((v): v is [string, string] => !!v[1]),
@@ -27,14 +32,14 @@ export default async function Ll144SummaryPage({
       );
     return summaryMarkup(view, "/api/ll144-summary?" + query + "&download=1");
   } catch (error) {
+    // The status /api/ll144-summary gives for the same inputs, as /report
+    // does (#220): 403 renders forbidden.tsx with the refusal's own message,
+    // 404 not-found.tsx; anything else is logged and answered below.
+    answerPrintFailure(error, "/ll144-summary");
     return (
       <main className="print-report">
         <h1>Summary unavailable</h1>
-        <p>
-          {error instanceof ApiError
-            ? error.message
-            : "The summary could not be loaded."}
-        </p>
+        <p>The summary could not be loaded.</p>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full-page navigation back to the workspace */}
         <a href="/">Return to workspace</a>
       </main>
