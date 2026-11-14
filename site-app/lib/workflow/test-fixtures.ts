@@ -51,6 +51,12 @@ export const people: Record<string, Member> = {
   },
 };
 
+/** Display names of some fixture members; the others fall back to their id. */
+export const displayNames: Record<string, string> = {
+  auditor: "Avery Auditor",
+  reviewer: "Riley Reviewer",
+};
+
 let sequence = 0;
 const nextId = (prefix: string) => prefix + "-" + ++sequence;
 
@@ -79,6 +85,7 @@ export function context(userId: string): WorkflowContext {
     makePaper: (templateId) => templatePaper(templateId, userId),
     seedWorkflow: (at) => seedWorkflow(resolveNew(), userId, at),
     member: async (id) => people[id] ?? null,
+    displayName: async (id) => displayNames[id],
   };
 }
 

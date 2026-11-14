@@ -12,7 +12,11 @@
 // someone other than the declarant withdraws it.
 import type { AuditGate } from "../domain/gates";
 import type { Engagement } from "../domain/types";
-import type { Declaration, Workflow } from "../workflow-types";
+import {
+  acceptancePreconditions,
+  type Declaration,
+  type Workflow,
+} from "../workflow-types";
 
 /**
  * Whether the gate applies: to every workflow adopted or created since it
@@ -107,24 +111,89 @@ export const declarationMessages: Record<
     "A declaration predates a change to the engagement team and must be renewed",
 };
 
+/** The conflict a person's declarations raise against the engagement, if any. */
+export function declaredConflict(
+  w: Workflow,
+  userId: string,
+  period?: Period,
+): "excluded" | "threat" | undefined {
+  if (standingExclusions(w, userId).length) return "excluded";
+  const d = currentDeclaration(w, userId, period ?? engagementPeriod(w));
+  return d && unresolvedThreats(d).length ? "threat" : undefined;
+}
+
 /**
  * Why this person cannot be assigned to the engagement, if any: a
  * disqualifying relationship they declared in any period and nobody
  * withdrew, or a threat in their declaration for `period` (by default the
- * current one) that nobody has resolved.
+ * current one) that nobody has resolved. With `name` the reason names them.
  */
 export function assignmentConflict(
   w: Workflow,
   userId: string,
   period?: Period,
+  name = "This person",
 ) {
-  if (standingExclusions(w, userId).length)
-    return "This person declared a disqualifying relationship with the engagement and cannot be assigned";
-  const d = currentDeclaration(w, userId, period ?? engagementPeriod(w));
-  if (d && unresolvedThreats(d).length)
-    return "This person declared an unresolved independence threat; resolve it before assigning them";
+  const conflict = declaredConflict(w, userId, period);
+  if (conflict === "excluded")
+    return (
+      name +
+      " declared a disqualifying relationship with the engagement and cannot be assigned"
+    );
+  if (conflict === "threat")
+    return (
+      name +
+      " declared an unresolved independence threat; resolve it before assigning them"
+    );
   return undefined;
 }
+
+/**
+ * Why a Lead Auditor (`approverId`) cannot approve the acceptance record's
+ * current draft, if any, and the status the server refuses it with. The
+ * approval command and the acceptance panel's Approve button share it, so
+ * the button is disabled with the reason the server gives; a team member's
+ * conflict names them by `nameOf` (their display name).
+ */
+export function approvalRefusal(
+  w: Workflow,
+  approverId: string,
+  nameOf: (userId: string) => string = (id) => id,
+): { status: 400 | 409; message: string } | undefined {
+  const a = w.acceptance;
+  if (!a)
+    return { status: 400, message: "Record acceptance and continuance first" };
+  if (acceptancePreconditions.some((k) => !a.preconditions[k].met))
+    return {
+      status: 400,
+      message:
+        "Every ISAE 3000 precondition must be met before the engagement is accepted",
+    };
+  if (!a.team.includes(approverId))
+    return {
+      status: 400,
+      message: "Name yourself on the engagement team before accepting it",
+    };
+  // Whichever period it was declared for, an open threat or a standing
+  // relationship blocks acceptance.
+  for (const id of engagementTeam(w)) {
+    const conflict = declaredConflict(w, id);
+    if (conflict)
+      return {
+        status: 409,
+        message:
+          nameOf(id) +
+          (conflict === "excluded"
+            ? " declared a disqualifying relationship with the engagement; remove them from the team before accepting it"
+            : " declared an independence threat that nobody has resolved; resolve it before accepting the engagement"),
+      };
+  }
+  return undefined;
+}
+
+/** The team members whose declarations block acceptance (approvalRefusal). */
+export const conflictedTeam = (w: Workflow) =>
+  engagementTeam(w).filter((id) => declaredConflict(w, id));
 
 /**
  * What the Planning-exit gate still needs: the approved acceptance record,

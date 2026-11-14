@@ -15,7 +15,9 @@ import {
   type Workflow,
 } from "../workflow-types";
 import {
+  approvalRefusal,
   assignmentConflict,
+  conflictedTeam,
   currentDeclaration,
   engagementTeam,
   latestDeclaration,
@@ -24,6 +26,7 @@ import {
 } from "./acceptance";
 import {
   calendarDate,
+  type Context,
   fail,
   optional,
   short,
@@ -112,6 +115,10 @@ export function assignable(w: Workflow, userId: string, period?: Period) {
   if (conflict) fail(400, conflict);
 }
 
+/** A member's display name for a refusal, or their user id. */
+const nameOf = async (c: Context, userId: string) =>
+  (await c.displayName?.(userId)) || userId;
+
 export const acceptanceCommands: Record<string, WorkflowHandler> = {
   async saveAcceptance({ c, writer, lead, authorized, w }, data) {
     writer();
@@ -132,7 +139,9 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
     }
     for (const id of a.team) {
       await authorized(id, ["Auditor", "Lead Auditor", "Reviewer"]);
-      assignable(x, id, a);
+      // The refusal names the person, as the team checklist marks them.
+      if (assignmentConflict(x, id, a))
+        fail(400, assignmentConflict(x, id, a, await nameOf(c, id))!);
     }
     // An approved revision enters the history when a Lead revises it; drafts
     // are amended without entries.
@@ -160,22 +169,12 @@ export const acceptanceCommands: Record<string, WorkflowHandler> = {
       r = x.acceptance ?? fail(400, "Record acceptance and continuance first");
     if (r.status !== "draft" || r.revision !== a.revision)
       fail(409, "Review the current draft of the acceptance record");
-    if (acceptancePreconditions.some((k) => !r.preconditions[k].met))
-      fail(
-        400,
-        "Every ISAE 3000 precondition must be met before the engagement is accepted",
-      );
-    if (!r.team.includes(c.userId))
-      fail(400, "Name yourself on the engagement team before accepting it");
-    // A Lead cannot accept an engagement while a declared threat is open or
-    // a declared relationship stands, whichever period it was declared for.
-    for (const id of engagementTeam(x)) {
-      if (assignmentConflict(x, id))
-        fail(
-          409,
-          "A team member declared an unresolved independence threat or a disqualifying relationship; resolve it before accepting the engagement",
-        );
-    }
+    // The acceptance panel's Approve button applies the same precondition
+    // (approvalRefusal), naming a conflicted team member the same way.
+    const names = new Map<string, string>();
+    for (const id of conflictedTeam(x)) names.set(id, await nameOf(c, id));
+    const refusal = approvalRefusal(x, c.userId, (id) => names.get(id) ?? id);
+    if (refusal) fail(refusal.status, refusal.message);
     r.approval = {
       userId: c.userId,
       at: c.at,

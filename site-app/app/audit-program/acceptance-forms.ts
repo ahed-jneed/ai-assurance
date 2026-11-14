@@ -4,6 +4,7 @@ import type { Engagement } from "@/lib/domain/types";
 import { canBeAssigned } from "@/lib/permissions";
 import {
   currentDeclaration,
+  declaredConflict,
   latestDeclaration,
 } from "@/lib/workflow/acceptance";
 import {
@@ -29,6 +30,12 @@ import {
 } from "./acceptance-labels";
 import type { Field, Form, WorkflowAct } from "./workflow-dialog";
 
+/** How the team checklist marks a person the server refuses to assign. */
+export const conflictMarks = {
+  excluded: "Cannot be assigned: declared a disqualifying relationship",
+  threat: "Cannot be assigned: unresolved independence threat",
+} as const;
+
 /** The form openers of the acceptance panel, for the engagement in `data`. */
 export function acceptanceForms({
   data,
@@ -51,10 +58,18 @@ export function acceptanceForms({
     const b = w.brief,
       people = data.people
         .filter((m) => m.status === "active" && canBeAssigned(m.role, "team"))
-        .map((m) => ({
-          value: m.user_id,
-          label: m.display_name + " · " + m.role,
-        }));
+        .map((m) => {
+          // Mark whom the server would refuse to put on the team, and why.
+          const conflict = declaredConflict(w, m.user_id);
+          return {
+            value: m.user_id,
+            label:
+              m.display_name +
+              " · " +
+              m.role +
+              (conflict ? " · " + conflictMarks[conflict] : ""),
+          };
+        });
     const fields: Field[] = [
       {
         name: "decision",

@@ -50,6 +50,12 @@ export type Context = {
     access_since?: string | null;
   } | null>;
   /**
+   * A practice member's display name, whatever their access to this
+   * engagement, so that a refusal names the person it concerns; absent or
+   * unknown, the refusal falls back to their user id.
+   */
+  displayName?: (userId: string) => Promise<string | null | undefined>;
+  /**
    * The readiness of the GenAI results that these evidence ids link
    * (lib/genai/store.ts); absent, no evidence id links one.
    */

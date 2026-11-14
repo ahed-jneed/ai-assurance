@@ -39,6 +39,15 @@ export const workflow: CommandModule = {
               )
               .bind(ctx.tenantId, uid, e.id)
               .first(),
+          displayName: async (uid) =>
+            (
+              await db()
+                .prepare(
+                  "SELECT display_name FROM memberships WHERE tenant_id=? AND user_id=?",
+                )
+                .bind(ctx.tenantId, uid)
+                .first<{ display_name: string | null }>()
+            )?.display_name,
           genaiReadiness: (ids) => linkedReadiness(ctx, e, ids),
         }),
       };

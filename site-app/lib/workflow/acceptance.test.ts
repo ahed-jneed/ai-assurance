@@ -317,7 +317,7 @@ describe("acceptance commands", () => {
     await expectFailure(
       approve(e),
       409,
-      "A team member declared an unresolved independence threat or a disqualifying relationship; resolve it before accepting the engagement",
+      "lead declared an independence threat that nobody has resolved; resolve it before accepting the engagement",
     );
     const d = workflowOf(e).declarations![0];
     // The declarant never evaluates their own threat.
@@ -556,7 +556,8 @@ describe("independence and competence declarations", () => {
         "lead",
       ),
       400,
-      threat,
+      // Named by user id: this fixture member has no display name.
+      "second-auditor declared an unresolved independence threat; resolve it before assigning them",
     );
     await expectFailure(
       command(
@@ -624,14 +625,16 @@ describe("independence and competence declarations", () => {
       { revision: workflowOf(e).acceptance!.revision, reason: "Accepted" },
       "lead",
     );
-  const conflicted =
-    "A team member declared an unresolved independence threat or a disqualifying relationship; resolve it before accepting the engagement";
+  // The refusal names the conflicted team member (#221).
+  const conflicted = (name = "Riley Reviewer") =>
+    name +
+    " declared a disqualifying relationship with the engagement; remove them from the team before accepting it";
 
   it("a renewal cannot clear a disqualifying relationship", async () => {
     const e = await accepted(["lead", "reviewer"]);
     await declare(e, "lead");
     await declare(e, "reviewer", { exclusions: ["employment"] });
-    await expectFailure(approve(e), 409, conflicted);
+    await expectFailure(approve(e), 409, conflicted());
     // Declaring again without the relationship is refused, so the gate, the
     // approval and the assignment check still see it.
     const removed =
@@ -647,7 +650,7 @@ describe("independence and competence declarations", () => {
       removed,
     );
     expect(workflowOf(e).declarations).toHaveLength(2);
-    await expectFailure(approve(e), 409, conflicted);
+    await expectFailure(approve(e), 409, conflicted());
     expect(declarationStatus(workflowOf(e), "reviewer")).toBe("excluded");
     await expectFailure(
       command(
@@ -701,7 +704,7 @@ describe("independence and competence declarations", () => {
       "Withdraw from the person's latest declaration",
     );
     await withdraw("employment", "lead");
-    await expectFailure(approve(e), 409, conflicted);
+    await expectFailure(approve(e), 409, conflicted());
     await withdraw("financial_interest", "second-lead");
     expect(d.exclusions).toEqual([]);
     expect(d.exclusionWithdrawals).toEqual([
@@ -733,10 +736,13 @@ describe("independence and competence declarations", () => {
     moved.periodEnd = "2026-10-31";
     const assign =
       "This person declared a disqualifying relationship with the engagement and cannot be assigned";
+    // Adding them to the acceptance team is refused with their name (#221).
+    const named =
+      "Avery Auditor declared a disqualifying relationship with the engagement and cannot be assigned";
     await expectFailure(
       command(e, "saveAcceptance", moved, "auditor"),
       400,
-      assign,
+      named,
     );
     // The Lead moves it instead (with someone else on the team); the
     // Auditor's relationship carries over to the new period.
@@ -753,7 +759,7 @@ describe("independence and competence declarations", () => {
     await expectFailure(
       command(e, "saveAcceptance", moved, "lead"),
       400,
-      assign,
+      named,
     );
     await expectFailure(
       command(
@@ -771,7 +777,7 @@ describe("independence and competence declarations", () => {
     await declare(e, "auditor", { exclusions: ["employment"] });
     expect(w.declarations!.at(-1)!.periodEnd).toBe("2026-10-31");
     w.acceptance!.team = ["lead", "auditor"];
-    await expectFailure(approve(e), 409, conflicted);
+    await expectFailure(approve(e), 409, conflicted("Avery Auditor"));
     // Back to the first period: the stale declaration there does not matter
     // once someone else withdraws the relationship from the latest one.
     await command(
@@ -806,8 +812,10 @@ describe("independence and competence declarations", () => {
     await declare(e, "reviewer", { threats: [familiarity] });
     const dropped =
       "A renewal cannot drop an independence threat nobody has resolved; a Lead Auditor or Reviewer other than you evaluates it";
+    const threatened =
+      "Riley Reviewer declared an independence threat that nobody has resolved; resolve it before accepting the engagement";
     await expectFailure(declare(e, "reviewer", { threats: [] }), 409, dropped);
-    await expectFailure(approve(e), 409, conflicted);
+    await expectFailure(approve(e), 409, threatened);
     // Restating the threat is allowed; it stays unresolved.
     const restated = { ...familiarity, description: "Eleven years" };
     await declare(e, "reviewer", { threats: [restated] });

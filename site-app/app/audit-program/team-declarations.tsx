@@ -49,7 +49,13 @@ export function DeclarationsTable({
   if (!declarants.length)
     return <p className="empty-result">Name the engagement team first.</p>;
   return (
-    <div className="workflow-table">
+    // Scrolls sideways on a narrow pane, so it takes focus (WCAG 2.1.1).
+    <div
+      className="workflow-table"
+      role="region"
+      aria-label="Team declarations"
+      tabIndex={0}
+    >
       <table className="compact-register">
         <thead>
           <tr>
@@ -167,7 +173,14 @@ export function CompetenceMatrix({
   name: (id: string) => string;
 }) {
   return (
-    <div className="workflow-table">
+    // The matrix scrolls sideways on a narrow pane, so it takes focus for
+    // keyboard scrolling (WCAG 2.1.1).
+    <div
+      className="workflow-table"
+      role="region"
+      aria-label="Competence matrix"
+      tabIndex={0}
+    >
       <table className="compact-register acceptance-matrix">
         <thead>
           <tr>

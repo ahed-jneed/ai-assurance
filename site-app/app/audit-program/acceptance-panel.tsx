@@ -11,6 +11,7 @@ import { DecisionButton } from "../workspace/decision-button";
 import type { Engagement, Role } from "@/lib/domain/types";
 import {
   acceptancePrompt,
+  approvalRefusal,
   currentDeclaration,
   engagementTeam,
 } from "@/lib/workflow/acceptance";
@@ -44,9 +45,8 @@ export function AcceptancePanel({
     data.people.find((m) => m.user_id === id)?.display_name ?? id;
   const team = engagementTeam(w),
     prompt = acceptancePrompt(e),
-    unmet = a
-      ? acceptancePreconditions.filter((k) => !a.preconditions[k].met)
-      : [];
+    // The server's own precondition for approving, with its reason.
+    refusal = approvalRefusal(w, uid, name);
 
   const {
     acceptanceForm,
@@ -195,18 +195,18 @@ export function AcceptancePanel({
           {a ? "Revise acceptance" : "Record acceptance"}
         </DecisionButton>
         {lead && a?.status === "draft" && (
-          <Button
+          <DecisionButton
             variant="outline"
-            disabled={busy || unmet.length > 0}
-            title={
-              unmet.length
-                ? "Every precondition must be met before acceptance"
-                : undefined
+            state={
+              refusal
+                ? { allowed: false, reason: refusal.message }
+                : { allowed: true }
             }
+            disabled={busy}
             onClick={approveForm}
           >
             Approve acceptance
-          </Button>
+          </DecisionButton>
         )}
       </div>
       <h3>Team declarations</h3>
