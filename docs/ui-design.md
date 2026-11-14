@@ -1,5 +1,7 @@
 # Workspace redesign — 6 October 2026
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 The workspace uses Notion-inspired database and document patterns. The design guidance is Anthropic's official [frontend-design skill](https://github.com/anthropics/skills/tree/main/skills/frontend-design), installed from the vendor repository. The interaction reference is Notion's [database views documentation](https://www.notion.com/help/views-filters-and-sorts).
 
 ## Design decisions

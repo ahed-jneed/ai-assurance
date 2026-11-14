@@ -1,3 +1,9 @@
+-- SUPERSEDED v0 DESIGN (labelled 14 Nov 2026, decision D-13 in docs/product/decisions.md).
+-- The platform stays on Cloudflare D1 with the engagement aggregate; the live
+-- schema is site-app/db/schema.ts with the migrations in site-app/drizzle/.
+-- This file was never deployed, lags the hosted model, and the RLS tests it
+-- once claimed were never committed (F-78). Kept for reference only.
+--
 -- Initial PostgreSQL migration baseline. Apply once to an empty database using
 -- a migration owner; never execute on application startup. This is a reference
 -- schema, not a deployed production migration/authorization service.

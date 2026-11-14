@@ -1,5 +1,7 @@
 # Design: multi-framework criteria model with typed crosswalks
 
+> **Paths are historical.** This design cites `site-app` file paths as they were when it was written; several modules have since moved (for example `lib/domain.ts` to `lib/domain/` and `lib/workflow-service.ts` to `lib/workflow/dispatch.ts`). The [capability matrix](../capabilities.md#older-documents-and-historical-paths) maps them to the current layout.
+
 | | |
 |---|---|
 | Issue | #26 (design). Phase 1 is implemented by #27. |

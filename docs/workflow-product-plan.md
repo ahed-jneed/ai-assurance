@@ -1,5 +1,7 @@
 # Auditor workflow product plan — 7 October 2026
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 Implementation update: the seven connected workflows below are now implemented. See [the implementation record](audit-workflow-implementation.md) for shipped behavior, technical controls, validation and remaining operating boundaries. The sections below preserve the original product reasoning; they are not a claim that every future enterprise service is deployed.
 
 The product should let an auditor answer five questions from every work item: What am I doing? Why is it required? What information or evidence is needed? What decision is mine? What happens next?

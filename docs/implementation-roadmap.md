@@ -1,5 +1,7 @@
 # Implementation status and production acceptance roadmap
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 Baseline: 5 October 2026. The repository supplies a working control-plane prototype, reusable methodology templates, a local diagnostic runner, common contracts, a normalized PostgreSQL migration baseline and a production architecture specification. A deployable prototype is not yet an enterprise compliance service. Only capabilities demonstrated by code and tests should be described as implemented.
 
 The 7 October business/workflow increment adds auditor-recorded evidence requests, explicit sufficiency decisions, mandatory limitation memos and stricter final readiness checks. See [the current business completeness review](audit-business-completeness.md) for implemented versus remaining operational capabilities and prioritized acceptance criteria.

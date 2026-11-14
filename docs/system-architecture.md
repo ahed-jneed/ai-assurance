@@ -1,5 +1,7 @@
 # AI Assurance platform — production architecture
 
+> **Superseded as a plan (14 Nov 2026).** This October 2026 target architecture (PostgreSQL, an OIDC control plane, KMS) was not built: the platform stays on Cloudflare D1 with the engagement aggregate ([decision D-13](product/decisions.md)). For what the platform does now, see the [capability matrix](capabilities.md) and the [codebase map](engineering/codebase-map.md); the controls below remain useful as production requirements.
+
 Design baseline: 5 October 2026. This document describes the target production system. The runnable application in this repository is a control-plane reference implementation; the controls and services below must pass the acceptance gates in `implementation-roadmap.md` before production use.
 
 The platform manages evidence, testing and independent audit decisions for traditional ML. A diagnostic threshold result is evidence about a defined population and method. It is not an EU AI Act compliance decision, conformity assessment, certification, or legal opinion. Applicability, sufficiency of evidence, residual risk and the engagement conclusion require identified human reviewers.

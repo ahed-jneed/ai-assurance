@@ -1,5 +1,7 @@
 # Technical advancement for the external AI auditor
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 Assessment: 7 October 2026. This analysis treats the external AI auditor as an independent professional assessing a client's AI system. An AI assistant is a supporting component with its own controls. Recommendations below are proposed capabilities, not newly deployed services. The assessment uses the current application and external engine source; it does not establish the deployed infrastructure's security or operating effectiveness.
 
 The product objective is to let an auditor independently collect, reproduce, challenge and explain evidence, then hand over an audit file that remains verifiable after access to the platform ends. The existing engagement workflow is a useful foundation. The largest gains now come from execution, evidence quality and verification.

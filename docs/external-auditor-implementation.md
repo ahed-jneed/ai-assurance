@@ -1,5 +1,7 @@
 # External auditor implementation and operator setup
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 Implementation record: 8 October 2026. This document describes the delivered application and portable tools, alongside the operator work needed to use external execution and optional model assistance. It updates the capability status of the earlier [technical advancement assessment](external-auditor-technical-advancement.md); it does not replace the audit methodology, approve a legal interpretation or attest the deployed infrastructure.
 
 The platform supports an independent auditor's working process: establish scope, select procedures, collect permitted evidence, perform or commission diagnostics, assess sufficiency, document findings, obtain independent review and hand over a verifiable audit file. Automation prepares evidence and draft working papers. It does not decide conformity, approve a source as truthful or discharge an actor's obligations.

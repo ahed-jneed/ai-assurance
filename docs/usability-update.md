@@ -1,5 +1,7 @@
 # Usability restructure — 5 October 2026
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 The platform now separates practice management from the work inside an audit.
 
 ## Client and engagement flow

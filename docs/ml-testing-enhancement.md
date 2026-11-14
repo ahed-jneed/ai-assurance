@@ -1,5 +1,7 @@
 # ML registration and testing enhancement
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 Design and delivery scope: 7 October 2026. This document describes the registration, reusable evaluation and traceability increment. It is an implementation contract and acceptance specification, not an execution log or a declaration of regulatory compliance. Capability claims in a released build must agree with its enabled routes and verified tests.
 
 ## 1. Analysis and design decisions

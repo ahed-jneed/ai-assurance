@@ -1,5 +1,7 @@
 # GenAI evaluation evidence: ingestion, per-item schema, evidence levels and recomputation
 
+> **Paths are historical.** This design cites `site-app` file paths as they were when it was written; several modules have since moved (for example `lib/domain.ts` to `lib/domain/` and `lib/workflow-service.ts` to `lib/workflow/dispatch.ts`). The [capability matrix](../capabilities.md#older-documents-and-historical-paths) maps them to the current layout.
+
 | | |
 |---|---|
 | Issue | #31 (milestone M2, "Multi-framework and GenAI evidence") |

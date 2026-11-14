@@ -1,5 +1,7 @@
 # Connected audit workflow — implemented 7 October 2026
 
+> **Superseded for status (14 Nov 2026).** This is a dated record of an earlier increment, kept as written. For what the platform does now, see the [capability matrix](capabilities.md) and [ROADMAP.md](../ROADMAP.md); file paths, counts and limits below are as they were when this was written ([historical paths](capabilities.md#older-documents-and-historical-paths)).
+
 The hosted workspace now implements the seven business workflows described in `workflow-product-plan.md`. The primary work surface is **Audit program**. Planning, Fieldwork, Evidence evaluation, Reporting and Sign-off remain the engagement lifecycle. The new work spine does not add seven competing navigation modules.
 
 ## What auditors can complete

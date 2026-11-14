@@ -6,6 +6,35 @@
 > - **Finding ids (F-xx)** come from the review's findings table, which is not reproduced here. Most roadmap issues quote the ids they fix, and [ROADMAP.md](../../ROADMAP.md) names the findings placed in issues on 5 November 2026 and those deferred to Later.
 > - **Counts, sizes and limits** (85 KB files, 17 tables, a 1.5 MB engagement body and so on) describe `74c6463` and will drift. The rules in section 3 are the review's recommendations for parallel work; where an issue says otherwise, the issue wins.
 > - **Edits to the review's text.** Apart from the renumbering, twelve lines differ from the review. Nine pointed to review sections not reproduced here (3, 5 and 6.5) or to its Wave 0 and Wave 1 plan; they now point to the README, to the note above, or to the issue or PR that does the work. Three gained issue references: the `hosting.json` setup step, and the `lib/domain.ts` and `lib/workflow-service.ts` rows of section 3.2. The `---` rules between the review's sections were dropped.
+> - **Kept current since.** Later PRs updated the descriptions of behaviour they changed (identity, roles, permissions, storage, flows). On 14 Nov 2026 ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38)) the module paths were brought up to the layout after the barrel deletions of [#70](https://github.com/ahed-jneed/ai-assurance/issues/70) and [#37](https://github.com/ahed-jneed/ai-assurance/issues/37) and the screen splits of [#64](https://github.com/ahed-jneed/ai-assurance/issues/64); section 0 below lists that layout. Sizes and counts quoted "at `74c6463`" remain historical, and the hot-file rules of section 3.2 record how the parallel work was organised.
+
+## 0. Module layout on `main` (14 Nov 2026)
+
+Paths are relative to `site-app/`. The [capability matrix](../capabilities.md) maps each capability to its modules and tests.
+
+| Area | Modules |
+|---|---|
+| Worker entry and identity | `build/sites-worker.ts` (Worker entry, wraps requests in the Sites connector binding), `build/sites-vite-plugin.ts` (dev sign-in), `lib/identity.ts` (identity modes), `lib/cloudflare-access.ts`, `lib/auth-paths.ts` |
+| HTTP, tenancy and persistence | `lib/http.ts` (`readBounded`, `checkOrigin`, errors), `lib/tenancy.ts` (`context`, `requireRole`, `requireAdmin`, provisioning, sign-in recording), `lib/engagement-repo.ts` (`getEngagement`, `save`), `lib/engagement-storage.ts` (R2 blobs), `lib/factories.ts`, `lib/ids.ts` (`id`, `now`, `sha256`), `lib/bindings.ts` (`db`, `bucket`). The `lib/store.ts` barrel is gone ([#70]) |
+| Routes | `app/api/*/route.ts`: `workspace`, `assurance`, `management`, `evidence`, `client-submission`, `report-package`, `dossier` (and `dossier/keys`), `coverage`, `audit-trail`, `access-log`, `ll144-summary`, `work-inbox`, `workspace-state`, `evaluation/dataset`, `operator`, `runner` |
+| Commands (every POST op) | `lib/commands/*.ts` (`/api/workspace`), `lib/commands/assurance/**` (`/api/assurance`), `lib/commands/management/**` (`/api/management`); each a `defineCommands({ op: { roles, handle } })` handler, with dispatcher tests that pin the op sets and roles |
+| Read models (GET) | `lib/read-models/**`: workspace, assurance, coverage, GenAI, LL144 summary, audit trail, Access log |
+| Domain | `lib/domain/` (`types.ts`, `classification.ts`, `risk.ts`, `gates.ts`, `report-model.ts`, `report-gates.ts`, `quality-review.ts`, `management-system.ts`, `art50-papers.ts`, `release-time.ts`). The `lib/domain.ts` barrel is gone ([#37]); import from the owning module |
+| Workflow | `lib/workflow/` (`brief-program.ts`, `procedures.ts`, `acceptance.ts`, `client-grants.ts`, `finding-assurance.ts`, `monitoring.ts`, `report-release.ts`, `command.ts`), with `lib/workflow/dispatch.ts` (`workflowOps`, `workflowCommand`), which replaced `lib/workflow-service.ts` ([#37]); `lib/workflow-state.ts`, `lib/workflow-types.ts`, `lib/workflow-seed.ts` |
+| Other domain modules | `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/papers/`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts`, `lib/permissions.ts`, `lib/attestation.ts` |
+| Evaluation and statistics | `lib/diagnostics.ts`, `lib/evaluation.ts`, `lib/evaluation-service.ts`, `lib/statistics.ts`, `lib/hosted-statistics.ts`, `lib/dataset-card.ts`, `lib/special-category.ts`, `lib/ll144.ts` |
+| Criteria and GenAI | `lib/criteria/`, `lib/genai/` |
+| Assurance and signing | `lib/assurance-{core,packet,store,store-client,query,search}.ts`, `lib/dossier.ts`, `lib/dossier-scope.ts`, `lib/signing-keys.ts` |
+| Workspace UI | `app/workspace/` (shell, hooks, `modals/`, `views/`, navigation guards); the split screens `app/audit-program/`, `app/assurance-workbench/` and `app/testing-lab/` ([#64]: [#186], [#187], [#188], [#193]), whose former files `app/audit-program.tsx`, `app/assurance-workbench.tsx` and `app/testing-lab.tsx` are now entries that re-export them |
+| Storage | `db/schema.ts` (Drizzle declaration of every D1 table), `drizzle/0000`–`0017` |
+
+[#37]: https://github.com/ahed-jneed/ai-assurance/issues/37
+[#64]: https://github.com/ahed-jneed/ai-assurance/issues/64
+[#70]: https://github.com/ahed-jneed/ai-assurance/issues/70
+[#186]: https://github.com/ahed-jneed/ai-assurance/issues/186
+[#187]: https://github.com/ahed-jneed/ai-assurance/issues/187
+[#188]: https://github.com/ahed-jneed/ai-assurance/issues/188
+[#193]: https://github.com/ahed-jneed/ai-assurance/issues/193
 
 ## 1. Architecture map
 
@@ -13,10 +42,10 @@
 
 | Component | Where | Responsibility |
 |---|---|---|
-| Web UI | `site-app/app/*.tsx`: 39 client components; root is `app/workspace.tsx` (85 KB) | React 19 single-page app rendered by Vinext (Vite 8, rolldown, RSC). Navigation is state-driven across 14 views and mirrored to the URL. Components fetch `/api/*` themselves. Built on shadcn/Radix (18 of 61 vendored components are used) and 11 global stylesheets |
+| Web UI | `site-app/app/`: the shell in `app/workspace/` (at `74c6463`, one 85 KB `app/workspace.tsx` and 39 client components) | React 19 single-page app rendered by Vinext (Vite 8, rolldown, RSC). Navigation is state-driven across 14 views and mirrored to the URL. Components fetch `/api/*` themselves. Built on shadcn/Radix (18 of 61 vendored components are used) and 11 global stylesheets |
 | API | `site-app/app/api/*/route.ts`: 11 handlers | `workspace`: GET returns the aggregate view; POST is a command bus with about 26 inline ops plus the 32 `workflowCommand` ops and 6 `evidenceRequestCommand` ops it dispatches. Also `management`, `assurance` (22 ops), `evidence`, `client-submission`, `dossier`, `report-package`, `work-inbox`, `workspace-state`, `evaluation/dataset`, and `runner` (bearer token) |
-| Tenancy, authorization and persistence core | `lib/store.ts`, `lib/engagement-storage.ts` | `context()` maps identity to tenant, role, client and practice-admin flag, and auto-provisions new users. `getEngagement()` authorizes and hydrates. `save()` runs the compare-and-swap batch. `sanitize()` builds the client projection. Also `readBounded`, `checkOrigin`, `responseError` |
-| Audit domain | `lib/domain.ts`, `lib/workflow-{types,state,service,seed}.ts`, `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts` | The engagement aggregate, lifecycle gates, brief/program/procedure workflow, independence rules, report approval and release, monitoring |
+| Tenancy, authorization and persistence core | `lib/tenancy.ts`, `lib/engagement-repo.ts`, `lib/http.ts`, `lib/client-projection.ts`, `lib/engagement-storage.ts` (at `74c6463`, all in `lib/store.ts`) | `context()` maps identity to tenant, role, client and practice-admin flag, and auto-provisions new users. `getEngagement()` authorizes and hydrates. `save()` runs the compare-and-swap batch. `sanitize()` builds the client projection. Also `readBounded`, `checkOrigin`, `responseError` |
+| Audit domain | `lib/domain/`, `lib/workflow/` (dispatch in `lib/workflow/dispatch.ts`), `lib/workflow-{types,state,seed}.ts`, `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts` | The engagement aggregate, lifecycle gates, brief/program/procedure workflow, independence rules, report approval and release, monitoring |
 | Evaluation | `lib/diagnostics.ts`, `lib/evaluation.ts`, `lib/evaluation-service.ts`, `lib/dataset-card.ts`, `lib/testing-readiness.ts` | CSV diagnostics computed inside the Worker (binary, multiclass, regression, plus demographic parity, disparate impact and equalized odds); frozen run manifests |
 | Assurance and signing | `lib/assurance-{core,packet,store}.ts`, `lib/dossier.ts`, `lib/signing-keys.ts` | Append-only assurance records, an external job queue with fenced leases, and Ed25519-signed dossiers and briefing packets with wrapped practice keys (`docs/security/signing-keys.md`) |
 | Worker entry and build | `build/sites-worker.ts`, `build/sites-vite-plugin.ts`, `vite.config.ts`, `scripts/run-framework.mjs` | Worker fetch wrapper; dev-only mock sign-in; copies `hosting.json` and `drizzle/` into `dist/.openai` |
@@ -28,8 +57,10 @@
 
 ### 1.2 Diagram
 
+The request path at `74c6463`, with module names updated to section 0. Since then the Worker entry resolves identity through `lib/identity.ts` and strips untrusted `oai-*` headers ([#11](https://github.com/ahed-jneed/ai-assurance/issues/11)), and more routes exist (section 0).
+
 ```
-Browser: React 19 SPA (app/workspace.tsx + feature components)
+Browser: React 19 SPA (app/workspace/ shell + feature components)
    |  same-origin fetch /api/*  (JSON or multipart; every POST needs a matching Origin)
    v
 Identity in front of the Worker
@@ -43,13 +74,13 @@ Cloudflare Worker: build/sites-worker.ts -> vinext fetch handler   (no header fi
    app/api/ workspace  management  assurance  evidence  client-submission  dossier
             report-package  work-inbox  workspace-state  evaluation/dataset
    app/api/runner  <-- bearer token + HMAC, fenced 120 s leases -------------------+
-   lib/store.ts: context() / getEngagement() / save() / sanitize()                 |
-   lib/domain.ts  workflow-*.ts  evidence-requests.ts  diagnostics.ts              |
+   lib/tenancy.ts context() / engagement-repo.ts getEngagement(), save()           |
+   lib/domain/  lib/workflow/  lib/commands/  evidence-requests.ts  diagnostics.ts |
    evaluation-service.ts  assurance-*.ts  dossier.ts  engagement-storage.ts        |
         |                                    |                                     |
         v                                    v                                     |
-   D1 (SQLite): 17 tables,              R2: evidence bytes, content-addressed      |
-   drizzle/0000-0004, append-only       report/paper/run blobs, sealed dossiers,   |
+   D1 (SQLite): tables in db/schema.ts, R2: evidence bytes, content-addressed      |
+   drizzle/0000-0017, append-only       report/paper/run blobs, sealed dossiers,   |
    triggers, engagement JSON bodies     runner results                             |
                                                                                    |
 Python engine (operator host): engine/worker.py --- HTTPS pull --------------------+
@@ -86,11 +117,11 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 ### 1.4 Storage
 
-**D1: 17 tables** (`db/schema.ts`, migrations `drizzle/0000`–`0004`; no drift between schema and migrations):
+**D1** (`db/schema.ts` declares every table; migrations `drizzle/0000`–`0017`; at `74c6463` there were 17 tables and migrations `0000`–`0004`):
 
 | Group | Tables |
 |---|---|
-| Tenancy and access | `tenants` (version, last_command_id; `eqr_cooling_off_days` since `drizzle/0011`), `memberships` (role, client_id, status; identity `email` since `drizzle/0013`), `invitations`, `clients`, `practice_admins`, `engagement_access`, `engagement_access_history` (every grant change with the holder's role, written by triggers, immutable; since `drizzle/0011`), `engagement_access_policies` |
+| Tenancy and access | `tenants` (version, last_command_id; `eqr_cooling_off_days` since `drizzle/0011`), `memberships` (role, client_id, status; identity `email` since `drizzle/0013`), `invitations`, `clients`, `practice_admins`, `engagement_access`, `engagement_access_history` (every grant change with the holder's role, written by triggers, immutable; since `drizzle/0011`), `engagement_access_policies`, `sign_in_events` (members' recorded sign-ins for the Access log, append-only, kept 400 days; since `drizzle/0017`) |
 | Engagement aggregate | `engagements` (JSON body up to 1.5 MB, version), `engagement_snapshots` (full body on every save), `audit_events` (hash-chained), `management_events` (not chained) |
 | Assurance and execution | `assurance_records`, `execution_jobs`, `execution_attempts`, `runner_workers` (stores only the token's SHA-256), `dossier_keys` (private keys wrapped under the `DOSSIER_KEK` secret since `drizzle/0009`; retired keys keep only the public key) |
 | Per user | `personal_preferences`, `workspace_drafts` |
@@ -108,7 +139,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 ### 1.5 Identity and authorization
 
-**Production.** OpenAI Sites dispatch injects `oai-authenticated-user-id`, `-email` and (optionally) `-full-name`. `app/chatgpt-auth.ts` trusts these headers without any signature, JWT or session check, and the Worker entry passes them through unchanged. `context()` (`lib/store.ts`) then works as follows:
+**Production.** OpenAI Sites dispatch injects `oai-authenticated-user-id`, `-email` and (optionally) `-full-name`. `app/chatgpt-auth.ts` trusts these headers without any signature, JWT or session check, and the Worker entry passes them through unchanged. `context()` (`lib/tenancy.ts`; `lib/store.ts` at `74c6463`) then works as follows:
 1. Missing headers return 401.
 2. Without an active membership it first accepts the pending invitations for the user's email (`lib/invitations.ts`). If the user has no membership at all and self-signup is allowed (`SELF_SIGNUP`, open only on the development server by default; see `docs/security/identity.md`), it creates `tenant-<sha256(userId)[:24]>`, named after the user ("<name> practice"), with the user as Lead Auditor plus an "Example client" and engagement `ENG-default`; otherwise it returns 403. If the user has only revoked memberships, it returns 403 "access revoked" instead.
 3. It loads the active membership and records the identity email on it when it is missing or changed (#95).
@@ -181,7 +212,7 @@ A second identity is impossible in this mode: the mock strips inbound `oai-*` he
 4. Bootstrap the personas:
    1. Load `/` as `qa-lead`. This creates qa-lead's own practice, with qa-lead as Lead Auditor and practice admin.
    2. Create a client "Acme" and a structured engagement for it (flow 2).
-   3. In **Members & access → Add member**, grant each persona below by entering its id as the "Signed-in account ID". Do this *before* that persona makes its first request: `grantMember` does not require the user to exist, and a user who already has an active membership does not get a sandbox practice (`lib/store.ts:26-30`). For internal personas, tick the Acme engagement in the Audit access step; for client personas, choose client Acme.
+   3. In **Members & access → Add member**, grant each persona below by entering its id as the "Signed-in account ID". Do this *before* that persona makes its first request: `grantMember` does not require the user to exist, and a user who already has an active membership does not get a sandbox practice (`lib/store.ts:26-30` at `74c6463`; now `context()` in `lib/tenancy.ts`). For internal personas, tick the Acme engagement in the Audit access step; for client personas, choose client Acme.
 
    Note that `local_seedy` is an ordinary user id in this mode.
 
@@ -342,14 +373,14 @@ Paths are relative to `site-app/` unless they start with a root folder name.
 
 | Area | Owns |
 |---|---|
-| **A0 Platform, build and CI** | Root `.gitignore`, `.gitattributes`, `.github/**`, README run/verify sections. `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `next.config.ts`, `drizzle.config.ts`, `eslint.config.mjs`, `.prettierrc`, `.npmrc`, `components.json`, `postcss.config.mjs`. `build/connector-preview-*.mjs`, `scripts/{run-framework,execution-profile,install-ci,npm-install,sites-env,build-verified,install-pnpm,pnpm-install}.*`, `scripts/connector-preview/**`, `lib/connector*.{ts,mts}`, `examples/**`. Shared test infrastructure: `tests/integration/_harness.mjs`, `playwright.config.ts`, the e2e persona fixtures |
-| **A1 Identity, tenancy and access** | `app/chatgpt-auth.ts`, `build/sites-worker.ts`, `build/sites-vite-plugin.ts`. `lib/store.ts`, until split into `lib/{identity,tenancy,http}.ts`. `lib/permissions.ts` (new), `app/api/management/route.ts`, `app/management-views.tsx`, `app/member-onboarding.tsx` |
+| **A0 Platform, build and CI** | Root `.gitignore`, `.gitattributes`, `.github/**`, README run/verify sections. `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`, `next.config.ts`, `drizzle.config.ts`, `eslint.config.mjs`, `.prettierrc`, `.npmrc`, `components.json`, `postcss.config.mjs`. `build/connector-preview-*.mjs`, `scripts/{run-framework,execution-profile,install-ci,npm-install,sites-env,build-verified}.*`, `scripts/connector-preview/**`, `lib/connector-context.ts`, `lib/connector-contract.mts` (the Sites connector runtime, kept by decision D-44; `examples/` and the pnpm installer were removed by [#37](https://github.com/ahed-jneed/ai-assurance/issues/37)). Shared test infrastructure: `tests/integration/_harness.mjs`, `playwright.config.ts`, the e2e persona fixtures |
+| **A1 Identity, tenancy and access** | `app/chatgpt-auth.ts`, `build/sites-worker.ts`, `build/sites-vite-plugin.ts`. `lib/identity.ts`, `lib/tenancy.ts`, `lib/http.ts` (split from `lib/store.ts`). `lib/permissions.ts` (new), `app/api/management/route.ts`, `app/management-views.tsx`, `app/member-onboarding.tsx` |
 | **A2 Persistence, storage and read models** | `lib/engagement-repo.ts` (from store.ts), `lib/engagement-storage.ts`, `db/**`, `drizzle/**` (serialized), `lib/read-models/**` (GET of `api/workspace`), `app/api/work-inbox/route.ts`, `app/api/workspace-state/route.ts`, `app/api/evidence/route.ts`, `lib/workspace-state.ts` |
-| **A3 Audit workflow domain and command API** | `lib/domain.ts` (→ `lib/domain/**`), `lib/workflow-{types,state,service,seed}.ts` (→ `lib/workflow/**`), `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts`, `lib/commands/**` (POST of `api/workspace`), `app/api/client-submission/route.ts`, `app/api/report-package/route.ts` |
-| **A4 Evaluation and diagnostics** | `lib/diagnostics.ts`, `lib/evaluation.ts`, `lib/evaluation-service.ts`, `lib/dataset-card.ts`, `lib/testing-readiness.ts`, `lib/presentation.ts`, `app/testing-lab.tsx`, `app/dataset-registry.tsx`, `app/testing-readiness.tsx`, `app/procedure-context.tsx`, `app/api/evaluation/dataset/route.ts`, `public/example-predictions.csv` |
-| **A5 Assurance workbench, runner and signing** | `app/api/assurance/route.ts`, `app/api/runner/route.ts`, `app/api/dossier/route.ts`, `lib/assurance-{core,packet,store,store-client}.ts`, `lib/dossier.ts`, `lib/workbench-presentation.ts`, `app/assurance-workbench.tsx`, `app/assurance-record-details.tsx`, `app/assurance-register.tsx`, `app/dossier-controls.tsx`, `app/package-integrity.tsx` |
-| **A6 Workspace shell, navigation and design system** | `app/workspace.tsx` (→ `app/workspace/**`), `app/page.tsx`, `app/layout.tsx`, `app/workspace-navigation.tsx`, `app/workspace-search.tsx`, `app/workspace-types.ts` (→ `lib/api-types.ts`, co-owned with A3), `app/engagement-switcher.tsx`, `app/business-workspace.tsx`, `app/work-inbox.tsx`, `app/next-steps.tsx`, `app/database-toolbar.tsx`, `app/register-controls.tsx`, `app/recoverable-draft.tsx`, all `app/*.css`, `components/**`, `hooks/**`, `vendor/**`, `lib/{navigation-preferences,workspace-links,workspace-preferences,workspace-search,register-views,utils}.ts`, `public/*.svg` |
-| **A7 Engagement feature screens** (can be split into 7a program/papers and 7b evidence/findings/reports/client) | `app/audit-program.tsx` (→ `app/audit-program/**`), `app/audit-gates.tsx`, `app/audit-registers.tsx`, `app/engagement-overview.tsx`, `app/paper-{editor,register,evidence}.tsx`, `app/revision-comparison.tsx`, `app/evidence-{workspace,details,request-form,requests}.tsx`, `app/finding-{actions,forms}.tsx`, `app/record-details.tsx`, `app/report-{workspace,details}.tsx`, `app/report/page.tsx`, `app/client-portal.tsx`, `lib/{paper,evidence,report}-presentation.ts`, `lib/revision-comparison.ts` |
+| **A3 Audit workflow domain and command API** | `lib/domain/**` (was `lib/domain.ts`), `lib/workflow/**` with `lib/workflow/dispatch.ts` (was `lib/workflow-service.ts`), `lib/workflow-{types,state,seed}.ts`, `lib/evidence-requests.ts`, `lib/{paper,finding,auditor}-workflow.ts`, `lib/work-items.ts`, `lib/work-inbox.ts`, `lib/client-projection.ts`, `lib/report-package.ts`, `lib/commands/**` (POST of `api/workspace`), `app/api/client-submission/route.ts`, `app/api/report-package/route.ts` |
+| **A4 Evaluation and diagnostics** | `lib/diagnostics.ts`, `lib/evaluation.ts`, `lib/evaluation-service.ts`, `lib/dataset-card.ts`, `lib/testing-readiness.ts`, `lib/presentation.ts`, `app/testing-lab/**` (split from `app/testing-lab.tsx`, now its entry), `app/dataset-registry.tsx`, `app/testing-readiness.tsx`, `app/procedure-context.tsx`, `app/api/evaluation/dataset/route.ts`, `public/example-predictions.csv` |
+| **A5 Assurance workbench, runner and signing** | `app/api/assurance/route.ts`, `app/api/runner/route.ts`, `app/api/dossier/route.ts`, `lib/assurance-{core,packet,store,store-client}.ts`, `lib/dossier.ts`, `lib/workbench-presentation.ts`, `app/assurance-workbench/**` (split from `app/assurance-workbench.tsx`, now its entry), `app/assurance-record-details.tsx`, `app/assurance-register.tsx`, `app/dossier-controls.tsx`, `app/package-integrity.tsx` |
+| **A6 Workspace shell, navigation and design system** | `app/workspace/**` (was `app/workspace.tsx`), `app/page.tsx`, `app/layout.tsx`, `app/workspace-navigation.tsx`, `app/workspace-search.tsx`, `app/workspace-types.ts` (→ `lib/api-types.ts`, co-owned with A3), `app/engagement-switcher.tsx`, `app/business-workspace.tsx`, `app/work-inbox.tsx`, `app/next-steps.tsx`, `app/database-toolbar.tsx`, `app/register-controls.tsx`, `app/recoverable-draft.tsx`, all `app/*.css`, `components/**`, `hooks/**`, `vendor/**`, `lib/{navigation-preferences,workspace-links,workspace-preferences,workspace-search,register-views,utils}.ts`, `public/*.svg` |
+| **A7 Engagement feature screens** (can be split into 7a program/papers and 7b evidence/findings/reports/client) | `app/audit-program/**` (split from `app/audit-program.tsx`, now its entry), `app/audit-gates.tsx`, `app/audit-registers.tsx`, `app/engagement-overview.tsx`, `app/paper-{editor,register,evidence}.tsx`, `app/revision-comparison.tsx`, `app/evidence-{workspace,details,request-form,requests}.tsx`, `app/finding-{actions,forms}.tsx`, `app/record-details.tsx`, `app/report-{workspace,details}.tsx`, `app/report/page.tsx`, `app/client-portal.tsx`, `lib/{paper,evidence,report}-presentation.ts`, `lib/revision-comparison.ts` |
 | **A8 Python engine and worker** | `engine/**`, including the Dockerfile, requirements files, tests and examples |
 | **A9 Contracts, methodology and docs** | `schemas/**`, `templates/**`, `docs/**`, root `README.md` (except the run/verify sections), `db/postgres.sql`, `deliverables/**`. `site-app/lib/{catalog,annex-iv-map,obligation-subitems}.json` (generated copies), `site-app/public/tools/**` (generated), `site-app/reference/**` (to be deleted) |
 
@@ -357,12 +388,12 @@ Paths are relative to `site-app/` unless they start with a root folder name.
 
 | Hot file | Why it conflicts | Rule |
 |---|---|---|
-| `app/workspace.tsx` | 85 KB: every view, modal, route and handoff | Only A6 edits it until the split in [#5](https://github.com/ahed-jneed/ai-assurance/issues/5). Other areas ask for hook-sized changes |
-| `app/api/workspace/route.ts` | About 60 ops plus the GET aggregate | Split into the command registry in [#4](https://github.com/ahed-jneed/ai-assurance/issues/4). After that, A3 owns POST and A2 owns GET |
-| `lib/store.ts` | Identity, persistence, projection and HTTP helpers in one file | Split in [#4](https://github.com/ahed-jneed/ai-assurance/issues/4), led by A1; A2 and A3 take their modules |
-| `lib/domain.ts`, `lib/workflow-types.ts` | Types and gates imported by every area | Additive changes only. A3 reviews every change. Gates move to their own file ([#6](https://github.com/ahed-jneed/ai-assurance/issues/6) splits `lib/domain.ts`) |
-| `lib/workflow-service.ts` | 32 ops in one file | Split per aggregate in [#6](https://github.com/ahed-jneed/ai-assurance/issues/6) (A3) |
-| `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` | 35–50 KB each | Split by [#50](https://github.com/ahed-jneed/ai-assurance/issues/50) (the route, with `app/api/management/route.ts`) and [#64](https://github.com/ahed-jneed/ai-assurance/issues/64) (the three screens, last in M3); the review assigned them to A5, A7, A5 and A4 respectively |
+| `app/workspace.tsx` | 85 KB: every view, modal, route and handoff | Only A6 edits it until the split in [#5](https://github.com/ahed-jneed/ai-assurance/issues/5). Other areas ask for hook-sized changes. Done: split into `app/workspace/` ([PR #48](https://github.com/ahed-jneed/ai-assurance/pull/48)). |
+| `app/api/workspace/route.ts` | About 60 ops plus the GET aggregate | Split into the command registry in [#4](https://github.com/ahed-jneed/ai-assurance/issues/4). After that, A3 owns POST and A2 owns GET. Done: ops in `lib/commands/`, GET in `lib/read-models/workspace-view.ts` ([PR #41](https://github.com/ahed-jneed/ai-assurance/pull/41)). |
+| `lib/store.ts` | Identity, persistence, projection and HTTP helpers in one file | Split in [#4](https://github.com/ahed-jneed/ai-assurance/issues/4), led by A1; A2 and A3 take their modules. Done: split by #4, and the barrel deleted by [#70](https://github.com/ahed-jneed/ai-assurance/issues/70) ([PR #169](https://github.com/ahed-jneed/ai-assurance/pull/169)); see section 0. |
+| `lib/domain.ts`, `lib/workflow-types.ts` | Types and gates imported by every area | Additive changes only. A3 reviews every change. Gates move to their own file ([#6](https://github.com/ahed-jneed/ai-assurance/issues/6) splits `lib/domain.ts`). Done: `lib/domain/` modules ([PR #44](https://github.com/ahed-jneed/ai-assurance/pull/44)); the `lib/domain.ts` barrel is deleted by [#37](https://github.com/ahed-jneed/ai-assurance/issues/37) ([PR #196](https://github.com/ahed-jneed/ai-assurance/pull/196)). |
+| `lib/workflow-service.ts` | 32 ops in one file | Split per aggregate in [#6](https://github.com/ahed-jneed/ai-assurance/issues/6) (A3). Done: `lib/workflow/` modules ([PR #44](https://github.com/ahed-jneed/ai-assurance/pull/44)); the dispatch table moved to `lib/workflow/dispatch.ts` in [PR #196](https://github.com/ahed-jneed/ai-assurance/pull/196). |
+| `app/api/assurance/route.ts`, `app/audit-program.tsx`, `app/assurance-workbench.tsx`, `app/testing-lab.tsx` | 35–50 KB each | Split by [#50](https://github.com/ahed-jneed/ai-assurance/issues/50) (the route, with `app/api/management/route.ts`) and [#64](https://github.com/ahed-jneed/ai-assurance/issues/64) (the three screens, last in M3); the review assigned them to A5, A7, A5 and A4 respectively. Done: [PR #53](https://github.com/ahed-jneed/ai-assurance/pull/53) for the routes; [#186](https://github.com/ahed-jneed/ai-assurance/issues/186), [#187](https://github.com/ahed-jneed/ai-assurance/issues/187), [#188](https://github.com/ahed-jneed/ai-assurance/issues/188) and [#193](https://github.com/ahed-jneed/ai-assurance/issues/193) for the screens. |
 | `app/globals.css`, the sibling stylesheets, the import order in `app/layout.tsx` | Order-dependent cascade | A6 owns tokens and base styles. Feature styles live in per-area files |
 | `app/workspace-types.ts` | Hand-written API contract | Replace with `lib/api-types.ts`; changes go with the op that needs them |
 | `package.json`, `package-lock.json` | Every dependency change | A0 batches dependency changes. On rebase, regenerate the lock with `npm install --package-lock-only` rather than merging it by hand |
