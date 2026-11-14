@@ -1328,6 +1328,9 @@ Raw text never appears unless excerpts were enabled, and then only as inert text
 | `genai_agentic_permissions_unknown` | `tools.agentic` is true and any tool has permission `unknown` |
 | `genai_run_incomplete` | Reason `run_incomplete` |
 | `genai_flag_unacknowledged` | Post-run edits, a tool-aggregate mismatch, a declaration or family conflict, or a `deterministic` declaration of an `unknown` score, without a `genai_acknowledgement` |
+| `genai_marking_requirement_unmet` | A deciding `marking_presence` criterion sets `requireTrustedSigner`, and metadata marks in its sample would count but for a signer the C2PA validator did not trust (#233) |
+
+Marking criteria (`genai_marking`) pass the gate like every other criterion (#233). The engine names no run for them (`runKeys` is empty) because they are computed from every marking block, so the gate takes those blocks as their runs: the effective level is that of the marking evidence actually held (an imported envelope stays at L1 until a worker result authenticates it), and the claim scope states that marking criteria say whether outputs carry a mark or are detected, never anything about output quality.
 
 When there are no blockers, the claim-scope statements are inserted into the paper's results section, and the reviewer cannot remove them without reopening the paper.
 

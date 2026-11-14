@@ -72,6 +72,13 @@ export type GenaiCriterionSummary = {
   }[];
   members: GenaiMember[];
   membersOmitted: number;
+  /**
+   * A `marking_presence` criterion whose plan sets requireTrustedSigner
+   * (#128): the metadata marks in its pool that would count but for a signer
+   * the C2PA validator did not trust, or for metadata that names no trusted
+   * signer at all (engine `marking.metadata_valid`). Absent otherwise.
+   */
+  trustedSigner?: { untrusted: number };
 };
 export type GenaiRunSummary = {
   runKey: string;
@@ -299,7 +306,11 @@ export function genaiSummary(
       markingRecords: block.count,
       signedResults: verifiedSignatures(block.records),
     });
+  const planned = new Map(
+    plannedCriteria(c.plan.normalized).map((k) => [k.id, k]),
+  );
   const criteria: GenaiCriterionSummary[] = c.criteria.map((k) => ({
+    ...trustedSigner(k.kind, planned.get(k.id), c.marking),
     id: k.id,
     kind: k.kind,
     role: k.decision.role,
@@ -442,6 +453,103 @@ function markingScope(records: unknown[]) {
         `${signed} signed detection results: each signature verified against a key the frozen plan pins for the detection solution, and each result bound to the sampled output's SHA-256.`,
       ]
     : [];
+}
+
+type PlannedCriterion = {
+  id: string;
+  metric?: unknown;
+  stratum?: unknown;
+  requireTrustedSigner?: unknown;
+};
+const plannedCriteria = (normalized: unknown): PlannedCriterion[] => {
+  const list = (normalized as { criteria?: unknown } | null)?.criteria;
+  return Array.isArray(list)
+    ? list.filter(
+        (k): k is PlannedCriterion =>
+          typeof k === "object" && k !== null && typeof k.id === "string",
+      )
+    : [];
+};
+
+type MarkedRecord = {
+  groundTruth?: unknown;
+  stratum?: Record<string, unknown> | null;
+  metadata?: { present?: unknown; validationStatus?: unknown } | null;
+  watermark?: { decision?: unknown } | null;
+  c2pa?: {
+    validationState?: unknown;
+    failureCodes?: unknown;
+    aiAssertion?: unknown;
+  } | null;
+};
+// engine/genai/formats/marking.py FAILURE_SUFFIXES.
+const FAILURE_SUFFIXES = new Set([
+  "mismatch",
+  "missing",
+  "invalid",
+  "revoked",
+  "expired",
+  "untrusted",
+  "error",
+  "failure",
+  "malformed",
+  "outsideValidity",
+]);
+/**
+ * Whether a record's metadata mark counts as present, as the engine's
+ * `marking.metadata_valid` decides it without requireTrustedSigner, and
+ * whether it would still count with it.
+ */
+function metadataMark(r: MarkedRecord): { valid: boolean; trusted: boolean } {
+  const meta = r.metadata;
+  if (!meta || meta.present !== true) return { valid: false, trusted: false };
+  const c2pa = r.c2pa;
+  if (c2pa) {
+    const valid =
+      !(Array.isArray(c2pa.failureCodes) && c2pa.failureCodes.length) &&
+      c2pa.validationState !== "Invalid" &&
+      c2pa.aiAssertion === true;
+    return { valid, trusted: valid && c2pa.validationState === "Trusted" };
+  }
+  const codes = Array.isArray(meta.validationStatus)
+    ? meta.validationStatus
+    : [];
+  const valid = !codes.some(
+    (code) =>
+      typeof code === "string" &&
+      FAILURE_SUFFIXES.has(code.split(".").at(-1) ?? ""),
+  );
+  // Nothing outside a C2PA validator report establishes the signer.
+  return { valid, trusted: false };
+}
+
+function trustedSigner(
+  kind: string,
+  planned: PlannedCriterion | undefined,
+  marking: GenaiComputation["marking"],
+): Pick<GenaiCriterionSummary, "trustedSigner"> {
+  if (
+    kind !== "genai_marking" ||
+    planned?.metric !== "marking_presence" ||
+    planned.requireTrustedSigner !== true
+  )
+    return {};
+  // The engine's stratum filter: "key=value", partitioned at the first "=".
+  const stratum = typeof planned.stratum === "string" ? planned.stratum : "",
+    cut = stratum.includes("=") ? stratum.indexOf("=") : stratum.length,
+    key = stratum.slice(0, cut),
+    value = stratum.slice(cut + 1);
+  let untrusted = 0;
+  for (const block of marking)
+    for (const raw of block.records) {
+      const r = markingRecord(raw) as MarkedRecord;
+      if (r.groundTruth === "human_made") continue;
+      if (key && r.stratum?.[key] !== value) continue;
+      if (r.watermark?.decision === "marked") continue;
+      const mark = metadataMark(r);
+      if (mark.valid && !mark.trusted) untrusted += 1;
+    }
+  return { trustedSigner: { untrusted } };
 }
 
 /** Bytes of a summary as the record stores it. */
