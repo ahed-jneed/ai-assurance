@@ -4,7 +4,7 @@
 > - **Method:** desk research of assurance standards, professional bodies, regulators, research papers and audit-tool vendors, in the same planning session; primary sources where possible, secondary ones flagged in the text.
 > - **Verification limits:** as the brief's opening note says, the shared search budget ran out near the end, so some items are marked unverified or left out (for example the figures from the 2024 "Null Compliance" study of LL144).
 > - **Links (checked 5 November 2026):** 72 distinct links: 68 returned a page, 3 refused automated requests, 1 returned 404 (the Eticas guide, `eticasfoundation.org/wp-content/uploads/2024/04/ETICAS-Adversarial-Algorithmic-Auditing-Guide-2023.pdf`). A page that loads was not re-read for the claim it supports.
-> - **Local paths:** `C:\Users\Ahedj\Documents\dev\AI Assurance\` is the repository root at commit `74c6463`, so read those paths as repository-relative (for example `site-app/lib/diagnostics.ts`). Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
+> - **Paths:** repository-relative at commit `74c6463`. Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
 
 ---
 
@@ -142,7 +142,7 @@ Review notes, sign-offs and time capture are long-standing features of audit-man
    - Annex VII-style documentation assessment, for future notified bodies.
 
    Add a crosswalk across AI Act articles, EN 18286, ISO 42001 Annex A, NIST AI RMF and CSA's AI Controls Matrix, citing paywalled standards by clause number only. *Why:* high-risk deadlines moved to 2027 and 2028, and today's engagements use other criteria.
-3. **Fix the reporting model.** The `reportOpinions` list on line 9 of `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\audit-gates.tsx` has no unmodified ("clean") conclusion and does not distinguish limited from reasonable assurance. Add:
+3. **Fix the reporting model.** The `reportOpinions` list on line 9 of `site-app/app/audit-gates.tsx` has no unmodified ("clean") conclusion and does not distinguish limited from reasonable assurance. Add:
    - the assurance level, and whether the engagement is attestation or direct;
    - the report elements ISAE 3000 requires;
    - logic that separates an adverse conclusion from a disclaimer;
@@ -150,7 +150,7 @@ Review notes, sign-offs and time capture are long-standing features of audit-man
    - ISO nonconformity grading, DSA-style ratings and an LL144 summary generator.
 
    *Why:* without these the platform cannot produce a report that complies with the standards.
-4. **Add an acceptance and independence gate.** Replace the free-text "Competence and independence" field in `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\audit-program.tsx` with:
+4. **Add an acceptance and independence gate.** Replace the free-text "Competence and independence" field in `site-app/app/audit-program.tsx` with:
    - a preconditions checklist;
    - a declaration from each team member, including the LL144 tests;
    - a check for conflicts with non-assurance services;
@@ -161,7 +161,7 @@ Review notes, sign-offs and time capture are long-standing features of audit-man
 5. **Guard against templated files.** Make an engagement-specific risk assessment decide which papers apply. Require a written rationale for every sample size. Add a "tailoring report" that compares the engagement with the template and with the prior year. *Why:* this is exactly what AICPA peer reviewers now look for.
 
 **P1: depth of fieldwork**
-6. **Sampling and LL144 statistics.** Extend the existing seeded selector in `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\assurance-workbench.tsx` with:
+6. **Sampling and LL144 statistics.** Extend the existing seeded selector in `site-app/app/assurance-workbench.tsx` with:
    - calculators for attribute sample sizes and evaluation of deviations;
    - LL144 selection and scoring rates, including intersectional categories;
    - the 2% exclusion rule and counts of individuals in the "unknown" category;

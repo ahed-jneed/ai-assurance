@@ -4,7 +4,7 @@
 > - **Method:** desk research of the AI Act text, NIST publications, research papers, tool documentation and repositories, in the same planning session. The worked statistics in §2 were computed for the brief, and "Where the code stands today" was checked against the repository at `74c6463`.
 > - **Verification limits:** as the note under Sources says, the shared search budget ran out near the end; items marked "unverified" or "not re-checked" rely on prior knowledge or secondary trackers, and the LL144 definitions come from search extracts of the city's rule. **Out of date:** §1 says no AI Act standard is cited in the Official Journal (CEN-CENELEC status of 27 May 2026). EN 18286:2026 was cited in October 2026 (synthesis §2.5).
 > - **Links (checked 5 November 2026):** 70 distinct links: 68 returned a page, 2 refused automated requests, none returned 404. A page that loads was not re-read for the claim it supports.
-> - **Local paths:** `C:\Users\Ahedj\Documents\dev\AI Assurance\` is the repository root at commit `74c6463`, so read those paths as repository-relative (for example `site-app/lib/diagnostics.ts`). Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
+> - **Paths:** repository-relative at commit `74c6463`. Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
 
 ---
 
@@ -199,10 +199,10 @@ Inspect logs can be edited after a run, and the edits are recorded in `log_updat
 ## Implications for our platform
 
 **Where the code stands today (checked):**
-- `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\diagnostics.py` puts Wilson intervals on per-group rates, with minimums of 30 per group and 10 per class. The headline demographic parity, disparate impact and equalized odds figures are bare point estimates. `evaluate()` compares that point estimate directly with the frozen threshold.
-- `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\assurance.py` already offers `intersectional_slices`: up to five protected fields, with a seeded IID or cluster percentile bootstrap. But one stratum under 30 makes the whole result inconclusive, there is no multiplicity control, and the intervals do not drive pass/fail.
-- `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\diagnostics.ts` (the hosted runner) states "No confidence intervals are estimated". It defaults to minimums of 20 rows and 5 per class.
-- The fieldwork template (`C:\Users\Ahedj\Documents\dev\AI Assurance\templates\article-fieldwork.md`) asks for approval of metrics, reference group, threshold, minimums and uncertainty policy before the run. Nothing checks statistical power.
+- `engine/diagnostics.py` puts Wilson intervals on per-group rates, with minimums of 30 per group and 10 per class. The headline demographic parity, disparate impact and equalized odds figures are bare point estimates. `evaluate()` compares that point estimate directly with the frozen threshold.
+- `engine/assurance.py` already offers `intersectional_slices`: up to five protected fields, with a seeded IID or cluster percentile bootstrap. But one stratum under 30 makes the whole result inconclusive, there is no multiplicity control, and the intervals do not drive pass/fail.
+- `site-app/lib/diagnostics.ts` (the hosted runner) states "No confidence intervals are estimated". It defaults to minimums of 20 rows and 5 per class.
+- The fieldwork template (`templates/article-fieldwork.md`) asks for approval of metrics, reference group, threshold, minimums and uncertainty policy before the run. Nothing checks statistical power.
 - Nothing evaluates LLMs.
 - Dossiers are Ed25519-signed with a key held on the server. Runs have no standard attestation, external timestamp or transparency log.
 

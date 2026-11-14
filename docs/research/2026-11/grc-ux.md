@@ -297,7 +297,7 @@ Trust centers are pages where a vendor shares security documents with prospectiv
 2. **Public report verification.**
    - What: a page anyone can use to check a report ID or hash. It shows the firm, the signer, the issue date, the scope and the status (valid, superseded or withdrawn).
    - How: build on our signed dossiers and hash chain, and add RFC 3161 external timestamps.
-   - Why: it answers Delve-style fraud directly [42].
+   - Why: it answers concerns about templated or unverifiable reports, such as the unproven allegations against Delve, which it denies [42].
 3. **Guardrails that force tailoring.**
    - Require an engagement-specific risk assessment and sampling rationale before testing can start.
    - Check across the whole practice for repeated risk text, samples or conclusions.

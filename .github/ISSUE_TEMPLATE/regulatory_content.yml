@@ -1,0 +1,28 @@
+name: Regulatory content correction
+description: A regulatory, standards or legal mapping is wrong or out of date.
+labels: [regulatory-content]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The regulatory content in this repository is research, not legal advice, and is pending qualified legal review. Corrections must cite a primary source.
+  - type: input
+    id: location
+    attributes:
+      label: File and entry
+      description: For example `templates/catalog.json`, rule `LR-03`.
+    validations:
+      required: true
+  - type: textarea
+    id: correction
+    attributes:
+      label: What is wrong and what it should say
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Primary source
+      description: A link to the official legal text, guidance or standard clause.
+    validations:
+      required: true

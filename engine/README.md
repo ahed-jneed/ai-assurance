@@ -12,10 +12,10 @@ From the repository root:
 
 ```powershell
 python -m unittest discover -s engine/tests -v
-python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output engine/examples/report.json
+python -m engine --data engine/examples/predictions.csv --reference engine/examples/reference.csv --config engine/examples/config.json --output new-report.json
 ```
 
-If Python is not on PATH, use the executable returned by Codex's workspace dependency tool. The initial delivered report already exists; use a new output filename for another execution. An existing output is never overwritten. Each invocation needs a newly allocated run ID in production; the example ID is for demonstration only. `engine/examples/generate_fixture.py` regenerates the synthetic input fixtures.
+If Python is not on PATH, use a CPython 3.12 interpreter. `engine/examples/report.json` is the committed example output; use a new output filename for each execution. An existing output is never overwritten. Each invocation needs a newly allocated run ID in production; the example ID is for demonstration only. `engine/examples/generate_fixture.py` regenerates the synthetic input fixtures.
 
 ## Packaging: Python version and image
 

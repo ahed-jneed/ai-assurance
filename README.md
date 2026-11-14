@@ -4,6 +4,8 @@ A workspace for independent AI auditors: plan an engagement, test an AI system, 
 
 It is a reference implementation. Do not describe it as a certified or fully hardened compliance service: a diagnostic result is evidence for the auditor's judgement, not a conformity decision, and the legal content is pending qualified legal review (see [Status](#status)).
 
+> **Disclaimer.** This software supports professional auditors. It does not provide legal advice and does not determine legal compliance or conformity, and its outputs are not certifications. The regulatory content reflects research as of the dates stated in each source, and may be incomplete or out of date. Consult qualified counsel before relying on it.
+
 ## Who it is for
 
 Independent assessors: specialist AI-audit firms, the technology-assurance teams of audit and testing firms, and AI testing labs, who sign conclusions about AI systems and must defend them to reviewers, regulators and clients. The engagement team (Lead Auditor, Auditor, Reviewer and Engagement Quality Reviewer) works in the practice workspace; the client contributes evidence and reads released reports in a client portal. The [product direction](docs/product/direction.md) explains the choice.
@@ -150,6 +152,8 @@ Formatting-only commits are listed in `.git-blame-ignore-revs`. Run `git config 
 
 ## Current legal snapshot
 
+> Pending qualified legal review. This is not legal advice, and it may be out of date.
+
 Legal text: the consolidated version `02024R1689-20260727` of Regulation (EU) 2024/1689, in force since 27 July 2026 and the latest consolidation at the research date (5 November 2026; not re-checked in the 14 November refresh). Rule pack: revision `2026.11.2` (2026.11.1 plus the Art 50 research edits), researched 5 November 2026 and pending qualified legal review. Chapter III Sections 1–3, except Article 6(5), apply from 2 December 2027 for Article 6(2)/Annex III systems and 2 August 2028 for Article 6(1)/Annex I systems, subject to actor/provision/sector/transitional analysis; under Article 111(2) as replaced, a system already on the market before its route's date is covered only after a significant design change, and legacy systems used by public authorities must comply by 2 August 2030. From 2 December 2026 the new Article 5(1)(ba) and (bb) prohibitions apply, and providers of generative systems placed on the market before 2 August 2026 must comply with Article 50(2) (Article 111(4)). Transparency can overlap with high-risk duties. EN 18286:2026 is the only harmonised AI Act standard cited in the Official Journal (Implementing Decision (EU) 2026/2274, OJ L 14.10.2026); ISO/IEC 42001 gives no presumption of conformity. Article 4a and data-protection requirements must be reviewed before sensitive-category bias processing; a selected upload label is not authorization.
 
 Sources and detailed applicability: `docs/audit-methodology.md` and the rule pack (`regulatorySnapshot` in `templates/catalog.json`). The authentic amendment is [Regulation (EU) 2026/1744](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=OJ:L_202601744) (ELI `http://data.europa.eu/eli/reg/2026/1744/oj`).
@@ -179,3 +183,10 @@ At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has
 | [engine/README.md](engine/README.md) and the other `engine/*.md` files | The engine, worker, runtime package, GenAI ingestion and assurance CLIs |
 
 The dated documents in `docs/` from October 2026 (architecture, increments, UX updates, validation record) and `db/postgres.sql` describe earlier designs and are marked superseded; design and research documents cite file paths as they were when written ([docs/capabilities.md](docs/capabilities.md#older-documents-and-historical-paths) maps them to the current layout).
+
+## Contributing, security and licence
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) covers setup, checks and conventions.
+- [SECURITY.md](SECURITY.md) explains how to report a vulnerability privately.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Licensed under the [Apache License 2.0](LICENSE). Third-party material is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

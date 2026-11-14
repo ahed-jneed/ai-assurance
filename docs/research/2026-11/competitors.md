@@ -12,7 +12,7 @@
 ## 1. Bottom line
 
 - **The category is built around the AI owner.** "AI governance platforms" now combine an AI inventory, risk assessment, control mapping and evidence with runtime control of AI agents. Gartner's first Magic Quadrant for AI Governance Platforms (16 Jun 2026, 13 vendors) names IBM, ServiceNow and Truyo as Leaders [1].
-- **No vendor builds for the independent assessor.** Credo AI, Holistic AI, Trustible, Saidot and Monitaur all advertise "audit-ready" evidence and audit trails. None publicly offers the auditor's own workflow: client acceptance and independence, scoping and sampling, reviewed working papers, findings and issuing an opinion [2–6].
+- **No vendor builds for the independent assessor.** Credo AI, Holistic AI, Trustible, Saidot and Monitaur all advertise "audit-ready" evidence and audit trails. We found no public evidence that any of them offers the auditor's own workflow: client acceptance and independence, scoping and sampling, reviewed working papers, findings and issuing an opinion [2–6].
 - **Large suites are absorbing the runtime layers.** Security vendors bought most guardrail and red-team startups in 2025–26. On 3 Nov 2026 CrowdStrike agreed to buy Fiddler and is selling agent observability as "compliance and audit evidence" [7].
 - **Auditor demand is real but split across schemes:**
   - ISO/IEC 42001 certification
@@ -92,7 +92,7 @@ All vendors below sell to the AI owner. None targets auditors or regulators as p
 
 **Tools on the auditor side:**
 - **Optro (formerly AuditBoard)** is folding FairNow's AI registry and risk assessments into its GRC suite [38][39].
-- **Fieldguide** automates SOC, ISO and HITRUST engagements for firms such as Baker Tilly. Its own agents are ISO 42001 and AIUC-1 certified, but it has no methodology for testing AI systems [65–67].
+- **Fieldguide** automates SOC, ISO and HITRUST engagements for firms such as Baker Tilly. Its own agents are ISO 42001 and AIUC-1 certified, but we found no public material describing a methodology for testing AI systems [65–67].
 - **Vanta** packages EU AI Act and ISO 42001 frameworks [68].
 - **QuantPi** became TÜV SÜD's first "CARAT" partner lab (Oct 2026). It says a notified body recognises its test evidence, which comes with statistical confidence bounds [69].
 - **Validaitor** markets AI testing to testing, inspection and certification (TIC) firms [70].
@@ -100,7 +100,7 @@ All vendors below sell to the AI owner. None targets auditors or regulators as p
 
 ## 5. Feature matrix
 
-● = native or strong; ◐ = partial, or via a module or partner; ○ = not evident in public materials. The ratings are our judgment from the §4 sources.
+● = native or strong; ◐ = partial, or via a module or partner; ○ = not evident in public materials. The ratings are our judgment from the §4 sources. They reflect public materials as of 5 Nov 2026, may be incomplete or outdated, and are not statements of fact about any vendor's products.
 
 | | Inventory | Risk | EU AI Act / ISO 42001 / NIST mapping | Evidence | Testing of predictive models | LLM red-team / guardrails | Monitoring | Reporting / attestation | Vendor AI risk | Workflow for independent auditors |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -144,7 +144,6 @@ All vendors below sell to the AI owner. None targets auditors or regulators as p
 The web-search budget ran out before these could be confirmed:
 - ValidMind's "SR 26-2" reference.
 - Profiles of Warden AI and BABL AI.
-- A single-source claim that Thoma Bravo bought OneTrust, which I left out.
 - Credo AI's feature dates and the date of Fiddler's Lumeus purchase.
 - Details of Vanta's auditor portal.
 - FairNow's bias audits using synthetic data, which only a competitor claims.

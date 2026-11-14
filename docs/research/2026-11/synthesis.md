@@ -5,7 +5,7 @@
 > - **Verification limits:** as the "Verification limits" note at the end of §2 says, the session's web-search budget ran out and EUR-Lex returned empty pages to automated fetching, so everything dated after mid-2026, apart from the Commission timeline, rests on the research briefs, many of them on secondary sources. §2.5 lists the conflicts and single-source claims. Nothing here is legal advice: legal content is verified against primary sources in [#8](https://github.com/ahed-jneed/ai-assurance/issues/8) and labelled for qualified legal review in [#18](https://github.com/ahed-jneed/ai-assurance/issues/18) before the platform states it.
 > - **Links (checked 5 November 2026):** 154 distinct links: 146 returned a page, 8 refused automated requests, none returned 404. A page that loads was not re-read for the claim it supports.
 > - **Re-checked when this record was filed:** three §2.5 items now have primary sources. The Official Journal text of Implementing Decision (EU) 2026/2274 settles the EN 18286 citation date: the decision, dated 12 October 2026, was published on 14 October 2026, and 19 October was the date of the Commission's news item. The Federal Reserve's SR 26-2 letter (17 April 2026) confirms that it supersedes SR 11-7, and footnote 3 of the guidance attached to it puts generative and agentic AI models out of scope. The Justice Department's page confirms its 9 June 2026 opinion on the EEOC guidelines. The [direction's sources table](../../product/direction.md#sources-and-verification) lists every fact re-checked.
-> - **Local paths:** `C:\Users\Ahedj\Documents\dev\AI Assurance\` is the repository root at commit `74c6463`, so read those paths as repository-relative (for example `site-app/lib/diagnostics.ts`). Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
+> - **Paths:** repository-relative at commit `74c6463`. Line numbers predate the Prettier reformat in [#1](https://github.com/ahed-jneed/ai-assurance/issues/1).
 > - **Superseded planning detail:** the milestone names and dates in §4 predate the GitHub milestones. M3 is now "Release readiness", and many §4 epics moved to the Later list in [ROADMAP.md](../../../ROADMAP.md).
 
 ---
@@ -34,22 +34,22 @@
 7. **We do not build** AI discovery, runtime guardrails, LLM firewalls, MCP gateways, observability, policy management or vendor-risk modules.
 
 **Repository evidence key** (cited below as F1–F15)
-- F1: `C:\Users\Ahedj\Documents\dev\AI Assurance\templates\catalog.json`. Identical copies exist at `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\catalog.json` and `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\reference\templates\catalog.json`.
-- F2: `C:\Users\Ahedj\Documents\dev\AI Assurance\docs\audit-methodology.md`
-- F3: `C:\Users\Ahedj\Documents\dev\AI Assurance\docs\obligation-subitems.json`. Identical copies exist at `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\obligation-subitems.json` and `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\reference\docs\obligation-subitems.json`.
-- F4: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\workspace.tsx` (about 85 KB; many features touch it)
-- F5: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\domain.ts`
-- F6: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\audit-gates.tsx`
-- F7: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\audit-program.tsx`
-- F8: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\diagnostics.ts`
-- F9: `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\diagnostics.py` and `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\assurance.py`
-- F10: `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\model_diagnostics.py` and `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\optional_adapters.py`
-- F11: `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\registry_import.py`
-- F12: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\lib\dossier.ts`
-- F13: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\chatgpt-auth.ts`
-- F14: `C:\Users\Ahedj\Documents\dev\AI Assurance\site-app\app\api\workspace\route.ts` (about 42 KB; many features touch it)
-- F15: `C:\Users\Ahedj\Documents\dev\AI Assurance\engine\cited_assistant.py`
-- The repository has no `C:\Users\Ahedj\Documents\dev\AI Assurance\.github` directory, so there is no CI.
+- F1: `templates/catalog.json`. Identical copies exist at `site-app/lib/catalog.json` and `site-app/reference/templates/catalog.json`.
+- F2: `docs/audit-methodology.md`
+- F3: `docs/obligation-subitems.json`. Identical copies exist at `site-app/lib/obligation-subitems.json` and `site-app/reference/docs/obligation-subitems.json`.
+- F4: `site-app/app/workspace.tsx` (about 85 KB; many features touch it)
+- F5: `site-app/lib/domain.ts`
+- F6: `site-app/app/audit-gates.tsx`
+- F7: `site-app/app/audit-program.tsx`
+- F8: `site-app/lib/diagnostics.ts`
+- F9: `engine/diagnostics.py` and `engine/assurance.py`
+- F10: `engine/model_diagnostics.py` and `engine/optional_adapters.py`
+- F11: `engine/registry_import.py`
+- F12: `site-app/lib/dossier.ts`
+- F13: `site-app/app/chatgpt-auth.ts`
+- F14: `site-app/app/api/workspace/route.ts` (about 42 KB; many features touch it)
+- F15: `engine/cited_assistant.py`
+- At that commit the repository had no `.github` directory, so there was no CI (CI has since been added).
 
 ---
 
