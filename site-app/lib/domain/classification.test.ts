@@ -230,6 +230,49 @@ describe("unknown handling", () => {
     }
   });
 
+  // #201 item 9: the release verifier expected "Needs information" while any
+  // required fact is unknown and saw "High risk". That is #19's decided
+  // behaviour, unchanged since PR #97 (decision "GPAI roles and SME status
+  // are required for approval but do not change the risk label"): only facts
+  // that can still change the class (route, Art 5) hold the label at needs
+  // information. On a high-risk route an Art 50 answer cannot change the
+  // class either, as High risk outranks Specific transparency. Every other
+  // unknown fact blocks the approval, so the label stays provisional.
+  it("reads high risk on a high-risk route while a fact that cannot change the class is unknown, and blocks approval", () => {
+    const annexIII = "Annex III — sensitive use case";
+    const checked: string[] = [];
+    for (const def of factDefinitions(rules).filter(
+      (d) => d.required && !d.parent && !d.routes && d.role !== "deployer",
+    )) {
+      const c = record({
+        annexRoute: annexIII,
+        facts: { [def.id]: "unknown" },
+      });
+      expect(approvalBlockers(c, rules), def.id).toContain(def.label);
+      expect(c.status, def.id).toBe("provisional");
+      if (def.section === "art5")
+        expect(classify(c), def.id).toBe("Needs information");
+      else {
+        expect(classify(c), def.id).toBe("High risk");
+        checked.push(def.section);
+      }
+    }
+    // GPAI roles, SME status and the Art 50 provider facts are among them.
+    expect(checked).toEqual(
+      expect.arrayContaining(["gpai", "organisation", "art50Provider"]),
+    );
+    // The route itself still decides: an open Art 6(3) derogation without
+    // profiling is needs information, not high risk.
+    expect(
+      classify(
+        record({
+          annexRoute: derogationRoute,
+          facts: { art6_3Derogation: "unknown" },
+        }),
+      ),
+    ).toBe("Needs information");
+  });
+
   it("keeps an unanswered Art 5 practice from reading as high risk", () => {
     const c = record({
       annexRoute: "Annex III — sensitive use case",
