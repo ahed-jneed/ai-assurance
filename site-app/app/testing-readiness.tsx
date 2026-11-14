@@ -10,6 +10,7 @@ import {
 } from "@/lib/testing-readiness";
 import type { Engagement, Role } from "@/lib/domain";
 import type { AssuranceRecord } from "@/lib/assurance-core";
+import { predictionOptionLabel } from "./assurance-workbench/types";
 export function ExecutionPlanner({
   engagement: e,
   role,
@@ -221,7 +222,7 @@ export function ExecutionPlanner({
                     x.body.systemId === selection.systemId &&
                     x.body.datasetId === r.data?.id,
                 )
-                .map((x) => ({ id: x.id, label: x.body.version ?? x.id })),
+                .map((x) => ({ id: x.id, label: predictionOptionLabel(x, e) })),
             )
           )}
         </div>

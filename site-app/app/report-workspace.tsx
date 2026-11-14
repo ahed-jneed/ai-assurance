@@ -103,7 +103,12 @@ export function ReportWorkspace({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const state = latest ? packageStatus(latest) : "";
   const needsPackage = !latest || ["withdrawn", "superseded"].includes(state);
-  const activeStep = gates.length
+  // Once the latest final package is approved or released, the handoff
+  // follows that package: the capture gates of the terms selected below are
+  // about a new capture, not about it (#202).
+  const settled = state === "approved" || state === "released",
+    blocked = gates.length > 0 && !settled;
+  const activeStep = blocked
     ? 0
     : !latest || ["withdrawn", "superseded"].includes(state)
       ? 1
@@ -404,15 +409,13 @@ export function ReportWorkspace({
               key={label}
               aria-current={i === activeStep ? "step" : undefined}
               className={
-                i < activeStep ||
-                (i === 3 && state === "released" && !gates.length)
+                i < activeStep || (i === 3 && state === "released")
                   ? "complete"
                   : ""
               }
             >
               <span>
-                {i < activeStep ||
-                (i === 3 && state === "released" && !gates.length) ? (
+                {i < activeStep || (i === 3 && state === "released") ? (
                   <CheckCircle2 size={17} aria-hidden="true" />
                 ) : (
                   <Circle size={17} aria-hidden="true" />
@@ -424,15 +427,15 @@ export function ReportWorkspace({
         </ol>
         <div className="report-next-step">
           <div>
-            <span className={"badge " + (gates.length ? "amber" : "green")}>
-              {gates.length
+            <span className={"badge " + (blocked ? "amber" : "green")}>
+              {blocked
                 ? "Final capture blocked"
-                : !needsPackage && latest && state !== "internal"
+                : settled && latest
                   ? packageStatusLabel(latest)
                   : "Final capture available"}
             </span>
             <h2>
-              {gates.length
+              {blocked
                 ? next.title
                 : state === "released"
                   ? "The latest final package is released"
@@ -443,15 +446,15 @@ export function ReportWorkspace({
                       : "The audit is ready for a final snapshot"}
             </h2>
             <p>
-              {gates.length
+              {blocked
                 ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${termsLabel(terms).toLowerCase()}. Draft snapshots are available throughout the audit.`
-                : !needsPackage && latest && state !== "internal"
+                : settled && latest
                   ? packageGuidance(latest)
                   : "Package approval and client release remain separate recorded decisions."}
             </p>
           </div>
           <div className="row-actions">
-            {gates.length ? (
+            {blocked ? (
               <Button disabled={busy} onClick={() => onGate(next)}>
                 Resolve next requirement
                 <ArrowRight size={15} aria-hidden="true" />
