@@ -44,6 +44,7 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
+import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
 
@@ -583,11 +584,7 @@ export function GenaiEvidence({
           type: "select",
           options: (view?.plans ?? []).map((p) => ({
             value: p.id,
-            label:
-              p.id +
-              " · " +
-              (procedures.find((q) => q.id === p.procedureId)?.templateId ??
-                p.procedureId),
+            label: planOptionLabel(p, procedures),
           })),
         },
         {
@@ -596,7 +593,7 @@ export function GenaiEvidence({
           type: "select",
           options: (view?.bundles ?? []).map((b) => ({
             value: b.id,
-            label: b.id + " · " + b.inputArtifactIds.length + " inputs",
+            label: bundleOptionLabel(b),
           })),
         },
       ],
