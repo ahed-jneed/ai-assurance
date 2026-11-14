@@ -30,6 +30,7 @@ import { captureGates } from "@/lib/domain/capture-gates";
 import { reportRows, type RegisterQuery } from "@/lib/register-views";
 import {
   packageGuidance,
+  reportTime,
   packageOpenLabel,
   packageStatus,
   packageStatusLabel,
@@ -191,9 +192,11 @@ export function ReportWorkspace({
                 <p>{opinionLabel(r.snapshot)}</p>
                 <dl>
                   <div>
-                    <dt>Captured</dt>
+                    <dt>{reportTime(r).label}</dt>
                     <dd>
-                      <time dateTime={r.createdAt}>{date(r.createdAt)}</time>
+                      <time dateTime={reportTime(r).at}>
+                        {date(reportTime(r).at)}
+                      </time>
                     </dd>
                   </div>
                   <div>
@@ -269,7 +272,7 @@ export function ReportWorkspace({
                 <TableHead>Report package</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Opinion</TableHead>
-                <TableHead>Captured</TableHead>
+                <TableHead>{clientView ? "Released" : "Captured"}</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
                 </TableHead>
@@ -315,7 +318,9 @@ export function ReportWorkspace({
                   </TableCell>
                   <TableCell>{opinionLabel(r.snapshot)}</TableCell>
                   <TableCell>
-                    <time dateTime={r.createdAt}>{date(r.createdAt)}</time>
+                    <time dateTime={reportTime(r).at}>
+                      {date(reportTime(r).at)}
+                    </time>
                   </TableCell>
                   <TableCell>
                     <div className="report-row-actions">
@@ -449,7 +454,7 @@ export function ReportWorkspace({
               {blocked
                 ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${termsLabel(terms).toLowerCase()}. Draft snapshots are available throughout the audit.`
                 : settled && latest
-                  ? packageGuidance(latest)
+                  ? packageGuidance(latest, e)
                   : "Package approval and client release remain separate recorded decisions."}
             </p>
           </div>

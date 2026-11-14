@@ -1,6 +1,8 @@
 "use client";
 import { ArrowUpRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { monitoringClosureRefusal } from "@/lib/preconditions";
+import type { MonitoringCase } from "@/lib/workflow-types";
 import { area, choice, evidence, label, options } from "./fields";
 import type { ProgramScope } from "./program-scope";
 /** The follow-up tab: monitoring, change, incident and remediation cases. */
@@ -13,6 +15,12 @@ export function FollowupPanel({
 }) {
   const { e, w, uid, busy, writer, lead, reviewer, name } = scope,
     { monitoring, command } = scope.forms;
+  // Review closure is disabled with the server's reason (#210): the closer's
+  // independence first, then what the case still needs.
+  const closureBlocked = (m: MonitoringCase) =>
+    m.contributors.includes(uid) || m.ownerId === uid
+      ? "A preparer or contributor cannot approve their own work"
+      : (monitoringClosureRefusal(e, m)?.message ?? "");
   return (
     <section className="panel">
       <div className="panel-head">
@@ -122,8 +130,9 @@ export function FollowupPanel({
             {reviewer && m.state === "in_progress" && (
               <Button
                 variant="outline"
-                disabled={
-                  busy || m.contributors.includes(uid) || m.ownerId === uid
+                disabled={busy || !!closureBlocked(m)}
+                aria-describedby={
+                  closureBlocked(m) ? "closure-blocked-" + m.id : undefined
                 }
                 onClick={() =>
                   command(
@@ -137,6 +146,11 @@ export function FollowupPanel({
               >
                 Review closure
               </Button>
+            )}
+            {reviewer && m.state === "in_progress" && closureBlocked(m) && (
+              <p className="subtle" id={"closure-blocked-" + m.id}>
+                {closureBlocked(m)}
+              </p>
             )}
             {writer &&
               m.state === "closed" &&

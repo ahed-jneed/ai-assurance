@@ -8,10 +8,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Report, Role } from "@/lib/domain/types";
+import type { Engagement, Report, Role } from "@/lib/domain/types";
 import { releaseChecklist, releaseChecklistLines } from "@/lib/domain/gates";
 import { opinionLabel } from "@/lib/domain/report-model";
 import { packageGuidance, packageStatusLabel } from "@/lib/report-presentation";
+import { releaseApprovalMessage, releaseRefusal } from "@/lib/preconditions";
 import { isWithdrawable, releaseState } from "@/lib/workflow-state";
 import { can } from "@/lib/permissions";
 import { FrozenReportDetails } from "../report-details";
@@ -19,6 +20,7 @@ import { area, checklistOptions, choice, label, reason } from "./fields";
 import { WorkflowDialog, type Form, type WorkflowAct } from "./workflow-dialog";
 export function ReportRelease({
   report: r,
+  engagement,
   role,
   userId,
   busy,
@@ -28,6 +30,8 @@ export function ReportRelease({
 }: {
   reports: Report[];
   report: Report;
+  /** The engagement the server checks the release against (#210). */
+  engagement?: Engagement | null;
   role: Role;
   userId: string;
   busy: boolean;
@@ -38,7 +42,16 @@ export function ReportRelease({
     [form, setForm] = useState<Form | null>(null),
     state = releaseState(r),
     lead = can(role, "releaseReport"),
-    reviewer = can(role, "approveReportPackage");
+    reviewer = can(role, "approveReportPackage"),
+    // Release is disabled with the reason the server would refuse it with.
+    releaseBlocked =
+      state === "approved"
+        ? engagement
+          ? (releaseRefusal(engagement, r, userId)?.message ?? "")
+          : r.release?.approval?.userId === userId
+            ? releaseApprovalMessage
+            : ""
+        : "";
   return (
     <section className="release-controls">
       <div className="panel-head">
@@ -47,7 +60,7 @@ export function ReportRelease({
         </h3>
         <span className="badge neutral">{packageStatusLabel(r)}</span>
       </div>
-      <p className="subtle">{packageGuidance(r)}</p>
+      <p className="subtle">{packageGuidance(r, engagement ?? undefined)}</p>
       <div className="row-actions">
         <Button
           variant="outline"
@@ -118,7 +131,10 @@ export function ReportRelease({
           )}
         {lead && state === "approved" && (
           <Button
-            disabled={busy || r.release?.approval?.userId === userId}
+            disabled={busy || !!releaseBlocked}
+            aria-describedby={
+              releaseBlocked ? "release-blocked-" + r.id : undefined
+            }
             onClick={() =>
               setForm({
                 title: "Authorize client release",
@@ -174,6 +190,11 @@ export function ReportRelease({
           </Button>
         )}
       </div>
+      {lead && releaseBlocked && (
+        <p className="subtle" id={"release-blocked-" + r.id}>
+          {releaseBlocked}
+        </p>
+      )}
       {r.release?.approval && (
         <p className="subtle">
           Approved {new Date(r.release.approval.at).toLocaleString()} ·{" "}
