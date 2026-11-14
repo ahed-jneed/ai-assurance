@@ -14,7 +14,7 @@ const source = (path: string) =>
 const fetchJsonConsumers = [
   "app/assurance-record-search.tsx",
   "app/access-log.tsx",
-  "app/assurance-workbench.tsx",
+  "app/assurance-workbench/workbench.tsx",
   "app/audit-trail.tsx",
   "app/dataset-registry.tsx",
   "app/dossier-controls.tsx",
