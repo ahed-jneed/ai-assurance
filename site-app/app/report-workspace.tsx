@@ -29,6 +29,7 @@ import {
 import { captureGates } from "@/lib/domain/capture-gates";
 import { reportRows, type RegisterQuery } from "@/lib/register-views";
 import {
+  awaitingApproval,
   packageGuidance,
   reportTime,
   packageOpenLabel,
@@ -104,11 +105,15 @@ export function ReportWorkspace({
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const state = latest ? packageStatus(latest) : "";
   const needsPackage = !latest || ["withdrawn", "superseded"].includes(state);
-  // Once the latest final package is approved or released, the handoff
-  // follows that package: the capture gates of the terms selected below are
-  // about a new capture, not about it (#202).
+  // Once a final package is captured, the handoff follows that package: the
+  // capture gates of the terms selected below are about a new capture, not
+  // about it (#202, R1-19). They apply only before capture.
   const settled = state === "approved" || state === "released",
-    blocked = gates.length > 0 && !settled;
+    blocked = gates.length > 0 && needsPackage,
+    awaiting =
+      latest && state === "internal"
+        ? awaitingApproval(latest, role, userId)
+        : undefined;
   const activeStep = blocked
     ? 0
     : !latest || ["withdrawn", "superseded"].includes(state)
@@ -435,27 +440,33 @@ export function ReportWorkspace({
             <span className={"badge " + (blocked ? "amber" : "green")}>
               {blocked
                 ? "Final capture blocked"
-                : settled && latest
-                  ? packageStatusLabel(latest)
-                  : "Final capture available"}
+                : awaiting
+                  ? awaiting.badge
+                  : settled && latest
+                    ? packageStatusLabel(latest)
+                    : "Final capture available"}
             </span>
             <h2>
               {blocked
                 ? next.title
-                : state === "released"
-                  ? "The latest final package is released"
-                  : state === "approved"
-                    ? "The final package awaits client release"
-                    : !needsPackage && latest
-                      ? packageStatusLabel(latest)
-                      : "The audit is ready for a final snapshot"}
+                : awaiting
+                  ? awaiting.title
+                  : state === "released"
+                    ? "The latest final package is released"
+                    : state === "approved"
+                      ? "The final package awaits client release"
+                      : !needsPackage && latest
+                        ? packageStatusLabel(latest)
+                        : "The audit is ready for a final snapshot"}
             </h2>
             <p>
               {blocked
                 ? `${gates.length} ${gates.length === 1 ? "requirement remains" : "requirements remain"} for ${termsLabel(terms).toLowerCase()}. Draft snapshots are available throughout the audit.`
-                : settled && latest
-                  ? packageGuidance(latest, e)
-                  : "Package approval and client release remain separate recorded decisions."}
+                : awaiting
+                  ? awaiting.guidance
+                  : settled && latest
+                    ? packageGuidance(latest, e)
+                    : "Package approval and client release remain separate recorded decisions."}
             </p>
           </div>
           <div className="row-actions">

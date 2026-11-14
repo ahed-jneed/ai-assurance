@@ -1,6 +1,7 @@
 import type { Engagement, Report, Role } from "./domain/types";
 import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
+import { conclusionTypes, snapshotTerms } from "./domain/report-model";
 
 /**
  * The date a captured report states: its report date element, else the
@@ -82,6 +83,38 @@ export function packageGuidance(report: Report, engagement?: Engagement) {
     default:
       return "Approve both package versions before client release.";
   }
+}
+
+/**
+ * "Captured (Qualified)": a final package with the conclusion it was
+ * captured with (a legacy package: its recorded opinion).
+ */
+export function capturedLabel(report: Report) {
+  const t = snapshotTerms(report.snapshot),
+    opinion = t
+      ? // "Readiness assessment (not assurance)" reads without the aside.
+        conclusionTypes[t.conclusion].label.replace(/ \(not assurance\)$/, "")
+      : typeof report.snapshot.opinion === "string"
+        ? report.snapshot.opinion
+        : "";
+  return opinion ? "Captured (" + opinion + ")" : "Captured";
+}
+
+/**
+ * The Reports & sign-off banner for a captured final package awaiting
+ * approval (R1-19): it describes that package, not the capture gates of the
+ * terms selected for a new capture, and the next step for the viewer.
+ */
+export function awaitingApproval(report: Report, role: Role, userId: string) {
+  const label = capturedLabel(report);
+  const guidance = !can(role, "approveReportPackage")
+    ? can(role, "saveQualityReview")
+      ? "Sign off both exact package versions in Quality review. A Reviewer or Lead Auditor approves them before client release."
+      : "A Reviewer or Lead Auditor who did not capture it approves both package versions before client release."
+    : report.actor === userId
+      ? "A Reviewer or Lead Auditor other than you approves both package versions before client release."
+      : "Review both package versions and approve them for client release.";
+  return { badge: label, title: label + ", awaiting approval", guidance };
 }
 
 export function packageOpenLabel(report: Report, role: Role, userId: string) {
