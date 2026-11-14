@@ -9,7 +9,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { AssuranceRecord } from "@/lib/assurance-core";
-import { AssuranceRecordDetails } from "../assurance-record-details";
+import {
+  AssuranceRecordDetails,
+  recordSubtitle,
+} from "../assurance-record-details";
 import { recordTitle } from "../assurance-register";
 import type { Engagement } from "./types";
 
@@ -52,7 +55,9 @@ export function RecordDialog({
             {selected ? recordTitle(selected) : "Assurance record"}
           </DialogTitle>
           <DialogDescription>
-            Saved assessment and source history
+            {selected
+              ? recordSubtitle(selected)
+              : "Saved assessment and source history"}
           </DialogDescription>
         </DialogHeader>
         {selected && (

@@ -92,6 +92,7 @@ const labels: Record<string, string> = {
   periodAnalysis: "Application period analysis",
   excerpt: "Source observation",
   quality: "Source quality and limitations",
+  active: "Access",
   lineageAssurance: "Lineage assurance",
   originAssurance: "Origin assurance",
   conclusion: "Proposed assessment",
@@ -144,7 +145,21 @@ const labels: Record<string, string> = {
   eligibleCount: "Eligible population size",
   selected: "Selected population records",
   sizeMeaning: "Sample size meaning",
+  userId: "Team member",
 };
+
+/**
+ * The record dialog's subtitle for this kind of record (#234 item 5): an
+ * access decision is not a saved assessment.
+ */
+export function recordSubtitle(record: AssuranceRecord) {
+  return record.kind === "access_event"
+    ? "Engagement access granted or revoked, and why"
+    : "Saved assessment and source history";
+}
+
+/** Fields that hold a member's id, shown by the member's display name. */
+const personFields = new Set(["userId"]);
 
 function fieldLabel(key: string) {
   return (
@@ -227,7 +242,9 @@ export function AssuranceRecordDetails({
             ? "System revision"
             : record.kind === "location"
               ? "Source observation"
-              : "Diagnostic record";
+              : record.kind === "access_event"
+                ? "Access decision"
+                : "Diagnostic record";
   const successors = records.filter(
     (item) => item.body.supersedesId === record.id,
   );
@@ -367,6 +384,14 @@ export function AssuranceRecordDetails({
     if (value === null || value === undefined)
       return <p className="subtle">Not declared</p>;
     if (typeof value !== "object") {
+      if (personFields.has(key) && typeof value === "string")
+        return <p className="record-text">{person(value)}</p>;
+      if (
+        record.kind === "access_event" &&
+        key === "active" &&
+        typeof value === "boolean"
+      )
+        return <p className="record-text">{value ? "Granted" : "Revoked"}</p>;
       if (
         sourceContext &&
         typeof value === "string" &&
