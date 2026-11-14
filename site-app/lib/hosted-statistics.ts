@@ -663,11 +663,22 @@ export function explainResult(result: Result): string {
       ? `RMSE ${short(rmse, 3)} is not shown to beat ${short(base, 3)}, the RMSE of predicting the mean of the reference values on every row, so the model is not shown to be better than a constant prediction.`
       : "The model is not shown to beat predicting the mean of the reference values on every row, so no pass is claimed.";
   }
+  // Without a deciding member (an open criterion), the sentence names the
+  // first member not shown inside its band, the one that keeps the outcome
+  // open, never a member whose interval already settles (#233).
+  const members = result.metrics.filter(
+      (m) => (m.details as { role?: string })?.role === "member",
+    ),
+    settled = (m: (typeof members)[number]) => {
+      const x = m.details as { status?: string; direction?: string };
+      return x.status === "evaluated" && x.direction === "pass";
+    };
   const deciding =
     result.metrics.find((m) => m.name === d.decidingMemberId) ??
-    result.metrics.find(
-      (m) => (m.details as { role?: string })?.role === "member",
-    );
+    (result.outcome === "pass"
+      ? undefined
+      : members.find((m) => !settled(m))) ??
+    members[0];
   if (!deciding?.confidenceInterval)
     return "A deciding metric is undefined on these rows, so no claim is made.";
   const { lower, upper } = deciding.confidenceInterval;

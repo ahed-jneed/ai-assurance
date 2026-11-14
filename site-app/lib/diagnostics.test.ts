@@ -281,6 +281,27 @@ describe("hosted decisions by interval", () => {
     );
   });
 
+  it("names the metric that decides a constant predictor's outcome (#233)", () => {
+    // 900 favourable and 100 other reference rows, every prediction
+    // favourable: accuracy's interval lies wholly above its 0.8 band, and
+    // balanced accuracy, on chance, keeps the outcome open.
+    const [performance] = evaluate(
+      run(["performance"]),
+      csv([
+        ["1", "1", "A", 900],
+        ["0", "1", "A", 100],
+      ]),
+    ).results;
+    expect(performance.outcome).toBe("inconclusive");
+    const accuracy = metric(performance, "accuracy")!;
+    expect(accuracy.confidenceInterval!.lower).toBeGreaterThan(
+      (accuracy.details as any).band.lower,
+    );
+    expect(explainResult(performance)).toMatch(
+      /^The 95% interval for balanced accuracy runs from .* on 1000 rows/,
+    );
+  });
+
   describe("regression against the mean-prediction baseline", () => {
     // 60 targets 10..21 (each five times): mean 15.5, population SD 3.452.
     const targets = Array.from({ length: 60 }, (_, i) => 10 + (i % 12));
