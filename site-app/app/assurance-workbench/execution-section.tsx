@@ -7,6 +7,7 @@ import { ExternalJobDetail } from "../external-job-detail";
 import { ExecutionPlanner } from "../testing-readiness";
 import type { Role } from "@/lib/domain/types";
 import {
+  attemptsLabel,
   jobNames,
   label,
   modeLabel,
@@ -76,7 +77,7 @@ export function ExecutionSection({
             <div>
               <b>{names[i]}</b>
               <small className="block subtle">
-                {modeLabel(j.mode)} · attempt {j.fence} ·{" "}
+                {modeLabel(j.mode)} · {attemptsLabel(j.attempts)} ·{" "}
                 {new Date(j.created_at).toLocaleString()}
               </small>
               <ExternalJobDetail job={j} />

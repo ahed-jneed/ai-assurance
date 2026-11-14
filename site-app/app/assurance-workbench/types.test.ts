@@ -6,6 +6,7 @@ import {
 import { executionFields } from "./execution-fields";
 import {
   adapterFormatLabel,
+  attemptsLabel,
   enrolmentFormats,
   predictionOptionLabel,
   telemetryText,
@@ -66,6 +67,14 @@ describe("workbench labels (#202)", () => {
     ).toBe(
       "2 requests · 0 queued · 0 running · 2 expired leases · listing the most recent",
     );
+  });
+
+  it("counts a job's real attempts, not its lease fence (#233)", () => {
+    // A job cancelled after one attempt has fence 2 but one attempt.
+    expect(attemptsLabel(1)).toBe("1 attempt");
+    expect(attemptsLabel(3)).toBe("3 attempts");
+    expect(attemptsLabel(0)).toBe("not yet attempted");
+    expect(attemptsLabel(undefined)).toBe("not yet attempted");
   });
 
   it("labels a prediction lineage by dataset, model version and date, not its id", () => {
