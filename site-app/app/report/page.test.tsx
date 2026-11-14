@@ -85,6 +85,28 @@ describe("the /report print view", () => {
     );
   });
 
+  it("answers a failure in a child component with 500 and the fallback (#234 item 8)", async () => {
+    // reportMarkup itself reads this snapshot; only its CriteriaPackLine
+    // child fails, on the null framework list.
+    state.snapshot = {
+      engagement: { title: "Credit scoring audit" },
+      criteriaPack: { packId: "eu-ai-act", packVersion: "1", frameworks: null },
+    };
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await withResponseStatus(async () => {
+      const page = await ReportPage({ searchParams: params });
+      return new Response(renderToStaticMarkup(page));
+    });
+    expect(response.status).toBe(500);
+    const html = await response.text();
+    expect(html).toContain("Report unavailable");
+    expect(html).not.toContain("Credit scoring audit");
+    expect(log).toHaveBeenCalledWith(
+      "The /report print view could not be rendered:",
+      expect.any(TypeError),
+    );
+  });
+
   it.each([
     ["mismatch", 409],
     ["unreadable", 409],

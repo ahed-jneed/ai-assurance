@@ -1,7 +1,43 @@
 import { forbidden, notFound } from "next/navigation";
+import {
+  cloneElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { ApiError } from "@/lib/http";
 import { setResponseStatus } from "@/lib/response-status";
 import { printRefusal } from "./print-refusal";
+
+/**
+ * Renders every function component of a print view's markup now, while the
+ * page body runs (#234 item 8): the markup's child components (the
+ * assurance report, the criteria pack line, an LL144 table) would otherwise
+ * render after the page body returned, so a failure in one of them would
+ * escape its catch block and reach the workspace error boundary with 200.
+ * Resolved here, a failure anywhere in the print tree throws inside the try
+ * block and is answered by answerPrintFailure with the fallback and a log
+ * line. The print markup is plain synchronous components without hooks.
+ */
+export function resolvePrintTree(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return node.map(resolvePrintTree);
+  if (!isValidElement(node)) return node;
+  const element = node as ReactElement<{ children?: ReactNode }>;
+  if (typeof element.type === "function") {
+    const rendered = resolvePrintTree(
+      (element.type as (props: unknown) => ReactNode)(element.props),
+    );
+    // A list item keeps its key once its component is replaced.
+    return element.key !== null && isValidElement(rendered)
+      ? cloneElement(rendered, { key: element.key })
+      : rendered;
+  }
+  return element.props.children === undefined
+    ? element
+    : cloneElement(element, {
+        children: resolvePrintTree(element.props.children),
+      });
+}
 
 /**
  * Answers a print view's failure (/report, /ll144-summary) with the status

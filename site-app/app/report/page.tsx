@@ -1,5 +1,5 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
-import { answerPrintFailure } from "@/app/print-failure";
+import { answerPrintFailure, resolvePrintTree } from "@/app/print-failure";
 import { sanitize } from "@/lib/client-projection";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
@@ -31,12 +31,11 @@ async function reportBody(params: Record<string, string | undefined>) {
       e = sanitize(engagement, ctx),
       report = e.reports.find((r) => r.id === params.reportId);
     if (!report) throw new ApiError(404, "Released report not found");
-    // Build the markup inside the try block so that a malformed snapshot is
-    // caught below and answered with the "Report unavailable" fallback.
-    return reportMarkup(
-      report,
-      report.snapshot as ReportSnapshot,
-      ctx.tenantId,
+    // Render the whole markup, its child components included, inside the
+    // try block (#234 item 8), so that a malformed snapshot is caught below
+    // and answered with the "Report unavailable" fallback.
+    return resolvePrintTree(
+      reportMarkup(report, report.snapshot as ReportSnapshot, ctx.tenantId),
     );
   } catch (error) {
     // The status /api/report-package gives for the same inputs (#209, #216,

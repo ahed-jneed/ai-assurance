@@ -1,5 +1,5 @@
 import { requireChatGPTUser } from "@/app/chatgpt-auth";
-import { answerPrintFailure } from "@/app/print-failure";
+import { answerPrintFailure, resolvePrintTree } from "@/app/print-failure";
 import { ll144SummaryView } from "@/lib/read-models/ll144-summary";
 import { context } from "@/lib/tenancy";
 import { summaryMarkup } from "./summary-markup";
@@ -30,7 +30,11 @@ async function summaryBody(params: Record<string, string | undefined>) {
         params.auditId ?? "",
         params.reportId ?? null,
       );
-    return summaryMarkup(view, "/api/ll144-summary?" + query + "&download=1");
+    // The whole markup, its tables included, renders inside the try block
+    // (#234 item 8).
+    return resolvePrintTree(
+      summaryMarkup(view, "/api/ll144-summary?" + query + "&download=1"),
+    );
   } catch (error) {
     // The status /api/ll144-summary gives for the same inputs, as /report
     // does (#220): 403 renders forbidden.tsx with the refusal's own message,

@@ -124,4 +124,32 @@ describe("the /ll144-summary page", () => {
     expect(responseError(damaged).status).toBe(409);
     expect(await response.text()).toContain("The summary could not be loaded.");
   });
+
+  it("answers a failure in a summary table with 500 and the fallback (#234 item 8)", async () => {
+    // summaryMarkup itself reads this view; only its Table child fails, on
+    // the null category list.
+    state.view = {
+      source: "live",
+      summary: {
+        tool: { name: "Resume screener" },
+        law: "Local Law 144",
+        status: "approved",
+        requiredElements: [],
+        dataSource: { kind: "historical", source: "", explanation: "" },
+        tables: [{ dimension: "sex", title: "Sex", categories: null }],
+        exclusions: [],
+        notes: [],
+      },
+    };
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const response = await render();
+    expect(response.status).toBe(500);
+    const html = await response.text();
+    expect(html).toContain("Summary unavailable");
+    expect(html).not.toContain("Resume screener");
+    expect(log).toHaveBeenCalledWith(
+      "The /ll144-summary print view could not be rendered:",
+      expect.any(TypeError),
+    );
+  });
 });
