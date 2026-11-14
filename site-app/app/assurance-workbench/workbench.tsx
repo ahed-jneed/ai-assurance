@@ -39,7 +39,7 @@ import { SamplingSection } from "./sampling-section";
 import { downloadPacket, submitValues } from "./submit-values";
 import { SystemsSection } from "./systems-section";
 import { TokenDialog } from "./token-dialog";
-import { predictionOptionLabel, type ActResult } from "./types";
+import { jobName, predictionOptionLabel, type ActResult } from "./types";
 import { useWorkbenchData } from "./use-workbench-data";
 import { useWorkbenchForm } from "./use-workbench-form";
 import { RecordFilters, WorkbenchBar } from "./workbench-bar";
@@ -254,7 +254,10 @@ export function AssuranceWorkbench({
       .map((w) => ({ value: w.id, label: w.name })),
     activeJobs: (snapshot?.jobs ?? [])
       .filter((j) => ["queued", "running"].includes(j.state))
-      .map((j) => ({ value: j.id, label: j.system_name + " · " + j.id })),
+      .map((j) => ({
+        value: j.id,
+        label: jobName(j, e.workflow?.procedures ?? []) + " · " + j.id,
+      })),
   });
 
   function open(

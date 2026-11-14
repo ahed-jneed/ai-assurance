@@ -10,6 +10,7 @@ import {
 } from "@/lib/runner-capabilities";
 import type { WorkspaceData } from "../workspace-types";
 import type { ExternalJobFields } from "../external-job-detail";
+import { planLabel } from "../genai-ingest-labels";
 
 export type Engagement = NonNullable<WorkspaceData["engagement"]>;
 
@@ -17,9 +18,14 @@ export type Engagement = NonNullable<WorkspaceData["engagement"]>;
 // and lib/assurance-store.ts (jobs).
 export type ExecutionJob = ExternalJobFields & {
   id: string;
-  system_name: string;
+  /** Null for a GenAI ingest job, which names no system. */
+  system_name: string | null;
   fence: number;
   created_at: string;
+  /** A GenAI ingest job's frozen plan: its procedure, criteria and time. */
+  procedure_id?: string | null;
+  plan_criteria?: number | null;
+  plan_created_at?: string | null;
 };
 export type RunnerWorker = {
   id: string;
@@ -135,6 +141,36 @@ export type Exclusion = { recordId: string; reason: string };
 
 export const label = (s: string) =>
   s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
+
+/** An execution mode as the execution requests show it. */
+export const modeLabel = (mode: string) =>
+  mode === "genai_ingest" ? "GenAI ingest" : label(mode);
+
+/**
+ * What an execution request is called (#221): the system it runs, or for a
+ * GenAI ingest job its frozen plan's label, as the Queue ingest dialog
+ * named the plan. Never null or a bare id.
+ */
+export function jobName(
+  j: Pick<
+    ExecutionJob,
+    | "mode"
+    | "system_name"
+    | "procedure_id"
+    | "plan_criteria"
+    | "plan_created_at"
+  >,
+  procedures: { id: string; templateId: string; title: string }[],
+) {
+  if (j.mode === "genai_ingest")
+    return planLabel(
+      j.procedure_id,
+      j.plan_criteria,
+      j.plan_created_at,
+      procedures,
+    );
+  return j.system_name || "External execution";
+}
 
 /**
  * The external queue's telemetry line: totals by state and, when the list is

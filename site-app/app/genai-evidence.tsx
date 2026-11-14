@@ -45,7 +45,11 @@ import {
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
 import { count } from "@/lib/presentation";
-import { bundleOptionLabel, planOptionLabel } from "./genai-ingest-labels";
+import {
+  bundleOptionLabel,
+  distinctOptions,
+  planOptionLabel,
+} from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
 
@@ -120,6 +124,25 @@ function Checklist({ run }: { run: GenaiRunSummary }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * The heading of a criterion's per-technique members: "C1: 1 member (2 more
+ * in the computation)", with the shared pluraliser (#221).
+ */
+export function membersHeading(c: {
+  id: string;
+  members: unknown[];
+  membersOmitted?: number;
+}) {
+  return (
+    c.id +
+    ": " +
+    count(c.members.length, "member") +
+    (c.membersOmitted
+      ? " (" + c.membersOmitted.toLocaleString() + " more in the computation)"
+      : "")
   );
 }
 
@@ -251,12 +274,7 @@ function ResultCard({
         .filter((c) => c.members.length > 0)
         .map((c) => (
           <details key={c.id} className="genai-members">
-            <summary>
-              {c.id}: {c.members.length} members
-              {c.membersOmitted
-                ? " (" + c.membersOmitted + " more in the computation)"
-                : ""}
-            </summary>
+            <summary>{membersHeading(c)}</summary>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -583,19 +601,15 @@ export function GenaiEvidence({
           name: "planRecordId",
           label: "Frozen plan",
           type: "select",
-          options: (view?.plans ?? []).map((p) => ({
-            value: p.id,
-            label: planOptionLabel(p, procedures),
-          })),
+          options: distinctOptions(view?.plans ?? [], (p) =>
+            planOptionLabel(p, procedures),
+          ),
         },
         {
           name: "bundleRecordId",
           label: "Declared bundle",
           type: "select",
-          options: (view?.bundles ?? []).map((b) => ({
-            value: b.id,
-            label: bundleOptionLabel(b),
-          })),
+          options: distinctOptions(view?.bundles ?? [], bundleOptionLabel),
         },
       ],
       save: (v) => run("queueGenaiIngest", v),

@@ -509,11 +509,17 @@ export async function assuranceGates(
   }
   return messages;
 }
+/**
+ * The engagement's 100 most recent external jobs. A GenAI ingest job, which
+ * names no system, carries what its frozen plan's label is made of
+ * (procedure_id, plan_criteria, plan_created_at), so the workbench names it
+ * as the Queue ingest dialog named the plan (#221).
+ */
 export async function jobs(ctx: Context, engagementId: string) {
   return (
     await db()
       .prepare(
-        "SELECT id,state,request_sha256,created_at,created_by,worker_id,attempt_id,fence,lease_until,result_sha256,error,completed_at,json_extract(request,'$.system.name') AS system_name,json_extract(request,'$.executionMode') AS mode,json_extract(request,'$.model.format') AS model_format,json_extract(request,'$.engineConfig.config.positiveLabel') AS positive_label,json_extract(request,'$.engineConfig.negativeLabel') AS negative_label,json_extract(request,'$.engineConfig.modelSpec.decisionThreshold') AS decision_threshold,json_extract(request,'$.engineConfig.modelSpec.predictionKind') AS prediction_kind FROM execution_jobs WHERE tenant_id=? AND engagement_id=? ORDER BY created_at DESC LIMIT 100",
+        "SELECT j.id,j.state,j.request_sha256,j.created_at,j.created_by,j.worker_id,j.attempt_id,j.fence,j.lease_until,j.result_sha256,j.error,j.completed_at,json_extract(j.request,'$.system.name') AS system_name,json_extract(j.request,'$.executionMode') AS mode,json_extract(j.request,'$.model.format') AS model_format,json_extract(j.request,'$.engineConfig.config.positiveLabel') AS positive_label,json_extract(j.request,'$.engineConfig.negativeLabel') AS negative_label,json_extract(j.request,'$.engineConfig.modelSpec.decisionThreshold') AS decision_threshold,json_extract(j.request,'$.engineConfig.modelSpec.predictionKind') AS prediction_kind,json_extract(j.request,'$.procedure.id') AS procedure_id,json_array_length(j.request,'$.plan.criteria') AS plan_criteria,(SELECT r.created_at FROM assurance_records r WHERE r.tenant_id=j.tenant_id AND r.engagement_id=j.engagement_id AND r.id=json_extract(j.request,'$.records.plan')) AS plan_created_at FROM execution_jobs j WHERE j.tenant_id=? AND j.engagement_id=? ORDER BY j.created_at DESC LIMIT 100",
       )
       .bind(ctx.tenantId, engagementId)
       .all()

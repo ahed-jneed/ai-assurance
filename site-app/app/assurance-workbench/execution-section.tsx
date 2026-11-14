@@ -7,7 +7,9 @@ import { ExternalJobDetail } from "../external-job-detail";
 import { ExecutionPlanner } from "../testing-readiness";
 import type { Role } from "@/lib/domain/types";
 import {
+  jobName,
   label,
+  modeLabel,
   telemetryText,
   type Act,
   type Engagement,
@@ -71,9 +73,9 @@ export function ExecutionSection({
         {snapshot.jobs.map((j) => (
           <div className="execution-row" key={j.id}>
             <div>
-              <b>{j.system_name}</b>
+              <b>{jobName(j, engagement.workflow?.procedures ?? [])}</b>
               <small className="block subtle">
-                {label(j.mode)} · attempt {j.fence} ·{" "}
+                {modeLabel(j.mode)} · attempt {j.fence} ·{" "}
                 {new Date(j.created_at).toLocaleString()}
               </small>
               <ExternalJobDetail job={j} />
