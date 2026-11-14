@@ -6,6 +6,8 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { useReturnFocus } from "@/hooks/use-return-focus"
+import { useRefusalFocus } from "@/hooks/use-refusal-focus"
+import { useComposedRefs } from "radix-ui/internal"
 import { keepOpenForToasts } from "@/components/ui/toaster-layer"
 import { Button } from "@/components/ui/button"
 
@@ -57,12 +59,15 @@ function DialogContent({
   onCloseAutoFocus,
   onPointerDownOutside,
   onFocusOutside,
+  ref,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
   // Local change (#203): focus returns to the opener on close.
   const returnFocus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus)
+  // Local change (#227): a refused submit keeps focus in the modal.
+  const refusalFocus = useComposedRefs(ref, useRefusalFocus<HTMLDivElement>())
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -73,6 +78,7 @@ function DialogContent({
           className
         )}
         {...props}
+        ref={refusalFocus}
         {...returnFocus}
         // Local change (#210): a toast action never dismisses the modal.
         onPointerDownOutside={keepOpenForToasts(onPointerDownOutside)}

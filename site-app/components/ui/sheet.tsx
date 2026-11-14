@@ -6,6 +6,8 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { useReturnFocus } from "@/hooks/use-return-focus"
+import { useRefusalFocus } from "@/hooks/use-refusal-focus"
+import { useComposedRefs } from "radix-ui/internal"
 import { keepOpenForToasts } from "@/components/ui/toaster-layer"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -55,6 +57,7 @@ function SheetContent({
   onCloseAutoFocus,
   onPointerDownOutside,
   onFocusOutside,
+  ref,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -62,6 +65,8 @@ function SheetContent({
 }) {
   // Local change (#203): focus returns to the opener on close.
   const returnFocus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus)
+  // Local change (#227): a refused submit keeps focus in the modal.
+  const refusalFocus = useComposedRefs(ref, useRefusalFocus<HTMLDivElement>())
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -81,6 +86,7 @@ function SheetContent({
           className
         )}
         {...props}
+        ref={refusalFocus}
         {...returnFocus}
         // Local change (#210): a toast action never dismisses the modal.
         onPointerDownOutside={keepOpenForToasts(onPointerDownOutside)}

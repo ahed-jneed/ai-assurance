@@ -211,7 +211,7 @@ export function TaskRows({
             section: i.section ?? "",
           });
         return (
-          <div className="business-task-row" key={i.id}>
+          <div className="business-task-row" key={i.id} data-work-id={i.id}>
             <a
               className="business-task-open"
               href={href}

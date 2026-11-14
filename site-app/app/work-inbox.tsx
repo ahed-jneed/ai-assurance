@@ -39,6 +39,7 @@ import {
   type InboxQuery,
 } from "@/lib/work-inbox";
 import { TaskRows, usePersonalPreferences } from "./business-workspace";
+import { focusAfterRemoval } from "@/lib/focus-order";
 
 const views = [
   ["all", "All assigned"],
@@ -92,6 +93,33 @@ export function WorkInbox({
     prefRef.current = pref;
   });
   const operation = useRef(false);
+  // The rows in view order when a snooze or resume began (#227): once that
+  // row has left the list, focus moves to the next row, else the previous
+  // one, else the list heading.
+  const results = useRef<HTMLDivElement>(null),
+    headingRef = useRef<HTMLHeadingElement>(null),
+    refocus = useRef<{ id: string; order: string[] } | null>(null);
+  useEffect(() => {
+    const pending = refocus.current,
+      list = results.current;
+    if (!pending || !list) return;
+    const row = (id: string) =>
+      list.querySelector<HTMLElement>(
+        '[data-work-id="' + CSS.escape(id) + '"] .business-task-open',
+      );
+    if (row(pending.id)) return;
+    refocus.current = null;
+    for (const id of focusAfterRemoval(pending.order, pending.id)) {
+      const link = row(id);
+      link?.focus();
+      if (link && document.activeElement === link) return;
+    }
+    const heading = list.querySelector<HTMLElement>("h2") ?? headingRef.current;
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
+  });
   const q =
     query.scope === "team" && !canSee(data.identity.role, "teamWork")
       ? { ...query, scope: "mine" as const }
@@ -239,6 +267,13 @@ export function WorkInbox({
     if (operation.current || !prefRef.current.ready) return;
     operation.current = true;
     setReminderBusy(true);
+    refocus.current = {
+      id: i.id,
+      order: [
+        ...(results.current?.querySelectorAll<HTMLElement>("[data-work-id]") ??
+          []),
+      ].map((el) => el.dataset.workId ?? ""),
+    };
     try {
       const current = prefRef.current;
       await current.save({
@@ -261,6 +296,7 @@ export function WorkInbox({
         });
       else toast.success("Reminder resumed");
     } catch {
+      refocus.current = null;
       /* Preference errors are displayed beside the queue. */
     } finally {
       operation.current = false;
@@ -288,7 +324,7 @@ export function WorkInbox({
       <div className="page-head">
         <div className="page-heading">
           <Inbox size={22} aria-hidden="true" />
-          <h1>My work</h1>
+          <h1 ref={headingRef}>My work</h1>
         </div>
         <div className="row-actions page-head-actions">
           <Button
@@ -571,7 +607,7 @@ export function WorkInbox({
           </Button>
         </p>
       )}
-      <div className="work-results" aria-busy={busy}>
+      <div className="work-results" aria-busy={busy} ref={results}>
         {busy && !loaded ? (
           <div className="work-loading" role="status">
             Loading your work…
