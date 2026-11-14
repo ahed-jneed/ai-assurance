@@ -1,6 +1,7 @@
 "use client";
 import type { Engagement, Role } from "@/lib/domain";
 import { clientPortalTitle } from "@/lib/navigation-preferences";
+import { canSee } from "@/lib/permissions";
 import { clientNotices } from "@/lib/report-presentation";
 
 /**
@@ -11,9 +12,8 @@ import { clientNotices } from "@/lib/report-presentation";
  * is left out for them instead of reading zero.
  */
 export function clientOverviewStats(e: Engagement, role: Role) {
-  const contributor = role === "Client Contributor";
   const stats: [string, number][] = [["Released reports", e.reports.length]];
-  if (!contributor)
+  if (canSee(role, "clientFindings"))
     stats.push([
       "Shared findings",
       e.findings.filter((f) => f.status !== "closed").length,
@@ -24,7 +24,7 @@ export function clientOverviewStats(e: Engagement, role: Role) {
       (a) => a.status === "accepted" && a.visibility === "client",
     ).length,
   ]);
-  if (contributor)
+  if (canSee(role, "clientPortal"))
     stats.push([
       "Your submissions awaiting review",
       e.artifacts.filter((a) => a.status !== "accepted").length,
@@ -46,9 +46,9 @@ export function ClientOverview({
   const notices = clientNotices(e.reports);
   const records: [string, string][] = [
     ["Reports", "Reports & sign-off"],
-    ...(role === "Client Contributor"
-      ? []
-      : ([["Findings & remediation", "Findings"]] as [string, string][])),
+    ...(canSee(role, "clientFindings")
+      ? ([["Findings & remediation", "Findings"]] as [string, string][])
+      : []),
     ["Shared evidence", "Evidence vault"],
   ];
   return (

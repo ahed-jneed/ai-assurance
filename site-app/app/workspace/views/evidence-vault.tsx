@@ -4,7 +4,7 @@ import { Database, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { Artifact, Engagement, EvidenceRequest, Role } from "@/lib/domain";
-import { canSee } from "@/lib/permissions";
+import { canSee, isClientRole } from "@/lib/permissions";
 import { evidenceRows as selectEvidence } from "@/lib/register-views";
 import { EvidenceRegister } from "../../audit-registers";
 import { DatabaseToolbar } from "../../database-toolbar";
@@ -68,7 +68,8 @@ export function EvidenceVault({
   const { search, setSearch, filter, setFilter, setFacet, setSort } = register;
   const evidenceRows = selectEvidence(e.artifacts, register.query);
   const genaiLevels = useGenaiLevels(data.tenantId, e, role),
-    requests = canSee(role, "evidenceRequests");
+    requests = canSee(role, "evidenceRequests"),
+    viewer = isClientRole(role);
   return (
     <>
       {canSee(role, "clientPortal") && (
@@ -131,7 +132,7 @@ export function EvidenceVault({
                     // submissions; quarantine is the audit team's concern.
                     [
                       { value: "all", label: "All shared evidence" },
-                      ...(role === "Client Contributor"
+                      ...(canSee(role, "clientPortal")
                         ? [
                             {
                               value: "unverified",

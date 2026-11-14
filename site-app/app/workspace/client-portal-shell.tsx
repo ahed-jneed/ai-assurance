@@ -18,6 +18,7 @@ import {
   clientPortalRoutes,
   type NavigationRoute,
 } from "@/lib/navigation-preferences";
+import { canSee } from "@/lib/permissions";
 import type { WorkspaceData } from "../workspace-types";
 
 const icons: Record<(typeof clientPortalRoutes)[number][0], LucideIcon> = {
@@ -29,7 +30,7 @@ const icons: Record<(typeof clientPortalRoutes)[number][0], LucideIcon> = {
 
 /** How the portal names the signed-in person's access. */
 export function clientAccessCopy(role: string) {
-  return role === "Client Contributor"
+  return canSee(role, "clientPortal")
     ? "Can answer evidence requests"
     : "Read-only access";
 }

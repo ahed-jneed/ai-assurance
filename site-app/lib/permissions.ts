@@ -14,6 +14,7 @@ const writers: readonly Role[] = ["Auditor", "Lead Auditor"],
   internal: readonly Role[] = ["Auditor", "Lead Auditor", "Reviewer"],
   qualityReviewer: readonly Role[] = ["Engagement Quality Reviewer"],
   clientContributor: readonly Role[] = ["Client Contributor"],
+  clientViewer: readonly Role[] = ["Client Viewer"],
   clientRoles: readonly Role[] = ["Client Viewer", "Client Contributor"],
   staff: readonly Role[] = [
     "Auditor",
@@ -196,6 +197,11 @@ export const viewAccess = {
    * Overview and the Evidence vault.
    */
   clientPortal: clientContributor,
+  /**
+   * The shared findings of the client portal (#36): the server's client
+   * projection gives a Client Contributor none (lib/client-projection.ts).
+   */
+  clientFindings: clientViewer,
 } as const satisfies Record<string, readonly Role[]>;
 
 export type View = keyof typeof viewAccess;

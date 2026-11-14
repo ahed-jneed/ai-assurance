@@ -327,6 +327,12 @@ describe("canSee", () => {
     ]);
   });
 
+  it("shows shared findings in the client portal to a Client Viewer only", () => {
+    expect(roles.filter((role) => canSee(role, "clientFindings"))).toEqual([
+      "Client Viewer",
+    ]);
+  });
+
   it("names only known roles", () => {
     for (const [view, admitted] of Object.entries(viewAccess))
       for (const role of admitted) expect(roles, view).toContain(role);
