@@ -21,7 +21,7 @@ import {
   saveLabels,
 } from "./form-config";
 import { SourceRelations } from "./source-relations";
-import { label, type Field } from "./types";
+import { adapterFormatLabel, enrolmentFormats, type Field } from "./types";
 import type { WorkbenchForm } from "./use-workbench-form";
 
 /** The dialog of the open workbench form. */
@@ -211,13 +211,7 @@ export function FormDialog({
             {form === "enrollWorker" && (
               <section>
                 <h3>Approved adapter scope</h3>
-                {[
-                  "provided_predictions",
-                  "ONNX",
-                  "XGBoost",
-                  "LightGBM",
-                  "PMML",
-                ].map((f) => (
+                {enrolmentFormats.map((f) => (
                   <label className="check-row" key={f}>
                     <input
                       type="checkbox"
@@ -225,7 +219,7 @@ export function FormDialog({
                       value={f}
                       defaultChecked={f === "provided_predictions"}
                     />
-                    {label(f)}
+                    {adapterFormatLabel(f)}
                   </label>
                 ))}
               </section>

@@ -146,16 +146,6 @@ export type Classification = {
   legacy?: LegacyClassification;
 };
 
-export const articleNames: Record<string, string> = {
-  "9": "Risk management",
-  "10": "Data & data governance",
-  "11": "Technical documentation",
-  "12": "Record-keeping",
-  "13": "Deployer transparency",
-  "14": "Human oversight",
-  "15": "Accuracy, robustness & security",
-};
-
 // ---------------------------------------------------------------------------
 // The facts the guided classification asks.
 

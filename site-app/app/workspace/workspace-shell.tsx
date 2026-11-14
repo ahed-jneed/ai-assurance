@@ -113,6 +113,8 @@ export default function Workspace() {
   const workspace = useWorkspaceData();
   const { data, busy, loading, bootstrapping, connect } = workspace;
   const e = data?.engagement,
+    // The least-privileged role gates actions until the identity loads; it is
+    // never shown as the account's role (#202).
     role = data?.identity.role ?? fallbackRole,
     // Coarse view flags; each action checks its own op with can().
     writer = can(role, "editPaper"),
@@ -164,6 +166,7 @@ export default function Workspace() {
     modal: modal.modal,
     isModalSubmitting: modal.isSubmitting,
     editorOpen: editing.editorOpen,
+    isEditorOpen: editing.isEditorOpen,
     view: url.view,
     isDirty: paper.isNavigationDirty,
     confirmDiscard: paper.confirmDiscard,
@@ -254,10 +257,28 @@ export default function Workspace() {
     );
   const openSearch = useCallback(() => setSearchOpen(true), []),
     closeOnboarding = useCallback(() => setOnboarding(false), []),
+    // Signed in whenever the server answered with anything but 401: a
+    // refused or failed load still offers Sign out (#202).
+    signedIn = !!data || workspace.accessDenied || !!workspace.error,
     account = useMemo(
-      () => <AccountMenu data={data} side={portal ? "bottom" : "right"} />,
-      [data, portal],
-    );
+      () => (
+        <AccountMenu
+          data={data}
+          signedIn={signedIn}
+          side={portal ? "bottom" : "right"}
+        />
+      ),
+      [data, signedIn, portal],
+    ),
+    identityStatus = data
+      ? data.identity.role
+      : loading || bootstrapping
+        ? "Signing in…"
+        : workspace.accessDenied
+          ? "No practice access"
+          : workspace.error
+            ? "Workspace unavailable"
+            : "Signing in…";
   const attest = handlers.attest;
   if (workspace.signedOut) return <SignedOut />;
   // Reloading a failed view reloads the open engagement, then renders it
@@ -292,6 +313,7 @@ export default function Workspace() {
             onSwitch={viewNav.switchEngagement}
             onPractice={viewNav.changePractice}
             account={account}
+            identityStatus={identityStatus}
           />
         )}
         {/* The vendored SidebarInset renders a <main>; the page has one main
@@ -320,7 +342,7 @@ export default function Workspace() {
               data={data}
               view={url.view}
               clientId={url.clientId}
-              role={role}
+              role={data ? role : null}
               searchDisabled={searchDisabled}
               onSearch={openSearch}
               onNavigate={viewNav.navigate}

@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
  * coverage views of the engagement's pinned criteria, or one of them
  * (docs/design/criteria-model.md section 10). With `format=csv` and a
  * framework, that view as CSV, filtered by `state`, `actor` and `date`
- * (section 15.2). Internal roles only; client roles get 403.
+ * (section 15.2); a filter value the view does not offer is 400. Internal
+ * roles only; client roles get 403.
  */
 export async function GET(request: Request) {
   try {
@@ -20,10 +21,11 @@ export async function GET(request: Request) {
         ctx,
         engagementId,
         q.get("framework"),
+        // An empty parameter is absent; an unknown value is 400 (#201).
         {
-          state: q.get("state") ?? "all",
-          actor: q.get("actor") ?? "all",
-          date: q.get("date") ?? "all",
+          state: q.get("state") || "all",
+          actor: q.get("actor") || "all",
+          date: q.get("date") || "all",
         },
       );
       return new Response(csv, {

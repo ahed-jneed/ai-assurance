@@ -317,8 +317,6 @@ const computation = z
   })
   .passthrough();
 export type GenaiComputation = z.infer<typeof computation>;
-export type GenaiCriterion = GenaiComputation["criteria"][number];
-export type GenaiRun = GenaiComputation["runs"][number];
 
 export class GenaiEnvelopeError extends Error {}
 const reject = (message: string): never => {

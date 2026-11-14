@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Result } from "./domain";
+import type { Result } from "./domain/types";
 import {
   diagnosticNarrative,
   humanLabel,

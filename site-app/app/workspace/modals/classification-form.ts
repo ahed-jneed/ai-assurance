@@ -12,7 +12,7 @@ import {
   type ClassificationInput,
   type ClassificationRules,
 } from "@/lib/domain/classification";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { asRulePack } from "@/lib/rule-pack";
 
 export const factChoice = (id: string) => "fact:" + id;

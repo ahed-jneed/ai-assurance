@@ -1,5 +1,5 @@
 "use client";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import { clientPortalTitle } from "@/lib/navigation-preferences";
 import { canSee } from "@/lib/permissions";
 import { clientNotices } from "@/lib/report-presentation";

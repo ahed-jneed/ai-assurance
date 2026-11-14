@@ -10,7 +10,7 @@ import {
   loadValidator,
   readCriteria,
 } from "../../../schemas/validate-criteria.mjs";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { freshEngagement } from "../factories";
 import type { ObligationRecord } from "./coverage-sources";
 import generated from "./bundle.generated.json";

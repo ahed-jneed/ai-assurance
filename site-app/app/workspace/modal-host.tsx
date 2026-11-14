@@ -19,7 +19,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import { errorMessage } from "@/lib/fetch-json";
 import type { WorkspaceData } from "../workspace-types";
 import { modalDefinition } from "./modals";

@@ -8,11 +8,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import type { Report, Role } from "@/lib/domain";
-import { releaseChecklist, releaseChecklistLines } from "@/lib/domain";
+import type { Report, Role } from "@/lib/domain/types";
+import { releaseChecklist, releaseChecklistLines } from "@/lib/domain/gates";
 import { opinionLabel } from "@/lib/domain/report-model";
-import { packageStatusLabel } from "@/lib/report-presentation";
-import { releaseState } from "@/lib/workflow-state";
+import { packageGuidance, packageStatusLabel } from "@/lib/report-presentation";
+import { isWithdrawable, releaseState } from "@/lib/workflow-state";
 import { can } from "@/lib/permissions";
 import { FrozenReportDetails } from "../report-details";
 import { area, checklistOptions, choice, label, reason } from "./fields";
@@ -47,11 +47,7 @@ export function ReportRelease({
         </h3>
         <span className="badge neutral">{packageStatusLabel(r)}</span>
       </div>
-      <p className="subtle">
-        {r.kind === "draft"
-          ? "Drafts are internal review snapshots."
-          : "Approve both package versions before client release."}
-      </p>
+      <p className="subtle">{packageGuidance(r)}</p>
       <div className="row-actions">
         <Button
           variant="outline"
@@ -161,7 +157,7 @@ export function ReportRelease({
             Release to client
           </Button>
         )}
-        {lead && ["approved", "released"].includes(state) && (
+        {lead && isWithdrawable(r) && (
           <Button
             variant="outline"
             disabled={busy}

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
-import { roles, stageGates } from "../domain";
+import { roles } from "../domain/types";
+import { stageGates } from "../domain/gates";
 import { db } from "../bindings";
 import { now, sha256 } from "../ids";
 import {
@@ -12,7 +13,7 @@ import {
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
 import { requireAdmin } from "../tenancy";
-import { calendarDate } from "../workflow-service";
+import { calendarDate } from "../workflow/command";
 import { defineCommands, type CommandHandler } from "./command";
 import { short } from "./fields";
 /**
@@ -79,6 +80,9 @@ export const engagement = defineCommands({
           400,
           "Model binaries stay quarantined until a trusted adapter and security review are available",
         );
+      // Accepting twice would attest a second Accept Evidence event.
+      if (a.status === "accepted")
+        throw new ApiError(409, "This evidence is already accepted");
       a.status = "accepted";
       return { details: { artifactId: a.id, sha256: a.sha256 } };
     },

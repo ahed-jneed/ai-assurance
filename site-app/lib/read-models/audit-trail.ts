@@ -9,6 +9,7 @@ import type { Context } from "../tenancy";
 import { isInternalRole } from "../workflow-state";
 import {
   eventFilters,
+  refuseUnknownAction,
   toPage,
   type EventPage,
   type EventQuery,
@@ -62,10 +63,21 @@ export async function auditTrailPage(
       .first())
   )
     throw new ApiError(404, "Engagement not found");
+  // The event types the filter offers: those recorded in the engagement.
+  const actions = await db()
+    .prepare(
+      "SELECT DISTINCT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY action",
+    )
+    .bind(ctx.tenantId, engagementId)
+    .all<{ action: string }>();
+  refuseUnknownAction(
+    q,
+    actions.results.map((a) => a.action),
+  );
   const filters = eventFilters(q);
   const name =
     "COALESCE((SELECT m.display_name FROM memberships m WHERE m.tenant_id=? AND m.user_id=actor),actor)";
-  const [rows, actors, actions] = await Promise.all([
+  const [rows, actors] = await Promise.all([
     db()
       .prepare(
         `SELECT id,actor,${name} AS actor_name,action,hash,previous_hash,created_at,details FROM audit_events WHERE tenant_id=? AND engagement_id=?` +
@@ -86,12 +98,6 @@ export async function auditTrailPage(
       )
       .bind(ctx.tenantId, ctx.tenantId, engagementId)
       .all<{ id: string; name: string }>(),
-    db()
-      .prepare(
-        "SELECT DISTINCT action FROM audit_events WHERE tenant_id=? AND engagement_id=? ORDER BY action",
-      )
-      .bind(ctx.tenantId, engagementId)
-      .all<{ action: string }>(),
   ]);
   return {
     ...toPage(rows.results, q.limit),

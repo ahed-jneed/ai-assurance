@@ -1,6 +1,6 @@
 // What may stop the workspace from changing view or record, and the single
 // function (guarded) every workspace change goes through.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { NavigationResult } from "./types";
 
@@ -49,22 +49,29 @@ export function reportEditing(
  */
 export function useEditingRegistry() {
   const [open, setOpen] = useState<readonly EditingSource[]>([]);
+  // The open editors as last reported, ahead of the render that shows them:
+  // a panel that finishes its action and then opens a record in the same
+  // effect is not refused by the render before its report (#202).
+  const reported = useRef<readonly EditingSource[]>([]);
   const reporters = useMemo(
     () =>
       Object.fromEntries(
         editingSources.map((source) => [
           source,
-          (editing: boolean) =>
-            setOpen((current) => reportEditing(current, source, editing)),
+          (editing: boolean) => {
+            reported.current = reportEditing(reported.current, source, editing);
+            setOpen((current) => reportEditing(current, source, editing));
+          },
         ]),
       ) as Record<EditingSource, EditingReporter>,
     [],
   );
-  const clear = useCallback(
-    () => setOpen((current) => (current.length ? [] : current)),
-    [],
-  );
-  return { editorOpen: open.length > 0, reporters, clear };
+  const clear = useCallback(() => {
+    reported.current = [];
+    setOpen((current) => (current.length ? [] : current));
+  }, []);
+  const isEditorOpen = useCallback(() => reported.current.length > 0, []);
+  return { editorOpen: open.length > 0, isEditorOpen, reporters, clear };
 }
 
 export type NavigationGuardState = {
@@ -76,6 +83,11 @@ export type NavigationGuardState = {
   isModalSubmitting: () => boolean;
   /** A panel or dialog reports an unfinished editor (its onEditing prop). */
   editorOpen: boolean;
+  /**
+   * The same as last reported, when the guard runs; it wins over
+   * `editorOpen`, which is the value of the render that built the guard.
+   */
+  isEditorOpen?: () => boolean;
   view: string;
   /** Unsaved paper edits or comments, which may be discarded. */
   isDirty: () => boolean;
@@ -94,7 +106,7 @@ export function navigationGuard(state: NavigationGuardState) {
       toast.info("Finish or cancel this form before changing workspace.");
       return "editor_open";
     }
-    if (state.editorOpen) {
+    if (state.isEditorOpen ? state.isEditorOpen() : state.editorOpen) {
       toast.info(
         state.view === "Assurance workbench"
           ? "Finish the pending workbench action or close your unsaved review before changing workspace."

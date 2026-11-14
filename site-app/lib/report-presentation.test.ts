@@ -1,6 +1,39 @@
 import { describe, expect, it } from "vitest";
-import type { Report } from "./domain";
-import { clientNotices, reportDate } from "./report-presentation";
+import type { Report } from "./domain/types";
+import {
+  clientNotices,
+  packageGuidance,
+  reportDate,
+} from "./report-presentation";
+
+describe("package guidance (#202)", () => {
+  const final = (state?: string): Report =>
+    ({
+      id: "R",
+      kind: "final",
+      createdAt: "2026-11-01T09:00:00.000Z",
+      actor: "",
+      sha256: "R",
+      snapshot: {},
+      ...(state ? { release: { state, history: [] } } : {}),
+    }) as unknown as Report;
+  it("gives pre-release guidance only while a final package awaits approval", () => {
+    expect(packageGuidance(final())).toBe(
+      "Approve both package versions before client release.",
+    );
+    expect(packageGuidance({ ...final(), kind: "draft" })).toBe(
+      "Drafts are internal review snapshots.",
+    );
+    for (const state of ["approved", "released", "superseded", "withdrawn"])
+      expect(packageGuidance(final(state))).not.toMatch(/before client/);
+    expect(packageGuidance(final("approved"))).toMatch(
+      /authorizes the client release/,
+    );
+    expect(packageGuidance(final("released"))).toMatch(
+      /^Released to the client/,
+    );
+  });
+});
 
 describe("report date", () => {
   it("states the capture date from the report date element", () => {

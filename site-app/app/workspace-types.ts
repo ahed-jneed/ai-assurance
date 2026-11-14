@@ -1,6 +1,6 @@
 import type { CriteriaTemplate } from "@/lib/catalog-criteria";
 import type { CriteriaView, PackSummary } from "@/lib/criteria/types";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
 import type { IntegrityIncidents } from "@/lib/engagement-storage";
 import type { RevocationCancellation } from "@/lib/read-models/workspace-view";

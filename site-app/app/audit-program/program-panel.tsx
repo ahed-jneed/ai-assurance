@@ -2,13 +2,27 @@
 import { ArrowUpRight, ClipboardList, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isReleaseTimeRecord } from "@/lib/domain";
+import { isReleaseTimeRecord } from "@/lib/domain/gates";
 import { procedureLabel } from "@/lib/workflow-state";
 import { decisionState } from "@/lib/permissions";
 import { procedureWork } from "@/lib/work-items";
 import { DecisionButton } from "../workspace/decision-button";
 import { label, reason } from "./fields";
 import type { ProgramScope } from "./program-scope";
+/**
+ * The next real step when no procedure is selected yet, by the state of the
+ * engagement brief (#202).
+ */
+export function programEmptyStep(
+  brief: "draft" | "submitted" | "approved" | undefined,
+) {
+  return brief === "approved"
+    ? "The engagement brief is approved: assess the methodology candidates and select the procedures in scope."
+    : brief === "submitted"
+      ? "Approve the submitted engagement brief, then assess methodology candidates."
+      : "Start with the engagement brief, then assess methodology candidates.";
+}
+
 /** The program tab: the procedure register with its filters and bulk actions. */
 export function ProgramPanel({
   scope,
@@ -320,7 +334,7 @@ export function ProgramPanel({
           </h3>
           <p>
             {filter === "selected"
-              ? "Start with the engagement brief, then assess methodology candidates."
+              ? programEmptyStep(b?.status)
               : "Choose another view or clear the search."}
           </p>
           {writer && filter === "selected" && (

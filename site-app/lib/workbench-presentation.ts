@@ -1,5 +1,5 @@
 import type { AssuranceRecord } from "./assurance-core";
-import type { Role } from "./domain";
+import type { Role } from "./domain/types";
 import { can } from "./permissions";
 import { currentAssessments, reviewFor } from "./assurance-store-client";
 

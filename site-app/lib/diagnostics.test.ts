@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- the golden fixture is untyped JSON. */
 import { describe, expect, it } from "vitest";
 import { evaluate, inspectCSV, parseCSV } from "./diagnostics";
-import type { EvaluationConfig, PlanConfig, Result, Run } from "./domain";
+import type { EvaluationConfig, PlanConfig, Result, Run } from "./domain/types";
 import { explainResult, planSuite } from "./hosted-statistics";
 import {
   HEADLINE_NAMES,

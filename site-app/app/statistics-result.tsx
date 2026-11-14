@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Metric, Result } from "@/lib/domain";
+import type { Metric, Result } from "@/lib/domain/types";
 import { REASON_TEXT, explainResult } from "@/lib/hosted-statistics";
 import { humanLabel } from "@/lib/presentation";
 import { positionLabel } from "./statistics-position";

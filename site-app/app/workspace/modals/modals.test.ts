@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Engagement, EvidenceRequest, Finding, Paper } from "@/lib/domain";
+import type {
+  Engagement,
+  EvidenceRequest,
+  Finding,
+  Paper,
+} from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 import type { WorkspaceData } from "../../workspace-types";
 
 const gates = vi.hoisted(() => ({ open: [] as unknown[] }));
-vi.mock("@/lib/domain", async (original) => ({
-  ...(await original<typeof import("@/lib/domain")>()),
-  finalReportGates: () => gates.open,
+vi.mock("@/lib/domain/capture-gates", async (original) => ({
+  ...(await original<typeof import("@/lib/domain/capture-gates")>()),
+  captureGates: () => gates.open,
 }));
 
 import { incidentChoices } from "../../integrity-incidents";

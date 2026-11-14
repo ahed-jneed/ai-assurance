@@ -5,7 +5,8 @@ import { useRef } from "react";
 import { can, fallbackRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { isAttestedOp } from "@/lib/attestation";
-import { type AuditGate, type EvidenceRequest, type Paper } from "@/lib/domain";
+import type { AuditGate } from "@/lib/domain/gates";
+import type { EvidenceRequest, Paper } from "@/lib/domain/types";
 import { normalizeEvidenceQuery } from "@/lib/evidence-presentation";
 import {
   paperProcedureSection,
@@ -267,6 +268,8 @@ export function useWorkspaceNavigation({
       navigate("Reports & sign-off");
     } else if (gate.kind === "management_system")
       navigate("Regulatory mapping");
+    // The LL144 audits are approved in the Testing lab's LL144 panel.
+    else if (gate.kind === "ll144") navigate("Testing lab");
     else if (gate.kind === "finding") {
       const record = e?.findings.find((f) => f.id === gate.recordId);
       if (record) viewRecord(record.title, record);

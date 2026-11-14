@@ -12,7 +12,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import type { CriterionOption } from "@/lib/criteria/types";
-import { risk, type Artifact, type Finding } from "@/lib/domain";
+import { risk } from "@/lib/domain/risk";
+import type { Artifact, Finding } from "@/lib/domain/types";
 import { findingReference, humanLabel } from "@/lib/presentation";
 
 type Choices = Record<string, string>;

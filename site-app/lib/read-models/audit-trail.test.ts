@@ -172,6 +172,45 @@ describe("auditTrailPage", () => {
     ).toEqual(["E3"]);
   });
 
+  it("refuses an event type the engagement does not record (#201)", async () => {
+    const sqlite = await seeded();
+    for (const action of ["bogus", "publishReport"]) {
+      const refusal = await auditTrailPage(
+        lead(),
+        "ENG-A",
+        q({ action }),
+      ).catch((e: unknown) => e);
+      expect(refusal, action).toBeInstanceOf(ApiError);
+      expect(refusal, action).toMatchObject({
+        status: 400,
+        message:
+          "action: Unknown event type " +
+          JSON.stringify(action) +
+          "; choose one of the event types this log offers",
+      });
+    }
+    // ENG-B records no editPaper; ENG-A does.
+    await expect(
+      auditTrailPage(lead(), "ENG-B", q({ action: "editPaper" })),
+    ).rejects.toMatchObject({ status: 400 });
+    // An assurance record's event type ("assurance:<kind>") can be chosen.
+    event(
+      sqlite,
+      "ENG-A",
+      "E8",
+      "auditor",
+      "assurance:test_result",
+      "2026-11-06T09:00:00.000Z",
+    );
+    const page = await auditTrailPage(
+      lead(),
+      "ENG-A",
+      q({ action: "assurance:test_result" }),
+    );
+    expect(ids(page)).toEqual(["E8"]);
+    expect(page.actions).toContain("assurance:test_result");
+  });
+
   it("names the actors and event types its filters offer", async () => {
     await seeded();
     const page = await auditTrailPage(lead(), "ENG-A", q());

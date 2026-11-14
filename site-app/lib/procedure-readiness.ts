@@ -3,7 +3,7 @@
 // record (WP-RP-02) is never prepared, executed or signed, so that checklist
 // would list steps nobody can take (#94): it shows whether a release has
 // recorded it instead.
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { isReleaseTimeRecord } from "./domain/release-time";
 import { procedureWork } from "./work-items";
 import { currentExecution } from "./workflow-state";

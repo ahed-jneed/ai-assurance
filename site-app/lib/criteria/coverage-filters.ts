@@ -88,6 +88,47 @@ export function effectiveFilters(
   return { state, actor, date };
 }
 
+/**
+ * What is wrong with filters a request names explicitly, such as the CSV
+ * export's query string (#201): a state outside `coverageStates`, or an actor
+ * or date the view does not offer, is an unknown value, never an empty
+ * export. "all" is always valid, and "none" where the view has requirements
+ * without one. Unlike `effectiveFilters`, nothing falls back.
+ */
+export function unknownFilters(
+  view: Pick<CoverageResponse, "cells">,
+  f: CoverageFilters,
+): string[] {
+  const o = filterOptions(view);
+  const problems: string[] = [];
+  if (f.state !== "all" && !coverageStates.includes(f.state as CellState))
+    problems.push(
+      "Unknown coverage state " +
+        JSON.stringify(f.state) +
+        "; use all or one of " +
+        coverageStates.join(", "),
+    );
+  if (
+    f.actor !== "all" &&
+    !o.actors.includes(f.actor) &&
+    !(f.actor === NONE && o.actorsMissing)
+  )
+    problems.push(
+      "Unknown actor " + JSON.stringify(f.actor) + " for this coverage view",
+    );
+  if (
+    f.date !== "all" &&
+    !o.dates.includes(f.date) &&
+    !(f.date === NONE && o.datesMissing)
+  )
+    problems.push(
+      "Unknown applicability date " +
+        JSON.stringify(f.date) +
+        " for this coverage view",
+    );
+  return problems;
+}
+
 /** Whether a requirement passes the filters. */
 export function matches(c: CellView, f: CoverageFilters) {
   if (f.state !== "all" && c.state !== f.state) return false;

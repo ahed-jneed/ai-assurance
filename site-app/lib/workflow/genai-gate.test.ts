@@ -4,7 +4,7 @@
 // limitations; a clear result puts its claim-scope statements in the results.
 import { describe, expect, it } from "vitest";
 import type { GenaiReadiness } from "../genai/readiness";
-import { workflowCommand } from "../workflow-service";
+import { workflowCommand } from "./dispatch";
 import {
   approveProgram,
   artifact,

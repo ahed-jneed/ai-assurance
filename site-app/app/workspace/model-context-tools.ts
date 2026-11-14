@@ -1,7 +1,7 @@
 // Read-only tools the workspace registers with navigator.modelContext (the
 // WebMCP proposal) when the browser provides it.
 import { useEffect, useEffectEvent } from "react";
-import { finalReportGates } from "@/lib/domain";
+import { captureGates } from "@/lib/domain/capture-gates";
 import { packFeatures, type WorkspaceData } from "../workspace-types";
 import { managementNavigation, navigation } from "./modules";
 
@@ -47,7 +47,7 @@ export function useModelContextTools(
             title: current.engagement.title,
             stage: current.engagement.stage,
             role: current.identity.role,
-            blockers: finalReportGates(
+            blockers: captureGates(
               current.engagement,
               undefined,
               packFeatures(current),

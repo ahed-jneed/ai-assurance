@@ -14,9 +14,9 @@ import {
 import {
   finalReportGates,
   paperCurrent,
-  type Engagement,
   type FinalReport,
-} from "../domain";
+} from "../domain/gates";
+import type { Engagement } from "../domain/types";
 import {
   criteriaPhrase,
   criterionRollup,
@@ -38,11 +38,8 @@ import {
 } from "../domain/report-model";
 import { id, now, sha256 } from "../ids";
 import { ApiError } from "../http";
-import {
-  incompleteLl144Runs,
-  incompleteRunMessage,
-  publishableSummary,
-} from "../ll144-audit";
+import { captureGates } from "../domain/capture-gates";
+import { publishableSummary } from "../ll144-audit";
 import { paperContext, paperRevisions } from "../papers/revision";
 import {
   assertReviewerIndependent,
@@ -152,29 +149,29 @@ export const reports = defineCommands({
         );
       // Counted over every job, not the most recent page (#151).
       const externalRunning = (await pendingJobCount(ctx, e.id)) > 0,
-        incompleteRuns = incompleteLl144Runs(e.ll144Audits ?? []);
+        // The record's capture gates, the list the UI shows (#202).
+        recordGates = captureGates(
+          e,
+          { ...terms, particulars },
+          gateFeatures(e),
+        );
       if (a.kind === "final") {
         if (externalRunning)
           throw new ApiError(
             409,
             "Complete or cancel external execution before final capture",
           );
-        if (incompleteRuns.length)
-          throw new ApiError(409, incompleteRunMessage(incompleteRuns[0]));
+        const incompleteRun = recordGates.find((g) => g.kind === "ll144");
+        if (incompleteRun) throw new ApiError(409, incompleteRun.message);
         const assuranceBlockers = await assuranceGates(ctx, e.id, a.conclusion);
         if (assuranceBlockers.length)
           throw new ApiError(409, assuranceBlockers[0]);
-        const gates = finalReportGates(
-          e,
-          { ...terms, particulars },
-          gateFeatures(e),
-        );
-        if (gates[0]?.kind === "stage")
-          throw new ApiError(400, gates[0].message);
-        if (gates.length)
+        if (recordGates[0]?.kind === "stage")
+          throw new ApiError(400, recordGates[0].message);
+        if (recordGates.length)
           throw new ApiError(
             400,
-            gates
+            recordGates
               .slice(0, 8)
               .map((g) => g.message)
               .join("; "),
@@ -195,15 +192,13 @@ export const reports = defineCommands({
       // A draft captured while completion gates are open says so above its
       // conclusion wording (#144); a final report has none open. It counts
       // every blocker final capture enforces: queued or running external
-      // execution, incomplete per-group LL144 runs, assurance blockers and
-      // the final-report gates.
+      // execution, assurance blockers and the record's capture gates (the
+      // final-report gates and incomplete per-group LL144 runs).
       const openGates =
         a.kind === "draft"
           ? (externalRunning ? 1 : 0) +
-            incompleteRuns.length +
             (await assuranceGates(ctx, e.id, a.conclusion)).length +
-            finalReportGates(e, { ...terms, particulars }, gateFeatures(e))
-              .length
+            recordGates.length
           : 0;
       const approvedLl144 = (e.ll144Audits ?? []).filter(
         (x) => x.status === "approved",

@@ -3,7 +3,7 @@
 // 13, 37, 38, 43 to 45), pack #1 on day one, the section 12 coverage table
 // and the views an engagement offers.
 import { afterEach, describe, expect, it } from "vitest";
-import type { Engagement, Finding } from "../domain";
+import type { Engagement, Finding } from "../domain/types";
 import { freshEngagement } from "../factories";
 import { evaluate, place, type CellState } from "./coverage";
 import { coverageSources, type ObligationRecord } from "./coverage-sources";

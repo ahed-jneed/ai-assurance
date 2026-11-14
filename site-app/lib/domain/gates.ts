@@ -45,7 +45,8 @@ export type AuditGate = {
     | "acceptance"
     | "report"
     | "quality_review"
-    | "management_system";
+    | "management_system"
+    | "ll144";
   recordId?: string;
   title: string;
   message: string;
@@ -278,15 +279,6 @@ export function completionGates(
           ": unavailable evidence prevents an unmodified or readiness conclusion",
       })),
   ];
-}
-export function reportBlockers(
-  e: Engagement,
-  conclusion = "readiness",
-  features?: GateFeatures,
-) {
-  return completionGates(e, conclusion, undefined, features).map(
-    (g) => g.message,
-  );
 }
 /** A final report as it is prepared: its terms and, at capture, particulars. */
 export type FinalReport = ReportTerms & { particulars?: ReportParticulars };

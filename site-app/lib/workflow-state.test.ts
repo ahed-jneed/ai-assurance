@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { seedWorkflow } from "./workflow-seed";
 import {
   approvalReserve,

@@ -1,4 +1,5 @@
-import type { Engagement, GateFeatures, Role } from "./domain";
+import type { Engagement, Role } from "./domain/types";
+import type { GateFeatures } from "./domain/gates";
 import {
   checklistProblem,
   qualityReviewSignedOff,

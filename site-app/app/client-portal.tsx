@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { can, canBeAssigned } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import {
 import type { WorkspaceData } from "./workspace-types";
 import { useNow } from "./use-now";
 import { requestLabel } from "@/lib/evidence-requests";
+/** Where focus goes next in a request; see data-portal-focus below. */
+type PortalFocus =
+  "summary" | "submit-button" | "submit-field" | "reply-button" | "reply-field";
 export function ClientPortal({
   data,
   busy,
@@ -28,7 +31,33 @@ export function ClientPortal({
     [sending, setSending] = useState(false),
     [dirty, setDirty] = useState(false),
     [files, setFiles] = useState<{ name: string; size: number }[]>([]),
-    [reply, setReply] = useState({ grantId: "", text: "" });
+    [reply, setReply] = useState({ grantId: "", text: "" }),
+    // The requests the contributor has expanded. A cancelled form leaves its
+    // request expanded, so focus can return to the button that opened it; a
+    // sent one collapses its request.
+    [expanded, setExpanded] = useState<string[]>([]);
+  const collapse = (grantId: string) =>
+    setExpanded((ids) => ids.filter((id) => id !== grantId));
+  // Keyboard focus follows the forms (#203): opening one moves focus to its
+  // first field, cancelling it returns focus to the button that opened it,
+  // and sending it moves focus to the request's summary, as the request
+  // collapses. The target is focused after the render that shows it.
+  const section = useRef<HTMLElement>(null),
+    pendingFocus = useRef("");
+  const focusNext = (grantId: string, target: PortalFocus) => {
+    pendingFocus.current = grantId + ":" + target;
+  };
+  useEffect(() => {
+    const key = pendingFocus.current;
+    if (!key) return;
+    const el = section.current?.querySelector<HTMLElement>(
+      `[data-portal-focus="${CSS.escape(key)}"]`,
+    );
+    // A control disabled while a request is in flight takes focus once the
+    // render that enables it runs this effect again.
+    el?.focus();
+    if (!el || document.activeElement === el) pendingFocus.current = "";
+  });
   useEffect(() => {
     onEditing(dirty || !!reply.text.trim());
     return () => onEditing(false);
@@ -57,6 +86,8 @@ export function ClientPortal({
         v = (await r.json()) as { error?: string };
       if (!r.ok) throw Error(v.error);
       setDirty(false);
+      focusNext(selected, "summary");
+      collapse(selected);
       setSelected("");
       setFiles([]);
       await onReload();
@@ -83,6 +114,8 @@ export function ClientPortal({
         }),
         v = (await r.json()) as { error?: string };
       if (!r.ok) throw Error(v.error);
+      focusNext(grantId, "summary");
+      collapse(grantId);
       setReply({ grantId: "", text: "" });
       await onReload();
     } catch (err) {
@@ -94,13 +127,14 @@ export function ClientPortal({
   function cancel() {
     if (dirty && !window.confirm("Discard the unsent evidence package?"))
       return;
+    focusNext(selected, "submit-button");
     setSelected("");
     setDirty(false);
     setFiles([]);
     setError("");
   }
   return (
-    <section className="panel">
+    <section className="panel" ref={section}>
       <div className="panel-head">
         <h2>Your evidence requests</h2>
       </div>
@@ -113,9 +147,23 @@ export function ClientPortal({
         <details
           className="captured-record"
           key={r.grantId}
-          open={selected === r.grantId || reply.grantId === r.grantId}
+          open={
+            expanded.includes(r.grantId) ||
+            selected === r.grantId ||
+            reply.grantId === r.grantId
+          }
+          onToggle={(ev) => {
+            const open = ev.currentTarget.open;
+            setExpanded((ids) =>
+              open
+                ? ids.includes(r.grantId)
+                  ? ids
+                  : [...ids, r.grantId]
+                : ids.filter((id) => id !== r.grantId),
+            );
+          }}
         >
-          <summary>
+          <summary data-portal-focus={r.grantId + ":summary"}>
             <span>
               {r.subject}
               <small className="block subtle">
@@ -197,7 +245,9 @@ export function ClientPortal({
                   <Button
                     variant="outline"
                     disabled={busy || sending || dirty || !!reply.text.trim()}
+                    data-portal-focus={r.grantId + ":submit-button"}
                     onClick={() => {
+                      focusNext(r.grantId, "submit-field");
                       setSelected(r.grantId);
                       setFiles([]);
                     }}
@@ -207,7 +257,11 @@ export function ClientPortal({
                   <Button
                     variant="ghost"
                     disabled={busy || sending || dirty}
-                    onClick={() => setReply({ grantId: r.grantId, text: "" })}
+                    data-portal-focus={r.grantId + ":reply-button"}
+                    onClick={() => {
+                      focusNext(r.grantId, "reply-field");
+                      setReply({ grantId: r.grantId, text: "" });
+                    }}
                   >
                     Ask a question
                   </Button>
@@ -226,6 +280,7 @@ export function ClientPortal({
                         name="file"
                         multiple
                         required
+                        data-portal-focus={r.grantId + ":submit-field"}
                         onChange={(ev) =>
                           setFiles(
                             Array.from(ev.target.files ?? []).map((f) => ({
@@ -309,6 +364,7 @@ export function ClientPortal({
                     <Textarea
                       required
                       maxLength={5000}
+                      data-portal-focus={r.grantId + ":reply-field"}
                       value={reply.text}
                       onChange={(ev) =>
                         setReply({ grantId: r.grantId, text: ev.target.value })
@@ -327,8 +383,10 @@ export function ClientPortal({
                         if (
                           !reply.text.trim() ||
                           window.confirm("Discard your unsent reply?")
-                        )
+                        ) {
+                          focusNext(r.grantId, "reply-button");
                           setReply({ grantId: "", text: "" });
+                        }
                       }}
                     >
                       Cancel reply
@@ -503,7 +561,9 @@ export function RequestAccess({
           </b>
           <p>
             {requestGrantStatus(g, lapsed, at)} · expires{" "}
-            {new Date(g.expiresAt).toLocaleDateString()}
+            {new Date(g.expiresAt).toLocaleDateString(undefined, {
+              timeZone: "UTC",
+            })}
           </p>
           {requestGrantStatus(g, lapsed, at) === "Lapsed" && (
             <p className="subtle">

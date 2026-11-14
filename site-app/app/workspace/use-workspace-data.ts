@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import {
   FetchError,
   errorMessage,
@@ -133,6 +133,9 @@ export function useWorkspaceData() {
   const [data, setData] = useState<WorkspaceData | null>(null),
     [error, setError] = useState(""),
     [signedOut, setSignedOut] = useState(false),
+    // The account is signed in but the server refused the workspace: no
+    // practice access (revoked, archived or never granted).
+    [accessDenied, setAccessDenied] = useState(false),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [bootstrapping, setBootstrapping] = useState(true);
@@ -183,11 +186,14 @@ export function useWorkspaceData() {
                 : "transient";
         if (failure.kind === "signed_out") {
           setSignedOut(true);
+          setAccessDenied(false);
           setData(null);
           return null;
         }
-        if (failure.kind === "forbidden") setData(null);
-        else if (tenantId || engagementId)
+        if (failure.kind === "forbidden") {
+          setAccessDenied(true);
+          setData(null);
+        } else if (tenantId || engagementId)
           setData((previous) =>
             previous ? { ...previous, engagement: null } : null,
           );
@@ -202,6 +208,7 @@ export function useWorkspaceData() {
         listener.current?.onClientAudience(body.identity.role);
       setData(body);
       setSignedOut(false);
+      setAccessDenied(false);
       // The selected engagement failed to load intact; the rest of the
       // workspace is usable, and the banner says why nothing is open.
       if (body.engagementError) setError(body.engagementError.error);
@@ -388,6 +395,7 @@ export function useWorkspaceData() {
     error,
     setError,
     signedOut,
+    accessDenied,
     busy,
     setBusy,
     loading,

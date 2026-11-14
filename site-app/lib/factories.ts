@@ -9,7 +9,7 @@ import {
   type Resolved,
 } from "./criteria/projection";
 import type { CriteriaPin } from "./criteria/types";
-import type { Engagement, Paper } from "./domain";
+import type { Engagement, Paper } from "./domain/types";
 import { id, now } from "./ids";
 import { ApiError } from "./http";
 import { seedWorkflow } from "./workflow-seed";

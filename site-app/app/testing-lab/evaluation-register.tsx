@@ -12,7 +12,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { can } from "@/lib/permissions";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import type { LabAct } from "./drafts";
 import { State } from "./lab-ui";
 import { download } from "./model-helpers";

@@ -76,22 +76,30 @@ export function DevPersonaSignIn() {
   );
 }
 
-/** The account menu in the sidebar footer. */
+/**
+ * The account menu in the sidebar footer. It is there whenever the account is
+ * signed in, also when the workspace refused it (revoked or no practice
+ * access): then it has no identity to show, but still offers Sign out and,
+ * on the development server, another persona.
+ */
 export function AccountMenu({
   data,
+  signedIn = !!data,
   side = "right",
 }: {
   data: WorkspaceData | null;
+  /** Signed in without workspace data, for example after a revocation. */
+  signedIn?: boolean;
   /** Where the menu opens: beside the sidebar, or below the portal header. */
   side?: "right" | "bottom";
 }) {
-  if (!data) return null;
+  if (!data && !signedIn) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           className="nav-preferences-trigger"
-          aria-label={"Account: " + data.identity.name}
+          aria-label={"Account" + (data ? ": " + data.identity.name : "")}
           title="Account"
         >
           <UserRound size={16} aria-hidden="true" />
@@ -113,21 +121,32 @@ export function AccountMenu({
  * Rendered when the menu opens, so the links return to the location at that
  * moment: the workspace rewrites the URL after it renders.
  */
-function AccountMenuItems({ data }: { data: WorkspaceData }) {
-  const practice = data.memberships.find(
+function AccountMenuItems({ data }: { data: WorkspaceData | null }) {
+  const practice = data?.memberships.find(
     (m) => m.tenant_id === data.tenantId,
   )?.name;
   const returnTo = here();
   return (
     <>
       <DropdownMenuLabel className="grid gap-0.5">
-        <span className="text-[13px] font-medium text-[#edf3ff]">
-          {data.identity.name}
-        </span>
-        <span>
-          {data.identity.role}
-          {practice ? " · " + practice : ""}
-        </span>
+        {data ? (
+          <>
+            <span className="text-[13px] font-medium text-[#edf3ff]">
+              {data.identity.name}
+            </span>
+            <span>
+              {data.identity.role}
+              {practice ? " · " + practice : ""}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-[13px] font-medium text-[#edf3ff]">
+              Signed in
+            </span>
+            <span>No practice access</span>
+          </>
+        )}
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       {import.meta.env.DEV && devPersonas.length > 0 && (
@@ -142,7 +161,7 @@ function AccountMenuItems({ data }: { data: WorkspaceData }) {
               <DropdownMenuItem
                 key={persona.id}
                 asChild
-                disabled={persona.userId === data.identity.id}
+                disabled={persona.userId === data?.identity.id}
               >
                 <a href={signInPath(returnTo, persona.id)} target="_top">
                   <span className="grid">
@@ -157,7 +176,7 @@ function AccountMenuItems({ data }: { data: WorkspaceData }) {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
       )}
-      {data.identity.operator && (
+      {data?.identity.operator && (
         <DropdownMenuItem asChild>
           <a href="/operator" target="_top">
             <ServerCog size={16} aria-hidden="true" />

@@ -1,4 +1,4 @@
-import type { Report } from "@/lib/domain";
+import type { Report } from "@/lib/domain/types";
 import {
   IntegrityError,
   recordIntegrityIncident,

@@ -4,7 +4,7 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { tests } from "@/lib/evaluation";
-import type { Engagement, EvaluationConfig } from "@/lib/domain";
+import type { Engagement, EvaluationConfig } from "@/lib/domain/types";
 import type { PlanForm } from "@/lib/hosted-statistics";
 import { specialCategoryGroupFloor } from "@/lib/special-category";
 import { ProtocolDeclaration } from "../special-category";
@@ -214,7 +214,7 @@ export function ProceduresStep({
               "Minimum rows per group",
               30,
               1000,
-              "Smaller groups are reported but never decide. A special-category group column needs at least " +
+              "At least 30, the platform floor. Smaller groups are reported but never decide. A special-category group column needs at least " +
                 specialCategoryGroupFloor +
                 ".",
             )}

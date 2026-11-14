@@ -3406,13 +3406,6 @@ try {
       ? JSON.stringify(JSON.parse(immutableFinal).snapshot)
       : "",
   );
-  // A superseded report is no longer released, so it cannot be withdrawn.
-  await command(
-    "withdrawReport",
-    { reportId: internalFinal.id, reason: "Superseded already" },
-    owner,
-    409,
-  );
   await command("withdrawReport", {
     reportId: replacement.id,
     reason: "Synthetic test withdrawal; preserve all captured bytes",
@@ -3443,6 +3436,32 @@ try {
         tenantId,
         engagementId: e.id,
         reportId: replacement.id,
+      }),
+    { user: viewer, status: 404 },
+  );
+  // #201: the superseded report the client still reads can be withdrawn
+  // too, by a Lead Auditor only; then the client holds no report.
+  await command(
+    "withdrawReport",
+    { reportId: internalFinal.id, reason: "Superseded report withdrawn" },
+    reviewer,
+    403,
+  );
+  await command("withdrawReport", {
+    reportId: internalFinal.id,
+    reason: "Superseded report withdrawn",
+  });
+  const afterBoth = await request(
+    "/api/workspace?" + new URLSearchParams({ tenantId, engagementId: e.id }),
+    { user: viewer },
+  );
+  assert.deepEqual(afterBoth.engagement.reports, []);
+  await request(
+    "/api/report-package?" +
+      new URLSearchParams({
+        tenantId,
+        engagementId: e.id,
+        reportId: internalFinal.id,
       }),
     { user: viewer, status: 404 },
   );

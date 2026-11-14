@@ -7,7 +7,7 @@ import {
 } from "../../assurance-store";
 import { bucket } from "../../bindings";
 import { activeSigningKey, sign } from "../../signing-keys";
-import { isReleaseTimeRecord, paperCurrent } from "../../domain";
+import { isReleaseTimeRecord, paperCurrent } from "../../domain/gates";
 import { save } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import { platformKey } from "../../special-category";

@@ -1,4 +1,4 @@
-import type { EvidenceRequest, Role } from "./domain";
+import type { EvidenceRequest, Role } from "./domain/types";
 import { requestClosed, requestOverdue } from "./evidence-requests";
 import { canSee } from "./permissions";
 

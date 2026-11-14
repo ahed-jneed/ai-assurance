@@ -1,7 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { label, type OpenForm, type Snapshot } from "./types";
+import {
+  adapterFormatLabel,
+  label,
+  type OpenForm,
+  type Snapshot,
+} from "./types";
 
 /** Access: the engagement team, runner connections and runtime downloads. */
 export function AccessSection({
@@ -63,7 +68,10 @@ export function AccessSection({
                 ? "Last attempt connection " +
                   new Date(w.last_seen).toLocaleString()
                 : "Awaiting first connection"}{" "}
-              · {JSON.parse(w.capabilities).join(", ")}
+              ·{" "}
+              {(JSON.parse(w.capabilities) as string[])
+                .map(adapterFormatLabel)
+                .join(", ")}
             </small>
             <details>
               <summary className="subtle">Image pin</summary>

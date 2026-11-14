@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sanitize } from "../client-projection";
-import type { Engagement, Paper, Report } from "../domain";
+import type { Engagement, Paper, Report } from "../domain/types";
 import { ApiError } from "../http";
 import {
   artifact,
@@ -13,7 +13,13 @@ import {
   recordAcceptance,
   submittedProcedure,
 } from "../workflow/test-fixtures";
-import { draftCaveat, qualityStatement } from "../domain/report-model";
+import { captureGates } from "../domain/capture-gates";
+import {
+  draftCaveat,
+  qualityStatement,
+  resolveParticulars,
+} from "../domain/report-model";
+import { gateFeatures } from "../criteria/pin";
 import {
   computeClassificationAudits,
   incompleteLl144Runs,
@@ -727,6 +733,51 @@ describe("per-group LL144 runs in a report (#144)", () => {
         final.snapshot.ll144Summaries as { classification: { group: string } }[]
       ).map((x) => x.classification.group),
     ).toEqual(["A", "B"]);
+  });
+
+  it("blocks final capture on exactly the gates the UI lists (#202)", async () => {
+    const e = await issuable();
+    const [first] = perGroupRun(e);
+    approve(first);
+    // A completion requirement besides the incomplete run.
+    delete e.qualityReview;
+    // What the completion checklist, the Reports & sign-off banner and the
+    // report dialog list (app/audit-gates.tsx, app/report-workspace.tsx,
+    // app/workspace/modals/report.tsx) for the report being captured.
+    const listed = captureGates(
+      e,
+      {
+        engagementType: "attestation",
+        assuranceLevel: "limited",
+        conclusion: "qualified",
+        particulars: resolveParticulars({
+          ...particulars,
+          basisForModification: qualified.basisForModification,
+          qualityStatement: "",
+        }),
+      },
+      gateFeatures(e),
+    );
+    expect(listed.map((g) => g.kind)).toContain("ll144");
+    expect(listed.map((g) => g.kind)).toContain("quality_review");
+    // The server refuses with the listed run first, then the other gates...
+    expect((await refusal(e, qualified)).message).toBe(
+      listed.find((g) => g.kind === "ll144")!.message,
+    );
+    // ...and a draft's caveat counts every listed gate, no more and no fewer.
+    const draft = await capture(e, { ...qualified, kind: "draft" });
+    expect(
+      (draft.snapshot.conclusionStatement as { draftCaveat?: string })
+        .draftCaveat,
+    ).toBe(draftCaveat(listed.length));
+    // Once the run is complete, the remaining listed gates are the refusal.
+    for (const a of e.ll144Audits!) approve(a);
+    expect((await refusal(e, qualified)).message).toBe(
+      listed
+        .filter((g) => g.kind !== "ll144")
+        .map((g) => g.message)
+        .join("; "),
+    );
   });
 
   it("captures a run none of whose groups is approved without its summaries", async () => {

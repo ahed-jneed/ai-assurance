@@ -130,6 +130,51 @@ export type Exclusion = { recordId: string; reason: string };
 export const label = (s: string) =>
   s.replace(/([A-Z])/g, " $1").replaceAll("_", " ");
 
+/**
+ * Display names of the worker adapter formats (lib/commands/assurance/
+ * workers.ts): label() would spell acronyms out ("O N N X") (#202).
+ */
+const adapterFormatNames: Record<string, string> = {
+  provided_predictions: "Provided predictions",
+  client_local: "Client-local worker",
+  ONNX: "ONNX",
+  XGBoost: "XGBoost",
+  LightGBM: "LightGBM",
+  PMML: "PMML",
+  genai_ingest: "GenAI evidence ingest",
+};
+export const adapterFormatLabel = (format: string) =>
+  adapterFormatNames[format] ?? label(format);
+/** The formats offered when enrolling a worker, in display order. */
+export const enrolmentFormats = [
+  "provided_predictions",
+  "ONNX",
+  "XGBoost",
+  "LightGBM",
+  "PMML",
+] as const;
+
+/**
+ * A prediction lineage record as a picker option: its input dataset, model
+ * name and version and the date the predictions were produced, never the raw
+ * record id (#202).
+ */
+export function predictionOptionLabel(
+  r: Pick<AssuranceRecord, "createdAt" | "body">,
+  e: Pick<Engagement, "artifacts" | "models">,
+) {
+  const dataset = e.artifacts.find((a) => a.id === r.body.datasetId)?.name,
+    model = e.models.find((m) => m.id === r.body.modelId),
+    date = String(r.body.producedAt ?? r.createdAt ?? "").slice(0, 10);
+  return [
+    dataset ?? "Predictions",
+    model ? model.name + " " + model.version : "",
+    date,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** "Pending legal review · LR-02": a flagged obligation item, never approved (D-02). */
 export const pendingLegalReview = (itemIds: string[]) =>
   "Pending legal review · " + itemIds.join(", ");
