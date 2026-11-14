@@ -5,12 +5,12 @@
 // views cannot disagree, and none of them carries an internal user id.
 import type {
   Artifact,
-  Classification,
   Engagement,
   Finding,
   Paper,
   Report,
-} from "./domain";
+} from "./domain/types";
+import type { Classification } from "./domain/classification";
 import { paperCurrent } from "./domain/gates";
 import type { Context } from "./tenancy";
 import { isClientRole, isClientVisible } from "./workflow-state";

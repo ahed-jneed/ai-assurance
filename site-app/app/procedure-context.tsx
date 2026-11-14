@@ -6,7 +6,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { procedureReadiness } from "@/lib/procedure-readiness";
 import { procedureWork } from "@/lib/work-items";
 import { planPinsCurrent } from "@/lib/workflow-state";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 const sampleRecords = recordsQuery("sample");
 

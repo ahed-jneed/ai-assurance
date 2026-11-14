@@ -1,7 +1,7 @@
 // What every view of the audit program reads: the engagement with its
 // adopted workflow, the signed-in member and the form openers.
 import type { ReactNode } from "react";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import type { PaperSuggestion } from "@/lib/domain/art50-papers";
 import type { Procedure, Workflow } from "@/lib/workflow-types";
 import type { WorkspaceData } from "../workspace-types";

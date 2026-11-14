@@ -1,7 +1,7 @@
 "use client";
 // Evaluation setup, step 4 (Review): the frozen request, its pre-registered
 // plan and power check, and the acknowledgements a run may need.
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { describePlan } from "@/lib/hosted-statistics";
 import { planSha256 } from "@/lib/statistics";
 import { PowerCheck } from "../power-check";

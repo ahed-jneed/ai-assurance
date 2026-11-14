@@ -1,4 +1,4 @@
-import type { Engagement, Role } from "./domain";
+import type { Engagement, Role } from "./domain/types";
 import type { AssuranceRecord } from "./assurance-core";
 import { canQueueAuditorModel } from "./permissions";
 import { undeclaredColumns } from "./special-category";

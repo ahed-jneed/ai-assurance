@@ -1,7 +1,7 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { canAssignEngagementAccess, isClientRole } from "@/lib/permissions";
-import { roles } from "@/lib/domain";
+import { roles } from "@/lib/domain/types";
 import { Choice } from "../workspace-ui";
 import type {
   ModalDefinition,

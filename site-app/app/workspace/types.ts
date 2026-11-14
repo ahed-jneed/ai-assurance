@@ -1,6 +1,6 @@
 // Contracts shared by the workspace shell, its hooks, views, modals and the
 // record sheet.
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { WorkspaceData } from "../workspace-types";
 
 /** Outcome of a guarded workspace change (see navigation-guards.ts). */

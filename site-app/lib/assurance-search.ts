@@ -15,7 +15,7 @@ import {
   type RecordRow,
 } from "./assurance-store";
 import { db } from "./bindings";
-import type { Role } from "./domain";
+import type { Role } from "./domain/types";
 import { ApiError } from "./http";
 import { can } from "./permissions";
 import type { Context } from "./tenancy";

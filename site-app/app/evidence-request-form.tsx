@@ -10,7 +10,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import type { Engagement, EvidenceRequest } from "@/lib/domain";
+import type { Engagement, EvidenceRequest } from "@/lib/domain/types";
 export function EvidenceRequestForm({
   mode,
   request: r,

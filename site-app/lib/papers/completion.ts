@@ -18,12 +18,8 @@
 // memo already carries.
 import catalog from "../catalog.json";
 import { packFeatures } from "../criteria/pin";
-import {
-  releaseChecklistLines,
-  type Engagement,
-  type Paper,
-  type Report,
-} from "../domain";
+import { releaseChecklistLines } from "../domain/gates";
+import type { Engagement, Paper, Report } from "../domain/types";
 import {
   paperContentDigest,
   paperRevision,

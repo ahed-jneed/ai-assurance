@@ -4,7 +4,7 @@ import { postJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { WorkflowDialog } from "./audit-program/workflow-dialog";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";

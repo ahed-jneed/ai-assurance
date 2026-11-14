@@ -1,5 +1,5 @@
 // What a registered model version can do here, and the lab's file exports.
-import type { Model } from "@/lib/domain";
+import type { Model } from "@/lib/domain/types";
 
 export function modelCapability(m: Model) {
   return m.format === "Prediction file" &&

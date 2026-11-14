@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { finalReportGates, type Engagement } from "../domain";
+import { finalReportGates } from "./gates";
+import type { Engagement } from "./types";
 import {
   approvedWorkflow,
   command,

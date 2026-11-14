@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import {
   FetchError,
   errorMessage,

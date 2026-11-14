@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import catalog from "./catalog.json";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { freshEngagement } from "./factories";
 import {
   annexRouteFacts,

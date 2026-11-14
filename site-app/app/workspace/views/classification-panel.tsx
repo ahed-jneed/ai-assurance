@@ -1,6 +1,6 @@
 "use client";
 import { classificationRules } from "@/lib/classification-rules";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { ActionState } from "@/lib/permissions";
 import {
   aiOfficeCompetence,

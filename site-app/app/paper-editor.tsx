@@ -39,7 +39,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { ApprovalTable } from "./record-details";
 import { humanLabel } from "@/lib/presentation";
-import type { Engagement, Paper, Role, EvidenceRequest } from "@/lib/domain";
+import type {
+  Engagement,
+  Paper,
+  Role,
+  EvidenceRequest,
+} from "@/lib/domain/types";
 import {
   paperChecklist,
   paperHistoryNotice,

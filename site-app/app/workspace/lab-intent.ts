@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useReducer } from "react";
-import type { Engagement, EvaluationProfile, Model, Run } from "@/lib/domain";
+import type {
+  Engagement,
+  EvaluationProfile,
+  Model,
+  Run,
+} from "@/lib/domain/types";
 import { activeProcedureRun } from "@/lib/workflow-state";
 
 /**

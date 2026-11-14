@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CriteriaView } from "@/lib/criteria/types";
-import { classify, type Engagement } from "@/lib/domain";
+import { classify } from "@/lib/domain/classification";
+import type { Engagement } from "@/lib/domain/types";
 import { SavedViews } from "../../business-workspace";
 import { navigation } from "../modules";
 import { Badge } from "../workspace-ui";

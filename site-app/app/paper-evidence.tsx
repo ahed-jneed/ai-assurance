@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { requestLabel } from "@/lib/evidence-requests";
 import { paperEvidenceReferences } from "@/lib/auditor-workflow";
-import type { Artifact, Paper, EvidenceRequest } from "@/lib/domain";
+import type { Artifact, Paper, EvidenceRequest } from "@/lib/domain/types";
 export function PaperEvidence({
   paper,
   artifacts,

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { assertEngagementQuota } from "../access-policy";
-import { roles, stageGates } from "../domain";
+import { roles } from "../domain/types";
+import { stageGates } from "../domain/gates";
 import { db } from "../bindings";
 import { now, sha256 } from "../ids";
 import {
@@ -12,7 +13,7 @@ import {
 import { freshEngagement } from "../factories";
 import { ApiError } from "../http";
 import { requireAdmin } from "../tenancy";
-import { calendarDate } from "../workflow-service";
+import { calendarDate } from "../workflow/command";
 import { defineCommands, type CommandHandler } from "./command";
 import { short } from "./fields";
 /**

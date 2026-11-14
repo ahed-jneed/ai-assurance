@@ -17,7 +17,7 @@ import { engagement } from "../commands/engagement";
 import { findings } from "../commands/findings";
 import { reports } from "../commands/reports";
 import { caller } from "../commands/test-fixtures";
-import type { Engagement, Finding, Report } from "../domain";
+import type { Engagement, Finding, Report } from "../domain/types";
 import { criterionRollup } from "../domain/report-gates";
 import { buildDossier } from "../dossier";
 import { freshEngagement } from "../factories";

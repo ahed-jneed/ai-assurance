@@ -113,7 +113,6 @@ export const genaiPlan = z
     if (JSON.stringify(p).length > 64 * 1024)
       x.addIssue({ code: "custom", message: "The plan exceeds 64 KiB" });
   });
-export type GenaiPlan = z.infer<typeof genaiPlan>;
 
 export const GENAI_INPUT_FORMATS = [
   "inspect_eval",
@@ -174,4 +173,3 @@ export const genaiManifest = z
     if (JSON.stringify(m).length > 64 * 1024)
       x.addIssue({ code: "custom", message: "The manifest exceeds 64 KiB" });
   });
-export type GenaiManifest = z.infer<typeof genaiManifest>;

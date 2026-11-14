@@ -5,7 +5,7 @@
 // module.
 import { env } from "./bindings";
 import type { DatabaseSync } from "node:sqlite";
-import type { Engagement, Report, Role } from "./domain";
+import type { Engagement, Report, Role } from "./domain/types";
 import { dehydrate } from "./engagement-storage";
 import catalog from "./catalog.json";
 import { freshEngagement, templatePaper } from "./factories";

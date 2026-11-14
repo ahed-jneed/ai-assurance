@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Artifact, Engagement, Model } from "./domain";
+import type { Artifact, Engagement, Model } from "./domain/types";
 import { runnerVersion, testDefinitionVersion } from "./evaluation";
 import {
   executionCSV,

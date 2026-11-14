@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { WorkspaceData } from "../workspace-types";
 import {
   findRecord,

@@ -1,7 +1,6 @@
 // Builders shared by the domain and workflow unit tests; the app never imports
-// this module. The tests go through the public lib/domain.ts and
-// lib/workflow-service.ts entry points that the app uses, so they pin
-// behaviour rather than module layout.
+// this module. The workflow tests go through lib/workflow/dispatch.ts, the
+// entry point the app uses, so they pin behaviour rather than module layout.
 import { expect } from "vitest";
 import catalog from "../catalog.json";
 import type {
@@ -13,13 +12,14 @@ import type {
   Model,
   Paper,
   Run,
-} from "../domain";
+} from "../domain/types";
 import {
   standBackChecklist,
   type QualityReview,
 } from "../domain/quality-review";
 import { seedWorkflow } from "../workflow-seed";
-import { WorkflowError, workflowCommand } from "../workflow-service";
+import { WorkflowError } from "./command";
+import { workflowCommand } from "./dispatch";
 import type { Procedure, ProcedureChange, Workflow } from "../workflow-types";
 import { resolveNew } from "../criteria/pin";
 

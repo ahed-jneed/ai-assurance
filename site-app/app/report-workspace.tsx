@@ -19,13 +19,8 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import {
-  finalReportGates,
-  type Engagement,
-  type Report,
-  type Role,
-} from "@/lib/domain";
-import type { GateFeatures } from "@/lib/domain";
+import { finalReportGates, type GateFeatures } from "@/lib/domain/gates";
+import type { Engagement, Report, Role } from "@/lib/domain/types";
 import {
   opinionLabel,
   termsLabel,

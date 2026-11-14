@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 import { activeProcedureRun } from "@/lib/workflow-state";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";

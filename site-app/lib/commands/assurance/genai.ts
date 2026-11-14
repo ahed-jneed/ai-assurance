@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { AssuranceRecord } from "../../assurance-core";
 import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
-import type { Artifact, Engagement } from "../../domain";
+import type { Artifact, Engagement } from "../../domain/types";
 import { save } from "../../engagement-repo";
 import { assertClaimFits } from "../../external-worker-contract";
 import {

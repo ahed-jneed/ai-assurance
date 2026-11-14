@@ -16,16 +16,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { can } from "@/lib/permissions";
 
-import {
-  type Artifact,
-  type Engagement,
-  type Paper,
-  type Role,
-  type Run,
-  type Finding,
-  type Model,
-  type EvidenceRequest,
-} from "@/lib/domain";
+import type {
+  Artifact,
+  Engagement,
+  Paper,
+  Role,
+  Run,
+  Finding,
+  Model,
+  EvidenceRequest,
+} from "@/lib/domain/types";
 
 import { humanLabel } from "@/lib/presentation";
 

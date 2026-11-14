@@ -5,7 +5,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { CriterionOption } from "@/lib/criteria/types";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { draftCaveat } from "@/lib/domain/report-model";
 import type { Ll144Audit } from "@/lib/ll144-audit";
 import { findingReference } from "@/lib/presentation";

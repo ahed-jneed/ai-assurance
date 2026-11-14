@@ -8,7 +8,7 @@ import {
   testingReadiness,
   type ExecutionSelection,
 } from "@/lib/testing-readiness";
-import type { Engagement, Role } from "@/lib/domain";
+import type { Engagement, Role } from "@/lib/domain/types";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 export function ExecutionPlanner({
   engagement: e,

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ArrowUpRight, FileText, Link2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { AssuranceRecord } from "@/lib/assurance-core";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { recordReviewState, recordTitle } from "./assurance-register";
 
 type Props = {

@@ -3,7 +3,7 @@ import { ApiError } from "./http";
 import { id, now, sha256 } from "./ids";
 import type { Context } from "./tenancy";
 import type { CriteriaStamp } from "./criteria/types";
-import type { Engagement, Report, RulePackStamp } from "./domain";
+import type { Engagement, Report, RulePackStamp } from "./domain/types";
 import { opinionLabel } from "./domain/report-model";
 import { canonical } from "./assurance-core";
 import { exportedPapers } from "./papers/export";

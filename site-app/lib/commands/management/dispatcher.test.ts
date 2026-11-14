@@ -6,7 +6,7 @@ import {
   managementModules,
   managementOps,
 } from "@/lib/commands/management";
-import { roles, type Role } from "@/lib/domain";
+import { roles, type Role } from "@/lib/domain/types";
 import { loadEngagement } from "@/lib/engagement-repo";
 import { ApiError } from "@/lib/http";
 import { context, type Context } from "@/lib/tenancy";

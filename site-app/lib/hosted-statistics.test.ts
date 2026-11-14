@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { Result } from "./domain";
+import type { Result } from "./domain/types";
 import {
   defaultPlanForm,
   describePlan,

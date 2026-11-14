@@ -3,7 +3,7 @@
 // keeps it.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain/types";
 import type { WorkspaceData } from "../workspace-types";
 import { ClientPortalHeader } from "./client-portal-shell";
 

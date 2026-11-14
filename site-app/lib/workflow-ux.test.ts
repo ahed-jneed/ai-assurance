@@ -10,7 +10,7 @@ import {
   auditStageIndex,
   paperEvidenceReferences,
 } from "./auditor-workflow";
-import { completionGates } from "./domain";
+import { completionGates } from "./domain/gates";
 import {
   evidenceRequestCommand,
   requestLabel,
