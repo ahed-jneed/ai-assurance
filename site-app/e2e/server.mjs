@@ -23,9 +23,10 @@
 //   npm run build && node e2e/server.mjs [port]
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildProblems } from "./build-files.mjs";
 
 const projectRoot = fileURLToPath(new URL("../", import.meta.url));
 const port = Number(process.argv[2] ?? process.env.E2E_PORT ?? "8790");
@@ -33,8 +34,17 @@ const state = ".wrangler/e2e-state";
 const server = path.join(projectRoot, "dist/server");
 const config = path.join(server, "wrangler.json");
 
-if (!existsSync(config)) {
-  console.error("dist/server is missing; run `npm run build` first.");
+// Refuse an incomplete build at once (#199), before the database is reset:
+// an interrupted build can leave wrangler.json beside missing modules.
+const problems = buildProblems(server);
+if (problems.length) {
+  console.error(
+    [
+      "dist/server is not a complete build; run `npm run build` first.",
+      ...problems.slice(0, 10).map((p) => "  - " + p),
+      ...(problems.length > 10 ? [`  - and ${problems.length - 10} more`] : []),
+    ].join("\n"),
+  );
   process.exit(1);
 }
 rmSync(path.join(projectRoot, state), { recursive: true, force: true });
