@@ -432,7 +432,6 @@ export function AssuranceWorkbench({
               initialProcedure={initialProcedure}
               open={open}
               act={act}
-              onExecutionMode={formState.setExecutionMode}
               onSystems={() => selectSection("systems")}
               onNavigate={onNavigate}
               onHosted={onHosted}
