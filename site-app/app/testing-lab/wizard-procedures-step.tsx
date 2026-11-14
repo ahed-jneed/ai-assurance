@@ -214,7 +214,7 @@ export function ProceduresStep({
               "Minimum rows per group",
               30,
               1000,
-              "Smaller groups are reported but never decide. A special-category group column needs at least " +
+              "At least 30, the platform floor. Smaller groups are reported but never decide. A special-category group column needs at least " +
                 specialCategoryGroupFloor +
                 ".",
             )}

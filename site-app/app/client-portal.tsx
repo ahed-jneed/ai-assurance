@@ -503,7 +503,9 @@ export function RequestAccess({
           </b>
           <p>
             {requestGrantStatus(g, lapsed, at)} · expires{" "}
-            {new Date(g.expiresAt).toLocaleDateString()}
+            {new Date(g.expiresAt).toLocaleDateString(undefined, {
+              timeZone: "UTC",
+            })}
           </p>
           {requestGrantStatus(g, lapsed, at) === "Lapsed" && (
             <p className="subtle">

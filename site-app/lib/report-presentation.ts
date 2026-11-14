@@ -41,6 +41,27 @@ export function packageStatusLabel(report: Report, clientView = false) {
   return labels[state] ?? "Internal package";
 }
 
+/**
+ * What comes next for a captured package, by its state (#202): the
+ * pre-release guidance only while a final package awaits approval.
+ */
+export function packageGuidance(report: Report) {
+  switch (packageStatus(report)) {
+    case "draft":
+      return "Drafts are internal review snapshots.";
+    case "approved":
+      return "Both package versions are approved. A Lead Auditor other than the approver authorizes the client release.";
+    case "released":
+      return "Released to the client. A newer released report supersedes it; a Lead Auditor can withdraw it.";
+    case "superseded":
+      return "Superseded by a newer released report. It stays readable as it was issued.";
+    case "withdrawn":
+      return "Withdrawn. Capture a new final package to report again.";
+    default:
+      return "Approve both package versions before client release.";
+  }
+}
+
 export function packageOpenLabel(report: Report, role: Role, userId: string) {
   if (isClientRole(role)) return "View report";
   const state = packageStatus(report);

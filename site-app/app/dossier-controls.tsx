@@ -50,6 +50,18 @@ const toggled = (list: string[], value: string, on: boolean) =>
   on ? [...list, value] : list.filter((x) => x !== value);
 const dossierRecords = recordsQuery("dossier");
 /**
+ * The audience the seal dialog posts for the one it was opened for: a scoped
+ * export is an internal dossier; anything else, an empty audience included,
+ * posts nothing (#202).
+ */
+export function sealedAudience(opened: string): "internal" | "client" | null {
+  return opened === "scoped" || opened === "internal"
+    ? "internal"
+    : opened === "client"
+      ? "client"
+      : null;
+}
+/**
  * Sealing and downloading the portable dossiers of one report. The role and
  * the report come from the workspace state; the sealed dossiers are the
  * engagement's dossier records, a shared query (lib/assurance-query.ts) read
@@ -152,6 +164,10 @@ export function DossierControls({
     setAudience(a);
   }
   async function seal() {
+    // The dialog posts only for the audience it was opened for: never an
+    // empty one, as while it closes (#202).
+    const target = sealedAudience(audience);
+    if (!target || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -179,7 +195,7 @@ export function DossierControls({
         tenantId,
         engagementId,
         reportId,
-        audience: scoped ? "internal" : audience,
+        audience: target,
         withheld: Object.entries(withheld).map(([id, reason]) => ({
           id,
           reason,
@@ -292,9 +308,10 @@ export function DossierControls({
             Practice verification keys (active and retired)
           </a>
         </p>
-        {Object.values(sealed).map((s) => (
-          <p key={s.keyId}>
-            Key {s.keyId}
+        {/* Both dossiers may be signed with the same key (#202). */}
+        {Object.entries(sealed).map(([a, s]) => (
+          <p key={a + ":" + s.keyId}>
+            Key {s.keyId} · {a} dossier
             <br />
             <code className="hash-text">{s.publicKeySPKI}</code>
           </p>
@@ -491,7 +508,7 @@ export function DossierControls({
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={!sealedAudience(audience)}>
                   {busy ? "Verifying and sealing…" : "Verify bytes and seal"}
                 </Button>
               </div>

@@ -11,7 +11,7 @@ import {
 import type { Report, Role } from "@/lib/domain";
 import { releaseChecklist, releaseChecklistLines } from "@/lib/domain";
 import { opinionLabel } from "@/lib/domain/report-model";
-import { packageStatusLabel } from "@/lib/report-presentation";
+import { packageGuidance, packageStatusLabel } from "@/lib/report-presentation";
 import { releaseState } from "@/lib/workflow-state";
 import { can } from "@/lib/permissions";
 import { FrozenReportDetails } from "../report-details";
@@ -47,11 +47,7 @@ export function ReportRelease({
         </h3>
         <span className="badge neutral">{packageStatusLabel(r)}</span>
       </div>
-      <p className="subtle">
-        {r.kind === "draft"
-          ? "Drafts are internal review snapshots."
-          : "Approve both package versions before client release."}
-      </p>
+      <p className="subtle">{packageGuidance(r)}</p>
       <div className="row-actions">
         <Button
           variant="outline"
