@@ -254,7 +254,7 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 |---|---|---|
 | GitHub Actions billing | Every CI job is refused before it starts; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | [#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6872999518) |
 | Dev server SSR 500 on a cold start | Not reproduced in about 15 cold starts; server-rendering errors are now logged with their stack, so a recurrence names its cause. `build/ssr-error-log.ts` patches Vinext and its test fails if an upgrade moves the anchor | `site-app/build/ssr-error-log.ts`; [#204] |
-| Release does not recheck LL144 per-group runs | `assertReleasable` rechecks the report gates only; capture already refuses incomplete runs ([decision D-48](docs/product/decisions.md)) | `site-app/lib/workflow/report-release.ts`; [#202] |
+| Release does not recheck LL144 per-group runs | `assertReleasable` rechecks the report gates only; capture already refuses incomplete runs ([decision D-48](docs/product/decisions.md)) | `site-app/lib/commands/reports.ts` (`assertReleasable`); [#202] |
 | Building beside a running e2e server | `npm run build` or `npm run check` in the same checkout as a running e2e server rewrites `dist/` mid-run | `site-app/e2e/README.md`; [#194] |
 | Sign-ins are recorded after an 8-hour gap, not at session start | The Access log shows first requests, not sessions ([decision D-41](docs/product/decisions.md)) | `site-app/lib/access-events.ts` |
 | `pruneSignIns` runs on the request path | Pruning happens when a sign-in is recorded; a scheduled handler would take it off the request path | `site-app/lib/tenancy.ts` |
