@@ -1,0 +1,122 @@
+# Changelog
+
+All notable changes to this repository, newest first within each group. The platform has no versioned releases yet; this file covers the November 2026 roadmap cycle ([ROADMAP.md](ROADMAP.md)), from the initial commit `74c6463` (5 Nov 2026) to `main` on 14 Nov 2026. Each entry is one merged pull request, with the issues it closed; dates are merge dates (UTC). Decisions taken along the way are in the [decision log](docs/product/decisions.md), and what the code now does is in the [capability matrix](docs/capabilities.md).
+
+## Unreleased: November 2026 roadmap cycle
+
+Highlights:
+
+- **Correctness and security (M1):** an identity adapter that denies by default; access lifecycle and practice administration; plan hashes that bind executed work; rule pack 2026.11.2 with the 2 Dec 2026 milestones; classification v2; report model v2 with ISAE 3000 conclusion types; statistics in which intervals and exact tests decide outcomes, in the engine and the hosted runner alike; an acceptance and independence gate; the Engagement Quality Reviewer role; wrapped dossier signing keys; the Art 4a gate and client-local jobs for special-category data.
+- **Multi-framework and GenAI evidence (M2):** criteria as data with typed crosswalks and coverage views; pack #2 (EN 18286 + ISO/IEC 42001, as drafts); NIST AI RMF and AI 600-1 crosswalks; the NYC Local Law 144 bias audit; GenAI evaluation evidence ingested, recomputed and gated in the workspace.
+- **Release readiness (M3):** the Playwright persona suite with axe checks; attestation dialogs and permission-aware actions; WCAG AA fixes and a client portal shell; the paged audit trail and practice Access log; the large screens and barrels split into modules.
+- **Open at 14 Nov 2026:** the dead-code sweep ([#37](https://github.com/ahed-jneed/ai-assurance/issues/37), [PR #196](https://github.com/ahed-jneed/ai-assurance/pull/196)) and this documentation refresh ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38)).
+
+### Added
+
+- **audit:** paged audit trail and practice Access log with CSV export ([#181](https://github.com/ahed-jneed/ai-assurance/issues/181)). [PR #184](https://github.com/ahed-jneed/ai-assurance/pull/184), 2026-11-14
+- **ui:** WCAG AA fixes, client portal shell and whole-page axe checks ([#36](https://github.com/ahed-jneed/ai-assurance/issues/36)). [PR #180](https://github.com/ahed-jneed/ai-assurance/pull/180), 2026-11-14
+- **ui:** fetchJson for remaining consumers, canSee and role-narrowing explanations ([#178](https://github.com/ahed-jneed/ai-assurance/issues/178)). [PR #179](https://github.com/ahed-jneed/ai-assurance/pull/179), 2026-11-14
+- **ui:** attestation dialogs, permission-aware actions and consistent error handling ([#35](https://github.com/ahed-jneed/ai-assurance/issues/35)). [PR #177](https://github.com/ahed-jneed/ai-assurance/pull/177), 2026-11-13
+- **ui:** one cached assurance query for the workspace views and per-view loading states ([#63](https://github.com/ahed-jneed/ai-assurance/issues/63)). [PR #176](https://github.com/ahed-jneed/ai-assurance/pull/176), 2026-11-13
+- **criteria:** link the GenAI evaluation pack to NIST AI 600-1 risks ([#161](https://github.com/ahed-jneed/ai-assurance/issues/161)). [PR #168](https://github.com/ahed-jneed/ai-assurance/pull/168), 2026-11-13
+- **evaluation:** macro F1 power, multiclass plan constraints and Art 50 readiness by period ([#152](https://github.com/ahed-jneed/ai-assurance/issues/152)). [PR #164](https://github.com/ahed-jneed/ai-assurance/pull/164), 2026-11-13
+- **reporting:** release notifications, paper banners and release-time procedure handling ([#94](https://github.com/ahed-jneed/ai-assurance/issues/94)). [PR #163](https://github.com/ahed-jneed/ai-assurance/pull/163), 2026-11-13
+- **security:** archive practices with issued work, incident handling and exact pending-job checks ([#151](https://github.com/ahed-jneed/ai-assurance/issues/151)). [PR #162](https://github.com/ahed-jneed/ai-assurance/pull/162), 2026-11-13
+- **engine:** genai_ingest worker job, signed detection results, C2PA reports and inert excerpts ([#128](https://github.com/ahed-jneed/ai-assurance/issues/128)). [PR #160](https://github.com/ahed-jneed/ai-assurance/pull/160), 2026-11-13
+- **evidence:** GenAI evidence levels in the vault, re-run attestation and a capability-aware queue button ([#145](https://github.com/ahed-jneed/ai-assurance/issues/145)). [PR #159](https://github.com/ahed-jneed/ai-assurance/pull/159), 2026-11-13
+- **evaluation:** hosted runner parity for clustered plans, reason texts and the regression baseline ([#136](https://github.com/ahed-jneed/ai-assurance/issues/136)). [PR #158](https://github.com/ahed-jneed/ai-assurance/pull/158), 2026-11-13
+- **criteria:** coverage filters by actor and date, CSV export and derived applicability rows ([#135](https://github.com/ahed-jneed/ai-assurance/issues/135)). [PR #157](https://github.com/ahed-jneed/ai-assurance/pull/157), 2026-11-13
+- **evaluation:** client-local pin tool, queue-time column checks, client attestation and a group-size floor ([#134](https://github.com/ahed-jneed/ai-assurance/issues/134)). [PR #156](https://github.com/ahed-jneed/ai-assurance/pull/156), 2026-11-13
+- **reporting:** pack clauses in findings, certification defaults, draft caveats and per-group LL144 runs ([#144](https://github.com/ahed-jneed/ai-assurance/issues/144)). [PR #155](https://github.com/ahed-jneed/ai-assurance/pull/155), 2026-11-13
+- **criteria:** NIST AI RMF 1.0 and AI 600-1 frameworks with typed crosswalks ([#29](https://github.com/ahed-jneed/ai-assurance/issues/29)). [PR #154](https://github.com/ahed-jneed/ai-assurance/pull/154), 2026-11-13
+- **evidence:** validate dataset cards, settle the report package proof scope and show exported working papers ([#137](https://github.com/ahed-jneed/ai-assurance/issues/137)). [PR #153](https://github.com/ahed-jneed/ai-assurance/pull/153), 2026-11-13
+- **api:** integrity incident view, a lighter workbench snapshot and a review-subject index ([#121](https://github.com/ahed-jneed/ai-assurance/issues/121)). [PR #150](https://github.com/ahed-jneed/ai-assurance/pull/150), 2026-11-13
+- **regulatory:** suggest Art 50 paper applicability, structure Art 50 criteria and check the research data in CI ([#120](https://github.com/ahed-jneed/ai-assurance/issues/120)). [PR #149](https://github.com/ahed-jneed/ai-assurance/pull/149), 2026-11-13
+- **security:** membership email, invitation sender, lapsed grants and an operator path for abandoned practices ([#95](https://github.com/ahed-jneed/ai-assurance/issues/95)). [PR #148](https://github.com/ahed-jneed/ai-assurance/pull/148), 2026-11-13
+- **evaluation:** real group sizes in power checks, one threshold library and a queue-time positive-class check ([#113](https://github.com/ahed-jneed/ai-assurance/issues/113)). [PR #147](https://github.com/ahed-jneed/ai-assurance/pull/147), 2026-11-13
+- **evidence:** GenAI evaluation evidence in the workspace with evidence levels, results and a readiness gate ([#33](https://github.com/ahed-jneed/ai-assurance/issues/33)). [PR #143](https://github.com/ahed-jneed/ai-assurance/pull/143), 2026-11-13
+- **evaluation:** NYC Local Law 144 bias audit computations, pack and publishable summary ([#30](https://github.com/ahed-jneed/ai-assurance/issues/30)). [PR #142](https://github.com/ahed-jneed/ai-assurance/pull/142), 2026-11-12
+- **criteria:** EN 18286 and ISO/IEC 42001 management-system audit pack (draft until owner review) ([#28](https://github.com/ahed-jneed/ai-assurance/issues/28)). [PR #141](https://github.com/ahed-jneed/ai-assurance/pull/141), 2026-11-12
+- **criteria:** explicit pins, framework stamps in reports and generated obligation files ([#61](https://github.com/ahed-jneed/ai-assurance/issues/61)). [PR #140](https://github.com/ahed-jneed/ai-assurance/pull/140), 2026-11-12
+- **dossier:** scoped export for large audit files with the scope bound into the signature ([#83](https://github.com/ahed-jneed/ai-assurance/issues/83)). [PR #139](https://github.com/ahed-jneed/ai-assurance/pull/139), 2026-11-12
+- **engine:** cluster-bootstrap decisions for clustered plans and bootstrap sensitivity intervals ([#93](https://github.com/ahed-jneed/ai-assurance/issues/93)). [PR #132](https://github.com/ahed-jneed/ai-assurance/pull/132), 2026-11-12
+- **contracts:** map papers, memos and dataset cards to the canonical schemas ([#51](https://github.com/ahed-jneed/ai-assurance/issues/51)). [PR #130](https://github.com/ahed-jneed/ai-assurance/pull/130), 2026-11-12
+- **regulatory:** classification re-review items, workbench trigger suggestions and a migration notice ([#104](https://github.com/ahed-jneed/ai-assurance/issues/104)). [PR #129](https://github.com/ahed-jneed/ai-assurance/pull/129), 2026-11-12
+- **criteria:** frameworks and engagement packs as data, AI Act pack #1 and coverage views ([#27](https://github.com/ahed-jneed/ai-assurance/issues/27)). [PR #133](https://github.com/ahed-jneed/ai-assurance/pull/133), 2026-11-06
+- **reporting:** readiness with gaps, firm-level report settings and a live record sheet ([#111](https://github.com/ahed-jneed/ai-assurance/issues/111)). [PR #131](https://github.com/ahed-jneed/ai-assurance/pull/131), 2026-11-06
+- **evaluation:** client-local external jobs keep special-category datasets off the platform ([#102](https://github.com/ahed-jneed/ai-assurance/issues/102)). [PR #126](https://github.com/ahed-jneed/ai-assurance/pull/126), 2026-11-06
+- **workflow:** independence checks on access grants, inbox items and display names ([#112](https://github.com/ahed-jneed/ai-assurance/issues/112)). [PR #124](https://github.com/ahed-jneed/ai-assurance/pull/124), 2026-11-06
+- **engine:** ingest and recompute GenAI evaluation evidence ([#32](https://github.com/ahed-jneed/ai-assurance/issues/32)). [PR #118](https://github.com/ahed-jneed/ai-assurance/pull/118), 2026-11-06
+- **workflow:** engagement quality reviewer role and completion gate ([#24](https://github.com/ahed-jneed/ai-assurance/issues/24)). [PR #115](https://github.com/ahed-jneed/ai-assurance/pull/115), 2026-11-06
+- **assurance:** workbench at scale with paged registers and server-side search and review queue ([#81](https://github.com/ahed-jneed/ai-assurance/issues/81)). [PR #110](https://github.com/ahed-jneed/ai-assurance/pull/110), 2026-11-06
+- **regulatory:** rule pack 2026.11.2 with the Art 50 research edits, and Art 50 working papers ([#77](https://github.com/ahed-jneed/ai-assurance/issues/77), [#78](https://github.com/ahed-jneed/ai-assurance/issues/78)). [PR #109](https://github.com/ahed-jneed/ai-assurance/pull/109), 2026-11-06
+- **evaluation:** hosted runner statistics parity with intervals, pre-registered decisions and cross-runner golden tests ([#22](https://github.com/ahed-jneed/ai-assurance/issues/22)). [PR #101](https://github.com/ahed-jneed/ai-assurance/pull/101), 2026-11-06
+- **reporting:** report model v2 with engagement types, assurance levels and ISAE 3000 conclusion types ([#20](https://github.com/ahed-jneed/ai-assurance/issues/20)). [PR #100](https://github.com/ahed-jneed/ai-assurance/pull/100), 2026-11-06
+- **workflow:** acceptance, independence and competence gate before fieldwork ([#23](https://github.com/ahed-jneed/ai-assurance/issues/23)). [PR #99](https://github.com/ahed-jneed/ai-assurance/pull/99), 2026-11-06
+- **regulatory:** classification v2 with tri-state facts, enumerated Art 5 practices, GPAI roles and Art 50 triggers ([#19](https://github.com/ahed-jneed/ai-assurance/issues/19)). [PR #97](https://github.com/ahed-jneed/ai-assurance/pull/97), 2026-11-06
+- **evaluation:** Art 4a gate for special-category fairness data ([#60](https://github.com/ahed-jneed/ai-assurance/issues/60)). [PR #92](https://github.com/ahed-jneed/ai-assurance/pull/92), 2026-11-06
+- **engine:** statistics 1.0.0 core with intervals, exact tests and multiplicity control deciding outcomes ([#21](https://github.com/ahed-jneed/ai-assurance/issues/21)). [PR #87](https://github.com/ahed-jneed/ai-assurance/pull/87), 2026-11-06
+- **security:** access lifecycle with revoke cascades, practice admins, invitations and self-provisioning control ([#12](https://github.com/ahed-jneed/ai-assurance/issues/12)). [PR #84](https://github.com/ahed-jneed/ai-assurance/pull/84), 2026-11-06
+- **regulatory:** rule pack 2026.11.1 with dated obligations, 2 Dec 2026 milestones, standards register and version stamps ([#18](https://github.com/ahed-jneed/ai-assurance/issues/18)). [PR #73](https://github.com/ahed-jneed/ai-assurance/pull/73), 2026-11-06
+- **security:** identity adapter that denies by default, with dev personas, seed data and an account menu ([#11](https://github.com/ahed-jneed/ai-assurance/issues/11)). [PR #55](https://github.com/ahed-jneed/ai-assurance/pull/55), 2026-11-06
+
+### Fixed
+
+- **ui:** remove React Compiler lint disables and fix runtime React warnings ([#39](https://github.com/ahed-jneed/ai-assurance/issues/39)). [PR #171](https://github.com/ahed-jneed/ai-assurance/pull/171), 2026-11-13
+- **evaluation:** check the cluster column of client-held datasets at queue time ([#166](https://github.com/ahed-jneed/ai-assurance/issues/166)). [PR #167](https://github.com/ahed-jneed/ai-assurance/pull/167), 2026-11-13
+- **workflow:** close quality reviewer independence gaps with grant history, a practice cooling-off policy and a signer check at release ([#127](https://github.com/ahed-jneed/ai-assurance/issues/127)). [PR #138](https://github.com/ahed-jneed/ai-assurance/pull/138), 2026-11-12
+- **evaluation:** gate Parquet, spreadsheet and UTF-16 uploads for special-category columns ([#103](https://github.com/ahed-jneed/ai-assurance/issues/103)). [PR #125](https://github.com/ahed-jneed/ai-assurance/pull/125), 2026-11-06
+- **workflow:** bind external jobs and sample records to the procedure planHash ([#105](https://github.com/ahed-jneed/ai-assurance/issues/105)). [PR #123](https://github.com/ahed-jneed/ai-assurance/pull/123), 2026-11-06
+- **evaluation:** regression criteria must beat the mean-prediction baseline on both runners ([#68](https://github.com/ahed-jneed/ai-assurance/issues/68)). [PR #117](https://github.com/ahed-jneed/ai-assurance/pull/117), 2026-11-06
+- **testing-lab:** keep dataset card pins on retries and refuse duplicate queued runs ([#67](https://github.com/ahed-jneed/ai-assurance/issues/67)). [PR #114](https://github.com/ahed-jneed/ai-assurance/pull/114), 2026-11-06
+- **security:** wrap dossier signing keys and restrict key rotation ([#25](https://github.com/ahed-jneed/ai-assurance/issues/25)). [PR #107](https://github.com/ahed-jneed/ai-assurance/pull/107), 2026-11-06
+- **assurance:** aggregate imported runs with aggregateOutcome and reject blank rows in sampling ([#66](https://github.com/ahed-jneed/ai-assurance/issues/66)). [PR #106](https://github.com/ahed-jneed/ai-assurance/pull/106), 2026-11-06
+- **engine:** apply the 2.1.0 performance rules and the performance positive class to external runs ([#65](https://github.com/ahed-jneed/ai-assurance/issues/65)). [PR #98](https://github.com/ahed-jneed/ai-assurance/pull/98), 2026-11-06
+- **assurance:** queue only external jobs the worker can run and explain failures ([#58](https://github.com/ahed-jneed/ai-assurance/issues/58)). [PR #91](https://github.com/ahed-jneed/ai-assurance/pull/91), 2026-11-06
+- **ui:** stop retrying a stale recovery draft's autosave after a conflict ([#76](https://github.com/ahed-jneed/ai-assurance/issues/76)). [PR #90](https://github.com/ahed-jneed/ai-assurance/pull/90), 2026-11-06
+- **workflow:** bind run retries, active-job guards and sample pins to the procedure plan ([#69](https://github.com/ahed-jneed/ai-assurance/issues/69)). [PR #89](https://github.com/ahed-jneed/ai-assurance/pull/89), 2026-11-06
+- **assurance:** assist answers 400 for unknown, non-source or empty selections ([#82](https://github.com/ahed-jneed/ai-assurance/issues/82)). [PR #88](https://github.com/ahed-jneed/ai-assurance/pull/88), 2026-11-06
+- **workflow:** retire orphaned papers, break circular final-stage gates and supersede released reports ([#14](https://github.com/ahed-jneed/ai-assurance/issues/14)). [PR #85](https://github.com/ahed-jneed/ai-assurance/pull/85), 2026-11-06
+- **assurance:** engagements past 1,000 assurance records keep working, with SQL gates and cursor pagination ([#17](https://github.com/ahed-jneed/ai-assurance/issues/17)). [PR #72](https://github.com/ahed-jneed/ai-assurance/pull/72), 2026-11-06
+- **testing-lab:** baseline-aware performance rules, edge-case handling and one-time lab hand-off ([#15](https://github.com/ahed-jneed/ai-assurance/issues/15)). [PR #56](https://github.com/ahed-jneed/ai-assurance/pull/56), 2026-11-06
+- **workflow:** bind work to plan hashes, count returns only, and keep approvals when limits are reached ([#13](https://github.com/ahed-jneed/ai-assurance/issues/13)). [PR #54](https://github.com/ahed-jneed/ai-assurance/pull/54), 2026-11-06
+- **engine:** make the external worker robust to bad jobs, slow transfers and contract drift ([#10](https://github.com/ahed-jneed/ai-assurance/issues/10)). [PR #47](https://github.com/ahed-jneed/ai-assurance/pull/47), 2026-11-06
+
+### Changed
+
+- **ui:** split acceptance-panel.tsx and tidy the split modules ([#193](https://github.com/ahed-jneed/ai-assurance/issues/193)). [PR #195](https://github.com/ahed-jneed/ai-assurance/pull/195), 2026-11-14
+- **ui:** split assurance-workbench.tsx along its sections ([#187](https://github.com/ahed-jneed/ai-assurance/issues/187)). [PR #192](https://github.com/ahed-jneed/ai-assurance/pull/192), 2026-11-14
+- **ui:** split testing-lab.tsx along its steps ([#188](https://github.com/ahed-jneed/ai-assurance/issues/188)). [PR #191](https://github.com/ahed-jneed/ai-assurance/pull/191), 2026-11-14
+- **ui:** split audit-program.tsx along its views ([#186](https://github.com/ahed-jneed/ai-assurance/issues/186)). [PR #190](https://github.com/ahed-jneed/ai-assurance/pull/190), 2026-11-14
+- **access:** sign-in retention, person-involved filter and server permission parity ([#185](https://github.com/ahed-jneed/ai-assurance/issues/185)). [PR #189](https://github.com/ahed-jneed/ai-assurance/pull/189), 2026-11-14
+- **ui:** client portal and accessibility follow-ups ([#182](https://github.com/ahed-jneed/ai-assurance/issues/182)). [PR #183](https://github.com/ahed-jneed/ai-assurance/pull/183), 2026-11-14
+- **site-app:** retire the lib/store.ts barrel ([#70](https://github.com/ahed-jneed/ai-assurance/issues/70)). [PR #169](https://github.com/ahed-jneed/ai-assurance/pull/169), 2026-11-13
+- **engine:** one supported Python, cryptography and zstd in the compute image, built in CI ([#62](https://github.com/ahed-jneed/ai-assurance/issues/62)). [PR #146](https://github.com/ahed-jneed/ai-assurance/pull/146), 2026-11-13
+- stop hydrating every engagement and isolate corrupt blobs ([#16](https://github.com/ahed-jneed/ai-assurance/issues/16)). [PR #108](https://github.com/ahed-jneed/ai-assurance/pull/108), 2026-11-06
+- single source of truth for contracts and methodology data, with generated copies checked in CI ([#3](https://github.com/ahed-jneed/ai-assurance/issues/3)). [PR #42](https://github.com/ahed-jneed/ai-assurance/pull/42), 2026-11-06
+- **site-app:** dispatch `/api/assurance` and `/api/management` ops to command modules ([#50](https://github.com/ahed-jneed/ai-assurance/issues/50)). [PR #53](https://github.com/ahed-jneed/ai-assurance/pull/53), 2026-11-05
+- **site-app:** split `app/workspace.tsx` into `app/workspace/` ([#5](https://github.com/ahed-jneed/ai-assurance/issues/5)). [PR #48](https://github.com/ahed-jneed/ai-assurance/pull/48), 2026-11-05
+- **site-app:** split `lib/domain.ts` and the workflow service into `lib/domain/` and `lib/workflow/` ([#6](https://github.com/ahed-jneed/ai-assurance/issues/6)). [PR #44](https://github.com/ahed-jneed/ai-assurance/pull/44), 2026-11-05
+- **site-app:** split `lib/store.ts` and the `/api/workspace` command bus into modules ([#4](https://github.com/ahed-jneed/ai-assurance/issues/4)). [PR #41](https://github.com/ahed-jneed/ai-assurance/pull/41), 2026-11-05
+
+### Tests and CI
+
+- **e2e:** fix the report-release flake at its root in the e2e server ([#194](https://github.com/ahed-jneed/ai-assurance/issues/194)). [PR #197](https://github.com/ahed-jneed/ai-assurance/pull/197), 2026-11-14
+- **site-app:** keep heavy Vitest cases deterministic under parallel load ([#174](https://github.com/ahed-jneed/ai-assurance/issues/174)). [PR #175](https://github.com/ahed-jneed/ai-assurance/pull/175), 2026-11-13
+- **site-app:** make the dataset-header worksheet-budget test deterministic under load ([#170](https://github.com/ahed-jneed/ai-assurance/issues/170)). [PR #173](https://github.com/ahed-jneed/ai-assurance/pull/173), 2026-11-13
+- **site-app:** move pure harness checks into Vitest and split the integration harness ([#52](https://github.com/ahed-jneed/ai-assurance/issues/52)). [PR #172](https://github.com/ahed-jneed/ai-assurance/pull/172), 2026-11-13
+- **e2e:** the remaining persona flows and negative checks ([#96](https://github.com/ahed-jneed/ai-assurance/issues/96)). [PR #165](https://github.com/ahed-jneed/ai-assurance/pull/165), 2026-11-13
+- **e2e:** make the auditor paper spec wait on real conditions ([#119](https://github.com/ahed-jneed/ai-assurance/issues/119)). [PR #122](https://github.com/ahed-jneed/ai-assurance/pull/122), 2026-11-06
+- **site-app:** fix the integrity harness for report model v2. [PR #116](https://github.com/ahed-jneed/ai-assurance/pull/116), 2026-11-06
+- **e2e:** Playwright persona suite with accessibility checks in CI ([#34](https://github.com/ahed-jneed/ai-assurance/issues/34)). [PR #86](https://github.com/ahed-jneed/ai-assurance/pull/86), 2026-11-06
+- **ci:** GitHub Actions workflow, Prettier baseline, zero-warning lint and build, and Vitest ([#1](https://github.com/ahed-jneed/ai-assurance/issues/1)). [PR #2](https://github.com/ahed-jneed/ai-assurance/pull/2), 2026-11-05
+
+### Documentation
+
+- **product:** decisions D-15 to D-24 and the new Later items ([#74](https://github.com/ahed-jneed/ai-assurance/issues/74)). [PR #75](https://github.com/ahed-jneed/ai-assurance/pull/75), 2026-11-06
+- **research:** what an auditor tests for the Art 50 transparency obligations ([#59](https://github.com/ahed-jneed/ai-assurance/issues/59)). [PR #71](https://github.com/ahed-jneed/ai-assurance/pull/71), 2026-11-06
+- **design:** GenAI evaluation evidence ingestion, per-item schema and evidence levels ([#31](https://github.com/ahed-jneed/ai-assurance/issues/31)). [PR #49](https://github.com/ahed-jneed/ai-assurance/pull/49), 2026-11-06
+- **design:** audit-grade statistics specification with hand-computed golden cases ([#9](https://github.com/ahed-jneed/ai-assurance/issues/9)). [PR #46](https://github.com/ahed-jneed/ai-assurance/pull/46), 2026-11-06
+- **design:** multi-framework criteria model with typed crosswalks ([#26](https://github.com/ahed-jneed/ai-assurance/issues/26)). [PR #45](https://github.com/ahed-jneed/ai-assurance/pull/45), 2026-11-06
+- record the product direction, roadmap, decision log and research behind it ([#7](https://github.com/ahed-jneed/ai-assurance/issues/7)). [PR #40](https://github.com/ahed-jneed/ai-assurance/pull/40), 2026-11-06
+- **research:** verify the 2026.11 rule pack against the Official Journal ([#8](https://github.com/ahed-jneed/ai-assurance/issues/8)). [PR #43](https://github.com/ahed-jneed/ai-assurance/pull/43), 2026-11-05
