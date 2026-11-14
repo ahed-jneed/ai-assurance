@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Engagement, EvidenceRequest, Finding, Paper } from "@/lib/domain";
+import type {
+  Engagement,
+  EvidenceRequest,
+  Finding,
+  Paper,
+} from "@/lib/domain/types";
 import type { Procedure } from "@/lib/workflow-types";
 import type { WorkspaceData } from "../../workspace-types";
 

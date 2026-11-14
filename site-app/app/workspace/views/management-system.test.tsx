@@ -4,7 +4,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ManagementSystemView } from "@/lib/criteria/types";
-import type { Engagement, Finding } from "@/lib/domain";
+import type { Engagement, Finding } from "@/lib/domain/types";
 import {
   Nonconformities,
   ProgrammePhases,

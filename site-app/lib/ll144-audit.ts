@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { calendarDate } from "./dataset-card";
 import { parseCSV } from "./diagnostics";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { ApiError } from "./http";
 import {
   Ll144Error,

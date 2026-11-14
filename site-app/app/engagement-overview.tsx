@@ -21,8 +21,8 @@ import {
   isReleaseTimeRecord,
   paperCurrent,
   paperRequired,
-} from "@/lib/domain";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+} from "@/lib/domain/gates";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import { roleReason } from "@/lib/permissions";
 import type { PaperTarget } from "@/lib/paper-workflow";
 

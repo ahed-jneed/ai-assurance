@@ -44,14 +44,16 @@ Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported ver
 ```powershell
 cd site-app
 npm ci
-npm run build
-npm run db:migrate:local
+npm run build             # writes dist/server/wrangler.json, which the migration reads
+npm run db:migrate:local  # creates the local D1 tables; required before dev and seed:demo
 npm run dev
-# in another terminal: the persona demo practice
+# in another terminal, while the dev server runs: the persona demo practice
 npm run seed:demo
 ```
 
-`npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. Hosting applies production migrations separately.
+The migration step is not optional. Without it the dev server still starts and its pages still load, but the local D1 database (`site-app/.wrangler/state`) has no tables: every API request answers 500 and the dev log shows `D1_ERROR: no such table: ...`, the workspace shows a request error instead of data, and `npm run seed:demo` stops with `GET /api/workspace answered 500`. To recover, stop the dev server, run `npm run db:migrate:local`, start it again and rerun `npm run seed:demo`. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. Hosting applies production migrations separately.
+
+On Windows, keep the checkout path short (`site-app\` under about 120 characters): workerd stores the local database about 125 characters below `site-app\` and cannot open a path past the 260-character limit, so in a deeper checkout `npm run db:migrate:local` fails with `SQLITE_CANTOPEN`.
 
 ### Checks
 
@@ -68,7 +70,7 @@ CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushe
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness against the built Worker in Miniflare; needs a build first. A harness never loads TypeScript sources or rewrites import paths: a check of a pure module is a Vitest test |
 | `npm run check:fixtures` | Validate the run, external-run and procedure records the harnesses just produced against `schemas/` |
 
-The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
+The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). On Windows they also need a short temp directory: Miniflare keeps each test database as an SQLite file about 150 characters below the temp directory, and workerd fails with `SQLITE_CANTOPEN` (or does not start) past the 260-character path limit. When `TEMP` is longer than 100 characters, `scripts/harness/env.mjs` switches the harnesses and their child processes to `%LOCALAPPDATA%\Temp\aa-harness` (else `%SystemDrive%\aa-harness-tmp`) and says so; set `ASSURANCE_HARNESS_TEMP` to choose another short directory. If none is writable, the harness stops with a message naming the fix. The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
 The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`.
 

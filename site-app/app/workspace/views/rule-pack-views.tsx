@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import {
   engagementPeriod,
   engagementRulePack,

@@ -17,6 +17,9 @@ const include = [
   "app/**/*.test.ts",
   "app/**/*.test.tsx",
   "build/**/*.test.ts",
+  "hooks/**/*.test.ts",
+  // Unit tests of the e2e tooling; Playwright runs only e2e/*.spec.ts.
+  "e2e/**/*.test.ts",
 ];
 // Tests of local-calendar defaults run in a time zone east of UTC, where
 // the local date changes before the UTC date does.

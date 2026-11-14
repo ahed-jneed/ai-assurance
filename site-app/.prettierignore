@@ -11,7 +11,7 @@ package-lock.json
 vendor/
 public/
 drizzle/meta/
-# shadcn registry files vendored verbatim (see eslint.config.mjs)
+# shadcn registry files vendored (nearly) verbatim (see eslint.config.mjs)
 components/ui/
 hooks/use-mobile.ts
 

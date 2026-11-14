@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import {
   clientNotices,
   packageGuidance,

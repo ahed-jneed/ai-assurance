@@ -59,8 +59,10 @@ const eslintConfig = defineConfig([
   {
     files: ["components/ui/**/*.{ts,tsx}", "hooks/use-mobile.ts"],
     rules: {
-      // These files are vendored verbatim from shadcn@4.17.0. Keep the
-      // registry source intact while applying the stricter rules to Site code.
+      // These files are vendored from shadcn@4.17.0, verbatim except that
+      // dialog, sheet and alert-dialog return focus to their opener (#203,
+      // hooks/use-return-focus.ts). Otherwise keep the registry source
+      // intact while applying the stricter rules to Site code.
       "@typescript-eslint/no-unused-vars": "off",
       "react-hooks/purity": "off",
       "react-hooks/set-state-in-effect": "off",

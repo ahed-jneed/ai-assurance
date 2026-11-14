@@ -1,5 +1,5 @@
 // Field builders shared by the audit program's forms.
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import type { Field, Option } from "./workflow-dialog";
 export const label = (s: string) =>
   s.replaceAll("_", " ").replace(/([A-Z])/g, " $1");

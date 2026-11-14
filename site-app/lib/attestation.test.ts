@@ -6,7 +6,7 @@ import {
 } from "@/lib/attestation";
 import { dispatch } from "@/lib/commands";
 import { caller, stored } from "@/lib/commands/test-fixtures";
-import type { Artifact, Engagement, Finding, Paper } from "@/lib/domain";
+import type { Artifact, Engagement, Finding, Paper } from "@/lib/domain/types";
 import { sha256 } from "@/lib/ids";
 
 const fileHash = "a".repeat(64);

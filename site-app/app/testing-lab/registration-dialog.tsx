@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { tasks } from "@/lib/evaluation";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { Field, SelectField } from "./lab-ui";
 import type { LabSetup } from "./use-lab-setup";
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { recordStatement } from "../../assurance-store";
 import { db } from "../../bindings";
 import { save } from "../../engagement-repo";
+import { ApiError } from "../../http";
 import { id, now, sha256 } from "../../ids";
 import { defineCommands } from "../command";
 import { note, short } from "../fields";
@@ -17,7 +18,12 @@ export const workers: AssuranceModule = defineCommands({
       const v = z
         .object({
           name: short,
-          imageDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+          imageDigest: z
+            .string()
+            .regex(
+              /^sha256:[a-f0-9]{64}$/,
+              "Enter the image digest as sha256: followed by 64 lowercase hexadecimal characters",
+            ),
           // "client_local": the client's own worker, which reads client-held
           // datasets in the client's environment (#102).
           formats: z
@@ -86,6 +92,17 @@ export const workers: AssuranceModule = defineCommands({
     roles: ["Lead Auditor"],
     async handle({ e }, d, ctx) {
       const v = z.object({ workerId: short, reason: note }).strict().parse(d);
+      // Only a runner enrolled for this engagement can be revoked: an unknown
+      // id must not leave a "revoked" worker event behind.
+      const runner = await db()
+        .prepare(
+          "SELECT active FROM runner_workers WHERE id=? AND tenant_id=? AND engagement_id=?",
+        )
+        .bind(v.workerId, ctx.tenantId, e.id)
+        .first<{ active: number }>();
+      if (!runner) throw new ApiError(404, "Runner not found");
+      if (!runner.active)
+        throw new ApiError(409, "This runner is already revoked");
       const log = await recordStatement(ctx, e.id, "worker_event", {
         ...v,
         action: "revoked",

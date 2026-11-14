@@ -6,7 +6,7 @@ import {
   pinnedCatalog,
 } from "../criteria/pin";
 import { selectablePacks } from "../criteria/registry";
-import type { Engagement } from "../domain";
+import type { Engagement } from "../domain/types";
 import { parseReportSettings } from "../domain/report-model";
 import { db } from "../bindings";
 import { getEngagement, storedSize } from "../engagement-repo";

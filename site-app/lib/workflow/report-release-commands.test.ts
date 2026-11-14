@@ -4,7 +4,9 @@
 // report-release.test.ts covers superseding and the completion checklist.
 import { describe, expect, it } from "vitest";
 import { legacyPackageMessage } from "../client-projection";
-import { releaseChecklist, type Engagement, type Report } from "../domain";
+import { isClientVisible } from "../workflow-state";
+import { releaseChecklist } from "../domain/gates";
+import type { Engagement, Report } from "../domain/types";
 import {
   approvedWorkflow,
   at,
@@ -413,7 +415,7 @@ describe("withdrawReport", () => {
   it.each([
     ["an internal", () => captured()],
     [
-      "a superseded",
+      "a never-released superseded",
       () =>
         approved({ release: { ...approved().release!, state: "superseded" } }),
     ],
@@ -428,7 +430,60 @@ describe("withdrawReport", () => {
       e,
       () => withdraw(e),
       409,
-      "Only an approved or released report can be withdrawn",
+      "Only an approved or released report, or a superseded report the client can still read, can be withdrawn",
+    );
+  });
+
+  describe("a superseded report the client can still read (#201)", () => {
+    /** R1 released, then superseded by R2, whose release was withdrawn. */
+    function supersededByWithdrawn() {
+      return signOff(
+        approved({
+          release: {
+            ...approved().release!,
+            state: "superseded",
+            releasedAt: at,
+            supersededBy: "R2",
+          },
+        }),
+        approved({
+          id: "R2",
+          sha256: "R2-internal",
+          release: {
+            ...approved().release!,
+            state: "withdrawn",
+            releasedAt: at,
+            supersedes: "R1",
+          },
+        }),
+      );
+    }
+
+    it("withdraws it after its successor is withdrawn", async () => {
+      const e = supersededByWithdrawn();
+      expect(isClientVisible(r1(e))).toBe(true);
+      expect(await withdraw(e)).toEqual({ reportId: "R1" });
+      expect(r1(e).release!.state).toBe("withdrawn");
+      expect(r1(e).release!.history.at(-1)).toEqual({
+        actor: "lead",
+        at,
+        action: "withdraw",
+        reason: "Material misstatement found",
+      });
+      expect(e.reports.filter(isClientVisible)).toEqual([]);
+    });
+
+    it.each(["auditor", "reviewer", "viewer"])(
+      "still refuses %s",
+      async (user) => {
+        const e = supersededByWithdrawn();
+        await refused(
+          e,
+          () => withdraw(e, user),
+          403,
+          "A Lead Auditor must authorize this decision",
+        );
+      },
     );
   });
 });

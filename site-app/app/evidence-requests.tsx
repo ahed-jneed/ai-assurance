@@ -26,12 +26,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import {
-  type Engagement,
-  type EvidenceRequest,
-  type Paper,
-  type Role,
-} from "@/lib/domain";
+import type {
+  Engagement,
+  EvidenceRequest,
+  Paper,
+  Role,
+} from "@/lib/domain/types";
 import {
   requestLabel,
   requestClosed,

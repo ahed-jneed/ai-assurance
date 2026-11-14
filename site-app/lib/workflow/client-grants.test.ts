@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { workflowCommand } from "../workflow-service";
+import { workflowCommand } from "./dispatch";
 import { clientGrantLapsed } from "../workflow-state";
 import {
   at,

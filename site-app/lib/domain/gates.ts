@@ -280,15 +280,6 @@ export function completionGates(
       })),
   ];
 }
-export function reportBlockers(
-  e: Engagement,
-  conclusion = "readiness",
-  features?: GateFeatures,
-) {
-  return completionGates(e, conclusion, undefined, features).map(
-    (g) => g.message,
-  );
-}
 /** A final report as it is prepared: its terms and, at capture, particulars. */
 export type FinalReport = ReportTerms & { particulars?: ReportParticulars };
 /**

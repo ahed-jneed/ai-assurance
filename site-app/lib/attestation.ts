@@ -4,7 +4,7 @@
 // same functions, so the digest the person saw is the digest the server
 // checks before the decision runs and records in the audit event.
 import { z } from "zod";
-import type { Engagement } from "./domain";
+import type { Engagement } from "./domain/types";
 import { sha256 } from "./ids";
 
 /** The decisions that need an attestation, with what the person declares. */
@@ -162,7 +162,6 @@ export const attestationInput = z
       .optional(),
   })
   .strict();
-export type AttestationInput = z.infer<typeof attestationInput>;
 
 /** What the audit event records for an attested decision. */
 export type AttestationRecord = {

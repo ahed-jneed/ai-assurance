@@ -8,7 +8,7 @@
 // recorded in operator_events, which is immutable and outlives the practice
 // (docs/security/identity.md).
 import { env } from "./bindings";
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import {
   IntegrityError,
   loadStoredPart,

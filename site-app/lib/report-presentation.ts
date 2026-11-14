@@ -1,4 +1,4 @@
-import type { Report, Role } from "./domain";
+import type { Report, Role } from "./domain/types";
 import { can, isClientRole } from "./permissions";
 
 /**

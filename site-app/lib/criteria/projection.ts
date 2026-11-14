@@ -2,7 +2,7 @@
 // sections 7 and 11.3): what a pack switches on, its items and links, and the
 // catalogue and obligation shapes the existing code reads. No bundle import,
 // so factories, the workflow seed and tests can use it without the loader.
-import type { RulePackStamp } from "../domain";
+import type { RulePackStamp } from "../domain/types";
 import { rulePackStamp } from "../rule-pack";
 import type {
   CatalogItem,

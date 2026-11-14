@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import golden from "../../schemas/fixtures/performance-rules-golden.json";
 import { evaluate } from "./diagnostics";
-import type { EvaluationConfig, Run } from "./domain";
+import type { EvaluationConfig, Run } from "./domain/types";
 import { performanceBaselines } from "./evaluation";
 
 describe("shared performance golden cases", () => {

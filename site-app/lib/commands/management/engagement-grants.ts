@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "../../bindings";
-import { roles, type Role } from "../../domain";
+import { roles, type Role } from "../../domain/types";
 import { loadEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
@@ -40,10 +40,15 @@ export async function checkAssignable(
   userId?: string,
 ) {
   if (!ids.length) return;
-  if (ctx.role !== "Lead Auditor" || isClientRole(role))
+  if (ctx.role !== "Lead Auditor")
     throw new ApiError(
       403,
       "Only a Lead Auditor may assign internal engagement access",
+    );
+  if (isClientRole(role))
+    throw new ApiError(
+      400,
+      "Client members get access through their client, not engagement grants. Remove the engagements and save again",
     );
   // Access is decided by the D1 record; its R2 parts are never needed here.
   for (const engagementId of ids) {

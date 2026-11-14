@@ -11,7 +11,7 @@ import { GET as download, POST as upload } from "@/app/api/evidence/route";
 import { POST as workspace } from "@/app/api/workspace/route";
 import { caller, postRequest, stored } from "./commands/test-fixtures";
 import { pyarrowParquet, workbook } from "./dataset-header.fixture";
-import type { Engagement, EvaluationProfile, Run } from "./domain";
+import type { Engagement, EvaluationProfile, Run } from "./domain/types";
 import { ApiError } from "./http";
 import {
   assertPlatformBytes,

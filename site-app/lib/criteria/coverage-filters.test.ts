@@ -14,6 +14,7 @@ import {
   filterOptions,
   matches,
   NONE,
+  unknownFilters,
 } from "./coverage-filters";
 import { criteriaRegistry, pinned, resolveNew } from "./pin";
 import { coverageFor, type CellView } from "./views";
@@ -194,6 +195,45 @@ describe("coverageExport", () => {
     await expect(
       coverageExport(caller("Auditor", false), "E-1", null),
     ).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("unknownFilters (#201)", () => {
+  const v = view();
+  const o = filterOptions(v);
+  it("accepts all, every state and every offered actor and date", () => {
+    expect(unknownFilters(v, all)).toEqual([]);
+    expect(
+      unknownFilters(v, {
+        state: "partial",
+        actor: o.actors[0],
+        date: o.dates[0],
+      }),
+    ).toEqual([]);
+  });
+  it("names an unknown state, actor or date instead of exporting a header only", () => {
+    expect(unknownFilters(v, { ...all, state: "bogus" })).toEqual([
+      'Unknown coverage state "bogus"; use all or one of full, partial, exception, open, parent_only, unmapped, excluded, not_applicable',
+    ]);
+    expect(unknownFilters(v, { ...all, actor: "Bogus" })).toEqual([
+      'Unknown actor "Bogus" for this coverage view',
+    ]);
+    expect(unknownFilters(v, { ...all, date: "1999-01-01" })).toEqual([
+      'Unknown applicability date "1999-01-01" for this coverage view',
+    ]);
+    expect(
+      unknownFilters(v, { state: "x", actor: "y", date: "z" }),
+    ).toHaveLength(3);
+  });
+  it("accepts none only where the view has requirements without one", () => {
+    expect(unknownFilters(v, { ...all, actor: NONE }).length).toBe(
+      o.actorsMissing ? 0 : 1,
+    );
+    const dated = {
+      cells: [cell({ actors: ["Provider"] })],
+    } as unknown as Parameters<typeof unknownFilters>[0];
+    expect(unknownFilters(dated, { ...all, actor: NONE })).toHaveLength(1);
+    expect(unknownFilters(dated, { ...all, date: NONE })).toEqual([]);
   });
 });
 

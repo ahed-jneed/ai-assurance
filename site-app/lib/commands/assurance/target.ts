@@ -4,7 +4,7 @@ import {
   recordsById,
   type AssessmentKind,
 } from "../../assurance-store";
-import type { Engagement } from "../../domain";
+import type { Engagement } from "../../domain/types";
 import { ApiError } from "../../http";
 import type { Context } from "../../tenancy";
 import type { CommandModule } from "../command";

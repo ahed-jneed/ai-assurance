@@ -1,6 +1,6 @@
 // The acceptance panel's forms: each opens the workflow dialog for one
 // acceptance or independence command.
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { canBeAssigned } from "@/lib/permissions";
 import {
   currentDeclaration,

@@ -14,9 +14,9 @@ import {
 import {
   finalReportGates,
   paperCurrent,
-  type Engagement,
   type FinalReport,
-} from "../domain";
+} from "../domain/gates";
+import type { Engagement } from "../domain/types";
 import {
   criteriaPhrase,
   criterionRollup,

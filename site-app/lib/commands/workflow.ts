@@ -5,16 +5,13 @@ import { templatePaper } from "../factories";
 import { linkedReadiness } from "../genai/store";
 import { seedWorkflow } from "../workflow-seed";
 import { ApiError } from "../http";
-import {
-  workflowCommand,
-  workflowOps,
-  WorkflowError,
-} from "../workflow-service";
+import { WorkflowError } from "../workflow/command";
+import { workflowCommand, workflowOps } from "../workflow/dispatch";
 import { workflowRoleRefusal } from "../permissions";
 import type { CommandModule } from "./command";
 import { assertReleasable } from "./reports";
 /**
- * The structured audit workflow from lib/workflow-service.ts, which checks its
+ * The structured audit workflow from lib/workflow/dispatch.ts, which checks its
  * own roles. Releasing a report first re-checks the captured snapshot.
  */
 export const workflow: CommandModule = {

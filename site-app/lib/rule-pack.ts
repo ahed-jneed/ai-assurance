@@ -4,7 +4,7 @@
 // engagement period, and three-valued predicate selection. Pure and without the
 // catalog import, so client views can use it with the catalog the workspace
 // API sends (lib/criteria/pin.ts binds the pinned pack).
-import type { Engagement, RulePackStamp } from "./domain";
+import type { Engagement, RulePackStamp } from "./domain/types";
 import { classificationFactValues } from "./domain/classification";
 import {
   select,

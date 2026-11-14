@@ -4,7 +4,7 @@
 // leaves the engagement exactly as it was.
 import { describe, expect, it } from "vitest";
 import { defaultFindingCriteria } from "../criteria/pin";
-import type { Engagement, Finding } from "../domain";
+import type { Engagement, Finding } from "../domain/types";
 import {
   artifact,
   at,

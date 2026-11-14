@@ -3,7 +3,7 @@
 // attestation button, and a level badge on each GenAI file of the register.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { Artifact } from "@/lib/domain";
+import type { Artifact } from "@/lib/domain/types";
 import { genaiArtifactLevels } from "@/lib/genai/evidence-levels";
 import { EvidenceRegister } from "./audit-registers";
 import { IntakeActions } from "./genai-evidence";

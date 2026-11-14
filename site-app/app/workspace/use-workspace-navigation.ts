@@ -5,7 +5,8 @@ import { useRef } from "react";
 import { can, fallbackRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { isAttestedOp } from "@/lib/attestation";
-import { type AuditGate, type EvidenceRequest, type Paper } from "@/lib/domain";
+import type { AuditGate } from "@/lib/domain/gates";
+import type { EvidenceRequest, Paper } from "@/lib/domain/types";
 import { normalizeEvidenceQuery } from "@/lib/evidence-presentation";
 import {
   paperProcedureSection,

@@ -14,6 +14,7 @@ import type { Context } from "../tenancy";
 import {
   eventFilters,
   maxPageSize,
+  refuseUnknownAction,
   toPage,
   type EventPage,
   type EventQuery,
@@ -67,9 +68,10 @@ const eventArgs = (tenantId: string) => [
   tenantId,
 ];
 
-function refuse(ctx: Context) {
+function refuse(ctx: Context, q: EventQuery) {
   if (!canSeeAccessLog(ctx))
     throw new ApiError(403, "The Access log is for practice administrators");
+  refuseUnknownAction(q, accessEventTypes);
 }
 
 async function rows(ctx: Context, q: EventQuery): Promise<Row[]> {
@@ -109,7 +111,7 @@ export async function accessLogPage(
   ctx: Context,
   q: EventQuery,
 ): Promise<AccessLogPage> {
-  refuse(ctx);
+  refuse(ctx, q);
   const [page, actors, people] = await Promise.all([
     rows(ctx, q),
     db()
@@ -163,7 +165,7 @@ export async function accessLogCsv(
   ctx: Context,
   q: EventQuery,
 ): Promise<{ filename: string; csv: string }> {
-  refuse(ctx);
+  refuse(ctx, q);
   const lines = [accessLogCsvColumns.join(",")];
   let after = q.after,
     count = 0;

@@ -3,7 +3,7 @@
 // the completion memo only when it binds the package's hashes.
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import type { Engagement, Report } from "./domain";
+import type { Engagement, Report } from "./domain/types";
 import { exportedPapers } from "./papers/export";
 import { paperContext, paperRevisions } from "./papers/revision";
 import { verifyPackage } from "./report-package";

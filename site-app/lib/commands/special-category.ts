@@ -1,4 +1,4 @@
-import type { Artifact } from "../domain";
+import type { Artifact } from "../domain/types";
 import { ApiError } from "../http";
 import { id, now } from "../ids";
 import {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { stageGates, type Engagement, type Role } from "../domain";
+import { stageGates } from "../domain/gates";
+import type { Engagement, Role } from "../domain/types";
 import { engagementWork } from "../work-items";
 import { seedWorkflow } from "../workflow-seed";
 import {

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import { ExternalJobDetail } from "../external-job-detail";
 import { ExecutionPlanner } from "../testing-readiness";
-import type { Role } from "@/lib/domain";
+import type { Role } from "@/lib/domain/types";
 import {
   label,
   type Act,

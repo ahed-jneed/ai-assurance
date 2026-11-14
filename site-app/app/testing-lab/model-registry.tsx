@@ -10,7 +10,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import type { Engagement } from "@/lib/domain";
+import type { Engagement } from "@/lib/domain/types";
 import { modelCapability } from "./model-helpers";
 import type { LabSetup } from "./use-lab-setup";
 

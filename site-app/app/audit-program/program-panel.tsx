@@ -2,7 +2,7 @@
 import { ArrowUpRight, ClipboardList, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isReleaseTimeRecord } from "@/lib/domain";
+import { isReleaseTimeRecord } from "@/lib/domain/gates";
 import { procedureLabel } from "@/lib/workflow-state";
 import { decisionState } from "@/lib/permissions";
 import { procedureWork } from "@/lib/work-items";

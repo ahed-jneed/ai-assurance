@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAssuranceQuery } from "@/hooks/use-assurance-query";
 import { recordsQuery, refreshAfterMutation } from "@/lib/assurance-query";
-import type { Engagement, Report, Role } from "@/lib/domain";
+import type { Engagement, Report, Role } from "@/lib/domain/types";
 import { errorMessage, fetchJson, postJson } from "@/lib/fetch-json";
 import { can } from "@/lib/permissions";
 import { isClientRole } from "@/lib/workflow-state";

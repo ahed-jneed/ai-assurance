@@ -22,9 +22,11 @@ const query = z
   .object({
     cursor: z.string().max(600).optional(),
     actor: z.string().max(256).optional(),
+    // Assurance records write "assurance:<kind>" events. Each log then
+    // refuses an event type it does not record (refuseUnknownAction).
     action: z
       .string()
-      .regex(/^[A-Za-z][A-Za-z0-9_]{0,63}$/, "Unknown event type")
+      .regex(/^[A-Za-z][A-Za-z0-9_:]{0,63}$/, "Unknown event type")
       .optional(),
     from: day.optional(),
     to: day.optional(),
@@ -123,6 +125,23 @@ export function parseEventQuery(
   if (q.from && q.to && q.from > q.to)
     throw new ApiError(400, "The date range ends before it starts");
   return { ...q, ...(cursor ? { after: decodeCursor(cursor) } : {}) };
+}
+
+/**
+ * Refuses an event type filter the log does not offer (#201): an unknown
+ * value is 400, as an unknown parameter is, never an empty page.
+ */
+export function refuseUnknownAction(
+  q: Pick<EventQuery, "action">,
+  actions: readonly string[],
+) {
+  if (q.action && !actions.includes(q.action))
+    throw new ApiError(
+      400,
+      "action: Unknown event type " +
+        JSON.stringify(q.action) +
+        "; choose one of the event types this log offers",
+    );
 }
 
 /** The ISO timestamp of the start of the UTC day after `day`. */

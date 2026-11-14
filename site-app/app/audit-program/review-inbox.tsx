@@ -1,6 +1,6 @@
 "use client";
 import { ArrowUpRight } from "lucide-react";
-import type { Paper } from "@/lib/domain";
+import type { Paper } from "@/lib/domain/types";
 import type { ProgramScope } from "./program-scope";
 /** The review inbox tab: current revisions awaiting independent review. */
 export function ReviewInbox({

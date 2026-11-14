@@ -4,7 +4,7 @@
 // itself.
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { roles } from "@/lib/domain";
+import { roles } from "@/lib/domain/types";
 
 const source = (path: string) =>
   readFileSync(new URL("../" + path, import.meta.url), "utf8");

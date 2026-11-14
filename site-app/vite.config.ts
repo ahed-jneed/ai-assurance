@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { depScanEnvironments } from "./build/dep-scan";
 import { sites } from "./build/sites-vite-plugin";
+import { ssrErrorLog } from "./build/ssr-error-log";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -102,6 +103,8 @@ export default defineConfig(async ({ command }) => {
     },
     plugins: [
       vinext(),
+      // Development only: SSR errors reach the log instead of a silent 500 (#204).
+      ssrErrorLog(),
       sites({ mockAuth }),
       connectorPreview(),
       cloudflare({

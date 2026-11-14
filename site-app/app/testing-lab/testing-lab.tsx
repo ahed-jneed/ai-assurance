@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { can } from "@/lib/permissions";
 import { isClientRole } from "@/lib/workflow-state";
-import type { Engagement, Paper, Role } from "@/lib/domain";
+import type { Engagement, Paper, Role } from "@/lib/domain/types";
 import { DatasetRegistry } from "../dataset-registry";
 import { GenaiEvidence } from "../genai-evidence";
 import {

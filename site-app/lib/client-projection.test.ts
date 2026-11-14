@@ -5,7 +5,7 @@ import {
   withdrawnSuccessor,
 } from "./client-projection";
 import { caller, stored } from "./commands/test-fixtures";
-import type { Report } from "./domain";
+import type { Report } from "./domain/types";
 import { packageStatusLabel } from "./report-presentation";
 import { paper } from "./workflow/test-fixtures";
 
@@ -111,6 +111,29 @@ describe("client projection of released reports", () => {
     expect(packageStatusLabel(client.reports[0], true)).toBe(
       "Superseded by a later report, since withdrawn",
     );
+  });
+
+  it("does not name a predecessor withdrawn after it was superseded (#201)", () => {
+    const e = stored();
+    e.reports = [
+      report("REPORT-1", {
+        state: "withdrawn",
+        releasedAt: at,
+        supersededBy: "REPORT-2",
+        history: [],
+      }),
+      report("REPORT-2", {
+        state: "released",
+        releasedAt: at,
+        supersedes: "REPORT-1",
+        history: [],
+      }),
+    ];
+    const client = sanitize(e, caller("Client Viewer", false));
+    expect(client.reports.map((r) => [r.id, r.replaces])).toEqual([
+      ["REPORT-2", []],
+    ]);
+    expect(JSON.stringify(client.reports)).not.toContain("REPORT-1");
   });
 
   it("names no replaced report for a first release", () => {
