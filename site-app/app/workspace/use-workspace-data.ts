@@ -412,12 +412,15 @@ export function useWorkspaceData() {
     async (tenantId: string, engagementId: string) => {
       const message = failureMessage.current;
       const body = await load(tenantId);
-      if (body && !body.engagement) {
-        loadFailure.current = "missing";
-        retrySelection.current = { tenantId, engagementId };
-        setError(message);
-      }
-      return body;
+      if (!body) return null;
+      // The practice opens on its default engagement; none is open here,
+      // as when the link named the default practice.
+      const missing = { ...body, engagement: null };
+      setData(missing);
+      loadFailure.current = "missing";
+      retrySelection.current = { tenantId, engagementId };
+      setError(message);
+      return missing;
     },
     [load],
   );
