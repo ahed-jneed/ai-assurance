@@ -116,7 +116,7 @@ describe("context", () => {
     rows([
       [/status='active' ORDER BY tenant_id/, { tenant_id: "tenant-1" }],
       [
-        /SELECT role,client_id,access_since,email FROM memberships/,
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/,
         { role: "Auditor", client_id: null, email: "lea@practice.example" },
       ],
       [/FROM practice_admins/, null],
@@ -137,7 +137,7 @@ describe("context", () => {
   it("records a sign-in for the Access log only after a gap without one (#181)", async () => {
     const member: [RegExp, Row][] = [
       [
-        /SELECT role,client_id,access_since,email FROM memberships/,
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/,
         { role: "Reviewer", client_id: null, email: "lea@practice.example" },
       ],
     ];
@@ -170,7 +170,7 @@ describe("context", () => {
     rows([
       [/FROM sign_in_events/, null],
       [
-        /SELECT role,client_id,access_since,email FROM memberships/,
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/,
         { role: "Auditor", client_id: null, email: "lea@practice.example" },
       ],
     ]);
@@ -211,7 +211,7 @@ describe("context", () => {
     rows([
       [/FROM sign_in_events/, null],
       [
-        /SELECT role,client_id,access_since,email FROM memberships/,
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/,
         { role: "Auditor", client_id: null, email: "lea@practice.example" },
       ],
     ]);
@@ -223,7 +223,7 @@ describe("context", () => {
   it("never refuses a request when the sign-in cannot be recorded", async () => {
     rows([
       [
-        /SELECT role,client_id,access_since,email FROM memberships/,
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/,
         { role: "Auditor", client_id: null, email: "lea@practice.example" },
       ],
     ]);
@@ -250,7 +250,7 @@ describe("context", () => {
       d1.state.writes = [];
       rows([
         [
-          /SELECT role,client_id,access_since,email FROM memberships/,
+          /SELECT role,client_id,access_since,email,display_name FROM memberships/,
           { role: "Auditor", client_id: null, email: stored },
         ],
       ]);
@@ -271,12 +271,52 @@ describe("context", () => {
     }
   });
 
+  it("records the member's name when the membership names them only by email (#241)", async () => {
+    const member = (display_name: string | null) =>
+      rows([
+        [
+          /SELECT role,client_id,access_since,email,display_name FROM memberships/,
+          {
+            role: "Auditor",
+            client_id: null,
+            email: lea.email,
+            display_name,
+          },
+        ],
+      ]);
+    for (const stored of ["LEA@practice.example", "", null]) {
+      d1.state.writes = [];
+      member(stored);
+      await as(lea, () => context("tenant-1"));
+      expect(d1.state.writes).toEqual([
+        {
+          sql: "UPDATE memberships SET display_name=? WHERE tenant_id=? AND user_id=? AND display_name IS ?",
+          args: ["Lea Lead", "tenant-1", "user-lea", stored],
+        },
+      ]);
+    }
+    // A name an administrator gave stays; without a full name nothing is known.
+    for (const [identity, stored] of [
+      [lea, "Lea L. (Risk)"],
+      [{ ...lea, fullName: null, displayName: lea.email }, lea.email],
+    ] as const) {
+      d1.state.writes = [];
+      member(stored);
+      await as(identity, () => context("tenant-1"));
+      expect(d1.state.writes).toEqual([]);
+    }
+  });
+
   it("provisions a first practice the user administers and may open", async () => {
     env.SELF_SIGNUP = "open";
     let provisioned = false;
     d1.state.lookup = (sql) => {
       if (/SELECT tenant_id FROM memberships/.test(sql)) return null;
-      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
+      if (
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/.test(
+          sql,
+        )
+      )
         return provisioned
           ? { role: "Lead Auditor", client_id: null, email: lea.email }
           : null;
@@ -410,7 +450,11 @@ describe("context", () => {
         )
       )
         return joined ? { tenant_id: "tenant-firm" } : null;
-      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
+      if (
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/.test(
+          sql,
+        )
+      )
         return joined
           ? {
               role: "Auditor",
@@ -499,7 +543,11 @@ describe("context", () => {
         )
       )
         return joined ? { tenant_id: "tenant-firm" } : null;
-      if (/SELECT role,client_id,access_since,email FROM memberships/.test(sql))
+      if (
+        /SELECT role,client_id,access_since,email,display_name FROM memberships/.test(
+          sql,
+        )
+      )
         return joined
           ? {
               role: "Auditor",

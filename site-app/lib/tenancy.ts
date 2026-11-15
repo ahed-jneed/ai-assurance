@@ -39,11 +39,12 @@ type MemberRow = {
   client_id: string | null;
   access_since: string | null;
   email?: string | null;
+  display_name?: string | null;
 };
 const memberRow = (tenantId: string, userId: string) =>
   db()
     .prepare(
-      "SELECT role,client_id,access_since,email FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
+      "SELECT role,client_id,access_since,email,display_name FROM memberships WHERE tenant_id=? AND user_id=? AND status='active'",
     )
     .bind(tenantId, userId)
     .first<MemberRow>();
@@ -66,6 +67,36 @@ async function recordEmail(
       "UPDATE memberships SET email=? WHERE tenant_id=? AND user_id=? AND email IS NOT ?",
     )
     .bind(email, tenantId, user.userId, email)
+    .run();
+}
+/**
+ * Records the member's name from the identity provider when their
+ * membership names them only by email (#241 item 8): a membership created
+ * by a sign-in without a full name, or an invitation accepted without a
+ * display name, stores the email, and every "Recorded by" then showed it.
+ * A name an administrator gave is never overwritten, and nothing is written
+ * while the identity sends no full name, so the email remains the fallback
+ * only while no name is known.
+ */
+async function recordName(
+  tenantId: string,
+  user: Context["user"] & { fullName?: string | null },
+  member: MemberRow,
+) {
+  const name = user.fullName?.trim().slice(0, 300);
+  const stored = member.display_name?.trim() ?? "";
+  const byEmail =
+    !stored ||
+    [user.email, member.email].some(
+      (email) => !!email && normalizeEmail(email) === normalizeEmail(stored),
+    );
+  // undefined: the row did not carry the column (never in production).
+  if (!name || member.display_name === undefined || !byEmail) return;
+  await db()
+    .prepare(
+      "UPDATE memberships SET display_name=? WHERE tenant_id=? AND user_id=? AND display_name IS ?",
+    )
+    .bind(name, tenantId, user.userId, member.display_name)
     .run();
 }
 /** The most expired sign-ins one recorded sign-in prunes. */
@@ -201,6 +232,7 @@ export async function context(tenantId?: string): Promise<Context> {
   if (!tenantId || !member || !roles.includes(member.role))
     throw new ApiError(403, "You do not have access to this practice");
   await recordEmail(tenantId, user, member);
+  await recordName(tenantId, user, member);
   const practiceAdmin = !!(await db()
     .prepare(
       "SELECT 1 FROM practice_admins WHERE tenant_id=? AND user_id=? AND active=1",
