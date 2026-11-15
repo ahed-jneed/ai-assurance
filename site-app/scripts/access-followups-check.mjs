@@ -38,12 +38,11 @@ assert(followups, "drizzle/*_access_followups.sql is missing");
 
 /** The trusted-headers identity of a fixture user. */
 const as = (user) => ({
-  "oai-authenticated-user-id": "user-" + user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
-  "oai-authenticated-user-full-name": encodeURIComponent(
+  "x-assurance-user-id": "user-" + user,
+  "x-assurance-user-email": user + "@fixture.invalid",
+  "x-assurance-user-name": encodeURIComponent(
     user[0].toUpperCase() + user.slice(1),
   ),
-  "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
   Origin: local,
 });
 

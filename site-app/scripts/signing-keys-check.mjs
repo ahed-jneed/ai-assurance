@@ -56,8 +56,8 @@ const canonical = (value) =>
         "}";
 const user = "user-signing-lead";
 const as = {
-  "oai-authenticated-user-id": user,
-  "oai-authenticated-user-email": "signing-lead@fixture.invalid",
+  "x-assurance-user-id": user,
+  "x-assurance-user-email": "signing-lead@fixture.invalid",
   Origin: local,
 };
 const tenantId = "tenant-" + sha256(user).slice(0, 24);

@@ -53,8 +53,8 @@ try {
     const r = await mf.dispatchFetch(base + route, {
       method,
       headers: {
-        "oai-authenticated-user-id": owner,
-        "oai-authenticated-user-email": owner + "@fixture.invalid",
+        "x-assurance-user-id": owner,
+        "x-assurance-user-email": owner + "@fixture.invalid",
         Origin: base,
         ...(body || raw ? { "Content-Type": "application/json" } : {}),
       },
@@ -125,8 +125,8 @@ try {
       ],
     ]) {
       const headers = {
-        "oai-authenticated-user-id": owner,
-        "oai-authenticated-user-email": owner + "@fixture.invalid",
+        "x-assurance-user-id": owner,
+        "x-assurance-user-email": owner + "@fixture.invalid",
       };
       const json = await mf.dispatchFetch(base + api + "?" + query, {
         headers,

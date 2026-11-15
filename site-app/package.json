@@ -7,10 +7,9 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "install:ci": "node scripts/install-ci.mjs",
     "dev": "node scripts/run-framework.mjs dev",
     "build": "node scripts/run-framework.mjs build",
-    "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
+    "start": "node --import ./scripts/wrangler-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
@@ -23,7 +22,7 @@
     "seed:demo": "node scripts/seed-demo.mjs",
     "db:migrate:local": "node scripts/db-migrate-local.mjs",
     "test:e2e": "playwright test",
-    "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .sites-runtime/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-1.5.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-client-local.json &&node ../schemas/validate-procedure-schema.mjs .sites-runtime/execution-schema-fixture.json && node ../schemas/validate-working-paper-schema.mjs --documents .sites-runtime/dossier-papers.json",
+    "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .test-output/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-1.5.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-client-local.json &&node ../schemas/validate-procedure-schema.mjs .test-output/execution-schema-fixture.json && node ../schemas/validate-working-paper-schema.mjs --documents .test-output/dossier-papers.json",
     "check": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run check:sync && npm run check:build && npm run check:harnesses && npm run check:fixtures",
     "db:generate": "drizzle-kit generate"
   },

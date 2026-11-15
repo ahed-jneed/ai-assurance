@@ -76,8 +76,8 @@ const owner = "assurance-owner",
   viewer = "assurance-client",
   auditor = "assurance-unassigned";
 const identity = (user) => ({
-  "oai-authenticated-user-id": user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
+  "x-assurance-user-id": user,
+  "x-assurance-user-email": user + "@fixture.invalid",
   Origin: origin,
 });
 const digest = (s) => createHash("sha256").update(s).digest("hex");

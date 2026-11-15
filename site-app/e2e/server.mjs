@@ -2,7 +2,7 @@
 // runs it as its webServer). Every run starts from an empty local D1 database
 // in .wrangler/e2e-state, so the suite never depends on, or changes, the
 // .wrangler/state that `npm run dev` and `npm start` use. The Worker trusts the
-// oai-authenticated-user-* headers each persona's browser context sends
+// x-assurance-user-* headers each persona's browser context sends
 // (IDENTITY_MODE=trusted-headers, loopback only; docs/security/identity.md).
 // Self-signup is off outside the development server, so the Worker allows it
 // for the persona domain only (SELF_SIGNUP=@personas.test): qa-lead, qa-lead2
@@ -55,9 +55,9 @@ const migrate = spawnSync(
 );
 if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 
-// The same environment `wrangler dev` gets from sites-env.mjs (no metrics or
+// The same environment `wrangler dev` gets from wrangler-env.mjs (no metrics or
 // log files in the checkout); importing it also moves to the project root.
-await import("../scripts/sites-env.mjs");
+await import("../scripts/wrangler-env.mjs");
 const { Log, LogLevel, Miniflare } = await import("miniflare");
 const { unstable_getMiniflareWorkerOptions } = await import("wrangler");
 

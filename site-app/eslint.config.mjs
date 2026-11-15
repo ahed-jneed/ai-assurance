@@ -17,7 +17,7 @@ const eslintConfig = defineConfig([
     "coverage/**",
     ".vinext/**",
     ".wrangler/**",
-    ".sites-runtime/**",
+    ".test-output/**",
     // Playwright output.
     "test-results/**",
     "playwright-report/**",

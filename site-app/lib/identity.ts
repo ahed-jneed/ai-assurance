@@ -1,8 +1,9 @@
-// Who is making the request. The Worker entry (build/sites-worker.ts) runs the
+// Who is making the request. The Worker entry (build/worker.ts) runs the
 // adapter before the app sees a request: IDENTITY_MODE picks the one credential
 // that is trusted, and with no mode configured every request is anonymous, so
-// the API answers 401. Inbound oai-* headers are removed unless Sites dispatch
-// set them. The trust boundary of each mode is in docs/security/identity.md.
+// the API answers 401. Inbound x-assurance-user-* headers are always removed
+// before the app runs. The trust boundary of each mode is in
+// docs/security/identity.md.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { SIGN_IN_PATH, SIGN_OUT_PATH, safeReturnPath } from "./auth-paths";
 import {
@@ -32,13 +33,11 @@ export type IdentitySettings = {
 export type IdentityConfig =
   /** Nothing trusted: every request is anonymous. */
   | { mode: "none"; problem?: string }
-  /** OpenAI Sites dispatch: it strips and sets the oai-* identity headers. */
-  | { mode: "sites" }
   /** A Cloudflare Access application token in Cf-Access-Jwt-Assertion. */
   | { mode: "cloudflare-access"; issuer: string; audiences: string[] }
-  /** oai-* headers from a test client, on loopback requests only. */
+  /** x-assurance-user-* headers from a test client, on loopback requests only. */
   | { mode: "trusted-headers" }
-  /** oai-* headers set by the development server's persona sign-in. */
+  /** x-assurance-user-* headers set by the development server's persona sign-in. */
   | { mode: "dev" };
 
 /** The value IDENTITY_TRUSTED_HEADERS must have to enable trusted-headers. */
@@ -47,15 +46,12 @@ export const TRUSTED_HEADERS_OPT_IN = "loopback-tests";
 /**
  * The identity mode the Worker variables select. A mode that is not fully
  * configured, or not allowed here, selects nothing and names the problem.
- * `defaultMode` applies only while IDENTITY_MODE is unset: the Sites build
- * compiles in "sites" (vite.config.ts), so the Site does not depend on its
- * publisher applying the Worker variables. An explicit IDENTITY_MODE wins.
  */
 export function identityConfig(
   settings: IdentitySettings,
-  { devServer, defaultMode }: { devServer: boolean; defaultMode?: "sites" },
+  { devServer }: { devServer: boolean },
 ): IdentityConfig {
-  const mode = settings.IDENTITY_MODE ?? defaultMode ?? "";
+  const mode = settings.IDENTITY_MODE ?? "";
   switch (mode) {
     case "":
       return {
@@ -63,8 +59,6 @@ export function identityConfig(
         problem:
           "no IDENTITY_MODE is configured, so every request is anonymous",
       };
-    case "sites":
-      return { mode: "sites" };
     case "dev":
       return devServer
         ? { mode: "dev" }
@@ -111,7 +105,7 @@ export function identityConfig(
 
 export type Authentication = {
   identity: Identity | null;
-  /** The request to hand to the app: without oai-* headers unless sites. */
+  /** The request to hand to the app, without identity headers. */
   request: Request;
 };
 
@@ -122,8 +116,7 @@ export async function authenticate(
 ): Promise<Authentication> {
   return {
     identity: await resolve(request, config),
-    request:
-      config.mode === "sites" ? request : withoutDispatchHeaders(request),
+    request: withoutIdentityHeaders(request),
   };
 }
 
@@ -135,8 +128,6 @@ async function resolve(
     case "none":
       if (config.problem) report(config.problem);
       return null;
-    case "sites":
-      return headerIdentity(request.headers);
     case "dev":
     case "trusted-headers":
       if (!isLoopback(request)) {
@@ -179,25 +170,25 @@ function accessVerifier(config: {
   return verifier;
 }
 
-const USER_ID_HEADER = "oai-authenticated-user-id";
-const USER_EMAIL_HEADER = "oai-authenticated-user-email";
-const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
-const USER_FULL_NAME_ENCODING_HEADER =
-  "oai-authenticated-user-full-name-encoding";
-const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
+/**
+ * The loopback identity headers that the `trusted-headers` and `dev` modes
+ * read: the user id, the email and an optional percent-encoded UTF-8 full name.
+ */
+export const IDENTITY_HEADER_PREFIX = "x-assurance-user-";
+export const USER_ID_HEADER = IDENTITY_HEADER_PREFIX + "id";
+export const USER_EMAIL_HEADER = IDENTITY_HEADER_PREFIX + "email";
+export const USER_FULL_NAME_HEADER = IDENTITY_HEADER_PREFIX + "name";
 
-/** The identity in Sites-style oai-authenticated-user-* headers. */
+/** The identity in the loopback x-assurance-user-* headers. */
 function headerIdentity(headers: Headers): Identity | null {
   const userId = headers.get(USER_ID_HEADER);
   const email = headers.get(USER_EMAIL_HEADER);
   if (!userId || !email || userId.length > 256 || email.length > 320)
     return null;
   const encodedFullName = headers.get(USER_FULL_NAME_HEADER);
-  const fullName =
-    encodedFullName &&
-    headers.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
-      ? safeDecodeURIComponent(encodedFullName)?.slice(0, 300) || null
-      : null;
+  const fullName = encodedFullName
+    ? safeDecodeURIComponent(encodedFullName)?.slice(0, 300) || null
+    : null;
   return { userId, email, displayName: fullName ?? email, fullName };
 }
 
@@ -227,9 +218,13 @@ function isLoopback(request: Request): boolean {
   );
 }
 
-function withoutDispatchHeaders(request: Request): Request {
+/**
+ * The request without identity headers, so the app can never read a
+ * client-supplied identity.
+ */
+function withoutIdentityHeaders(request: Request): Request {
   const names = [...request.headers.keys()].filter((name) =>
-    name.startsWith("oai-"),
+    name.startsWith(IDENTITY_HEADER_PREFIX),
   );
   if (!names.length) return request;
   const headers = new Headers(request.headers);
@@ -238,8 +233,7 @@ function withoutDispatchHeaders(request: Request): Request {
 }
 
 /**
- * The reserved sign-in routes in modes that have no dispatch or development
- * server to answer them, given the identity authenticate() resolved. Behind
+ * The sign-in routes in modes that have no development server to answer them, given the identity authenticate() resolved. Behind
  * Cloudflare Access, which signs in on the way to the page, sign-in returns a
  * verified caller to the page and sign-out leaves through the Access logout
  * URL. A sign-in without a verified identity bypassed or failed Access (a
@@ -256,8 +250,7 @@ export function authRoute(
   const url = new URL(request.url);
   const signIn = url.pathname === SIGN_IN_PATH,
     signOut = url.pathname === SIGN_OUT_PATH;
-  if ((!signIn && !signOut) || config.mode === "sites" || config.mode === "dev")
-    return null;
+  if ((!signIn && !signOut) || config.mode === "dev") return null;
   const headers = { "Cache-Control": "private, no-store" };
   if (
     !["GET", "HEAD"].includes(request.method) &&

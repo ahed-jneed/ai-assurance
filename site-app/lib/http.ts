@@ -104,7 +104,7 @@ export function checkOrigin(request: Request) {
     throw new ApiError(403, "A same-origin request is required");
 }
 /**
- * Wraps a request's body so the Worker entry (build/sites-worker.ts) knows
+ * Wraps a request's body so the Worker entry (build/worker.ts) knows
  * whether the app read it to the end (#209). A route that refuses a request
  * before reading its body (checkOrigin's 403, the runner's 401, a 413 that
  * stops reading) would otherwise answer with the body still on the

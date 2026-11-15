@@ -1,4 +1,4 @@
-import { requireChatGPTUser } from "@/app/chatgpt-auth";
+import { requireUser } from "@/app/require-user";
 import { answerPrintFailure, resolvePrintTree } from "@/app/print-failure";
 import { ll144SummaryView } from "@/lib/read-models/ll144-summary";
 import { context } from "@/lib/tenancy";
@@ -21,7 +21,7 @@ async function summaryBody(params: Record<string, string | undefined>) {
       Object.entries(params).filter((v): v is [string, string] => !!v[1]),
     ),
   );
-  await requireChatGPTUser("/ll144-summary?" + query);
+  await requireUser("/ll144-summary?" + query);
   try {
     const ctx = await context(params.tenantId),
       view = await ll144SummaryView(

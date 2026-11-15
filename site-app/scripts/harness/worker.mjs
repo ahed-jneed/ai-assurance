@@ -86,8 +86,8 @@ export function fixtureUsers() {
 
 /** The identity headers of a fixture user. */
 export const identity = (user) => ({
-  "oai-authenticated-user-id": user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
+  "x-assurance-user-id": user,
+  "x-assurance-user-email": user + "@fixture.invalid",
   Origin: base,
 });
 

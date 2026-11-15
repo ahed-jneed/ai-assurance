@@ -1,8 +1,8 @@
 {
-  "$comment": "Loopback development identities. /signin-with-chatgpt signs in as `defaultIdentity`; /signin-with-chatgpt?as=<id> as a persona (build/sites-vite-plugin.ts). `npm run seed:demo` gives each persona its role in a demo practice (scripts/seed-demo.mjs). Never used by a build.",
+  "$comment": "Loopback development identities. /auth/sign-in signs in as `defaultIdentity`; /auth/sign-in?as=<id> as a persona (build/dev-sign-in.ts). `npm run seed:demo` gives each persona its role in a demo practice (scripts/seed-demo.mjs). Never used by a build.",
   "defaultIdentity": {
     "userId": "local_seedy",
-    "email": "seedy@sites.test",
+    "email": "seedy@personas.test",
     "name": "Seedy"
   },
   "personas": [

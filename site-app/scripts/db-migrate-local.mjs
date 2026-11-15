@@ -58,7 +58,7 @@ function execute(target) {
     process.execPath,
     [
       "--import",
-      "./scripts/sites-env.mjs",
+      "./scripts/wrangler-env.mjs",
       "./node_modules/wrangler/bin/wrangler.js",
       "d1",
       "execute",

@@ -1,4 +1,4 @@
-import { requireChatGPTUser } from "@/app/chatgpt-auth";
+import { requireUser } from "@/app/require-user";
 import { isOperator } from "@/lib/operator";
 import { OperatorConsole } from "./operator-console";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
  * else is told the page is for operators; the API refuses them as well.
  */
 export default async function OperatorPage() {
-  const user = await requireChatGPTUser("/operator");
+  const user = await requireUser("/operator");
   if (!isOperator(user.email))
     return (
       <main className="operator-console">

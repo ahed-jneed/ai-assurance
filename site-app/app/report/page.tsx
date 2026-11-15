@@ -1,4 +1,4 @@
-import { requireChatGPTUser } from "@/app/chatgpt-auth";
+import { requireUser } from "@/app/require-user";
 import { answerPrintFailure, resolvePrintTree } from "@/app/print-failure";
 import { sanitize } from "@/lib/client-projection";
 import { getEngagement } from "@/lib/engagement-repo";
@@ -17,7 +17,7 @@ export default async function ReportPage({
   return await reportBody(params);
 }
 async function reportBody(params: Record<string, string | undefined>) {
-  await requireChatGPTUser(
+  await requireUser(
     "/report?" +
       new URLSearchParams(
         Object.fromEntries(

@@ -1,17 +1,13 @@
 // The identity boundary of the built Worker (docs/security/identity.md): which
-// credential each IDENTITY_MODE trusts, that forged oai-* headers are refused
-// in every mode except sites, Cloudflare Access tokens checked against a stub
-// key set (no network), and that the development personas never reach a build.
-// Needs `npm run build` first. A Sites checkout (one with .openai/hosting.json)
-// builds a Worker that defaults to sites mode, which the checks expect there.
+// credential each IDENTITY_MODE trusts, that forged x-assurance-user-* headers
+// are refused in every mode that does not trust them, Cloudflare Access tokens
+// checked against a stub key set (no network), and that the development
+// personas never reach a build. Needs `npm run build` first.
 import assert from "node:assert/strict";
 import "./harness/env.mjs";
-import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Miniflare } from "miniflare";
-
-const sitesCheckout = existsSync(".openai/hosting.json");
 
 const modules = [
   "index.js",
@@ -30,8 +26,8 @@ for (const file of (await fs.readdir("drizzle"))
 
 const local = "http://127.0.0.1:5173";
 const forged = {
-  "oai-authenticated-user-id": "forged-admin",
-  "oai-authenticated-user-email": "forged@attacker.invalid",
+  "x-assurance-user-id": "forged-admin",
+  "x-assurance-user-email": "forged@attacker.invalid",
 };
 const trusted = {
   IDENTITY_MODE: "trusted-headers",
@@ -84,12 +80,11 @@ async function refused(call, headers, url = local + "/api/workspace") {
 }
 
 // --- No identity is trusted unless a mode is configured ---------------------
-// The Sites build trusts dispatch headers while IDENTITY_MODE is unset (next
-// section); every explicit setting below still wins over that default.
 for (const [label, bindings] of [
-  ...(sitesCheckout ? [] : [["no IDENTITY_MODE", {}]]),
+  ["no IDENTITY_MODE", {}],
   ["an empty IDENTITY_MODE", { IDENTITY_MODE: "" }],
-  ["an unknown IDENTITY_MODE", { IDENTITY_MODE: "SITES" }],
+  ["an unknown IDENTITY_MODE", { IDENTITY_MODE: "DEV" }],
+  ["the removed sites mode", { IDENTITY_MODE: "sites" }],
   ["IDENTITY_MODE=dev in a build", { IDENTITY_MODE: "dev" }],
   ["trusted-headers without the opt-in", { IDENTITY_MODE: "trusted-headers" }],
   [
@@ -110,29 +105,12 @@ for (const [label, bindings] of [
     );
     await refused(call, forged, local + "/api/work-inbox");
     // The sign-in routes say so instead of pretending to sign anyone in.
-    const signIn = await call(local + "/signin-with-chatgpt?return_to=/");
+    const signIn = await call(local + "/auth/sign-in?return_to=/");
     assert.equal(signIn.status, 401, label);
   });
 console.log(
-  sitesCheckout
-    ? "PASS forged identity headers are refused with an empty, unknown, dev or incomplete IDENTITY_MODE, over the Sites build default"
-    : "PASS forged identity headers are refused with no, empty, unknown, dev or incomplete identity configuration",
+  "PASS forged identity headers are refused with no, empty, unknown, removed, dev or incomplete identity configuration",
 );
-
-// --- The Sites build defaults to sites while IDENTITY_MODE is unset ----------
-// The default is compiled in, so the Site does not depend on the publisher
-// applying the vars of dist/server/wrangler.json. Any other build has no
-// default ("no IDENTITY_MODE" above).
-if (sitesCheckout) {
-  await withWorker({}, async (call) => {
-    const ok = await call("https://site.example/api/workspace", forged);
-    assert.equal(ok.status, 200, JSON.stringify(ok.body));
-    assert.equal(ok.body.identity.id, "forged-admin");
-  });
-  console.log(
-    "PASS the Sites build trusts dispatch headers while IDENTITY_MODE is unset",
-  );
-}
 
 // --- trusted-headers: explicit opt-in, loopback requests only ----------------
 await withWorker(trusted, async (call) => {
@@ -146,19 +124,6 @@ await withWorker(trusted, async (call) => {
 console.log(
   "PASS trusted-headers mode needs its opt-in and refuses non-loopback hosts and clients",
 );
-
-// --- sites: dispatch headers are trusted, by explicit configuration ----------
-await withWorker({ IDENTITY_MODE: "sites" }, async (call) => {
-  const ok = await call("https://site.example/api/workspace", {
-    ...forged,
-    "oai-authenticated-user-full-name": "Ren%C3%A9e%20Lead",
-    "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
-  });
-  assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.equal(ok.body.identity.name, "Renée Lead");
-  await refused(call, {}, "https://site.example/api/workspace");
-});
-console.log("PASS sites mode trusts the dispatch headers it is configured for");
 
 // --- cloudflare-access: RS256 tokens against a stub team key set -------------
 const team = "assurance-team.cloudflareaccess.com",
@@ -270,13 +235,11 @@ await withWorker(
       assert.equal(response.status, 401, label);
     }
     // Sign-out leaves through Access; sign-in comes back to the deep link.
-    const out = await call(app + "/signout-with-chatgpt?return_to=/");
+    const out = await call(app + "/auth/sign-out?return_to=/");
     assert.equal(out.status, 302);
     assert.equal(out.headers.get("location"), "/cdn-cgi/access/logout");
     const into = await call(
-      app +
-        "/signin-with-chatgpt?return_to=" +
-        encodeURIComponent("/?view=Findings"),
+      app + "/auth/sign-in?return_to=" + encodeURIComponent("/?view=Findings"),
       { "Cf-Access-Jwt-Assertion": await accessToken() },
     );
     assert.equal(into.status, 302);
@@ -289,8 +252,7 @@ await withWorker(
     const hop = new URL(page.headers.get("location"), app);
     assert.equal(
       hop.pathname + hop.search,
-      "/signin-with-chatgpt?return_to=" +
-        encodeURIComponent("/report?reportId=RPT-1"),
+      "/auth/sign-in?return_to=" + encodeURIComponent("/report?reportId=RPT-1"),
     );
     for (const [label, headers] of [
       ["no token", {}],
@@ -343,8 +305,8 @@ const wrangler = JSON.parse(
 );
 assert.equal(
   wrangler.vars?.IDENTITY_MODE,
-  sitesCheckout ? "sites" : undefined,
-  "only the Sites build (a checkout with .openai/hosting.json) trusts dispatch headers",
+  undefined,
+  "a build trusts no identity until the deployment sets IDENTITY_MODE",
 );
 const personas = JSON.parse(
   await fs.readFile("fixtures/dev-personas.json", "utf8"),
@@ -360,13 +322,12 @@ for (const file of await fs.readdir("dist", { recursive: true })) {
       !text.includes(marker),
       `${file} contains the dev persona ${marker}`,
     );
-  // The Worker's default mode and the browser's sign-in label read the
-  // define; a reference left in the output would throw when it runs.
   assert(
-    !/\.m?js$/.test(file) || !text.includes("__SITES_IDENTITY_DEFAULT__"),
-    `dist/${file} still references __SITES_IDENTITY_DEFAULT__, which vite.config.ts defines`,
+    !/\.m?js$/.test(file) ||
+      !/signin-with-chatgpt|oai-authenticated/.test(text),
+    `dist/${file} still contains the removed ChatGPT sign-in`,
   );
 }
 console.log(
-  "PASS the build configures identity only for Sites, compiles its Sites default into the Worker and the browser bundle, and contains no development personas",
+  "PASS the build configures no identity, contains no development personas and no trace of the removed ChatGPT sign-in",
 );

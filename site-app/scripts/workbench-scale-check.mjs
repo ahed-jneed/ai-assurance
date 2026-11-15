@@ -72,8 +72,8 @@ const owner = "scale-owner",
   reviewer = "scale-reviewer",
   outsider = "scale-outsider";
 const identity = (user) => ({
-  "oai-authenticated-user-id": user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
+  "x-assurance-user-id": user,
+  "x-assurance-user-email": user + "@fixture.invalid",
   Origin: origin,
 });
 async function api(route, { user = owner, body, status = 200 } = {}) {

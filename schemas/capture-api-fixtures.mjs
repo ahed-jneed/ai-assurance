@@ -1,7 +1,7 @@
 /**
  * Writes fixtures/hosted-api-runs.v1.4.json from the runs a Site integration
  * harness made through the real API (site-app/scripts/engagement-lifecycle-check.mjs
- * writes them to site-app/.sites-runtime/run-schema-fixtures.json): every run
+ * writes them to site-app/.test-output/run-schema-fixtures.json): every run
  * that pins a registered dataset card, which the engine job then validates
  * without running the harness. The capture is frozen like hosted-runs.v1.1.json;
  * rerun it only to replace the capture.
@@ -15,7 +15,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
-const source = resolve(process.argv[2] ?? resolve(directory, '../site-app/.sites-runtime/run-schema-fixtures.json'));
+const source = resolve(process.argv[2] ?? resolve(directory, '../site-app/.test-output/run-schema-fixtures.json'));
 const runs = JSON.parse(readFileSync(source, 'utf8'));
 const pinned = runs.filter(run => run.manifest?.dataset?.cardPin);
 assert.ok(pinned.some(run => run.state === 'succeeded'), 'The harness output holds no succeeded card-pinned run');

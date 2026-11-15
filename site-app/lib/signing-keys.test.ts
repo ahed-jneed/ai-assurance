@@ -48,7 +48,7 @@ afterEach(() => {
 
 describe("keyEncryptionKey", () => {
   it("refuses to sign without DOSSIER_KEK outside the development server", async () => {
-    for (const mode of [undefined, "sites", "cloudflare-access"])
+    for (const mode of [undefined, "trusted-headers", "cloudflare-access"])
       expect(
         refusal(
           await keyEncryptionKey({ IDENTITY_MODE: mode }).catch((e) => e),
