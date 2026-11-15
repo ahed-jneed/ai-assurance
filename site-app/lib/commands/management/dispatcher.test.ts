@@ -76,7 +76,13 @@ const valid: Record<string, Record<string, unknown>> = {
 };
 // The members of the fixture practice besides the caller (user-lead).
 const people: Record<string, Record<string, unknown>> = {
-  "user-2": { role: "Auditor", status: "active", client_id: null, admin: 0 },
+  "user-2": {
+    role: "Auditor",
+    status: "active",
+    client_id: null,
+    admin: 0,
+    display_name: "Ada",
+  },
   "user-4": {
     role: "Lead Auditor",
     status: "active",
@@ -352,14 +358,22 @@ describe("POST /api/management", () => {
           userId: "user-2",
           exclusions: ["financial_interest"],
         }),
+        declaration("auditor", {
+          userId: "user-5",
+          exclusions: ["financial_interest"],
+        }),
       ],
     };
     vi.mocked(loadEngagement).mockResolvedValue(e);
     signIn(caller());
-    for (const op of ["updateMember", "grantMember"]) {
+    // An edit of an active member, and the restoring grant of a revoked one.
+    for (const [op, userId] of [
+      ["updateMember", "user-2"],
+      ["grantMember", "user-5"],
+    ]) {
       const d1 = practice();
       const response = await post(op, {
-        userId: "user-2",
+        userId,
         displayName: "Ada",
         role: "Reviewer",
         engagementIds: ["ENG-1"],
@@ -454,6 +468,24 @@ describe("access lifecycle (F-24)", () => {
       status: 409,
       error: "This member's access is already revoked",
     });
+  });
+
+  it("refuses to add an active member again, as Invite by email does (#244 item 3)", async () => {
+    const d1 = practice();
+    signIn(caller());
+    const response = await post("grantMember", {
+      userId: "user-2",
+      displayName: "Someone else",
+      role: "Auditor",
+      engagementIds: [],
+    });
+    expect(await refusal(response)).toEqual({
+      status: 409,
+      error:
+        "Ada is already an active member. Change their role or engagements in Members & access instead.",
+    });
+    // Nothing is written: the member keeps their name and grants.
+    expect(d1.batches).toEqual([]);
   });
 
   it("requires a re-grant to list its engagements and restores nothing else", async () => {

@@ -20,11 +20,12 @@ type Existing = {
   client_id: string | null;
   practice_admin: number;
   email: string | null;
+  display_name: string | null;
 };
 async function existingMember(tenantId: string, userId: string) {
   return db()
     .prepare(
-      "SELECT m.role,m.status,m.client_id,m.email,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin FROM memberships m WHERE m.tenant_id=? AND m.user_id=?",
+      "SELECT m.role,m.status,m.client_id,m.email,m.display_name,EXISTS(SELECT 1 FROM practice_admins a WHERE a.tenant_id=m.tenant_id AND a.user_id=m.user_id AND a.active=1) AS practice_admin FROM memberships m WHERE m.tenant_id=? AND m.user_id=?",
     )
     .bind(tenantId, userId)
     .first<Existing>();
@@ -59,7 +60,8 @@ export async function clientScope(
  * `engagementIds` are granted, which such a change must list explicitly for
  * an internal role. Editing only the name keeps the grants; listed
  * engagements are then added. Only a Lead Auditor may grant internal
- * engagement access with a membership.
+ * engagement access with a membership. A grant to an active member is
+ * refused: their access is changed with updateMember.
  */
 const saveMember: ManagementHandler = {
   roles,
@@ -77,6 +79,15 @@ const saveMember: ManagementHandler = {
     if (a.userId === ctx.user.userId)
       throw new ApiError(400, "You cannot change or revoke your own access");
     const existing = await existingMember(ctx.tenantId, a.userId);
+    // Adding someone who already holds active access would overwrite their
+    // name and grants (#244 item 3): refused as Invite by email refuses the
+    // same person. Restoring a revoked member stays a grant.
+    if (op === "grantMember" && existing?.status === "active")
+      throw new ApiError(
+        409,
+        (existing.display_name || a.userId) +
+          " is already an active member. Change their role or engagements in Members & access instead.",
+      );
     if (op === "updateMember" && !existing)
       throw new ApiError(404, "User not found in this practice");
     if (op === "updateMember" && existing?.status !== "active")

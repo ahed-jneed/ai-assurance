@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceData } from "./workspace-types";
 import type { WorkflowAct } from "./audit-program/workflow-dialog";
+import type { CommandOptions } from "./workspace/types";
 export function MemberOnboarding({
   open,
   onClose,
@@ -30,7 +31,12 @@ export function MemberOnboarding({
   onClose: () => void;
   data: WorkspaceData;
   busy: boolean;
-  manage: (op: string, d: Record<string, unknown>) => Promise<unknown>;
+  /** Practice commands; the wizard shows their refusals inline, not as a toast. */
+  manage: (
+    op: string,
+    d: Record<string, unknown>,
+    options?: CommandOptions,
+  ) => Promise<unknown>;
   act: WorkflowAct;
   onEditing: (v: boolean) => void;
 }) {
@@ -102,25 +108,35 @@ export function MemberOnboarding({
     try {
       if (!done.includes("membership") && byEmail) {
         // The invitee joins at their next sign-in with this email.
-        await manage("inviteMember", {
-          email: email.trim(),
-          displayName: name.trim(),
-          role,
-          ...(client
-            ? { clientId }
-            : { engagementIds: canAssign ? engagements : [] }),
-        });
+        await manage(
+          "inviteMember",
+          {
+            email: email.trim(),
+            displayName: name.trim(),
+            role,
+            ...(client
+              ? { clientId }
+              : { engagementIds: canAssign ? engagements : [] }),
+          },
+          { quiet: true },
+        );
         done.push("membership");
         setCompleted([...done]);
       }
       if (!done.includes("membership")) {
-        await manage("grantMember", {
-          userId: userId.trim(),
-          displayName: name.trim(),
-          role,
-          clientId: client ? clientId : null,
-          engagementIds: client || !canAssign ? [] : engagements,
-        });
+        // An account that is already an active member is refused (#244
+        // item 3); the refusal shows in the form below.
+        await manage(
+          "grantMember",
+          {
+            userId: userId.trim(),
+            displayName: name.trim(),
+            role,
+            clientId: client ? clientId : null,
+            engagementIds: client || !canAssign ? [] : engagements,
+          },
+          { quiet: true },
+        );
         done.push("membership");
         setCompleted([...done]);
       }
