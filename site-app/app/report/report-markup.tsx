@@ -253,6 +253,11 @@ export function reportMarkup(
   const scope = s.scope ?? s.workflow?.brief,
     v2 = !!snapshotTerms(s) && !!s.conclusionStatement,
     supersededBy = report.supersededBy ?? report.release?.supersededBy,
+    // A report that was released reads "Released" with its release time,
+    // also after a withdrawal (#244 item 6, as #210 item 4 for the other
+    // views): the client projection carries releasedAt, a staff record its
+    // release record.
+    released = report.releasedAt ?? report.release?.releasedAt,
     withdrawn =
       releaseState(report) === "withdrawn"
         ? {
@@ -275,8 +280,8 @@ export function reportMarkup(
         </p>
         <h1>{s.engagement.title}</h1>
         <p className="report-meta">
-          {report.id} · {report.releasedAt ? "Released" : "Created"}{" "}
-          {viennaTime(report.createdAt)} Europe/Vienna
+          {report.id} · {released ? "Released" : "Created"}{" "}
+          {viennaTime(released ?? report.createdAt)} Europe/Vienna
         </p>
         {!!report.replaces?.length && (
           <p className="report-meta">Replaces {report.replaces.join(", ")}</p>

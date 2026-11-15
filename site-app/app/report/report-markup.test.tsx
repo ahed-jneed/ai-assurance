@@ -112,6 +112,30 @@ describe("the printed report's release status", () => {
     expect(html).toContain("Reason: Restated after a data error");
   });
 
+  it("reads Released with the release time on a released-then-withdrawn report (#244 item 6)", () => {
+    const r = report(
+      "R-1",
+      "withdrawn",
+      { releasedAt: "2026-11-03T09:00:00.000Z" },
+      [withdraw],
+    );
+    const html = printed(r, [r]);
+    const meta = html.match(/<p class="report-meta">([\s\S]*?)<\/p>/)?.[1];
+    expect(meta).toContain("Released");
+    expect(meta).not.toContain("Created");
+    expect(meta).toContain("03/11/2026");
+    expect(html).toContain("<strong>Withdrawn.</strong>");
+  });
+
+  it("reads Created with the capture time on a package never released", () => {
+    const r = report("R-1", "approved");
+    const meta = printed(r, [r]).match(
+      /<p class="report-meta">([\s\S]*?)<\/p>/,
+    )?.[1];
+    expect(meta).toContain("Created");
+    expect(meta).toContain("01/11/2026");
+  });
+
   it("describes a withdrawn successor as since withdrawn", () => {
     const r1 = report("R-1", "withdrawn", { supersededBy: "R-2" }, [withdraw]),
       r2 = report("R-2", "withdrawn", { supersedes: "R-1" }, [withdraw]);
