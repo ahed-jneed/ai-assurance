@@ -28,8 +28,8 @@ def pins(path):
 class SupportedPythonVersionTest(unittest.TestCase):
     def test_dockerfile_base_image_is_the_supported_version(self):
         dockerfile = (ENGINE / "Dockerfile").read_text(encoding="utf-8")
-        image = re.search(r"^ARG PYTHON_IMAGE=python:(\d+\.\d+)\.\d+-slim$", dockerfile, re.M)
-        self.assertIsNotNone(image, "engine/Dockerfile must default PYTHON_IMAGE to a python:X.Y.Z-slim tag")
+        image = re.search(r"^ARG PYTHON_IMAGE=python:(\d+\.\d+)\.\d+-slim@sha256:[0-9a-f]{64}$", dockerfile, re.M)
+        self.assertIsNotNone(image, "engine/Dockerfile must default PYTHON_IMAGE to a python:X.Y.Z-slim tag pinned by @sha256 digest")
         self.assertEqual(image.group(1), SUPPORTED)
 
     def test_ci_runs_python_on_the_supported_version(self):
