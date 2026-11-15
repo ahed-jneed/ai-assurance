@@ -36,8 +36,8 @@ import {
   packageOpenLabel,
   packageStatus,
   packageStatusLabel,
+  releaseHeld,
 } from "@/lib/report-presentation";
-import { releaseRefusal } from "@/lib/preconditions";
 import type { QualityReviewView } from "@/lib/read-models/quality-review-view";
 import { DatabaseToolbar } from "./database-toolbar";
 import { RegisterControls } from "./register-controls";
@@ -134,11 +134,9 @@ export function ReportWorkspace({
         : undefined,
     standing = qualityReview?.standing,
     // An approved package the server would still refuse to release, the
-    // Engagement Quality Reviewer's release-time re-checks included (#244).
-    releaseHeld =
-      !!latest &&
-      state === "approved" &&
-      !!releaseRefusal(e, latest, undefined, standing);
+    // Engagement Quality Reviewer's release-time re-checks included (#244):
+    // the badge and heading say the release is held (#248).
+    held = latest ? releaseHeld(latest, e, standing) : null;
   const activeStep = blocked
     ? 0
     : !latest || ["withdrawn", "superseded"].includes(state)
@@ -462,31 +460,31 @@ export function ReportWorkspace({
         </ol>
         <div className="report-next-step">
           <div>
-            <span
-              className={
-                "badge " + (blocked || releaseHeld ? "amber" : "green")
-              }
-            >
+            <span className={"badge " + (blocked || held ? "amber" : "green")}>
               {blocked
                 ? "Final capture blocked"
                 : awaiting
                   ? awaiting.badge
-                  : settled && latest
-                    ? packageStatusLabel(latest)
-                    : "Final capture available"}
+                  : held
+                    ? held.badge
+                    : settled && latest
+                      ? packageStatusLabel(latest)
+                      : "Final capture available"}
             </span>
             <h2>
               {blocked
                 ? next.title
                 : awaiting
                   ? awaiting.title
-                  : state === "released"
-                    ? "The latest final package is released"
-                    : state === "approved"
-                      ? "The final package awaits client release"
-                      : !needsPackage && latest
-                        ? packageStatusLabel(latest)
-                        : "The audit is ready for a final snapshot"}
+                  : held
+                    ? held.title
+                    : state === "released"
+                      ? "The latest final package is released"
+                      : state === "approved"
+                        ? "The final package awaits client release"
+                        : !needsPackage && latest
+                          ? packageStatusLabel(latest)
+                          : "The audit is ready for a final snapshot"}
             </h2>
             <p>
               {blocked

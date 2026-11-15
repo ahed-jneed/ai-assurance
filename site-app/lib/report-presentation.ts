@@ -1,5 +1,9 @@
 import type { Engagement, Report, Role } from "./domain/types";
-import type { QualityReviewerStanding } from "./domain/quality-review";
+import {
+  qualityReviewReleaseProblem,
+  reviewerStandingProblem,
+  type QualityReviewerStanding,
+} from "./domain/quality-review";
 import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
 import {
@@ -266,6 +270,42 @@ export function packageGuidance(
     default:
       return "Approve both package versions before client release.";
   }
+}
+
+/** The handoff badge while an approved package's release is held (#248). */
+export const releaseHeldBadge = "Release held";
+/** The handoff heading while the quality review holds the release (#248). */
+export const releaseHeldByReviewTitle =
+  "Release is held until an eligible reviewer signs off";
+
+/**
+ * The Reports & sign-off handoff's badge and heading for an approved package
+ * the server would still refuse to release (#248), so they never say
+ * "Approved for release" against the reason line: held by the quality review
+ * (a sign-off outstanding, or the reviewer revoked, moved to another role or
+ * onto the team after signing off, #244 item 1), or by other work before
+ * release. Null when the package is not approved or may be released; the
+ * reason itself is packageGuidance's.
+ */
+export function releaseHeld(
+  report: Report,
+  engagement: Engagement,
+  standing?: QualityReviewerStanding | null,
+) {
+  if (packageStatus(report) !== "approved") return null;
+  const refusal = releaseRefusal(engagement, report, undefined, standing);
+  if (!refusal) return null;
+  // Held by the review only when its problem is the reason the line states.
+  const byReview =
+    refusal.message ===
+    (qualityReviewReleaseProblem(engagement, report) ||
+      reviewerStandingProblem(engagement, standing));
+  return {
+    badge: releaseHeldBadge,
+    title: byReview
+      ? releaseHeldByReviewTitle
+      : "Release is held until the requirement below is met",
+  };
 }
 
 /**

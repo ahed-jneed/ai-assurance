@@ -15,6 +15,7 @@ import {
   packageApprovalRefusal,
   releaseRefusal,
 } from "./preconditions";
+import { packageGuidance, releaseHeld } from "./report-presentation";
 import {
   approveScope,
   approvedWorkflow,
@@ -177,6 +178,67 @@ describe("the release precondition", () => {
     const e = released();
     e.reports[0].release = { state: "internal", history: [] };
     await refusedAlike(releaseRefusal(e, e.reports[0], "lead"), release(e));
+  });
+});
+
+describe("the handoff of a held release (#248)", () => {
+  const signedOff = () =>
+    completedQualityReview({
+      signOffs: [
+        {
+          reportId: "R1",
+          userId: "quality-reviewer",
+          at,
+          internalHash: "R1-internal",
+          clientHash: "R1-client",
+          checklistRevision: 2,
+          conclusion: "Stand-back review complete",
+        },
+      ],
+    });
+  const standing = {
+    reviewerId: "quality-reviewer",
+    activeReviewer: false,
+    onRecordedTeam: false,
+  };
+
+  it("says Release held, until an eligible reviewer signs off, while the EQR re-check holds it", () => {
+    const e = released({ qualityReview: signedOff() });
+    // The reason line stays packageGuidance's, in the server's words.
+    expect(packageGuidance(e.reports[0], e, standing)).toBe(
+      "Both package versions are approved. " + reviewerInactiveMessage + ".",
+    );
+    expect(releaseHeld(e.reports[0], e, standing)).toEqual({
+      badge: "Release held",
+      title: "Release is held until an eligible reviewer signs off",
+    });
+    // A sign-off still outstanding holds it the same way.
+    const unsigned = released({ qualityReview: completedQualityReview() });
+    expect(releaseHeld(unsigned.reports[0], unsigned)?.title).toBe(
+      "Release is held until an eligible reviewer signs off",
+    );
+  });
+
+  it("is not held once the release may proceed, nor before approval", () => {
+    const e = released({ qualityReview: signedOff() });
+    expect(
+      releaseHeld(e.reports[0], e, { ...standing, activeReviewer: true }),
+    ).toBeNull();
+    expect(releaseHeld(released().reports[0], released())).toBeNull();
+    e.reports[0].release = { state: "internal", history: [] };
+    expect(releaseHeld(e.reports[0], e, standing)).toBeNull();
+  });
+
+  it("does not blame the reviewer for other work before release", () => {
+    const e = released({ qualityReview: signedOff() });
+    e.workflow!.program.status = "draft";
+    expect(releaseRefusal(e, e.reports[0])?.message).toBe(
+      "Resolve current scope/program completion before release",
+    );
+    expect(releaseHeld(e.reports[0], e, standing)).toEqual({
+      badge: "Release held",
+      title: "Release is held until the requirement below is met",
+    });
   });
 });
 

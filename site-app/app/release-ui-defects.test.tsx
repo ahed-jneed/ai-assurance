@@ -53,8 +53,19 @@ describe("the Reports & sign-off banner after approval and release", () => {
                 createdAt: "2026-11-01T09:00:00.000Z",
                 actor: "user-lead",
                 sha256: "a",
+                clientSha256: "b",
                 snapshot: {},
-                release: { state, history: [] },
+                release: {
+                  state,
+                  approval: {
+                    userId: "user-reviewer",
+                    at: "2026-11-01T10:00:00.000Z",
+                    internalHash: "a",
+                    clientHash: "b",
+                    reason: "Both packages reviewed",
+                  },
+                  history: [],
+                },
               },
             ],
           } as never
@@ -102,8 +113,17 @@ describe("the Reports & sign-off banner after approval and release", () => {
     ).toBeGreaterThan(0);
     const text = banner("approved");
     expect(text).not.toContain("Final capture blocked");
-    expect(text).toContain("The final package awaits client release");
     expect(text).not.toContain("before client release");
+    // The fixture's programme is not complete, so release is held, and the
+    // badge and heading say so rather than "Approved for release" (#248).
+    expect(text).toContain(
+      "Both package versions are approved. Resolve current scope/program completion before release.",
+    );
+    expect(text).toContain("Release held");
+    expect(text).toContain(
+      "Release is held until the requirement below is met",
+    );
+    expect(text).not.toContain("The final package awaits client release");
   });
   it("follows a released package", () => {
     const text = banner("released");

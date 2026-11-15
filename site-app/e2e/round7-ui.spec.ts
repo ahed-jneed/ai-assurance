@@ -149,6 +149,12 @@ test("Release is disabled with the server's reason once the signed-off EQR is re
       handoff.getByText("Both package versions are approved. " + reason + "."),
     ).toBeVisible();
     await expect(handoff.locator(".badge").first()).toHaveClass(/amber/);
+    // #248: the badge and heading say the release is held, not approved.
+    await expect(handoff.locator(".badge").first()).toHaveText("Release held");
+    await expect(handoff.getByRole("heading", { level: 2 })).toHaveText(
+      "Release is held until an eligible reviewer signs off",
+    );
+    await expect(handoff.getByText("Approved for release")).toHaveCount(0);
     await page.goto(recordPath(e, "Reports & sign-off", "report", report.id));
     const sheet = page.getByRole("dialog");
     const releaseButton = sheet.getByRole("button", {
