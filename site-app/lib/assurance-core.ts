@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 export const canonical = (value: unknown): string => {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
@@ -361,7 +361,7 @@ export function assist(
 export const resultEnvelope = z
   .object({
     schemaVersion: z.literal("1.0"),
-    externalReport: z.record(z.unknown()),
+    externalReport: z.record(z.string(), z.unknown()),
     hostedResults: z
       .array(
         z
@@ -402,7 +402,7 @@ export const resultEnvelope = z
       )
       .max(30),
     provenance: z
-      .object({ requestSha256: hash, inputHashes: z.record(hash) })
+      .object({ requestSha256: hash, inputHashes: z.record(z.string(), hash) })
       .passthrough(),
   })
   .passthrough();

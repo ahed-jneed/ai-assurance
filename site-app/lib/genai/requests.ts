@@ -5,7 +5,7 @@
 // never fails its ingest job as plan_invalid (#248); a manifest is checked
 // for what the workspace can see: its shape and the pins to accepted
 // evidence. Pure.
-import { z } from "zod";
+import { z } from "../zod";
 import { genaiPlanProblems } from "./plan-check";
 
 const sha = z.string().regex(/^[a-f0-9]{64}$/);
@@ -14,10 +14,12 @@ const sha = z.string().regex(/^[a-f0-9]{64}$/);
  * genai-plan/0.1: refused with every reason the engine would refuse it for,
  * each naming its criterion; frozen as the auditor wrote it.
  */
-export const genaiPlan = z.record(z.unknown()).superRefine((plan, x) => {
-  for (const message of genaiPlanProblems(plan))
-    x.addIssue({ code: "custom", message });
-});
+export const genaiPlan = z
+  .record(z.string(), z.unknown())
+  .superRefine((plan, x) => {
+    for (const message of genaiPlanProblems(plan))
+      x.addIssue({ code: "custom", message });
+  });
 
 export const GENAI_INPUT_FORMATS = [
   "inspect_eval",
@@ -66,7 +68,7 @@ export const genaiManifest = z
       )
       .min(1)
       .max(64),
-    declared: z.record(z.unknown()).optional(),
+    declared: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
   .superRefine((m, x) => {

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import type { Engagement, Model, Run, EvaluationProfile } from "./domain/types";
 import { bucket } from "./bindings";
 import { ApiError } from "./http";

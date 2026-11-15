@@ -2,6 +2,13 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+// lib/zod.ts configures zod's default messages; importing "zod" directly
+// would let a module parse before that configuration is loaded.
+const zodImport = {
+  name: "zod",
+  message: 'Import { z } from lib/zod instead of "zod".',
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -33,6 +40,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["**/*.{ts,tsx}"],
+    ignores: ["lib/zod.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [zodImport] }],
+    },
+  },
+  {
     // The criteria loader and its bundle are server-only: client components
     // receive projections from the API (docs/design/criteria-model.md 14.4).
     files: ["app/**/*.tsx"],
@@ -41,6 +55,7 @@ const eslintConfig = defineConfig([
       "no-restricted-imports": [
         "error",
         {
+          paths: [zodImport],
           patterns: [
             {
               group: [

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import {
   locationSchema,
   sampleRecords,
@@ -60,7 +60,7 @@ export const sources: AssuranceModule = defineCommands({
         summary = packetSummary(packet);
       } catch (error) {
         if (error instanceof z.ZodError)
-          throw new ApiError(400, packetRefusal(error));
+          throw new ApiError(400, packetRefusal(error, packet));
         throw error;
       }
       return {

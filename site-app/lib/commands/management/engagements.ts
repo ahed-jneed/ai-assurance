@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { assertEngagementQuota } from "../../access-policy";
 import { db } from "../../bindings";
 import { roles } from "../../domain/types";

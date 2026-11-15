@@ -9,7 +9,7 @@
 // or impact review of work that a plan or scope change made stale, and
 // returns are never refused: approved plan and scope revisions, and the
 // reviewer's decisions, bound how often those happen.
-import { z } from "zod";
+import { z } from "../zod";
 import {
   currentExecution,
   executionPlanCurrent,

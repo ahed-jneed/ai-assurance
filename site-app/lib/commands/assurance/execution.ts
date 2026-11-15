@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
 import type { Outcome, Result, Run } from "../../domain/types";

@@ -3,7 +3,7 @@
 // enrolled for the engagement can be revoked, once.
 import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it } from "vitest";
-import { z } from "zod";
+import { z } from "../../zod";
 import { enrolmentFormats } from "../../../app/assurance-workbench/types";
 import { getEngagement } from "../../engagement-repo";
 import { ApiError } from "../../http";
@@ -96,10 +96,10 @@ describe("enrollWorker", () => {
     expect(refused).toBeInstanceOf(z.ZodError);
     const [issue] = (refused as z.ZodError).issues;
     expect(issue).toMatchObject({
-      code: "invalid_enum_value",
+      code: "invalid_value",
       path: ["formats", 0],
     });
-    const accepted = (issue as z.ZodInvalidEnumValueIssue).options;
+    const accepted = (issue as z.core.$ZodIssueInvalidValue).values;
     expect(new Set(accepted)).toEqual(new Set(enrolmentFormats));
     expect(accepted).toHaveLength(enrolmentFormats.length);
   });

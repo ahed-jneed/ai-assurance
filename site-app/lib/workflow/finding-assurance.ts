@@ -1,6 +1,6 @@
 // Finding assurance commands: the support behind a finding, the
 // independent retest of its remediation and reopening a closed finding.
-import { z } from "zod";
+import { z } from "../zod";
 import { defaultFindingCriteria } from "../criteria/pin";
 import { fail, short, text, uid, type WorkflowHandler } from "./command";
 export const findingAssuranceCommands: Record<string, WorkflowHandler> = {

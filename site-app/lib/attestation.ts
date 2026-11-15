@@ -3,7 +3,7 @@
 // attestation dialog and POST /api/workspace compute the subject with the
 // same functions, so the digest the person saw is the digest the server
 // checks before the decision runs and records in the audit event.
-import { z } from "zod";
+import { z } from "./zod";
 import type { Engagement } from "./domain/types";
 import { sha256 } from "./ids";
 

@@ -8,7 +8,7 @@
 // The Art 4a reading behind this gate is pending legal review (LR-06): on its
 // face, condition (d) bars access by other parties, so Art 4a alone may not
 // let a client hand such data to an external auditor's platform.
-import { z } from "zod";
+import { z } from "./zod";
 import { calendarDate } from "./dataset-card";
 import {
   type BinaryHeader,
@@ -119,7 +119,7 @@ export const basisInputSchema = z
         kind: z.literal("art4a"),
         paragraph: z.enum(["1", "2"]),
         /** The client's statement for each condition point, keyed by point. */
-        conditions: z.record(statement),
+        conditions: z.record(z.string(), statement),
         ...common,
       })
       .strict(),
@@ -139,14 +139,14 @@ export const basisInputSchema = z
     for (const point of required)
       if (!given.includes(point))
         issue.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["conditions", point],
           message: "Record the client's statement for condition " + point,
         });
     for (const point of given)
       if (!required.includes(point))
         issue.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: "custom",
           path: ["conditions", point],
           message: "Art 4a(" + v.paragraph + ") has no condition " + point,
         });

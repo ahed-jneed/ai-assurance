@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { db } from "@/lib/bindings";
 import { short } from "@/lib/commands/fields";
 import { dispatchManagement, managementOps } from "@/lib/commands/management";
@@ -12,7 +12,7 @@ const command = z
     tenantId: short,
     expectedVersion: z.number().int().positive(),
     op: z.enum(managementOps),
-    data: z.record(z.unknown()),
+    data: z.record(z.string(), z.unknown()),
   })
   .strict();
 

@@ -3,7 +3,7 @@
 // each leaves. A refused command leaves the engagement exactly as it was.
 // monitoring.test.ts covers the evidence each decision needs at closure.
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError } from "../zod";
 import type { Engagement, Report } from "../domain/types";
 import type { MonitoringCase } from "../workflow-types";
 import {
