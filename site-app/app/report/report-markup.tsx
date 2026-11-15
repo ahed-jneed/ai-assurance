@@ -19,6 +19,7 @@ import {
 import { requestLabel } from "@/lib/evidence-requests";
 import { reportDate } from "@/lib/report-presentation";
 import { legalDate } from "@/lib/rule-pack";
+import { releaseState } from "@/lib/workflow-state";
 
 export type ReportSnapshot = {
   scope?: BriefFields;
@@ -198,12 +199,24 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
                 <tr key={r.criterion}>
                   <td>{r.criterion}</td>
                   <td>{r.procedures}</td>
-                  <td>{r.exceptions}</td>
+                  {/* No procedure evaluated a criterion of its own, so it
+                      has no procedure exceptions to count (#241). */}
+                  <td>{r.procedures ? r.exceptions : "None evaluated"}</td>
                   <td>
-                    {r.openFindings}
-                    {r.openHighFindings
-                      ? " (" + r.openHighFindings + " High or Critical)"
-                      : ""}
+                    {r.withheldHighFindings && !r.openFindings
+                      ? "Withheld"
+                      : r.openFindings +
+                        (r.openHighFindings
+                          ? " (" + r.openHighFindings + " High or Critical)"
+                          : "") +
+                        (r.withheldHighFindings ? " and withheld" : "")}
+                    {!!r.withheldHighFindings && (
+                      <small className="report-note">
+                        {" "}
+                        A High or Critical finding for internal use decides this
+                        result; its details are not part of this report.
+                      </small>
+                    )}
                   </td>
                   <td>{criterionResults[r.result] ?? r.result}</td>
                 </tr>
@@ -216,14 +229,38 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
   );
 }
 
+/**
+ * The successor a report names, as the client projection describes it
+ * (#241): a successor that was withdrawn after its release reads "since
+ * withdrawn". Staff see its id; the client projection does not name it.
+ */
+export function successorLabel(
+  supersededBy: string,
+  reports: readonly Report[] = [],
+) {
+  const successor = reports.find((q) => q.id === supersededBy);
+  return successor && releaseState(successor) === "withdrawn"
+    ? supersededBy + ", since withdrawn"
+    : supersededBy;
+}
+
 export function reportMarkup(
   report: Report,
   s: ReportSnapshot,
   tenantId?: string,
+  reports: readonly Report[] = [],
 ) {
   const scope = s.scope ?? s.workflow?.brief,
     v2 = !!snapshotTerms(s) && !!s.conclusionStatement,
-    supersededBy = report.supersededBy ?? report.release?.supersededBy;
+    supersededBy = report.supersededBy ?? report.release?.supersededBy,
+    withdrawn =
+      releaseState(report) === "withdrawn"
+        ? {
+            ...report.release?.history
+              .filter((h) => h.action === "withdraw")
+              .at(-1),
+          }
+        : undefined;
   return (
     <main className="print-report">
       <nav className="print-toolbar">
@@ -234,6 +271,7 @@ export function reportMarkup(
       <header>
         <p className="eyebrow">
           AI ASSURANCE · CONTROLLED {report.kind.toUpperCase()} REPORT
+          {withdrawn ? " · WITHDRAWN" : ""}
         </p>
         <h1>{s.engagement.title}</h1>
         <p className="report-meta">
@@ -246,9 +284,24 @@ export function reportMarkup(
         {!!report.replaces?.length && (
           <p className="report-meta">Replaces {report.replaces.join(", ")}</p>
         )}
+        {withdrawn && (
+          <p className="report-withdrawn" role="note">
+            <strong>Withdrawn.</strong> This report was withdrawn
+            {withdrawn.at
+              ? " on " +
+                new Date(withdrawn.at).toLocaleString("en-GB", {
+                  timeZone: "Europe/Vienna",
+                }) +
+                " Europe/Vienna"
+              : ""}{" "}
+            and is no longer issued to the client.
+            {withdrawn.reason ? " Reason: " + withdrawn.reason : ""}
+          </p>
+        )}
         {supersededBy && (
           <p className="report-meta report-superseded">
-            Superseded by {supersededBy}. This report remains as it was issued.
+            Superseded by {successorLabel(supersededBy, reports)}. This report
+            remains as it was issued.
           </p>
         )}
       </header>

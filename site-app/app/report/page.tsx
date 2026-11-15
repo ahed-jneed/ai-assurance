@@ -35,7 +35,12 @@ async function reportBody(params: Record<string, string | undefined>) {
     // try block (#234 item 8), so that a malformed snapshot is caught below
     // and answered with the "Report unavailable" fallback.
     return resolvePrintTree(
-      reportMarkup(report, report.snapshot as ReportSnapshot, ctx.tenantId),
+      reportMarkup(
+        report,
+        report.snapshot as ReportSnapshot,
+        ctx.tenantId,
+        e.reports,
+      ),
     );
   } catch (error) {
     // The status /api/report-package gives for the same inputs (#209, #216,

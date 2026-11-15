@@ -598,6 +598,11 @@ describe("findings that reference criteria", () => {
     (e.findings.at(-1) as Finding).severity = "High";
     expect(
       criterionRollup(e, clientOnly, lookup).find((c) => c.criterion === art50),
-    ).toMatchObject({ openFindings: 0, result: "exceptions" });
+    ).toMatchObject({
+      procedures: 0,
+      openFindings: 0,
+      withheldHighFindings: 1,
+      result: "exceptions",
+    });
   });
 });

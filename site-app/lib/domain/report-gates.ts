@@ -77,6 +77,11 @@ export const criteriaPhrase = "the criteria set out in this report";
  * report counts only client-visible findings, so its counts match the
  * findings it lists. The result still reflects every open High or Critical
  * finding, because it states the practitioner's view of the criterion.
+ * `withheldHighFindings` counts the open High or Critical findings that
+ * decide the result but are left out of the counts, so the report can say
+ * the count is withheld instead of showing a 0 that contradicts the result
+ * (#241; D-36 opens the row for the result, F-57 keeps the counts to the
+ * findings the report lists).
  *
  * With `lookup` (the pinned criteria, docs/design/criteria-model.md section 7,
  * phase 2), an open finding linked to no selected procedure is rolled up
@@ -102,6 +107,7 @@ export function criterionRollup(
       notEvaluated: number;
       openFindings: number;
       openHighFindings: number;
+      withheldHighFindings: number;
     }
   >();
   const highCriteria = new Set<string>();
@@ -114,6 +120,7 @@ export function criterionRollup(
       notEvaluated: 0,
       openFindings: 0,
       openHighFindings: 0,
+      withheldHighFindings: 0,
     };
   // The requirement references each criterion's procedures link.
   const linked = new Map<string, Set<string>>();
@@ -125,7 +132,7 @@ export function criterionRollup(
     if (counted(f)) {
       g.openFindings++;
       if (high) g.openHighFindings++;
-    }
+    } else if (high) g.withheldHighFindings++;
     groups.set(criterion, g);
   };
   for (const p of e.workflow?.procedures ?? []) {

@@ -1592,6 +1592,12 @@ input {
 .print-report .report-superseded {
   font-weight: 600;
 }
+.print-report .report-withdrawn {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 2px solid currentColor;
+  font-weight: 600;
+}
 .print-report table {
   width: 100%;
   font-size: 12px;

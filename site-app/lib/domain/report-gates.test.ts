@@ -272,6 +272,7 @@ describe("results by criterion", () => {
         notEvaluated: 0,
         openFindings: 0,
         openHighFindings: 0,
+        withheldHighFindings: 0,
         result: "no_exceptions",
       },
     ]);
@@ -332,8 +333,12 @@ describe("results by criterion", () => {
     ).toMatchObject({
       openFindings: 1,
       openHighFindings: 0,
+      // The internal High finding decides the result; the client report
+      // says its count is withheld (#241).
+      withheldHighFindings: 1,
       result: "exceptions",
     });
+    expect(criterionRollup(e)[0].withheldHighFindings).toBe(0);
   });
 });
 
