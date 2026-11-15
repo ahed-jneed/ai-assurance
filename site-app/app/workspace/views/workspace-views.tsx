@@ -281,6 +281,25 @@ export const WorkspaceViews = memo(function WorkspaceViews({
         title="This engagement cannot be opened"
         text="Choose another engagement from the directory. The banner above says what is wrong with this one."
       />
+    ) : viewer && data.engagements.length ? (
+      // #240 item 7: a client opened a link to an engagement that is not
+      // theirs (another client's, or one whose grant ended); they still have
+      // engagements of their own, so the page leads back to them.
+      <Empty
+        icon={Building2}
+        title="This engagement is not available to you"
+        text="It belongs to another client or your access to it has ended. Open one of your engagements instead."
+      >
+        {data.engagements.map((g) => (
+          <Button
+            key={g.id}
+            variant="outline"
+            onClick={() => nav.openEngagement(g.id)}
+          >
+            Open {g.title}
+          </Button>
+        ))}
+      </Empty>
     ) : viewer ? (
       <Empty
         icon={Building2}
