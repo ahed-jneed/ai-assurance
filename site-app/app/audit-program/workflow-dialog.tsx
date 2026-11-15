@@ -29,6 +29,11 @@ export type Field = {
   ids?: string[];
   optional?: boolean;
   hint?: string;
+  /**
+   * A checklist that needs at least one item ticked: the form refuses to
+   * save without one and says this instead of the server's validator text.
+   */
+  requiredMessage?: string;
   /** Overrides the default limit (8,000 for an area, 300 for text). */
   maxLength?: number;
 };
@@ -91,13 +96,26 @@ export function WorkflowDialog({
   }, [form, onEditing]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const fields = new FormData(event.currentTarget),
+    const formEl = event.currentTarget,
+      fields = new FormData(formEl),
       v: Record<string, string | string[]> = {};
     for (const f of form!.fields)
       v[f.name] =
         f.type === "checklist"
           ? fields.getAll(f.name).map(String)
           : String(fields.get(f.name) ?? "");
+    const missing = form!.fields.find(
+      (f) => f.type === "checklist" && f.requiredMessage && !v[f.name].length,
+    );
+    if (missing) {
+      setError(missing.requiredMessage!);
+      formEl
+        .querySelector<HTMLInputElement>(
+          `input[name="${CSS.escape(missing.name)}"]`,
+        )
+        ?.focus();
+      return;
+    }
     try {
       setError("");
       await form!.save(v);
@@ -157,7 +175,10 @@ export function WorkflowDialog({
                 <div className="workflow-field" key={f.name}>
                   {f.type === "checklist" ? (
                     <fieldset>
-                      <legend>{f.label}</legend>
+                      <legend>
+                        {f.label}
+                        {f.requiredMessage && " (required)"}
+                      </legend>
                       <div className="workflow-checklist">
                         {f.options?.map((o) => (
                           <label key={o.value}>

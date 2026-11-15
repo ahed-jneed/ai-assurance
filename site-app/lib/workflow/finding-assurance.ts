@@ -43,7 +43,7 @@ export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
           performed: text,
           results: text,
           rationale: text,
-          evidenceIds: z.array(short).min(1).max(100),
+          evidenceIds: z.array(short).max(100),
           conclusion: z.enum(["effective", "not_effective"]),
         })
         .strict()
@@ -51,6 +51,9 @@ export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
       f =
         e.findings.find((f) => f.id === a.findingId) ??
         fail(404, "Finding not found");
+    // A required field of the form, refused in its words (#241).
+    if (!a.evidenceIds.length)
+      fail(400, "Select the evidence the retest relied on");
     if (f.createdBy === c.userId || f.remediationBy === c.userId)
       fail(403, "An independent person must perform the retest");
     if (f.status !== "ready_for_retest" || !f.remediation.trim())

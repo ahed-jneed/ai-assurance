@@ -444,6 +444,17 @@ export type NarrowedAction = keyof typeof narrowings;
 export const narrowedActions = Object.keys(narrowings) as NarrowedAction[];
 
 /**
+ * Why the finding's creator or remediator cannot close it (#241): once an
+ * effective independent retest is on record, the rule that still applies is
+ * the closer's independence, so the refusal names that rule.
+ */
+export function closeFindingRefusal(f: Finding): string {
+  return f.retest?.conclusion === "effective"
+    ? "The finding's creator or remediator cannot close it"
+    : "Independent retest confirmation is required";
+}
+
+/**
  * The role check and the independence rule of a decision on one record, the
  * way its command checks them (lib/commands/**): a preparer, contributor or
  * reviewer of the work cannot also approve, close or sign it. For the
@@ -507,7 +518,7 @@ export function decisionState(
     case "closeFinding": {
       const f = decision.finding;
       return f.createdBy === userId || f.remediationBy === userId
-        ? refused("Independent retest confirmation is required")
+        ? refused(closeFindingRefusal(f))
         : allowed;
     }
     case "approveClassification": {

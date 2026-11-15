@@ -120,7 +120,13 @@ export function FindingAssurance({
                     "Evidence assessment and conclusion rationale",
                     f.retest?.rationale,
                   ),
-                  evidence(e, f.retest?.evidenceIds ?? f.retestEvidenceIds),
+                  {
+                    ...evidence(
+                      e,
+                      f.retest?.evidenceIds ?? f.retestEvidenceIds,
+                    ),
+                    requiredMessage: "Select the evidence the retest relied on",
+                  },
                   choice(
                     "conclusion",
                     "Remediation effectiveness",

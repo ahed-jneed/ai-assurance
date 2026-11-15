@@ -206,6 +206,17 @@ describe("recordFindingRetest", () => {
     );
   });
 
+  it("refuses a retest without evidence in the form's words", async () => {
+    const e = withFinding(ready);
+    await refused(
+      e,
+      () => record(e, { evidenceIds: [] }),
+      400,
+      "Select the evidence the retest relied on",
+    );
+    expect(theFinding(e).retest).toBeUndefined();
+  });
+
   it("refuses an unknown finding", async () => {
     const e = withFinding(ready);
     await refused(

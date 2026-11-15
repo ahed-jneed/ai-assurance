@@ -530,6 +530,17 @@ describe("decisionState", () => {
     ).toBe(true);
   });
 
+  it("names the closer's independence once the retest is effective (#241)", () => {
+    const finding = { createdBy: "a", remediationBy: "b" } as Finding;
+    const reason = (f: Finding) =>
+      decisionState("Reviewer", "b", { action: "closeFinding", finding: f })
+        .reason;
+    expect(reason(finding)).toBe("Independent retest confirmation is required");
+    expect(
+      reason({ ...finding, retest: { conclusion: "effective" } } as Finding),
+    ).toBe("The finding's creator or remediator cannot close it");
+  });
+
   it("approves a report package only for someone other than its creator (#226)", () => {
     const report = { actor: "creator" } as unknown as Report;
     expect(

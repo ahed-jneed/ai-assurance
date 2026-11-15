@@ -10,6 +10,7 @@ import { risk } from "../domain/risk";
 import type { Finding } from "../domain/types";
 import { id, now } from "../ids";
 import { ApiError } from "../http";
+import { closeFindingRefusal } from "../permissions";
 import { defineCommands } from "./command";
 import { short, text } from "./fields";
 /** Requirement references such as "eu-ai-act:AIA-ART-9" (at most 20). */
@@ -163,7 +164,7 @@ export const findings = defineCommands({
         f.createdBy === ctx.user.userId ||
         f.remediationBy === ctx.user.userId
       )
-        throw new ApiError(403, "Independent retest confirmation is required");
+        throw new ApiError(403, closeFindingRefusal(f));
       if (
         f.status !== "ready_for_retest" ||
         !f.remediation.trim() ||
