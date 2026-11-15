@@ -4,6 +4,10 @@
 import { describe, expect, it } from "vitest";
 import type { Engagement, Report } from "./domain/types";
 import { releaseChecklist } from "./domain/gates";
+import {
+  reviewerInactiveMessage,
+  reviewerOnTeamMessage,
+} from "./domain/quality-review";
 import { decisionState } from "./permissions";
 import {
   monitoringClosureRefusal,
@@ -109,6 +113,57 @@ describe("the release precondition", () => {
     });
     expect(releaseRefusal(e, e.reports[0], "lead")).toBeNull();
     await release(e);
+  });
+
+  it("applies the EQR's release-time re-checks from the reviewer's standing (#244 item 1)", () => {
+    const e = released({
+      qualityReview: completedQualityReview({
+        signOffs: [
+          {
+            reportId: "R1",
+            userId: "quality-reviewer",
+            at,
+            internalHash: "R1-internal",
+            clientHash: "R1-client",
+            checklistRevision: 2,
+            conclusion: "Stand-back review complete",
+          },
+        ],
+      }),
+    });
+    const standing = {
+      reviewerId: "quality-reviewer",
+      activeReviewer: true,
+      onRecordedTeam: false,
+    };
+    expect(releaseRefusal(e, e.reports[0], "lead", standing)).toBeNull();
+    // Revoked or moved to another role after their sign-off.
+    const inactive = { ...standing, activeReviewer: false };
+    expect(releaseRefusal(e, e.reports[0], "lead", inactive)).toEqual({
+      status: 409,
+      message: reviewerInactiveMessage,
+    });
+    expect(reviewerInactiveMessage).toContain("appoint an eligible reviewer");
+    // The guidance (no releaser) names the same reason.
+    expect(releaseRefusal(e, e.reports[0], undefined, inactive)).toEqual(
+      releaseRefusal(e, e.reports[0], "lead", inactive),
+    );
+    // On the team by recorded work: the independence re-check comes first,
+    // as release runs it before the signer's.
+    expect(
+      releaseRefusal(e, e.reports[0], "lead", {
+        ...inactive,
+        onRecordedTeam: true,
+      }),
+    ).toEqual({ status: 409, message: reviewerOnTeamMessage });
+    // A standing of another reviewer than the one appointed counts for
+    // nothing.
+    expect(
+      releaseRefusal(e, e.reports[0], "lead", {
+        ...inactive,
+        reviewerId: "someone-else",
+      }),
+    ).toBeNull();
   });
 
   it("refuses the approver as releaser, but not in the guidance", async () => {

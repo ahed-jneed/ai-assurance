@@ -2511,7 +2511,7 @@ try {
         409,
       )
     ).error,
-    "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+    "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint an eligible reviewer and obtain their sign-off before release",
   );
   await management("grantMember", {
     userId: quality,

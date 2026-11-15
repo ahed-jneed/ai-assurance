@@ -18,7 +18,10 @@ import { sqliteD1 } from "../test-d1";
 import {
   assertReviewerIndependent,
   assertSignerActive,
+  reviewerStanding,
 } from "../quality-review-records";
+import { releaseRefusal } from "../preconditions";
+import { qualityReviewView } from "../read-models/quality-review-view";
 import {
   acceptedRecord,
   approvedWorkflow,
@@ -598,7 +601,7 @@ describe("the signer at release", () => {
     const refused = {
       status: 409,
       message:
-        "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
+        "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint an eligible reviewer and obtain their sign-off before release",
     };
     changeRole("eqr", "Reviewer", new Date().toISOString());
     expect(await refusal(assertSignerActive(lead, e))).toEqual(refused);
@@ -612,6 +615,108 @@ describe("the signer at release", () => {
     expect(await refusal(assertSignerActive(lead, e))).toEqual(refused);
     // Without a reviewer there is no signer to check.
     await assertSignerActive(lead, engagement());
+  });
+});
+
+describe("the workspace's view of the quality review (#244)", () => {
+  /** A final package the appointed reviewer approved and signed off. */
+  async function signedOff() {
+    const e = engagement({
+      reports: [finalPackage()],
+      workflow: approvedWorkflow(),
+      stage: "Sign-off",
+    });
+    await appoint(e);
+    await dispatch(e, "saveQualityReview", { items: allSatisfied }, eqr);
+    await dispatch(
+      e,
+      "signOffQualityReview",
+      {
+        reportId: "R1",
+        internalHash: "internal-hash",
+        clientHash: "client-hash",
+        conclusion: "Stand-back review complete",
+      },
+      eqr,
+    );
+    e.reports[0].release = {
+      state: "approved",
+      approval: {
+        userId: "reviewer",
+        at: "2026-11-05T11:00:00.000Z",
+        internalHash: "internal-hash",
+        clientHash: "client-hash",
+        reason: "Both packages reviewed",
+      },
+      history: [],
+    };
+    return e;
+  }
+
+  it("disables Release with the refusal the signer re-check answers", async () => {
+    const e = await signedOff();
+    expect(
+      releaseRefusal(e, e.reports[0], "lead", await reviewerStanding(lead, e)),
+    ).toBeNull();
+    sqlite
+      .prepare(
+        "UPDATE memberships SET status='revoked' WHERE tenant_id='tenant-1' AND user_id='eqr'",
+      )
+      .run();
+    const shown = releaseRefusal(
+      e,
+      e.reports[0],
+      "lead",
+      await reviewerStanding(lead, e),
+    );
+    expect(shown).toEqual(await refusal(assertSignerActive(lead, e)));
+    // Without the standing, the record alone admits the release.
+    expect(releaseRefusal(e, e.reports[0], "lead")).toBeNull();
+  });
+
+  it("disables Release with the refusal the independence re-check answers", async () => {
+    const e = await signedOff();
+    auditEvent("ENG-1", "eqr", "comment");
+    expect(
+      releaseRefusal(e, e.reports[0], "lead", await reviewerStanding(lead, e)),
+    ).toEqual(await refusal(assertReviewerIndependent(lead, e)));
+  });
+
+  it("gives each listed member the refusal the appointment answers", async () => {
+    member("eqr-team", "Engagement Quality Reviewer");
+    member("eqr-cooling", "Engagement Quality Reviewer");
+    storedEngagement("ENG-0", "client", engagement({ id: "ENG-0" }));
+    auditEvent(
+      "ENG-0",
+      "eqr-cooling",
+      "editPaper",
+      new Date(Date.now() - 30 * 86_400_000).toISOString(),
+    );
+    const e = engagement({ papers: [paper({ authorId: "eqr-team" })] });
+    const people = ["lead", "eqr", "eqr-team", "eqr-cooling"].map((id) => ({
+      user_id: id,
+      role: id === "lead" ? "Lead Auditor" : "Engagement Quality Reviewer",
+      status: "active",
+    }));
+    const view = await qualityReviewView(lead, e, people, 730);
+    expect(view?.standing).toBeNull();
+    expect(view?.candidates).toEqual([
+      { user_id: "eqr", refusal: null },
+      { user_id: "eqr-team", refusal: teamRefusal.message },
+      {
+        user_id: "eqr-cooling",
+        refusal: (await refusal(appoint(e, "eqr-cooling"))).message,
+      },
+    ]);
+    expect(await refusal(appoint(e, "eqr-team"))).toEqual(teamRefusal);
+    // Only a Lead Auditor sees the picker's refusals; the standing is for
+    // every internal member, and nothing for a client.
+    expect((await qualityReviewView(eqr, e, people, 730))?.candidates).toEqual(
+      [],
+    );
+    expect(
+      await qualityReviewView(as("viewer", "Client Viewer"), e, people, 730),
+    ).toBeNull();
   });
 });
 

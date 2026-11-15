@@ -325,7 +325,7 @@ export function qualityReviewGates(
       gate(
         "quality-review",
         "Appoint an independent engagement quality reviewer",
-        "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer",
+        reviewerOnTeamMessage,
       ),
     ];
   const problem = checklistProblem(q);
@@ -358,9 +358,49 @@ export function qualityReviewReleaseProblem(e: Engagement, r: Report) {
   const q = e.qualityReview;
   if (!q)
     return "Appoint an engagement quality reviewer and obtain their sign-off before release";
-  if (onEngagementTeam(e, q.reviewerId))
-    return "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer";
+  if (onEngagementTeam(e, q.reviewerId)) return reviewerOnTeamMessage;
   return qualityReviewSignedOff(q, r)
     ? ""
     : "The engagement quality reviewer must sign off both exact packages before release";
+}
+
+/** Why appointQualityReviewer refuses a member of the engagement team. */
+export const appointmentTeamMessage =
+  "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer";
+/** The refusal while the appointed reviewer is on the engagement team. */
+export const reviewerOnTeamMessage =
+  "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer";
+/** The refusal while the appointed reviewer no longer holds the role. */
+export const reviewerInactiveMessage =
+  "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint an eligible reviewer and obtain their sign-off before release";
+
+/**
+ * The appointed reviewer's standing as the server's stores show it, which
+ * the engagement record alone cannot (lib/quality-review-records.ts
+ * reviewerStanding): whether they still are an active member holding the
+ * Engagement Quality Reviewer role, and whether recorded work (audit
+ * events, assurance records, engagement grants under another role) puts them
+ * on the engagement team.
+ */
+export type QualityReviewerStanding = {
+  reviewerId: string;
+  activeReviewer: boolean;
+  onRecordedTeam: boolean;
+};
+
+/**
+ * Why release is refused for the appointed reviewer's standing (#244 item
+ * 1): the re-checks release runs (assertReviewerIndependent, then
+ * assertSignerActive), in their order and words. Empty without a reviewer,
+ * without a standing, or for a standing of another reviewer than the one
+ * appointed.
+ */
+export function reviewerStandingProblem(
+  e: Engagement,
+  standing?: QualityReviewerStanding | null,
+) {
+  const q = e.qualityReview;
+  if (!q || !standing || standing.reviewerId !== q.reviewerId) return "";
+  if (standing.onRecordedTeam) return reviewerOnTeamMessage;
+  return standing.activeReviewer ? "" : reviewerInactiveMessage;
 }

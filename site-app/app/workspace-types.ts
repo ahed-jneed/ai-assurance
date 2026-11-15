@@ -4,6 +4,7 @@ import type { Engagement, Role } from "@/lib/domain/types";
 import type { PracticeReportSettings } from "@/lib/domain/report-model";
 import type { IntegrityIncidents } from "@/lib/engagement-storage";
 import type { RevocationCancellation } from "@/lib/read-models/workspace-view";
+import type { QualityReviewView } from "@/lib/read-models/quality-review-view";
 export type CatalogItem = {
   id: string;
   title: string;
@@ -105,6 +106,13 @@ export type WorkspaceData = {
    * the practice set it (otherwise the default applies).
    */
   qualityReviewPolicy?: { coolingOffDays: number; practiceSet: boolean } | null;
+  /**
+   * The selected engagement's quality review as the server's stores show it
+   * (#244), for internal members: the appointed reviewer's standing, which
+   * Release is disabled for, and the reviewer picker's members with the
+   * refusal each would meet.
+   */
+  qualityReview?: QualityReviewView | null;
   /** The practice's report settings, for internal roles. */
   reportSettings?: PracticeReportSettings | null;
   /**

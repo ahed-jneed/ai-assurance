@@ -156,6 +156,7 @@ describe("the Reports & sign-off banner of a captured final package (R1-19)", ()
           onCreate={noop}
           onOpen={noop}
           onAct={noop}
+          onAppoint={async () => {}}
           section="packages"
           onSection={noop}
           query={

@@ -548,6 +548,11 @@ export const WorkspaceViews = memo(function WorkspaceViews({
             onCreate={on.createReport}
             onOpen={on.openReport}
             onAct={safeAct}
+            // The appointment form shows a refusal itself (#244 item 2).
+            onAppoint={(values) =>
+              act("appointQualityReviewer", values, undefined, { quiet: true })
+            }
+            qualityReview={data.qualityReview}
             section={url.reportSection}
             onSection={url.setReportSection}
             query={url.registerQuery}

@@ -75,6 +75,7 @@ describe("the Reports & sign-off banner after approval and release", () => {
         onCreate={() => {}}
         onOpen={() => {}}
         onAct={() => {}}
+        onAppoint={async () => {}}
         section="packages"
         onSection={() => {}}
         query={

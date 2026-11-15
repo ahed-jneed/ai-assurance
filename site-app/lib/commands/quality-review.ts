@@ -10,10 +10,7 @@ import { db } from "../bindings";
 import { now } from "../ids";
 import { ApiError } from "../http";
 import { canBeAssigned } from "../permissions";
-import {
-  onRecordedTeam,
-  recordedCoolingOffConflicts,
-} from "../quality-review-records";
+import { appointmentRefusal, onRecordedTeam } from "../quality-review-records";
 import { qualityReviewPolicy } from "../quality-review-policy";
 import type { Context } from "../tenancy";
 import { releaseState } from "../workflow-state";
@@ -36,28 +33,6 @@ async function ownReview(e: Engagement, ctx: Context) {
       "You are on the engagement team and cannot act as its quality reviewer",
     );
   return q;
-}
-
-/**
- * The client's other engagements, for the cooling-off check. Their stored
- * records are read as they are, without the paper histories kept in R2.
- */
-async function clientEngagements(ctx: Context, e: Engagement) {
-  const rows = (
-    await db()
-      .prepare(
-        "SELECT body FROM engagements WHERE tenant_id=? AND client_id=? AND id<>?",
-      )
-      .bind(ctx.tenantId, e.clientId, e.id)
-      .all<{ body: string }>()
-  ).results;
-  return rows.flatMap((r) => {
-    try {
-      return [JSON.parse(r.body) as Engagement];
-    } catch {
-      return [];
-    }
-  });
 }
 
 /**
@@ -100,32 +75,10 @@ export const qualityReview = defineCommands({
           400,
           "Grant the reviewer access to this engagement in Users & access first",
         );
-      if (await onRecordedTeam(ctx, e, a.userId))
-        throw new ApiError(
-          409,
-          "This person is on the engagement team (a preparer, reviewer or Lead of this engagement) and cannot be its quality reviewer",
-        );
       const days = (await qualityReviewPolicy(ctx.tenantId)).coolingOffDays,
         at = now();
-      const conflicts = days
-        ? await recordedCoolingOffConflicts(
-            ctx,
-            e,
-            await clientEngagements(ctx, e),
-            a.userId,
-            days,
-            at,
-          )
-        : [];
-      if (conflicts.length)
-        throw new ApiError(
-          409,
-          "This person served on the team of " +
-            conflicts.map((c) => c.id).join(", ") +
-            " for the same client within the " +
-            days +
-            "-day cooling-off period and is not yet eligible",
-        );
+      const refused = await appointmentRefusal(ctx, e, a.userId, days, at);
+      if (refused) throw new ApiError(refused.status, refused.message);
       const previous = e.qualityReview;
       const q: QualityReview = {
         reviewerId: a.userId,

@@ -37,6 +37,8 @@ import {
   packageStatus,
   packageStatusLabel,
 } from "@/lib/report-presentation";
+import { releaseRefusal } from "@/lib/preconditions";
+import type { QualityReviewView } from "@/lib/read-models/quality-review-view";
 import { DatabaseToolbar } from "./database-toolbar";
 import { RegisterControls } from "./register-controls";
 import { ReportReadiness, type GateAction } from "./audit-gates";
@@ -58,6 +60,13 @@ type Props = {
   onOpen: (report: Report) => void;
   /** Runs an engagement command (the quality review's). */
   onAct: (op: string, data: Record<string, unknown>) => void;
+  /**
+   * Appoints the engagement quality reviewer; rejects with the server's
+   * refusal, which the appointment form shows itself (#244 item 2).
+   */
+  onAppoint: (data: { userId: string; reason: string }) => Promise<unknown>;
+  /** The quality review as the server's stores show it (#244). */
+  qualityReview?: QualityReviewView | null;
   section: string;
   onSection: (value: string) => void;
   query: RegisterQuery;
@@ -81,6 +90,8 @@ export function ReportWorkspace({
   onCreate,
   onOpen,
   onAct,
+  onAppoint,
+  qualityReview,
   section,
   onSection,
   query,
@@ -120,7 +131,14 @@ export function ReportWorkspace({
     awaiting =
       latest && state === "internal"
         ? awaitingApproval(latest, role, userId)
-        : undefined;
+        : undefined,
+    standing = qualityReview?.standing,
+    // An approved package the server would still refuse to release, the
+    // Engagement Quality Reviewer's release-time re-checks included (#244).
+    releaseHeld =
+      !!latest &&
+      state === "approved" &&
+      !!releaseRefusal(e, latest, undefined, standing);
   const activeStep = blocked
     ? 0
     : !latest || ["withdrawn", "superseded"].includes(state)
@@ -444,7 +462,11 @@ export function ReportWorkspace({
         </ol>
         <div className="report-next-step">
           <div>
-            <span className={"badge " + (blocked ? "amber" : "green")}>
+            <span
+              className={
+                "badge " + (blocked || releaseHeld ? "amber" : "green")
+              }
+            >
               {blocked
                 ? "Final capture blocked"
                 : awaiting
@@ -472,7 +494,7 @@ export function ReportWorkspace({
                 : awaiting
                   ? awaiting.guidance
                   : settled && latest
-                    ? packageGuidance(latest, e)
+                    ? packageGuidance(latest, e, standing)
                     : "Package approval and client release remain separate recorded decisions."}
             </p>
             {stillRead && (
@@ -549,9 +571,11 @@ export function ReportWorkspace({
             role={role}
             userId={userId}
             people={people}
+            qualityReview={qualityReview}
             terms={terms}
             busy={busy}
             onAct={onAct}
+            onAppoint={onAppoint}
           />
         </TabsContent>
       </Tabs>

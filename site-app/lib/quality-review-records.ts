@@ -11,9 +11,13 @@
 import { db } from "./bindings";
 import type { Engagement } from "./domain/types";
 import {
+  appointmentTeamMessage,
   coolingOffConflicts,
   engagementTeam,
   qualityReviewerRole,
+  reviewerInactiveMessage,
+  reviewerOnTeamMessage,
+  type QualityReviewerStanding,
 } from "./domain/quality-review";
 import { ApiError } from "./http";
 import type { Context } from "./tenancy";
@@ -108,9 +112,6 @@ export async function grantInvolvement(
   return last;
 }
 
-const teamMessage =
-  "The engagement quality reviewer is on the engagement team; appoint an eligible reviewer";
-
 /**
  * Whether the user is on this engagement's team, by the engagement record or
  * by recorded work.
@@ -134,7 +135,37 @@ export async function onRecordedTeam(
 export async function assertReviewerIndependent(ctx: Context, e: Engagement) {
   const q = e.qualityReview;
   if (q && (await onRecordedTeam(ctx, e, q.reviewerId)))
-    throw new ApiError(409, teamMessage);
+    throw new ApiError(409, reviewerOnTeamMessage);
+}
+
+/** Whether the user is an active member holding the reviewer role. */
+async function activeReviewer(ctx: Context, userId: string) {
+  const member = await db()
+    .prepare(
+      "SELECT role,status FROM memberships WHERE tenant_id=? AND user_id=?",
+    )
+    .bind(ctx.tenantId, userId)
+    .first<{ role: string; status: string }>();
+  return member?.status === "active" && member.role === qualityReviewerRole;
+}
+
+/**
+ * The appointed reviewer's standing for the workspace (#244 item 1), from
+ * the same stores the release re-checks read: the workspace disables Release
+ * with reviewerStandingProblem's refusal, as assertReviewerIndependent and
+ * assertSignerActive refuse it. Null without a reviewer.
+ */
+export async function reviewerStanding(
+  ctx: Context,
+  e: Engagement,
+): Promise<QualityReviewerStanding | null> {
+  const q = e.qualityReview;
+  if (!q) return null;
+  return {
+    reviewerId: q.reviewerId,
+    activeReviewer: await activeReviewer(ctx, q.reviewerId),
+    onRecordedTeam: await onRecordedTeam(ctx, e, q.reviewerId),
+  };
 }
 
 /**
@@ -145,18 +176,8 @@ export async function assertReviewerIndependent(ctx: Context, e: Engagement) {
  */
 export async function assertSignerActive(ctx: Context, e: Engagement) {
   const q = e.qualityReview;
-  if (!q) return;
-  const member = await db()
-    .prepare(
-      "SELECT role,status FROM memberships WHERE tenant_id=? AND user_id=?",
-    )
-    .bind(ctx.tenantId, q.reviewerId)
-    .first<{ role: string; status: string }>();
-  if (member?.status !== "active" || member.role !== qualityReviewerRole)
-    throw new ApiError(
-      409,
-      "The engagement quality reviewer is no longer an active member with the Engagement Quality Reviewer role; appoint a reviewer and obtain their sign-off before release",
-    );
+  if (q && !(await activeReviewer(ctx, q.reviewerId)))
+    throw new ApiError(409, reviewerInactiveMessage);
 }
 
 /**
@@ -190,4 +211,68 @@ export async function recordedCoolingOffConflicts(
       });
   }
   return [...conflicts.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * The client's other engagements, for the cooling-off check. Their stored
+ * records are read as they are, without the paper histories kept in R2.
+ */
+export async function clientEngagements(ctx: Context, e: Engagement) {
+  const rows = (
+    await db()
+      .prepare(
+        "SELECT body FROM engagements WHERE tenant_id=? AND client_id=? AND id<>?",
+      )
+      .bind(ctx.tenantId, e.clientId, e.id)
+      .all<{ body: string }>()
+  ).results;
+  return rows.flatMap((r) => {
+    try {
+      return [JSON.parse(r.body) as Engagement];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/**
+ * Why appointQualityReviewer refuses `userId`, an active member with the
+ * reviewer role and access to the engagement, for independence: on the
+ * engagement team, or on the team of another of the client's engagements
+ * within the cooling-off period of `days` before `at`. Null when eligible.
+ * The reviewer picker lists the members it refuses as disabled, with this
+ * reason (#244 item 2). `others` are the client's other engagements, read
+ * once when several members are checked.
+ */
+export async function appointmentRefusal(
+  ctx: Context,
+  e: Engagement,
+  userId: string,
+  days: number,
+  at: string,
+  others?: readonly Engagement[],
+): Promise<{ status: 409; message: string } | null> {
+  if (await onRecordedTeam(ctx, e, userId))
+    return { status: 409, message: appointmentTeamMessage };
+  const conflicts = days
+    ? await recordedCoolingOffConflicts(
+        ctx,
+        e,
+        others ?? (await clientEngagements(ctx, e)),
+        userId,
+        days,
+        at,
+      )
+    : [];
+  return conflicts.length
+    ? {
+        status: 409,
+        message:
+          "This person served on the team of " +
+          conflicts.map((c) => c.id).join(", ") +
+          " for the same client within the " +
+          days +
+          "-day cooling-off period and is not yet eligible",
+      }
+    : null;
 }

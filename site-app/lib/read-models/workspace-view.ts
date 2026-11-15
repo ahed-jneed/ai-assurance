@@ -17,6 +17,7 @@ import {
 } from "../engagement-storage";
 import { isOperator } from "../operator";
 import { effectiveCoolingOffDays } from "../quality-review-policy";
+import { qualityReviewView } from "./quality-review-view";
 import type { Context } from "../tenancy";
 import {
   clientGrantLapsed,
@@ -350,6 +351,14 @@ export async function workspaceView(
         practiceSet: typeof tenant.cooling_off_days === "number",
       }
     : null;
+  // The appointed reviewer's standing and the reviewer picker's refusals,
+  // from the server's stores (#244 items 1 and 2).
+  const qualityReview = await qualityReviewView(
+    ctx,
+    e,
+    people as { user_id: string; role: string; status: string }[],
+    effectiveCoolingOffDays(tenant.cooling_off_days),
+  );
   // What a new report states unless the Lead Auditor overrides it; clients
   // read reports only as issued.
   const reportSettings = isInternalRole(ctx.role)
@@ -386,6 +395,7 @@ export async function workspaceView(
     people,
     managementVersion,
     qualityReviewPolicy,
+    qualityReview,
     revocationCancellations: revocations,
     integrityIncidents: incidents,
     reportSettings,

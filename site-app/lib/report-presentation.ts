@@ -1,4 +1,5 @@
 import type { Engagement, Report, Role } from "./domain/types";
+import type { QualityReviewerStanding } from "./domain/quality-review";
 import { can, isClientRole } from "./permissions";
 import { releaseRefusal } from "./preconditions";
 import {
@@ -222,14 +223,21 @@ export function clientStillReads(reports: readonly Report[]) {
  * pre-release guidance only while a final package awaits approval. With the
  * engagement, an approved package that the server would still refuse to
  * release (an Engagement Quality Reviewer's sign-off outstanding, open
- * completion work) names what it awaits, in the server's words (#210).
+ * completion work) names what it awaits, in the server's words (#210);
+ * with the appointed reviewer's `standing`, also a reviewer revoked, moved
+ * to another role or onto the team after their sign-off (#244 item 1).
  */
-export function packageGuidance(report: Report, engagement?: Engagement) {
+export function packageGuidance(
+  report: Report,
+  engagement?: Engagement,
+  standing?: QualityReviewerStanding | null,
+) {
   switch (packageStatus(report)) {
     case "draft":
       return "Drafts are internal review snapshots.";
     case "approved": {
-      const refusal = engagement && releaseRefusal(engagement, report);
+      const refusal =
+        engagement && releaseRefusal(engagement, report, undefined, standing);
       return refusal
         ? "Both package versions are approved. " + refusal.message + "."
         : "Both package versions are approved. A Lead Auditor other than the approver authorizes the client release.";

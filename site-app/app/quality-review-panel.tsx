@@ -10,13 +10,17 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Engagement, Role } from "@/lib/domain/types";
 import {
+  appointmentTeamMessage,
   checklistProblem,
   engagementTeam,
   qualityReviewReleaseProblem,
   qualityReviewRequired,
+  reviewerStandingProblem,
   standBackChecklist,
   type QualityReviewItem,
 } from "@/lib/domain/quality-review";
+import { errorMessage } from "@/lib/fetch-json";
+import type { QualityReviewView } from "@/lib/read-models/quality-review-view";
 import { engagementTypes, type ReportTerms } from "@/lib/domain/report-model";
 import { releaseState } from "@/lib/workflow-state";
 import type { WorkspaceData } from "./workspace-types";
@@ -26,9 +30,16 @@ type Props = {
   role: Role;
   userId: string;
   people: WorkspaceData["people"];
+  /**
+   * The quality review as the server's stores show it (#244): the appointed
+   * reviewer's standing and the refusal each listed member would meet.
+   */
+  qualityReview?: QualityReviewView | null;
   terms: ReportTerms;
   busy: boolean;
   onAct: (op: string, data: Record<string, unknown>) => void;
+  /** Appoints the reviewer; rejects with the server's refusal. */
+  onAppoint: (data: { userId: string; reason: string }) => Promise<unknown>;
 };
 
 const date = (value: string) =>
@@ -43,9 +54,11 @@ export function QualityReviewPanel({
   role,
   userId,
   people,
+  qualityReview,
   terms,
   busy,
   onAct,
+  onAppoint,
 }: Props) {
   const q = e.qualityReview,
     lead = can(role, "appointQualityReviewer"),
@@ -54,15 +67,27 @@ export function QualityReviewPanel({
       people.find((p) => p.user_id === id)?.display_name || id,
     own = !!q && duties(role).qualityReview && q.reviewerId === userId,
     required = qualityReviewRequired(e, terms.engagementType),
-    candidates = people.filter(
-      (p) =>
-        canBeAssigned(p.role, "qualityReviewer") &&
-        p.status === "active" &&
-        p.user_id !== q?.reviewerId &&
-        !team.has(p.user_id),
-    );
+    // The server's refusal of each member (#244 item 2); without it, the
+    // engagement record's team.
+    refusals = new Map(
+      (qualityReview?.candidates ?? []).map((c) => [c.user_id, c.refusal]),
+    ),
+    candidates = people
+      .filter(
+        (p) =>
+          canBeAssigned(p.role, "qualityReviewer") &&
+          p.status === "active" &&
+          p.user_id !== q?.reviewerId,
+      )
+      .map((p) => ({
+        ...p,
+        refusal:
+          refusals.get(p.user_id) ??
+          (team.has(p.user_id) ? appointmentTeamMessage : null),
+      }));
   const [candidate, setCandidate] = useState("");
   const [reason, setReason] = useState("");
+  const [appointError, setAppointError] = useState("");
   const [items, setItems] = useState<QualityReviewItem[]>(q?.items ?? []);
   const [conclusion, setConclusion] = useState("");
   const [loadedRevision, setLoadedRevision] = useState(q?.revision);
@@ -88,7 +113,16 @@ export function QualityReviewPanel({
       r.kind === "final" && ["internal", "approved"].includes(releaseState(r)),
   );
   const problem = q ? checklistProblem(q) : "";
-  const reviewerOnTeam = !!q && team.has(q.reviewerId);
+  // The appointed reviewer's standing as release re-checks it (#244 item
+  // 1): on the team by the record or by recorded work, or no longer an
+  // active member with the role.
+  const standingProblem = reviewerStandingProblem(e, qualityReview?.standing);
+  const reviewerOnTeam =
+    !!q &&
+    (team.has(q.reviewerId) ||
+      (qualityReview?.standing?.reviewerId === q.reviewerId &&
+        qualityReview.standing.onRecordedTeam));
+  const reviewerIneligible = reviewerOnTeam || !!standingProblem;
   return (
     <section className="quality-review" aria-labelledby="quality-review-title">
       <header className="quality-review-head">
@@ -113,7 +147,7 @@ export function QualityReviewPanel({
             "badge " +
             (!required
               ? "neutral"
-              : q && !problem && !reviewerOnTeam
+              : q && !problem && !reviewerIneligible
                 ? "green"
                 : "amber")
           }
@@ -124,9 +158,11 @@ export function QualityReviewPanel({
               : "Not required"
             : reviewerOnTeam
               ? "Reviewer not independent"
-              : problem
-                ? "Review in progress"
-                : "Checklist complete"}
+              : reviewerIneligible
+                ? "Reviewer not eligible"
+                : problem
+                  ? "Review in progress"
+                  : "Checklist complete"}
         </span>
       </header>
 
@@ -149,9 +185,11 @@ export function QualityReviewPanel({
               <dd>
                 {reviewerOnTeam
                   ? "On the engagement team: not eligible. Appoint another reviewer."
-                  : "Outside the engagement team; cooling-off of " +
-                    q.coolingOffDays +
-                    " days checked against the client's other engagements at appointment."}
+                  : standingProblem
+                    ? "No longer an active member with the Engagement Quality Reviewer role: not eligible. Appoint another reviewer."
+                    : "Outside the engagement team; cooling-off of " +
+                      q.coolingOffDays +
+                      " days checked against the client's other engagements at appointment."}
               </dd>
             </div>
           </dl>
@@ -161,25 +199,40 @@ export function QualityReviewPanel({
         {lead && (
           <form
             className="quality-review-appoint"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              onAct("appointQualityReviewer", {
-                userId: candidate,
-                reason: reason.trim(),
-              });
-              setReason("");
+              setAppointError("");
+              // A refusal keeps the typed reason and shows in the form
+              // (#244 item 2).
+              try {
+                await onAppoint({ userId: candidate, reason: reason.trim() });
+                setReason("");
+                setCandidate("");
+              } catch (failure) {
+                setAppointError(
+                  errorMessage(failure, "The reviewer was not appointed"),
+                );
+              }
             }}
           >
             <label>
               {q ? "Replace the reviewer" : "Appoint a reviewer"}
               <select
                 value={candidate}
-                onChange={(event) => setCandidate(event.target.value)}
+                onChange={(event) => {
+                  setCandidate(event.target.value);
+                  setAppointError("");
+                }}
               >
                 <option value="">Select an eligible reviewer</option>
                 {candidates.map((p) => (
-                  <option key={p.user_id} value={p.user_id}>
-                    {p.display_name || p.user_id}
+                  <option
+                    key={p.user_id}
+                    value={p.user_id}
+                    disabled={!!p.refusal}
+                  >
+                    {(p.display_name || p.user_id) +
+                      (p.refusal ? " (not eligible: " + p.refusal + ")" : "")}
                   </option>
                 ))}
               </select>
@@ -196,8 +249,14 @@ export function QualityReviewPanel({
             <p className="subtle">
               Only members with the Engagement Quality Reviewer role and access
               to this engagement are listed; nobody who prepared, reviewed or
-              led its work is eligible.
+              led its work, or served on the client&apos;s other engagements
+              within the cooling-off period, is eligible.
             </p>
+            {appointError && (
+              <p className="form-error" role="alert">
+                {appointError}
+              </p>
+            )}
             <Button
               type="submit"
               disabled={busy || !candidate || !reason.trim()}

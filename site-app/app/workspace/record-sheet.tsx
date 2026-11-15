@@ -223,6 +223,7 @@ export function RecordSheet({
                         reports={e?.reports ?? []}
                         report={liveDetail as Report}
                         engagement={e}
+                        standing={data?.qualityReview?.standing}
                         role={role}
                         userId={data?.identity.id ?? ""}
                         busy={busy}

@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import type { Engagement, Report, Role } from "@/lib/domain/types";
+import type { QualityReviewerStanding } from "@/lib/domain/quality-review";
 import { releaseChecklist, releaseChecklistLines } from "@/lib/domain/gates";
 import { opinionLabel } from "@/lib/domain/report-model";
 import { packageGuidance, packageStatusLabel } from "@/lib/report-presentation";
@@ -28,11 +29,17 @@ export function ReportRelease({
   act,
   onEditing,
   reports,
+  standing,
 }: {
   reports: Report[];
   report: Report;
   /** The engagement the server checks the release against (#210). */
   engagement?: Engagement | null;
+  /**
+   * The appointed reviewer's standing from the workspace read model, for
+   * the release-time re-checks of the Engagement Quality Reviewer (#244).
+   */
+  standing?: QualityReviewerStanding | null;
   role: Role;
   userId: string;
   busy: boolean;
@@ -48,7 +55,7 @@ export function ReportRelease({
     releaseBlocked =
       state === "approved"
         ? engagement
-          ? (releaseRefusal(engagement, r, userId)?.message ?? "")
+          ? (releaseRefusal(engagement, r, userId, standing)?.message ?? "")
           : r.release?.approval?.userId === userId
             ? releaseApprovalMessage
             : ""
@@ -61,7 +68,9 @@ export function ReportRelease({
         </h3>
         <span className="badge neutral">{packageStatusLabel(r)}</span>
       </div>
-      <p className="subtle">{packageGuidance(r, engagement ?? undefined)}</p>
+      <p className="subtle">
+        {packageGuidance(r, engagement ?? undefined, standing)}
+      </p>
       <div className="row-actions">
         <Button
           variant="outline"

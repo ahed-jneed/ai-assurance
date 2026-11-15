@@ -3,7 +3,11 @@
 // the server would refuse it with. Keep runtime imports to pure domain
 // modules: the workspace runs them in the browser.
 import { releaseRequirements } from "./domain/gates";
-import { qualityReviewReleaseProblem } from "./domain/quality-review";
+import {
+  qualityReviewReleaseProblem,
+  reviewerStandingProblem,
+  type QualityReviewerStanding,
+} from "./domain/quality-review";
 import type { Engagement, Report } from "./domain/types";
 import type { MonitoringCase } from "./workflow-types";
 
@@ -51,14 +55,18 @@ export const releaseApprovalMessage =
  * Why this captured final package may not be released to the client yet
  * (releaseReport refuses with 409 and this message); null when it may.
  * With `releaserId`, a Lead Auditor who approved the package cannot also
- * release it. The checks that need the server's stores (assurance pins,
- * external jobs, member status, unchanged source records) run at release
- * only.
+ * release it. With the appointed reviewer's `standing` (the workspace read
+ * model's, from the server's stores), the release-time re-checks of the
+ * Engagement Quality Reviewer apply too (#244 item 1): a reviewer revoked,
+ * moved to another role or onto the team after their sign-off. The other
+ * checks that need the server's stores (assurance pins, external jobs,
+ * unchanged source records) run at release only.
  */
 export function releaseRefusal(
   e: Engagement,
   r: Report,
   releaserId?: string,
+  standing?: QualityReviewerStanding | null,
 ): Refusal | null {
   const approval = r.release?.approval;
   if (
@@ -73,7 +81,8 @@ export function releaseRefusal(
       status: 409,
       message: "Resolve current scope/program completion before release",
     };
-  const qualityReview = qualityReviewReleaseProblem(e, r);
+  const qualityReview =
+    qualityReviewReleaseProblem(e, r) || reviewerStandingProblem(e, standing);
   return qualityReview ? { status: 409, message: qualityReview } : null;
 }
 
