@@ -5,6 +5,15 @@
 export const SIGN_IN_PATH = "/auth/sign-in";
 export const SIGN_OUT_PATH = "/auth/sign-out";
 const reservedPaths = new Set([SIGN_IN_PATH, SIGN_OUT_PATH]);
+/**
+ * The loopback identity headers that the `trusted-headers` and `dev` modes
+ * read (lib/identity.ts): the user id, the email and an optional
+ * percent-encoded UTF-8 full name.
+ */
+export const IDENTITY_HEADER_PREFIX = "x-assurance-user-";
+export const USER_ID_HEADER = IDENTITY_HEADER_PREFIX + "id";
+export const USER_EMAIL_HEADER = IDENTITY_HEADER_PREFIX + "email";
+export const USER_FULL_NAME_HEADER = IDENTITY_HEADER_PREFIX + "name";
 /** Development persona ids, as in fixtures/dev-personas.json. */
 const personaPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
 

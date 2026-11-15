@@ -5,7 +5,15 @@
 // before the app runs. The trust boundary of each mode is in
 // docs/security/identity.md.
 import { AsyncLocalStorage } from "node:async_hooks";
-import { SIGN_IN_PATH, SIGN_OUT_PATH, safeReturnPath } from "./auth-paths";
+import {
+  IDENTITY_HEADER_PREFIX,
+  SIGN_IN_PATH,
+  SIGN_OUT_PATH,
+  USER_EMAIL_HEADER,
+  USER_FULL_NAME_HEADER,
+  USER_ID_HEADER,
+  safeReturnPath,
+} from "./auth-paths";
 import {
   AccessTokenError,
   accessIssuer,
@@ -169,15 +177,6 @@ function accessVerifier(config: {
   }
   return verifier;
 }
-
-/**
- * The loopback identity headers that the `trusted-headers` and `dev` modes
- * read: the user id, the email and an optional percent-encoded UTF-8 full name.
- */
-export const IDENTITY_HEADER_PREFIX = "x-assurance-user-";
-export const USER_ID_HEADER = IDENTITY_HEADER_PREFIX + "id";
-export const USER_EMAIL_HEADER = IDENTITY_HEADER_PREFIX + "email";
-export const USER_FULL_NAME_HEADER = IDENTITY_HEADER_PREFIX + "name";
 
 /** The identity in the loopback x-assurance-user-* headers. */
 function headerIdentity(headers: Headers): Identity | null {

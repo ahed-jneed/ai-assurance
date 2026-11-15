@@ -9,17 +9,15 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect, Plugin } from "vite";
 import devPersonas from "../fixtures/dev-personas.json" with { type: "json" };
 import {
+  IDENTITY_HEADER_PREFIX,
   SIGN_IN_PATH,
   SIGN_OUT_PATH,
-  isAuthPath,
-  safeReturnPath,
-} from "../lib/auth-paths.ts";
-import {
-  IDENTITY_HEADER_PREFIX,
   USER_EMAIL_HEADER,
   USER_FULL_NAME_HEADER,
   USER_ID_HEADER,
-} from "../lib/identity.ts";
+  isAuthPath,
+  safeReturnPath,
+} from "../lib/auth-paths.ts";
 
 type LocalIdentity = { userId: string; email: string; name: string };
 // Cookies ignore the port, so dev servers on one host would share a single
