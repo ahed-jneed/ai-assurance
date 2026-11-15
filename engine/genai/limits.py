@@ -13,6 +13,10 @@ MAX_BUNDLE_BYTES = 200 * MiB
 MAX_DECOMPRESSED_BYTES = 512 * MiB
 MAX_ENTRY_BYTES = 64 * MiB
 MAX_ZIP_ENTRIES = 50_000
+# Central-directory bytes an archive may declare, checked before zipfile parses
+# it: MAX_ZIP_ENTRIES fixed 46-byte headers, each with a maximal name and 128
+# bytes of extra field and comment.
+MAX_ZIP_CENTRAL_DIRECTORY_BYTES = MAX_ZIP_ENTRIES * (46 + 512 + 128)
 MAX_ENTRY_RATIO = 500
 RATIO_CHECK_ABOVE = 1 * MiB
 MAX_ZIP_NAME_BYTES = 512

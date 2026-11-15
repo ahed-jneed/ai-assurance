@@ -265,6 +265,34 @@ class ZipLimitsTest(unittest.TestCase):
         declared_huge[cd + 24:cd + 28] = struct.pack("<I", 1 << 30)
         self.assertEqual(code(self.read, declared_huge), "zip_entry_too_large")
 
+    def test_declared_entry_count_is_refused_before_zipfile_parses(self):
+        data = _zip([("header.json", b"{}")])
+        eocd = data.rfind(b"PK\x05\x06")
+        many = bytearray(data)
+        many[eocd + 8:eocd + 12] = struct.pack("<HH", 60000, 60000)
+        huge_cd = bytearray(data)
+        huge_cd[eocd + 12:eocd + 16] = struct.pack("<I", limits.MAX_ZIP_CENTRAL_DIRECTORY_BYTES + 1)
+        # ZIP64: the classic record defers to a ZIP64 end record declaring a million entries.
+        cd_size, cd_offset = struct.unpack("<II", data[eocd + 12:eocd + 20])
+        zip64_record = b"PK\x06\x06" + struct.pack("<QHHIIQQQQ", 44, 45, 45, 0, 0, 1_000_000, 1_000_000, cd_size, cd_offset)
+        locator = b"PK\x06\x07" + struct.pack("<IQI", 0, eocd, 1)
+        classic = bytearray(data[eocd:])
+        classic[8:12] = struct.pack("<HH", 0xFFFF, 0xFFFF)
+        zip64 = bytes(data[:eocd]) + zip64_record + locator + bytes(classic)
+        no_zip64_record = bytes(data[:eocd]) + bytes(classic)
+        with mock.patch.object(readers.zipfile, "ZipFile", side_effect=AssertionError("zipfile must not parse")):
+            for crafted in (many, huge_cd, zip64, no_zip64_record):
+                self.assertEqual(code(self.archive, crafted), "zip_invalid")
+        # More central-directory records than the limit, whatever the end record claims.
+        records = _zip([(f"e{index}.json", b"{}") for index in range(5)])
+        eocd = records.rfind(b"PK\x05\x06")
+        records[eocd + 8:eocd + 12] = struct.pack("<HH", 1, 1)
+        with mock.patch.object(limits, "MAX_ZIP_ENTRIES", 4), mock.patch.object(readers.zipfile, "ZipFile", side_effect=AssertionError("zipfile must not parse")):
+            self.assertEqual(code(self.archive, records), "zip_invalid")
+        # The same ZIP64 layout declaring one entry still reads.
+        valid64 = zip64.replace(struct.pack("<QQ", 1_000_000, 1_000_000), struct.pack("<QQ", 1, 1))
+        self.assertEqual(readers.ZipArchive(valid64).read("header.json"), b"{}")
+
     def test_zstd_unavailable(self):
         data = _zip([("header.json", b"{}")], zipfile.ZIP_STORED)
         cd = _central_offset(data, "header.json")
