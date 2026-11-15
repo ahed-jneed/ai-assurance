@@ -20,6 +20,7 @@
     "check:build": "node scripts/strict-build.mjs",
     "check:harnesses": "node scripts/run-checks.mjs",
     "seed:demo": "node scripts/seed-demo.mjs",
+    "self-host": "node scripts/self-host.mjs",
     "db:migrate:local": "node scripts/db-migrate-local.mjs",
     "test:e2e": "playwright test",
     "check:fixtures": "node ../schemas/validate-run-schema.mjs --fixtures .test-output/run-schema-fixtures.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-1.5.json --external-run ../tmp/assurance-worker-fixture/hosted-external-run-client-local.json &&node ../schemas/validate-procedure-schema.mjs .test-output/execution-schema-fixture.json && node ../schemas/validate-working-paper-schema.mjs --documents .test-output/dossier-papers.json",

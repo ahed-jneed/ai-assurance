@@ -42,6 +42,9 @@ next-env.d.ts
 # Fixtures the check harnesses write (npm run check:fixtures reads them).
 /.test-output/
 
+# npm run self-host: the database, evidence and secrets
+/data/
+
 /outputs/
 /work/
 
