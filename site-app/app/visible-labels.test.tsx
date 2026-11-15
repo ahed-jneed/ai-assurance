@@ -8,6 +8,7 @@ import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { Engagement } from "@/lib/domain/types";
 import { readGenaiEnvelope } from "@/lib/genai/envelope";
 import { genaiReadiness } from "@/lib/genai/readiness";
+import { GENAI_INPUT_FORMATS } from "@/lib/genai/requests";
 import { genaiSummary } from "@/lib/genai/summary";
 import {
   defaultPlanForm,
@@ -418,5 +419,67 @@ describe("readable labels in the power check and GenAI results (#240 item 4)", (
     const checklists = html.match(/<ul class="genai-checklist"[\s\S]*?<\/ul>/g);
     expect(checklists?.length).toBeGreaterThan(0);
     for (const list of checklists ?? []) expectReadable(list);
+  });
+
+  it("names the run format and every overall outcome (#244 item 4)", async () => {
+    const { envelope, computation } = await readGenaiEnvelope(
+      readFileSync("../schemas/fixtures/genai-result.example.json", "utf8"),
+    );
+    const card = (overallOutcome: string, format: string) => {
+      const summary = genaiSummary(computation, {
+        computationSha256: envelope.computationSha256,
+        itemsSha256: envelope.itemsSha256,
+      });
+      summary.overallOutcome = overallOutcome;
+      summary.runs = summary.runs.map((r) => ({ ...r, format }));
+      return renderToStaticMarkup(
+        <ResultCard
+          result={
+            {
+              id: "AS-1",
+              createdAt: "2026-11-05T00:00:00.000Z",
+              custody: "worker",
+              authenticatedBy: null,
+              attested: false,
+              summary,
+              readiness: genaiReadiness({
+                recordId: "AS-1",
+                artifactId: "JOB-1",
+                custody: "worker",
+                acknowledgements: [],
+                attested: false,
+                summary,
+              }),
+            } as never
+          }
+          reviewer={false}
+          busy={false}
+          onAcknowledge={() => {}}
+        />,
+      );
+    };
+    const outcomes = {
+      pass: "Pass",
+      fail: "Fail",
+      inconclusive: "Inconclusive",
+      not_applicable: "Not applicable",
+    };
+    for (const [code, label] of Object.entries(outcomes)) {
+      const html = card(code, "inspect_eval");
+      const overall = html.match(/<p>Overall outcome: ([\s\S]*?)<\/p>/)?.[1];
+      expect(overall).toBe("<strong>" + label + "</strong>");
+    }
+    for (const format of GENAI_INPUT_FORMATS) {
+      const html = card("pass", format);
+      const runs = html.match(
+        /<details class="genai-run"><summary>[\s\S]*?<\/summary>/g,
+      );
+      expect(runs?.length).toBeGreaterThan(0);
+      for (const run of runs ?? []) {
+        expect(run).not.toContain(format);
+        expectReadable(run);
+      }
+    }
+    expect(card("pass", "inspect_eval")).toContain("Inspect log (.eval)");
   });
 });

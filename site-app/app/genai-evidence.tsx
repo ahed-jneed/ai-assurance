@@ -45,7 +45,13 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
-import { count, genaiFieldLabel, valueLabel } from "@/lib/presentation";
+import {
+  count,
+  genaiFieldLabel,
+  genaiFormatLabel,
+  genaiOutcomeLabel,
+  valueLabel,
+} from "@/lib/presentation";
 import { jobNames } from "./assurance-workbench/types";
 import {
   bundleOptionLabel,
@@ -221,7 +227,7 @@ export function ResultCard({
         {result.attested ? " · re-run attested" : ""}
       </p>
       <p>
-        Overall outcome: <strong>{s.overallOutcome}</strong>
+        Overall outcome: <strong>{genaiOutcomeLabel(s.overallOutcome)}</strong>
       </p>
       {r.blockers.length ? (
         <Alert variant="destructive" role="status">
@@ -370,7 +376,7 @@ export function ResultCard({
       {s.runs.map((run) => (
         <details key={run.runKey} className="genai-run">
           <summary>
-            {run.runKey} · {run.format}
+            {run.runKey} · {genaiFormatLabel(run.format)}
             {run.kind === "marking" ? " · marking check" : ""}
             {run.signedResults
               ? " · " + run.signedResults + " signatures verified"

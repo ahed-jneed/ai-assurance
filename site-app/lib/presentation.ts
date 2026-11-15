@@ -99,6 +99,42 @@ export const genaiFieldLabel = (field: string) =>
   genaiFieldNames[field] ?? humanLabel(field.replaceAll(".", " "));
 
 /**
+ * The GenAI input formats (lib/genai/requests.ts GENAI_INPUT_FORMATS) by the
+ * names of the tools that write them (#244 item 4), never their format ids.
+ */
+const genaiFormatNames: Record<string, string> = {
+  inspect_eval: "Inspect log (.eval)",
+  inspect_json: "Inspect log (JSON)",
+  lm_eval_samples: "lm-evaluation-harness samples",
+  promptfoo_results: "promptfoo results",
+  garak_report: "garak report",
+  pyrit_export: "PyRIT export",
+  deepeval_test_run: "DeepEval test run",
+  ragas_results: "Ragas results",
+  judge_validation_jsonl: "Judge validation records",
+  marking_check_jsonl: "Marking check records",
+  c2pa_validator_report: "C2PA validator report",
+  signed_detection_jsonl: "Signed detection records",
+};
+/** A GenAI input format by its tool's name; an unknown one in sentence case. */
+export const genaiFormatLabel = (format: string) =>
+  genaiFormatNames[format] ?? humanLabel(format);
+
+/**
+ * A GenAI result's overall outcome (lib/statistics.ts overallOutcome) as the
+ * result card shows it (#244 item 4).
+ */
+const genaiOutcomeNames: Record<string, string> = {
+  pass: "Pass",
+  fail: "Fail",
+  inconclusive: "Inconclusive",
+  not_applicable: "Not applicable",
+};
+/** A GenAI overall outcome by its label; an unknown one in sentence case. */
+export const genaiOutcomeLabel = (outcome: string) =>
+  genaiOutcomeNames[outcome] ?? humanLabel(outcome);
+
+/**
  * A coded value as the page shows it: "one_off" reads "One-off",
  * "no_reassessment" "No reassessment", "true" "Yes". Every other value in
  * sentence case, as humanLabel writes it.
