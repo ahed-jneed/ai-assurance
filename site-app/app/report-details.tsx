@@ -18,7 +18,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { requestLabel } from "@/lib/evidence-requests";
-import type { EvidenceRequest } from "@/lib/domain/types";
+import type { EvidenceRequest, Report } from "@/lib/domain/types";
+import { successorLabel } from "@/lib/workflow-state";
 import { opinionLabel, snapshotTerms } from "@/lib/domain/report-model";
 import {
   findingReference,
@@ -290,7 +291,17 @@ function CapturedRuns({
     </>
   );
 }
-export function FrozenReportDetails({ value }: { value: Row }) {
+export function FrozenReportDetails({
+  value,
+  reports = [],
+}: {
+  value: Row;
+  /**
+   * The engagement's reports, so a successor that was withdrawn reads
+   * "since withdrawn" as in the print view and the client projection (#246).
+   */
+  reports?: readonly Report[];
+}) {
   const snapshot = record(value.snapshot) ? value.snapshot : {},
     audit = record(snapshot.engagement) ? snapshot.engagement : {},
     // Only packs with the AI Act classification capture one (criteria
@@ -380,7 +391,8 @@ export function FrozenReportDetails({ value }: { value: Row }) {
       )}
       {supersededBy && (
         <p className="subtle report-replaces">
-          Superseded by {supersededBy}. This report remains as it was issued.
+          Superseded by {successorLabel(supersededBy, reports)}. This report
+          remains as it was issued.
         </p>
       )}
       <Tabs

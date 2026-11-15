@@ -262,6 +262,7 @@ export function ReportRelease({
           </DialogHeader>
           <FrozenReportDetails
             value={{ ...r, snapshot: r.clientSnapshot, sha256: r.clientSha256 }}
+            reports={reports}
           />
         </DialogContent>
       </Dialog>

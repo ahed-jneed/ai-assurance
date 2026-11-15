@@ -26,7 +26,7 @@ import {
   withheldFindingNote,
 } from "@/lib/report-presentation";
 import { legalDate } from "@/lib/rule-pack";
-import { releaseState } from "@/lib/workflow-state";
+import { releaseState, successorLabel } from "@/lib/workflow-state";
 
 export type ReportSnapshot = {
   scope?: BriefFields;
@@ -229,20 +229,8 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
   );
 }
 
-/**
- * The successor a report names, as the client projection describes it
- * (#241): a successor that was withdrawn after its release reads "since
- * withdrawn". Staff see its id; the client projection does not name it.
- */
-export function successorLabel(
-  supersededBy: string,
-  reports: readonly Report[] = [],
-) {
-  const successor = reports.find((q) => q.id === supersededBy);
-  return successor && releaseState(successor) === "withdrawn"
-    ? supersededBy + ", since withdrawn"
-    : supersededBy;
-}
+// The successor line is shared with the in-app report sheet (#246).
+export { successorLabel };
 
 export function reportMarkup(
   report: Report,

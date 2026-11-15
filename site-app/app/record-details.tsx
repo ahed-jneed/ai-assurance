@@ -865,7 +865,10 @@ export function RecordDetails({
     );
   if ("procedures" in value && "objective" in value)
     return <TemplateDetails record={value} resolve={resolve} />;
-  if ("snapshot" in value) return <FrozenReportDetails value={value} />;
+  if ("snapshot" in value)
+    return (
+      <FrozenReportDetails value={value} reports={engagement?.reports ?? []} />
+    );
   if ("condition" in value && "riskScore" in value)
     return (
       <FindingDetails

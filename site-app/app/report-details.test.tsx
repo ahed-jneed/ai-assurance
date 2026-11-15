@@ -4,7 +4,10 @@
 // finding opens must read as it does in the /report print view.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import type { Engagement, Report } from "@/lib/domain/types";
+import { successorLabel } from "@/lib/workflow-state";
 import { FrozenReportDetails } from "./report-details";
+import { RecordDetails } from "./record-details";
 
 const row = {
   criterion: "EU AI Act (amended) Art. 50",
@@ -80,5 +83,63 @@ describe("the in-app results by criterion (#241)", () => {
     const [, , exceptions, result] = cells([{ ...older, procedures: 1 }]);
     expect(exceptions).toBe("0");
     expect(result).not.toContain("withheld");
+  });
+});
+
+describe("the in-app successor line (#246)", () => {
+  const release = (state: string, extra: Record<string, unknown> = {}) => ({
+    state,
+    history: [],
+    ...extra,
+  });
+  const r1 = {
+      id: "REPORT-1",
+      kind: "final",
+      createdAt: "2026-11-01T09:00:00.000Z",
+      actor: "user-lead",
+      release: release("superseded", { supersededBy: "REPORT-2" }),
+      snapshot: { engagement: { id: "ENG-1", title: "Credit scoring audit" } },
+    },
+    successor = (state: string) =>
+      ({
+        id: "REPORT-2",
+        kind: "final",
+        createdAt: "2026-11-02T09:00:00.000Z",
+        actor: "user-lead",
+        release: release(state, { supersedes: "REPORT-1" }),
+      }) as unknown as Report;
+  const line = (reports: Report[]) =>
+    renderToStaticMarkup(
+      <FrozenReportDetails value={r1} reports={reports} />,
+    ).replace(/<!-- -->/g, "");
+
+  it("says since withdrawn when the successor was withdrawn, as the print view does", () => {
+    const reports = [r1 as unknown as Report, successor("withdrawn")];
+    expect(line(reports)).toContain(
+      "Superseded by REPORT-2, since withdrawn. This report",
+    );
+    expect(line(reports)).toContain(
+      "Superseded by " + successorLabel("REPORT-2", reports) + ".",
+    );
+  });
+
+  it("names a live successor plainly", () => {
+    const html = line([r1 as unknown as Report, successor("released")]);
+    expect(html).toContain("Superseded by REPORT-2. This report");
+    expect(html).not.toContain("since withdrawn");
+  });
+
+  it("passes the engagement's reports through the record sheet", () => {
+    const html = renderToStaticMarkup(
+      <RecordDetails
+        value={r1}
+        engagement={
+          { reports: [r1, successor("withdrawn")] } as unknown as Engagement
+        }
+        onPaper={() => {}}
+        resolve={(id) => id}
+      />,
+    ).replace(/<!-- -->/g, "");
+    expect(html).toContain("Superseded by REPORT-2, since withdrawn.");
   });
 });

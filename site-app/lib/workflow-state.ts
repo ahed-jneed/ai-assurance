@@ -16,6 +16,23 @@ import type { DraftKind } from "./workspace-state";
 export { isClientRole, isInternalRole } from "./permissions";
 export const releaseState = (report: Report) =>
   report.release?.state ?? "internal";
+/**
+ * The successor a report names, as the client projection describes it
+ * (#241): a successor that was withdrawn after its release reads "since
+ * withdrawn". Staff see its id; the client projection does not name it.
+ * The print view, the client projection and the in-app report sheet all
+ * use it (#246), so the three agree.
+ */
+export function successorLabel(
+  supersededBy: string,
+  reports: readonly Report[] = [],
+) {
+  const successor = reports.find((q) => q.id === supersededBy);
+  return successor && releaseState(successor) === "withdrawn"
+    ? supersededBy + ", since withdrawn"
+    : supersededBy;
+}
+
 export const isReleased = (report: Report) =>
   report.kind === "final" &&
   releaseState(report) === "released" &&

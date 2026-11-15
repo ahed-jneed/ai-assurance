@@ -225,6 +225,12 @@ test("a released report is superseded by the next release", async ({
   await page.goto(reportPath(e, first));
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText(notice)).toBeVisible();
+  // The staff sheet's successor line agrees with /report (#246 item 1).
+  await expect(
+    sheet.getByText(
+      `Superseded by ${second.id}, since withdrawn. This report remains as it was issued.`,
+    ),
+  ).toBeVisible();
   await expect(
     sheet.getByText("Superseded by a newer released report"),
   ).toHaveCount(0);
@@ -235,4 +241,16 @@ test("a released report is superseded by the next release", async ({
   await expect(page.getByTestId("client-still-reads")).toHaveText(
     `${first.id}: ${notice}`,
   );
+  // The client's sheet reads the projection's line, which does not name
+  // the withdrawn successor (#246 item 1).
+  await clientPage.goto(
+    recordPath(e, "Reports & sign-off", "report", first.id),
+  );
+  await expect(
+    clientPage
+      .getByRole("dialog")
+      .getByText(
+        "Superseded by a later report, since withdrawn. This report remains as it was issued.",
+      ),
+  ).toBeVisible();
 });
