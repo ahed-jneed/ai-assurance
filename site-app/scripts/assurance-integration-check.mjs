@@ -1385,6 +1385,16 @@ try {
       genaiComputation.marking.map((b) => [b.format, b.count]),
       [["signed_detection_jsonl", 100]],
     );
+    // #240 item 1: before the compile the workbench offers it on the row.
+    assert.equal(
+      (
+        await api(
+          "/api/assurance?" +
+            new URLSearchParams({ tenantId, engagementId: e.id }),
+        )
+      ).jobs.find((j) => j.id === genaiJob.jobId).compiled,
+      false,
+    );
     // A tabular import refuses a GenAI job; compile binds it as a worker result.
     assert.match(
       (await assurance("importJob", { jobId: genaiJob.jobId }, owner, 409))
@@ -1405,6 +1415,28 @@ try {
       genaiComputation.criteria.find((c) => c.id === "detection").outcome,
     );
     assert(e.artifacts.some((a) => a.id === genaiJob.jobId));
+    // #240 item 1: the workbench marks the compiled GenAI job compiled, so its
+    // row offers no second compile.
+    assert.equal(
+      (
+        await api(
+          "/api/assurance?" +
+            new URLSearchParams({ tenantId, engagementId: e.id }),
+        )
+      ).jobs.find((j) => j.id === genaiJob.jobId).compiled,
+      true,
+    );
+    assert.match(
+      (
+        await assurance(
+          "compileGenaiResult",
+          { jobId: genaiJob.jobId },
+          owner,
+          409,
+        )
+      ).error,
+      /already compiled/,
+    );
     console.log(
       "PASS GenAI ingest: queue → worker claims genai_ingest → pinned inputs by index → engine recompute with verified signed detections → compiled worker result; a hostile bundle fails with its code",
     );

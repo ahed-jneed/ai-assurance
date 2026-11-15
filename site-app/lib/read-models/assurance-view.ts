@@ -67,9 +67,14 @@ export async function assuranceView(ctx: Context, engagementId: string) {
     total: Object.values(kindCounts).reduce((sum, n) => sum + n, 0),
     kindCounts,
     queue: await reviewQueueSummary(ctx, e.id),
+    // A tabular job is compiled once a draft paper records it; a GenAI ingest
+    // job once its result is an artifact of the engagement, the check
+    // compileGenaiResult refuses a second compile by (#240 item 1).
     jobs: recent.map((j) => ({
       ...j,
-      compiled: compiled.includes(String(j.id)),
+      compiled:
+        compiled.includes(String(j.id)) ||
+        e.artifacts.some((a) => a.id === String(j.id)),
     })),
     workers,
     access,

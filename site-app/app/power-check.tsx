@@ -8,6 +8,7 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { fetchJson } from "@/lib/fetch-json";
+import { humanLabel } from "@/lib/presentation";
 import { Textarea } from "@/components/ui/textarea";
 import { criterionPower, type Plan } from "@/lib/statistics";
 import {
@@ -190,7 +191,7 @@ export function PowerCheck({
           const { problem } = assumptionsFor(c, inputs[c.id] ?? {}, planned);
           return (
             <div key={c.id} className="power-criterion">
-              <b>{c.id.replaceAll("_", " ")}</b>
+              <b>{humanLabel(c.id)}</b>
               <div className="ml-form-grid">
                 {fieldsFor(c, planned).map((f) => (
                   <label key={f.key} className="ml-field">

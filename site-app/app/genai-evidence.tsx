@@ -45,7 +45,8 @@ import {
   art50GenaiPlan,
 } from "@/lib/art50-criteria";
 import { WorkflowDialog, type Form } from "./audit-program/workflow-dialog";
-import { count } from "@/lib/presentation";
+import { count, genaiFieldLabel, valueLabel } from "@/lib/presentation";
+import { jobNames } from "./assurance-workbench/types";
 import {
   bundleOptionLabel,
   distinctOptions,
@@ -119,9 +120,9 @@ function Checklist({ run }: { run: GenaiRunSummary }) {
                   : "red")
             }
           >
-            {c.state}
+            {valueLabel(c.state)}
           </span>{" "}
-          {c.field}
+          {genaiFieldLabel(c.field)}
         </li>
       ))}
     </ul>
@@ -300,10 +301,11 @@ export function ResultCard({
           {s.criteria.map((c) => (
             <TableRow key={c.id}>
               <TableCell>
-                {c.id} <small className="block subtle">{c.kind}</small>
+                {c.id}{" "}
+                <small className="block subtle">{valueLabel(c.kind)}</small>
               </TableCell>
-              <TableCell>{c.role}</TableCell>
-              <TableCell>{c.outcome ?? "—"}</TableCell>
+              <TableCell>{valueLabel(c.role)}</TableCell>
+              <TableCell>{c.outcome ? valueLabel(c.outcome) : "—"}</TableCell>
               <TableCell>{c.sampleSize ?? "—"}</TableCell>
               <TableCell>
                 {fmt(c.pValue)} ({fmt(c.adjustedPValue)})
@@ -354,7 +356,7 @@ export function ResultCard({
                         : "—"}
                     </TableCell>
                     <TableCell>{fmt(m.seCluster ?? m.se)}</TableCell>
-                    <TableCell>{m.status}</TableCell>
+                    <TableCell>{valueLabel(m.status)}</TableCell>
                     <TableCell>
                       {m.reasons.map(reasonLabel).join("; ")}
                     </TableCell>
@@ -404,6 +406,45 @@ export function ResultCard({
         </details>
       ))}
     </section>
+  );
+}
+
+/**
+ * The finished ingest jobs not yet compiled, each named by its frozen plan's
+ * label as the workbench's execution requests name it (#240 item 2), never
+ * by its job id.
+ */
+export function FinishedIngests({
+  jobs,
+  imported,
+  procedures,
+  busy,
+  onCompile,
+}: {
+  jobs: GenaiView["jobs"];
+  /** Artifact ids of the results already compiled or imported. */
+  imported: ReadonlySet<string>;
+  procedures: Parameters<typeof jobNames>[1];
+  busy: boolean;
+  onCompile: (jobId: string) => void;
+}) {
+  const typed = jobs as unknown as Parameters<typeof jobNames>[0],
+    names = jobNames(typed, procedures),
+    finished = jobs
+      .map((j, i) => ({ id: String(j.id), state: j.state, name: names[i] }))
+      .filter((j) => j.state === "succeeded" && !imported.has(j.id));
+  if (!finished.length) return null;
+  return (
+    <ul>
+      {finished.map((j) => (
+        <li key={j.id} className="row-actions">
+          The ingest of {j.name} finished.
+          <Button size="sm" disabled={busy} onClick={() => onCompile(j.id)}>
+            Compile result
+          </Button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -540,10 +581,7 @@ export function GenaiEvidence({
     ),
     // The runner route serves a GenAI ingest job only to an active worker
     // enrolled with genai_ingest; until one is, a queued job would wait.
-    ingestAvailable = !!view && view.ingestWorkers > 0,
-    compilable = (view?.jobs ?? []).filter(
-      (j) => j.state === "succeeded" && !imported.has(String(j.id)),
-    );
+    ingestAvailable = !!view && view.ingestWorkers > 0;
 
   // #152: the Art 50 criteria GenAI marking evidence decides, pre-registered
   // for review; nothing is frozen until the auditor freezes the plan.
@@ -810,23 +848,14 @@ export function GenaiEvidence({
             </ul>
           </div>
         )}
-        {writer && compilable.length > 0 && (
-          <ul>
-            {compilable.map((j) => (
-              <li key={String(j.id)} className="row-actions">
-                Ingest job {String(j.id)} finished.
-                <Button
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    void act("compileGenaiResult", { jobId: j.id })
-                  }
-                >
-                  Compile result
-                </Button>
-              </li>
-            ))}
-          </ul>
+        {writer && view && (
+          <FinishedIngests
+            jobs={view.jobs}
+            imported={imported}
+            procedures={e.workflow?.procedures ?? []}
+            busy={busy}
+            onCompile={(jobId) => void act("compileGenaiResult", { jobId })}
+          />
         )}
         {genai.loading && <ViewLoading label="Loading GenAI evidence" />}
         {view && !view.results.length && (

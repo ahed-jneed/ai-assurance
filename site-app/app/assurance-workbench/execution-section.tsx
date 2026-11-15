@@ -8,6 +8,7 @@ import { ExecutionPlanner } from "../testing-readiness";
 import type { Role } from "@/lib/domain/types";
 import {
   attemptsLabel,
+  compileAction,
   jobNames,
   label,
   modeLabel,
@@ -72,58 +73,63 @@ export function ExecutionSection({
         </span>
       </div>
       <div className="assurance-register">
-        {snapshot.jobs.map((j, i) => (
-          <div className="execution-row" key={j.id}>
-            <div>
-              <b>{names[i]}</b>
-              <small className="block subtle">
-                {modeLabel(j.mode)} · {attemptsLabel(j.attempts)} ·{" "}
-                {new Date(j.created_at).toLocaleString()}
-              </small>
-              <ExternalJobDetail job={j} />
+        {snapshot.jobs.map((j, i) => {
+          const compile = writer ? compileAction(j) : null;
+          return (
+            <div className="execution-row" key={j.id}>
+              <div>
+                <b>{names[i]}</b>
+                <small className="block subtle">
+                  {modeLabel(j.mode)} · {attemptsLabel(j.attempts)} ·{" "}
+                  {new Date(j.created_at).toLocaleString()}
+                </small>
+                <ExternalJobDetail job={j} />
+              </div>
+              <span
+                className={
+                  "badge " +
+                  (j.state === "succeeded"
+                    ? "green"
+                    : j.state === "failed"
+                      ? "red"
+                      : "neutral")
+                }
+              >
+                {label(j.state)}
+              </span>
+              <div className="row-actions">
+                {writer && ["queued", "running"].includes(j.state) && (
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => open("cancelJob", null, { jobId: j.id })}
+                  >
+                    Cancel
+                  </Button>
+                )}
+                {compile && (
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      void act(compile.op, { jobId: j.id })
+                        .then((result) => {
+                          // A GenAI result opens no paper; it shows on the
+                          // GenAI evidence tab.
+                          if (result.record?.body.paperId)
+                            onCompiled(result.record.body.paperId);
+                        })
+                        .catch(() => {})
+                    }
+                  >
+                    <FileCheck2 size={15} />
+                    {compile.label}
+                  </Button>
+                )}
+              </div>
             </div>
-            <span
-              className={
-                "badge " +
-                (j.state === "succeeded"
-                  ? "green"
-                  : j.state === "failed"
-                    ? "red"
-                    : "neutral")
-              }
-            >
-              {label(j.state)}
-            </span>
-            <div className="row-actions">
-              {writer && ["queued", "running"].includes(j.state) && (
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => open("cancelJob", null, { jobId: j.id })}
-                >
-                  Cancel
-                </Button>
-              )}
-              {writer && j.state === "succeeded" && !j.compiled && (
-                <Button
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() =>
-                    void act("importJob", { jobId: j.id })
-                      .then((result) => {
-                        if (result.record?.body.paperId)
-                          onCompiled(result.record.body.paperId);
-                      })
-                      .catch(() => {})
-                  }
-                >
-                  <FileCheck2 size={15} />
-                  Compile draft paper
-                </Button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {!snapshot.jobs.length && (
         <p className="empty-result">No external execution requests.</p>
