@@ -82,6 +82,7 @@ const genaiFieldNames: Record<string, string> = {
   harness: "Harness",
   "systemUnderTest.snapshot": "System snapshot",
   "systemUnderTest.family": "System model family",
+  "systemUnderTest.model": "System model",
   systemPrompt: "System prompt",
   decoding: "Decoding settings",
   tools: "Tools offered",

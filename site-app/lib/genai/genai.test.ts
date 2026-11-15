@@ -318,13 +318,22 @@ describe("the GenAI readiness gate", () => {
       const m = c.criteria[0].members[0];
       m.reasons = ["below_minimum_sample_size"];
       m.interval = null;
-      c.runs[0].runMetadata.completeness.missing = ["decoding"];
+      c.runs[0].runMetadata.completeness.missing = [
+        "decoding",
+        "judges.family",
+      ];
     });
     expect(codes(await context(text))).toEqual([
       "genai_below_minimum_items",
       "genai_interval_missing",
       "genai_metadata_incomplete",
     ]);
+    // #246 item 2: the fields by their checklist labels, not dotted paths.
+    expect(
+      genaiReadiness(await context(text)).blockers.find(
+        (b) => b.code === "genai_metadata_incomplete",
+      )?.detail,
+    ).toBe("Decoding settings, Judge model family");
   });
 
   it.each(["genai_attack_success", "genai_marking", "genai_paired_difference"])(

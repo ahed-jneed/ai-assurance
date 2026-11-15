@@ -56,7 +56,9 @@ import { jobNames } from "./assurance-workbench/types";
 import {
   bundleOptionLabel,
   distinctOptions,
+  planLabel,
   planOptionLabel,
+  runOfPlan,
 } from "./genai-ingest-labels";
 
 type Result = GenaiView["results"][number];
@@ -196,21 +198,44 @@ export function queueIngestFields(
   ];
 }
 
+/**
+ * The plan label a GenAI result's runs are named by (#246 item 2): the label
+ * of the ingest job it was compiled from, as the workbench names that job,
+ * else the label of the procedure its plan was frozen for. Null when
+ * neither is known, so its runs keep their keys.
+ */
+export function resultPlanLabel(
+  r: Pick<Result, "jobId" | "artifactId" | "procedureId">,
+  jobs: GenaiView["jobs"],
+  procedures: Parameters<typeof jobNames>[1],
+): string | null {
+  const typed = jobs as unknown as Parameters<typeof jobNames>[0],
+    i = jobs.findIndex((j) => String(j.id) === (r.jobId ?? r.artifactId));
+  if (i >= 0) return jobNames(typed, procedures)[i];
+  return procedures.some((p) => p.id === r.procedureId)
+    ? planLabel(r.procedureId, null, null, procedures)
+    : null;
+}
+
 export function ResultCard({
   result,
   reviewer,
   busy,
   onAcknowledge,
+  plan = null,
 }: {
   result: Result;
   reviewer: boolean;
   busy: boolean;
   onAcknowledge: (a: GenaiAcknowledgement) => void;
+  /** The plan label its blockers name the runs by (resultPlanLabel). */
+  plan?: string | null;
 }) {
   const s = result.summary,
     r = result.readiness,
     runLevel = (key: string) =>
-      r.runs.find((x) => x.runKey === key)?.effectiveLevel ?? "L0";
+      r.runs.find((x) => x.runKey === key)?.effectiveLevel ?? "L0",
+    runKeys = s.runs.map((x) => x.runKey);
   return (
     <section className="panel" data-genai-result={result.id}>
       <div className="panel-head">
@@ -240,7 +265,9 @@ export function ResultCard({
                 <li key={b.code + i} data-genai-blocker={b.code}>
                   {b.message}
                   {b.criterionId ? " (criterion " + b.criterionId + ")" : ""}
-                  {b.runKey ? " (run " + b.runKey + ")" : ""}
+                  {b.runKey
+                    ? " (" + runOfPlan(b.runKey, runKeys, plan) + ")"
+                    : ""}
                   {b.detail ? ": " + b.detail : ""}
                 </li>
               ))}
@@ -882,6 +909,11 @@ export function GenaiEvidence({
             reviewer={reviewer}
             busy={busy}
             onAcknowledge={(a) => acknowledge(r, a)}
+            plan={resultPlanLabel(
+              r,
+              view?.jobs ?? [],
+              e.workflow?.procedures ?? [],
+            )}
           />
         ))}
       <WorkflowDialog

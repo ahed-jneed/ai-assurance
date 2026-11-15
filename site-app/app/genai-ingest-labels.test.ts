@@ -4,8 +4,26 @@ import {
   bundleOptionLabel,
   distinctOptions,
   planOptionLabel,
+  runOfPlan,
   stamp,
 } from "./genai-ingest-labels";
+
+describe("a GenAI blocker's run (#246 item 2)", () => {
+  const plan = "WP-GA-01 Accuracy of answers · 2 criteria";
+  it("names the only run of a result by its plan label", () => {
+    expect(runOfPlan("inspect:abc", ["inspect:abc"], plan)).toBe(
+      "run of " + plan,
+    );
+  });
+  it("numbers one of several runs in the result's order", () => {
+    expect(runOfPlan("pf:b", ["pf:a", "pf:b"], plan)).toBe("run 2 of " + plan);
+  });
+  it("keeps the run key without a plan label", () => {
+    expect(runOfPlan("inspect:abc", ["inspect:abc"], null)).toBe(
+      "run inspect:abc",
+    );
+  });
+});
 
 const procedures = [
   { id: "PROC-1", templateId: "WP-GA-01", title: "Accuracy of answers" },

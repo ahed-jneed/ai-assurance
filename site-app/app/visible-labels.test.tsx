@@ -22,7 +22,7 @@ import {
   recordSubtitle,
 } from "./assurance-record-details";
 import { ProcedurePlan } from "./audit-program/procedure-plan";
-import { ResultCard } from "./genai-evidence";
+import { ResultCard, resultPlanLabel } from "./genai-evidence";
 import { PowerCheck } from "./power-check";
 import type { ProgramScope } from "./audit-program/program-scope";
 import { RecordFields } from "./record-details";
@@ -481,5 +481,87 @@ describe("readable labels in the power check and GenAI results (#240 item 4)", (
       }
     }
     expect(card("pass", "inspect_eval")).toContain("Inspect log (.eval)");
+  });
+
+  it("names missing run metadata and the run by its plan label (#246 item 2)", async () => {
+    const { envelope, computation } = await readGenaiEnvelope(
+      readFileSync("../schemas/fixtures/genai-result.example.json", "utf8"),
+    );
+    const summary = genaiSummary(computation, {
+      computationSha256: envelope.computationSha256,
+      itemsSha256: envelope.itemsSha256,
+    });
+    const missing = [
+      "systemUnderTest.snapshot",
+      "systemUnderTest.family",
+      "judges.family",
+      "judges.validation",
+    ];
+    summary.runs = summary.runs.map((r) => ({ ...r, missing }));
+    const runKey = summary.runs[0].runKey,
+      result = {
+        id: "AS-1",
+        createdAt: "2026-11-05T00:00:00.000Z",
+        custody: "worker",
+        authenticatedBy: null,
+        attested: false,
+        artifactId: "JOB-1",
+        jobId: "JOB-1",
+        procedureId: "PROC-1",
+        summary,
+        readiness: genaiReadiness({
+          recordId: "AS-1",
+          artifactId: "JOB-1",
+          custody: "worker",
+          acknowledgements: [],
+          attested: false,
+          summary,
+        }),
+      } as never as Parameters<typeof resultPlanLabel>[0] &
+        Parameters<typeof ResultCard>[0]["result"];
+    const jobs = [
+      {
+        id: "JOB-1",
+        mode: "genai_ingest",
+        system_name: null,
+        procedure_id: "PROC-1",
+        plan_id: "PLAN-1",
+        plan_criteria: 1,
+        plan_created_at: null,
+      },
+    ] as never;
+    const plan = resultPlanLabel(result, jobs, [procedure]);
+    expect(plan).toBe("WP-A09-01 Risk management system · 1 criterion");
+    const blocker = (label: string | null) =>
+      visibleText(
+        renderToStaticMarkup(
+          <ResultCard
+            result={result}
+            reviewer={false}
+            busy={false}
+            onAcknowledge={() => {}}
+            plan={label}
+          />,
+        ).match(
+          /<li data-genai-blocker="genai_metadata_incomplete">[\s\S]*?<\/li>/,
+        )?.[0] ?? "",
+      ).join(" ");
+    const named = blocker(plan);
+    expect(named).toContain(
+      "System snapshot, System model family, Judge model family, Judge validation",
+    );
+    expect(named).toContain("(run of " + plan + ")");
+    for (const field of missing) expect(named).not.toContain(field);
+    expect(named).not.toContain(runKey);
+    // Without a plan label the run keeps its key.
+    expect(blocker(null)).toContain("(run " + runKey + ")");
+    // A result without a job or a known procedure has no plan label.
+    expect(
+      resultPlanLabel(
+        { jobId: null, artifactId: "EV-9", procedureId: "PROC-X" },
+        [],
+        [procedure],
+      ),
+    ).toBeNull();
   });
 });

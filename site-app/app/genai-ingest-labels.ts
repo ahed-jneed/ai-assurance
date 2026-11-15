@@ -117,6 +117,23 @@ export function bundleOptionLabel(
 }
 
 /**
+ * A run as a result's blockers name it (#246 item 2): "run of <plan>" for
+ * the only run of a result, "run 2 of <plan>" for one of several, in the
+ * order the result lists its runs; "run <key>" when no plan label exists.
+ */
+export function runOfPlan(
+  runKey: string,
+  runKeys: readonly string[],
+  plan: string | null | undefined,
+) {
+  if (!plan) return "run " + runKey;
+  const n = runKeys.indexOf(runKey);
+  return runKeys.length > 1 && n >= 0
+    ? "run " + (n + 1) + " of " + plan
+    : "run of " + plan;
+}
+
+/**
  * Options whose labels tell them apart: a label that two records still
  * share (the same procedure, criteria or inputs in the same minute) ends in
  * a short suffix of each record's id; every other label stays as it is.

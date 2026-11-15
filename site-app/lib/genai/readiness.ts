@@ -3,6 +3,7 @@
 // level, what blocks a positive conclusion, and the claim-scope statements a
 // positive conclusion carries. The engine decides the statistics; this gate
 // decides whether the evidence may support a conclusion at all. Pure.
+import { genaiFieldLabel } from "../presentation";
 import { reasonLabel } from "./labels";
 import type { GenaiCustody, GenaiLevel, GenaiSummary } from "./summary";
 
@@ -304,9 +305,11 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
 
   for (const x of runs) {
     if (x.missing.length)
+      // #246 item 2: the fields by the run checklist's labels, never their
+      // dotted paths ("Judge model family", not "judges.family").
       block("genai_metadata_incomplete", {
         runKey: x.runKey,
-        detail: x.missing.join(", "),
+        detail: x.missing.map(genaiFieldLabel).join(", "),
       });
     if (
       x.tools.agentic === true &&
