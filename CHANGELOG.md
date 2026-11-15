@@ -13,7 +13,8 @@ Highlights:
 
 ### Public release preparation (15 Nov 2026)
 
-- **breaking:** the ChatGPT sign-in and the whole Sites hosting integration are removed (decision D-49). `IDENTITY_MODE=sites` is no longer recognised; production identity is Cloudflare Access. The development persona sign-in moves to `/auth/sign-in` and the loopback identity headers to `x-assurance-user-*`. The external worker no longer sends a Sites platform credential (`ASSURANCE_SITE_SERVICE_TOKEN` is gone).
+- **breaking:** the ChatGPT sign-in and the whole Sites hosting integration are removed (decision D-49). `IDENTITY_MODE=sites` is no longer recognised. The development persona sign-in moves to `/auth/sign-in` and the loopback identity headers to `x-assurance-user-*`. The external worker no longer sends a Sites platform credential (`ASSURANCE_SITE_SERVICE_TOKEN` is gone).
+- **feature:** self-hosting with one command (`docker compose up` or `npm run self-host`) and built-in accounts as the default sign-in: owner setup on first visit, invitation sign-up links, PBKDF2 passwords with lockout, `reset-password` (decision D-50). A Docker image is built on pull requests and published to ghcr.io from `main`.
 - **security:** React 19.2.9 and Next.js 16.4.6 for published remote-code-execution advisories; zod 4 and current dev tooling; security headers on every Worker response, including `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
 - **security (engine):** an encoding-aware PMML DTD guard, a zip entry-count check before the central directory is parsed, the native scorer started in isolated mode, the compute base image pinned by digest and the optional requirements hash-locked.
 - **docs:** Apache-2.0 licence, `SECURITY.md`, `CONTRIBUTING.md`, code of conduct, issue templates, Dependabot and a not-legal-advice disclaimer.

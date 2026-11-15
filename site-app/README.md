@@ -53,7 +53,7 @@ With the development server running and the local migrations applied (`npm run d
 
 A server-rendering error in the development server is printed to its log as `[ssr] Server rendering error; ...` with its stack (`build/ssr-error-log.ts`): Vinext otherwise answers such a page with a silent 500 and lets the browser render it.
 
-`npm start` serves the built Worker without a sign-in simulation: the build trusts no identity and the API answers 401. For local end-to-end tests and the seeded personas, stop the development server (both use `.wrangler/state`) and start the built Worker in the loopback-only `trusted-headers` mode, then send the `x-assurance-user-*` headers from the test client:
+`npm start` serves the built Worker with the built-in accounts and no personas (`npm run self-host` does the same with its own data directory and secrets). For local end-to-end tests and the seeded personas, stop the development server (both use `.wrangler/state`) and start the built Worker in the loopback-only `trusted-headers` mode, then send the `x-assurance-user-*` headers from the test client:
 
 ```sh
 npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests --var SELF_SIGNUP:open
@@ -69,9 +69,9 @@ Local previews use Miniflare's placeholder `Request.cf` metadata; set `CLOUDFLAR
 
 ## Identity
 
-`lib/identity.ts` resolves the caller at the Worker entry according to `IDENTITY_MODE`: `cloudflare-access` (a verified Access token) in production, or the loopback-only `trusted-headers` and `dev` modes. With no mode, every request is anonymous and the API answers 401 (decision D-23). In every mode the Worker entry removes inbound `x-assurance-user-*` headers before the app runs, and app code reads the caller only through `currentUser()`. See [docs/security/identity.md](../docs/security/identity.md).
+`lib/identity.ts` resolves the caller at the Worker entry according to `IDENTITY_MODE`: unset or `local`, the built-in accounts (`lib/local-auth.ts`, decision D-50); `cloudflare-access`, a verified Access token; or the loopback-only `trusted-headers` and `dev` modes. An unknown or incomplete mode trusts nothing and the API answers 401. In every mode the Worker entry removes inbound `x-assurance-user-*` headers before the app runs, and app code reads the caller only through `currentUser()`. See [docs/security/identity.md](../docs/security/identity.md).
 
-`/auth/sign-in` and `/auth/sign-out` are answered by the development server in `dev` mode and by the Worker entry in every other mode (behind Cloudflare Access, sign-in returns a verified caller to the page and sign-out goes to the Access logout). Do not implement app routes for those paths, and start sign-in only as a top-level navigation (build links with `signInPath()` and `signOutPath()` from `lib/auth-paths.ts`). Sign-in establishes identity only; practice membership and roles are checked on the server (`lib/tenancy.ts`).
+`/auth/sign-in` and `/auth/sign-out` are answered by the development server in `dev` mode and by the Worker entry in every other mode: the built-in accounts' pages (with `/auth/setup`, `/auth/sign-up` and `/auth/password`) in `local` mode, and behind Cloudflare Access a return to the page or the Access logout. Do not implement app routes for those paths, and start sign-in only as a top-level navigation (build links with `signInPath()` and `signOutPath()` from `lib/auth-paths.ts`). Sign-in establishes identity only; practice membership and roles are checked on the server (`lib/tenancy.ts`).
 
 ## Local D1 migrations
 
@@ -89,7 +89,9 @@ Without the local migrations the development server still starts, but every API 
 
 `npm run test:e2e` runs the Playwright persona suite with axe accessibility checks against the built Worker on a fresh database in `.wrangler/e2e-state` (run `npm run build` and, once, `npx playwright install chromium` first). Do not run `npm run build` or `npm run check` in the same checkout while the suite's server runs. See [e2e/README.md](e2e/README.md) for the flows, the tracked accessibility exceptions and the CI job.
 
-## Deployment
+## Self-hosting
 
-The Worker runs on Cloudflare Workers with D1 and R2 bindings named `DB` and `BUCKET` (`cloudflare-env.d.ts`), behind a Cloudflare Access application. [docs/security/identity.md](../docs/security/identity.md#configure-cloudflare-access) walks through the Access setup and the deploy command; [docs/security/signing-keys.md](../docs/security/signing-keys.md) covers the `DOSSIER_KEK` secret. Apply the migrations in `drizzle/` to the production database, in order, before deploying a build that needs them. `.wrangler/` and `.vinext/` hold disposable local state and are ignored by Git.
+`npm run self-host` builds the Worker on first start, creates `DOSSIER_KEK` in `data/secrets.env`, applies the migrations to `data/state` and serves it on `http://127.0.0.1:8787` (`PORT`, `HOST` and `DATA_DIR` change that). The first visit creates the owner account; see the root README's [Quick start](../README.md#quick-start) for Docker and password resets, and [docs/security/identity.md](../docs/security/identity.md#built-in-accounts-local-the-default) for how the built-in accounts work. `Dockerfile` builds the same thing as one container (data in `/data`).
+
+To deploy on Cloudflare Workers instead, bind D1 and R2 as `DB` and `BUCKET` (`cloudflare-env.d.ts`), set the `DOSSIER_KEK` secret ([docs/security/signing-keys.md](../docs/security/signing-keys.md)) and apply the migrations in `drizzle/` in order. The built-in accounts work there too; to use Cloudflare Access instead, follow [Configure Cloudflare Access](../docs/security/identity.md#configure-cloudflare-access). `.wrangler/` and `.vinext/` hold disposable local state and are ignored by Git.
 

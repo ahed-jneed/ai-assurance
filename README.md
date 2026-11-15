@@ -24,7 +24,7 @@ The [capability matrix](docs/capabilities.md) lists every capability with the co
 
 ## Architecture
 
-A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), with D1 for records and R2 for evidence and immutable blobs. Identity comes from Cloudflare Access through an adapter that denies by default. The Python engine in `engine/` runs diagnostics, statistics and GenAI ingestion as an external worker and as offline tools. The [codebase map](docs/engineering/codebase-map.md) describes the components, data flow, storage and module layout; [docs/security/identity.md](docs/security/identity.md) and [docs/security/signing-keys.md](docs/security/signing-keys.md) cover identity and signing.
+A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), with D1 for records and R2 for evidence and immutable blobs. Sign-in uses built-in accounts (email and password, with the first account as the owner), or optionally Cloudflare Access, through an adapter that denies by default. The Python engine in `engine/` runs diagnostics, statistics and GenAI ingestion as an external worker and as offline tools. The [codebase map](docs/engineering/codebase-map.md) describes the components, data flow, storage and module layout; [docs/security/identity.md](docs/security/identity.md) and [docs/security/signing-keys.md](docs/security/signing-keys.md) cover identity and signing.
 
 | Folder | Contents |
 |---|---|
@@ -37,9 +37,37 @@ A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), wi
 
 ## Quick start
 
-Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging).
+Run your own copy with one command. Then open <http://localhost:8787>: the first visit asks you to create the **owner account**, and the owner invites everyone else from **Members & access** by sending each person a sign-up link. There is no external sign-in service to set up.
 
-```powershell
+**With Docker:**
+
+```bash
+docker compose up -d
+```
+
+The data (database, evidence and the generated secret) lives in the `ai-assurance-data` volume. Once a release is published, the image is also available as `ghcr.io/ahed-jneed/ai-assurance`.
+
+**With Node.js** (22.13 or later):
+
+```bash
+cd site-app
+npm ci
+npm run self-host
+```
+
+The data lives in `site-app/data/`. Back it up together with `data/secrets.env`, which holds the key that signs reports and sign-up links. `PORT`, `HOST` and `DATA_DIR` change where it listens and stores data, for example `PORT=3000 npm run self-host`.
+
+**Forgot a password?** Run `npm run self-host -- reset-password <email>` (in Docker: `docker compose exec ai-assurance node scripts/self-host.mjs reset-password <email>`). It prints a temporary password.
+
+**Reaching it from other machines.** Put it behind a reverse proxy that serves HTTPS (for example Caddy or nginx) and forwards `X-Forwarded-Proto`, so the session cookie is marked `Secure`. The Docker image listens on all interfaces; `npm run self-host` listens on `127.0.0.1` unless you set `HOST=0.0.0.0`.
+
+To deploy to Cloudflare Workers behind Cloudflare Access instead, see [docs/security/identity.md](docs/security/identity.md#configure-cloudflare-access).
+
+## Development
+
+Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging). The development server signs you in as a test persona instead of an account.
+
+```bash
 cd site-app
 npm ci
 npm run build             # writes dist/server/wrangler.json, which the migration reads
@@ -74,7 +102,7 @@ npm run seed:demo -- http://127.0.0.1:5180
 | `qa-viewer` | Client Viewer for Acme |
 | `qa-outsider` | No membership (isolation checks) |
 
-The seed creates the client Acme, a structured engagement, every persona's membership and grant, and an evidence request for `qa-contrib`; it is safe to run again. The account menu switches persona and signs out. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. A deployment applies production migrations separately and signs users in with Cloudflare Access, never the local mock: the Worker trusts only the identity source that `IDENTITY_MODE` names and answers 401 when none is configured ([docs/security/identity.md](docs/security/identity.md)). The build uses the `DB` and `BUCKET` bindings. [site-app/README.md](site-app/README.md) has the details, including `npm start` for the built Worker.
+The seed creates the client Acme, a structured engagement, every persona's membership and grant, and an evidence request for `qa-contrib`; it is safe to run again. The account menu switches persona and signs out. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. The personas exist only on the development server; every build signs people in with the built-in accounts, or with the identity source `IDENTITY_MODE` names ([docs/security/identity.md](docs/security/identity.md)). The build uses the `DB` and `BUCKET` bindings. [site-app/README.md](site-app/README.md) has the details, including `npm start` for the built Worker.
 
 ## Checks
 
