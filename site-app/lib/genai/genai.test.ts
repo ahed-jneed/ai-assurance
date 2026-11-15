@@ -211,6 +211,28 @@ describe("the GenAI readiness gate", () => {
     expect(codes(await context(text))).toEqual(["genai_judge_not_validated"]);
   });
 
+  it("names the rule a judge failed in readable words (#240 item 3)", async () => {
+    const text = await variant((c) => {
+      c.criteria[0].flags = [
+        {
+          flag: "judge_not_validated",
+          runKey: RUN,
+          score: "model_graded_qa",
+          judgeRef: "J1",
+          reasons: ["position_consistency_below_floor"],
+        },
+      ];
+    });
+    const [b] = genaiReadiness(await context(text)).blockers;
+    expect(b.code).toBe("genai_judge_not_validated");
+    expect(b.message).toBe(
+      "A model-graded or unclassified score decides, and its judge is not validated: position-swap consistency is below the 0.80 floor",
+    );
+    expect(b.message).not.toMatch(/kappa/);
+    expect(b.detail).toBe("judge J1");
+    expect(b.message + b.detail).not.toMatch(/_/);
+  });
+
   it("reports a same-family or undeclared judge separately", async () => {
     const text = await variant((c) => {
       c.criteria[0].flags = [

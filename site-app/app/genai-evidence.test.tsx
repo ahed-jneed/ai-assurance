@@ -10,7 +10,7 @@ import { genaiArtifactLevels } from "@/lib/genai/evidence-levels";
 import { genaiReadiness } from "@/lib/genai/readiness";
 import { genaiSummary } from "@/lib/genai/summary";
 import { EvidenceRegister } from "./audit-registers";
-import { IntakeActions, ResultCard } from "./genai-evidence";
+import { FinishedIngests, IntakeActions, ResultCard } from "./genai-evidence";
 
 const noop = () => {};
 const actions = (
@@ -166,5 +166,50 @@ describe("ResultCard", () => {
     );
     validation.pairs = 0;
     expect(card()).toContain("position consistency: no swapped (AB/BA) pairs");
+  });
+});
+
+describe("FinishedIngests (#240 item 2)", () => {
+  const procedures = [
+    { id: "PROC-1", templateId: "WP-GA-01", title: "Accuracy of answers" },
+  ];
+  const job = (id: string, state: string) => ({
+    id,
+    state,
+    mode: "genai_ingest",
+    system_name: null,
+    procedure_id: "PROC-1",
+    plan_id: "AS-PLAN-1",
+    plan_criteria: 2,
+    plan_created_at: null,
+  });
+  const html = (imported: string[] = []) =>
+    renderToStaticMarkup(
+      <FinishedIngests
+        jobs={
+          [
+            job("JOB-aaa", "succeeded"),
+            job("JOB-bbb", "running"),
+            job("JOB-ccc", "succeeded"),
+          ] as never
+        }
+        imported={new Set(imported)}
+        procedures={procedures}
+        busy={false}
+        onCompile={noop}
+      />,
+    );
+
+  it("names a finished ingest by its plan, never by its job id", () => {
+    const out = html(["JOB-ccc"]);
+    expect(out).toContain(
+      "The ingest of WP-GA-01 Accuracy of answers · 2 criteria finished.",
+    );
+    expect(out).not.toMatch(/JOB-/);
+    expect(out.match(/Compile result/g)).toHaveLength(1);
+  });
+
+  it("shows nothing once every finished ingest is compiled", () => {
+    expect(html(["JOB-aaa", "JOB-ccc"])).toBe("");
   });
 });

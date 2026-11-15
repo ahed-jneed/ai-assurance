@@ -3,6 +3,7 @@
 // level, what blocks a positive conclusion, and the claim-scope statements a
 // positive conclusion carries. The engine decides the statistics; this gate
 // decides whether the evidence may support a conclusion at all. Pure.
+import { reasonLabel } from "./labels";
 import type { GenaiCustody, GenaiLevel, GenaiSummary } from "./summary";
 
 /**
@@ -291,10 +292,12 @@ export function genaiReadiness(r: GenaiResultContext): GenaiReadiness {
         );
       });
       if (open.length)
+        // #240 item 3: name the rules the judge failed, in readable words.
         block("genai_judge_not_validated", {
           criterionId: k.id,
           runKey: f.runKey,
-          detail: (f.judgeRef ? f.judgeRef + ": " : "") + open.join(", "),
+          detail: f.judgeRef ? "judge " + f.judgeRef : undefined,
+          message: judgeNotValidatedMessage(open),
         });
     }
   }
@@ -380,6 +383,19 @@ export function procedureGenaiBlockers(
       message: GENAI_BLOCKERS.genai_result_missing,
     });
   return out;
+}
+
+/**
+ * The judge blocker's message for the rules a judge failed (#240 item 3):
+ * each reason in readable words, so a judge that meets the kappa floor but
+ * fails position consistency is not told about the kappa rule.
+ */
+export function judgeNotValidatedMessage(reasons: readonly string[]) {
+  if (!reasons.length) return GENAI_BLOCKERS.genai_judge_not_validated;
+  return (
+    "A model-graded or unclassified score decides, and its judge is not validated: " +
+    [...new Set(reasons)].map(reasonLabel).join("; ")
+  );
 }
 
 /** One line per blocker, as a paper's limitations list them. */

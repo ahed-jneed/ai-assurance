@@ -408,6 +408,22 @@ describe("revokeClientRequest", () => {
     );
   });
 
+  it.each([
+    [
+      "revoked",
+      { active: false, revokedAt: "2026-11-02T00:00:00.000Z", revokedBy: "x" },
+    ],
+    ["expired", { expiresAt: "2026-11-01T00:00:00.000Z" }],
+  ])("refuses a %s grant and keeps its record (#240 item 5)", async (_, g) => {
+    const e = withGrant(g);
+    await refused(
+      e,
+      () => command(e, "revokeClientRequest", revoke, "lead"),
+      409,
+      "This grant is no longer active",
+    );
+  });
+
   it("needs a reason", async () => {
     const e = withGrant();
     await expect(
@@ -475,15 +491,19 @@ describe("publishClientClarification", () => {
   });
 
   it.each([
-    ["revoked", { active: false }],
-    ["expired", { expiresAt: "2026-11-01T00:00:00.000Z" }],
-  ])("refuses a %s assignment", async (_, g) => {
+    ["revoked", { active: false }, "This grant was revoked"],
+    [
+      "expired",
+      { expiresAt: "2026-11-01T00:00:00.000Z" },
+      "The client assignment has expired",
+    ],
+  ])("refuses a %s assignment (#240 item 6)", async (_, g, message) => {
     const e = withGrant(g);
     await refused(
       e,
       () => command(e, "publishClientClarification", clarify, "auditor"),
       409,
-      "The client assignment has expired",
+      message,
     );
   });
 

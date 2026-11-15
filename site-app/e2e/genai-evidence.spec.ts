@@ -73,6 +73,11 @@ test("an auditor imports a GenAI envelope and the gate holds its conclusion", as
   await expect(
     card.getByText(/not accuracy on the population/i).first(),
   ).toBeVisible();
+  // #240 item 4: the criteria and run metadata read in words.
+  await expect(card.getByRole("cell", { name: /Mean score/ })).toBeVisible();
+  await expect(card).toContainText("System model family");
+  await expect(card).not.toContainText("genai_mean");
+  await expect(card).not.toContainText("systemUnderTest");
   await expectAccessible(page, "GenAI evidence tab");
 
   // #145: no worker of the demo engagement is enrolled with genai_ingest, so

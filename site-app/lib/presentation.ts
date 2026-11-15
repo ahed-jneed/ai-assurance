@@ -65,7 +65,38 @@ const valueNames: Record<string, string> = {
   false: "No",
   one_off: "One-off",
   follow_up: "Follow-up",
+  // GenAI criterion kinds (genai-plan/0.1), as the GenAI results show them
+  // (#240 item 4).
+  genai_mean: "Mean score",
+  genai_marking: "Marking check",
+  genai_attack_success: "Attack success rate",
+  genai_paired_difference: "Paired difference",
+  genai_pass_k: "Pass at k",
 };
+
+/**
+ * The GenAI run-metadata fields (lib/genai/summary.ts METADATA_FIELDS) as
+ * the run checklist names them (#240 item 4), never their dotted paths.
+ */
+const genaiFieldNames: Record<string, string> = {
+  harness: "Harness",
+  "systemUnderTest.snapshot": "System snapshot",
+  "systemUnderTest.family": "System model family",
+  systemPrompt: "System prompt",
+  decoding: "Decoding settings",
+  tools: "Tools offered",
+  dataset: "Dataset",
+  epochs: "Epochs",
+  dates: "Run dates",
+  attackSet: "Attack set",
+  "judges.model": "Judge model",
+  "judges.family": "Judge model family",
+  "judges.promptTemplate": "Judge prompt template",
+  "judges.validation": "Judge validation",
+};
+/** A GenAI run-metadata field by its label; an unknown one in sentence case. */
+export const genaiFieldLabel = (field: string) =>
+  genaiFieldNames[field] ?? humanLabel(field.replaceAll(".", " "));
 
 /**
  * A coded value as the page shows it: "one_off" reads "One-off",

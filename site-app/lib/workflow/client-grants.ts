@@ -114,6 +114,9 @@ export const clientGrantCommands: Record<string, WorkflowHandler> = {
       g =
         w().clientGrants.find((g) => g.id === a.grantId) ??
         fail(404, "Grant not found");
+    // #240 item 5: a revoked or expired grant keeps who revoked it and when.
+    if (!g.active || Date.parse(g.expiresAt) <= Date.parse(c.at))
+      fail(409, "This grant is no longer active");
     g.active = false;
     g.revokedAt = c.at;
     g.revokedBy = c.userId;
@@ -125,7 +128,9 @@ export const clientGrantCommands: Record<string, WorkflowHandler> = {
       g =
         w().clientGrants.find((g) => g.id === a.grantId) ??
         fail(404, "Request assignment not found");
-    if (!g.active || Date.parse(g.expiresAt) <= Date.parse(c.at))
+    // #240 item 6: a revoked grant is not called expired.
+    if (!g.active) fail(409, "This grant was revoked");
+    if (Date.parse(g.expiresAt) <= Date.parse(c.at))
       fail(409, "The client assignment has expired");
     await refuseLapsed(c, g);
     g.communications ??= [];

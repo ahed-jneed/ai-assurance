@@ -7,6 +7,7 @@ import { executionFields } from "./execution-fields";
 import {
   adapterFormatLabel,
   attemptsLabel,
+  compileAction,
   enrolmentFormats,
   predictionOptionLabel,
   telemetryText,
@@ -102,5 +103,27 @@ describe("workbench labels (#202)", () => {
         e,
       ),
     ).toBe("Predictions · 2026-11-03");
+  });
+});
+
+describe("compileAction (#240 item 1)", () => {
+  it("compiles a GenAI ingest job as a GenAI result, never as a paper", () => {
+    expect(compileAction({ mode: "genai_ingest", state: "succeeded" })).toEqual(
+      { op: "compileGenaiResult", label: "Compile GenAI result" },
+    );
+    expect(compileAction({ mode: "provided", state: "succeeded" })).toEqual({
+      op: "importJob",
+      label: "Compile draft paper",
+    });
+  });
+
+  it("offers nothing once compiled or before the job succeeded", () => {
+    for (const mode of ["genai_ingest", "provided"]) {
+      expect(
+        compileAction({ mode, state: "succeeded", compiled: true }),
+      ).toBeNull();
+      for (const state of ["queued", "running", "failed", "cancelled"])
+        expect(compileAction({ mode, state })).toBeNull();
+    }
   });
 });

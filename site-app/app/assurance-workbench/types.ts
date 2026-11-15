@@ -176,6 +176,21 @@ export function jobName(
 }
 
 /**
+ * What a finished execution request offers to compile, if anything (#240
+ * item 1): a GenAI ingest job compiles its envelope into a GenAI result, as
+ * the GenAI evidence tab does; any other job compiles a draft paper. Nothing
+ * once the job is compiled or before it succeeded.
+ */
+export function compileAction(
+  j: Pick<ExecutionJob, "mode" | "state"> & { compiled?: boolean },
+): { op: "compileGenaiResult" | "importJob"; label: string } | null {
+  if (j.state !== "succeeded" || j.compiled) return null;
+  return j.mode === "genai_ingest"
+    ? { op: "compileGenaiResult", label: "Compile GenAI result" }
+    : { op: "importJob", label: "Compile draft paper" };
+}
+
+/**
  * The execution requests' names, in order (#227): jobName, and for GenAI
  * ingest jobs of different plans that would read the same, the plan's id
  * suffix, as the Queue ingest dialog tells those plans apart.

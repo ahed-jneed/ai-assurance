@@ -1,17 +1,28 @@
 // No coded value reaches the page (#227 item 4, #234 items 5 to 7): each view
 // that showed a snake_case or lower-case enum value renders here with those
 // values, and the test fails on any of them in its visible text.
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { AssuranceRecord } from "@/lib/assurance-core";
 import type { Engagement } from "@/lib/domain/types";
-import { describePlan } from "@/lib/hosted-statistics";
+import { readGenaiEnvelope } from "@/lib/genai/envelope";
+import { genaiReadiness } from "@/lib/genai/readiness";
+import { genaiSummary } from "@/lib/genai/summary";
+import {
+  defaultPlanForm,
+  describePlan,
+  planFromForm,
+  validateHostedPlan,
+} from "@/lib/hosted-statistics";
 import type { Procedure } from "@/lib/workflow-types";
 import {
   AssuranceRecordDetails,
   recordSubtitle,
 } from "./assurance-record-details";
 import { ProcedurePlan } from "./audit-program/procedure-plan";
+import { ResultCard } from "./genai-evidence";
+import { PowerCheck } from "./power-check";
 import type { ProgramScope } from "./audit-program/program-scope";
 import { RecordFields } from "./record-details";
 import { ProcedureComparison } from "./revision-comparison";
@@ -33,6 +44,12 @@ const codes = [
   "internal_policy",
   "equalized_odds",
   "confirmatory",
+  "exploratory",
+  "declared",
+  "recorded",
+  "missing",
+  "genai_marking",
+  "genai_mean",
 ];
 /** The text a reader sees: text nodes and option labels, entities decoded. */
 function visibleText(html: string) {
@@ -292,5 +309,114 @@ describe("the access decision record sheet (#234 item 5)", () => {
     expect(recordSubtitle({ ...record, kind: "assertion" })).toBe(
       "Saved assessment and source history",
     );
+  });
+});
+
+describe("readable labels in the power check and GenAI results (#240 item 4)", () => {
+  it("names the power check's criteria", () => {
+    const plan = validateHostedPlan(
+      "Binary classification",
+      planFromForm(
+        "Binary classification",
+        ["demographic_parity", "equalized_odds"],
+        {
+          minimumSampleSize: 40,
+          minimumClassCount: 12,
+          minimumGroupSize: 35,
+          maximumParityGap: 0.08,
+          minimumImpactRatio: 0.8,
+          minimumAccuracy: 0.85,
+          minimumRecall: 0.75,
+          maximumOddsGap: 0.1,
+        },
+        defaultPlanForm,
+        null,
+      ),
+    );
+    const html = renderToStaticMarkup(
+      <PowerCheck
+        plan={plan}
+        rows={400}
+        dataset={{ tenantId: "T", engagementId: "ENG", artifactId: "EV-1" }}
+        groupColumn={null}
+        labelColumn={null}
+        assumptions={{}}
+        acknowledgement=""
+        disabled={false}
+        onAssumptions={() => {}}
+        onAcknowledgement={() => {}}
+      />,
+    );
+    const text = visibleText(html);
+    expect(text).toEqual(
+      expect.arrayContaining(["Demographic parity", "Equalized odds"]),
+    );
+    expect(text).not.toContain("equalized odds");
+    expect(text).not.toContain("demographic parity");
+    expectReadable(html);
+  });
+
+  it("names the GenAI criteria kinds, roles and run metadata", async () => {
+    const { envelope, computation } = await readGenaiEnvelope(
+      readFileSync("../schemas/fixtures/genai-result.example.json", "utf8"),
+    );
+    const summary = genaiSummary(computation, {
+      computationSha256: envelope.computationSha256,
+      itemsSha256: envelope.itemsSha256,
+    });
+    // The example's plan decides by a mean; a marking check shows its kind too.
+    summary.criteria.push({
+      ...summary.criteria[0],
+      id: "detection",
+      kind: "genai_marking",
+      role: "exploratory",
+    });
+    const html = renderToStaticMarkup(
+      <ResultCard
+        result={
+          {
+            id: "AS-1",
+            createdAt: "2026-11-05T00:00:00.000Z",
+            custody: "worker",
+            authenticatedBy: null,
+            attested: false,
+            summary,
+            readiness: genaiReadiness({
+              recordId: "AS-1",
+              artifactId: "JOB-1",
+              custody: "worker",
+              acknowledgements: [],
+              attested: false,
+              summary,
+            }),
+          } as never
+        }
+        reviewer={false}
+        busy={false}
+        onAcknowledge={() => {}}
+      />,
+    );
+    const text = visibleText(html);
+    expect(text).toEqual(
+      expect.arrayContaining([
+        "Mean score",
+        "Marking check",
+        "Confirmatory",
+        "Exploratory",
+        "System model family",
+      ]),
+    );
+    expect(html).not.toContain("systemUnderTest.family");
+    // The criteria table and the run checklists; the claim scope and run
+    // summaries quote dataset and harness names as the tool recorded them.
+    const criteria = html.slice(
+      html.indexOf("<h3>Criteria</h3>"),
+      html.indexOf("</table>", html.indexOf("<h3>Criteria</h3>")),
+    );
+    expect(criteria).toContain("Marking check");
+    expectReadable(criteria);
+    const checklists = html.match(/<ul class="genai-checklist"[\s\S]*?<\/ul>/g);
+    expect(checklists?.length).toBeGreaterThan(0);
+    for (const list of checklists ?? []) expectReadable(list);
   });
 });
