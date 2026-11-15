@@ -19,11 +19,41 @@ import {
 import {
   checklistProblem,
   coolingOffConflicts,
+  coolingOffMessage,
   engagementTeam,
   qualityReviewGates,
   qualityReviewReleaseProblem,
   qualityReviewRequired,
 } from "./quality-review";
+
+describe("the cooling-off refusal (#246 item 3)", () => {
+  const tail =
+    " for the same client within the 730-day cooling-off period and is not yet eligible";
+  const client = [
+    { id: "ENG-1", title: "Chatbot transparency review" },
+    { id: "ENG-2", title: "Credit scoring audit" },
+    { id: "ENG-3", title: "Hiring tool audit" },
+    { id: "ENG-4", title: "Hiring tool audit" },
+  ];
+  it("names an engagement by its unique title, never its id", () => {
+    const message = coolingOffMessage([client[1]], 730, client);
+    expect(message).toBe(
+      "This person served on the team of Credit scoring audit" + tail,
+    );
+    expect(message).not.toContain("ENG-2");
+  });
+  it("adds the id in parentheses only where another engagement shares the title", () => {
+    expect(coolingOffMessage([client[2], client[1]], 730, client)).toBe(
+      "This person served on the team of Hiring tool audit (ENG-3) and Credit scoring audit" +
+        tail,
+    );
+  });
+  it("falls back to the id when no title is known", () => {
+    expect(
+      coolingOffMessage([{ id: "ENG-9", title: "ENG-9" }], 730, client),
+    ).toBe("This person served on the team of ENG-9" + tail);
+  });
+});
 
 /** A captured attestation package the reviewer approved independently. */
 function approvedPackage(id = "R1"): Report {

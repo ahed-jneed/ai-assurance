@@ -265,6 +265,40 @@ export function coolingOffConflicts(
 }
 
 /**
+ * Why a member is refused for the cooling-off period (#246 item 3): the
+ * engagements by their titles, an id in parentheses only after a title that
+ * another of the client's `engagements` shares, and the bare id only when
+ * no title is known. The reviewer picker, the inline refusal and the
+ * server's 409 all read this text.
+ */
+export function coolingOffMessage(
+  conflicts: readonly { id: string; title?: string }[],
+  days: number,
+  engagements: readonly { id: string; title?: string }[],
+) {
+  const titleOf = (o: { id: string; title?: string }) =>
+    typeof o.title === "string" ? o.title.trim() : "";
+  const all = [...engagements, ...conflicts];
+  const names = conflicts.map((c) => {
+    const title = titleOf(c);
+    if (!title || title === c.id) return c.id;
+    const shared = all.some((o) => o.id !== c.id && titleOf(o) === title);
+    return shared ? title + " (" + c.id + ")" : title;
+  });
+  const list =
+    names.length > 1
+      ? names.slice(0, -1).join(", ") + " and " + names.at(-1)
+      : names.join("");
+  return (
+    "This person served on the team of " +
+    list +
+    " for the same client within the " +
+    days +
+    "-day cooling-off period and is not yet eligible"
+  );
+}
+
+/**
  * Whether final issuance needs an engagement quality review: an appointed
  * reviewer always does, and an assurance engagement type always needs one.
  */

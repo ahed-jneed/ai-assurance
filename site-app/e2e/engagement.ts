@@ -15,8 +15,12 @@ import {
   type PersonaId,
 } from "./fixtures";
 
-/** The ids of an engagement a spec created for itself. */
-export type Engagement = { tenantId: string; engagementId: string };
+/** The ids of an engagement a spec created for itself, and its title. */
+export type Engagement = {
+  tenantId: string;
+  engagementId: string;
+  title?: string;
+};
 
 /** A new engagement of the demo client, opened by the Lead Auditor. */
 export async function newEngagement(
@@ -25,11 +29,12 @@ export async function newEngagement(
   clientId: string,
   title: string,
 ): Promise<Engagement> {
+  const named = `${title} ${unique()}`;
   const { engagementId } = await lead.manage(tenantId, "createEngagement", {
     clientId,
-    title: `${title} ${unique()}`,
+    title: named,
   });
-  return { tenantId, engagementId };
+  return { tenantId, engagementId, title: named };
 }
 
 /**

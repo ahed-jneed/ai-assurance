@@ -268,7 +268,7 @@ describe("appointing the engagement quality reviewer", () => {
     expect(await refusal(appoint(e))).toEqual({
       status: 409,
       message:
-        "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
+        "This person served on the team of Credit scoring assurance (ENG-0) for the same client within the 730-day cooling-off period and is not yet eligible",
     });
   });
 
@@ -332,7 +332,7 @@ describe("appointing the engagement quality reviewer", () => {
     expect(await refusal(appoint(e))).toEqual({
       status: 409,
       message:
-        "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
+        "This person served on the team of Credit scoring assurance (ENG-0) for the same client within the 730-day cooling-off period and is not yet eligible",
     });
     // The practice policy (setQualityReviewPolicy) sets the period.
     sqlite
@@ -433,7 +433,7 @@ describe("team membership the engagement record does not show", () => {
     expect(await refusal(appoint(e, "former"))).toEqual({
       status: 409,
       message:
-        "This person served on the team of ENG-0 for the same client within the 730-day cooling-off period and is not yet eligible",
+        "This person served on the team of Credit scoring assurance (ENG-0) for the same client within the 730-day cooling-off period and is not yet eligible",
     });
   });
 
@@ -446,7 +446,26 @@ describe("team membership the engagement record does not show", () => {
       .run(daysAgo(100));
     expect(await refusal(appoint(engagement()))).toMatchObject({
       status: 409,
-      message: expect.stringContaining("served on the team of ENG-0"),
+      message: expect.stringContaining(
+        "served on the team of Credit scoring assurance (ENG-0)",
+      ),
+    });
+  });
+
+  it("names the earlier engagement by its title alone where the title is unique (#246 item 3)", async () => {
+    storedEngagement(
+      "ENG-0",
+      "client",
+      engagement({
+        id: "ENG-0",
+        title: "Hiring tool bias audit",
+        papers: [paper({ authorId: "eqr", updatedAt: daysAgo(30) })],
+      }),
+    );
+    expect(await refusal(appoint(engagement()))).toEqual({
+      status: 409,
+      message:
+        "This person served on the team of Hiring tool bias audit for the same client within the 730-day cooling-off period and is not yet eligible",
     });
   });
 

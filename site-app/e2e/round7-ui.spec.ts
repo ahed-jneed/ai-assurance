@@ -231,10 +231,12 @@ test("the reviewer picker shows who the server refuses, and a refusal keeps the 
   );
   await expect(option(coolingOff)).toHaveJSProperty("disabled", true);
   await expect(option(coolingOff)).toContainText(
+    // #246 item 3: the earlier engagement by its title, not its id.
     "(not eligible: This person served on the team of " +
-      other.engagementId +
+      other.title +
       " for the same client within the",
   );
+  await expect(option(coolingOff)).not.toContainText(other.engagementId);
   await expectAccessible(page, "Reviewer picker with refused members");
 
   // The Lead picks the eligible member and writes a reason; meanwhile the
@@ -251,8 +253,9 @@ test("the reviewer picker shows who the server refuses, and a refusal keeps the 
   });
   const alert = quality.getByRole("alert");
   await expect(alert).toContainText(
-    "This person served on the team of " + other.engagementId,
+    "This person served on the team of " + other.title + " for the same",
   );
+  await expect(alert).not.toContainText(other.engagementId);
   await expect(reason).toHaveValue(typed);
   await expect(appoint).toBeEnabled();
   // The refusal shows in the form only, not as a toast.

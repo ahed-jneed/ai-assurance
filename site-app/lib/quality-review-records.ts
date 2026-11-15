@@ -13,6 +13,7 @@ import type { Engagement } from "./domain/types";
 import {
   appointmentTeamMessage,
   coolingOffConflicts,
+  coolingOffMessage,
   engagementTeam,
   qualityReviewerRole,
   reviewerInactiveMessage,
@@ -254,25 +255,21 @@ export async function appointmentRefusal(
 ): Promise<{ status: 409; message: string } | null> {
   if (await onRecordedTeam(ctx, e, userId))
     return { status: 409, message: appointmentTeamMessage };
-  const conflicts = days
-    ? await recordedCoolingOffConflicts(
-        ctx,
-        e,
-        others ?? (await clientEngagements(ctx, e)),
-        userId,
-        days,
-        at,
-      )
-    : [];
+  if (!days) return null;
+  const engagements = others ?? (await clientEngagements(ctx, e));
+  const conflicts = await recordedCoolingOffConflicts(
+    ctx,
+    e,
+    engagements,
+    userId,
+    days,
+    at,
+  );
   return conflicts.length
     ? {
         status: 409,
-        message:
-          "This person served on the team of " +
-          conflicts.map((c) => c.id).join(", ") +
-          " for the same client within the " +
-          days +
-          "-day cooling-off period and is not yet eligible",
+        // #246 item 3: the engagements by title, not by bare id.
+        message: coolingOffMessage(conflicts, days, [e, ...engagements]),
       }
     : null;
 }
