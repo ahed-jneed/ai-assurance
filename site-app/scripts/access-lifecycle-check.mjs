@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const local = "http://127.0.0.1:5173";
 const modules = [
@@ -49,20 +49,20 @@ const as = (user) => ({
 });
 
 async function withWorker(bindings, check) {
-  const mf = new Miniflare({
-    modules: modules.map((p) => ({
-      type: "ESModule",
-      path: path.resolve("dist/server", p),
-    })),
-    modulesRoot: path.resolve("dist/server"),
-    compatibilityDate: "2026-05-15",
-    compatibilityFlags: ["nodejs_compat"],
-    bindings: { ...trusted, ...bindings },
-    d1Databases: { DB: "access-lifecycle" },
-    r2Buckets: { BUCKET: "access-lifecycle-evidence" },
-    d1Persist: false,
-    r2Persist: false,
-  });
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: modules.map((p) => ({
+        type: "ESModule",
+        path: path.resolve("dist/server", p),
+      })),
+      modulesRoot: path.resolve("dist/server"),
+      compatibilityDate: "2026-05-15",
+      compatibilityFlags: ["nodejs_compat"],
+      bindings: { ...trusted, ...bindings },
+      d1Databases: { DB: "access-lifecycle" },
+      r2Buckets: { BUCKET: "access-lifecycle-evidence" },
+    }),
+  );
   try {
     const db = await mf.getD1Database("DB");
     for (const file of migrationFiles)
@@ -572,14 +572,15 @@ console.log(
 
 // --- drizzle 0007 withdraws what earlier revocations left active ------------
 {
-  const mf = new Miniflare({
-    modules: true,
-    script:
-      "export default { fetch() { return new Response(null, { status: 404 }); } };",
-    compatibilityDate: "2026-05-15",
-    d1Databases: { DB: "access-lifecycle-migration" },
-    d1Persist: false,
-  });
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script:
+        "export default { fetch() { return new Response(null, { status: 404 }); } };",
+      compatibilityDate: "2026-05-15",
+      d1Databases: { DB: "access-lifecycle-migration" },
+    }),
+  );
   try {
     const db = await mf.getD1Database("DB");
     const run = (sql) => db.prepare(sql).run();

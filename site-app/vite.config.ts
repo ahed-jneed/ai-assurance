@@ -2,9 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
-import { depScanEnvironments } from "./build/dep-scan";
-import { sites } from "./build/sites-vite-plugin";
-import { ssrErrorLog } from "./build/ssr-error-log";
+// Imports carry their file extensions so Vite's future native config loader
+// (configLoader: "native") can load this file as is.
+import { depScanEnvironments } from "./build/dep-scan.ts";
+import { sites } from "./build/sites-vite-plugin.ts";
+import { ssrErrorLog } from "./build/ssr-error-log.ts";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
@@ -87,9 +89,24 @@ export default defineConfig(async ({ command }) => {
         : "undefined",
     },
     build: {
-      // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
-      // load, so it made `npm run build` output non-deterministic.
-      rolldownOptions: { checks: { pluginTimings: false } },
+      // vinext 1.4 leaves vendor code to Rolldown's graph-based chunking, so
+      // the workspace shell's route chunk carries its UI libraries (about
+      // 600 kB, 175 kB gzipped; vinext 1.0 split the same code across
+      // chunks). The limit still flags growth beyond that.
+      chunkSizeWarningLimit: 700,
+      rolldownOptions: {
+        checks: {
+          // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on
+          // host load, so it made `npm run build` output non-deterministic.
+          pluginTimings: false,
+          // [SOURCEMAP_BROKEN] names transforms inside @vitejs/plugin-rsc and
+          // vinext that emit no source map, and [INEFFECTIVE_DYNAMIC_IMPORT]
+          // modules that vinext's generated entries import both statically
+          // and dynamically; neither concerns this app's code.
+          sourcemapBroken: false,
+          ineffectiveDynamicImport: false,
+        },
+      },
     },
     server: {
       ...(managedLinux

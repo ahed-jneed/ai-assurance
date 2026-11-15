@@ -9,14 +9,14 @@ import { access, cp, mkdir, rm } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
 import type { Connect, Plugin } from "vite";
-import devPersonas from "../fixtures/dev-personas.json";
+import devPersonas from "../fixtures/dev-personas.json" with { type: "json" };
 import {
   CALLBACK_PATH,
   SIGN_IN_PATH,
   SIGN_OUT_PATH,
   isAuthPath,
   safeReturnPath,
-} from "../lib/auth-paths";
+} from "../lib/auth-paths.ts";
 
 type LocalIdentity = { userId: string; email: string; name: string };
 // Cookies ignore the port, so dev servers on one host would share a single

@@ -4,7 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import { spawn } from "node:child_process";
 import { createHash, createHmac, randomBytes } from "node:crypto";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { python } from "./harness/env.mjs";
 const modules = [
   "index.js",
@@ -12,29 +12,29 @@ const modules = [
     (p) => p !== "index.js" && /\.m?js$/.test(p),
   ),
 ];
-const mf = new Miniflare({
-  modules: modules.map((p) => ({
-    type: "ESModule",
-    path: path.resolve("dist/server", p),
-  })),
-  modulesRoot: path.resolve("dist/server"),
-  compatibilityDate: "2026-05-15",
-  compatibilityFlags: ["nodejs_compat"],
-  // The fixture identity headers below are trusted only because this opts in
-  // to the loopback-only test mode (docs/security/identity.md).
-  bindings: {
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-    // First sign-ins provision the fixture practices (lib/access-policy.ts).
-    SELF_SIGNUP: "open",
-    // A key-encryption key generated for this run (docs/security/signing-keys.md).
-    DOSSIER_KEK: randomBytes(32).toString("base64"),
-  },
-  d1Databases: { DB: "assurance-fixture" },
-  r2Buckets: { BUCKET: "assurance-fixture-evidence" },
-  d1Persist: false,
-  r2Persist: false,
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: modules.map((p) => ({
+      type: "ESModule",
+      path: path.resolve("dist/server", p),
+    })),
+    modulesRoot: path.resolve("dist/server"),
+    compatibilityDate: "2026-05-15",
+    compatibilityFlags: ["nodejs_compat"],
+    // The fixture identity headers below are trusted only because this opts in
+    // to the loopback-only test mode (docs/security/identity.md).
+    bindings: {
+      IDENTITY_MODE: "trusted-headers",
+      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+      // First sign-ins provision the fixture practices (lib/access-policy.ts).
+      SELF_SIGNUP: "open",
+      // A key-encryption key generated for this run (docs/security/signing-keys.md).
+      DOSSIER_KEK: randomBytes(32).toString("base64"),
+    },
+    d1Databases: { DB: "assurance-fixture" },
+    r2Buckets: { BUCKET: "assurance-fixture-evidence" },
+  }),
+);
 const testDb = await mf.getD1Database("DB"),
   testBucket = await mf.getR2Bucket("BUCKET");
 for (const file of (await fs.readdir("drizzle"))
