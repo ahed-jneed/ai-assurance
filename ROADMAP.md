@@ -227,7 +227,6 @@ Deferred during the cycle:
 - **Access log** (from [#181] and [#185]; [decision D-41](docs/product/decisions.md)):
   - exact sign-in recording through Cloudflare Access hooks, which needs owner configuration;
   - moving `pruneSignIns` (`site-app/lib/tenancy.ts`) to a scheduled Worker handler if one is added.
-- **Hosting:** whether to drop the Sites connector runtime, which the app does not use, is the hosting owner's call ([decision D-44](docs/product/decisions.md)).
 
 ## Watch list
 
@@ -258,7 +257,6 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 | Building beside a running e2e server | `npm run build` or `npm run check` in the same checkout as a running e2e server rewrites `dist/` mid-run | `site-app/e2e/README.md`; [#194] |
 | Sign-ins are recorded after an 8-hour gap, not at session start | The Access log shows first requests, not sessions ([decision D-41](docs/product/decisions.md)) | `site-app/lib/access-events.ts` |
 | `pruneSignIns` runs on the request path | Pruning happens when a sign-in is recorded; a scheduled handler would take it off the request path | `site-app/lib/tenancy.ts` |
-| The Sites connector runtime | Kept as part of the hosting contract although the app has no connectors ([decision D-44](docs/product/decisions.md)) | `site-app/build/sites-worker.ts`, `site-app/lib/connector-context.ts` |
 | Large engagements on real D1 | Local tests cannot reproduce production D1 limits; the owner offered a load test of an engagement with more than 1,000 assurance records after a deploy | [#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6681963181) |
 
 ## Owner actions (outside the roadmap)
@@ -277,7 +275,6 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 | Deploy: run the pre-deploy legacy check of the criteria model (section 11.4 of the [criteria-model design](docs/design/criteria-model.md)) on staging and production | Deploying [#27] safely |
 | Deploy: pin the compute image's reviewed base digest ([#62], `engine/WORKER.md`) | Production use of the external worker image |
 | Deploy, optional: set `PLATFORM_OPERATORS` to use the `/operator` view ([#95], [#151]) | Removing abandoned practices |
-| After the next Sites publish: check that sign-in still works ([#11]) | Confirms the compiled-in `sites` identity default |
 | Optional: an email provider for invitations ([#12]); a promptfoo account for a genuine red-team fixture ([#32]); report the `commit_refs_rules` push error to GitHub support | Invitation emails; a stronger fixture; nothing is blocked |
 
 [PR #2]: https://github.com/ahed-jneed/ai-assurance/pull/2

@@ -23,7 +23,7 @@ Without `DOSSIER_KEK`, sealing a dossier, exporting a briefing packet and rotati
 
 | Where | KEK |
 | --- | --- |
-| Production, the Sites build, Cloudflare Access and `trusted-headers` deployments | `DOSSIER_KEK` secret; required |
+| Production (Cloudflare Access) and `trusted-headers` deployments | `DOSSIER_KEK` secret; required |
 | Development server (`npm run dev`, `IDENTITY_MODE=dev`) | `DOSSIER_KEK` when set, otherwise a public development key (`kek-development`) that protects nothing |
 | Vitest and the Miniflare harnesses | A test key generated for each run |
 

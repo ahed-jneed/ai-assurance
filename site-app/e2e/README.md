@@ -52,7 +52,7 @@ that. The server keeps
 deleted part of `dist/server`, and the next server start finds no build.
 
 Each persona's browser context and API client
-send that persona's `oai-authenticated-user-*` headers; the Worker trusts them
+send that persona's `x-assurance-user-*` headers; the Worker trusts them
 only for loopback requests in this mode.
 
 The `seed` project runs first: `scripts/seed-demo.mjs --trusted-headers` creates

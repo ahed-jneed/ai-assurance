@@ -12,7 +12,6 @@ Provision these values using your secret manager or service environment; do not 
 | --- | --- |
 | `ASSURANCE_SITE_ORIGIN` | HTTPS origin only, e.g. `https://your-assurance-site.example` |
 | `ASSURANCE_WORKER_TOKEN` | Application worker credential enrolled by the platform |
-| `ASSURANCE_SITE_SERVICE_TOKEN` | Optional separate Sites service-access credential for a restricted Site |
 | `ASSURANCE_WORKER_ID` | Enrolled worker identifier |
 | `ASSURANCE_WORKER_IMAGE_DIGEST` | Enrolled compute identity, `sha256:<64 lowercase hex>` |
 | `ASSURANCE_COMPUTE_IMAGE` | For Docker: locally available `repository@sha256:<digest>` |
@@ -31,7 +30,7 @@ A client's own worker adds `--client-data-dir D:\ClientData\assurance` (see [Cli
 
 `--once` exits after one attempt or an idle response. Long-running mode polls every five seconds by default. `--heartbeat-seconds` defaults to ten; `--compute-timeout` to 300 (maximum 600); `--maximum-jobs` to 100; `--transport-timeout`, the per-read idle timeout described under [Verification and current limits](#verification-and-current-limits), to 15 (maximum 120). Use a dedicated workspace owned by the service account, an encrypted filesystem with a disk quota, and retention/archival procedures. The worker stops acquiring leases when its retained-job count reaches the configured limit. It preserves inputs, request bytes, exact results and completion bodies for reconciliation; it never silently deletes evidence. Local create-once files do not provide object-lock retention or independent custody attestation.
 
-Application authorization uses `Authorization: Bearer <application token>`. The optional platform credential uses `OAI-Sites-Authorization: Bearer <platform service token>`. They have separate purposes. Credentials are read from the environment; neither is copied into the compute environment, job files or result envelope. Redirects are rejected. HTTPS certificate verification is provided by Python's default TLS context. Loopback HTTP is available only through the test constructor, not the public CLI.
+Application authorization uses `Authorization: Bearer <application token>`. Behind Cloudflare Access, `/api/runner` needs a Bypass policy (see `docs/security/identity.md`), because runners carry no Access session. The credential is read from the environment; it is never copied into the compute environment, job files or result envelope. Redirects are rejected. HTTPS certificate verification is provided by Python's default TLS context. Loopback HTTP is available only through the test constructor, not the public CLI.
 
 ## Exact wire contract
 

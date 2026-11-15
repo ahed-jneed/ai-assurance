@@ -175,19 +175,19 @@ class Transport:
     the time to move its maximum byte count at MIN_TRANSFER_RATE, and every
     retry starts a fresh budget.
     """
-    def __init__(self, site, application_token, platform_token=None, *, timeout=15, retries=2, allow_local_http=False):
+    def __init__(self, site, application_token, *, timeout=15, retries=2, allow_local_http=False):
         parsed = urllib.parse.urlsplit(site)
         local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
         if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"} or not parsed.hostname:
             raise ValueError("Site must be an HTTPS origin without credentials/path/query")
         if parsed.scheme != "https" and not (allow_local_http and local and parsed.scheme == "http"):
             raise ValueError("Worker transport requires HTTPS; local HTTP is test-only")
-        if not application_token or any(c in application_token for c in "\r\n") or platform_token and any(c in platform_token for c in "\r\n"):
+        if not application_token or any(c in application_token for c in "\r\n"):
             raise ValueError("Invalid worker credential configuration")
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= MAX_TRANSPORT_TIMEOUT or not 0 <= retries <= 3:
             raise ValueError("Transport timeout/retry bounds exceeded")
         self.endpoint = site.rstrip("/")+"/api/runner"
-        self.application_token, self.platform_token = application_token, platform_token
+        self.application_token = application_token
         self.timeout, self.retries = timeout, retries
         self.opener = urllib.request.build_opener(NoRedirect())
 
@@ -198,8 +198,6 @@ class Transport:
     def _request(self, method, url, *, body=None, maximum=MAX_ENVELOPE_BYTES, retry=False, sign=False, check_active=None, sink=None):
         """One bounded request: (what the sink collected, ServerClock of the answering attempt)."""
         headers = {"Authorization": "Bearer "+self.application_token, "Accept": "application/json", "User-Agent": "ai-assurance-worker/"+WORKER_VERSION}
-        if self.platform_token:
-            headers["OAI-Sites-Authorization"] = "Bearer "+self.platform_token
         if body is not None:
             headers["Content-Type"] = "application/json; charset=utf-8"
         if sign:
@@ -1036,7 +1034,7 @@ def main(argv=None):
         token = os.environ.get("ASSURANCE_WORKER_TOKEN")
         if not token:
             raise ValueError("ASSURANCE_WORKER_TOKEN must be provided through the environment/secret manager")
-        transport = Transport(args.site, token, os.environ.get("ASSURANCE_SITE_SERVICE_TOKEN"), timeout=args.transport_timeout)
+        transport = Transport(args.site, token, timeout=args.transport_timeout)
         executor = DockerExecutor(args.compute_image) if args.executor == "docker" else ProcessExecutor()
         worker = Worker(transport, executor, args.workspace, worker_id=args.worker_id, image_digest=args.image_digest, formats=filter(None, (f.strip() for f in args.formats.split(","))), approved_hashes=filter(None, (h.strip() for h in args.approved_model_hashes.split(","))), heartbeat=args.heartbeat_seconds, compute_timeout=args.compute_timeout, maximum_jobs=args.maximum_jobs, client_data=args.client_data_dir or None, genai_ingest=not args.no_genai_ingest)
         while True:

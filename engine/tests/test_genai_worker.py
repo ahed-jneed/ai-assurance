@@ -32,7 +32,7 @@ from engine.genai.envelope import envelope_json
 from engine.genai.ingest import run_bundle
 from engine.tests import genai_support as gs
 from engine.tests.test_genai_marking_sources import KEY, has_cryptography
-from engine.tests.test_worker import IMAGE, PLATFORM, TOKEN, WORKER_ID, claim_body
+from engine.tests.test_worker import IMAGE, TOKEN, WORKER_ID, claim_body
 from engine.worker import ProcessExecutor, Transport, Worker, compute_genai_job, genai_readiness, runtime_readiness
 from engine.worker_contract import COMPUTE_FAILURE_CODES, FAILURE_CODES, WORKER_VERSION, Claim, json_bytes, result_signature, validate_request, verify_genai_result_bytes
 from engine.genai.errors import ERROR_CODES
@@ -93,7 +93,7 @@ class GenaiRunner:
                 self.respond({"error": message}, status)
 
             def authorized(self):
-                return self.headers.get("Authorization") == "Bearer " + TOKEN and self.headers.get("OAI-Sites-Authorization") == "Bearer " + PLATFORM
+                return self.headers.get("Authorization") == "Bearer " + TOKEN
 
             def do_POST(self):
                 raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
@@ -189,7 +189,7 @@ class GenaiRunner:
         self.thread.join(timeout=5)
 
     def transport(self):
-        return Transport(self.origin, TOKEN, PLATFORM, timeout=5, retries=1, allow_local_http=True)
+        return Transport(self.origin, TOKEN, timeout=5, retries=1, allow_local_http=True)
 
 
 class Ready(ProcessExecutor):
