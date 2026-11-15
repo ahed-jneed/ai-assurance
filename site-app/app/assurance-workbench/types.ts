@@ -61,6 +61,8 @@ export type Snapshot = {
   workers: RunnerWorker[];
   access: EngagementAccess[];
   eligibleMembers: WorkspaceData["people"];
+  /** Every member of the practice by name, revoked members included. */
+  memberNames?: { user_id: string; display_name: string | null }[];
   capabilities: Record<string, string>;
   // The external queue over every job of the engagement.
   telemetry: {
@@ -297,4 +299,26 @@ export function obligationOptionLabel(o: ObligationOptions["items"][number]) {
   return o.legalReview?.required
     ? label + " (" + pendingLegalReview(o.legalReview.itemIds) + ")"
     : label;
+}
+
+/**
+ * A person's name in the workbench's records: the viewer, then the members
+ * holding access to the engagement, then any member of the practice, so a
+ * revoked member keeps their name on the access decision that revoked them
+ * (#244 item 5). "Practice member" only for an id no membership names.
+ */
+export function personName(
+  id: string,
+  sources: {
+    identity: { id: string; name: string };
+    people: readonly { user_id: string; display_name: string }[];
+    memberNames?: readonly { user_id: string; display_name: string | null }[];
+  },
+) {
+  if (id === sources.identity.id) return sources.identity.name;
+  return (
+    sources.people.find((p) => p.user_id === id)?.display_name ||
+    sources.memberNames?.find((p) => p.user_id === id)?.display_name ||
+    "Practice member"
+  );
 }

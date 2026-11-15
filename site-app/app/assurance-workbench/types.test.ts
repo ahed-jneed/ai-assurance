@@ -9,6 +9,7 @@ import {
   attemptsLabel,
   compileAction,
   enrolmentFormats,
+  personName,
   predictionOptionLabel,
   telemetryText,
 } from "./types";
@@ -125,5 +126,29 @@ describe("compileAction (#240 item 1)", () => {
       for (const state of ["queued", "running", "failed", "cancelled"])
         expect(compileAction({ mode, state })).toBeNull();
     }
+  });
+});
+
+describe("personName (#244 item 5)", () => {
+  const sources = {
+    identity: { id: "lead", name: "Lea Lead" },
+    people: [{ user_id: "auditor", display_name: "Ada Auditor" }],
+    memberNames: [
+      { user_id: "auditor", display_name: "Ada Auditor" },
+      { user_id: "eqr", display_name: "Quinn Reviewer" },
+    ],
+  };
+  it("names a member whose access was revoked from the practice's members", () => {
+    expect(personName("eqr", sources)).toBe("Quinn Reviewer");
+  });
+  it("names the viewer and the engagement's members first", () => {
+    expect(personName("lead", sources)).toBe("Lea Lead");
+    expect(personName("auditor", sources)).toBe("Ada Auditor");
+  });
+  it("falls back to Practice member only for an id no membership names", () => {
+    expect(personName("ghost", sources)).toBe("Practice member");
+    expect(personName("eqr", { ...sources, memberNames: undefined })).toBe(
+      "Practice member",
+    );
   });
 });

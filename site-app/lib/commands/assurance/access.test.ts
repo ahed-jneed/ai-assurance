@@ -85,6 +85,11 @@ describe("engagement access for the Engagement Quality Reviewer", () => {
     expect(access(sqlite, "eqr")).toBe(1);
     await setAccess("eqr", false);
     expect(access(sqlite, "eqr")).toBe(0);
+    // The revoked member keeps their name in the workbench (#244 item 5).
+    expect((await assuranceView(lead(), "ENG-Q")).memberNames).toContainEqual({
+      user_id: "eqr",
+      display_name: "Name of eqr",
+    });
     for (const userId of ["contributor", "viewer", "nobody"]) {
       const error = await refusal(setAccess(userId));
       expect(error, userId).toBeInstanceOf(ApiError);

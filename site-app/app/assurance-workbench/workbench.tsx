@@ -41,6 +41,7 @@ import { SystemsSection } from "./systems-section";
 import { TokenDialog } from "./token-dialog";
 import {
   activeJobOptions,
+  personName,
   predictionOptionLabel,
   type ActResult,
 } from "./types";
@@ -299,10 +300,11 @@ export function AssuranceWorkbench({
   }
 
   const person = (id: string) =>
-    id === data.identity.id
-      ? data.identity.name
-      : (data.people.find((p) => p.user_id === id)?.display_name ??
-        "Practice member");
+    personName(id, {
+      identity: data.identity,
+      people: data.people,
+      memberNames: snapshot?.memberNames,
+    });
 
   const clearFilters = () =>
     onLocation({ ...location, search: "", review: "all" });

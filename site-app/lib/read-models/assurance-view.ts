@@ -34,6 +34,7 @@ async function internalEngagement(ctx: Context, engagementId: string) {
  * jobs (each marked when already compiled into a draft paper), enrolled
  * workers and access grants, the members a Lead Auditor may grant access to
  * (every active staff member, the Engagement Quality Reviewer included),
+ * the names of the practice's members (revoked ones included),
  * the caller's review queue (counts and the next assessment of each), what
  * the platform can and cannot attest, and the external queue's telemetry over
  * every job. Client roles are refused. The workbench reads records by search,
@@ -92,6 +93,17 @@ export async function assuranceView(ctx: Context, engagementId: string) {
               .all()
           ).results
         : [],
+    // Every member of the practice by name, revoked members included, so a
+    // record about someone who no longer holds access (an access decision
+    // that revoked it, #244 item 5) still names them.
+    memberNames: (
+      await db()
+        .prepare(
+          "SELECT user_id,display_name FROM memberships WHERE tenant_id=? ORDER BY user_id",
+        )
+        .bind(ctx.tenantId)
+        .all<{ user_id: string; display_name: string | null }>()
+    ).results,
     practiceAdmin: ctx.practiceAdmin,
     capabilities: {
       hosted:
