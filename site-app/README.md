@@ -28,7 +28,7 @@ The AI Assurance workspace: a React 19 single-page app and its API in one Cloudf
 | `npm ci` | Install from the lockfile (`npm run install:ci` does the same for the Sites tooling) |
 | `npm run dev` | The development server with hot reload and the loopback sign-in simulation (port 5173; pass `-- --port <port> --strictPort` for another) |
 | `npm run build` | Build the Worker into `dist/` |
-| `npm start` | Run the built Worker locally through Wrangler on `127.0.0.1`, sharing `.wrangler/state` with the development server; no sign-in simulation |
+| `npm start` | Run the built Worker locally through Wrangler on `127.0.0.1` (port 8787; pass `-- --port <port>` for another), sharing `.wrangler/state` with the development server; no sign-in simulation |
 | `npm run db:migrate:local` | Apply the pending D1 migrations to the local database (idempotent) |
 | `npm run seed:demo` | Seed the persona demo practice into a running development server |
 | `npm run db:generate` | Generate a Drizzle migration after a schema change |
@@ -60,6 +60,8 @@ npm start -- --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:
 # in another terminal, while it runs (http://127.0.0.1:8787)
 npm run seed:demo -- --trusted-headers http://127.0.0.1:8787
 ```
+
+To serve it on another port, add `--port` to the same command and give the seed that URL, for example `npm start -- --port 8788 --var IDENTITY_MODE:trusted-headers --var IDENTITY_TRUSTED_HEADERS:loopback-tests --var SELF_SIGNUP:open` and `npm run seed:demo -- --trusted-headers http://127.0.0.1:8788`. These commands are the same in PowerShell and in a macOS or Linux shell.
 
 Outside the development server self-signup is off unless `SELF_SIGNUP` allows it ([docs/security/identity.md](../docs/security/identity.md#who-gets-a-practice-invitations-and-self-signup)), so without `--var SELF_SIGNUP:open` (or `--var SELF_SIGNUP:@personas.test`, the persona domain) a fresh database answers the seed's first persona with 403 "You have no practice membership or pending invitation", and the seed stops and names the setting.
 

@@ -42,12 +42,21 @@ docker run --rm --entrypoint python assurance-compute:dev -I -c "import cryptogr
 
 The second command prints the worker's `--readiness` report. CI's `engine` job runs all three. For production pass `--build-arg PYTHON_IMAGE=python@sha256:<reviewed-base-digest>` (see [WORKER.md](WORKER.md)).
 
-**Tests on the supported version**, in a virtual environment outside the repository:
+**Tests on the supported version**, in a virtual environment outside the repository, from the repository root. On macOS or Linux:
 
 ```bash
 python3.12 -m venv ../engine-venv
 ../engine-venv/bin/python -m pip install -r engine/requirements-dev.txt
 ENGINE_REQUIRE_CRYPTOGRAPHY=1 GENAI_REQUIRE_ZSTD=1 ../engine-venv/bin/python -m unittest discover -s engine/tests
+```
+
+On Windows, in PowerShell (`py` is the Python launcher that the python.org installer adds; the two variables last for the current window):
+
+```powershell
+py -3.12 -m venv ..\engine-venv
+..\engine-venv\Scripts\python.exe -m pip install -r engine/requirements-dev.txt
+$env:ENGINE_REQUIRE_CRYPTOGRAPHY = "1"; $env:GENAI_REQUIRE_ZSTD = "1"
+..\engine-venv\Scripts\python.exe -m unittest discover -s engine/tests
 ```
 
 ## Implemented controls

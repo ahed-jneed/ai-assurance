@@ -51,7 +51,15 @@ The migration step is not optional. Without it the dev server still starts and i
 
 On Windows, keep the checkout path short (`site-app\` under about 120 characters): workerd stores the local database about 125 characters below `site-app\` and cannot open a path past the 260-character limit, so in a deeper checkout `npm run db:migrate:local` fails with `SQLITE_CANTOPEN`.
 
-Then open the URL the dev server prints (port 5173 by default) and sign in with the loopback simulation, `/signin-with-chatgpt?return_to=/`. To work as a persona, run `npm run seed:demo` first and sign in with `/signin-with-chatgpt?as=<persona>&return_to=/`:
+Then open the URL the dev server prints (port 5173 by default) and sign in with the loopback simulation, `/signin-with-chatgpt?return_to=/`. To pick another port, pass it after `--` and give the seed the same URL; the commands are the same in PowerShell and in a macOS or Linux shell:
+
+```sh
+npm run dev -- --port 5180 --strictPort
+# in another terminal
+npm run seed:demo -- http://127.0.0.1:5180
+```
+
+`--strictPort` makes the dev server stop with an error when the port is taken instead of moving to the next free one. `npm start` (the built Worker, below) listens on port 8787; pass `npm start -- --port <port>` for another. To work as a persona, run `npm run seed:demo` first and sign in with `/signin-with-chatgpt?as=<persona>&return_to=/`:
 
 | Persona | Role in the demo practice |
 |---|---|
@@ -85,9 +93,23 @@ The harnesses run from any working directory (`scripts/harness/env.mjs` moves th
 
 The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`. Do not run `npm run build` or `npm run check` in the same checkout while the e2e server runs: the build rewrites `dist/` under it (see the e2e README).
 
-The `engine` job runs these commands from the repository root (the validators load Ajv from `site-app/node_modules`, so run `npm ci` in `site-app/` first):
+The `engine` job runs the commands below from the repository root on Python 3.12, the engine's one supported version. The validators load Ajv from `site-app/node_modules`, so run `npm ci` in `site-app/` first. Locally, create a Python 3.12 virtual environment outside the checkout and put it first on `PATH` for the current shell, so that `python` below is that interpreter. On macOS or Linux:
+
+```sh
+python3.12 -m venv ../engine-venv
+source ../engine-venv/bin/activate
+```
+
+On Windows, in PowerShell (`py` is the Python launcher that the python.org installer adds; this changes `PATH` for the current window only and needs no change to the script execution policy):
 
 ```powershell
+py -3.12 -m venv ..\engine-venv
+$env:PATH = (Resolve-Path ..\engine-venv\Scripts).Path + ";" + $env:PATH
+```
+
+Then, on every platform:
+
+```sh
 python -m pip install -r engine/requirements-dev.txt
 python -m unittest discover -s engine/tests -v
 node schemas/validate-rule-pack.mjs
