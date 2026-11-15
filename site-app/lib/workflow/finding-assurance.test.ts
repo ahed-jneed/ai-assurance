@@ -217,6 +217,16 @@ describe("recordFindingRetest", () => {
     expect(theFinding(e).retest).toBeUndefined();
   });
 
+  it("tells the finding's author they cannot retest before asking for evidence", async () => {
+    const e = withFinding({ ...ready, createdBy: "reviewer" });
+    await refused(
+      e,
+      () => record(e, { evidenceIds: [] }),
+      403,
+      "An independent person must perform the retest",
+    );
+  });
+
   it("refuses an unknown finding", async () => {
     const e = withFinding(ready);
     await refused(

@@ -51,11 +51,12 @@ export const findingAssuranceCommands: Record<string, WorkflowHandler> = {
       f =
         e.findings.find((f) => f.id === a.findingId) ??
         fail(404, "Finding not found");
-    // A required field of the form, refused in its words (#241).
-    if (!a.evidenceIds.length)
-      fail(400, "Select the evidence the retest relied on");
     if (f.createdBy === c.userId || f.remediationBy === c.userId)
       fail(403, "An independent person must perform the retest");
+    // A required field of the form, refused in its words (#241), after
+    // the independence refusal so a creator still learns they cannot retest.
+    if (!a.evidenceIds.length)
+      fail(400, "Select the evidence the retest relied on");
     if (f.status !== "ready_for_retest" || !f.remediation.trim())
       fail(409, "Record management remediation and request retest first");
     accepted(a.evidenceIds);
