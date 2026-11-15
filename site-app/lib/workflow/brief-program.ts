@@ -12,7 +12,7 @@
 // draft and invalidates that procedure's work only. Its assignment
 // (preparer, reviewer, due date) is versioned apart from it and changes
 // without renewed program approval or invalidating any work.
-import { z } from "zod";
+import { z } from "../zod";
 import { isReleaseTimeRecord, paperCurrent } from "../domain/gates";
 import {
   briefReturns,

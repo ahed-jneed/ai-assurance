@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 import { ApiError } from "./http";
 const short = z.string().trim().min(1).max(300),
   note = z.string().trim().min(1).max(5000);

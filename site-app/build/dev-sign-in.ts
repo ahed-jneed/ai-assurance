@@ -3,23 +3,23 @@
 // cookie per dev server port. It runs only in the development server, never in
 // a build, and only for loopback requests; the Worker trusts the headers it
 // sets only in IDENTITY_MODE=dev (lib/identity.ts).
-// Derived from the MIT-licensed @openai/dev-sign-in 0.2.0; see
+// Derived from the MIT-licensed @openai/sites-vite-plugin 0.2.0; see
 // dev-sign-in.LICENSE.
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Connect, Plugin } from "vite";
-import devPersonas from "../fixtures/dev-personas.json";
+import devPersonas from "../fixtures/dev-personas.json" with { type: "json" };
 import {
   SIGN_IN_PATH,
   SIGN_OUT_PATH,
   isAuthPath,
   safeReturnPath,
-} from "../lib/auth-paths";
+} from "../lib/auth-paths.ts";
 import {
   IDENTITY_HEADER_PREFIX,
   USER_EMAIL_HEADER,
   USER_FULL_NAME_HEADER,
   USER_ID_HEADER,
-} from "../lib/identity";
+} from "../lib/identity.ts";
 
 type LocalIdentity = { userId: string; email: string; name: string };
 // Cookies ignore the port, so dev servers on one host would share a single

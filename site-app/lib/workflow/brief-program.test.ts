@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError } from "../zod";
 import catalog from "../catalog.json";
 import type { Engagement } from "../domain/types";
 import type { Procedure, ProcedurePlan } from "../workflow-types";

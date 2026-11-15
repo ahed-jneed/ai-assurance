@@ -1,8 +1,10 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import { depScanEnvironments } from "./build/dep-scan";
-import { devSignIn } from "./build/dev-sign-in";
-import { ssrErrorLog } from "./build/ssr-error-log";
+// Imports carry their file extensions so Vite's future native config loader
+// (configLoader: "native") can load this file as is.
+import { depScanEnvironments } from "./build/dep-scan.ts";
+import { devSignIn } from "./build/dev-sign-in.ts";
+import { ssrErrorLog } from "./build/ssr-error-log.ts";
 
 // Local D1 and R2 bindings (cloudflare-env.d.ts). The database ID is a local
 // placeholder; a deployment supplies its own wrangler configuration.
@@ -52,9 +54,24 @@ export default defineConfig(async ({ command }) => {
     // leaves them out (build/dep-scan.ts); Vite appends vinext's entries.
     ...(command === "serve" ? { environments: depScanEnvironments } : {}),
     build: {
-      // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
-      // load, so it made `npm run build` output non-deterministic.
-      rolldownOptions: { checks: { pluginTimings: false } },
+      // vinext 1.4 leaves vendor code to Rolldown's graph-based chunking, so
+      // the workspace shell's route chunk carries its UI libraries (about
+      // 600 kB, 175 kB gzipped; vinext 1.0 split the same code across
+      // chunks). The limit still flags growth beyond that.
+      chunkSizeWarningLimit: 700,
+      rolldownOptions: {
+        checks: {
+          // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on
+          // host load, so it made `npm run build` output non-deterministic.
+          pluginTimings: false,
+          // [SOURCEMAP_BROKEN] names transforms inside @vitejs/plugin-rsc and
+          // vinext that emit no source map, and [INEFFECTIVE_DYNAMIC_IMPORT]
+          // modules that vinext's generated entries import both statically
+          // and dynamically; neither concerns this app's code.
+          sourcemapBroken: false,
+          ineffectiveDynamicImport: false,
+        },
+      },
     },
     plugins: [
       vinext(),

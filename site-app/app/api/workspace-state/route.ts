@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { db } from "@/lib/bindings";
 import { loadEngagement } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
@@ -203,7 +203,7 @@ export async function POST(request: Request) {
           recordId: short,
           baseRevision: short,
           expectedVersion: z.number().int().nonnegative(),
-          content: z.record(z.unknown()),
+          content: z.record(z.string(), z.unknown()),
         })
         .strict()
         .parse(raw),
@@ -217,7 +217,7 @@ export async function POST(request: Request) {
       a.kind === "paper"
         ? z
             .object({
-              body: z.record(z.string().max(20000)),
+              body: z.record(z.string(), z.string().max(20000)),
               evidenceIds: z.array(short).max(300),
               required: z.boolean(),
             })
@@ -225,6 +225,7 @@ export async function POST(request: Request) {
             .parse(a.content)
         : z
             .record(
+              z.string(),
               z.union([
                 z.string().max(8000),
                 z.array(z.string().max(300)).max(300),

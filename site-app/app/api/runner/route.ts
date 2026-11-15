@@ -13,7 +13,7 @@ import { claimResponse } from "@/lib/external-worker-contract";
 import { requestedCriteria } from "@/lib/hosted-statistics";
 import { assertPlatformBytes } from "@/lib/special-category";
 import type { Artifact } from "@/lib/domain/types";
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 export const dynamic = "force-dynamic";
 type WorkerRow = {
   id: string;
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
           workerId: short.optional(),
           imageDigest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
           formats: z.array(short).min(1).max(10),
-          capabilities: z.record(z.unknown()).optional(),
+          capabilities: z.record(z.string(), z.unknown()).optional(),
         })
         .strict()
         .parse(d);

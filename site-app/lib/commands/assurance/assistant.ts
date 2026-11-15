@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { assist, canonical } from "../../assurance-core";
 import {
   addRecord,

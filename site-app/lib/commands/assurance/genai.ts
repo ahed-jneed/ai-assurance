@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import type { AssuranceRecord } from "../../assurance-core";
 import { pendingJobCount, recordStatement } from "../../assurance-store";
 import { bucket, db } from "../../bindings";
@@ -215,7 +215,7 @@ export const genai: AssuranceModule = defineCommands({
     roles: ["Auditor", "Lead Auditor"],
     async handle({ e }, d, ctx) {
       const v = z
-        .object({ procedureId: short, plan: z.record(z.unknown()) })
+        .object({ procedureId: short, plan: z.record(z.string(), z.unknown()) })
         .strict()
         .parse(d);
       // The plan first: a lowered floor is refused as such, whatever the scope.
@@ -244,7 +244,7 @@ export const genai: AssuranceModule = defineCommands({
     async handle({ e }, d, ctx) {
       const v = z
         .object({
-          manifest: z.record(z.unknown()),
+          manifest: z.record(z.string(), z.unknown()),
           inputArtifactIds: z.array(short).min(1).max(64),
         })
         .strict()

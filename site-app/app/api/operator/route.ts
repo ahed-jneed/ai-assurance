@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { bucket, db } from "@/lib/bindings";
 import { short } from "@/lib/commands/fields";
 import { checkOrigin, readJson, responseError } from "@/lib/http";

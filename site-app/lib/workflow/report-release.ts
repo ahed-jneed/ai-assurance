@@ -6,7 +6,7 @@
 // sign-off of both exact packages (lib/domain/quality-review.ts). The
 // approver answers the MEM-SO-01 completion checklist with the approval, and
 // the release copies the answers into its completion record.
-import { z } from "zod";
+import { z } from "../zod";
 import {
   releaseChecklist,
   releaseChecklistAnswers,

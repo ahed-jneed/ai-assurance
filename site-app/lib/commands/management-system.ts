@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import type { Engagement, Finding } from "../domain/types";
 import { nonconformityGradeIds, soaRows } from "../domain/management-system";
 import { now } from "../ids";

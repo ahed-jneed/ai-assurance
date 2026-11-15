@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "./zod";
 const hash = z.string().regex(/^[a-f0-9]{64}$/),
   count = z.number().int().nonnegative(),
   outcome = z.enum(["pass", "fail", "inconclusive", "not_applicable"]);
@@ -28,12 +28,22 @@ const fieldWords: Record<string, string> = {
  * imports (#226 item 4): the supported version and at most the first missing
  * field in plain words, never the validator's own text.
  */
-export function packetRefusal(error: z.ZodError): string {
+export function packetRefusal(error: z.ZodError, packet: unknown): string {
+  // Zod 4 issues do not carry the received value, so a field counts as missing
+  // when the packet itself has nothing at the issue's path.
+  const valueAt = (path: readonly PropertyKey[]) =>
+    path.reduce<unknown>(
+      (v, key) =>
+        v !== null && typeof v === "object"
+          ? (v as Record<PropertyKey, unknown>)[key]
+          : undefined,
+      packet,
+    );
   const missing = error.issues.find(
     (i) =>
       i.path.length > 0 &&
-      ((i.code === "invalid_type" && i.received === "undefined") ||
-        (i.code === "invalid_literal" && i.received === undefined)),
+      (i.code === "invalid_type" || i.code === "invalid_value") &&
+      valueAt(i.path) === undefined,
   );
   const field = missing?.path.map(String).join(".") ?? "";
   const words =
@@ -133,7 +143,7 @@ export function packetSummary(value: unknown) {
         outcome,
         recordCount: count,
         populationSha256: hash,
-        splitCounts: z.record(count),
+        splitCounts: z.record(z.string(), count),
         missingFields: z.array(z.unknown()),
         duplicateIds: z.array(z.unknown()),
         recordLeakage: z.array(z.unknown()),

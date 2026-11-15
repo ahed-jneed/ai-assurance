@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { bucket } from "@/lib/bindings";
 import { getEngagement } from "@/lib/engagement-repo";
 import { ApiError, checkOrigin, readJson, responseError } from "@/lib/http";
@@ -26,18 +26,14 @@ export async function POST(request: Request) {
           // A seal is for a named audience; a missing one is never assumed
           // to be internal (#226 item 2).
           audience: z.enum(["internal", "client"], {
-            errorMap: () => ({
-              message: "Choose who the dossier is for (internal or client)",
-            }),
+            error: "Choose who the dossier is for (internal or client)",
           }),
           // Signing keys are practice-wide: rotation is the management op
           // rotateSigningKey, for practice administrators only (#25).
           op: z
             .literal("seal", {
-              errorMap: () => ({
-                message:
-                  "This endpoint only seals dossiers. A practice administrator rotates the signing key (management op rotateSigningKey).",
-              }),
+              error:
+                "This endpoint only seals dossiers. A practice administrator rotates the signing key (management op rotateSigningKey).",
             })
             .optional(),
           withheld: z

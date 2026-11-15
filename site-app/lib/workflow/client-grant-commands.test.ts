@@ -2,7 +2,7 @@
 // each refusal and the state each leaves. A refused command leaves the
 // engagement exactly as it was.
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError } from "../zod";
 import type { Engagement, EvidenceRequest } from "../domain/types";
 import { workflowCommand } from "./dispatch";
 import type { ClientGrant, Submission } from "../workflow-types";

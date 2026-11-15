@@ -9,7 +9,7 @@
 // The legal reading here is the methodology's, pending the qualified legal
 // review tracked in #57 (D-02); docs/research/ll144-2026-11.md lists the
 // points (LR-LL144-01 to LR-LL144-08).
-import { z } from "zod";
+import { z } from "./zod";
 import { calendarDate } from "./dataset-card";
 import { parseCSV } from "./diagnostics";
 import type { Engagement } from "./domain/types";
@@ -126,10 +126,8 @@ export const ll144InputSchema = z
     dataSource: dataSourceSchema,
     /** DCWP FAQ: imputed or inferred demographic data cannot be used. */
     demographicsNotInferred: z.literal(true, {
-      errorMap: () => ({
-        message:
-          "Confirm that every sex and race/ethnicity value was reported by the individual and none was inferred or imputed: DCWP does not allow inferred or imputed data in a bias audit",
-      }),
+      error:
+        "Confirm that every sex and race/ethnicity value was reported by the individual and none was inferred or imputed: DCWP does not allow inferred or imputed data in a bias audit",
     }),
     demographicsStatement: z.string().trim().min(1).max(2000),
     /** Required when a mapped column holds special-category data. */

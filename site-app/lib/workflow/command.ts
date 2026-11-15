@@ -1,7 +1,7 @@
 // What every workflow command shares: the error commands fail with, the
 // input field schemas, the context the workspace route supplies and the
 // guards and lookups bound to one engagement and caller.
-import { z } from "zod";
+import { z } from "../zod";
 import type { Engagement, Paper, Role } from "../domain/types";
 import type { GenaiReadiness } from "../genai/readiness";
 import { ownWorkRefusal } from "../preconditions";

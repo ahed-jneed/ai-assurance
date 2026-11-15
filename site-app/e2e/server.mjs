@@ -58,7 +58,8 @@ if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 // The same environment `wrangler dev` gets from wrangler-env.mjs (no metrics or
 // log files in the checkout); importing it also moves to the project root.
 await import("../scripts/wrangler-env.mjs");
-const { Log, LogLevel, Miniflare } = await import("miniflare");
+const { Log, LogLevel, Miniflare, convertV4MiniflareOptions } =
+  await import("miniflare");
 const { unstable_getMiniflareWorkerOptions } = await import("wrangler");
 
 // The bindings, compatibility settings and static assets of the build's
@@ -78,31 +79,33 @@ const modules = [
     .filter((file) => file !== main && /\.m?js$/.test(file)),
 ];
 
-const mf = new Miniflare({
-  ...workerOptions,
-  name: "ai-assurance-workspace-e2e",
-  modules: modules.map((file) => ({
-    type: "ESModule",
-    path: path.join(server, file),
-  })),
-  modulesRoot: server,
-  bindings: {
-    ...workerOptions.bindings,
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-    SELF_SIGNUP: "@personas.test",
-    // A throwaway key-encryption key for this run's practice signing keys,
-    // so the dossier specs can seal (docs/security/signing-keys.md). The
-    // database it wraps keys in is deleted at the next start.
-    DOSSIER_KEK: randomBytes(32).toString("base64"),
-  },
-  // The D1 database and R2 bucket that db-migrate-local.mjs migrated, at the
-  // path `wrangler dev --persist-to` uses.
-  defaultPersistRoot: path.join(projectRoot, state, "v3"),
-  host: "127.0.0.1",
-  port,
-  log: new Log(LogLevel.WARN),
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    ...workerOptions,
+    name: "ai-assurance-workspace-e2e",
+    modules: modules.map((file) => ({
+      type: "ESModule",
+      path: path.join(server, file),
+    })),
+    modulesRoot: server,
+    bindings: {
+      ...workerOptions.bindings,
+      IDENTITY_MODE: "trusted-headers",
+      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+      SELF_SIGNUP: "@personas.test",
+      // A throwaway key-encryption key for this run's practice signing keys,
+      // so the dossier specs can seal (docs/security/signing-keys.md). The
+      // database it wraps keys in is deleted at the next start.
+      DOSSIER_KEK: randomBytes(32).toString("base64"),
+    },
+    // The D1 database and R2 bucket that db-migrate-local.mjs migrated, at the
+    // path `wrangler dev --persist-to` uses.
+    resourcePersistencePath: path.join(projectRoot, state, "v3"),
+    host: "127.0.0.1",
+    port,
+    log: new Log(LogLevel.WARN),
+  }),
+);
 const url = await mf.ready;
 console.log(`E2E Worker ready on ${url.origin}`);
 

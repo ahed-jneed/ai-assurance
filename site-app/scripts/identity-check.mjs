@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const modules = [
   "index.js",
@@ -36,23 +36,23 @@ const trusted = {
 
 /** Runs `check` against the built Worker with the given Worker variables. */
 async function withWorker(bindings, check, outboundService) {
-  const mf = new Miniflare({
-    modules: modules.map((p) => ({
-      type: "ESModule",
-      path: path.resolve("dist/server", p),
-    })),
-    modulesRoot: path.resolve("dist/server"),
-    compatibilityDate: "2026-05-15",
-    compatibilityFlags: ["nodejs_compat"],
-    // The checks below sign in first-time users, which provisions their
-    // practice only where self-signup is allowed (lib/access-policy.ts).
-    bindings: { SELF_SIGNUP: "open", ...bindings },
-    ...(outboundService ? { outboundService } : {}),
-    d1Databases: { DB: "identity-fixture" },
-    r2Buckets: { BUCKET: "identity-fixture-evidence" },
-    d1Persist: false,
-    r2Persist: false,
-  });
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: modules.map((p) => ({
+        type: "ESModule",
+        path: path.resolve("dist/server", p),
+      })),
+      modulesRoot: path.resolve("dist/server"),
+      compatibilityDate: "2026-05-15",
+      compatibilityFlags: ["nodejs_compat"],
+      // The checks below sign in first-time users, which provisions their
+      // practice only where self-signup is allowed (lib/access-policy.ts).
+      bindings: { SELF_SIGNUP: "open", ...bindings },
+      ...(outboundService ? { outboundService } : {}),
+      d1Databases: { DB: "identity-fixture" },
+      r2Buckets: { BUCKET: "identity-fixture-evidence" },
+    }),
+  );
   try {
     const db = await mf.getD1Database("DB");
     for (const sql of migrations) await db.prepare(sql).run();

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { recordStatement } from "../../assurance-store";
 import { db } from "../../bindings";
 import { save } from "../../engagement-repo";
