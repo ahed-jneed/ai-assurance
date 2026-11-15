@@ -98,7 +98,13 @@ export function WorkInbox({
   // one, else the list heading.
   const results = useRef<HTMLDivElement>(null),
     headingRef = useRef<HTMLHeadingElement>(null),
-    refocus = useRef<{ id: string; order: string[] } | null>(null);
+    // `restore` (#241): Undo on the snooze toast brings the row back, and
+    // focus returns to it once the saved preferences show it again.
+    refocus = useRef<{
+      id: string;
+      order: string[];
+      restore?: "saving" | "saved";
+    } | null>(null);
   useEffect(() => {
     const pending = refocus.current,
       list = results.current;
@@ -107,6 +113,14 @@ export function WorkInbox({
       list.querySelector<HTMLElement>(
         '[data-work-id="' + CSS.escape(id) + '"] .business-task-open',
       );
+    if (pending.restore) {
+      const link = pending.restore === "saved" ? row(pending.id) : null;
+      if (link) {
+        refocus.current = null;
+        link.focus();
+      }
+      return;
+    }
     if (row(pending.id)) return;
     refocus.current = null;
     for (const id of focusAfterRemoval(pending.order, pending.id)) {
@@ -263,17 +277,19 @@ export function WorkInbox({
     shown = visible.slice(0, limit),
     groups = groupWork(shown);
   const scopeText = q.scope === "team" ? "Team workload" : "Assigned to you";
-  async function updateReminder(i: WorkItem, until?: string) {
+  async function updateReminder(i: WorkItem, until?: string, undo = false) {
     if (operation.current || !prefRef.current.ready) return;
     operation.current = true;
     setReminderBusy(true);
-    refocus.current = {
+    const pending: NonNullable<typeof refocus.current> = {
       id: i.id,
       order: [
         ...(results.current?.querySelectorAll<HTMLElement>("[data-work-id]") ??
           []),
       ].map((el) => el.dataset.workId ?? ""),
+      ...(undo ? { restore: "saving" as const } : {}),
     };
+    refocus.current = pending;
     try {
       const current = prefRef.current;
       await current.save({
@@ -285,12 +301,25 @@ export function WorkInbox({
           ...(until ? [{ id: i.id, until }] : []),
         ].slice(-100),
       });
+      // The render that clears reminderBusy shows the restored row.
+      // A row the current view filters out never returns: give up then.
+      if (pending.restore) {
+        pending.restore = "saved";
+        setTimeout(() => {
+          if (refocus.current === pending) refocus.current = null;
+        }, 3000);
+      }
       if (until)
         toast.success("Reminder snoozed until tomorrow at 08:00", {
           action: {
             label: "Undo",
             onClick: () => {
-              void updateReminder(i);
+              // Leave the toaster first: sonner returns focus to where it
+              // came from when focus leaves it, or when its list unmounts,
+              // which would otherwise take focus from the restored row.
+              if (document.activeElement instanceof HTMLElement)
+                document.activeElement.blur();
+              void updateReminder(i, undefined, true);
             },
           },
         });

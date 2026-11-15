@@ -16,7 +16,9 @@ export function FollowupPanel({
   const { e, w, uid, busy, writer, lead, reviewer, name } = scope,
     { monitoring, command } = scope.forms;
   // Review closure is disabled with the server's reason (#210): the closer's
-  // independence first, then what the case still needs.
+  // independence first, then what the case still needs. An open case not yet
+  // assessed shows it too, with "Assess the case before independent
+  // closure" (#241 item 7).
   const closureBlocked = (m: MonitoringCase) =>
     m.contributors.includes(uid) || m.ownerId === uid
       ? "A preparer or contributor cannot approve their own work"
@@ -127,7 +129,7 @@ export function FollowupPanel({
                   Open reassessment
                 </Button>
               )}
-            {reviewer && m.state === "in_progress" && (
+            {reviewer && m.state !== "closed" && (
               <Button
                 variant="outline"
                 disabled={busy || !!closureBlocked(m)}
@@ -147,7 +149,7 @@ export function FollowupPanel({
                 Review closure
               </Button>
             )}
-            {reviewer && m.state === "in_progress" && closureBlocked(m) && (
+            {reviewer && m.state !== "closed" && closureBlocked(m) && (
               <p className="subtle" id={"closure-blocked-" + m.id}>
                 {closureBlocked(m)}
               </p>

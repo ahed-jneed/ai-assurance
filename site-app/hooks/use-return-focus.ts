@@ -13,16 +13,34 @@ import { useRef } from "react";
  * to <body>; the history still names the menu's trigger before it.
  */
 const recent: HTMLElement[] = [];
+function remember(el: HTMLElement) {
+  const at = recent.indexOf(el);
+  if (at >= 0) recent.splice(at, 1);
+  recent.push(el);
+  if (recent.length > 20) recent.shift();
+}
+/**
+ * The trigger of the menu an element sits in. Opened by mouse, a Radix menu
+ * never focuses its trigger (it prevents focus on pointerdown), so a dialog
+ * opened from one of its items would otherwise return focus to whatever was
+ * focused before the menu (#241 item 6). The menu content is labelled by its
+ * trigger.
+ */
+export function menuTriggerOf(el: Element): HTMLElement | null {
+  const menu = el.closest('[role="menu"][aria-labelledby]');
+  const id = menu?.getAttribute("aria-labelledby");
+  const trigger = id ? el.ownerDocument.getElementById(id) : null;
+  return trigger && trigger !== el ? (trigger as HTMLElement) : null;
+}
 if (typeof document !== "undefined")
   document.addEventListener(
     "focusin",
     (event) => {
       const el = event.target;
       if (!(el instanceof HTMLElement)) return;
-      const at = recent.indexOf(el);
-      if (at >= 0) recent.splice(at, 1);
-      recent.push(el);
-      if (recent.length > 20) recent.shift();
+      const trigger = menuTriggerOf(el);
+      if (trigger) remember(trigger);
+      remember(el);
     },
     true,
   );
