@@ -5,6 +5,7 @@ import importlib
 import importlib.metadata
 import json
 import math
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -33,9 +34,72 @@ def require_artifact(path, format_name, trusted_model):
             raise EngineError("model_artifact_invalid", "Expected a native XGBoost JSON model")
     if format_name == "lightgbm_text" and not data.lstrip().startswith(b"tree\n") and not data.lstrip().startswith(b"tree\r\n"):
         raise EngineError("model_artifact_invalid", "Expected native LightGBM text model")
-    if format_name == "pmml" and (b"<!DOCTYPE" in data.upper() or b"<!ENTITY" in data.upper()):
-        raise EngineError("model_artifact_invalid", "PMML external entities and document types are prohibited")
+    if format_name == "pmml":
+        check_pmml_text(data)
     return source, data
+
+
+# Byte-order marks and the no-BOM first bytes of "<" (XML 1.0 Appendix F).
+_XML_BOMS = ((b"\x00\x00\xfe\xff", "utf-32-be"), (b"\xff\xfe\x00\x00", "utf-32-le"), (b"\xef\xbb\xbf", "utf-8"), (b"\xfe\xff", "utf-16-be"), (b"\xff\xfe", "utf-16-le"))
+_XML_NO_BOM = ((b"\x00\x00\x00<", "utf-32-be"), (b"<\x00\x00\x00", "utf-32-le"), (b"\x00<", "utf-16-be"), (b"<\x00", "utf-16-le"))
+# Declared encodings accepted for each detected family. Anything else (UTF-7,
+# EBCDIC, multi-byte legacy code pages) is refused rather than guessed at.
+_XML_DECLARED = {
+    "ascii": {"utf-8", "utf8", "us-ascii", "ascii", "iso-8859-1", "latin-1", "latin1", "iso_8859-1", "windows-1252", "cp1252"},
+    "utf-8": {"utf-8", "utf8"},
+    "utf-16-le": {"utf-16", "utf-16le"},
+    "utf-16-be": {"utf-16", "utf-16be"},
+    "utf-32-le": {"utf-32", "utf-32le", "ucs-4"},
+    "utf-32-be": {"utf-32", "utf-32be", "ucs-4"},
+}
+_XML_DECLARATION = re.compile(r"<\?xml\s[^>]*?\?>")
+_XML_ENCODING = re.compile(r"\sencoding\s*=\s*(?:\"([A-Za-z][A-Za-z0-9._-]*)\"|'([A-Za-z][A-Za-z0-9._-]*)')")
+
+
+def check_pmml_text(data):
+    """Reject a PMML document type or entity declaration in whatever encoding an XML parser would read.
+
+    A plain byte search misses "<!DOCTYPE" written in UTF-16 or UTF-32, so the
+    bytes are decoded the way XML 1.0 Appendix F detects the encoding, and an
+    encoding that cannot be checked reliably is refused.
+    """
+    invalid = EngineError("model_artifact_invalid", "PMML encoding is unsupported; use UTF-8, UTF-16 or UTF-32")
+    family, body = None, data
+    for mark, name in _XML_BOMS:
+        if data.startswith(mark):
+            family, body = name, data[len(mark):]
+            break
+    else:
+        for prefix, name in _XML_NO_BOM:
+            if data.startswith(prefix):
+                family = name
+                break
+    if family is None:
+        # Single-byte ASCII-compatible text never contains NUL; anything that
+        # does is a wide encoding this detection did not recognise.
+        # A recognised ASCII-compatible document starts with "<" (whitespace
+        # may precede a root element without an XML declaration); EBCDIC and
+        # other ASCII-incompatible encodings do not.
+        if b"\x00" in data or not data.lstrip(b" \t\r\n").startswith(b"<"):
+            raise invalid
+        family = "ascii"
+    try:
+        text = body.decode("latin-1" if family == "ascii" else family)
+    except UnicodeDecodeError as exc:
+        raise invalid from exc
+    if "\x00" in text:
+        raise invalid
+    if re.match(r"<\?xml\s", text):
+        declaration = _XML_DECLARATION.match(text)
+        if declaration is None:
+            raise invalid
+        if "encoding" in declaration.group(0):
+            declared = _XML_ENCODING.search(declaration.group(0))
+            if declared is None or (declared.group(1) or declared.group(2)).lower() not in _XML_DECLARED[family]:
+                raise invalid
+    folded = text.upper()
+    if "<!DOCTYPE" in folded or "<!ENTITY" in folded:
+        raise EngineError("model_artifact_invalid", "PMML external entities and document types are prohibited")
 
 
 class NumericAdapter:
@@ -261,7 +325,7 @@ class NativeTreeAdapter(NumericAdapter):
         self.matrix(records)
         payload = {"path": str(self.path), "format": self.descriptor.format, "expectedSha256": self.descriptor.artifact_sha256, "spec": self.spec, "records": records}
         try:
-            process = subprocess.run([sys.executable, "-m", "engine.model_process"], input=json.dumps(payload, allow_nan=False), capture_output=True, text=True, timeout=60, check=False)
+            process = subprocess.run(native_scorer_command(), input=json.dumps(payload, allow_nan=False), capture_output=True, text=True, timeout=60, check=False)
         except subprocess.TimeoutExpired as exc:
             raise EngineError("compute_timeout", "Native model scoring process exceeded its 60-second time budget") from exc
         if process.returncode:
@@ -271,6 +335,16 @@ class NativeTreeAdapter(NumericAdapter):
         except ValueError as exc:
             raise EngineError("model_output_invalid", "Native model scoring process returned invalid JSON") from exc
         return self.labels_from_values(values)
+
+
+# Isolated mode (-I): neither the working directory nor PYTHON* variables nor
+# user site-packages reach sys.path; only the resolved engine package root is
+# inserted before the fixed scorer module runs.
+_SCORER_BOOTSTRAP = "import runpy,sys;sys.path.insert(0,sys.argv.pop(1));runpy.run_module('engine.model_process',run_name='__main__',alter_sys=True)"
+
+
+def native_scorer_command():
+    return [sys.executable, "-I", "-c", _SCORER_BOOTSTRAP, str(Path(__file__).resolve().parent.parent)]
 
 
 def scoring_failure_code(stdout):
