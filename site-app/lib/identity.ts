@@ -1,8 +1,8 @@
 // Who is making the request. The Worker entry (build/worker.ts) runs the
 // adapter before the app sees a request: IDENTITY_MODE picks the one credential
-// that is trusted, and with no mode configured every request is anonymous, so
-// the API answers 401. Inbound x-assurance-user-* headers are always removed
-// before the app runs. The trust boundary of each mode is in
+// that is trusted. Unset, it is `local`: the built-in accounts and their
+// session cookie (lib/local-auth.ts). Inbound x-assurance-user-* headers are
+// always removed before the app runs. The trust boundary of each mode is in
 // docs/security/identity.md.
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
@@ -14,6 +14,8 @@ import {
   USER_ID_HEADER,
   safeReturnPath,
 } from "./auth-paths";
+import { sessionAccount } from "./local-auth";
+import { sessionToken } from "./local-auth-pages";
 import {
   AccessTokenError,
   accessIssuer,
@@ -33,6 +35,8 @@ export type Identity = {
 /** The Worker variables that configure identity (cloudflare-env.d.ts). */
 export type IdentitySettings = {
   IDENTITY_MODE?: string;
+  /** The D1 database the built-in accounts live in (`local` mode). */
+  DB?: D1Database;
   IDENTITY_TRUSTED_HEADERS?: string;
   CF_ACCESS_TEAM_DOMAIN?: string;
   CF_ACCESS_AUD?: string;
@@ -41,6 +45,8 @@ export type IdentitySettings = {
 export type IdentityConfig =
   /** Nothing trusted: every request is anonymous. */
   | { mode: "none"; problem?: string }
+  /** The built-in accounts: a session cookie checked against D1. */
+  | { mode: "local"; db: D1Database }
   /** A Cloudflare Access application token in Cf-Access-Jwt-Assertion. */
   | { mode: "cloudflare-access"; issuer: string; audiences: string[] }
   /** x-assurance-user-* headers from a test client, on loopback requests only. */
@@ -52,21 +58,23 @@ export type IdentityConfig =
 export const TRUSTED_HEADERS_OPT_IN = "loopback-tests";
 
 /**
- * The identity mode the Worker variables select. A mode that is not fully
- * configured, or not allowed here, selects nothing and names the problem.
+ * The identity mode the Worker variables select; unset means `local`, the
+ * built-in accounts. A mode that is not fully configured, or not allowed here,
+ * selects nothing and names the problem.
  */
 export function identityConfig(
   settings: IdentitySettings,
   { devServer }: { devServer: boolean },
 ): IdentityConfig {
-  const mode = settings.IDENTITY_MODE ?? "";
+  const mode = settings.IDENTITY_MODE?.trim() || "local";
   switch (mode) {
-    case "":
-      return {
-        mode: "none",
-        problem:
-          "no IDENTITY_MODE is configured, so every request is anonymous",
-      };
+    case "local":
+      return settings.DB
+        ? { mode: "local", db: settings.DB }
+        : {
+            mode: "none",
+            problem: "the built-in accounts need the DB binding",
+          };
     case "dev":
       return devServer
         ? { mode: "dev" }
@@ -136,6 +144,18 @@ async function resolve(
     case "none":
       if (config.problem) report(config.problem);
       return null;
+    case "local": {
+      const token = sessionToken(request);
+      const account = token ? await sessionAccount(config.db, token) : null;
+      return account
+        ? {
+            userId: account.user_id,
+            email: account.email,
+            displayName: account.name || account.email,
+            fullName: account.name || null,
+          }
+        : null;
+    }
     case "dev":
     case "trusted-headers":
       if (!isLoopback(request)) {
@@ -249,7 +269,8 @@ export function authRoute(
   const url = new URL(request.url);
   const signIn = url.pathname === SIGN_IN_PATH,
     signOut = url.pathname === SIGN_OUT_PATH;
-  if ((!signIn && !signOut) || config.mode === "dev") return null;
+  if ((!signIn && !signOut) || config.mode === "dev" || config.mode === "local")
+    return null;
   const headers = { "Cache-Control": "private, no-store" };
   if (
     !["GET", "HEAD"].includes(request.method) &&

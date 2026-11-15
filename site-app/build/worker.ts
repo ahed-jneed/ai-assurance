@@ -6,13 +6,14 @@ import {
   identityConfig,
   runWithIdentity,
 } from "../lib/identity";
+import { localAuthRoute } from "../lib/local-auth-pages";
 import { withResponseStatus } from "../lib/response-status";
 
 export default {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext) {
     // The identity is settled before the app sees the request: IDENTITY_MODE
-    // picks the one trusted credential, and inbound identity headers are always
-    // removed (docs/security/identity.md). The `dev` mode exists only on the
+    // picks the one trusted credential (unset: the built-in accounts), and
+    // inbound identity headers are always removed (docs/security/identity.md). The `dev` mode exists only on the
     // development server. The sign-in routes are answered after
     // authentication: behind Cloudflare Access, sign-in returns only a
     // verified caller to the page.
@@ -21,6 +22,15 @@ export default {
     // response goes out, so the connection stays usable (#209).
     const tracked = trackRequestBody(request);
     try {
+      // The built-in accounts' own pages: setup, sign-in, sign-up, password.
+      if (config.mode === "local") {
+        const page = await localAuthRoute(
+          tracked.request,
+          config.db,
+          env.DOSSIER_KEK,
+        );
+        if (page) return withSecurityHeaders(page);
+      }
       const caller = await authenticate(tracked.request, config);
       const route = authRoute(tracked.request, config, caller.identity);
       if (route) return withSecurityHeaders(route);

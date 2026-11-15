@@ -63,7 +63,9 @@ function InviteFields(props: ModalFieldsProps) {
         <EngagementChecks {...props} legend="Engagement access" />
       )}
       <p className="subtle">
-        Site sharing must also allow this person to open the platform.
+        With the built-in accounts, copy the invitation&apos;s sign-up link from
+        the pending invitations after saving and send it to this person: they
+        set their own password.
       </p>
     </>
   );

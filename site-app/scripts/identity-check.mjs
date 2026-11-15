@@ -79,10 +79,8 @@ async function refused(call, headers, url = local + "/api/workspace") {
   return response;
 }
 
-// --- No identity is trusted unless a mode is configured ---------------------
+// --- Nothing is trusted with an unknown or incomplete mode -------------------
 for (const [label, bindings] of [
-  ["no IDENTITY_MODE", {}],
-  ["an empty IDENTITY_MODE", { IDENTITY_MODE: "" }],
   ["an unknown IDENTITY_MODE", { IDENTITY_MODE: "DEV" }],
   ["the removed sites mode", { IDENTITY_MODE: "sites" }],
   ["IDENTITY_MODE=dev in a build", { IDENTITY_MODE: "dev" }],
@@ -109,7 +107,141 @@ for (const [label, bindings] of [
     assert.equal(signIn.status, 401, label);
   });
 console.log(
-  "PASS forged identity headers are refused with no, empty, unknown, removed, dev or incomplete identity configuration",
+  "PASS forged identity headers are refused with an unknown, removed, dev or incomplete identity configuration",
+);
+
+// --- local (the default): built-in accounts and their session cookie --------
+const kek = Buffer.alloc(32, 3).toString("base64");
+for (const bindings of [{}, { IDENTITY_MODE: "" }, { IDENTITY_MODE: "local" }])
+  await withWorker(
+    // Self-signup off: only the owner account may found a practice.
+    { SELF_SIGNUP: "off", DOSSIER_KEK: kek, ...bindings },
+    async (call) => {
+      const form = (fields) => ({
+        method: "POST",
+        body: new URLSearchParams(fields).toString(),
+      });
+      const formHeaders = {
+        Origin: local,
+        "Content-Type": "application/x-www-form-urlencoded",
+      };
+      const password = "correct horse battery";
+      await refused(call, forged);
+      const toSetup = await call(local + "/auth/sign-in?return_to=/");
+      assert.equal(toSetup.status, 302);
+      assert.equal(toSetup.headers.get("location"), "/auth/setup");
+      // A cross-site form post is refused before anything is written.
+      const crossSite = await call(
+        local + "/auth/setup",
+        { ...formHeaders, Origin: "https://evil.example" },
+        form({
+          name: "Mallory",
+          email: "m@evil.example",
+          password,
+          confirm: password,
+        }),
+      );
+      assert.equal(crossSite.status, 403);
+      const setup = await call(
+        local + "/auth/setup",
+        formHeaders,
+        form({
+          name: "Olive Owner",
+          email: "olive@practice.example",
+          password,
+          confirm: password,
+        }),
+      );
+      assert.equal(setup.status, 303, JSON.stringify(setup.body));
+      const cookie = setup.headers.get("set-cookie").split(";")[0];
+      assert.match(cookie, /^assurance_session=[\w-]{43}$/);
+      assert.match(setup.headers.get("set-cookie"), /HttpOnly; SameSite=Lax/);
+      // The owner founds the practice; forged headers beside the cookie change nothing.
+      const owner = await call(local + "/api/workspace", {
+        ...forged,
+        Cookie: cookie,
+      });
+      assert.equal(owner.status, 200, JSON.stringify(owner.body));
+      assert.equal(owner.body.identity.name, "Olive Owner");
+      assert.equal(owner.body.identity.localAccount, true);
+      // No second owner.
+      const again = await call(
+        local + "/auth/setup",
+        formHeaders,
+        form({
+          name: "Mallory",
+          email: "m@evil.example",
+          password,
+          confirm: password,
+        }),
+      );
+      assert.equal(again.headers.get("location"), "/auth/sign-in");
+      // An invitation carries a sign-up link; the invitee joins through it.
+      const tenantId = owner.body.tenantId;
+      const invite = await call(
+        local + "/api/management",
+        { Cookie: cookie, Origin: local, "Content-Type": "application/json" },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            tenantId,
+            expectedVersion: owner.body.managementVersion ?? 1,
+            op: "inviteMember",
+            data: {
+              email: "ava@practice.example",
+              role: "Reviewer",
+              engagementIds: [],
+            },
+          }),
+        },
+      );
+      assert.equal(invite.status, 200, JSON.stringify(invite.body));
+      const listed = await call(local + "/api/workspace?tenantId=" + tenantId, {
+        Cookie: cookie,
+      });
+      const link = listed.body.invitations[0].signup_path;
+      assert.match(link, /^\/auth\/sign-up\?invite=[\w-]+\.[\w-]+$/);
+      const token = new URL(local + link).searchParams.get("invite");
+      const signUp = await call(
+        local + "/auth/sign-up",
+        formHeaders,
+        form({
+          invite: token,
+          name: "Ava Auditor",
+          password,
+          confirm: password,
+        }),
+      );
+      assert.equal(signUp.status, 303, JSON.stringify(signUp.body));
+      const avaCookie = signUp.headers.get("set-cookie").split(";")[0];
+      const ava = await call(local + "/api/workspace", { Cookie: avaCookie });
+      assert.equal(ava.status, 200, JSON.stringify(ava.body));
+      assert.equal(ava.body.tenantId, tenantId);
+      assert.equal(ava.body.identity.role, "Reviewer");
+      // The used link is spent; a wrong password is refused; sign-out ends the session.
+      assert.equal(
+        (
+          await call(
+            local + "/auth/sign-up?invite=" + encodeURIComponent(token),
+          )
+        ).status,
+        404, // accepted on Ava's first request, so the link is spent
+      );
+      const wrong = await call(
+        local + "/auth/sign-in",
+        formHeaders,
+        form({ email: "olive@practice.example", password: "wrong password!!" }),
+      );
+      assert.equal(wrong.status, 401);
+      await call(local + "/auth/sign-out", { Cookie: cookie });
+      await refused(call, { Cookie: cookie });
+      // Security headers on the built-in pages too.
+      const page = await call(local + "/auth/sign-in");
+      assert.equal(page.headers.get("x-frame-options"), "DENY");
+    },
+  );
+console.log(
+  "PASS local mode (the default): first-run owner setup, one owner only, cross-site posts refused, forged headers ignored, invited sign-up through a signed link, wrong passwords refused and sign-out ending the session",
 );
 
 // --- trusted-headers: explicit opt-in, loopback requests only ----------------

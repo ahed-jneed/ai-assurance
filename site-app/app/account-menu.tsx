@@ -3,7 +3,13 @@
 // platform operators, Sign out, and on the development server a switch to
 // another test persona. Sign-in and sign-out
 // are top-level navigations that come back to the current location.
-import { LogOut, ServerCog, UserRound, UsersRound } from "lucide-react";
+import {
+  KeyRound,
+  LogOut,
+  ServerCog,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import personaFixture from "@/fixtures/dev-personas.json";
-import { signInPath, signOutPath } from "@/lib/auth-paths";
+import { PASSWORD_PATH, signInPath, signOutPath } from "@/lib/auth-paths";
 import type { WorkspaceData } from "./workspace-types";
 
 /**
@@ -181,6 +187,14 @@ function AccountMenuItems({
           <a href="/operator" target="_top">
             <ServerCog size={16} aria-hidden="true" />
             Operator console
+          </a>
+        </DropdownMenuItem>
+      )}
+      {data?.identity.localAccount && (
+        <DropdownMenuItem asChild>
+          <a href={PASSWORD_PATH} target="_top">
+            <KeyRound size={16} aria-hidden="true" />
+            Change password
           </a>
         </DropdownMenuItem>
       )}

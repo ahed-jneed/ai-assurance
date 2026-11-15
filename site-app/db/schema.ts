@@ -488,3 +488,45 @@ export const practiceErasures = sqliteTable("practice_erasures", {
   eventId: text("event_id").notNull(),
   createdAt: text("created_at").notNull(),
 });
+/**
+ * Built-in accounts of the `local` identity mode (lib/local-auth.ts): an email
+ * and a PBKDF2-SHA256 password hash. The first account is the owner, who may
+ * provision the first practice; everyone else joins through an invitation and
+ * its sign-up link. Not tied to a practice: one account can belong to several.
+ */
+export const localAccounts = sqliteTable(
+  "local_accounts",
+  {
+    userId: text("user_id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    owner: integer("owner").notNull().default(0),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    lockedUntil: text("locked_until"),
+    createdAt: text("created_at").notNull(),
+    passwordChangedAt: text("password_changed_at").notNull(),
+  },
+  // At most one owner, so two first-run setups cannot both succeed.
+  (t) => [
+    uniqueIndex("idx_local_accounts_owner")
+      .on(t.owner)
+      .where(sql`owner = 1`),
+  ],
+);
+/**
+ * Sessions of the `local` identity mode: the SHA-256 of a random cookie
+ * token, never the token itself, with a fixed expiry (lib/local-auth.ts).
+ */
+export const localSessions = sqliteTable(
+  "local_sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => localAccounts.userId),
+    createdAt: text("created_at").notNull(),
+    expiresAt: text("expires_at").notNull(),
+  },
+  (t) => [index("idx_local_sessions_user").on(t.userId)],
+);
