@@ -546,7 +546,14 @@ describe("the GenAI readiness gate on marking evidence (#233)", () => {
 describe("plans and manifests the workspace freezes", () => {
   const plan = {
     schemaVersion: "genai-plan/0.1",
-    criteria: [{ id: "acc", kind: "genai_mean", metric: "accuracy" }],
+    criteria: [
+      {
+        id: "acc",
+        kind: "genai_mean",
+        metric: "accuracy",
+        band: { lower: 0.8 },
+      },
+    ],
   };
   it("accepts raised floors and refuses lowered ones (D-10, D-16)", () => {
     expect(

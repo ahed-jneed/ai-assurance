@@ -32,6 +32,7 @@ import {
   RERUN_STATEMENT,
   attestationPayload,
 } from "@/lib/genai/evidence-levels";
+import { GENAI_PLAN_TEMPLATE } from "@/lib/genai/plan-check";
 import type { GenaiAcknowledgement } from "@/lib/genai/readiness";
 import type { GenaiRunSummary } from "@/lib/genai/summary";
 import { can } from "@/lib/permissions";
@@ -63,14 +64,7 @@ import {
 
 type Result = GenaiView["results"][number];
 
-const PLAN_TEMPLATE = JSON.stringify(
-  {
-    schemaVersion: "genai-plan/0.1",
-    criteria: [{ id: "C1", kind: "genai_mean" }],
-  },
-  null,
-  2,
-);
+const PLAN_TEMPLATE = JSON.stringify(GENAI_PLAN_TEMPLATE, null, 2);
 
 async function post(
   tenantId: string,

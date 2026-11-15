@@ -214,6 +214,27 @@ describe("POST /api/assurance", () => {
     });
   });
 
+  it("refuses a GenAI plan the engine would refuse with 400 naming the criterion (#248)", async () => {
+    const e = stored();
+    load(e, caller("Auditor"));
+    const response = await post(e, "freezeGenaiPlan", {
+      procedureId: "PROC-1",
+      plan: {
+        schemaVersion: "genai-plan/0.1",
+        criteria: [
+          { id: "C1", kind: "genai_mean", band: { lower: 0.9 } },
+          { id: "ASR", kind: "genai_attack_success" },
+        ],
+      },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'Criterion ASR needs a band, for example "band": {"upper": 0.05}',
+    });
+    expect(recordStatement).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
   it("answers the record an op wrote as { record }, uncached", async () => {
     const e = stored();
     e.artifacts.push(dataset);

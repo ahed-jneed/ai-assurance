@@ -1,0 +1,126 @@
+{
+  "description": "Shared genai-plan/0.1 cases (#248). engine/tests/test_genai_plan_contract.py holds the engine's normalize_plan to them and site-app/lib/genai/plan-contract.test.ts the workspace's check before it freezes a plan: both accept every valid plan and refuse every invalid one. An invalid case names the criterion id the workspace's reason must name (criterion) and the location the engine's message names (engine).",
+  "valid": [
+    {
+      "name": "default-template",
+      "plan": {
+        "schemaVersion": "genai-plan/0.1",
+        "criteria": [{ "id": "C1", "kind": "genai_mean", "metric": "accuracy", "band": { "lower": 0.9 } }]
+      }
+    },
+    {
+      "name": "art50-marking",
+      "plan": {
+        "schemaVersion": "genai-plan/0.1",
+        "minimums": { "memberSize": 30 },
+        "criteria": [
+          { "id": "A50-P-02C-C01", "kind": "genai_marking", "role": "confirmatory", "metric": "detection_rate", "band": { "lower": 0.95 } },
+          { "id": "A50-P-02C-C02", "kind": "genai_marking", "role": "confirmatory", "metric": "false_positive_rate", "band": { "upper": 0.01 } }
+        ]
+      }
+    },
+    {
+      "name": "every-kind-and-setting",
+      "plan": {
+        "schemaVersion": "genai-plan/0.1",
+        "statisticsVersion": "1.0.0",
+        "confidenceLevel": 0.99,
+        "minimums": { "sampleSize": 50, "memberSize": 12, "clusters": 10 },
+        "primaryScore": "model_graded_qa",
+        "successRule": { "type": "value_in", "values": ["C", "P"] },
+        "epochReducer": "mean",
+        "scorePolicy": "as_edited",
+        "clusterKey": { "tiny_qa": "passage_id" },
+        "techniqueKey": "technique",
+        "variantKey": null,
+        "taskTypes": { "tiny_qa": "qa", "canary": "attack" },
+        "categories": { "default": ["jailbreak"], "byTechnique": { "base64": ["prompt_injection_direct", "jailbreak"] } },
+        "maxUnscoredFraction": 0.02,
+        "maxErrorFraction": 0,
+        "judgeValidation": { "minimumItems": 80, "minimumKappaLowerBound": 0.7, "requireDifferentFamily": true, "pairwiseMinimumConsistencyLowerBound": 0.85 },
+        "excerpts": "failures",
+        "detectionKeys": [
+          { "keyId": "test-detector-key-1", "solutionId": "example-detector", "algorithm": "Ed25519", "publicKeySPKI": "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=" }
+        ],
+        "allowUnverifiedFormatVersion": false,
+        "reconciliationTolerance": 0.000001,
+        "criteria": [
+          { "id": "acc", "kind": "genai_mean", "metric": "score_mean", "band": { "lower": 0.6, "upper": 0.95 }, "select": { "task": "tiny_qa" }, "primaryScore": "match", "epochReducer": "majority", "successRule": { "type": "threshold", "operator": ">=", "value": 0.5 } },
+          { "id": "asr", "kind": "genai_attack_success", "role": "exploratory", "groupBy": "technique_variant", "band": { "upper": 0.05 }, "successRule": { "type": "tool_native" } },
+          { "id": "pk", "kind": "genai_pass_k", "k": [1, 4], "band": { "lower": 0.5 } },
+          { "id": "diff", "kind": "genai_paired_difference", "candidate": { "runKey": "run-b" }, "baseline": { "runKey": "run-a", "format": "inspect_eval" }, "band": { "lower": -0.02 } },
+          { "id": "mark:after-crop", "kind": "genai_marking", "metric": "detection_rate_after_transformation", "transformation": "crop", "stratum": "images", "band": { "lower": 0.8 } },
+          { "id": "presence", "kind": "genai_marking", "metric": "marking_presence", "requireTrustedSigner": true, "band": { "lower": 0.9 } },
+          { "id": "self-id", "kind": "genai_marking", "metric": "self_identification_rate", "band": { "lower": 0.98 } }
+        ]
+      }
+    },
+    {
+      "name": "mean-without-metric",
+      "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "M1", "kind": "genai_mean", "band": { "upper": 0.2 } }] }
+    }
+  ],
+  "invalid": [
+    { "name": "criterion-without-band", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean" }] } },
+    { "name": "second-criterion-without-band", "criterion": "C2", "engine": "plan.criteria[1].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }, { "id": "C2", "kind": "genai_pass_k", "k": [1] }] } },
+    { "name": "band-without-bound", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": {} }] } },
+    { "name": "band-of-nulls", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": null, "upper": null } }] } },
+    { "name": "band-bound-at-one", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 1 } }] } },
+    { "name": "band-bound-at-zero", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "upper": 0 } }] } },
+    { "name": "band-in-percent", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 90 } }] } },
+    { "name": "band-lower-above-upper", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9, "upper": 0.8 } }] } },
+    { "name": "band-unknown-key", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "min": 0.9 } }] } },
+    { "name": "band-as-text", "criterion": "C1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": "0.9" } }] } },
+    { "name": "attack-band-with-lower", "criterion": "A1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "A1", "kind": "genai_attack_success", "band": { "lower": 0.1 } }] } },
+    { "name": "pass-k-band-with-upper", "criterion": "P1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "P1", "kind": "genai_pass_k", "k": [1], "band": { "upper": 0.5 } }] } },
+    { "name": "paired-band-with-upper", "criterion": "D1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "D1", "kind": "genai_paired_difference", "candidate": { "runKey": "b" }, "baseline": { "runKey": "a" }, "band": { "upper": 0.02 } }] } },
+    { "name": "paired-band-at-minus-one", "criterion": "D1", "engine": "plan.criteria[0].band", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "D1", "kind": "genai_paired_difference", "candidate": { "runKey": "b" }, "baseline": { "runKey": "a" }, "band": { "lower": -1 } }] } },
+    { "name": "false-positive-band-with-lower", "criterion": "F1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "F1", "kind": "genai_marking", "metric": "false_positive_rate", "band": { "lower": 0.01 } }] } },
+    { "name": "criterion-without-id", "criterion": null, "engine": "plan.criteria[0].id", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "id-with-space", "criterion": "C 1", "engine": "plan.criteria[0].id", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C 1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "id-starting-with-dot", "criterion": ".C1", "engine": "plan.criteria[0].id", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": ".C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "criterion-unknown-key", "criterion": "C1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 }, "threshold": 0.9 }] } },
+    { "name": "unknown-kind", "criterion": "C1", "engine": "plan.criteria[0].kind", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_median", "band": { "lower": 0.9 } }] } },
+    { "name": "mean-unknown-metric", "criterion": "C1", "engine": "plan.criteria[0].metric", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "metric": "f1", "band": { "lower": 0.9 } }] } },
+    { "name": "mean-with-group-by", "criterion": "C1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "groupBy": "technique", "band": { "lower": 0.9 } }] } },
+    { "name": "attack-unknown-group-by", "criterion": "A1", "engine": "plan.criteria[0].groupBy", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "A1", "kind": "genai_attack_success", "groupBy": "severity", "band": { "upper": 0.1 } }] } },
+    { "name": "attack-with-metric", "criterion": "A1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "A1", "kind": "genai_attack_success", "metric": "accuracy", "band": { "upper": 0.1 } }] } },
+    { "name": "pass-k-without-k", "criterion": "P1", "engine": "plan.criteria[0].k", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "P1", "kind": "genai_pass_k", "band": { "lower": 0.5 } }] } },
+    { "name": "pass-k-repeated-k", "criterion": "P1", "engine": "plan.criteria[0].k", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "P1", "kind": "genai_pass_k", "k": [2, 2], "band": { "lower": 0.5 } }] } },
+    { "name": "pass-k-zero", "criterion": "P1", "engine": "plan.criteria[0].k", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "P1", "kind": "genai_pass_k", "k": [0], "band": { "lower": 0.5 } }] } },
+    { "name": "paired-without-baseline", "criterion": "D1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "D1", "kind": "genai_paired_difference", "candidate": { "runKey": "b" }, "band": { "lower": 0.02 } }] } },
+    { "name": "paired-with-select", "criterion": "D1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "D1", "kind": "genai_paired_difference", "candidate": { "runKey": "b" }, "baseline": { "runKey": "a" }, "select": { "task": "t" }, "band": { "lower": 0.02 } }] } },
+    { "name": "selector-unknown-key", "criterion": "C1", "engine": "plan.criteria[0].select", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "select": { "model": "x" }, "band": { "lower": 0.9 } }] } },
+    { "name": "marking-without-metric", "criterion": "K1", "engine": "plan.criteria[0].metric", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "K1", "kind": "genai_marking", "band": { "lower": 0.9 } }] } },
+    { "name": "after-transformation-without-transformation", "criterion": "K1", "engine": "plan.criteria[0]", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "K1", "kind": "genai_marking", "metric": "detection_rate_after_transformation", "band": { "lower": 0.8 } }] } },
+    { "name": "trusted-signer-on-detection-rate", "criterion": "K1", "engine": "plan.criteria[0].requireTrustedSigner", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "K1", "kind": "genai_marking", "metric": "detection_rate", "requireTrustedSigner": true, "band": { "lower": 0.8 } }] } },
+    { "name": "trusted-signer-on-mean", "criterion": "C1", "engine": "plan.criteria[0].requireTrustedSigner", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "requireTrustedSigner": true, "band": { "lower": 0.9 } }] } },
+    { "name": "criterion-epoch-reducer", "criterion": "C1", "engine": "plan.criteria[0].epochReducer", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "epochReducer": "median", "band": { "lower": 0.9 } }] } },
+    { "name": "criterion-role", "criterion": "C1", "engine": "plan.criteria[0].role", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "role": "primary", "band": { "lower": 0.9 } }] } },
+    { "name": "criterion-threshold-rule-without-value", "criterion": "C1", "engine": "plan.criteria[0].successRule", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "successRule": { "type": "threshold", "operator": ">=" }, "band": { "lower": 0.9 } }] } },
+    { "name": "duplicate-criterion-ids", "criterion": null, "engine": "criterion ids must be unique", "plan": { "schemaVersion": "genai-plan/0.1", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }, { "id": "C1", "kind": "genai_mean", "band": { "lower": 0.8 } }] } },
+    { "name": "plan-unknown-key", "criterion": null, "engine": "plan: unknown keys", "plan": { "schemaVersion": "genai-plan/0.1", "threshold": 0.9, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-schema-version", "criterion": null, "engine": "plan.schemaVersion", "plan": { "schemaVersion": "genai-plan/0.2", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-statistics-version", "criterion": null, "engine": "plan.statisticsVersion", "plan": { "schemaVersion": "genai-plan/0.1", "statisticsVersion": "2.0.0", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-confidence-level", "criterion": null, "engine": "plan.confidenceLevel", "plan": { "schemaVersion": "genai-plan/0.1", "confidenceLevel": 0.8, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "lowered-sample-size", "criterion": null, "engine": "plan.minimums.sampleSize", "plan": { "schemaVersion": "genai-plan/0.1", "minimums": { "sampleSize": 10 }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "fractional-cluster-minimum", "criterion": null, "engine": "plan.minimums.clusters", "plan": { "schemaVersion": "genai-plan/0.1", "minimums": { "clusters": 10.5 }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "lowered-kappa", "criterion": null, "engine": "judgeValidation.minimumKappaLowerBound", "plan": { "schemaVersion": "genai-plan/0.1", "judgeValidation": { "minimumKappaLowerBound": 0.5 }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "kappa-of-one", "criterion": null, "engine": "judgeValidation.minimumKappaLowerBound", "plan": { "schemaVersion": "genai-plan/0.1", "judgeValidation": { "minimumKappaLowerBound": 1 }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "lowered-judge-items", "criterion": null, "engine": "judgeValidation.minimumItems", "plan": { "schemaVersion": "genai-plan/0.1", "judgeValidation": { "minimumItems": 49 }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "same-family-judge", "criterion": null, "engine": "judgeValidation.requireDifferentFamily", "plan": { "schemaVersion": "genai-plan/0.1", "judgeValidation": { "requireDifferentFamily": false }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "raised-error-fraction", "criterion": null, "engine": "plan.maxErrorFraction", "plan": { "schemaVersion": "genai-plan/0.1", "maxErrorFraction": 0.1, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-epoch-reducer", "criterion": null, "engine": "plan.epochReducer", "plan": { "schemaVersion": "genai-plan/0.1", "epochReducer": "median", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-score-policy", "criterion": null, "engine": "plan.scorePolicy", "plan": { "schemaVersion": "genai-plan/0.1", "scorePolicy": "latest", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-empty-cluster-key", "criterion": null, "engine": "plan.clusterKey", "plan": { "schemaVersion": "genai-plan/0.1", "clusterKey": "", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-task-type", "criterion": null, "engine": "plan.taskTypes", "plan": { "schemaVersion": "genai-plan/0.1", "taskTypes": { "t": "chat" }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-unknown-category", "criterion": null, "engine": "plan.categories.default", "plan": { "schemaVersion": "genai-plan/0.1", "categories": { "default": ["toxicity"] }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-excerpts", "criterion": null, "engine": "plan.excerpts", "plan": { "schemaVersion": "genai-plan/0.1", "excerpts": "some", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-reconciliation-tolerance", "criterion": null, "engine": "plan.reconciliationTolerance", "plan": { "schemaVersion": "genai-plan/0.1", "reconciliationTolerance": 0.01, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-unverified-format-flag", "criterion": null, "engine": "plan.allowUnverifiedFormatVersion", "plan": { "schemaVersion": "genai-plan/0.1", "allowUnverifiedFormatVersion": "yes", "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-success-rule", "criterion": null, "engine": "plan.successRule", "plan": { "schemaVersion": "genai-plan/0.1", "successRule": { "type": "tool_native", "values": ["C"] }, "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "detection-key-algorithm", "criterion": null, "engine": "plan.detectionKeys[0].algorithm", "plan": { "schemaVersion": "genai-plan/0.1", "detectionKeys": [{ "keyId": "k1", "solutionId": "example-detector", "algorithm": "RSA", "publicKeySPKI": "MCowBQYDK2VwAyEABMLQhLHohbbhmtEklJfBudz3SqA9tR6DHXkKUPYuC8U=" }], "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "detection-key-not-spki", "criterion": null, "engine": "plan.detectionKeys[0].publicKeySPKI", "plan": { "schemaVersion": "genai-plan/0.1", "detectionKeys": [{ "keyId": "k1", "solutionId": "example-detector", "algorithm": "Ed25519", "publicKeySPKI": "AAAA" }], "criteria": [{ "id": "C1", "kind": "genai_mean", "band": { "lower": 0.9 } }] } },
+    { "name": "plan-without-criteria", "criterion": null, "engine": "plan.criteria is required", "plan": { "schemaVersion": "genai-plan/0.1" } }
+  ]
+}
