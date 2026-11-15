@@ -17,7 +17,14 @@ import {
   type ReportParticulars,
 } from "@/lib/domain/report-model";
 import { requestLabel } from "@/lib/evidence-requests";
-import { reportDate } from "@/lib/report-presentation";
+import {
+  criterionExceptionsCell,
+  criterionOpenFindingsCell,
+  criterionWithheld,
+  reportDate,
+  viennaTime,
+  withheldFindingNote,
+} from "@/lib/report-presentation";
 import { legalDate } from "@/lib/rule-pack";
 import { releaseState } from "@/lib/workflow-state";
 
@@ -199,22 +206,15 @@ function AssuranceReport({ s }: { s: ReportSnapshot }) {
                 <tr key={r.criterion}>
                   <td>{r.criterion}</td>
                   <td>{r.procedures}</td>
-                  {/* No procedure evaluated a criterion of its own, so it
-                      has no procedure exceptions to count (#241). */}
-                  <td>{r.procedures ? r.exceptions : "None evaluated"}</td>
+                  {/* "None evaluated" and "Withheld" (#241) are worded by the
+                      helpers the in-app report sheet shares. */}
+                  <td>{criterionExceptionsCell(r)}</td>
                   <td>
-                    {r.withheldHighFindings && !r.openFindings
-                      ? "Withheld"
-                      : r.openFindings +
-                        (r.openHighFindings
-                          ? " (" + r.openHighFindings + " High or Critical)"
-                          : "") +
-                        (r.withheldHighFindings ? " and withheld" : "")}
-                    {!!r.withheldHighFindings && (
+                    {criterionOpenFindingsCell(r)}
+                    {!!criterionWithheld(r) && (
                       <small className="report-note">
                         {" "}
-                        A High or Critical finding for internal use decides this
-                        result; its details are not part of this report.
+                        {withheldFindingNote}
                       </small>
                     )}
                   </td>
@@ -276,10 +276,7 @@ export function reportMarkup(
         <h1>{s.engagement.title}</h1>
         <p className="report-meta">
           {report.id} · {report.releasedAt ? "Released" : "Created"}{" "}
-          {new Date(report.createdAt).toLocaleString("en-GB", {
-            timeZone: "Europe/Vienna",
-          })}{" "}
-          Europe/Vienna
+          {viennaTime(report.createdAt)} Europe/Vienna
         </p>
         {!!report.replaces?.length && (
           <p className="report-meta">Replaces {report.replaces.join(", ")}</p>
@@ -288,11 +285,7 @@ export function reportMarkup(
           <p className="report-withdrawn" role="note">
             <strong>Withdrawn.</strong> This report was withdrawn
             {withdrawn.at
-              ? " on " +
-                new Date(withdrawn.at).toLocaleString("en-GB", {
-                  timeZone: "Europe/Vienna",
-                }) +
-                " Europe/Vienna"
+              ? " on " + viennaTime(withdrawn.at) + " Europe/Vienna"
               : ""}{" "}
             and is no longer issued to the client.
             {withdrawn.reason ? " Reason: " + withdrawn.reason : ""}

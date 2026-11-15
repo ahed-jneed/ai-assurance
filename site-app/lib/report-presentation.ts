@@ -27,6 +27,70 @@ export function reportDate(snapshot: Record<string, unknown>) {
 }
 
 /**
+ * A time as the printed report states it: en-GB in Europe/Vienna, the zone
+ * the report names beside it (#241).
+ */
+export function viennaTime(at: string) {
+  return new Date(at).toLocaleString("en-GB", { timeZone: "Europe/Vienna" });
+}
+
+/** The counts of a captured results-by-criterion row, as either renderer reads them. */
+type CriterionCounts = {
+  procedures?: unknown;
+  exceptions?: unknown;
+  openFindings?: unknown;
+  openHighFindings?: unknown;
+  withheldHighFindings?: unknown;
+};
+const count = (v: unknown) => {
+  const n = typeof v === "string" && v.trim() ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : 0;
+};
+
+/** The note beside a criterion whose result an internal-only High or Critical finding decides (#241, D-36). */
+export const withheldFindingNote =
+  "A High or Critical finding for internal use decides this result; its details are not part of this report.";
+
+/**
+ * The Exceptions cell of a results-by-criterion row (#241): a criterion no
+ * procedure evaluated has no procedure exceptions to count, so it reads
+ * "None evaluated" rather than 0. Shared by the /report print view and the
+ * in-app report sheet (FrozenReportDetails).
+ */
+export function criterionExceptionsCell(row: CriterionCounts) {
+  return count(row.procedures)
+    ? String(count(row.exceptions))
+    : "None evaluated";
+}
+
+/**
+ * How many open High or Critical findings decide the row's result but are
+ * left out of its counts (F-57 keeps the client counts to the findings the
+ * report lists; D-36 opens the row for the result). 0 for snapshots captured
+ * before the field existed.
+ */
+export function criterionWithheld(row: CriterionCounts) {
+  return count(row.withheldHighFindings);
+}
+
+/**
+ * The Open findings cell of a results-by-criterion row (#241): "Withheld"
+ * when only internal-only findings are open, "N and withheld" beside listed
+ * findings, else the plain counts.
+ */
+export function criterionOpenFindingsCell(row: CriterionCounts) {
+  const open = count(row.openFindings),
+    high = count(row.openHighFindings),
+    withheld = criterionWithheld(row);
+  if (withheld && !open) return "Withheld";
+  return (
+    open +
+    (high ? " (" + high + " High or Critical)" : "") +
+    (withheld ? " and withheld" : "")
+  );
+}
+
+/**
  * The time a report row shows and its label (#210): the client projection
  * carries the release time, which the client sees as "Released"; a staff
  * record shows its capture time.

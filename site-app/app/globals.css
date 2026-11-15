@@ -1592,6 +1592,10 @@ input {
 .print-report .report-superseded {
   font-weight: 600;
 }
+.criterion-withheld {
+  display: block;
+  margin-top: 4px;
+}
 .print-report .report-withdrawn {
   margin: 12px 0;
   padding: 10px 12px;

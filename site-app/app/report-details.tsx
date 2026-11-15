@@ -25,6 +25,11 @@ import {
   humanLabel,
   readableResults,
 } from "@/lib/presentation";
+import {
+  criterionExceptionsCell,
+  criterionWithheld,
+  withheldFindingNote,
+} from "@/lib/report-presentation";
 import { legalDate } from "@/lib/rule-pack";
 type Row = Record<string, unknown>;
 const record = (v: unknown): v is Row =>
@@ -493,8 +498,19 @@ export function FrozenReportDetails({ value }: { value: Row }) {
                       <TableRow key={text(c.criterion, "")}>
                         <TableCell>{text(c.criterion)}</TableCell>
                         <TableCell>{text(c.procedures)}</TableCell>
-                        <TableCell>{text(c.exceptions, "0")}</TableCell>
-                        <TableCell>{humanLabel(text(c.result))}</TableCell>
+                        <TableCell>{criterionExceptionsCell(c)}</TableCell>
+                        <TableCell>
+                          {humanLabel(text(c.result))}
+                          {/* The client counts only list the findings the
+                              report lists; an internal-only High finding
+                              that decides the result is withheld (#241). */}
+                          {!!criterionWithheld(c) && (
+                            <small className="subtle criterion-withheld">
+                              {" "}
+                              Open findings withheld. {withheldFindingNote}
+                            </small>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
