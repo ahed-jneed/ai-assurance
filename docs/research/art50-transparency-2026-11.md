@@ -2,7 +2,7 @@
 
 Issue [#59](https://github.com/ahed-jneed/ai-assurance/issues/59). Researched 5 November 2026. It feeds classification v2 ([#19](https://github.com/ahed-jneed/ai-assurance/issues/19)), rule pack 2026.11.1 and the methodology text ([#18](https://github.com/ahed-jneed/ai-assurance/issues/18)), the criteria model and catalogue ([#27](https://github.com/ahed-jneed/ai-assurance/issues/27)) and the GenAI evidence design ([#31](https://github.com/ahed-jneed/ai-assurance/issues/31)). The machine-readable companion is [`art50-transparency-2026-11.json`](art50-transparency-2026-11.json), described in [section 14](#14-json-schema). The legal timeline is the one verified in [`rule-pack-2026-11.json`](rule-pack-2026-11.json) (#8).
 
-> **Status: research, not legal advice.** No qualified lawyer has reviewed this file (decision D-02; owner action #57). Items marked **Legal review** must not be shown in the platform as settled law. The authentic Official Journal (OJ) texts govern. The Commission's guidelines are non-binding, and the Code of Practice is voluntary. Standards and specifications are cited by number and clause number with our own titles only (decision D-03). Legal and guidance texts are paraphrased. The audit procedures are a draft for methodology review.
+> **Status: research, not legal advice.** No qualified lawyer has reviewed this file (decision D-02; the expert review tracked in #261). Items marked **Legal review** must not be shown in the platform as settled law. The authentic Official Journal (OJ) texts govern. The Commission's guidelines are non-binding, and the Code of Practice is voluntary. Standards and specifications are cited by number and clause number with our own titles only (decision D-03). Legal and guidance texts are paraphrased. The audit procedures are a draft for methodology review.
 
 ## 1. Key conclusions
 
@@ -1085,7 +1085,7 @@ What #8 left open and this research resolves: UV-05 (the final Code of 10 June 2
 |---|---|
 | `schemaVersion`, `kind`, `id`, `researchedOn` | `1.0.0`, `art50-transparency-research`, `art50-transparency-2026-11`, `2026-11-05` |
 | `basedOn` | The rule-pack entries, guidance, legal-review and unverified ids this research builds on |
-| `approval` | `unapproved`; reviewer and date stay empty until legal review (#57) |
+| `approval` | `unapproved`; reviewer and date stay empty until legal review (#261) |
 | `vocabularies` | Verification markers, actors, test methods, outcomes, conclusions; `factVocabulary` (the Art 50 facts for #19); predicate, exclusion, derivation and step-condition rules |
 | `sources` | Source register with access route and SHA-256 of every file read |
 | `guidance` | Status and dates of the guidelines, the Code, the adequacy assessments, the signatory list, the icons, the Q&A and the studies |
@@ -1104,7 +1104,7 @@ What #8 left open and this research resolves: UV-05 (the final Code of 10 June 2
 - **#19 (classification).** It evaluates `procedures[*].applicability` with `vocabularies.predicateRule`, `exclusionRule`, `derivationRule` and `roleRequired`. An unknown fact yields `needs_information`. Applicability stays a reviewed human decision, and an exclusion whose basis is `guidance` shows its legal-review flag.
 - **#18 and #27 (rule pack and criteria model).** They map `procedures[*].testSteps` to catalogue steps, at most 30 per item, using `catalogItemId` (the counts per item are in section 11). `evidenceItems` supply `evidenceRequired`. `sampling.methodologyDefaults` became the threshold-library entries of A50-ED-40 (`schemas/threshold-library.json`), labelled `no_legal_safe_harbour`, and each deciding criterion names its entry in `libraryEntry` (schema 1.1.0). A default's `band` is either a fixed `lower` or `upper` bound, or a bound derived from the provider's declared figure (`derivation`, `tolerance`, `defaultIfUndeclared`), as in the statistics design's declared-performance entry. Its `range` gives the allowed `min` and `max` of the named `parameter`.
 - **#31 (GenAI evidence).** Marking tests produce per-item records whose fields are listed in A50-ED-30. The criteria are recomputed with the method in `sampling.method`.
-- **Legal review.** Anything that cites an LR item is shown as pending legal review until #57 is done.
+- **Legal review.** Anything that cites an LR item is shown as pending legal review until #261 is done.
 
 The schema (JSON Schema draft 2020-12) is [`schemas/art50-transparency-research.schema.json`](../../schemas/art50-transparency-research.schema.json). Version 1.0.0, which the validation run used, was printed in this section; version 1.1.0 (#120) moved it to that file and replaced the free-text `libraryEntry` of a statistical criterion (for example "policy.eu-aia.art50-disclosure-probe@1 (proposed)") with a reference to the threshold library, `{id, version, parameters}`, or null for a descriptive criterion. The parameters are the entry's values that give the criterion's band; for the entries that derive a bound from a declared rate they are the library defaults, which give the band used when nothing is declared. CI runs `node schemas/validate-art50-research.mjs`: the schema and the checks below.
 

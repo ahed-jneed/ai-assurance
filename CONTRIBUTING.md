@@ -28,7 +28,7 @@ Milestones group issues by when we plan to do them: `v0.1 Public preview`, `v0.2
 
 **Ask before you start anything large.** Open an issue or a discussion first, so nobody spends a week on something we cannot merge. Please also read section 3 of the product direction, ["What we will not build"](docs/product/direction.md#3-what-we-will-not-build), before you propose a new feature.
 
-**You do not have to write code.** Lawyers, auditors and standards experts can help a great deal by checking the regulatory and methodology content. The expert-review issue (EXPERT_REVIEW_ISSUE_LINK) explains what needs review and how to send your comments.
+**You do not have to write code.** Lawyers, auditors and standards experts can help a great deal by checking the regulatory and methodology content. The [expert-review issue (#261)](https://github.com/ahed-jneed/ai-assurance/issues/261) explains what needs review and how to send your comments.
 
 **Questions** go to [GitHub Discussions](https://github.com/ahed-jneed/ai-assurance/discussions). No question is too basic.
 

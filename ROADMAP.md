@@ -15,13 +15,13 @@ Every roadmap issue in M0, M1 and M2 is closed with a merged PR. In M3, seven is
 | [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion | 18 closed | none |
 | [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification | 28 closed | [#37], [#38], [#199], [#201], [#202], [#203], [#204] |
 
-[#57] (owner actions) has no milestone and is not a roadmap item; see [Owner actions](#owner-actions-outside-the-roadmap).
+[#261] (expert review) is not a roadmap item; see [Owner actions](#owner-actions-outside-the-roadmap).
 
 What did not ship as planned:
 
-- **Pack #2 (EN 18286 + ISO/IEC 42001)** is built but ships as drafts until the owner actions in [#57] are done ([decision D-37](docs/product/decisions.md)).
+- **Pack #2 (EN 18286 + ISO/IEC 42001)** is built but ships as drafts until the expert review tracked in [#261] is done ([decision D-37](docs/product/decisions.md)).
 - **Legal content** (the rule pack, the Art 50 research, the LL144 pack) shows as pending qualified legal review ([decisions D-02, D-17 and D-34](docs/product/decisions.md)).
-- **GitHub CI** has been refused since about 06:15 UTC on 14 Nov 2026 because of an account billing problem only the owner can fix ([#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6872999518)). The last two merges, [PR #195] and [PR #197], had green PR CI before the stoppage; their post-merge `main` runs are unverified until they are re-run, and later work is checked locally.
+- **GitHub CI** has been refused since about 06:15 UTC on 14 Nov 2026 because of an account billing problem only the owner can fix. The last two merges, [PR #195] and [PR #197], had green PR CI before the stoppage; their post-merge `main` runs are unverified until they are re-run, and later work is checked locally.
 
 ## Issues and their merged PRs
 
@@ -251,17 +251,17 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 
 | What to watch | Why | Where |
 |---|---|---|
-| GitHub Actions billing | Every CI job is refused before it starts; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | [#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6872999518) |
+| GitHub Actions billing | Every CI job is refused before it starts; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | — |
 | Dev server SSR 500 on a cold start | Not reproduced in about 15 cold starts; server-rendering errors are now logged with their stack, so a recurrence names its cause. `build/ssr-error-log.ts` patches Vinext and its test fails if an upgrade moves the anchor | `site-app/build/ssr-error-log.ts`; [#204] |
 | Release does not recheck LL144 per-group runs | `assertReleasable` rechecks the report gates only; capture already refuses incomplete runs ([decision D-48](docs/product/decisions.md)) | `site-app/lib/commands/reports.ts` (`assertReleasable`); [#202] |
 | Building beside a running e2e server | `npm run build` or `npm run check` in the same checkout as a running e2e server rewrites `dist/` mid-run | `site-app/e2e/README.md`; [#194] |
 | Sign-ins are recorded after an 8-hour gap, not at session start | The Access log shows first requests, not sessions ([decision D-41](docs/product/decisions.md)) | `site-app/lib/access-events.ts` |
 | `pruneSignIns` runs on the request path | Pruning happens when a sign-in is recorded; a scheduled handler would take it off the request path | `site-app/lib/tenancy.ts` |
-| Large engagements on real D1 | Local tests cannot reproduce production D1 limits; the owner offered a load test of an engagement with more than 1,000 assurance records after a deploy | [#57, comment](https://github.com/ahed-jneed/ai-assurance/issues/57#issuecomment-6681963181) |
+| Large engagements on real D1 | Local tests cannot reproduce production D1 limits; the owner offered a load test of an engagement with more than 1,000 assurance records after a deploy | — |
 
 ## Owner actions (outside the roadmap)
 
-[#57] tracks what only the owner can provide. It is not a roadmap item and has no milestone. The issues it unblocks shipped without it, with the affected content marked unapproved, pending review or draft.
+[#261] tracks the expert review in the table below: qualified legal review, practitioner review and checks against licensed standards. The other actions are ones only the owner can provide. None of this is a roadmap item. The issues it unblocks shipped without it, with the affected content marked unapproved, pending review or draft.
 
 | Action | Unblocks |
 |---|---|
@@ -419,7 +419,7 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 [#50]: https://github.com/ahed-jneed/ai-assurance/issues/50
 [#51]: https://github.com/ahed-jneed/ai-assurance/issues/51
 [#52]: https://github.com/ahed-jneed/ai-assurance/issues/52
-[#57]: https://github.com/ahed-jneed/ai-assurance/issues/57
+[#261]: https://github.com/ahed-jneed/ai-assurance/issues/261
 [#58]: https://github.com/ahed-jneed/ai-assurance/issues/58
 [#59]: https://github.com/ahed-jneed/ai-assurance/issues/59
 [#60]: https://github.com/ahed-jneed/ai-assurance/issues/60

@@ -76,7 +76,7 @@ Two rules sit under all five:
 
 ## 6. Open questions
 
-- **Law and standards.** The research for [#8] ([PR #43]) read the Official Journal texts of Regulation (EU) 2026/1744 and Implementing Decision (EU) 2026/2274 from the Publications Office, because EUR-Lex refuses automated fetches. The decision that cites EN 18286:2026 is dated 12 October 2026 and was published in the OJ on 14 October 2026; 19 October 2026 was the date of the Commission's news item. Ten points of interpretation, LR-01 to LR-10, await qualified legal review, which [#57] tracks; until then [#18] shows the affected content as pending legal review ([D-02](decisions.md)). No AI Act notified body could be verified in NANDO.
+- **Law and standards.** The research for [#8] ([PR #43]) read the Official Journal texts of Regulation (EU) 2026/1744 and Implementing Decision (EU) 2026/2274 from the Publications Office, because EUR-Lex refuses automated fetches. The decision that cites EN 18286:2026 is dated 12 October 2026 and was published in the OJ on 14 October 2026; 19 October 2026 was the date of the Commission's news item. Ten points of interpretation, LR-01 to LR-10, await qualified legal review, which [#261] tracks; until then [#18] shows the affected content as pending legal review ([D-02](decisions.md)). No AI Act notified body could be verified in NANDO.
 - **Unconfirmed claims the design must not lean on:** the EEOC's rescission of its Uniform Guidelines' interpretive parts (the Justice Department's 9 June 2026 opinion against those guidelines is confirmed), and whether AIUC-1's "quarterly" means retests or revisions of the standard (plan for both). AIUC-1 content licensing is unconfirmed.
 - **Scope, decided on 5 November 2026:** the Art 4a record is [#60]; per-practice SSO and MFA, and Colorado and CCPA ADMT audits, are on the Later list; the other items once listed as not yet placed are placed as [ROADMAP.md](../../ROADMAP.md#placed-on-5-nov-2026) shows.
 
@@ -123,6 +123,6 @@ Two rules sit under all five:
 [#31]: https://github.com/ahed-jneed/ai-assurance/issues/31
 [#32]: https://github.com/ahed-jneed/ai-assurance/issues/32
 [#33]: https://github.com/ahed-jneed/ai-assurance/issues/33
-[#57]: https://github.com/ahed-jneed/ai-assurance/issues/57
+[#261]: https://github.com/ahed-jneed/ai-assurance/issues/261
 [#60]: https://github.com/ahed-jneed/ai-assurance/issues/60
 [PR #43]: https://github.com/ahed-jneed/ai-assurance/pull/43
