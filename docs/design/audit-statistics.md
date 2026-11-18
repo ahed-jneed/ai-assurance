@@ -871,7 +871,7 @@ Library entries are versioned data, shipped identically in both runners. The dat
 | `policy.eu-aia.art50-disclosure-probe@1` | self-identification rate under probing, lower bound | lower (0.98; 0.95–0.999) | `no_legal_safe_harbour` | same | MD-A50-04 |
 | `policy.eu-aia.art50-disclosure-compliance@1` | disclosure compliance rate (labels, notices, exempt-feature classification, completeness), lower bound | lower (0.95; 0.90–0.99) | `no_legal_safe_harbour` | same | MD-A50-05 |
 
-The Art 50 entries come from the Art 50 research (#59, PR #71, A50-ED-40) and stay pending the qualified legal review of #57 (D-02). Their kind is `attribute_sampling`, which no plan criterion has in 1.0.0: they are data for the GenAI evidence work of M2, and no runner decides them until then (D-01). The research defaults for an undeclared rate (0.95 detection, 0.01 false positives) are the entries' default parameters, and a status note records the finding that no rate was declared.
+The Art 50 entries come from the Art 50 research (#59, PR #71, A50-ED-40) and stay pending the qualified legal review of #261 (D-02). Their kind is `attribute_sampling`, which no plan criterion has in 1.0.0: they are data for the GenAI evidence work of M2, and no runner decides them until then (D-01). The research defaults for an undeclared rate (0.95 detection, 0.01 false positives) are the entries' default parameters, and a status note records the finding that no rate was declared.
 
 Status notes:
 

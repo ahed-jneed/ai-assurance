@@ -5,7 +5,7 @@ What the platform does on `main` as of **14 Nov 2026**, after the November 2026 
 **Status** is one of:
 
 - **Implemented**: in the code on `main`, and covered by the tests named in the row. A row with a gap in its tests says so.
-- **Implemented, content pending review**: the code ships, but the legal or standards content it carries is marked pending qualified review or draft until the owner actions of [#57] are done ([decisions D-02, D-03, D-17, D-34 and D-37](product/decisions.md)).
+- **Implemented, content pending review**: the code ships, but the legal or standards content it carries is marked pending qualified review or draft until the expert review tracked in [#261] is done ([decisions D-02, D-03, D-17, D-34 and D-37](product/decisions.md)).
 - **Specified**: designed in a document in this repository, not built.
 - **Planned**: on the [Later list](../ROADMAP.md#later) or the watch list, with neither a design nor code.
 
@@ -121,7 +121,7 @@ The platform is a reference implementation for independent AI auditors. It is no
 
 | Capability | Status | Implemented in | Tests |
 |---|---|---|---|
-| Report model v2: engagement type, assurance level and ISAE 3000 conclusion types, with our own wording; readiness with gaps; firm-level report settings ([#20], [#111]) | Implemented, content pending review (practitioner review in [#57]) | `lib/domain/report-model.ts`, `lib/domain/report-gates.ts`, `lib/report-settings.ts`, `drizzle/0010_practice_report_settings.sql` | Vitest `lib/domain/report-model.test.ts`, `lib/domain/report-gates.test.ts`; e2e `e2e/report-settings.spec.ts` |
+| Report model v2: engagement type, assurance level and ISAE 3000 conclusion types, with our own wording; readiness with gaps; firm-level report settings ([#20], [#111]) | Implemented, content pending review (practitioner review in [#261]) | `lib/domain/report-model.ts`, `lib/domain/report-gates.ts`, `lib/report-settings.ts`, `drizzle/0010_practice_report_settings.sql` | Vitest `lib/domain/report-model.test.ts`, `lib/domain/report-gates.test.ts`; e2e `e2e/report-settings.spec.ts` |
 | Fixed report snapshots, approval by someone other than the creator, release by someone other than the approver, automatic supersession, withdrawal (also of a superseded report the client still reads, D-45), client notification, guidance that follows the package's state; packages captured before v2 are recaptured (D-27); the completion checklist and "Outstanding at capture" list exactly the server's capture blockers, including incomplete LL144 per-group runs (D-48) ([#14], [#94], [#201], [#202]) | Implemented | `lib/workflow/report-release.ts`, `lib/workflow-state.ts` (`isWithdrawable`), `lib/domain/capture-gates.ts`, `lib/report-presentation.ts`, `lib/commands/reports.ts`, `lib/report-package.ts`, `app/api/report-package/route.ts`, `app/audit-program/report-release.tsx` | Vitest `lib/workflow/report-release.test.ts`, `lib/workflow/report-release-commands.test.ts`, `lib/commands/reports.test.ts`, `lib/domain/capture-gates.test.ts`, `lib/report-presentation.test.ts`, `lib/report-package.test.ts`, `app/audit-program/report-release.test.tsx`, `app/release-ui-defects.test.tsx`; e2e `e2e/report-release.spec.ts` |
 | Server-rendered print view of a report | Implemented | `app/report/page.tsx`, `app/report/report-markup.tsx` | Vitest `app/report/report-render.test.tsx` |
 | Ed25519-signed dossiers per audience, scoped exports for large files, wrapped practice keys (`DOSSIER_KEK`) and admin-only rotation; offline verification ([#25], [#83]) | Implemented | `lib/dossier.ts`, `lib/dossier-scope.ts`, `lib/signing-keys.ts`, `app/api/dossier/route.ts`, `app/api/dossier/keys/route.ts`, `engine/assurance.py`; [docs/security/signing-keys.md](security/signing-keys.md) | Vitest `lib/signing-keys.test.ts`, `lib/dossier-scope.test.ts`; harness `scripts/signing-keys-check.mjs`; engine `engine/tests/test_assurance.py`; e2e `e2e/dossier.spec.ts` |
@@ -147,7 +147,7 @@ The platform is a reference implementation for independent AI auditors. It is no
 | Capability | Status | Implemented in | Tests |
 |---|---|---|---|
 | One source of truth: the root `schemas/`, `templates/`, `engine/` and `docs/obligation-subitems.json` are canonical, and generated copies in `site-app/` are checked (D-14) ([#3]) | Implemented | `scripts/sync-generated.mjs` | `npm run check:sync` |
-| CI with the `engine`, `web` and `e2e` jobs; a warning-free build; lint with no warnings ([#1]) | Implemented; GitHub Actions has been refused since 14 Nov 2026 for an account billing problem ([#57]) | `.github/workflows/ci.yml`, `scripts/strict-build.mjs`, `scripts/run-checks.mjs` | `npm run check` |
+| CI with the `engine`, `web` and `e2e` jobs; a warning-free build; lint with no warnings ([#1]) | Implemented; GitHub Actions has not run since 14 Nov 2026 for a hosting-account reason unrelated to the code | `.github/workflows/ci.yml`, `scripts/strict-build.mjs`, `scripts/run-checks.mjs` | `npm run check` |
 | Idempotent local D1 migrations | Implemented | `scripts/db-migrate-local.mjs` | used by `e2e/server.mjs` on every e2e run |
 | The e2e server refuses an incomplete build: it follows the Worker's imports and the client assets the RSC manifest names, and exits with "run `npm run build`" before touching the database ([#199]) | Implemented | `e2e/build-files.mjs`, `e2e/server.mjs` | Vitest `e2e/build-files.test.ts` |
 | Server-rendering errors on the development server are logged with their stack instead of a silent 500 ([#204]) | Implemented | `build/ssr-error-log.ts` (development-only Vite plugin) | Vitest `build/ssr-error-log.test.ts` (fails if a Vinext upgrade moves the anchor) |
@@ -208,7 +208,7 @@ The dated documents in `docs/` (5 to 8 October 2026: the architecture, methodolo
 [#37]: https://github.com/ahed-jneed/ai-assurance/issues/37
 [#50]: https://github.com/ahed-jneed/ai-assurance/issues/50
 [#51]: https://github.com/ahed-jneed/ai-assurance/issues/51
-[#57]: https://github.com/ahed-jneed/ai-assurance/issues/57
+[#261]: https://github.com/ahed-jneed/ai-assurance/issues/261
 [#58]: https://github.com/ahed-jneed/ai-assurance/issues/58
 [#60]: https://github.com/ahed-jneed/ai-assurance/issues/60
 [#61]: https://github.com/ahed-jneed/ai-assurance/issues/61

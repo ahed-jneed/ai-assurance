@@ -1,6 +1,6 @@
 name: Regulatory content correction
 description: A regulatory, standards or legal mapping is wrong or out of date.
-labels: [regulatory-content]
+labels: ["area: regulatory content"]
 body:
   - type: markdown
     attributes:
