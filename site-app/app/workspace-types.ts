@@ -48,6 +48,11 @@ export type Invitation = {
   invited_by_name?: string | null;
   created_at: string;
   expires_at: string;
+  /**
+   * The invitee's sign-up link with the built-in accounts; null when the
+   * installation has no DOSSIER_KEK to sign it, absent in other modes.
+   */
+  signup_path?: string | null;
 };
 export type WorkspaceData = {
   identity: {
@@ -57,6 +62,8 @@ export type WorkspaceData = {
     practiceAdmin?: boolean;
     /** Whether the signed-in person is a platform operator (#151). */
     operator?: boolean;
+    /** Signed in with a built-in account, which can change its password. */
+    localAccount?: boolean;
   };
   tenantId: string;
   memberships: { tenant_id: string; name: string; role: Role }[];

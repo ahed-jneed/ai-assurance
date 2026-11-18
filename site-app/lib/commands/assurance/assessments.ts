@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { assertionSchema, impactSchema } from "../../assurance-core";
 import { addRecord } from "../../assurance-store";
 import { ApiError } from "../../http";

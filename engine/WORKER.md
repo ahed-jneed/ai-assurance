@@ -12,7 +12,6 @@ Provision these values using your secret manager or service environment; do not 
 | --- | --- |
 | `ASSURANCE_SITE_ORIGIN` | HTTPS origin only, e.g. `https://your-assurance-site.example` |
 | `ASSURANCE_WORKER_TOKEN` | Application worker credential enrolled by the platform |
-| `ASSURANCE_SITE_SERVICE_TOKEN` | Optional separate Sites service-access credential for a restricted Site |
 | `ASSURANCE_WORKER_ID` | Enrolled worker identifier |
 | `ASSURANCE_WORKER_IMAGE_DIGEST` | Enrolled compute identity, `sha256:<64 lowercase hex>` |
 | `ASSURANCE_COMPUTE_IMAGE` | For Docker: locally available `repository@sha256:<digest>` |
@@ -31,7 +30,7 @@ A client's own worker adds `--client-data-dir D:\ClientData\assurance` (see [Cli
 
 `--once` exits after one attempt or an idle response. Long-running mode polls every five seconds by default. `--heartbeat-seconds` defaults to ten; `--compute-timeout` to 300 (maximum 600); `--maximum-jobs` to 100; `--transport-timeout`, the per-read idle timeout described under [Verification and current limits](#verification-and-current-limits), to 15 (maximum 120). Use a dedicated workspace owned by the service account, an encrypted filesystem with a disk quota, and retention/archival procedures. The worker stops acquiring leases when its retained-job count reaches the configured limit. It preserves inputs, request bytes, exact results and completion bodies for reconciliation; it never silently deletes evidence. Local create-once files do not provide object-lock retention or independent custody attestation.
 
-Application authorization uses `Authorization: Bearer <application token>`. The optional platform credential uses `OAI-Sites-Authorization: Bearer <platform service token>`. They have separate purposes. Credentials are read from the environment; neither is copied into the compute environment, job files or result envelope. Redirects are rejected. HTTPS certificate verification is provided by Python's default TLS context. Loopback HTTP is available only through the test constructor, not the public CLI.
+Application authorization uses `Authorization: Bearer <application token>`. Behind Cloudflare Access, `/api/runner` needs a Bypass policy (see `docs/security/identity.md`), because runners carry no Access session. The credential is read from the environment; it is never copied into the compute environment, job files or result envelope. Redirects are rejected. HTTPS certificate verification is provided by Python's default TLS context. Loopback HTTP is available only through the test constructor, not the public CLI.
 
 ## Exact wire contract
 
@@ -239,7 +238,7 @@ Build the core image from the engine directory, replacing the base image with a 
 docker build --build-arg PYTHON_IMAGE=python@sha256:<reviewed-base-digest> -t assurance-compute:reviewed engine
 ```
 
-The delivered Dockerfile installs only `requirements-image.txt` (`cryptography` for signature verification and `zstandard` for Inspect `.eval` logs, with their dependencies), hash-locked and from wheels only; the base must stay on CPython 3.12, the one supported version (`README.md`, section Packaging). Its default Python tag is a development convenience, not a production pin. Optional runtimes must be included in an operator-owned derived image from a reviewed hash-locked dependency set; do not install from claimed job content. The optional requirement pins are only an initial baseline. The resulting image digest, full transitive/native dependency lock and native golden-fixture results must be enrolled together.
+The delivered Dockerfile installs only `requirements-image.txt` (`cryptography` for signature verification and `zstandard` for Inspect `.eval` logs, with their dependencies), hash-locked and from wheels only; the base must stay on CPython 3.12, the one supported version (`README.md`, section Packaging). Its default base is `python:3.12.14-slim` pinned by the tag's multi-arch index digest, so the default build is reproducible; production still reviews and enrolls its own base digest. Optional runtimes must be included in an operator-owned derived image from a reviewed hash-locked dependency set; do not install from claimed job content. The optional requirement pins are only an initial baseline. The resulting image digest, full transitive/native dependency lock and native golden-fixture results must be enrolled together.
 
 Use a host service with a rootless Docker CLI or equivalent controlled container launcher. Do not give an inference container the Docker socket. The supplied worker's Docker executor launches only a **locally present digest-pinned image** with `--pull=never`, network none, read-only image, all capabilities dropped, no new privileges, a nonroot user, default 1 CPU/1 GiB memory with no extra swap, 64 PIDs, file-descriptor/file-size bounds and a 64 MiB temporary filesystem. Inputs mount read-only; the separate output mount contains created evidence. It terminates the generated job container on timeout or lost lease, including native child processes. Host egress belongs to the transport service; inference containers receive neither credentials nor network.
 

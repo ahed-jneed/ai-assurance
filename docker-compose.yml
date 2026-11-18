@@ -1,0 +1,15 @@
+# Self-host the AI Assurance workspace:
+#   docker compose up -d
+# then open http://localhost:8787 and create the owner account.
+services:
+  ai-assurance:
+    build: ./site-app
+    image: ai-assurance
+    ports:
+      - "8787:8787"
+    volumes:
+      - ai-assurance-data:/data
+    restart: unless-stopped
+
+volumes:
+  ai-assurance-data:

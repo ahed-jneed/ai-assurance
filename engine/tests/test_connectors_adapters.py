@@ -17,7 +17,7 @@ from engine.contract import validate_report
 from engine.diagnostics import _inference, run, sha256, validate_config
 from engine.errors import EngineError
 from engine.model_diagnostics import permutation_importance, perturbation
-from engine.optional_adapters import NativeTreeAdapter, NumericAdapter, load_adapter, require_artifact, scoring_failure_code
+from engine.optional_adapters import NativeTreeAdapter, NumericAdapter, load_adapter, native_scorer_command, require_artifact, scoring_failure_code
 from engine.tests.test_diagnostics import config, jsonschema, schema_violations
 
 try:
@@ -195,6 +195,63 @@ class ConnectorAdapterTests(unittest.TestCase):
             with self.assertRaises(EngineError) as error:
                 adapter.predict([{"x": 1.0}])
         self.assertEqual(error.exception.code, "model_objective_mismatch")
+
+    def test_pmml_declarations_are_rejected_in_every_xml_encoding(self):
+        pmml = self.directory/"model.pmml"
+        hostile = '<?xml version="1.0" encoding="{encoding}"?><!DOCTYPE PMML [<!ENTITY x SYSTEM "file:///etc/passwd">]><PMML>&x;</PMML>'
+        cases = [
+            ("utf-16-le", b"\xff\xfe", "UTF-16"), ("utf-16-be", b"\xfe\xff", "UTF-16"),
+            ("utf-16-le", b"", "UTF-16"), ("utf-16-be", b"", "UTF-16"),
+            ("utf-32-le", b"\xff\xfe\x00\x00", "UTF-32"), ("utf-32-be", b"\x00\x00\xfe\xff", "UTF-32"),
+            ("utf-8", b"\xef\xbb\xbf", "UTF-8"), ("utf-8", b"", "UTF-8"),
+        ]
+        for codec, bom, declared in cases:
+            for text in (hostile.format(encoding=declared), '<!ENTITY x "y"><PMML/>', '<!doctype PMML><PMML/>'):
+                with self.subTest(codec=codec, bom=bom, text=text[:20]):
+                    pmml.write_bytes(bom+text.encode(codec))
+                    with self.assertRaises(EngineError) as error:
+                        require_artifact(pmml, "pmml", True)
+                    self.assertEqual(error.exception.code, "model_artifact_invalid")
+                    self.assertIn("entities", str(error.exception))
+        # Clean documents in each supported encoding are accepted.
+        for codec, bom, declared in cases:
+            with self.subTest(clean=codec, bom=bom):
+                pmml.write_bytes(bom+f'<?xml version="1.0" encoding="{declared}"?><PMML version="4.4"/>'.encode(codec))
+                self.assertEqual(require_artifact(pmml, "pmml", True)[0], pmml.resolve())
+                pmml.write_bytes(bom+'<PMML version="4.4"/>'.encode(codec))
+                require_artifact(pmml, "pmml", True)
+        # Encodings that cannot be checked reliably are refused, not guessed at.
+        unsupported = [
+            '<?xml version="1.0" encoding="UTF-7"?><PMML/>'.encode("ascii"),
+            '<?xml version="1.0" encoding="UTF-16"?><PMML/>'.encode("utf-8"),  # declaration contradicts the bytes
+            b"\xef\xbb\xbf" + '<?xml version="1.0" encoding="ISO-8859-1"?><PMML/>'.encode("ascii"),
+            '<?xml version="1.0" encoding="cp037"?><PMML/>'.encode("cp037"),  # EBCDIC
+            " <PMML/>".encode("utf-16-le"),  # wide text without a recognisable start
+            b"\xff\xfe" + b"\x00\xd8",  # lone surrogate in UTF-16
+        ]
+        for data in unsupported:
+            with self.subTest(unsupported=data[:24]):
+                pmml.write_bytes(data)
+                with self.assertRaises(EngineError) as error:
+                    require_artifact(pmml, "pmml", True)
+                self.assertEqual(error.exception.code, "model_artifact_invalid")
+
+    @requires_numpy
+    def test_native_scorer_runs_isolated_from_the_working_directory(self):
+        command = native_scorer_command()
+        self.assertEqual(command[:3], [sys.executable, "-I", "-c"])
+        self.assertNotIn("-m", command)
+        self.assertEqual(Path(command[-1]), Path(model_process.__file__).resolve().parent.parent)
+        # A planted engine package in the working directory must not shadow the real one.
+        planted = self.directory/"cwd"
+        (planted/"engine").mkdir(parents=True)
+        marker = planted/"imported"
+        (planted/"engine"/"__init__.py").write_text(f"open({str(marker)!r}, 'w').close()\n", encoding="utf-8")
+        (planted/"json.py").write_text(f"open({str(marker)!r}, 'w').close()\n", encoding="utf-8")
+        process = subprocess.run(command, input="{}", capture_output=True, text=True, timeout=60, cwd=planted, check=False)
+        self.assertFalse(marker.exists())
+        self.assertEqual(process.returncode, 2, process.stderr)
+        self.assertEqual(json.loads(process.stdout), {"error": "model_inference_failed"})
 
     def test_running_out_of_memory_is_not_reported_as_a_model_defect(self):
         # Loading: the ONNX and PMML wrappers let MemoryError through.

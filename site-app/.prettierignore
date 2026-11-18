@@ -4,7 +4,6 @@
 # Generated output, lockfiles and checkout-local tool state
 dist/
 coverage/
-.openai/
 package-lock.json
 
 # Copies and vendored sources kept byte-identical with their upstream

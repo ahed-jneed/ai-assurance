@@ -31,7 +31,6 @@ from engine.tests.test_connectors_adapters import THRESHOLD_ROWS, FakeOnnxSessio
 
 # Same shape as an enrolled platform token: two UUIDs, 72 characters.
 TOKEN = "00000000-0000-4000-8000-000000000001"+"00000000-0000-4000-8000-000000000002"
-PLATFORM = "dummy-platform-service-token-for-tests"
 WORKER_ID = "worker-fixture"
 IMAGE = "sha256:"+"a"*64
 CSV = b"actual,predicted,group\n1,1,A\n1,1,A\n0,0,A\n0,0,A\n1,1,B\n1,0,B\n0,0,B\n0,0,B\n"
@@ -160,8 +159,7 @@ class RunnerServer:
     and lookup, strict per-operation envelopes, format filtering and
     {"idle": true}, attempt pins and leases, HMAC verification of complete
     and fail bodies, the result envelope and frozen-request checks,
-    duplicate completion, and GET input authorization. A restricted Site's
-    front door additionally requires the platform token. Database, R2 and
+    duplicate completion, and GET input authorization. Database, R2 and
     membership checks are out of scope. Fault injection (transient_*,
     truncated_get, redirect, heartbeat_rejected) simulates infrastructure.
     """
@@ -198,9 +196,6 @@ class RunnerServer:
                 self.respond({"error": message}, status)
 
             def authenticated(self):
-                if self.headers.get("OAI-Sites-Authorization") != "Bearer "+PLATFORM:
-                    self.reject(401, "Sites service authentication required")
-                    return False
                 match = re.fullmatch(r"Bearer ([a-zA-Z0-9-]{60,100})", self.headers.get("Authorization") or "")
                 if not match:
                     self.reject(401, "Runner authentication required")
@@ -400,7 +395,7 @@ class RunnerServer:
         self.thread.join(timeout=5)
 
     def transport(self):
-        return Transport(self.origin, TOKEN, PLATFORM, timeout=2, retries=2, allow_local_http=True)
+        return Transport(self.origin, TOKEN, timeout=2, retries=2, allow_local_http=True)
 
 
 class WorkerTests(unittest.TestCase):
@@ -1236,13 +1231,13 @@ class WorkerTests(unittest.TestCase):
                     raise KeyboardInterrupt
                 return
             real_sleep(seconds)
-        def loopback(site, token, platform, *, timeout):
+        def loopback(site, token, *, timeout):
             # The public CLI refuses plain HTTP; only this fixture may use it.
             self.assertEqual(site, server.origin)
-            return Transport(site, token, platform, timeout=timeout, allow_local_http=True)
+            return Transport(site, token, timeout=timeout, allow_local_http=True)
         argv = ["--site", server.origin, "--worker-id", "worker-fixture", "--image-digest", IMAGE, "--workspace", str(self.root/"daemon"), "--poll-seconds", "1.5", "--heartbeat-seconds", "1", *arguments]
         stdout, stderr = io.StringIO(), io.StringIO()
-        with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM}), patch("engine.worker.Transport", side_effect=loopback), patch("engine.worker.time.sleep", side_effect=sleep), redirect_stdout(stdout), redirect_stderr(stderr):
+        with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN}), patch("engine.worker.Transport", side_effect=loopback), patch("engine.worker.time.sleep", side_effect=sleep), redirect_stdout(stdout), redirect_stderr(stderr):
             code = worker_main(argv)
         return code, [json.loads(line) for line in stdout.getvalue().splitlines()], stderr.getvalue()
 
@@ -1368,7 +1363,7 @@ class WorkerTests(unittest.TestCase):
     def raw(self, server, method, *, body=None, token=TOKEN, sign=True, query=""):
         """One request that bypasses the worker's own encoders: (status, JSON or bytes)."""
         data = body if body is None or isinstance(body, bytes) else json.dumps(body).encode("utf-8")
-        headers = {"Authorization": "Bearer "+token, "OAI-Sites-Authorization": "Bearer "+PLATFORM}
+        headers = {"Authorization": "Bearer "+token}
         if data is not None and sign:
             headers["X-Result-Signature"] = result_signature(token, data)
         request = urllib.request.Request(server.origin+"/api/runner"+query, data=data, method=method, headers=headers)
@@ -1459,9 +1454,9 @@ class WorkerTests(unittest.TestCase):
 
     def test_cli_once_exit_codes_follow_the_outcome(self):
         def once(server, token=TOKEN):
-            loopback = lambda site, token, platform, *, timeout: Transport(site, token, platform, timeout=timeout, allow_local_http=True)
+            loopback = lambda site, token, *, timeout: Transport(site, token, timeout=timeout, allow_local_http=True)
             with patch("engine.worker.Transport", side_effect=loopback):
-                code, stdout, _ = self.cli(["--site", server.origin, "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--heartbeat-seconds", "1", "--once"], {"ASSURANCE_WORKER_TOKEN": token, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM})
+                code, stdout, _ = self.cli(["--site", server.origin, "--worker-id", WORKER_ID, "--image-digest", IMAGE, "--workspace", str(self.root/"cli"), "--heartbeat-seconds", "1", "--once"], {"ASSURANCE_WORKER_TOKEN": token})
             return code, json.loads(stdout)
         with RunnerServer(claims=[]) as server:
             self.assertEqual(once(server), (0, {"state": "idle"}))
@@ -1552,11 +1547,11 @@ class WorkerTests(unittest.TestCase):
         keeper = LeaseKeeper(None, Claim.parse(claim_body()), time.monotonic()-1)
         with self.assertRaises(LeaseLost):
             keeper.valid()
-        with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN, "ASSURANCE_SITE_SERVICE_TOKEN": PLATFORM, "HTTP_PROXY": "fixture-proxy", "DOCKER_HOST": "unix:///fixture-rootless-docker.sock"}):
+        with patch.dict(os.environ, {"ASSURANCE_WORKER_TOKEN": TOKEN, "ASSURANCE_OPERATOR_SECRET": "fixture-secret", "HTTP_PROXY": "fixture-proxy", "DOCKER_HOST": "unix:///fixture-rootless-docker.sock"}):
             environment = stripped_compute_env()
             control = docker_control_env()
         self.assertNotIn("ASSURANCE_WORKER_TOKEN", environment)
-        self.assertNotIn("ASSURANCE_SITE_SERVICE_TOKEN", environment)
+        self.assertNotIn("ASSURANCE_OPERATOR_SECRET", environment)
         self.assertNotIn("HTTP_PROXY", environment)
         self.assertNotIn("DOCKER_HOST", environment)
         self.assertEqual(control["DOCKER_HOST"], "unix:///fixture-rootless-docker.sock")

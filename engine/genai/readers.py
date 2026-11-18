@@ -247,12 +247,64 @@ def safe_entry_name(name: str) -> bool:
     return ".." not in name.split("/")
 
 
+_EOCD = b"PK\x05\x06"
+_EOCD64 = b"PK\x06\x06"
+_EOCD64_LOCATOR = b"PK\x06\x07"
+_CENTRAL_HEADER = b"PK\x01\x02"
+
+
+def _eocd_offset(data: bytes):
+    """Where zipfile looks for the end-of-central-directory record, or None."""
+    if len(data) >= 22 and data[-22:-18] == _EOCD and data[-2:] == b"\x00\x00":
+        return len(data) - 22
+    floor = max(len(data) - 0xFFFF - 22, 0)
+    found = data.rfind(_EOCD, floor)
+    return found if found >= 0 and found + 22 <= len(data) else None
+
+
+def check_central_directory(data: bytes):
+    """Refuse an archive whose declared or possible entry count exceeds the limits.
+
+    zipfile.ZipFile builds a ZipInfo for every central-directory record before
+    any limit can be checked, so a small archive of millions of tiny records
+    costs hundreds of megabytes. This reads the end records (and the ZIP64 ones)
+    directly and bounds the count from the bytes themselves.
+    """
+    eocd = _eocd_offset(data)
+    require(eocd is not None, "zip_invalid", "no end of central directory record")
+    disk_entries, total_entries, cd_size = struct.unpack("<HHI", data[eocd + 8: eocd + 16])
+    counts = [disk_entries, total_entries]
+    sizes = [cd_size]
+    locator = eocd - 20
+    if locator >= 0 and data[locator: locator + 4] == _EOCD64_LOCATOR:
+        locator_disk, record_offset, disks = struct.unpack("<IQI", data[locator + 4: locator + 20])
+        require(locator_disk == 0 and disks <= 1, "zip_invalid", "multi-disk archive")
+        # 0xFFFF / 0xFFFFFFFF in the classic record defer to the ZIP64 record.
+        counts = [count for count in counts if count != 0xFFFF]
+        sizes = [size for size in sizes if size != 0xFFFFFFFF]
+        # zipfile reads the ZIP64 record at the locator's offset, or directly
+        # before the locator when data is prepended: bound both.
+        candidates = [offset for offset in {record_offset, locator - 56} if 0 <= offset <= locator - 56 and data[offset: offset + 4] == _EOCD64]
+        require(candidates, "zip_invalid", "ZIP64 end of central directory record not found")
+        for offset in candidates:
+            disk_entries64, total_entries64, cd_size64 = struct.unpack("<QQQ", data[offset + 24: offset + 48])
+            counts += [disk_entries64, total_entries64]
+            sizes.append(cd_size64)
+    require(max(counts, default=0) <= limits.MAX_ZIP_ENTRIES, "zip_invalid", "too many entries")
+    require(max(sizes, default=0) <= limits.MAX_ZIP_CENTRAL_DIRECTORY_BYTES, "zip_invalid", "central directory too large")
+    # Every record zipfile parses starts with this non-self-overlapping
+    # signature at a distinct offset, so its count bounds the records whatever
+    # the end records claim.
+    require(data.count(_CENTRAL_HEADER) <= limits.MAX_ZIP_ENTRIES, "zip_invalid", "too many entries")
+
+
 class ZipArchive:
     """Central-directory view of an untrusted zip with capped, verified reads of single entries."""
 
     def __init__(self, data: bytes):
         require(len(data) <= limits.MAX_INPUT_FILE_BYTES, "input_too_large")
         self._data = bytes(data)
+        check_central_directory(self._data)
         try:
             archive = zipfile.ZipFile(io.BytesIO(self._data))
             infos = archive.infolist()

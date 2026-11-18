@@ -1,11 +1,29 @@
 // Sign-in and sign-out locations, shared by the server and the browser. The
-// paths are the ones Sites dispatch owns; in the other identity modes the
-// development server (build/sites-vite-plugin.ts) or the Worker entry
-// (lib/identity.ts) answers them. See docs/security/identity.md.
-export const SIGN_IN_PATH = "/signin-with-chatgpt";
-export const SIGN_OUT_PATH = "/signout-with-chatgpt";
-export const CALLBACK_PATH = "/callback";
-const reservedPaths = new Set([SIGN_IN_PATH, SIGN_OUT_PATH, CALLBACK_PATH]);
+// development server (build/dev-sign-in.ts) answers them in the `dev` identity
+// mode and the Worker entry (lib/identity.ts) in every other mode. See
+// docs/security/identity.md.
+export const SIGN_IN_PATH = "/auth/sign-in";
+export const SIGN_OUT_PATH = "/auth/sign-out";
+/** Built-in accounts (`local` mode): first-run owner setup, invited sign-up, password change. */
+export const SETUP_PATH = "/auth/setup";
+export const SIGN_UP_PATH = "/auth/sign-up";
+export const PASSWORD_PATH = "/auth/password";
+const reservedPaths = new Set([
+  SIGN_IN_PATH,
+  SIGN_OUT_PATH,
+  SETUP_PATH,
+  SIGN_UP_PATH,
+  PASSWORD_PATH,
+]);
+/**
+ * The loopback identity headers that the `trusted-headers` and `dev` modes
+ * read (lib/identity.ts): the user id, the email and an optional
+ * percent-encoded UTF-8 full name.
+ */
+export const IDENTITY_HEADER_PREFIX = "x-assurance-user-";
+export const USER_ID_HEADER = IDENTITY_HEADER_PREFIX + "id";
+export const USER_EMAIL_HEADER = IDENTITY_HEADER_PREFIX + "email";
+export const USER_FULL_NAME_HEADER = IDENTITY_HEADER_PREFIX + "name";
 /** Development persona ids, as in fixtures/dev-personas.json. */
 const personaPattern = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -49,19 +67,4 @@ export function signOutPath(returnTo = "/"): string {
     "?" +
     new URLSearchParams({ return_to: safeReturnPath(returnTo) })
   );
-}
-
-/**
- * The sign-in button's text for a build. Only Sites dispatch signs in with
- * ChatGPT, and the development server mocks it, so only the Sites build (whose
- * `defaultMode` is "sites") and the development server name ChatGPT; every
- * other build says "Sign in". Display only: the Worker decides whom it trusts.
- */
-export function signInLabel(build: {
-  devServer: boolean;
-  defaultMode?: "sites";
-}): string {
-  return build.devServer || build.defaultMode === "sites"
-    ? "Sign in with ChatGPT"
-    : "Sign in";
 }

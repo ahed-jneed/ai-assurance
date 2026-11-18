@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { classificationRules } from "../classification-rules";
 import { pinnedPack, requireFeature } from "../criteria/pin";
 import type { PackDocument } from "../criteria/types";

@@ -10,6 +10,7 @@
 // the caller only reads.
 import { signInGapHours, signInRetentionDays } from "./access-events";
 import { selfSignupAllowed } from "./access-policy";
+import { isLocalOwner } from "./local-auth";
 import { db } from "./bindings";
 import { roles, type Role } from "./domain/types";
 import {
@@ -208,7 +209,11 @@ export async function context(tenantId?: string): Promise<Context> {
           403,
           "Your practice access has been revoked. Contact a practice administrator.",
         );
-      else if (!selfSignupAllowed(user.email))
+      else if (
+        !selfSignupAllowed(user.email) &&
+        // The built-in owner account founds the first practice (local mode).
+        !(await isLocalOwner(db(), user.userId))
+      )
         throw new ApiError(
           403,
           "You have no practice membership or pending invitation. Ask a practice administrator to invite " +

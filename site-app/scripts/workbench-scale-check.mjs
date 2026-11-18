@@ -14,7 +14,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import http from "node:http";
 import { createHash } from "node:crypto";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const modules = [
   "index.js",
@@ -22,26 +22,26 @@ const modules = [
     (p) => p !== "index.js" && /\.m?js$/.test(p),
   ),
 ];
-const mf = new Miniflare({
-  modules: modules.map((p) => ({
-    type: "ESModule",
-    path: path.resolve("dist/server", p),
-  })),
-  modulesRoot: path.resolve("dist/server"),
-  compatibilityDate: "2026-05-15",
-  compatibilityFlags: ["nodejs_compat"],
-  // The fixture identity headers below are trusted only because this opts in
-  // to the loopback-only test mode (docs/security/identity.md).
-  bindings: {
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-    SELF_SIGNUP: "open",
-  },
-  d1Databases: { DB: "workbench-scale-fixture" },
-  r2Buckets: { BUCKET: "workbench-scale-fixture-evidence" },
-  d1Persist: false,
-  r2Persist: false,
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: modules.map((p) => ({
+      type: "ESModule",
+      path: path.resolve("dist/server", p),
+    })),
+    modulesRoot: path.resolve("dist/server"),
+    compatibilityDate: "2026-05-15",
+    compatibilityFlags: ["nodejs_compat"],
+    // The fixture identity headers below are trusted only because this opts in
+    // to the loopback-only test mode (docs/security/identity.md).
+    bindings: {
+      IDENTITY_MODE: "trusted-headers",
+      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+      SELF_SIGNUP: "open",
+    },
+    d1Databases: { DB: "workbench-scale-fixture" },
+    r2Buckets: { BUCKET: "workbench-scale-fixture-evidence" },
+  }),
+);
 const testDb = await mf.getD1Database("DB");
 for (const file of (await fs.readdir("drizzle"))
   .filter((f) => f.endsWith(".sql"))
@@ -72,8 +72,8 @@ const owner = "scale-owner",
   reviewer = "scale-reviewer",
   outsider = "scale-outsider";
 const identity = (user) => ({
-  "oai-authenticated-user-id": user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
+  "x-assurance-user-id": user,
+  "x-assurance-user-email": user + "@fixture.invalid",
   Origin: origin,
 });
 async function api(route, { user = owner, body, status = 200 } = {}) {

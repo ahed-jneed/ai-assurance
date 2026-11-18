@@ -6,7 +6,7 @@
 // needed concludes the case, so it needs its evidence when it is recorded; a
 // follow-up decision may be recorded first and its evidence in a later
 // assessment, before closure.
-import { z } from "zod";
+import { z } from "../zod";
 import { monitoringClosureRefusal } from "../preconditions";
 import type { MonitoringCase } from "../workflow-types";
 import {

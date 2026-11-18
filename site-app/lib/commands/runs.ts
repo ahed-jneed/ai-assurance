@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { recordsById } from "../assurance-store";
 import { evaluate } from "../diagnostics";
 import type { Engagement } from "../domain/types";

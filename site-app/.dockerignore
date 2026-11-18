@@ -1,0 +1,12 @@
+node_modules
+dist
+data
+.wrangler
+.vinext
+.test-output
+test-results
+playwright-report
+coverage
+*.log
+.env*
+.dev.vars*

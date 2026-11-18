@@ -3,7 +3,7 @@
 // created within a period, with or without the evidence bytes. Manifest 1.2
 // signs the scope and how many of the report's pinned records it includes;
 // report.json still lists every pin, so the omitted records stay identifiable.
-import { z } from "zod";
+import { z } from "./zod";
 import { ApiError } from "./http";
 
 /** The verifier's bound on files per dossier (engine/assurance.py MAX_FILES). */

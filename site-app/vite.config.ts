@@ -1,45 +1,24 @@
-import { existsSync, readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import { readExecutionProfile } from "./scripts/execution-profile.mjs";
-import { depScanEnvironments } from "./build/dep-scan";
-import { sites } from "./build/sites-vite-plugin";
-import { ssrErrorLog } from "./build/ssr-error-log";
-import { connectorPreview } from "./build/connector-preview-plugin.mjs";
+// Imports carry their file extensions so Vite's future native config loader
+// (configLoader: "native") can load this file as is.
+import { depScanEnvironments } from "./build/dep-scan.ts";
+import { devSignIn } from "./build/dev-sign-in.ts";
+import { ssrErrorLog } from "./build/ssr-error-log.ts";
 
-const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
-  "00000000-0000-4000-8000-000000000000";
-
-// `.openai/hosting.json` is checkout-local (Git ignores `.openai/`). Clean
-// clones and CI fall back to the bindings declared in cloudflare-env.d.ts.
-const hostingConfigFile = new URL("./.openai/hosting.json", import.meta.url);
-const sitesProject = existsSync(hostingConfigFile);
-const { d1, r2 }: { d1?: string; r2?: string } = sitesProject
-  ? JSON.parse(readFileSync(hostingConfigFile, "utf8"))
-  : { d1: "DB", r2: "BUCKET" };
-
-const managedLinux = readExecutionProfile() === "managed-linux";
-
+// Local D1 and R2 bindings (cloudflare-env.d.ts). The database ID is a local
+// placeholder; a deployment supplies its own wrangler configuration.
 const localBindingConfig = {
-  main: "./build/sites-worker.ts",
+  main: "./build/worker.ts",
   compatibility_flags: ["nodejs_compat"],
-  d1_databases: d1
-    ? [
-        {
-          binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
-        },
-      ]
-    : [],
-  r2_buckets: r2
-    ? [
-        {
-          binding: r2,
-          bucket_name: "site-creator-r2",
-        },
-      ]
-    : [],
+  d1_databases: [
+    {
+      binding: "DB",
+      database_name: "assurance-d1",
+      database_id: "00000000-0000-4000-8000-000000000000",
+    },
+  ],
+  r2_buckets: [{ binding: "BUCKET", bucket_name: "assurance-r2" }],
 };
 
 export default defineConfig(async ({ command }) => {
@@ -59,19 +38,12 @@ export default defineConfig(async ({ command }) => {
 
   // Identity (docs/security/identity.md). The Worker trusts no identity unless
   // IDENTITY_MODE names one: the development server uses the loopback persona
-  // mock, the Sites build (a checkout with .openai/hosting.json) trusts Sites
-  // dispatch, and any other build answers 401 until the deployment sets it.
-  // The Sites build also compiles `sites` in as the default for an unset
-  // IDENTITY_MODE, in case the Sites publisher does not apply the vars of
-  // dist/server/wrangler.json. An explicit IDENTITY_MODE still wins. The
-  // browser reads the same define only to label the sign-in button.
-  const mockAuth = command === "serve" && !managedLinux;
-  const sitesBuild = command === "build" && sitesProject;
-  const identityVars: Record<string, string> = mockAuth
+  // sign-in (build/dev-sign-in.ts), and a build answers 401 until the
+  // deployment sets IDENTITY_MODE (cloudflare-access in production).
+  const devServer = command === "serve";
+  const identityVars: Record<string, string> = devServer
     ? { IDENTITY_MODE: "dev" }
-    : sitesBuild
-      ? { IDENTITY_MODE: "sites" }
-      : {};
+    : {};
 
   return {
     // vinext scans every app/**/*.{tsx,ts,jsx,js} for dependencies to
@@ -81,58 +53,35 @@ export default defineConfig(async ({ command }) => {
     // it (#121, #145). Tests are never served, so the development server
     // leaves them out (build/dep-scan.ts); Vite appends vinext's entries.
     ...(command === "serve" ? { environments: depScanEnvironments } : {}),
-    define: {
-      __SITES_IDENTITY_DEFAULT__: sitesBuild
-        ? JSON.stringify("sites")
-        : "undefined",
-    },
     build: {
-      // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on host
-      // load, so it made `npm run build` output non-deterministic.
-      rolldownOptions: { checks: { pluginTimings: false } },
-    },
-    server: {
-      ...(managedLinux
-        ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
-        : {}),
+      // vinext 1.4 leaves vendor code to Rolldown's graph-based chunking, so
+      // the workspace shell's route chunk carries its UI libraries (about
+      // 600 kB, 175 kB gzipped; vinext 1.0 split the same code across
+      // chunks). The limit still flags growth beyond that.
+      chunkSizeWarningLimit: 700,
+      rolldownOptions: {
+        checks: {
+          // Rolldown's [PLUGIN_TIMINGS] notice is informational and depends on
+          // host load, so it made `npm run build` output non-deterministic.
+          pluginTimings: false,
+          // [SOURCEMAP_BROKEN] names transforms inside @vitejs/plugin-rsc and
+          // vinext that emit no source map, and [INEFFECTIVE_DYNAMIC_IMPORT]
+          // modules that vinext's generated entries import both statically
+          // and dynamically; neither concerns this app's code.
+          sourcemapBroken: false,
+          ineffectiveDynamicImport: false,
+        },
+      },
     },
     plugins: [
       vinext(),
       // Development only: SSR errors reach the log instead of a silent 500 (#204).
       ssrErrorLog(),
-      sites({ mockAuth }),
-      connectorPreview(),
+      devSignIn({ enabled: devServer }),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
-        config: {
-          ...localBindingConfig,
-          vars: identityVars,
-          ...(command === "serve"
-            ? {
-                services: [
-                  {
-                    binding: "CONNECTORS",
-                    service: "sites-connector-preview",
-                    entrypoint: "ConnectorPreview",
-                  },
-                ],
-              }
-            : {}),
-        },
-        ...(command === "serve"
-          ? {
-              auxiliaryWorkers: [
-                {
-                  config: {
-                    name: "sites-connector-preview",
-                    main: "./build/connector-preview-worker.mjs",
-                    compatibility_date: "2026-05-15",
-                  },
-                },
-              ],
-            }
-          : {}),
+        config: { ...localBindingConfig, vars: identityVars },
       }),
     ],
   };

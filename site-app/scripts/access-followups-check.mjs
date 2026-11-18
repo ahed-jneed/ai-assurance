@@ -14,7 +14,7 @@ import "./harness/env.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const local = "http://127.0.0.1:5173";
 const modules = [
@@ -38,34 +38,33 @@ assert(followups, "drizzle/*_access_followups.sql is missing");
 
 /** The trusted-headers identity of a fixture user. */
 const as = (user) => ({
-  "oai-authenticated-user-id": "user-" + user,
-  "oai-authenticated-user-email": user + "@fixture.invalid",
-  "oai-authenticated-user-full-name": encodeURIComponent(
+  "x-assurance-user-id": "user-" + user,
+  "x-assurance-user-email": user + "@fixture.invalid",
+  "x-assurance-user-name": encodeURIComponent(
     user[0].toUpperCase() + user.slice(1),
   ),
-  "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
   Origin: local,
 });
 
 async function withWorker(bindings, check) {
-  const mf = new Miniflare({
-    modules: modules.map((p) => ({
-      type: "ESModule",
-      path: path.resolve("dist/server", p),
-    })),
-    modulesRoot: path.resolve("dist/server"),
-    compatibilityDate: "2026-05-15",
-    compatibilityFlags: ["nodejs_compat"],
-    bindings: {
-      IDENTITY_MODE: "trusted-headers",
-      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-      ...bindings,
-    },
-    d1Databases: { DB: "access-followups" },
-    r2Buckets: { BUCKET: "access-followups-evidence" },
-    d1Persist: false,
-    r2Persist: false,
-  });
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: modules.map((p) => ({
+        type: "ESModule",
+        path: path.resolve("dist/server", p),
+      })),
+      modulesRoot: path.resolve("dist/server"),
+      compatibilityDate: "2026-05-15",
+      compatibilityFlags: ["nodejs_compat"],
+      bindings: {
+        IDENTITY_MODE: "trusted-headers",
+        IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+        ...bindings,
+      },
+      d1Databases: { DB: "access-followups" },
+      r2Buckets: { BUCKET: "access-followups-evidence" },
+    }),
+  );
   try {
     const db = await mf.getD1Database("DB");
     const bucket = await mf.getR2Bucket("BUCKET");
@@ -836,14 +835,15 @@ await withWorker(
 
 // --- drizzle 0013 -----------------------------------------------------------
 {
-  const mf = new Miniflare({
-    modules: true,
-    script:
-      "export default { fetch() { return new Response(null, { status: 404 }); } };",
-    compatibilityDate: "2026-05-15",
-    d1Databases: { DB: "access-followups-migration" },
-    d1Persist: false,
-  });
+  const mf = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script:
+        "export default { fetch() { return new Response(null, { status: 404 }); } };",
+      compatibilityDate: "2026-05-15",
+      d1Databases: { DB: "access-followups-migration" },
+    }),
+  );
   try {
     const db = await mf.getD1Database("DB");
     const run = (sql) => db.prepare(sql).run();

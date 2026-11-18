@@ -5,13 +5,8 @@
 // lib/commands/assurance/access.test.ts, lib/read-models/workspace-view.test.ts
 // and lib/workspace-links.test.ts.
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { approvedWorkflow, engagement } from "@/lib/workflow/test-fixtures";
-// The build defines this (vite.config.ts); the account menu reads it.
-vi.hoisted(() => {
-  (globalThis as Record<string, unknown>).__SITES_IDENTITY_DEFAULT__ =
-    undefined;
-});
 import { AccountMenu } from "./account-menu";
 import { ClientSubmissions, grantHolderLabel } from "./client-portal";
 import { refusedAccountName } from "./workspace/use-workspace-data";

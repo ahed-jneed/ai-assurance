@@ -22,7 +22,7 @@ node schemas/validate-run-schema.mjs
 Validate fresh API outputs after the Site harnesses (`npm run check:fixtures` in `site-app/` runs this and the procedure check below; CI runs it after the harnesses):
 
 ```powershell
-node schemas/validate-run-schema.mjs --fixtures site-app/.sites-runtime/run-schema-fixtures.json --external-run tmp/assurance-worker-fixture/hosted-external-run.json
+node schemas/validate-run-schema.mjs --fixtures site-app/.test-output/run-schema-fixtures.json --external-run tmp/assurance-worker-fixture/hosted-external-run.json
 ```
 
 The validator checks the schema itself, legacy compatibility, current Python reports, all hosted execution states, and external 1.2 projections produced from actual binary/fairness/multiclass/regression computations. It verifies exact request/result string hashes, frozen bindings, rich metrics and malformed-record/tamper rejection. The committed fixtures contain fictional local test data and dummy declarations; they do not test production service authentication or native runtimes. `--ajv-package` can point to an alternative package.json whose dependencies include `ajv` and `ajv-formats`. `--external-fixtures` optionally selects another fixture file containing `{fixture,requestJSON,resultJSON,run}` entries. `--external-run` validates one platform-compiled 1.2 run, including its dataset-card pin when present.
@@ -54,7 +54,7 @@ Hosted 1.1 runs may bind an approved audit procedure through `procedureBinding`:
 `procedure-execution.schema.json` covers the actual work performed, explicit step dispositions, scope revisions, the plan hash it binds (optional for records made before plan hashes), evidence/run references and optional human assessment. Validate it and a fresh API execution with:
 
 ```powershell
-node schemas/validate-procedure-schema.mjs site-app/.sites-runtime/execution-schema-fixture.json
+node schemas/validate-procedure-schema.mjs site-app/.test-output/execution-schema-fixture.json
 ```
 
 The execution schema checks record shape; accepted evidence, authorized actors, matching approved inputs and independent review remain server-enforced. Without a path argument it validates the committed `fixtures/procedure-execution.json`, which is how CI runs it.

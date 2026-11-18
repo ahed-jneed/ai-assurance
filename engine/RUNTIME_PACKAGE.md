@@ -28,7 +28,8 @@ The core CSV computation path needs only Python's standard library. Signature
 verification and Inspect `.eval` reading need `cryptography` and `zstandard`,
 hash-locked in `requirements-image.txt`, which the Dockerfile installs. Optional
 native model and Parquet capabilities need separately reviewed runtimes.
-`requirements-optional.txt` is a baseline, not a resolved transitive lock. No native runtime or Docker execution was qualified in this distribution's
+`requirements-optional.txt` is a hash-locked transitive resolution for CPython 3.12 on
+linux x86_64 (manylinux), not yet installed or integration-tested here. No native runtime or Docker execution was qualified in this distribution's
 local checks. The repository's engine tests use synthetic fixtures,
 application-owned test predictors, dummy credentials and loopback/mocked
 transports.

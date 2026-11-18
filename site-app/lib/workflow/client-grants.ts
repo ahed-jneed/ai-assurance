@@ -1,7 +1,7 @@
 // Client request commands: time-limited grants that let a client
 // contributor answer one evidence request, their instructions and
 // clarifications, and the acknowledgement of what the client submitted.
-import { z } from "zod";
+import { z } from "../zod";
 import { clientGrantLapsed } from "../workflow-state";
 import type { ClientGrant } from "../workflow-types";
 import {

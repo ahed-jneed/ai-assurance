@@ -19,14 +19,14 @@ If Python is not on PATH, use a CPython 3.12 interpreter. `engine/examples/repor
 
 ## Packaging: Python version and image
 
-**One supported version: CPython 3.12.** The compute image's base is `python:3.12.14-slim` (`Dockerfile`), CI runs every Python step on 3.12 (`.github/workflows/ci.yml`, jobs `engine` and `web`), and `engine/tests/test_packaging.py` fails when the Dockerfile, CI, `requirements.txt` or these docs name another version. A production base digest must be the same minor version. Moving to another version is one change across those files, after the engine tests pass on it.
+**One supported version: CPython 3.12.** The compute image's base is `python:3.12.14-slim`, pinned by its multi-arch index digest (`Dockerfile`), CI runs every Python step on 3.12 (`.github/workflows/ci.yml`, jobs `engine` and `web`), and `engine/tests/test_packaging.py` fails when the Dockerfile, CI, `requirements.txt` or these docs name another version. A production base digest must be the same minor version. Moving to another version is one change across those files, after the engine tests pass on it.
 
 | File | Installs | Where |
 | --- | --- | --- |
 | `requirements.txt` | nothing: the default CSV path is standard-library only | any 3.12 interpreter |
 | `requirements-image.txt` | `cryptography` (with `cffi`, `pycparser`) and `zstandard`, pinned with SHA-256 hashes of the cp312/abi3 manylinux wheels for x86_64 and aarch64 | the compute image; a source install that verifies signatures or reads Inspect `.eval` logs |
 | `requirements-dev.txt` | the same `cryptography` and `zstandard` versions, plus `jsonschema` and `numpy` for the tests | CI and local test environments |
-| `requirements-optional.txt` | native model and Parquet runtimes (a baseline, not a lock) | an operator-owned derived image |
+| `requirements-optional.txt` | native model and Parquet runtimes, hash-locked with transitive dependencies for CPython 3.12 on linux x86_64 | an operator-owned derived image |
 
 **Signatures.** `cryptography` verifies Ed25519 signatures: trusted dossier signatures (`assurance.py`) and trusted exporter signatures (`cited_assistant.py`). Without it a dossier signature is reported as not verified (`verification_unavailable`, outcome inconclusive) and a signed briefing packet is rejected, so every install that must verify signatures declares it, and the image installs it. The signature tests skip without the package, unless `ENGINE_REQUIRE_CRYPTOGRAPHY=1`: then they fail. CI sets the variable, as it sets `GENAI_REQUIRE_ZSTD=1` for the `.eval` tests.
 
@@ -145,6 +145,6 @@ python -m engine --data features.csv --config model-run.json --model reviewed-mo
 python -m engine.connectors --database client-snapshot.db --spec snapshot-spec.json --output snapshot.csv
 ```
 
-`requirements-optional.txt` pins an optional runtime baseline; no packages were installed. Before production, resolve and hash-lock transitive dependencies and validate each adapter with real reviewed models and golden predictions. Pin availability was checked against owner pages: [ONNX Runtime](https://pypi.org/project/onnxruntime/), [pypmml](https://pypi.org/project/pypmml/), [XGBoost](https://pypi.org/project/xgboost/), [LightGBM](https://pypi.org/project/lightgbm/), [PyArrow](https://pypi.org/project/pyarrow/).
+`requirements-optional.txt` hash-locks the optional runtimes and their transitive dependencies for CPython 3.12 on linux x86_64 (manylinux wheels; install with `--require-hashes --only-binary=:all:`); no packages were installed or integration-tested here, and other platforms need their own lock. Before production, validate each adapter with real reviewed models and golden predictions. Pin availability was checked against owner pages: [ONNX Runtime](https://pypi.org/project/onnxruntime/), [pypmml](https://pypi.org/project/pypmml/), [XGBoost](https://pypi.org/project/xgboost/), [LightGBM](https://pypi.org/project/lightgbm/), [PyArrow](https://pypi.org/project/pyarrow/).
 
 See `ASYNC_INTEGRATION.md` for the API/outbox/queue/worker contract. The local web prototype must never execute this Python engine in a browser or imply an API was deployed merely because the runner exists.

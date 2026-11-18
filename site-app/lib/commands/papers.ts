@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { isReleaseTimeRecord, releaseTimeMessage } from "../domain/gates";
 import type { Engagement, Paper } from "../domain/types";
 import { id, now, sha256 } from "../ids";

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { sanitize } from "@/lib/client-projection";
 import { dispatch } from "@/lib/commands";
 import { short } from "@/lib/commands/fields";
@@ -55,7 +55,7 @@ const command = z
     engagementId: short,
     expectedVersion: z.number().int().positive(),
     op: short,
-    data: z.record(z.unknown()).default({}),
+    data: z.record(z.string(), z.unknown()).default({}),
   })
   .strict();
 /** Parse → context → load → dispatch (lib/commands) → save. */

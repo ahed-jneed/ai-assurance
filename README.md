@@ -24,7 +24,7 @@ The [capability matrix](docs/capabilities.md) lists every capability with the co
 
 ## Architecture
 
-A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), with D1 for records and R2 for evidence and immutable blobs. Identity comes from the host (Sites dispatch or Cloudflare Access) through an adapter that denies by default. The Python engine in `engine/` runs diagnostics, statistics and GenAI ingestion as an external worker and as offline tools. The [codebase map](docs/engineering/codebase-map.md) describes the components, data flow, storage and module layout; [docs/security/identity.md](docs/security/identity.md) and [docs/security/signing-keys.md](docs/security/signing-keys.md) cover identity and signing.
+A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), with D1 for records and R2 for evidence and immutable blobs. Sign-in uses built-in accounts (email and password, with the first account as the owner), or optionally Cloudflare Access, through an adapter that denies by default. The Python engine in `engine/` runs diagnostics, statistics and GenAI ingestion as an external worker and as offline tools. The [codebase map](docs/engineering/codebase-map.md) describes the components, data flow, storage and module layout; [docs/security/identity.md](docs/security/identity.md) and [docs/security/signing-keys.md](docs/security/signing-keys.md) cover identity and signing.
 
 | Folder | Contents |
 |---|---|
@@ -37,9 +37,37 @@ A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), wi
 
 ## Quick start
 
-Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging).
+Run your own copy with one command. Then open <http://localhost:8787>: the first visit asks you to create the **owner account**, and the owner invites everyone else from **Members & access** by sending each person a sign-up link. There is no external sign-in service to set up.
 
-```powershell
+**With Docker:**
+
+```bash
+docker compose up -d
+```
+
+The data (database, evidence and the generated secret) lives in the `ai-assurance-data` volume. Once a release is published, the image is also available as `ghcr.io/ahed-jneed/ai-assurance`.
+
+**With Node.js** (22.13 or later):
+
+```bash
+cd site-app
+npm ci
+npm run self-host
+```
+
+The data lives in `site-app/data/`. Back it up together with `data/secrets.env`, which holds the key that signs reports and sign-up links. `PORT`, `HOST` and `DATA_DIR` change where it listens and stores data, for example `PORT=3000 npm run self-host`.
+
+**Forgot a password?** Run `npm run self-host -- reset-password <email>` (in Docker: `docker compose exec ai-assurance node scripts/self-host.mjs reset-password <email>`). It prints a temporary password.
+
+**Reaching it from other machines.** Put it behind a reverse proxy that serves HTTPS (for example Caddy or nginx) and forwards `X-Forwarded-Proto`, so the session cookie is marked `Secure`. The Docker image listens on all interfaces; `npm run self-host` listens on `127.0.0.1` unless you set `HOST=0.0.0.0`.
+
+To deploy to Cloudflare Workers behind Cloudflare Access instead, see [docs/security/identity.md](docs/security/identity.md#configure-cloudflare-access).
+
+## Development
+
+Node >=22.13.0 (CI uses Node 22) and Python 3.12, the engine's one supported version (see `engine/README.md`, section Packaging). The development server signs you in as a test persona instead of an account.
+
+```bash
 cd site-app
 npm ci
 npm run build             # writes dist/server/wrangler.json, which the migration reads
@@ -53,7 +81,7 @@ The migration step is not optional. Without it the dev server still starts and i
 
 On Windows, keep the checkout path short (`site-app\` under about 120 characters): workerd stores the local database about 125 characters below `site-app\` and cannot open a path past the 260-character limit, so in a deeper checkout `npm run db:migrate:local` fails with `SQLITE_CANTOPEN`.
 
-Then open the URL the dev server prints (port 5173 by default) and sign in with the loopback simulation, `/signin-with-chatgpt?return_to=/`. To pick another port, pass it after `--` and give the seed the same URL; the commands are the same in PowerShell and in a macOS or Linux shell:
+Then open the URL the dev server prints (port 5173 by default) and sign in with the loopback simulation, `/auth/sign-in?return_to=/`. To pick another port, pass it after `--` and give the seed the same URL; the commands are the same in PowerShell and in a macOS or Linux shell:
 
 ```sh
 npm run dev -- --port 5180 --strictPort
@@ -61,7 +89,7 @@ npm run dev -- --port 5180 --strictPort
 npm run seed:demo -- http://127.0.0.1:5180
 ```
 
-`--strictPort` makes the dev server stop with an error when the port is taken instead of moving to the next free one. `npm start` (the built Worker, below) listens on port 8787; pass `npm start -- --port <port>` for another. To work as a persona, run `npm run seed:demo` first and sign in with `/signin-with-chatgpt?as=<persona>&return_to=/`:
+`--strictPort` makes the dev server stop with an error when the port is taken instead of moving to the next free one. `npm start` (the built Worker, below) listens on port 8787; pass `npm start -- --port <port>` for another. To work as a persona, run `npm run seed:demo` first and sign in with `/auth/sign-in?as=<persona>&return_to=/`:
 
 | Persona | Role in the demo practice |
 |---|---|
@@ -74,7 +102,7 @@ npm run seed:demo -- http://127.0.0.1:5180
 | `qa-viewer` | Client Viewer for Acme |
 | `qa-outsider` | No membership (isolation checks) |
 
-The seed creates the client Acme, a structured engagement, every persona's membership and grant, and an evidence request for `qa-contrib`; it is safe to run again. The account menu switches persona and signs out. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. Hosting applies production migrations separately and uses dispatch-owned identity, not the local mock: the Worker trusts only the identity source that `IDENTITY_MODE` names and answers 401 when none is configured ([docs/security/identity.md](docs/security/identity.md)). `site-app/.openai/hosting.json` is checkout-local and optional: without it, the build uses the `DB` and `BUCKET` bindings. [site-app/README.md](site-app/README.md) has the details, including `npm start` for the built Worker.
+The seed creates the client Acme, a structured engagement, every persona's membership and grant, and an evidence request for `qa-contrib`; it is safe to run again. The account menu switches persona and signs out. `npm run db:migrate:local` applies only the migrations not yet applied, so it is safe to run again after pulling. The personas exist only on the development server; every build signs people in with the built-in accounts, or with the identity source `IDENTITY_MODE` names ([docs/security/identity.md](docs/security/identity.md)). The build uses the `DB` and `BUCKET` bindings. [site-app/README.md](site-app/README.md) has the details, including `npm start` for the built Worker.
 
 ## Checks
 
@@ -91,7 +119,7 @@ CI (`.github/workflows/ci.yml`) runs its jobs on every pull request and on pushe
 | `npm run check:harnesses` | Every `scripts/*-check.mjs` harness against the built Worker in Miniflare; needs a build first. A harness never loads TypeScript sources or rewrites import paths: a check of a pure module is a Vitest test |
 | `npm run check:fixtures` | Validate the run, external-run and procedure records the harnesses just produced against `schemas/` |
 
-The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). On Windows they also need a short temp directory: Miniflare keeps each test database as an SQLite file about 150 characters below the temp directory, and workerd fails with `SQLITE_CANTOPEN` (or does not start) past the 260-character path limit. When `TEMP` is longer than 100 characters, `scripts/harness/env.mjs` switches the harnesses and their child processes to `%LOCALAPPDATA%\Temp\aa-harness` (else `%SystemDrive%\aa-harness-tmp`) and says so; set `ASSURANCE_HARNESS_TEMP` to choose another short directory. If none is writable, the harness stops with a message naming the fix. The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Sites' real authentication dispatcher, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
+The harnesses run from any working directory (`scripts/harness/env.mjs` moves them to `site-app/`). On Windows they also need a short temp directory: Miniflare keeps each test database as an SQLite file about 150 characters below the temp directory, and workerd fails with `SQLITE_CANTOPEN` (or does not start) past the 260-character path limit. When `TEMP` is longer than 100 characters, `scripts/harness/env.mjs` switches the harnesses and their child processes to `%LOCALAPPDATA%\Temp\aa-harness` (else `%SystemDrive%\aa-harness-tmp`) and says so; set `ASSURANCE_HARNESS_TEMP` to choose another short directory. If none is writable, the harness stops with a message naming the fix. The ones that start Python use `ASSURANCE_TEST_PYTHON`, then `PYTHON`, then `python` on Windows and `python3` elsewhere, with `engine/requirements-dev.txt` installed. `check:sync` also runs Python (`PYTHON`, same default). The API harnesses (`workspace-access`, `criteria-pins`, `work-inbox-api`, `practice-management` and `engagement-lifecycle`, which share `scripts/harness/worker.mjs`, and the access, identity and assurance harnesses) provision an ephemeral local Miniflare database/object store and inject fictional fixture identity headers directly into the local Worker only, after opting in to the loopback-only `trusted-headers` identity mode; they do not exercise Cloudflare Access, and `scripts/harness/worker.mjs` refuses non-loopback URLs. `identity-check.mjs` checks that every other mode refuses forged identity headers, verifies Cloudflare Access tokens against a stub key set, and checks that builds contain no development personas.
 
 The `e2e` job builds the Worker and runs `npm run test:e2e`, the Playwright persona suite with axe accessibility checks (`site-app/e2e/README.md`); run it locally after `npm run build` and, once, `npx playwright install chromium`. Do not run `npm run build` or `npm run check` in the same checkout while the e2e server runs: the build rewrites `dist/` under it (see the e2e README).
 

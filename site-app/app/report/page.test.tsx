@@ -30,8 +30,8 @@ vi.mock("next/navigation", () => {
   };
   return { forbidden: fallback(403), notFound: fallback(404) };
 });
-vi.mock("@/app/chatgpt-auth", () => ({
-  requireChatGPTUser: vi.fn(async () => ({ id: "user-1" })),
+vi.mock("@/app/require-user", () => ({
+  requireUser: vi.fn(async () => ({ id: "user-1" })),
 }));
 vi.mock("@/lib/tenancy", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/tenancy")>()),

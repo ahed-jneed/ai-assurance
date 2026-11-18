@@ -3,7 +3,13 @@
 // platform operators, Sign out, and on the development server a switch to
 // another test persona. Sign-in and sign-out
 // are top-level navigations that come back to the current location.
-import { LogOut, ServerCog, UserRound, UsersRound } from "lucide-react";
+import {
+  KeyRound,
+  LogOut,
+  ServerCog,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,11 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import personaFixture from "@/fixtures/dev-personas.json";
-import { signInLabel, signInPath, signOutPath } from "@/lib/auth-paths";
+import { PASSWORD_PATH, signInPath, signOutPath } from "@/lib/auth-paths";
 import type { WorkspaceData } from "./workspace-types";
-
-/** "sites" in the Sites build, else undefined (`define` in vite.config.ts). */
-declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
 
 /**
  * Test personas, on the development server only: in a build the condition is
@@ -28,15 +31,8 @@ declare const __SITES_IDENTITY_DEFAULT__: "sites" | undefined;
  */
 const devPersonas = import.meta.env.DEV ? personaFixture.personas : [];
 
-/**
- * The sign-in button's text: "Sign in with ChatGPT" in the Sites build and on
- * the development server, "Sign in" in every other build. Compiled in, so the
- * browser reads nothing to choose it.
- */
-export const SIGN_IN_LABEL = signInLabel({
-  devServer: import.meta.env.DEV,
-  defaultMode: __SITES_IDENTITY_DEFAULT__,
-});
+/** The sign-in button's text. */
+export const SIGN_IN_LABEL = "Sign in";
 
 /** The current location, to return to after signing in or out. */
 function here() {
@@ -191,6 +187,14 @@ function AccountMenuItems({
           <a href="/operator" target="_top">
             <ServerCog size={16} aria-hidden="true" />
             Operator console
+          </a>
+        </DropdownMenuItem>
+      )}
+      {data?.identity.localAccount && (
+        <DropdownMenuItem asChild>
+          <a href={PASSWORD_PATH} target="_top">
+            <KeyRound size={16} aria-hidden="true" />
+            Change password
           </a>
         </DropdownMenuItem>
       )}

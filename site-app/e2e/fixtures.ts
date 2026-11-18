@@ -50,10 +50,9 @@ export function persona(id: PersonaId): Persona {
  */
 export function identityHeaders(who: Persona): Record<string, string> {
   return {
-    "oai-authenticated-user-id": who.userId,
-    "oai-authenticated-user-email": who.email,
-    "oai-authenticated-user-full-name": encodeURIComponent(who.name),
-    "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
+    "x-assurance-user-id": who.userId,
+    "x-assurance-user-email": who.email,
+    "x-assurance-user-name": encodeURIComponent(who.name),
   };
 }
 

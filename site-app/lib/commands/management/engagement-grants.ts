@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../zod";
 import { db } from "../../bindings";
 import { roles, type Role } from "../../domain/types";
 import { loadEngagement } from "../../engagement-repo";

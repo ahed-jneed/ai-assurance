@@ -4,7 +4,7 @@
 // string is then parsed, never re-serialised, because Python writes `1.0`
 // where JavaScript writes `1`. The workspace never recomputes statistics; it
 // checks pins and reads what the engine computed. Pure: no bindings.
-import { z } from "zod";
+import { z } from "../zod";
 import { sha256 } from "../ids";
 
 export const GENAI_RESULT_SCHEMA = "genai-result/0.1";
@@ -104,7 +104,7 @@ const criterion = z
       })
       .passthrough(),
     runKeys: z.array(z.string()),
-    scoreKinds: z.record(z.record(z.array(z.string()))),
+    scoreKinds: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
     flags: z.array(flag),
   })
   .passthrough();
@@ -284,7 +284,7 @@ const computation = z
               .object({
                 runKey: z.string(),
                 judgeRef: z.string(),
-                binding: z.record(z.boolean().nullable()),
+                binding: z.record(z.string(), z.boolean().nullable()),
                 validated: z.boolean(),
                 reasons: z.array(z.string()),
               })

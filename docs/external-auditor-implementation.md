@@ -59,7 +59,6 @@ An audit lead enrolls a worker for one engagement with an image digest, reviewed
     ASSURANCE_WORKER_ID
     ASSURANCE_WORKER_IMAGE_DIGEST
     ASSURANCE_WORKER_TOKEN
-    ASSURANCE_SITE_SERVICE_TOKEN  (where private Site service access requires it)
 
 A baseline command for provided predictions is:
 

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../../../lib/zod";
 import { assuranceTarget, dispatchAssurance } from "@/lib/commands/assurance";
 import { short } from "@/lib/commands/fields";
 import { getEngagement } from "@/lib/engagement-repo";
@@ -74,7 +74,7 @@ const command = z
     tenantId: short,
     engagementId: short,
     op: short,
-    data: z.record(z.unknown()),
+    data: z.record(z.string(), z.unknown()),
   })
   .strict();
 /**

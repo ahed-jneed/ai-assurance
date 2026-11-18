@@ -21,11 +21,10 @@ import {
 } from "@/lib/identity";
 
 const forged = {
-  "oai-authenticated-user-id": "forged-admin",
-  "oai-authenticated-user-email": "forged@attacker.example",
-  "oai-authenticated-user-full-name": "Forged%20Admin",
-  "oai-authenticated-user-full-name-encoding": "percent-encoded-utf-8",
-  "oai-site-id": "forged-site",
+  "x-assurance-user-id": "forged-admin",
+  "x-assurance-user-email": "forged@attacker.example",
+  "x-assurance-user-name": "Forged%20Admin",
+  "x-assurance-user-role": "forged-role",
 };
 const trusted: IdentitySettings = {
   IDENTITY_MODE: "trusted-headers",
@@ -47,8 +46,10 @@ function request(
 ) {
   return new Request(url, { ...init, headers });
 }
-function dispatchHeaders(r: Request) {
-  return [...r.headers.keys()].filter((name) => name.startsWith("oai-"));
+function identityHeaders(r: Request) {
+  return [...r.headers.keys()].filter((name) =>
+    name.startsWith("x-assurance-user-"),
+  );
 }
 
 let warn: MockInstance<typeof console.warn>;
@@ -66,13 +67,13 @@ describe("identityConfig", () => {
   });
 
   it("rejects unknown modes instead of guessing", () => {
-    const result = config({ IDENTITY_MODE: "SITES" });
+    const result = config({ IDENTITY_MODE: "DEV" });
     expect(result).toMatchObject({ mode: "none" });
-    expect(result.mode === "none" && result.problem).toContain('"SITES"');
+    expect(result.mode === "none" && result.problem).toContain('"DEV"');
   });
 
-  it("selects sites only when it is named", () => {
-    expect(config({ IDENTITY_MODE: "sites" })).toEqual({ mode: "sites" });
+  it("no longer knows the removed sites mode", () => {
+    expect(config({ IDENTITY_MODE: "sites" })).toMatchObject({ mode: "none" });
   });
 
   it("allows dev only on the development server", () => {
@@ -108,26 +109,9 @@ describe("identityConfig", () => {
       mode: "none",
     });
   });
-
-  it("uses the Sites build default only while IDENTITY_MODE is unset", () => {
-    const sitesBuild = (settings: IdentitySettings) =>
-      identityConfig(settings, { devServer: false, defaultMode: "sites" });
-    expect(sitesBuild({})).toEqual({ mode: "sites" });
-    expect(sitesBuild(access)).toEqual(config(access));
-    for (const mode of [
-      "",
-      "SITES",
-      "dev",
-      "trusted-headers",
-      "cloudflare-access",
-    ])
-      expect(sitesBuild({ IDENTITY_MODE: mode })).toMatchObject({
-        mode: "none",
-      });
-  });
 });
 
-describe("forged oai-* headers", () => {
+describe("forged identity headers", () => {
   const rejecting: [string, IdentityConfig, string?][] = [
     ["no mode", config({})],
     ["an unknown mode", config({ IDENTITY_MODE: "headers" })],
@@ -153,7 +137,7 @@ describe("forged oai-* headers", () => {
     async (_, mode, url) => {
       const caller = await authenticate(request(url), mode);
       expect(caller.identity).toBeNull();
-      expect(dispatchHeaders(caller.request)).toEqual([]);
+      expect(identityHeaders(caller.request)).toEqual([]);
     },
   );
 
@@ -167,22 +151,8 @@ describe("forged oai-* headers", () => {
         mode,
       );
       expect(caller.identity).toBeNull();
-      expect(dispatchHeaders(caller.request)).toEqual([]);
+      expect(identityHeaders(caller.request)).toEqual([]);
     }
-  });
-
-  it("are trusted and kept in sites mode", async () => {
-    const caller = await authenticate(
-      request("https://site.example/api/workspace"),
-      config({ IDENTITY_MODE: "sites" }),
-    );
-    expect(caller.identity).toEqual({
-      userId: "forged-admin",
-      email: "forged@attacker.example",
-      displayName: "Forged Admin",
-      fullName: "Forged Admin",
-    });
-    expect(dispatchHeaders(caller.request)).toHaveLength(5);
   });
 
   it("are trusted on loopback in trusted-headers and dev mode, then removed", async () => {
@@ -200,7 +170,7 @@ describe("forged oai-* headers", () => {
           mode,
         );
         expect(caller.identity?.userId).toBe("forged-admin");
-        expect(dispatchHeaders(caller.request)).toEqual([]);
+        expect(identityHeaders(caller.request)).toEqual([]);
         expect(caller.request.headers.get("cf-connecting-ip")).toBe(
           "127.0.0.1",
         );
@@ -226,41 +196,40 @@ describe("forged oai-* headers", () => {
   });
 });
 
-describe("dispatch-style header identity", () => {
-  const sites = config({ IDENTITY_MODE: "sites" });
+describe("loopback header identity", () => {
+  const trustedHeaders = config(trusted);
   async function identity(headers: Record<string, string>) {
-    return (await authenticate(request(undefined, headers), sites)).identity;
+    return (await authenticate(request(undefined, headers), trustedHeaders))
+      .identity;
   }
 
   it("decodes the percent-encoded full name and falls back to the email", async () => {
     expect(
       await identity({
         ...forged,
-        "oai-authenticated-user-full-name": "Ren%C3%A9e%20Auditor",
+        "x-assurance-user-name": "Ren%C3%A9e%20Auditor",
       }),
     ).toMatchObject({ displayName: "Renée Auditor" });
     expect(
       await identity({
         ...forged,
-        "oai-authenticated-user-full-name": "%E0%A4%A",
+        "x-assurance-user-name": "%E0%A4%A",
       }),
     ).toMatchObject({ displayName: "forged@attacker.example", fullName: null });
     expect(
       await identity({
-        ...forged,
-        "oai-authenticated-user-full-name-encoding": "plain",
+        "x-assurance-user-id": "user-1",
+        "x-assurance-user-email": "user@practice.example",
       }),
     ).toMatchObject({ fullName: null });
   });
 
   it("needs both the id and the email, within bounds", async () => {
-    expect(
-      await identity({ "oai-authenticated-user-id": "user-1" }),
-    ).toBeNull();
+    expect(await identity({ "x-assurance-user-id": "user-1" })).toBeNull();
     expect(
       await identity({
         ...forged,
-        "oai-authenticated-user-id": "x".repeat(257),
+        "x-assurance-user-id": "x".repeat(257),
       }),
     ).toBeNull();
   });
@@ -335,7 +304,7 @@ describe("cloudflare-access mode", () => {
       displayName: "Lea Lead",
       fullName: "Lea Lead",
     });
-    expect(dispatchHeaders(caller.request)).toEqual([]);
+    expect(identityHeaders(caller.request)).toEqual([]);
   });
 
   it("falls back to the email without a name claim", async () => {
@@ -371,8 +340,7 @@ describe("cloudflare-access mode", () => {
   });
 
   it("returns only a verified caller from sign-in to the page", async () => {
-    const signIn =
-      "https://audit.example.com/signin-with-chatgpt?return_to=%2Freport";
+    const signIn = "https://audit.example.com/auth/sign-in?return_to=%2Freport";
     for (const [headers, status] of [
       [{ "Cf-Access-Jwt-Assertion": await jwt(claims()) }, 302],
       [
@@ -398,8 +366,8 @@ describe("cloudflare-access mode", () => {
 
 describe("authRoute", () => {
   const signIn =
-    "http://127.0.0.1:5173/signin-with-chatgpt?return_to=%2F%3Fview%3DFindings";
-  const signOut = "http://127.0.0.1:5173/signout-with-chatgpt?return_to=%2F";
+    "http://127.0.0.1:5173/auth/sign-in?return_to=%2F%3Fview%3DFindings";
+  const signOut = "http://127.0.0.1:5173/auth/sign-out?return_to=%2F";
   const lea: Identity = {
     userId: "access-user-1",
     email: "lea@practice.example",
@@ -407,10 +375,7 @@ describe("authRoute", () => {
     fullName: "Lea Lead",
   };
 
-  it("leaves the reserved routes to Sites dispatch and the development server", () => {
-    expect(
-      authRoute(new Request(signIn), config({ IDENTITY_MODE: "sites" }), null),
-    ).toBeNull();
+  it("leaves the sign-in routes to the development server", () => {
     expect(
       authRoute(
         new Request(signIn),
@@ -441,7 +406,7 @@ describe("authRoute", () => {
     expect(
       authRoute(
         new Request(
-          "http://127.0.0.1:5173/signin-with-chatgpt?return_to=//evil.example",
+          "http://127.0.0.1:5173/auth/sign-in?return_to=//evil.example",
         ),
         mode,
         lea,
@@ -455,7 +420,7 @@ describe("authRoute", () => {
   it("refuses sign-in that Cloudflare Access did not authenticate, instead of returning to the page", async () => {
     const refused = authRoute(
       new Request(
-        "https://assurance.example.workers.dev/signin-with-chatgpt?return_to=%2Freport",
+        "https://assurance.example.workers.dev/auth/sign-in?return_to=%2Freport",
       ),
       config(access),
       null,

@@ -532,6 +532,37 @@ export function ManagementViews({
                         {i.expires_at.slice(0, 10)}
                       </TableCell>
                       <TableCell>
+                        {i.signup_path !== undefined &&
+                          (i.signup_path ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                void navigator.clipboard
+                                  .writeText(
+                                    window.location.origin + i.signup_path,
+                                  )
+                                  .then(() =>
+                                    toast.success(
+                                      "Sign-up link copied. Send it to " +
+                                        i.email +
+                                        ".",
+                                    ),
+                                  )
+                                  .catch(() =>
+                                    toast.error(
+                                      "Copying failed. Open the link from a browser that allows copying.",
+                                    ),
+                                  )
+                              }
+                            >
+                              Copy sign-up link
+                            </Button>
+                          ) : (
+                            <span className="subtle">
+                              Sign-up links need the DOSSIER_KEK secret
+                            </span>
+                          ))}
                         <Button
                           variant="ghost"
                           size="sm"

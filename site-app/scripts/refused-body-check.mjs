@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import "./harness/env.mjs";
 
 const modules = [
@@ -18,23 +18,23 @@ const modules = [
     (p) => p !== "index.js" && /\.m?js$/.test(p),
   ),
 ];
-const mf = new Miniflare({
-  modules: modules.map((p) => ({
-    type: "ESModule",
-    path: path.resolve("dist/server", p),
-  })),
-  modulesRoot: path.resolve("dist/server"),
-  compatibilityDate: "2026-05-15",
-  compatibilityFlags: ["nodejs_compat"],
-  bindings: {
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-  },
-  d1Databases: { DB: "refused-body" },
-  r2Buckets: { BUCKET: "refused-body-evidence" },
-  d1Persist: false,
-  r2Persist: false,
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: modules.map((p) => ({
+      type: "ESModule",
+      path: path.resolve("dist/server", p),
+    })),
+    modulesRoot: path.resolve("dist/server"),
+    compatibilityDate: "2026-05-15",
+    compatibilityFlags: ["nodejs_compat"],
+    bindings: {
+      IDENTITY_MODE: "trusted-headers",
+      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+    },
+    d1Databases: { DB: "refused-body" },
+    r2Buckets: { BUCKET: "refused-body-evidence" },
+  }),
+);
 
 /** The status lines of every response read from the socket so far. */
 const statuses = (text) =>

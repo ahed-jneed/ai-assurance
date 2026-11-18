@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError } from "../zod";
 import * as service from "./dispatch";
 import { WorkflowError, calendarDate } from "./command";
 import { workflowCommand, workflowOps } from "./dispatch";

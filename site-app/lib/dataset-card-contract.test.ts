@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { isDeepStrictEqual } from "node:util";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { z } from "./zod";
 import {
   datasetCardExport,
   datasetCardFields,
@@ -52,29 +52,47 @@ const validate = ajv.compile(
   ),
 ) as (value: unknown) => boolean;
 
-type Check = { kind: string; value?: number; regex?: RegExp };
-const checks = (t: z.ZodTypeAny): Check[] =>
-  (t._def as { checks?: Check[] }).checks ?? [];
-const unwrap = (t: z.ZodTypeAny): z.ZodTypeAny =>
+// Zod 4 keeps each constraint as a check on the schema itself: a refinement
+// such as calendarDate's is a "custom" check, not a wrapping schema.
+type Check = {
+  check: string;
+  minimum?: number;
+  maximum?: number;
+  value?: number;
+  format?: string;
+  pattern?: RegExp;
+  tx?: (v: unknown) => unknown;
+};
+const checks = (t: z.ZodType): Check[] =>
+  (t._zod.def.checks ?? []).map((c) => c._zod.def as unknown as Check);
+const unwrap = (t: z.ZodType): z.ZodType =>
   t instanceof z.ZodOptional || t instanceof z.ZodDefault
-    ? unwrap(t._def.innerType)
-    : t instanceof z.ZodEffects
-      ? unwrap(t._def.schema)
-      : t;
-const trimmed = (t: z.ZodTypeAny) => checks(t).some((c) => c.kind === "trim");
+    ? unwrap(t.unwrap() as z.ZodType)
+    : t;
+const trimmed = (t: z.ZodType) =>
+  checks(t).some((c) => c.check === "overwrite" && c.tx?.(" a ") === "a");
 
 /** The JSON Schema a zod field corresponds to, for the fields cards use. */
-function expected(t: z.ZodTypeAny): JsonSchema {
+function expected(t: z.ZodType): JsonSchema {
   const inner = unwrap(t);
-  if (inner instanceof z.ZodLiteral) return { const: inner._def.value };
-  if (inner instanceof z.ZodEnum) return { enum: [...inner._def.values] };
+  if (inner instanceof z.ZodLiteral) return { const: inner.value };
+  if (inner instanceof z.ZodEnum) return { enum: [...inner.options] };
   if (inner instanceof z.ZodNumber) {
-    const min = checks(inner).find((c) => c.kind === "min");
-    expect(checks(inner).some((c) => c.kind === "int")).toBe(true);
-    return { type: "integer", ...(min ? { minimum: min.value } : {}) };
+    expect(
+      checks(inner).some(
+        (c) => c.check === "number_format" && c.format === "safeint",
+      ),
+    ).toBe(true);
+    const minimum = checks(inner).find(
+      (c) => c.check === "greater_than",
+    )?.value;
+    return {
+      type: "integer",
+      ...(minimum !== undefined ? { minimum } : {}),
+    };
   }
   if (inner instanceof z.ZodObject) {
-    const shape = inner.shape as Record<string, z.ZodTypeAny>;
+    const shape = inner.shape as Record<string, z.ZodType>;
     return {
       type: "object",
       additionalProperties: false,
@@ -87,11 +105,13 @@ function expected(t: z.ZodTypeAny): JsonSchema {
     };
   }
   if (!(inner instanceof z.ZodString)) throw Error("Unmapped zod field");
-  const min = checks(inner).find((c) => c.kind === "min")?.value,
-    max = checks(inner).find((c) => c.kind === "max")?.value,
-    regex = checks(inner).find((c) => c.kind === "regex")?.regex,
+  const min = checks(inner).find((c) => c.check === "min_length")?.minimum,
+    max = checks(inner).find((c) => c.check === "max_length")?.maximum,
+    regex = checks(inner).find(
+      (c) => c.check === "string_format" && c.format === "regex",
+    )?.pattern,
     // A calendar date is a refined YYYY-MM-DD string.
-    date = t instanceof z.ZodEffects;
+    date = checks(inner).some((c) => c.check === "custom");
   return {
     type: "string",
     ...(min ? { minLength: min } : {}),
@@ -124,11 +144,11 @@ function described(s: JsonSchema): JsonSchema {
     Object.entries(s).filter(([k]) => !["title", "description"].includes(k)),
   ) as JsonSchema;
 }
-function fromZod(o: z.ZodObject<z.ZodRawShape>): JsonSchema {
+function fromZod(o: z.ZodObject): JsonSchema {
   const e = expected(o);
   // A defaulted field is always present once parsed, but cards stored
   // before it existed lack it, so the contract does not require it.
-  const shape = o.shape as Record<string, z.ZodTypeAny>;
+  const shape = o.shape as Record<string, z.ZodType>;
   e.required = Object.keys(shape)
     .filter(
       (k) => !shape[k].isOptional() && !(shape[k] instanceof z.ZodDefault),

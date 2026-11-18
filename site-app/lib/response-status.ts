@@ -4,7 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 // forbidden() and unauthorized() change it, and vinext answers a segment
 // error boundary (error.tsx) with 200. A page that renders its own failure
 // fallback records the status here instead, and the Worker entry
-// (build/sites-worker.ts) applies it to the response (#216).
+// (build/worker.ts) applies it to the response (#216).
 const slots = new AsyncLocalStorage<{ status?: number }>();
 
 /**

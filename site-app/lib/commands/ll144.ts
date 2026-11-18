@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "../zod";
 import { id, now } from "../ids";
 import { datasetCSV } from "../evaluation-service";
 import { ApiError } from "../http";

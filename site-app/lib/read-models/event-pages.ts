@@ -4,7 +4,7 @@
 // (created_at, id) descending, so events written in the same millisecond
 // keep one order and a page never repeats or skips one; the cursor names the
 // last event of the previous page.
-import { z } from "zod";
+import { z } from "../zod";
 import { ApiError } from "../http";
 
 /** Events per page unless the request asks for fewer or more. */

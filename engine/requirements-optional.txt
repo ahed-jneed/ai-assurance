@@ -1,12 +1,63 @@
-# Optional runtime baseline; not installed or integration-tested in this environment.
-# Resolve transitive dependencies and produce a hash-locked worker image before production.
-# Versions checked against package-owner PyPI pages on 2026-10-05.
-numpy==2.3.5
-pandas==3.0.1
-onnxruntime==1.30.0
-pypmml==1.5.8
-xgboost==3.4.1
-lightgbm==4.6.0
-pyarrow==25.0.1
-# Inspect .eval logs (GenAI evidence, engine/genai): zstd entries below Python 3.14.
-zstandard==0.25.0
+# Optional runtimes for an operator-owned derived image (engine/WORKER.md); the
+# core image installs only requirements-image.txt. Install with
+#   python -m pip install --require-hashes --only-binary=:all: -r requirements-optional.txt
+# Supported interpreter: CPython 3.12 (the image's base is python:3.12.14-slim).
+#
+# Direct pins: versions checked against package-owner PyPI pages on 2026-10-05.
+# Transitive dependencies resolved on 2026-11-15 for CPython 3.12 on linux
+# x86_64 (manylinux, glibc 2.28 or later) with
+#   uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_28 --only-binary :all:
+# Hashes: every PyPI wheel of the pinned version that installs on cp312
+# manylinux x86_64, taken from the PyPI JSON API. Other platforms (aarch64)
+# need their own lock. The zstandard pin and hash match requirements-image.txt
+# and requirements-dev.txt (engine/tests/test_packaging.py checks the pins).
+#
+# Not integration-tested in this environment: the native golden fixtures, the
+# derived image digest and this lock must still be enrolled together before
+# production.
+numpy==2.3.5 \
+    --hash=sha256:0d8163f43acde9a73c2a33605353a4f1bc4798745a8b1d73183b28e5b435ae28
+pandas==3.0.1 \
+    --hash=sha256:532527a701281b9dd371e2f582ed9094f4c12dd9ffb82c0c54ee28d8ac9520c4
+onnxruntime==1.30.0 \
+    --hash=sha256:fa688e7891a6aa206636fe7372e27ee75fd17713289f6b4fc7b190e0a7de9328
+pypmml==1.5.8 \
+    --hash=sha256:cfa4e82b6d8d92f989e18a95fb4740a0ad81db094880cf7ac8dd5ff84147e617
+xgboost==3.4.1 \
+    --hash=sha256:6adf2afa396da2ae8ed30295b50b99d4712eed9a6e0ce6cfe069290e4335e51f
+lightgbm==4.6.0 \
+    --hash=sha256:cb19b5afea55b5b61cbb2131095f50538bd608a00655f23ad5d25ae3e3bf1c8d
+pyarrow==25.0.1 \
+    --hash=sha256:5389cdf79447ed1515c9e31620e6e1e2302249564d603f2ad727d4f6d313e4c3
+zstandard==0.25.0 \
+    --hash=sha256:5a56ba0db2d244117ed744dfa8f6f5b366e14148e00de44723413b2f3938a902
+
+# Transitive dependencies.
+# via onnxruntime
+flatbuffers==25.12.19 \
+    --hash=sha256:7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4
+# via pypmml
+jpype1==1.7.1 \
+    --hash=sha256:4de86ec7f9f381c7aea8cbbecaa189c020e5fb700620bd96f4762f954757656b
+# via xgboost (declared by its manylinux_2_28 wheel; about 200 MB)
+nvidia-nccl-cu13==2.32.6 \
+    --hash=sha256:76e7aad00482092baf01e13e66f441d54c96b5cf1e3f143dee27db7f731d41ba
+# via jpype1, onnxruntime
+packaging==26.3 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+# via onnxruntime
+protobuf==7.36.2 \
+    --hash=sha256:89f23aa53c24553a2416fd4fd1ec06f74fa42b14b546d8883128813f775bbfd2 \
+    --hash=sha256:bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e
+# via pypmml
+py4j==0.10.9.9 \
+    --hash=sha256:c7c26e4158defb37b0bb124933163641a2ff6e3a3913f7811b0ddbe07ed61533
+# via pandas
+python-dateutil==4.0.0 \
+    --hash=sha256:a5e246f79eb80475e691bf93862cead98decd8a498cf53ba0516fcdc0f50dc1c
+# via lightgbm, xgboost
+scipy==1.18.1 \
+    --hash=sha256:f55fa87b6c612ecd6b058f167c53231b1d14e412efe361d3d6e38b3631c73218
+# via python-dateutil
+tzdata==2026.6 \
+    --hash=sha256:0a10eec6e13ef16b627fabed9a5f2ba61a62b1c67f327305f4e7e412a70b4aec

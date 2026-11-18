@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import "./harness/env.mjs";
 import fs from "node:fs/promises";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const files = (await fs.readdir("drizzle"))
   .filter((f) => f.endsWith(".sql"))
@@ -19,14 +19,15 @@ const statements = async (file) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-const mf = new Miniflare({
-  modules: true,
-  script:
-    "export default { fetch() { return new Response(null, { status: 404 }); } };",
-  compatibilityDate: "2026-05-15",
-  d1Databases: { DB: "access-adoption" },
-  d1Persist: false,
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: true,
+    script:
+      "export default { fetch() { return new Response(null, { status: 404 }); } };",
+    compatibilityDate: "2026-05-15",
+    d1Databases: { DB: "access-adoption" },
+  }),
+);
 try {
   const db = await mf.getD1Database("DB");
   const run = (sql, ...args) =>

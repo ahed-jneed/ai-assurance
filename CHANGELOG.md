@@ -11,6 +11,14 @@ Highlights:
 - **Release readiness (M3):** the Playwright persona suite with axe checks; attestation dialogs and permission-aware actions; WCAG AA fixes and a client portal shell; the paged audit trail and practice Access log; the large screens and barrels split into modules.
 - **Open at 14 Nov 2026:** the dead-code sweep ([#37](https://github.com/ahed-jneed/ai-assurance/issues/37), [PR #196](https://github.com/ahed-jneed/ai-assurance/pull/196)), the fixes from the release-candidate verification ([#199](https://github.com/ahed-jneed/ai-assurance/issues/199), [#201](https://github.com/ahed-jneed/ai-assurance/issues/201) to [#204](https://github.com/ahed-jneed/ai-assurance/issues/204); listed under Open below) and this documentation refresh ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38), [PR #198](https://github.com/ahed-jneed/ai-assurance/pull/198)). The open PRs are stacked to merge in the order #196, #207, #200, #205, #206, #208, #198.
 
+### Public release preparation (15 Nov 2026)
+
+- **breaking:** the ChatGPT sign-in and the whole Sites hosting integration are removed (decision D-49). `IDENTITY_MODE=sites` is no longer recognised. The development persona sign-in moves to `/auth/sign-in` and the loopback identity headers to `x-assurance-user-*`. The external worker no longer sends a Sites platform credential (`ASSURANCE_SITE_SERVICE_TOKEN` is gone).
+- **feature:** self-hosting with one command (`docker compose up` or `npm run self-host`) and built-in accounts as the default sign-in: owner setup on first visit, invitation sign-up links, PBKDF2 passwords with lockout, `reset-password` (decision D-50). A Docker image is built on pull requests and published to ghcr.io from `main`.
+- **security:** React 19.2.9 and Next.js 16.4.6 for published remote-code-execution advisories; zod 4 and current dev tooling; security headers on every Worker response, including `X-Frame-Options: DENY` and `frame-ancestors 'none'`.
+- **security (engine):** an encoding-aware PMML DTD guard, a zip entry-count check before the central directory is parsed, the native scorer started in isolated mode, the compute base image pinned by digest and the optional requirements hash-locked.
+- **docs:** Apache-2.0 licence, `SECURITY.md`, `CONTRIBUTING.md`, code of conduct, issue templates, Dependabot and a not-legal-advice disclaimer.
+
 ### Open: release verification
 
 In review on 14 Nov 2026, stacked in merge order; each entry names its PR and the issue it closes.

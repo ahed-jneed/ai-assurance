@@ -13,11 +13,11 @@
 //   npm run seed:demo -- http://127.0.0.1:5184
 //   npm run seed:demo -- --trusted-headers http://127.0.0.1:8787
 //
-// --trusted-headers sends the persona as oai-* headers, for a built Worker
+// --trusted-headers sends the persona as x-assurance-user-* headers, for a built Worker
 // started in trusted-headers mode (docs/security/identity.md) with
 // SELF_SIGNUP=open, so that qa-lead and qa-lead2 may provision their
 // practices (npm start -- --var SELF_SIGNUP:open ...); otherwise each
-// persona signs in through /signin-with-chatgpt?as=<id> like a browser. At
+// persona signs in through /auth/sign-in?as=<id> like a browser. At
 // the end it prints how to sign in as each persona on that server: the
 // dev-server links, or with --trusted-headers the headers to send
 // (scripts/seed-sign-in.mjs).
@@ -61,14 +61,14 @@ async function identify(who) {
   if (!sessions.has(who.id)) {
     const response = await fetch(
       base +
-        "/signin-with-chatgpt?" +
+        "/auth/sign-in?" +
         new URLSearchParams({ as: who.id, return_to: "/" }),
       { redirect: "manual" },
     );
     // The dev server names its sign-in cookie for its port.
     const cookie = response.headers
       .getSetCookie()
-      .find((c) => /^__sites_local_auth_\d+=/.test(c));
+      .find((c) => /^__dev_sign_in_\d+=/.test(c));
     if (response.status !== 302 || !cookie)
       throw new Error(
         `Persona sign-in failed (HTTP ${response.status}). Is \`npm run dev\` serving ${base}? For a built Worker in trusted-headers mode pass --trusted-headers.`,

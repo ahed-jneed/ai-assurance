@@ -1,34 +1,34 @@
-// Vendored from @openai/sites-vite-plugin 0.2.0 (MIT, npmjs.com/package/@openai/sites-vite-plugin).
-// See sites-vite-plugin.LICENSE for the upstream MIT license.
-// Local changes: test personas (`/signin-with-chatgpt?as=<id>`) from
-// fixtures/dev-personas.json, a sign-in cookie per dev server port, shared
-// return-path checks, the middleware exported for its tests, and hosting.json
-// staying optional. The mock runs only in the development server, never in a
-// build; the Worker trusts its headers in IDENTITY_MODE=dev (lib/identity.ts).
-import { access, cp, mkdir, rm } from "node:fs/promises";
+// The development server's sign-in: the default identity or a test persona
+// (`/auth/sign-in?as=<id>`) from fixtures/dev-personas.json, held in a sign-in
+// cookie per dev server port. It runs only in the development server, never in
+// a build, and only for loopback requests; the Worker trusts the headers it
+// sets only in IDENTITY_MODE=dev (lib/identity.ts).
+// Derived from the MIT-licensed @openai/sites-vite-plugin 0.2.0; see
+// dev-sign-in.LICENSE.
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { resolve } from "node:path";
 import type { Connect, Plugin } from "vite";
-import devPersonas from "../fixtures/dev-personas.json";
+import devPersonas from "../fixtures/dev-personas.json" with { type: "json" };
 import {
-  CALLBACK_PATH,
+  IDENTITY_HEADER_PREFIX,
   SIGN_IN_PATH,
   SIGN_OUT_PATH,
+  USER_EMAIL_HEADER,
+  USER_FULL_NAME_HEADER,
+  USER_ID_HEADER,
   isAuthPath,
   safeReturnPath,
-} from "../lib/auth-paths";
+} from "../lib/auth-paths.ts";
 
 type LocalIdentity = { userId: string; email: string; name: string };
 // Cookies ignore the port, so dev servers on one host would share a single
 // sign-in cookie and sign each other in and out. Each server reads and sets
-// only the cookie named for its own port. Upstream's unsuffixed name and other
-// ports' cookies are never read, and no local sign-in cookie reaches the app.
-const localCookiePrefix = "__sites_local_auth";
-const localCookiePattern = /^__sites_local_auth(?:_\d+)?=/;
+// only the cookie named for its own port. Other ports' cookies are never read,
+// and no local sign-in cookie reaches the app.
+const localCookiePrefix = "__dev_sign_in";
+const localCookiePattern = /^__dev_sign_in(?:_\d+)?=/;
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
 const localAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-// Cookie value "1" is the default identity (as upstream); a persona id selects
-// that persona. Any other value signs nobody in.
+// Cookie value "1" is the default identity; a persona id selects that persona. Any other value signs nobody in.
 const personas = new Map<string, LocalIdentity>(
   devPersonas.personas.map((persona) => [persona.id, persona]),
 );
@@ -36,23 +36,11 @@ function localIdentity(cookie: string): LocalIdentity | undefined {
   return cookie === "1" ? devPersonas.defaultIdentity : personas.get(cookie);
 }
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return false;
-    }
-    throw error;
-  }
-}
-
 /**
- * The development server's sign-in mock. It answers the reserved sign-in
- * routes for loopback requests and turns this server's sign-in cookie into the
- * oai-authenticated-user-* headers that IDENTITY_MODE=dev trusts. Inbound
- * copies of those headers are removed from every request first.
+ * The development server's sign-in middleware. It answers the sign-in routes
+ * for loopback requests and turns this server's sign-in cookie into the
+ * x-assurance-user-* headers that IDENTITY_MODE=dev trusts. Inbound copies of
+ * those headers are removed from every request first.
  */
 export function localAuthMiddleware({
   secure,
@@ -61,7 +49,7 @@ export function localAuthMiddleware({
 }): Connect.NextHandleFunction {
   return (request, response, next) => {
     for (const name of Object.keys(request.headers)) {
-      if (name.startsWith("oai-authenticated-user-")) {
+      if (name.startsWith(IDENTITY_HEADER_PREFIX)) {
         removeHeader(request, name);
       }
     }
@@ -83,8 +71,7 @@ export function localAuthMiddleware({
     }
 
     const hostname = authority.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-    // Local change: the port this server accepted the connection on names its
-    // sign-in cookie.
+    // The port this server accepted the connection on names its sign-in cookie.
     const port = request.socket.localPort;
     if (
       !localHosts.has(hostname) ||
@@ -115,11 +102,6 @@ export function localAuthMiddleware({
       }
     }
 
-    if (url.pathname === CALLBACK_PATH) {
-      respond(response, 501);
-      return;
-    }
-
     const signIn = url.pathname === SIGN_IN_PATH;
     const signOut = url.pathname === SIGN_OUT_PATH;
     if (!signIn && !signOut) {
@@ -128,17 +110,12 @@ export function localAuthMiddleware({
           ? localIdentity(signInCookies[0])
           : undefined;
       if (identity) {
-        setHeader(request, "oai-authenticated-user-id", identity.userId);
-        setHeader(request, "oai-authenticated-user-email", identity.email);
+        setHeader(request, USER_ID_HEADER, identity.userId);
+        setHeader(request, USER_EMAIL_HEADER, identity.email);
         setHeader(
           request,
-          "oai-authenticated-user-full-name",
+          USER_FULL_NAME_HEADER,
           encodeURIComponent(identity.name),
-        );
-        setHeader(
-          request,
-          "oai-authenticated-user-full-name-encoding",
-          "percent-encoded-utf-8",
         );
       }
       next();
@@ -174,7 +151,7 @@ export function localAuthMiddleware({
       return;
     }
 
-    // Local change: `?as=<id>` signs in as a persona from the fixture.
+    // `?as=<id>` signs in as a persona from the fixture.
     const persona = signIn ? url.searchParams.get("as") : null;
     if (persona !== null && !personas.has(persona)) {
       response.statusCode = 400;
@@ -202,45 +179,18 @@ export function localAuthMiddleware({
   };
 }
 
-export function sites({ mockAuth = true } = {}): Plugin {
-  let root = process.cwd();
-  let command: "build" | "serve" = "build";
-
+/** The development server's sign-in (never part of a build). */
+export function devSignIn({ enabled = true } = {}): Plugin {
   return {
-    name: "sites",
-    configResolved(config) {
-      root = config.root;
-      command = config.command;
-    },
+    name: "dev-sign-in",
+    apply: "serve",
     configureServer(server) {
-      if (!mockAuth) return;
+      if (!enabled) return;
       const secure = Boolean(server.config.server.https);
-
       server.config.logger.info(
-        `Sites local sign-in: ${devPersonas.defaultIdentity.email}; personas: ${SIGN_IN_PATH}?as=<${[...personas.keys()].join("|")}>`,
+        `Development sign-in: ${devPersonas.defaultIdentity.email}; personas: ${SIGN_IN_PATH}?as=<${[...personas.keys()].join("|")}>`,
       );
       server.middlewares.use(localAuthMiddleware({ secure }));
-    },
-    async closeBundle() {
-      if (command !== "build") return;
-
-      const outputDirectory = resolve(root, "dist", ".openai");
-      const hostingConfig = resolve(root, ".openai", "hosting.json");
-      const drizzleSource = resolve(root, "drizzle");
-
-      await rm(outputDirectory, { recursive: true, force: true });
-      await mkdir(outputDirectory, { recursive: true });
-
-      // Local change: hosting.json is checkout-local, so clean clones and CI
-      // build without it (vite.config.ts then uses the default bindings).
-      if (await exists(hostingConfig)) {
-        await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));
-      }
-      if (await exists(drizzleSource)) {
-        await cp(drizzleSource, resolve(outputDirectory, "drizzle"), {
-          recursive: true,
-        });
-      }
     },
   };
 }

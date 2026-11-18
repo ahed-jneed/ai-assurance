@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import "./harness/env.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { Miniflare } from "miniflare";
+import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 const base = "http://127.0.0.1:5173";
 const moduleFiles = [
   "index.js",
@@ -16,25 +16,25 @@ const moduleFiles = [
     (p) => p !== "index.js" && (p.endsWith(".js") || p.endsWith(".mjs")),
   ),
 ];
-const mf = new Miniflare({
-  modules: moduleFiles.map((p) => ({
-    type: "ESModule",
-    path: path.resolve("dist/server", p),
-  })),
-  modulesRoot: path.resolve("dist/server"),
-  compatibilityDate: "2026-05-15",
-  compatibilityFlags: ["nodejs_compat"],
-  // Loopback-only fixture identities (docs/security/identity.md).
-  bindings: {
-    IDENTITY_MODE: "trusted-headers",
-    IDENTITY_TRUSTED_HEADERS: "loopback-tests",
-    SELF_SIGNUP: "open",
-  },
-  d1Databases: { DB: "engagement-integrity" },
-  r2Buckets: { BUCKET: "engagement-integrity-evidence" },
-  d1Persist: false,
-  r2Persist: false,
-});
+const mf = new Miniflare(
+  convertV4MiniflareOptions({
+    modules: moduleFiles.map((p) => ({
+      type: "ESModule",
+      path: path.resolve("dist/server", p),
+    })),
+    modulesRoot: path.resolve("dist/server"),
+    compatibilityDate: "2026-05-15",
+    compatibilityFlags: ["nodejs_compat"],
+    // Loopback-only fixture identities (docs/security/identity.md).
+    bindings: {
+      IDENTITY_MODE: "trusted-headers",
+      IDENTITY_TRUSTED_HEADERS: "loopback-tests",
+      SELF_SIGNUP: "open",
+    },
+    d1Databases: { DB: "engagement-integrity" },
+    r2Buckets: { BUCKET: "engagement-integrity-evidence" },
+  }),
+);
 try {
   const testDb = await mf.getD1Database("DB"),
     bucket = await mf.getR2Bucket("BUCKET");
@@ -53,8 +53,8 @@ try {
     const r = await mf.dispatchFetch(base + route, {
       method,
       headers: {
-        "oai-authenticated-user-id": owner,
-        "oai-authenticated-user-email": owner + "@fixture.invalid",
+        "x-assurance-user-id": owner,
+        "x-assurance-user-email": owner + "@fixture.invalid",
         Origin: base,
         ...(body || raw ? { "Content-Type": "application/json" } : {}),
       },
@@ -125,8 +125,8 @@ try {
       ],
     ]) {
       const headers = {
-        "oai-authenticated-user-id": owner,
-        "oai-authenticated-user-email": owner + "@fixture.invalid",
+        "x-assurance-user-id": owner,
+        "x-assurance-user-email": owner + "@fixture.invalid",
       };
       const json = await mf.dispatchFetch(base + api + "?" + query, {
         headers,

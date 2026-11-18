@@ -2,7 +2,7 @@
 // approves, each team member's dated independence and competence
 // declaration, and the evaluation that resolves a declared threat. The rules
 // they share with the Planning-exit gate live in ./acceptance.ts.
-import { z } from "zod";
+import { z } from "../zod";
 import { isInternalRole } from "../workflow-state";
 import {
   acceptancePreconditions,

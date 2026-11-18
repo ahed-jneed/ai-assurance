@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
+import { ZodError } from "../zod";
 import { legacyPackageMessage } from "../client-projection";
 import { releaseChecklist } from "../domain/gates";
 import type { Report } from "../domain/types";

@@ -1,6 +1,6 @@
 // The sign-in instructions seed:demo prints (#220): dev-server persona links
 // for the development server, and for a built Worker in trusted-headers mode
-// the headers to send, since /signin-with-chatgpt does not exist there.
+// the headers to send, since /auth/sign-in does not exist there.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
@@ -36,7 +36,7 @@ describe("seed:demo sign-in instructions", () => {
     expect(lines[0]).toMatch(/loopback development server/);
     expect(lines).toHaveLength(personas.length + 1);
     expect(lines[1]).toContain(
-      "http://127.0.0.1:5173/signin-with-chatgpt?" +
+      "http://127.0.0.1:5173/auth/sign-in?" +
         new URLSearchParams({ as: personas[0].id, return_to: deepLink }),
     );
   });
@@ -50,15 +50,15 @@ describe("seed:demo sign-in instructions", () => {
     });
     const text = lines.join("\n");
     // The only mention of the dev route says it does not work here.
-    expect(text).not.toContain("signin-with-chatgpt?");
+    expect(text).not.toContain("/auth/sign-in?");
     expect(text).toMatch(/does not work here/);
     for (const who of personas) {
       const line = lines.find((l) => l.startsWith("  " + who.id + " "));
-      expect(line).toContain("oai-authenticated-user-id: " + who.userId);
-      expect(line).toContain("oai-authenticated-user-email: " + who.email);
+      expect(line).toContain("x-assurance-user-id: " + who.userId);
+      expect(line).toContain("x-assurance-user-email: " + who.email);
     }
     expect(text).toContain(
-      `curl -H "oai-authenticated-user-id: ${personas[0].userId}" -H "oai-authenticated-user-email: ${personas[0].email}" "http://127.0.0.1:8787/api/workspace"`,
+      `curl -H "x-assurance-user-id: ${personas[0].userId}" -H "x-assurance-user-email: ${personas[0].email}" "http://127.0.0.1:8787/api/workspace"`,
     );
     expect(text).toContain("http://127.0.0.1:8787" + deepLink);
   });
@@ -82,7 +82,7 @@ describe("seed:demo sign-in instructions", () => {
 
   it("prints the same identity headers the seed sends", () => {
     const sent = personaHeaders(personas[0]);
-    expect(sent["oai-authenticated-user-id"]).toBe(personas[0].userId);
-    expect(sent["oai-authenticated-user-email"]).toBe(personas[0].email);
+    expect(sent["x-assurance-user-id"]).toBe(personas[0].userId);
+    expect(sent["x-assurance-user-email"]).toBe(personas[0].email);
   });
 });

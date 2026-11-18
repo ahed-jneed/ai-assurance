@@ -593,9 +593,9 @@ try {
   assert(e.runs.at(-1).error.includes("integrity"));
   await evidenceBucket.put(pinnedArtifact.key, originalBytes);
   for (const run of e.runs) assert.deepEqual(run.rulePack, e.rulePack);
-  await fs.mkdir(".sites-runtime", { recursive: true });
+  await fs.mkdir(".test-output", { recursive: true });
   await fs.writeFile(
-    ".sites-runtime/run-schema-fixtures.json",
+    ".test-output/run-schema-fixtures.json",
     JSON.stringify([pinned, ...e.runs], null, 2),
   );
   console.log(
@@ -2736,7 +2736,7 @@ try {
         f.path.startsWith("papers/"),
       );
       await fs.writeFile(
-        ".sites-runtime/dossier-papers.json",
+        ".test-output/dossier-papers.json",
         JSON.stringify(paperFiles, null, 2),
       );
     } else
@@ -3655,11 +3655,11 @@ try {
   );
 
   await fs.writeFile(
-    ".sites-runtime/run-schema-fixtures.json",
+    ".test-output/run-schema-fixtures.json",
     JSON.stringify([pinned, ...e.runs], null, 2),
   );
   await fs.writeFile(
-    ".sites-runtime/execution-schema-fixture.json",
+    ".test-output/execution-schema-fixture.json",
     JSON.stringify(
       e.workflow.procedures.find((p) => p.id === proc.id).execution,
       null,

@@ -7,7 +7,7 @@ keep their original licence, and each licence text is kept next to the files.
 | Material | Location | Licence | Licence text |
 |---|---|---|---|
 | shadcn/ui Tailwind theme and components (modified) | `site-app/vendor/shadcn-tailwind-4.13.0.css`, `site-app/components/ui/`, `site-app/hooks/use-mobile.ts` | MIT, © 2023 shadcn | [`site-app/vendor/shadcn-tailwind-4.13.0.LICENSE.md`](site-app/vendor/shadcn-tailwind-4.13.0.LICENSE.md) |
-| `@openai/sites-vite-plugin` 0.2.0 (modified development-server plugin) | `site-app/build/sites-vite-plugin.ts` | MIT, © 2026 OpenAI | [`site-app/build/sites-vite-plugin.LICENSE`](site-app/build/sites-vite-plugin.LICENSE) |
+| Development sign-in middleware, derived from `@openai/sites-vite-plugin` 0.2.0 | `site-app/build/dev-sign-in.ts` | MIT, © 2026 OpenAI | [`site-app/build/dev-sign-in.LICENSE`](site-app/build/dev-sign-in.LICENSE) |
 | Next.js starter icons | `site-app/public/file.svg`, `globe.svg`, `window.svg` | MIT, © Vercel, Inc. | <https://github.com/vercel/next.js/blob/canary/license.md> |
 
 ## Dependencies

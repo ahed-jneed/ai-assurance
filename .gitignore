@@ -8,7 +8,6 @@
 *.key
 .DS_Store
 node_modules/
-.openai/
 .dev.vars*
 .wrangler/
 .venv/

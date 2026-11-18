@@ -8,7 +8,9 @@ import {
 import { selectablePacks } from "../criteria/registry";
 import { canWrite, type Engagement } from "../domain/types";
 import { parseReportSettings } from "../domain/report-model";
-import { db } from "../bindings";
+import { db, env } from "../bindings";
+import { SIGN_UP_PATH } from "../auth-paths";
+import { signupToken } from "../local-auth";
 import { getEngagement, storedSize } from "../engagement-repo";
 import {
   IntegrityError,
@@ -302,20 +304,38 @@ export async function workspaceView(
         }[],
       }))
     : [];
+  // With the built-in accounts (IDENTITY_MODE unset or "local"), each pending
+  // invitation carries its sign-up link: null when DOSSIER_KEK, which keys the
+  // links, is not set (lib/local-auth.ts).
+  const localAccounts =
+    !env.IDENTITY_MODE?.trim() || env.IDENTITY_MODE.trim() === "local";
   const invitations = ctx.practiceAdmin
-    ? (
-        await db()
-          .prepare(
-            "SELECT i.id,i.email,i.display_name,i.role,i.client_id,i.engagement_ids,i.invited_by,(SELECT m.display_name FROM memberships m WHERE m.tenant_id=i.tenant_id AND m.user_id=i.invited_by) AS invited_by_name,i.created_at,i.expires_at FROM invitations i WHERE i.tenant_id=? AND i.status='pending' AND i.expires_at>? ORDER BY i.created_at DESC LIMIT 100",
-          )
-          .bind(ctx.tenantId, new Date().toISOString())
-          .all<Record<string, unknown>>()
-      ).results.map((i) => ({
-        ...i,
-        engagement_ids: JSON.parse(
-          String(i.engagement_ids ?? "[]"),
-        ) as string[],
-      }))
+    ? await Promise.all(
+        (
+          await db()
+            .prepare(
+              "SELECT i.id,i.email,i.display_name,i.role,i.client_id,i.engagement_ids,i.invited_by,(SELECT m.display_name FROM memberships m WHERE m.tenant_id=i.tenant_id AND m.user_id=i.invited_by) AS invited_by_name,i.created_at,i.expires_at FROM invitations i WHERE i.tenant_id=? AND i.status='pending' AND i.expires_at>? ORDER BY i.created_at DESC LIMIT 100",
+            )
+            .bind(ctx.tenantId, new Date().toISOString())
+            .all<Record<string, unknown>>()
+        ).results.map(async (i) => ({
+          ...i,
+          ...(localAccounts
+            ? {
+                signup_path: await signupToken(
+                  env.DOSSIER_KEK,
+                  ctx.tenantId,
+                  String(i.id),
+                ).then((token) =>
+                  token ? SIGN_UP_PATH + "?invite=" + token : null,
+                ),
+              }
+            : {}),
+          engagement_ids: JSON.parse(
+            String(i.engagement_ids ?? "[]"),
+          ) as string[],
+        })),
+      )
     : [];
   const people = isInternalRole(ctx.role)
     ? (
@@ -380,6 +400,7 @@ export async function workspaceView(
       // A platform operator (PLATFORM_OPERATORS) gets a link to /operator in
       // the account menu (#151); the console checks the list again itself.
       operator: isOperator(ctx.user.email),
+      localAccount: localAccounts,
     },
     tenantId: ctx.tenantId,
     memberships,
