@@ -21,7 +21,7 @@ What did not ship as planned:
 
 - **Pack #2 (EN 18286 + ISO/IEC 42001)** is built but ships as drafts until the expert review tracked in [#261] is done ([decision D-37](docs/product/decisions.md)).
 - **Legal content** (the rule pack, the Art 50 research, the LL144 pack) shows as pending qualified legal review ([decisions D-02, D-17 and D-34](docs/product/decisions.md)).
-- **GitHub CI** has been refused since about 06:15 UTC on 14 Nov 2026 because of an account billing problem only the owner can fix. The last two merges, [PR #195] and [PR #197], had green PR CI before the stoppage; their post-merge `main` runs are unverified until they are re-run, and later work is checked locally.
+- **GitHub CI** has not run since about 06:15 UTC on 14 Nov 2026, for a hosting-account reason that has nothing to do with the code and that the maintainer is sorting out. The last two merges, [PR #195] and [PR #197], had green PR CI before the stoppage; their post-merge `main` runs are unverified until they are re-run, and later work is checked locally.
 
 ## Issues and their merged PRs
 
@@ -251,7 +251,7 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 
 | What to watch | Why | Where |
 |---|---|---|
-| GitHub Actions billing | Every CI job is refused before it starts; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | — |
+| GitHub Actions is not running | No CI job starts on this repository at the moment; nothing should merge on red or missing CI. The two `main` runs for [PR #195] and [PR #197] need a re-run | — |
 | Dev server SSR 500 on a cold start | Not reproduced in about 15 cold starts; server-rendering errors are now logged with their stack, so a recurrence names its cause. `build/ssr-error-log.ts` patches Vinext and its test fails if an upgrade moves the anchor | `site-app/build/ssr-error-log.ts`; [#204] |
 | Release does not recheck LL144 per-group runs | `assertReleasable` rechecks the report gates only; capture already refuses incomplete runs ([decision D-48](docs/product/decisions.md)) | `site-app/lib/commands/reports.ts` (`assertReleasable`); [#202] |
 | Building beside a running e2e server | `npm run build` or `npm run check` in the same checkout as a running e2e server rewrites `dist/` mid-run | `site-app/e2e/README.md`; [#194] |
@@ -265,7 +265,7 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 
 | Action | Unblocks |
 |---|---|
-| **Fix GitHub Actions billing** (blocking since 14 Nov 2026) and re-run the failed `main` runs | CI on every PR and on `main` |
+| **Get GitHub Actions running again** (stopped since 14 Nov 2026) and re-run the failed `main` runs | CI on every PR and on `main` |
 | Qualified legal review of LR-01 to LR-10 (rule pack, [PR #43]), LR-A50-01 to LR-A50-14 (Art 50, [PR #71]), LR-LL144-01 to LR-LL144-08 (LL144, [PR #142]) and the LL144-based exclusion wording in the independence gate ([#23]) | Rule-pack, Art 50 and LL144 content shown as approved ([decisions D-02, D-17 and D-34](docs/product/decisions.md)) |
 | A purchased copy of EN 18286:2026, a licensed copy of ISO/IEC 42001 for clause checks, counsel's sign-off on citing clause numbers with our own titles, a legal review of pack #2's two legal effects and a methodology review of its `superset_of` links | Releasing pack #2 ([#28], [decision D-37](docs/product/decisions.md)) |
 | A qualified reviewer for the remaining 34 AI Act article and annex headings in `templates/criteria/` (only Arts 9, 16, 17 and 50 were checked) | A new framework data version without "unverified" headings ([#27]) |

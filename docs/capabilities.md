@@ -147,7 +147,7 @@ The platform is a reference implementation for independent AI auditors. It is no
 | Capability | Status | Implemented in | Tests |
 |---|---|---|---|
 | One source of truth: the root `schemas/`, `templates/`, `engine/` and `docs/obligation-subitems.json` are canonical, and generated copies in `site-app/` are checked (D-14) ([#3]) | Implemented | `scripts/sync-generated.mjs` | `npm run check:sync` |
-| CI with the `engine`, `web` and `e2e` jobs; a warning-free build; lint with no warnings ([#1]) | Implemented; GitHub Actions has been refused since 14 Nov 2026 for an account billing problem | `.github/workflows/ci.yml`, `scripts/strict-build.mjs`, `scripts/run-checks.mjs` | `npm run check` |
+| CI with the `engine`, `web` and `e2e` jobs; a warning-free build; lint with no warnings ([#1]) | Implemented; GitHub Actions has not run since 14 Nov 2026 for a hosting-account reason unrelated to the code | `.github/workflows/ci.yml`, `scripts/strict-build.mjs`, `scripts/run-checks.mjs` | `npm run check` |
 | Idempotent local D1 migrations | Implemented | `scripts/db-migrate-local.mjs` | used by `e2e/server.mjs` on every e2e run |
 | The e2e server refuses an incomplete build: it follows the Worker's imports and the client assets the RSC manifest names, and exits with "run `npm run build`" before touching the database ([#199]) | Implemented | `e2e/build-files.mjs`, `e2e/server.mjs` | Vitest `e2e/build-files.test.ts` |
 | Server-rendering errors on the development server are logged with their stack instead of a silent 500 ([#204]) | Implemented | `build/ssr-error-log.ts` (development-only Vite plugin) | Vitest `build/ssr-error-log.test.ts` (fails if a Vinext upgrade moves the anchor) |
