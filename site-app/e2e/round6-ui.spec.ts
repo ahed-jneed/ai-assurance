@@ -20,6 +20,7 @@ import {
   type Api,
   attest,
   DEMO,
+  engagementWork,
   expect,
   persona,
   recordPath,
@@ -182,13 +183,7 @@ test("Undo on the snooze toast returns focus to the restored row", async ({
     "E2E round-6 undo",
   );
   const page = await signIn("qa-lead");
-  await page.goto(
-    workspacePath(e, "My work") +
-      "&" +
-      new URLSearchParams({ workEngagement: e.engagementId, workSort: "due" }),
-  );
-  const rows = page.locator(".work-results [data-work-id]");
-  await expect(rows.first()).toBeVisible();
+  const rows = await engagementWork(page, e);
   const id = await rows.nth(1).getAttribute("data-work-id");
   await rows
     .nth(1)

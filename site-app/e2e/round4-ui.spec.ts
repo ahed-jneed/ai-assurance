@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 import { expectAccessible } from "./a11y";
 import { joinTeam, newEngagement, run } from "./engagement";
 import {
+  engagementWork,
   expect,
   paperPath,
   persona,
@@ -122,13 +123,7 @@ test("a snooze moves focus to the next row, and the last one to the list heading
     "E2E round-4 snooze",
   );
   const page = await signIn("qa-lead");
-  await page.goto(
-    workspacePath(e, "My work") +
-      "&" +
-      new URLSearchParams({ workEngagement: e.engagementId, workSort: "due" }),
-  );
-  const rows = page.locator(".work-results [data-work-id]");
-  await expect(rows.first()).toBeVisible();
+  const rows = await engagementWork(page, e);
   const snoozeButtons = page.getByRole("button", {
     name: /^Snooze reminder for /,
   });

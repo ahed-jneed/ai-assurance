@@ -266,6 +266,30 @@ export function workspacePath(demo: EngagementRef, view: string) {
   );
 }
 
+/**
+ * Opens My work filtered to the engagement and returns its rows once they
+ * show. The inbox checks 25 engagements at a time, ordered by their random
+ * ids (app/api/work-inbox/route.ts), and the Lead Auditor has access to
+ * every engagement the specs created: when the engagement is not among the
+ * first 25, My work says so and offers "Check more engagements", which this
+ * presses until the engagement's work is listed.
+ */
+export async function engagementWork(page: Page, e: EngagementRef) {
+  await page.goto(
+    workspacePath(e, "My work") +
+      "&" +
+      new URLSearchParams({ workEngagement: e.engagementId, workSort: "due" }),
+  );
+  const rows = page.locator(".work-results [data-work-id]"),
+    // Named "Loading engagements…" while a page of engagements loads.
+    more = page.getByRole("button", { name: "Check more engagements" });
+  for (;;) {
+    await expect(rows.or(more).first()).toBeVisible();
+    if (await rows.count()) return rows;
+    await more.click();
+  }
+}
+
 /** The deep link that opens a working paper (lib/workspace-links.ts). */
 export function paperPath(demo: EngagementRef, paperId: string) {
   return recordPath(demo, "Working papers", "paper", paperId);
