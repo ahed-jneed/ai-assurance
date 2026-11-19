@@ -2,7 +2,7 @@
 
 > GitHub issues and milestones are the source of truth. This file records the outcome of the November 2026 cycle as of **14 Nov 2026** ([#38]); the plan it started from (5 Nov 2026, with its dependency order) is in this file's Git history, last at commit `ffe27c1`.
 
-The cycle was planned on 5 November 2026. The [product direction](docs/product/direction.md) says what we are building and why, the [decision log](docs/product/decisions.md) records the product and technical decisions taken since (D-01 to D-44), and the [capability matrix](docs/capabilities.md) says what `main` does now, with the code and tests behind each row. The [research record](docs/research/2026-11/README.md) holds the evidence behind the plan, and the [codebase map](docs/engineering/codebase-map.md) describes the code (it started as a snapshot at commit `74c6463`; its module paths are updated to the current layout). The [changelog](CHANGELOG.md) lists what each merged PR changed.
+The cycle was planned on 5 November 2026. The [product direction](docs/product/direction.md) says what we are building and why, the [decision log](docs/product/decisions.md) records the product and technical decisions taken since (D-01 to D-50), and the [capability matrix](docs/capabilities.md) says what `main` does now, with the code and tests behind each row. The [research record](docs/research/2026-11/README.md) holds the evidence behind the plan, and the [codebase map](docs/engineering/codebase-map.md) describes the code (it started as a snapshot at commit `74c6463`; its module paths are updated to the current layout). The [changelog](CHANGELOG.md) lists what each merged PR changed.
 
 ## Outcome
 

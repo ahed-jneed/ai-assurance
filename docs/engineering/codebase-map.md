@@ -26,7 +26,7 @@ Paths are relative to `site-app/`. The [capability matrix](../capabilities.md) m
 | Criteria and GenAI | `lib/criteria/`, `lib/genai/` |
 | Assurance and signing | `lib/assurance-{core,packet,store,store-client,query,search}.ts`, `lib/dossier.ts`, `lib/dossier-scope.ts`, `lib/signing-keys.ts` |
 | Workspace UI | `app/workspace/` (shell, hooks, `modals/`, `views/`, navigation guards); the split screens `app/audit-program/`, `app/assurance-workbench/` and `app/testing-lab/` ([#64]: [#186], [#187], [#188], [#193]), whose former files `app/audit-program.tsx`, `app/assurance-workbench.tsx` and `app/testing-lab.tsx` are now entries that re-export them |
-| Storage | `db/schema.ts` (Drizzle declaration of every D1 table), `drizzle/0000`–`0017` |
+| Storage | `db/schema.ts` (Drizzle declaration of every D1 table), `drizzle/0000`–`0018` |
 
 [#37]: https://github.com/ahed-jneed/ai-assurance/issues/37
 [#64]: https://github.com/ahed-jneed/ai-assurance/issues/64
@@ -82,7 +82,7 @@ Cloudflare Worker: build/sites-worker.ts -> vinext fetch handler   (no header fi
         |                                    |                                     |
         v                                    v                                     |
    D1 (SQLite): tables in db/schema.ts, R2: evidence bytes, content-addressed      |
-   drizzle/0000-0017, append-only       report/paper/run blobs, sealed dossiers,   |
+   drizzle/0000-0018, append-only       report/paper/run blobs, sealed dossiers,   |
    triggers, engagement JSON bodies     runner results                             |
                                                                                    |
 Python engine (operator host): engine/worker.py --- HTTPS pull --------------------+
@@ -119,7 +119,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 
 ### 1.4 Storage
 
-**D1** (`db/schema.ts` declares every table; migrations `drizzle/0000`–`0017`; at `74c6463` there were 17 tables and migrations `0000`–`0004`):
+**D1** (`db/schema.ts` declares every table; migrations `drizzle/0000`–`0018`; at `74c6463` there were 17 tables and migrations `0000`–`0004`):
 
 | Group | Tables |
 |---|---|
@@ -196,7 +196,7 @@ Repo data: schemas/ (run, procedure, working-paper contracts)
 1. The build uses the `DB` and `BUCKET` bindings (`site-app/cloudflare-env.d.ts`).
 2. Run `npm ci` in `site-app/`.
 3. Run `npm run build`. It writes `dist/server/wrangler.json`, which the migration reads.
-4. Run `npm run db:migrate:local`. It applies every migration in `site-app/drizzle/` that is not applied yet (18 today, `0000` to `0017`), records each by its SHA-256 and is safe to run again ([#34]; at `74c6463` the README listed only two of the five migrations then, F-15). Skipping it leaves the local D1 database without tables: every API request answers 500 with `no such table`, and `npm run seed:demo` stops.
+4. Run `npm run db:migrate:local`. It applies every migration in `site-app/drizzle/` that is not applied yet (19 today, `0000` to `0018`), records each by its SHA-256 and is safe to run again ([#34]; at `74c6463` the README listed only two of the five migrations then, F-15). Skipping it leaves the local D1 database without tables: every API request answers 500 with `no such table`, and `npm run seed:demo` stops.
 5. On Windows, keep the checkout path short (`site-app\` under about 120 characters), or the migration fails with `SQLITE_CANTOPEN`. The check harnesses pick a short temp directory themselves when `TEMP` is long ([#204]).
 
 **A. Personas on the development server, with hot reload (`npm run dev`).** This is the mode for manual QA.
