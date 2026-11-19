@@ -1,0 +1,6 @@
+# Caddy serves the workspace over HTTPS and passes every request on to the app.
+# The host name comes from ASSURANCE_HOST in the .env file beside this file
+# (docs/self-hosting/https-caddy.md). Caddy gets and renews the certificate.
+{$ASSURANCE_HOST} {
+	reverse_proxy ai-assurance:8787
+}

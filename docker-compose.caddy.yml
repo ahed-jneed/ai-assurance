@@ -1,0 +1,30 @@
+# Optional overlay: HTTPS through Caddy (docs/self-hosting/https-caddy.md).
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+# Needs Docker Compose 2.24.4 or later (for the !reset tag below) and
+# ASSURANCE_HOST in a .env file beside this file.
+services:
+  ai-assurance:
+    # Do not publish the app's plain-HTTP port; only Caddy reaches it, over
+    # the compose network.
+    ports: !reset []
+
+  caddy:
+    image: caddy:2
+    environment:
+      ASSURANCE_HOST: ${ASSURANCE_HOST:?Set ASSURANCE_HOST in .env, for example ASSURANCE_HOST=assurance.example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and their keys. Keep this volume.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - ai-assurance
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
