@@ -27,8 +27,77 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Buildx is Docker's build tool; it keeps a layer cache inside this job
+      # that the two build steps below share.
       - uses: docker/setup-buildx-action@v4
 
+      # Works out the image tags (and descriptive labels) for this event:
+      #   push to main      -> latest, sha-<commit>
+      #   push tag v0.1.0   -> v0.1.0, 0.1.0, 0.1, sha-<commit>, latest
+      #   pull request      -> sha-<commit> (never pushed)
+      # The semver lines add the plain version numbers. A pre-release tag such
+      # as v0.2.0-rc.1 gets 0.2.0-rc.1 but no 0.2. There is on purpose no bare
+      # major tag ("0"): a 0.x version makes no stability promise.
+      # The action itself adds "latest" for every tag push.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      # Step 1 of 3, on every event: build the image and load it into this
+      # runner's local Docker under a test-only name. Nothing is published.
+      - name: Build the image
+        uses: docker/build-push-action@v7
+        with:
+          context: site-app
+          load: true
+          tags: ai-assurance:ci
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Step 2 of 3, on every event: the image just built must start and send
+      # a first-time visitor to the first-run set-up page. If it does not,
+      # the job fails here and nothing is published.
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 8787:8787 ai-assurance:ci
+          url=http://127.0.0.1:8787/auth/sign-in
+          answered=no
+          for i in $(seq 1 90); do
+            if curl -fs -o /dev/null "$url"; then answered=yes; break; fi
+            if [ "$(docker inspect -f '{{.State.Running}}' smoke)" != "true" ]; then
+              echo "::error::The container stopped before the app answered."
+              break
+            fi
+            sleep 2
+          done
+          if [ "$answered" != "yes" ]; then
+            echo "::error::The app did not answer on $url."
+            exit 1
+          fi
+          redirect="$(curl -s -o /dev/null -w '%{redirect_url}' "$url")"
+          if [ "$redirect" != "http://127.0.0.1:8787/auth/setup" ]; then
+            echo "::error::Expected a redirect to /auth/setup (first-run set-up), got '$redirect'."
+            exit 1
+          fi
+          echo "Smoke test passed: $url redirects to $redirect"
+
+      # Runs after a failed smoke test too, so the reason is in the job log.
+      - name: Show the container log
+        if: always()
+        run: docker logs smoke 2>&1 | tail -50 || true
+
+      # Step 3 of 3, only on pushes to main and on version tags, and only when
+      # the smoke test passed: publish. This build has the same inputs as the
+      # first one, so every layer comes from the build cache and the image
+      # that is pushed is the one that was tested.
       - name: Log in to the GitHub container registry
         if: github.event_name == 'push'
         uses: docker/login-action@v4
@@ -37,34 +106,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=tag
-            type=sha
-
-      # Pull requests only build the image; main and version tags publish it.
-      - uses: docker/build-push-action@v7
+      - name: Publish the tested image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v7
         with:
           context: site-app
-          push: ${{ github.event_name == 'push' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # The built image must start and offer the first-run setup.
-      - name: Smoke test
-        if: github.event_name == 'pull_request'
-        run: |
-          docker buildx build --load -t ai-assurance:ci site-app
-          docker run -d --name smoke -p 8787:8787 ai-assurance:ci
-          for i in $(seq 1 90); do
-            curl -fs -o /dev/null http://127.0.0.1:8787/auth/sign-in && break
-            sleep 2
-          done
-          test "$(curl -s -o /dev/null -w '%{redirect_url}' http://127.0.0.1:8787/auth/sign-in)" = "http://127.0.0.1:8787/auth/setup"
-          docker logs smoke | tail -20
