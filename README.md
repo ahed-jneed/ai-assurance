@@ -201,7 +201,7 @@ At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has
 |---|---|
 | [docs/capabilities.md](docs/capabilities.md) | What `main` does, with code and tests per capability |
 | [ROADMAP.md](ROADMAP.md), [CHANGELOG.md](CHANGELOG.md) | The November 2026 cycle's outcome, deferred work, watch list and owner actions; merged PRs |
-| [docs/product/direction.md](docs/product/direction.md), [docs/product/decisions.md](docs/product/decisions.md) | Who we serve and why; the decision log (D-01 to D-48) |
+| [docs/product/direction.md](docs/product/direction.md), [docs/product/decisions.md](docs/product/decisions.md) | Who we serve and why; the decision log (D-01 to D-50) |
 | [docs/engineering/codebase-map.md](docs/engineering/codebase-map.md) | Components, data flow, storage, identity, module layout and file ownership |
 | [docs/audit-methodology.md](docs/audit-methodology.md) | The audit methodology and the regulatory snapshot |
 | [docs/design/](docs/design/) | Statistics, criteria-model and GenAI-evidence designs |

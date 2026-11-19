@@ -14,7 +14,7 @@ The AI Assurance workspace: a React 19 single-page app and its API in one Cloudf
 | `lib/criteria/`, `lib/genai/`, `lib/papers/` | The criteria model and coverage, GenAI evidence, and paper revisions and exports |
 | `lib/http.ts`, `lib/tenancy.ts`, `lib/engagement-repo.ts`, `lib/factories.ts`, `lib/ids.ts`, `lib/bindings.ts` | HTTP helpers; identity-to-tenant context, `requireRole`, `requireAdmin` and provisioning; engagement persistence; record factories; ids, `now` and `sha256`; the `DB` and `BUCKET` bindings |
 | `lib/identity.ts`, `lib/permissions.ts` | The identity adapter, and the one permission map that the UI and the tests share |
-| `db/schema.ts`, `drizzle/` | The Drizzle declaration of every D1 table, and the SQL migrations (`0000` to `0017`; take the next free number) |
+| `db/schema.ts`, `drizzle/` | The Drizzle declaration of every D1 table, and the SQL migrations (`0000` to `0018`; take the next free number) |
 | `build/`, `vite.config.ts` | The Worker entry (`build/worker.ts`) and the development sign-in plugin (`build/dev-sign-in.ts`) |
 | `scripts/` | Build, sync, seed and migration scripts, and the Miniflare harnesses (`*-check.mjs`, sharing `scripts/harness/`) |
 | `e2e/` | The Playwright persona suite ([e2e/README.md](e2e/README.md)) |
