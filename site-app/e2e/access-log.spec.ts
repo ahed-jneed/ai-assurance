@@ -32,18 +32,10 @@ test("the practice administrator filters the Access log and exports it as CSV", 
     .click();
   await accessLogShown(page);
   const table = page.getByRole("table", { name: "Access events" });
-  // The seed granted every persona its membership, and the Lead's own visit
-  // was recorded as a sign-in.
-  await expect(
-    table.getByRole("row").filter({ hasText: "Member granted" }).first(),
-  ).toBeVisible();
-  await expect(
-    table
-      .getByRole("row")
-      .filter({ hasText: "Signed in" })
-      .filter({ hasText: persona("qa-lead").name })
-      .first(),
-  ).toBeVisible();
+  // The first page holds the newest 50 events, whatever the specs before
+  // this one recorded: the seed's events are looked up through the filters
+  // below, never on this page.
+  await expect(table.getByRole("row").nth(1)).toBeVisible();
   await expectAccessible(page, "Access log");
 
   const filters = page.getByRole("group", { name: "Filter the Access log" });
@@ -77,6 +69,7 @@ test("the practice administrator filters the Access log and exports it as CSV", 
   expect(response.headers()["content-disposition"]).toBe(
     'attachment; filename="access-log.csv"',
   );
+  const lead = persona("qa-lead");
   const csv = await response.text();
   const lines = csv.trimEnd().split("\r\n");
   expect(lines[0]).toBe(
@@ -84,10 +77,32 @@ test("the practice administrator filters the Access log and exports it as CSV", 
   );
   expect(lines.length).toBeGreaterThan(1);
   for (const line of lines.slice(1)) expect(line.split(",")[2]).toBe("signIn");
-  expect(csv).toContain(persona("qa-lead").userId);
+  expect(csv).toContain(lead.userId);
+
+  // The Lead's own visit was recorded as a sign-in, once per
+  // signInGapHours: with "Acted by" as well, it is on the first page however
+  // many members signed in after it.
+  const own = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/access-log" &&
+      new URL(r.url()).searchParams.get("action") === "signIn" &&
+      new URL(r.url()).searchParams.get("actor") === lead.userId,
+  );
+  await filters.getByLabel("Acted by").selectOption(lead.userId);
+  expect((await own).status()).toBe(200);
+  await expect(page.locator(".loading-grid")).toHaveCount(0);
+  await expect(
+    table
+      .getByRole("row")
+      .filter({ hasText: "Signed in" })
+      .filter({ hasText: lead.name })
+      .first(),
+  ).toBeVisible();
 
   // The person involved filter (#185) lists the events about the auditor:
-  // the seed's membership grant names them as the member acted on.
+  // the seed's membership grant names them as the member acted on. The
+  // specs that add the auditor to an engagement's team record a "Member
+  // changed" each, so the grant is looked up with the event filter as well.
   await page.getByRole("button", { name: "Clear filters" }).click();
   await expect(page.locator(".loading-grid")).toHaveCount(0);
   const auditor = persona("qa-auditor");
@@ -98,6 +113,15 @@ test("the practice administrator filters the Access log and exports it as CSV", 
   );
   await filters.getByLabel("Person involved").selectOption(auditor.userId);
   expect((await involved).status()).toBe(200);
+  await expect(page.locator(".loading-grid")).toHaveCount(0);
+  const granted = page.waitForResponse(
+    (r) =>
+      new URL(r.url()).pathname === "/api/access-log" &&
+      new URL(r.url()).searchParams.get("involved") === auditor.userId &&
+      new URL(r.url()).searchParams.get("action") === "grantMember",
+  );
+  await filters.getByLabel("Event").selectOption("grantMember");
+  expect((await granted).status()).toBe(200);
   await expect(page.locator(".loading-grid")).toHaveCount(0);
   await expect(
     table
