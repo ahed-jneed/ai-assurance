@@ -4,7 +4,13 @@
 //
 //   npm run self-host                                 (http://127.0.0.1:8787)
 //   PORT=3000 npm run self-host
+//   npm run self-host -- --rebuild                    (after an upgrade)
 //   npm run self-host -- reset-password owner@example.com
+//
+// --rebuild builds the workspace again before it starts. Without it an
+// existing build (dist/) is reused, so after `git pull` and `npm ci` the old
+// version would still be served. The Docker image does not need it: a new
+// image holds a new build. See docs/self-hosting/upgrading.md.
 //
 // Settings (environment variables):
 //   PORT       port to listen on (default 8787)
