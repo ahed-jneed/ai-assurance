@@ -65,7 +65,33 @@ Never use `docker compose down -v` as part of an upgrade. The `-v` deletes the d
 
 ### If you run a published image instead of building one
 
-Once a release is published, the image is also available as `ghcr.io/ahed-jneed/ai-assurance`. If your install runs that image, you do not need `git pull` or `--build`: pull the image of the new version, then create the container again from it with the same data volume. The image contains the finished build, and the migrations apply at start as described above. Back up first in the same way. This route was not tested for this guide, because no image had been published when it was written.
+`docker-compose.pull.yml` runs a ready-made image from the GitHub container registry, `ghcr.io/ahed-jneed/ai-assurance`, and builds nothing on your machine. If you started the app with that file, you do not need `git pull` or `--build`. Put `-f docker-compose.pull.yml` in every `docker compose` command, including the ones in the backup guide: `-f` names the file to use.
+
+```bash
+# 1. Take a backup (see "Back up before upgrading").
+
+# 2. Download the newer image.
+docker compose -f docker-compose.pull.yml pull
+
+# 3. Restart the app with it.
+docker compose -f docker-compose.pull.yml up -d
+
+# 4. Watch the start. Press Ctrl+C to stop watching; the app keeps running.
+docker compose -f docker-compose.pull.yml logs -f ai-assurance
+```
+
+Which version step 2 downloads depends on the variable `AI_ASSURANCE_VERSION`:
+
+- **Not set:** the tag `latest`, the newest published build. Each `pull` moves you to whatever is newest at that moment.
+- **Set to a release, for example `AI_ASSURANCE_VERSION=0.1.0`:** that release, and nothing newer. This is called pinning a version, and it is the safer choice for a real install. `pull` then finds nothing new, so **to upgrade you change the pin** to the new release and run steps 2 and 3. Set the variable in a file called `.env` next to `docker-compose.pull.yml`, or in front of each command.
+
+Write down the pin you had before the upgrade. If you ran `latest`, you cannot name the previous build afterwards, which is one more reason to pin.
+
+The image contains the finished build, and the migrations apply at start as described above, so step 4 shows the same lines.
+
+**To go back** after a failed upgrade, do both things, as in [If an upgrade fails](#if-an-upgrade-fails): set `AI_ASSURANCE_VERSION` back to the previous release, and restore the backup. Stop the app, delete the upgraded data with `docker compose -f docker-compose.pull.yml down -v` (check first that your backup file is there), and follow [Restore, under Docker](backup-restore.md#restore) in the backup guide with `-f docker-compose.pull.yml` in each command. Its step 1 becomes `docker compose -f docker-compose.pull.yml pull`.
+
+This route was not tested for this guide: the test environment could not download the image.
 
 ## Node.js
 
@@ -187,4 +213,4 @@ Under Docker, `docker compose up -d --build` could not finish in the test enviro
 | New image with a changed page text and a made-up migration, then `docker compose up -d` | The container was created again from the new image; the migration was applied; the new text was served; `secrets.env` in the data volume was unchanged |
 | New image with a made-up migration whose second statement fails | `db:migrate:local failed:` in the logs; `docker compose ps` showed the container as restarting |
 
-Not tested: an upgrade between two real versions; `docker compose up -d --build` to the end, as written; the published image; going back with a restore after a real failed upgrade (the restore itself is tested in the [backup guide](backup-restore.md#tested)); Windows.
+Not tested: an upgrade between two real versions; `docker compose up -d --build` to the end, as written; the route with `docker-compose.pull.yml` and the published image (the test environment could not download the image; only the way `AI_ASSURANCE_VERSION` selects the image tag was checked, with `docker compose config`); going back with a restore after a real failed upgrade (the restore itself is tested in the [backup guide](backup-restore.md#tested)); Windows.
