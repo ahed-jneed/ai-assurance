@@ -1,0 +1,39 @@
+# Self-host the AI Assurance workspace from the published image. Nothing is
+# built on your machine: Docker downloads ("pulls") the ready-made image from
+# the GitHub container registry, ghcr.io.
+#
+#   docker compose -f docker-compose.pull.yml up -d
+#
+# then open http://localhost:8787 and create the owner account.
+#
+# Which version runs: by default the tag "latest", which is the newest
+# published build (the main branch, or the newest release tag). To pin a
+# release, which is the safer choice for a real installation, set
+# AI_ASSURANCE_VERSION in your shell or in a .env file next to this file:
+#
+#   AI_ASSURANCE_VERSION=0.1.0 docker compose -f docker-compose.pull.yml up -d
+#
+# Published tags: a release such as v0.1.0 is available as "v0.1.0", "0.1.0"
+# and "0.1" (the newest 0.1.x).
+#
+# To upgrade, download the newer image and restart:
+#
+#   docker compose -f docker-compose.pull.yml pull
+#   docker compose -f docker-compose.pull.yml up -d
+#
+# This file is self-contained; docker-compose.yml (which builds the image from
+# source) is not needed. Both files use the same service name and volume name,
+# and Compose prefixes the volume with the project name, which is the name of
+# this directory. So both files, used from the same directory, share one data
+# volume: you can switch between them without losing data.
+services:
+  ai-assurance:
+    image: ghcr.io/ahed-jneed/ai-assurance:${AI_ASSURANCE_VERSION:-latest}
+    ports:
+      - "8787:8787"
+    volumes:
+      - ai-assurance-data:/data
+    restart: unless-stopped
+
+volumes:
+  ai-assurance-data:
