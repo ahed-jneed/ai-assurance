@@ -1,19 +1,33 @@
 # Roadmap
 
-> GitHub issues and milestones are the source of truth. This file records the outcome of the November 2026 cycle as of **14 Nov 2026** ([#38]); the plan it started from (5 Nov 2026, with its dependency order) is in this file's Git history, last at commit `ffe27c1`.
+> GitHub issues and milestones are the source of truth. This file records the outcome of the November 2026 cycle. It was first written for the state at 14 Nov 2026 ([#38]), and its intro and Outcome section were brought up to date on **20 Nov 2026** for the first public preview, v0.1.0 ([#262]); the plan it started from (5 Nov 2026, with its dependency order) is in this file's Git history, last at commit `ffe27c1`.
 
 The cycle was planned on 5 November 2026. The [product direction](docs/product/direction.md) says what we are building and why, the [decision log](docs/product/decisions.md) records the product and technical decisions taken since (D-01 to D-50), and the [capability matrix](docs/capabilities.md) says what `main` does now, with the code and tests behind each row. The [research record](docs/research/2026-11/README.md) holds the evidence behind the plan, and the [codebase map](docs/engineering/codebase-map.md) describes the code (it started as a snapshot at commit `74c6463`; its module paths are updated to the current layout). The [changelog](CHANGELOG.md) lists what each merged PR changed.
 
 ## Outcome
 
-Every roadmap issue in M0, M1 and M2 is closed with a merged PR. In M3, seven issues remain open, each with a PR in review: [#37] (dead-code removal, [PR #196]), the five release-verification issues [#204], [#199], [#201], [#203] and [#202] ([PR #207], [PR #200], [PR #205], [PR #206] and [PR #208]), and [#38] (this refresh, [PR #198]). The PRs are stacked to merge in that order, each on top of the one before. Issues opened during the cycle as follow-ups were added to the milestone whose work they continued, so the issue counts below are larger than the plan's.
+Every issue in M0, M1, M2 and M3 is closed, and the four milestones were closed on GitHub on 18 Nov 2026. Every roadmap issue closed with a merged PR, except [#64], which was done through four sub-issues and their PRs.
+
+At the 14 Nov 2026 refresh, seven M3 issues were still open, each with a PR in review. GitHub records all seven PRs as merged on 15 Nov 2026, and the issues closed the same day: [#37] (dead-code removal, [PR #196]), the five release-verification issues [#204], [#199], [#201], [#203] and [#202] ([PR #207], [PR #200], [PR #205], [PR #206] and [PR #208]), and [#38] (the documentation refresh, [PR #198]). The release-candidate verification then ran further rounds (rounds 2 to 9). Their 20 issues, from [#209] to [#248], were added to M3 and closed on 15 Nov 2026 as well; the [changelog](CHANGELOG.md) lists each of their PRs, and they are not repeated in the tables below. Issues opened during the cycle as follow-ups were added to the milestone whose work they continued, so the issue counts below are larger than the plan's.
+
+Counts are GitHub's at 20 Nov 2026.
 
 | Milestone | Goal | Issues | Open |
 |---|---|---|---|
-| [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene | 6 closed | none |
-| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review | 46 closed | none |
-| [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion | 18 closed | none |
-| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification | 28 closed | [#37], [#38], [#199], [#201], [#202], [#203], [#204] |
+| [M0 Foundation](https://github.com/ahed-jneed/ai-assurance/milestone/1) (closed) | CI pipeline, formatting and lint baseline, warning-free build, repo hygiene | 6 closed | none |
+| [M1 Defensible core](https://github.com/ahed-jneed/ai-assurance/milestone/2) (closed) | Correctness, security and legal currency: verified bug fixes, identity hardening, rule pack 2026.11, report model v2, audit-grade statistics, independence and quality review | 46 closed | none |
+| [M2 Multi-framework and GenAI evidence](https://github.com/ahed-jneed/ai-assurance/milestone/3) (closed) | Criteria as data with typed crosswalks, EN 18286 + ISO/IEC 42001 and NYC LL144 packs, NIST AI RMF crosswalk, GenAI evaluation evidence ingestion | 18 closed | none |
+| [M3 Release readiness](https://github.com/ahed-jneed/ai-assurance/milestone/4) (closed) | End-to-end persona tests, UX and accessibility hardening, dead-code removal, documentation that matches the code, final verification | 55 closed | none |
+
+After the cycle, the work moved to new milestones:
+
+| Milestone | Goal | Issues | Open |
+|---|---|---|---|
+| [v0.1 Public preview](https://github.com/ahed-jneed/ai-assurance/milestone/5) (open) | A stranger can self-host the project from the tagged release `v0.1.0` | 1 closed ([#267]) | [#262], the release checklist; [#263], [#264], [#265] and [#266], the self-hosting guides, which are written and merged ([PR #281], [PR #278], [PR #282] and [PR #279]) and close once the README links to them |
+| [v0.2 Contributor-ready](https://github.com/ahed-jneed/ai-assurance/milestone/6) (open) | Maintenance work that is open to contributors: more unit tests, faster feedback, smaller modules | none closed | [#268], [#269], [#270], [#271], [#272], [#273] |
+| [Regulatory content review](https://github.com/ahed-jneed/ai-assurance/milestone/7) (open) | Expert review of the legal, standards and practitioner content | none closed | [#261] |
+
+**v0.1.0 is the first public preview.** Since the cycle, `main` gained self-hosting with one command and built-in accounts, and lost the ChatGPT sign-in and the Sites hosting integration ([PR #260], merged 18 Nov 2026; [decisions D-49 and D-50](docs/product/decisions.md)). It also gained four self-hosting guides in [`docs/self-hosting/`](docs/self-hosting/), a Docker workflow that tests the image before it publishes it, and a compose file that runs the published image ([PR #280]). The checklist in [#262] tracks what is left before the tag. Two limits belong in every description of this preview: the self-hosted runtime starts the app with `wrangler dev --local`, Cloudflare's local development runtime, not a production-hardened server; and no independent security assessment has been done ([SECURITY.md](SECURITY.md)).
 
 [#261] (expert review) is not a roadmap item; see [Owner actions](#owner-actions-outside-the-roadmap).
 
@@ -119,8 +133,8 @@ Merge dates are UTC, all in November 2026. Titles are the issues' own.
 | [#34] | E2E: Playwright persona suite with accessibility checks in CI | [PR #86], merged 6 Nov |
 | [#35] | UX: attestation dialogs, permission-aware actions and consistent error handling | [PR #177], merged 13 Nov |
 | [#36] | Accessibility fixes and a dedicated client portal shell | [PR #180], merged 14 Nov |
-| [#37] | Remove dead code, unused components and unused dependencies | **Open.** [PR #196] in review |
-| [#38] | Docs: capability matrix, README and status docs that match the code | **Open.** This refresh, [PR #198], stacked last |
+| [#37] | Remove dead code, unused components and unused dependencies | [PR #196], merged 15 Nov |
+| [#38] | Docs: capability matrix, README and status docs that match the code | [PR #198], merged 15 Nov |
 | [#39] | UI correctness: triage the 62 React Compiler lint disables and fix runtime React warnings | [PR #171], merged 13 Nov |
 | [#52] | Test: move pure-module harness checks into Vitest and unit-test commands covered only over HTTP | [PR #172], merged 13 Nov |
 | [#62] | Engine packaging: one supported Python version, cryptography in the runtime image, signature tests that cannot skip in CI | [PR #146], merged 13 Nov |
@@ -146,11 +160,11 @@ Merge dates are UTC, all in November 2026. Titles are the issues' own.
 | [#188] | Split app/testing-lab.tsx along its views (part of #64) | [PR #191], merged 14 Nov |
 | [#193] | Finish #64: split acceptance-panel.tsx and tidy the split modules | [PR #195], merged 14 Nov |
 | [#194] | Flaky e2e: workerd 'Network connection lost' in report-release.spec.ts | [PR #197], merged 14 Nov |
-| [#199] | Test the 50 MB evidence upload limit and harden the e2e server start | **Open.** [PR #200] in review: boundary tests for the evidence and client submission limits, and an e2e server that refuses an incomplete build |
-| [#201] | Release verification: server-side defects (client projection leak, missing guards, refusal messages) | **Open.** [PR #205] in review: no staff ids in client projections, 409 and 404 guards, clearer refusals, strict filters (D-46), withdrawal of a superseded client-visible report (D-45), #19's label confirmed (D-47) |
-| [#202] | Release verification: UI defects (revoked screen, labels, guidance, LL144 checklist, compile draft) | **Open.** [PR #208] in review: the eleven items, one capture-gate list for UI and server (D-48), and Withdraw for a superseded client-visible report |
-| [#203] | Release verification: keyboard focus in record sheets and the client portal | **Open.** [PR #206] in review: focus returns to the opener from every dialog and sheet; the portal forms take and return focus |
-| [#204] | Release verification: dev server returns 500 on server-rendered pages; local setup docs | **Open.** [PR #207] in review: SSR errors logged on the dev server, a short harness temp directory on Windows, the migration step in the README Quick start |
+| [#199] | Test the 50 MB evidence upload limit and harden the e2e server start | [PR #200], merged 15 Nov: boundary tests for the evidence and client submission limits, and an e2e server that refuses an incomplete build |
+| [#201] | Release verification: server-side defects (client projection leak, missing guards, refusal messages) | [PR #205], merged 15 Nov: no staff ids in client projections, 409 and 404 guards, clearer refusals, strict filters (D-46), withdrawal of a superseded client-visible report (D-45), #19's label confirmed (D-47) |
+| [#202] | Release verification: UI defects (revoked screen, labels, guidance, LL144 checklist, compile draft) | [PR #208], merged 15 Nov: the eleven items, one capture-gate list for UI and server (D-48), and Withdraw for a superseded client-visible report |
+| [#203] | Release verification: keyboard focus in record sheets and the client portal | [PR #206], merged 15 Nov: focus returns to the opener from every dialog and sheet; the portal forms take and return focus |
+| [#204] | Release verification: dev server returns 500 on server-rendered pages; local setup docs | [PR #207], merged 15 Nov: SSR errors logged on the dev server, a short harness temp directory on Windows, the migration step in the README Quick start |
 
 ## Placed on 5 Nov 2026
 
@@ -483,3 +497,23 @@ Facts and risks the product depends on that are still moving. On each date, re-c
 [#202]: https://github.com/ahed-jneed/ai-assurance/issues/202
 [#203]: https://github.com/ahed-jneed/ai-assurance/issues/203
 [#204]: https://github.com/ahed-jneed/ai-assurance/issues/204
+[#209]: https://github.com/ahed-jneed/ai-assurance/issues/209
+[#248]: https://github.com/ahed-jneed/ai-assurance/issues/248
+[#262]: https://github.com/ahed-jneed/ai-assurance/issues/262
+[#263]: https://github.com/ahed-jneed/ai-assurance/issues/263
+[#264]: https://github.com/ahed-jneed/ai-assurance/issues/264
+[#265]: https://github.com/ahed-jneed/ai-assurance/issues/265
+[#266]: https://github.com/ahed-jneed/ai-assurance/issues/266
+[#267]: https://github.com/ahed-jneed/ai-assurance/issues/267
+[#268]: https://github.com/ahed-jneed/ai-assurance/issues/268
+[#269]: https://github.com/ahed-jneed/ai-assurance/issues/269
+[#270]: https://github.com/ahed-jneed/ai-assurance/issues/270
+[#271]: https://github.com/ahed-jneed/ai-assurance/issues/271
+[#272]: https://github.com/ahed-jneed/ai-assurance/issues/272
+[#273]: https://github.com/ahed-jneed/ai-assurance/issues/273
+[PR #260]: https://github.com/ahed-jneed/ai-assurance/pull/260
+[PR #278]: https://github.com/ahed-jneed/ai-assurance/pull/278
+[PR #279]: https://github.com/ahed-jneed/ai-assurance/pull/279
+[PR #280]: https://github.com/ahed-jneed/ai-assurance/pull/280
+[PR #281]: https://github.com/ahed-jneed/ai-assurance/pull/281
+[PR #282]: https://github.com/ahed-jneed/ai-assurance/pull/282

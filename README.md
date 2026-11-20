@@ -39,13 +39,25 @@ A React 19 single-page app and its API run in one Cloudflare Worker (Vinext), wi
 
 Run your own copy with one command. Then open <http://localhost:8787>: the first visit asks you to create the **owner account**, and the owner invites everyone else from **Members & access** by sending each person a sign-up link. There is no external sign-in service to set up.
 
-**With Docker:**
+> **The self-hosted runtime is a preview.** It starts the app with `wrangler dev --local`, which is Cloudflare's local development runtime, not a production-hardened server (see the last lines of [`site-app/scripts/self-host.mjs`](site-app/scripts/self-host.mjs)). Use it to evaluate the platform, or for a small team whose members you trust, and put it behind HTTPS as soon as anyone reaches it over a network. It has not been hardened as a production service, and this repository records no load test of it.
+>
+> **No independent security assessment has been done.** This reference implementation has not had an independent security assessment. Do a security review of your own before you deploy it with real audit evidence. [SECURITY.md](SECURITY.md) says how to report a vulnerability and links the hardening notes.
+
+**With Docker**, building the image on your machine (run this in the repository root):
 
 ```bash
 docker compose up -d
 ```
 
-The data (database, evidence and the generated secret) lives in the `ai-assurance-data` volume. Once a release is published, the image is also available as `ghcr.io/ahed-jneed/ai-assurance`.
+**With Docker, without building.** `docker-compose.pull.yml` downloads ("pulls") the ready-made image `ghcr.io/ahed-jneed/ai-assurance` from the GitHub container registry instead of building it:
+
+```bash
+docker compose -f docker-compose.pull.yml up -d
+```
+
+By default this runs the tag `latest`, the newest published build. Every build of `main` is published as `latest` after it passes a start-up test; a release is also published under its version, so `v0.1.0`, the first public preview, gets the tags `v0.1.0`, `0.1.0` and `0.1`. To stay on one release, which is the safer choice for a real installation, set `AI_ASSURANCE_VERSION`, for example `AI_ASSURANCE_VERSION=0.1.0 docker compose -f docker-compose.pull.yml up -d`. A version tag exists only once that release is published; the header of [`docker-compose.pull.yml`](docker-compose.pull.yml) explains the details.
+
+With either compose file, the data (database, evidence and the generated secret) lives in a Docker volume, a disk area that Docker manages and that outlives the container. The compose files call it `ai-assurance-data`, and Docker Compose puts the project name, which is the name of the directory, in front: in a directory called `ai-assurance` the volume is `ai-assurance_ai-assurance-data`. Both compose files, used from the same directory, share that volume. The [backup guide](docs/self-hosting/backup-restore.md#the-name-of-the-docker-volume) explains this.
 
 **With Node.js** (22.13 or later):
 
@@ -55,11 +67,18 @@ npm ci
 npm run self-host
 ```
 
-The data lives in `site-app/data/`. Back it up together with `data/secrets.env`, which holds the key that signs reports and sign-up links. `PORT`, `HOST` and `DATA_DIR` change where it listens and stores data, for example `PORT=3000 npm run self-host`.
+The data lives in `site-app/data/`. Back it up together with `data/secrets.env`, which holds the key that signs reports and sign-up links; the [backup and restore guide](docs/self-hosting/backup-restore.md) has the commands. `PORT`, `HOST` and `DATA_DIR` change where it listens and stores data, for example `PORT=3000 npm run self-host`; the [configuration reference](docs/self-hosting/configuration.md) lists every setting.
+
+**Self-hosting guides:**
+
+- [HTTPS with Caddy](docs/self-hosting/https-caddy.md): serve the app over HTTPS, with a ready-made compose overlay (a second compose file that adds to the first).
+- [Back up and restore](docs/self-hosting/backup-restore.md): what to copy, how to get it back, and what happens if `secrets.env` is lost.
+- [Upgrading](docs/self-hosting/upgrading.md): move to a newer version without losing data. Back up first.
+- [Configuration reference](docs/self-hosting/configuration.md): every setting, its default, and how to set it under Docker and under Node.js. [`.env.example`](.env.example) is the matching example file.
 
 **Forgot a password?** Run `npm run self-host -- reset-password <email>` (in Docker: `docker compose exec ai-assurance node scripts/self-host.mjs reset-password <email>`). It prints a temporary password.
 
-**Reaching it from other machines.** Put it behind a reverse proxy that serves HTTPS (for example Caddy or nginx) and forwards `X-Forwarded-Proto`, so the session cookie is marked `Secure`. The Docker image listens on all interfaces; `npm run self-host` listens on `127.0.0.1` unless you set `HOST=0.0.0.0`.
+**Reaching it from other machines.** Put it behind a reverse proxy that serves HTTPS (a server that sits in front of the app and passes requests on to it) and forwards `X-Forwarded-Proto`, so the session cookie is marked `Secure`. The [HTTPS with Caddy guide](docs/self-hosting/https-caddy.md) shows one tested way, with `docker-compose.caddy.yml` and a `Caddyfile` that you do not need to edit; nginx or another proxy works on the same principle. The Docker image listens on all interfaces; `npm run self-host` listens on `127.0.0.1` unless you set `HOST=0.0.0.0`.
 
 To deploy to Cloudflare Workers behind Cloudflare Access instead, see [docs/security/identity.md](docs/security/identity.md#configure-cloudflare-access).
 
@@ -188,12 +207,16 @@ Sources and detailed applicability: `docs/audit-methodology.md` and the rule pac
 
 ## Status
 
-At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has seven open issues, each with a pull request in review: the dead-code sweep ([#37](https://github.com/ahed-jneed/ai-assurance/issues/37)), the five fixes from the release-candidate verification ([#199](https://github.com/ahed-jneed/ai-assurance/issues/199), [#201](https://github.com/ahed-jneed/ai-assurance/issues/201) to [#204](https://github.com/ahed-jneed/ai-assurance/issues/204)) and this documentation refresh ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38)). See [ROADMAP.md](ROADMAP.md) for the outcome, the Later list, the watch list and the owner actions, and [CHANGELOG.md](CHANGELOG.md) for each merged PR.
+At 20 Nov 2026 the project is preparing its first public preview, **v0.1.0**. The [v0.1 release checklist](https://github.com/ahed-jneed/ai-assurance/issues/262) tracks what is left, and the [v0.1 Public preview milestone](https://github.com/ahed-jneed/ai-assurance/milestone/5) holds its issues.
 
-- **Pending expert review** ([#261](https://github.com/ahed-jneed/ai-assurance/issues/261)): qualified legal review of the rule pack, Art 50 and LL144 content (shown as pending review); licensed copies of EN 18286 and ISO/IEC 42001 and counsel's sign-off before pack #2 leaves draft; and a practitioner review of the ISAE 3000 wording. **Pending owner actions:** deploy settings such as the `DOSSIER_KEK` secret.
+- **The November 2026 roadmap cycle is finished.** Milestones M0 to M3 are closed on GitHub, and every issue in them is closed. That includes the seven issues that were still open at the 14 Nov 2026 refresh: the dead-code sweep ([#37](https://github.com/ahed-jneed/ai-assurance/issues/37)), the five fixes from the release-candidate verification ([#199](https://github.com/ahed-jneed/ai-assurance/issues/199), [#201](https://github.com/ahed-jneed/ai-assurance/issues/201) to [#204](https://github.com/ahed-jneed/ai-assurance/issues/204)) and the documentation refresh ([#38](https://github.com/ahed-jneed/ai-assurance/issues/38)). Their pull requests reached `main` on 15 Nov 2026. See [ROADMAP.md](ROADMAP.md) for the outcome, the Later list, the watch list and the owner actions, and [CHANGELOG.md](CHANGELOG.md) for each merged PR.
+- **Self-hosting is a preview.** `docker compose up -d` and `npm run self-host` start the app with `wrangler dev --local`, Cloudflare's local development runtime, not a production-hardened server. See the note in the [Quick start](#quick-start) and the guides listed there.
+- **No independent security assessment.** This reference implementation has not had an independent security assessment. Do a security review of your own before you deploy it with real audit evidence ([SECURITY.md](SECURITY.md)).
+- **Pending expert review** ([#261](https://github.com/ahed-jneed/ai-assurance/issues/261)): qualified legal review of the rule pack, Art 50 and LL144 content (shown as pending review); licensed copies of EN 18286 and ISO/IEC 42001 and counsel's sign-off before pack #2 leaves draft; and a practitioner review of the ISAE 3000 wording. **Pending owner actions** for a Cloudflare Workers deployment: deploy settings such as the `DOSSIER_KEK` secret (a self-hosted install creates this secret itself on first start).
 - **GitHub CI** did not run from 14 to 18 Nov 2026, for a hosting-account reason that had nothing to do with the code. Changes merged in that window were checked locally with the commands above; CI has run on every pull request and on `main` again since 18 Nov 2026.
 - **Not built:** upload malware scanning, retention and region controls, RFC 3161 timestamps, qualified signatures and WORM storage, per-practice SSO, MFA and SCIM through the host, native model runtimes in the default worker image, SHAP or LIME explanations, adversarial evaluations and inference-log connectors. These and the other deferred items are on the [Later list](ROADMAP.md#later).
 - **Production limits:** an engagement's metadata is capped at 1.5 MB, and hosted diagnostics accept at most 10,000 rows; larger datasets go to the external worker. Before processing real audit evidence, an operator still needs the deploy actions, infrastructure observability, recovery exercises and an independent security assessment.
+- **Next:** [v0.2 Contributor-ready](https://github.com/ahed-jneed/ai-assurance/milestone/6) collects maintenance work that is open to contributors, and [Regulatory content review](https://github.com/ahed-jneed/ai-assurance/milestone/7) holds the expert review ([#261](https://github.com/ahed-jneed/ai-assurance/issues/261)).
 
 ## Documentation
 
@@ -206,6 +229,10 @@ At 14 Nov 2026 every roadmap issue in milestones M0 to M2 has merged, and M3 has
 | [docs/audit-methodology.md](docs/audit-methodology.md) | The audit methodology and the regulatory snapshot |
 | [docs/design/](docs/design/) | Statistics, criteria-model and GenAI-evidence designs |
 | [docs/research/](docs/research/) | Verified research behind the rule pack, Art 50 and LL144, and the November 2026 research record |
+| [docs/self-hosting/https-caddy.md](docs/self-hosting/https-caddy.md) | Self-hosting: HTTPS through Caddy, with a compose overlay |
+| [docs/self-hosting/backup-restore.md](docs/self-hosting/backup-restore.md) | Self-hosting: back up and restore, and what happens if `secrets.env` is lost |
+| [docs/self-hosting/upgrading.md](docs/self-hosting/upgrading.md) | Self-hosting: upgrade to a newer version, and go back if an upgrade fails |
+| [docs/self-hosting/configuration.md](docs/self-hosting/configuration.md) | Self-hosting: every setting with its default, and [`.env.example`](.env.example) |
 | [docs/security/](docs/security/) | Identity modes and dossier signing keys |
 | [site-app/e2e/README.md](site-app/e2e/README.md) | The Playwright persona suite |
 | [engine/README.md](engine/README.md) and the other `engine/*.md` files | The engine, worker, runtime package, GenAI ingestion and assurance CLIs |
