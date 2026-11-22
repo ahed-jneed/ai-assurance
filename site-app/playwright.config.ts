@@ -1,10 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Persona end-to-end suite (e2e/README.md). It runs against the built Worker
-// in trusted-headers mode on a fresh local database: run `npm run build`
-// first, then `npm run test:e2e`.
+// End-to-end suite (e2e/README.md): run `npm run build` first, then
+// `npm run test:e2e`. The persona projects (`seed`, `chromium`) run against
+// the built Worker in trusted-headers mode on a fresh local database. The
+// `auth-pages` project runs against a second server in the default built-in
+// account mode, on its own port and its own fresh database (#273).
 const port = Number(process.env.E2E_PORT ?? 8790);
 const baseURL = `http://127.0.0.1:${port}`;
+const authPort = Number(process.env.E2E_AUTH_PORT ?? 8791);
+const authBaseURL = `http://127.0.0.1:${authPort}`;
+const authSpec = /auth-pages\.spec\.ts$/;
 const ci = !!process.env.CI;
 
 export default defineConfig({
@@ -36,16 +41,33 @@ export default defineConfig({
     { name: "seed", testMatch: /seed\.setup\.ts/ },
     {
       name: "chromium",
+      // Every persona spec, but not the built-in account pages.
+      testIgnore: [/\.test\.ts$/, authSpec],
       use: { ...devices["Desktop Chrome"] },
       dependencies: ["seed"],
     },
+    {
+      name: "auth-pages",
+      testMatch: authSpec,
+      use: { ...devices["Desktop Chrome"], baseURL: authBaseURL },
+    },
   ],
-  webServer: {
-    command: `node e2e/server.mjs ${port}`,
-    url: `${baseURL}/`,
-    reuseExistingServer: !ci,
-    timeout: 120_000,
-    stdout: "ignore",
-    stderr: "pipe",
-  },
+  webServer: [
+    {
+      command: `node e2e/server.mjs ${port}`,
+      url: `${baseURL}/`,
+      reuseExistingServer: !ci,
+      timeout: 120_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      command: `node e2e/auth-server.mjs ${authPort}`,
+      url: `${authBaseURL}/auth/sign-in`,
+      reuseExistingServer: !ci,
+      timeout: 120_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  ],
 });

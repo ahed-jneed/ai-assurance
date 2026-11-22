@@ -2,7 +2,10 @@
 
 Playwright drives the workspace as the development personas of
 `fixtures/dev-personas.json`, one browser context per persona, with axe
-accessibility checks on the views each flow visits.
+accessibility checks on the views each flow visits. A second project,
+`auth-pages`, checks the built-in account pages (setup, sign-in, sign-up and
+password change) against a server of its own: see
+[Built-in account pages](#built-in-account-pages).
 
 ## Run it
 
@@ -68,6 +71,47 @@ A reused server must be `node e2e/server.mjs`: any other server on the port
 headers, and every spec then fails with confusing sign-in or 403 errors. CI
 always starts a fresh server.
 
+## Built-in account pages
+
+The `auth-pages` project (#273) runs `auth-pages.spec.ts` only, and the
+persona projects (`seed`, `chromium`) never run it. The persona server trusts
+the persona headers, so the Worker's own account pages never appear there.
+This project therefore gets a second web server, `e2e/auth-server.mjs`, which
+starts the same build in the default built-in account mode (`local`: no
+`IDENTITY_MODE`, `SELF_SIGNUP=off` and a random `DOSSIER_KEK`, which keys the
+invitation sign-up links; `docs/security/identity.md`). It listens on
+`127.0.0.1:8791` (set `E2E_AUTH_PORT` for another port). Like the persona
+server, it checks the build first, then deletes `.wrangler/e2e-auth` and
+migrates an empty database there, so the first visit is offered
+`/auth/setup`. It never touches `.wrangler/e2e-state` or `.wrangler/state`.
+
+```sh
+npx playwright test --project=auth-pages     # only the account pages
+E2E_PORT=8890 E2E_AUTH_PORT=8891 npm run test:e2e   # both, on other ports
+```
+
+Playwright starts both web servers whichever project you select, so both
+ports must be free (or hold the matching server, which is reused outside CI).
+
+The spec walks the flow of the `local` section of
+`scripts/identity-check.mjs` with made-up accounts (`owner@example.com`):
+it creates the owner in `/auth/setup`, signs out and signs in at
+`/auth/sign-in`, invites a member through the API, signs up through the
+invitation link at `/auth/sign-up` in a second browser context, changes that
+member's password at `/auth/password` and signs in with the new one. axe
+(`expectAccessible`) checks each of the four pages, and each one again with
+an error message shown (passwords that do not match, a wrong password). Every
+form is completed with the keyboard alone: focus starts in the first field,
+Tab moves through the fields in order to the submit button, each with a
+visible focus outline, and Enter submits. Each error message must be an
+alert (`role="alert"`), and the fields it is about carry `aria-invalid` and
+an `aria-describedby` that points to it.
+
+CI runs every spec twice on one database, and a reused server keeps its
+accounts. When the owner already exists, the spec says so in a `note`
+annotation, skips the setup step and signs in as the owner; each run invites
+a new address, so sign-up and password change are checked every time.
+
 ## Flows
 
 One spec per flow, so new flows add files instead of editing shared ones:
@@ -77,6 +121,7 @@ One spec per flow, so new flows add files instead of editing shared ones:
 | `lead-creates-engagement.spec.ts` | Lead Auditor creates an engagement for Acme; an Auditor's `createEngagement` is refused |
 | `auditor-prepares-paper.spec.ts` | Auditor creates a paper, records results and conclusion, links accepted evidence, saves and submits it |
 | `reviewer-reviews-paper.spec.ts` | Reviewer approves the review, the Lead Auditor signs the revision; the author's own review and an Auditor's review are refused |
+| `auth-pages.spec.ts` | Project `auth-pages`, its own server: axe and keyboard-only use of the built-in account pages (setup, sign-in, sign-up through an invitation, password change), each also with an error message shown ([Built-in account pages](#built-in-account-pages)) |
 | `accessibility.spec.ts` | axe finds no serious or critical violation on any of the Lead Auditor's engagement and practice views or on any client portal view (Viewer and Contributor); keyboard-only use reaches the skip link, the content and the portal navigation |
 | `client-contributor.spec.ts` | Client Contributor answers the seeded evidence request in the client portal shell (no practice navigation) and the audit team sees it; internal commands are refused |
 | `client-viewer.spec.ts` | Client Viewer gets the client portal shell without practice navigation or search, and sees accepted, client-shared evidence only; pending and internal evidence is neither listed nor downloadable |
@@ -176,7 +221,8 @@ The `e2e` job in `.github/workflows/ci.yml` builds the Worker, restores
 Chromium's headless shell from the cache (keyed by the Playwright version; a
 new version restores the latest earlier cache through `restore-keys`) or
 downloads it with `npx playwright install --only-shell chromium`, and runs the
-suite with every spec twice. Only runs on `main` save the browser cache: a
+suite with every spec twice. `npm run test:e2e` runs every project, so the
+job also runs the `auth-pages` project against its own server. Only runs on `main` save the browser cache: a
 cache a pull request saves is visible to that pull request only. It skips
 `--with-deps`: the runner image has Chromium's libraries, and
 the optional font packages it would add took ten minutes from the apt mirror. On failure it uploads `playwright-report/` and `test-results/`
