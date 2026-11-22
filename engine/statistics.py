@@ -19,6 +19,7 @@ import math
 import operator
 import random
 import re
+import struct
 from pathlib import Path
 from statistics import NormalDist
 
@@ -78,6 +79,141 @@ def load_library(path=LIBRARY_FILE):
 LIBRARY = load_library()
 
 
+# ---------------------------------------------------------------- platform-independent erf, erfc, exp
+# The platform C library supplies math.erf, math.erfc and math.exp, and their last bit differs
+# between macOS, glibc and Windows (macOS gave a p-value 1 ulp away from Linux and Windows, so the
+# GenAI computationSha256 differed). These are pure-Python ports of fdlibm 5.3 (Sun Microsystems,
+# s_erf.c and e_exp.c, error below 1 ulp). CPython float arithmetic is IEEE double on every
+# platform, so they give the same bits everywhere.
+def _high_word(x):
+    return struct.unpack("<q", struct.pack("<d", x))[0] >> 32  # signed, as fdlibm's __HI
+
+
+def _clear_low_word(x):
+    return struct.unpack("<d", struct.pack("<q", struct.unpack("<q", struct.pack("<d", x))[0] & ~0xFFFFFFFF))[0]
+
+
+_LN2_HI, _LN2_LO, _INV_LN2 = 6.93147180369123816490e-01, 1.90821492927058770002e-10, 1.44269504088896338700e+00
+_EXP_P = (1.66666666666666019037e-01, -2.77777777770155933842e-03, 6.61375632143793436117e-05, -1.65339022054652515390e-06, 4.13813679705723846039e-08)
+_EXP_OVERFLOW, _EXP_UNDERFLOW = 7.09782712893383973096e+02, -7.45133219101941108420e+02
+
+
+def _exp(x):
+    """fdlibm e_exp.c."""
+    if math.isnan(x):
+        return x
+    if x > _EXP_OVERFLOW:
+        return math.inf
+    if x < _EXP_UNDERFLOW:
+        return 0.0
+    hx = _high_word(x) & 0x7FFFFFFF
+    negative = x < 0.0
+    if hx > 0x3FD62E42:  # |x| > 0.5 ln2
+        if hx < 0x3FF0A2B2:  # |x| < 1.5 ln2
+            k = -1 if negative else 1
+            hi, lo = (x + _LN2_HI, -_LN2_LO) if negative else (x - _LN2_HI, _LN2_LO)
+        else:
+            k = int(_INV_LN2 * x + (-0.5 if negative else 0.5))
+            hi, lo = x - k * _LN2_HI, k * _LN2_LO
+        x = hi - lo
+    elif hx < 0x3E300000:  # |x| < 2**-28
+        return 1.0 + x
+    else:
+        k, hi, lo = 0, 0.0, 0.0
+    t = x * x
+    p1, p2, p3, p4, p5 = _EXP_P
+    c = x - t * (p1 + t * (p2 + t * (p3 + t * (p4 + t * p5))))
+    if k == 0:
+        return 1.0 - ((x * c) / (c - 2.0) - x)
+    return math.ldexp(1.0 - ((lo - (x * c) / (2.0 - c)) - hi), k)
+
+
+_ERX = 8.45062911510467529297e-01
+_EFX, _EFX8 = 1.28379167095512586316e-01, 1.02703333676410069053e+00
+_PP = (1.28379167095512558561e-01, -3.25042107247001499370e-01, -2.84817495755985104766e-02, -5.77027029648944159157e-03, -2.37630166566501626084e-05)
+_QQ = (3.97917223959155352819e-01, 6.50222499887672944485e-02, 5.08130628187576562776e-03, 1.32494738004321644526e-04, -3.96022827877536812320e-06)
+_PA = (-2.36211856075265944077e-03, 4.14856118683748331666e-01, -3.72207876035701323847e-01, 3.18346619901161753674e-01, -1.10894694282396677476e-01, 3.54783043256182359371e-02, -2.16637559486879084300e-03)
+_QA = (1.06420880400844228286e-01, 5.40397917702171048937e-01, 7.18286544141962662868e-02, 1.26171219808761642112e-01, 1.36370839120290507362e-02, 1.19844998467991074170e-02)
+_RA = (-9.86494403484714822705e-03, -6.93858572707181764372e-01, -1.05586262253232909814e+01, -6.23753324503260060396e+01, -1.62396669462573470355e+02, -1.84605092906711035994e+02, -8.12874355063065934246e+01, -9.81432934416914548592e+00)
+_SA = (1.96512716674392571292e+01, 1.37657754143519042600e+02, 4.34565877475229228821e+02, 6.45387271733267880336e+02, 4.29008140027567833386e+02, 1.08635005541779435134e+02, 6.57024977031928170135e+00, -6.04244152148580987438e-02)
+_RB = (-9.86494292470009928597e-03, -7.99283237680523006574e-01, -1.77579549177547519889e+01, -1.60636384855821916062e+02, -6.37566443368389627722e+02, -1.02509513161107724954e+03, -4.83519191608651397019e+02)
+_SB = (3.03380607434824582924e+01, 3.25792512996573918826e+02, 1.53672958608443695994e+03, 3.19985821950859553908e+03, 2.55305040643316442583e+03, 4.74528541206955367215e+02, -2.24409524465858183362e+01)
+
+
+def _poly(c, x):  # c[0] + x*(c[1] + x*(...)), the nesting fdlibm writes out
+    result = c[-1]
+    for coefficient in reversed(c[:-1]):
+        result = coefficient + x * result
+    return result
+
+
+def _erf_ratio(x):  # |x| < 0.84375: y with erf(x) = x + x*y
+    z = x * x
+    return _poly(_PP, z) / (1.0 + z * _poly(_QQ, z))
+
+
+def _erf_middle(ax):  # 0.84375 <= |x| < 1.25: P/Q with erf(|x|) = erx + P/Q
+    s = ax - 1.0
+    return _poly(_PA, s) / (1.0 + s * _poly(_QA, s))
+
+
+def _erfc_tail(ax, ix):  # 1.25 <= |x| < 28: erfc(|x|)
+    s = 1.0 / (ax * ax)
+    if ix < 0x4006DB6D:  # |x| < 1/0.35
+        r, q = _poly(_RA, s), 1.0 + s * _poly(_SA, s)
+    else:
+        r, q = _poly(_RB, s), 1.0 + s * _poly(_SB, s)
+    z = _clear_low_word(ax)
+    return _exp(-z * z - 0.5625) * _exp((z - ax) * (z + ax) + r / q) / ax
+
+
+def erf(x):
+    """fdlibm s_erf.c erf."""
+    if math.isnan(x):
+        return x
+    if math.isinf(x):
+        return math.copysign(1.0, x)
+    ix = _high_word(x) & 0x7FFFFFFF
+    if ix < 0x3FEB0000:  # |x| < 0.84375
+        if ix < 0x3E300000:  # |x| < 2**-28
+            return 0.125 * (8.0 * x + _EFX8 * x) if ix < 0x00800000 else x + _EFX * x
+        return x + x * _erf_ratio(x)
+    if ix < 0x3FF40000:  # |x| < 1.25
+        return _ERX + _erf_middle(abs(x)) if x >= 0.0 else -_ERX - _erf_middle(abs(x))
+    if ix >= 0x40180000:  # |x| >= 6
+        return 1.0 if x >= 0.0 else -1.0
+    r = _erfc_tail(abs(x), ix)
+    return 1.0 - r if x >= 0.0 else r - 1.0
+
+
+def erfc(x):
+    """fdlibm s_erf.c erfc."""
+    if math.isnan(x):
+        return x
+    if math.isinf(x):
+        return 0.0 if x > 0.0 else 2.0
+    hx = _high_word(x)
+    ix = hx & 0x7FFFFFFF
+    if ix < 0x3FEB0000:  # |x| < 0.84375
+        if ix < 0x3C700000:  # |x| < 2**-56
+            return 1.0 - x
+        y = _erf_ratio(x)
+        if hx < 0x3FD00000:  # x < 1/4
+            return 1.0 - (x + x * y)
+        return 0.5 - (x * y + (x - 0.5))
+    if ix < 0x3FF40000:  # |x| < 1.25
+        return (1.0 - _ERX) - _erf_middle(abs(x)) if x >= 0.0 else 1.0 + (_ERX + _erf_middle(abs(x)))
+    if ix < 0x403C0000:  # |x| < 28
+        if x < 0.0 and ix >= 0x40180000:  # x <= -6
+            return 2.0
+        r = _erfc_tail(abs(x), ix)
+        return r if x > 0.0 else 2.0 - r
+    return 0.0 if x > 0.0 else 2.0
+
+
+SQRT2 = math.sqrt(2.0)
+
+
 # ---------------------------------------------------------------- numerics
 def zcrit(level):
     return ND.inv_cdf(1.0 - (1.0 - level) / 2.0)
@@ -85,7 +221,7 @@ def zcrit(level):
 
 def p_from_z(z):
     """Decision p-value 2*(1 - Phi(z)) for z >= 0."""
-    return math.erfc(min(max(z, 0.0), Z_MAX) / math.sqrt(2.0))
+    return erfc(min(max(z, 0.0), Z_MAX) / math.sqrt(2.0))
 
 
 def on_boundary(value, bound):
@@ -97,7 +233,8 @@ def code_point_key(text):
 
 
 def phi(x):
-    return ND.cdf(x)
+    # NormalDist.cdf's formula (mu 0, sigma 1) with the platform-independent erf.
+    return 0.5 * (1.0 + erf(x / SQRT2))
 
 
 # ---------------------------------------------------------------- intervals at critical value z
@@ -195,7 +332,7 @@ def jaccard_f1(tp, m, z):
 
 def per_class_z(z, k):
     """Critical value for each of k per-class intervals when the macro interval uses Bonferroni at the level of z."""
-    tail = math.erfc(z / math.sqrt(2.0)) / 2.0  # 1 - Phi(z)
+    tail = erfc(z / math.sqrt(2.0)) / 2.0  # 1 - Phi(z)
     return min(Z_MAX, -ND.inv_cdf(tail / k)) if tail / k > 0 else Z_MAX
 
 
@@ -1638,7 +1775,7 @@ def apply_cluster_bootstrap(entry, values, clusters, replicates, level, descript
     entry["interval"] = {"lower": quantile(ordered, tail), "upper": quantile(ordered, 1.0 - tail), "level": level, "method": "cluster_percentile_bootstrap"}
 
     def ci_at(z):  # the percentile interval at the two-sided level of critical value z, for the headline
-        u = 0.5 * math.erfc(z / math.sqrt(2.0))
+        u = 0.5 * erfc(z / math.sqrt(2.0))
         return quantile(ordered, u), quantile(ordered, 1.0 - u)
     entry["_ci_at"] = ci_at
     if descriptive or entry["status"] != "evaluated" or not entry["_decide"]:
