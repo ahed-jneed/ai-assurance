@@ -13,5 +13,5 @@
 # so the .eval tests cannot skip there.
 cryptography==50.0.2
 jsonschema==4.26.0
-numpy==2.3.5
+numpy==2.5.5
 zstandard==0.25.0
