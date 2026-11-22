@@ -109,7 +109,34 @@ class GoldenFixtureTests(unittest.TestCase):
             self.assertAlmostEqual(st.zcrit(entry["twoSidedLevel"]), entry["z"], delta=1e-9)
         # The fixture stores 12 significant digits, so the comparison allows their rounding.
         for entry in GOLDEN["numerics"]["erfc"]:
-            self.assertLessEqual(abs(math.erfc(entry["x"]) - entry["value"]), 1e-11 * entry["value"])
+            self.assertLessEqual(abs(st.erfc(entry["x"]) - entry["value"]), 1e-11 * entry["value"])
+
+    def test_erf_erfc_exp_give_the_same_bits_on_every_platform(self):
+        """Pinned bits of the pure-Python fdlibm ports: CI runs this on Linux, Windows and macOS.
+
+        math.erfc gave 1 ulp different p-values on macOS, so a run's computationSha256 depended on the platform.
+        """
+        pinned = [
+            (st.p_from_z, 2.3904572186687876, "0x1.13b34559e8e9fp-6"),
+            (st.erfc, 1e-20, "0x1.0000000000000p+0"), (st.erfc, 0.1, "0x1.c66b42bb6099ap-1"), (st.erfc, 0.5, "0x1.eb02147ce245cp-2"),
+            (st.erfc, 1.0, "0x1.4226162fbddd5p-3"), (st.erfc, -1.0, "0x1.d7bb3d3a08446p+0"), (st.erfc, 2.0, "0x1.328f5ec350e67p-8"),
+            (st.erfc, 5.397997213313375, "0x1.9a392f0fb6c5ep-46"), (st.erfc, -3.0, "0x1.fffe8d6209afdp+0"), (st.erfc, 10.0, "0x1.7d8a7f2a8a2d0p-149"),
+            (st.erfc, 24.327010304387912, "0x1.b692c6e843005p-860"),
+            (st.erf, 0.1, "0x1.cca5ea24fb334p-4"), (st.erf, 1.0, "0x1.af767a741088bp-1"), (st.erf, 1.6590604074977708, "0x1.f64a894e25200p-1"),
+            (st.erf, -2.5, "-0x1.ffcaa8f4c9beap-1"),
+            (st._exp, 1.0, "0x1.5bf0a8b14576ap+1"), (st._exp, -0.2, "0x1.a330ad6166159p-1"), (st._exp, 700.0, "0x1.d945df4f8ec8ep+1009"),
+            (st._exp, -700.0, "0x1.14f2b0fb9307fp-1010"), (st.phi, -1.96, "0x1.9990c58859310p-6"),
+        ]
+        for function, x, bits in pinned:
+            with self.subTest(function=function.__name__, x=x):
+                self.assertEqual(function(x).hex(), bits)
+        # Agreement with the platform library well inside the specification's 1e-12 relative error (section 5.13).
+        for x in (0.0, 0.3, 0.9, 1.3, 3.0, 7.0, 26.0, -0.7, -6.5):
+            with self.subTest(x=x):
+                self.assertLessEqual(abs(st.erfc(x) - math.erfc(x)), 1e-13 * math.erfc(x))
+                self.assertLessEqual(abs(st.erf(x) - math.erf(x)), 1e-13 * max(abs(math.erf(x)), 1e-300))
+        self.assertEqual((st.erfc(math.inf), st.erfc(-math.inf), st.erf(math.inf), st.erf(-math.inf), st.erfc(40.0)), (0.0, 2.0, 1.0, -1.0, 0.0))
+        self.assertTrue(math.isnan(st.erfc(math.nan)) and math.isnan(st.erf(math.nan)))
 
 
 class CoreBehaviourTests(unittest.TestCase):

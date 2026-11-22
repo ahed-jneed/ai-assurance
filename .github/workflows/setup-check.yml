@@ -1,0 +1,90 @@
+# Follows the Prerequisites and Setup sections of CONTRIBUTING.md on Linux,
+# Windows and macOS, so a newcomer's first afternoon works on each system.
+# It covers install, build, local database migration and the unit tests. It
+# does NOT start the dev server (`npm run dev`): that step runs until stopped,
+# so the check ends after the migration that the dev server depends on.
+name: Setup check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Same style as ci.yml: pull-request runs of one ref replace each other; every
+# push to main gets a group of its own and is never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: setup (${{ matrix.os }})
+    strategy:
+      # Let each system finish and report on its own.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # Prerequisites: Node.js from .nvmrc, as nvm and fnm read it.
+      - name: "Prerequisites: Node.js (.nvmrc)"
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: site-app/package-lock.json
+
+      # Prerequisites: Python from .python-version, as pyenv and uv read it.
+      - name: "Prerequisites: Python (.python-version)"
+        uses: actions/setup-python@v7
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: engine/requirements-dev.txt
+
+      # Shows the versions and the checkout path; on Windows CONTRIBUTING.md
+      # asks for site-app\ under about 120 characters.
+      - name: Show tool versions and checkout path
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          python --version
+          echo "site-app path: $(cd site-app && pwd -W 2>/dev/null || pwd)"
+
+      - name: "Setup, web app: npm ci"
+        working-directory: site-app
+        run: npm ci
+
+      - name: "Setup, web app: npm run build"
+        working-directory: site-app
+        run: npm run build
+
+      # Creates the local database tables that the dev server needs.
+      - name: "Setup, web app: npm run db:migrate:local"
+        working-directory: site-app
+        run: npm run db:migrate:local
+
+      - name: "Setup, engine (repository root): pip install -r engine/requirements-dev.txt"
+        run: python -m pip install -r engine/requirements-dev.txt
+
+      # From "Before you open a pull request": the web unit tests.
+      - name: "Before a pull request: web unit tests (npm test)"
+        working-directory: site-app
+        run: npm test
+
+      # From "Before you open a pull request": the engine unit tests, with the
+      # same environment as ci.yml's engine job.
+      - name: "Before a pull request: engine unit tests (python -m unittest)"
+        env:
+          # The Inspect .eval tests need a zstd back-end; fail instead of skipping.
+          GENAI_REQUIRE_ZSTD: "1"
+          # The Ed25519 signature tests need cryptography; fail instead of skipping.
+          ENGINE_REQUIRE_CRYPTOGRAPHY: "1"
+        run: python -m unittest discover -s engine/tests -v
