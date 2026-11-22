@@ -65,7 +65,9 @@ def readonly_sqlite(path):
     if not source.is_file():
         raise ValueError("SQLite source must be an existing file")
     connection = sqlite3.connect(source.as_uri()+"?mode=ro", uri=True, timeout=5)
-    connection.enable_load_extension(False)
+    # Builds without loadable-extension support (python.org macOS) lack this method and cannot load extensions at all.
+    if hasattr(connection, "enable_load_extension"):
+        connection.enable_load_extension(False)
     connection.execute("PRAGMA query_only = ON")
     connection.execute("PRAGMA trusted_schema = OFF")
     deadline = time.monotonic()+20
