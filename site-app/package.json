@@ -59,7 +59,7 @@
     "eslint-config-next": "16.4.6",
     "json-rpc-2.0": "1.7.1",
     "playwright-core": "1.64.1",
-    "prettier": "3.9.10",
+    "prettier": "3.10.1",
     "raw-body": "3.0.2",
     "react-server-dom-webpack": "19.3.1",
     "tailwindcss": "4.2.1",
