@@ -69,9 +69,6 @@ class EnvelopeSchemaTest(unittest.TestCase):
         committed = json.loads((gs.SCHEMAS / "fixtures" / "genai-result.example.json").read_text(encoding="utf-8"))
         self.result.validate(committed)
         fresh = example_envelope()
-        if committed["computationSha256"] != fresh["computationSha256"]:  # TEMPORARY WP9 DEBUG, removed before merge
-            import sys
-            print("WP9-DEBUG-COMPUTATION-BEGIN", fresh["computationJSON"], "WP9-DEBUG-COMPUTATION-END", sep="\n", file=sys.stderr, flush=True)
         self.assertEqual(committed["computationSha256"], fresh["computationSha256"], "regenerate with: python -m engine.tests.test_genai_envelope --write-example")
         self.assertEqual(committed, fresh)
 
