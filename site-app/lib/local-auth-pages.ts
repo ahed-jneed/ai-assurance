@@ -99,16 +99,35 @@ button{margin-top:20px;width:100%;padding:10px;border:0;border-radius:6px;backgr
     },
   });
 }
-const errorBox = (message?: string) =>
-  message ? `<p class="error" role="alert">${escape(message)}</p>` : "";
+/** An error message and the fields it is about. */
+type FormError = { message: string; fields: string[] };
+const ERROR_ID = "form-error";
+const errorBox = (error?: FormError) =>
+  error
+    ? `<p class="error" id="${ERROR_ID}" role="alert">${escape(error.message)}</p>`
+    : "";
+/**
+ * The aria attributes of a field: marked invalid and described by the error
+ * message when the error is about it, and described by its hint, if any.
+ */
+function fieldAria(id: string, error?: FormError, hint?: string) {
+  const invalid = !!error?.fields.includes(id);
+  const describedBy = [invalid ? ERROR_ID : "", hint ?? ""]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    (invalid ? ' aria-invalid="true"' : "") +
+    (describedBy ? ` aria-describedby="${describedBy}"` : "")
+  );
+}
 const hidden = (name: string, value: string) =>
   `<input type="hidden" name="${name}" value="${escape(value)}">`;
-const passwordFields = (autocomplete: string) => `
+const passwordFields = (autocomplete: string, error?: FormError) => `
 <label for="password">Password</label>
-<input id="password" name="password" type="password" required minlength="${MIN_PASSWORD_LENGTH}" maxlength="200" autocomplete="${autocomplete}" aria-describedby="password-hint">
+<input id="password" name="password" type="password" required minlength="${MIN_PASSWORD_LENGTH}" maxlength="200" autocomplete="${autocomplete}"${fieldAria("password", error, "password-hint")}>
 <small id="password-hint">At least ${MIN_PASSWORD_LENGTH} characters.</small>
 <label for="confirm">Repeat the password</label>
-<input id="confirm" name="confirm" type="password" required minlength="${MIN_PASSWORD_LENGTH}" maxlength="200" autocomplete="${autocomplete}">`;
+<input id="confirm" name="confirm" type="password" required minlength="${MIN_PASSWORD_LENGTH}" maxlength="200" autocomplete="${autocomplete}"${fieldAria("confirm", error)}>`;
 
 function redirect(location: string, request: Request, cookie?: string) {
   return new Response(null, {
@@ -145,27 +164,27 @@ async function readForm(request: Request): Promise<URLSearchParams | Response> {
   return new URLSearchParams(text);
 }
 
-function signInPage(returnTo: string, message?: string, status = 200) {
+function signInPage(returnTo: string, error?: FormError, status = 200) {
   return page(
     "Sign in",
-    `<h1>Sign in</h1><p>AI Assurance workspace</p>${errorBox(message)}
+    `<h1>Sign in</h1><p>AI Assurance workspace</p>${errorBox(error)}
 <form method="post" action="${SIGN_IN_PATH}">${hidden("return_to", returnTo)}
-<label for="email">Email</label><input id="email" name="email" type="email" required maxlength="320" autocomplete="username" autofocus>
-<label for="password">Password</label><input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password">
+<label for="email">Email</label><input id="email" name="email" type="email" required maxlength="320" autocomplete="username" autofocus${fieldAria("email", error)}>
+<label for="password">Password</label><input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"${fieldAria("password", error)}>
 <button type="submit">Sign in</button></form>
 <p style="margin-top:16px"><small>Forgot your password? Ask the person who runs this installation to reset it.</small></p>`,
     { status },
   );
 }
 
-function setupPage(message?: string, status = 200) {
+function setupPage(error?: FormError, status = 200) {
   return page(
     "Set up",
-    `<h1>Create the owner account</h1><p>This installation has no accounts yet. The owner leads the first practice and invites everyone else.</p>${errorBox(message)}
+    `<h1>Create the owner account</h1><p>This installation has no accounts yet. The owner leads the first practice and invites everyone else.</p>${errorBox(error)}
 <form method="post" action="${SETUP_PATH}">
-<label for="name">Your name</label><input id="name" name="name" required maxlength="120" autocomplete="name" autofocus>
-<label for="email">Email</label><input id="email" name="email" type="email" required maxlength="320" autocomplete="username">
-${passwordFields("new-password")}
+<label for="name">Your name</label><input id="name" name="name" required maxlength="120" autocomplete="name" autofocus${fieldAria("name", error)}>
+<label for="email">Email</label><input id="email" name="email" type="email" required maxlength="320" autocomplete="username"${fieldAria("email", error)}>
+${passwordFields("new-password", error)}
 <button type="submit">Create the owner account</button></form>`,
     { status },
   );
@@ -174,27 +193,27 @@ ${passwordFields("new-password")}
 function signUpPage(
   token: string,
   invite: { email: string; displayName: string | null },
-  message?: string,
+  error?: FormError,
   status = 200,
 ) {
   return page(
     "Create your account",
-    `<h1>Create your account</h1><p>You were invited as <b>${escape(invite.email)}</b>.</p>${errorBox(message)}
+    `<h1>Create your account</h1><p>You were invited as <b>${escape(invite.email)}</b>.</p>${errorBox(error)}
 <form method="post" action="${SIGN_UP_PATH}">${hidden("invite", token)}
-<label for="name">Your name</label><input id="name" name="name" required maxlength="120" autocomplete="name" value="${escape(invite.displayName ?? "")}" autofocus>
-${passwordFields("new-password")}
+<label for="name">Your name</label><input id="name" name="name" required maxlength="120" autocomplete="name" value="${escape(invite.displayName ?? "")}" autofocus${fieldAria("name", error)}>
+${passwordFields("new-password", error)}
 <button type="submit">Create account</button></form>`,
     { status },
   );
 }
 
-function passwordPage(message?: string, status = 200) {
+function passwordPage(error?: FormError, status = 200) {
   return page(
     "Change password",
-    `<h1>Change your password</h1><p>Your other sessions are signed out.</p>${errorBox(message)}
+    `<h1>Change your password</h1><p>Your other sessions are signed out.</p>${errorBox(error)}
 <form method="post" action="${PASSWORD_PATH}">
-<label for="current">Current password</label><input id="current" name="current" type="password" required maxlength="200" autocomplete="current-password" autofocus>
-${passwordFields("new-password")}
+<label for="current">Current password</label><input id="current" name="current" type="password" required maxlength="200" autocomplete="current-password" autofocus${fieldAria("current", error)}>
+${passwordFields("new-password", error)}
 <button type="submit">Change password</button></form>
 <p style="margin-top:16px"><a href="/">Back to the workspace</a></p>`,
     { status },
@@ -205,9 +224,14 @@ ${passwordFields("new-password")}
 function newPassword(form: URLSearchParams, email: string) {
   const password = form.get("password") ?? "",
     confirm = form.get("confirm") ?? "";
-  if (password !== confirm) return { problem: "The passwords do not match." };
+  if (password !== confirm)
+    return {
+      problem: { message: "The passwords do not match.", fields: ["confirm"] },
+    };
   const problem = passwordProblem(password, email);
-  return problem ? { problem } : { password };
+  return problem
+    ? { problem: { message: problem, fields: ["password"] } }
+    : { password };
 }
 
 const validEmail = (email: string) =>
@@ -240,8 +264,16 @@ export async function localAuthRoute(
       if (form instanceof Response) return form;
       const name = (form.get("name") ?? "").trim(),
         email = normalizeEmail(form.get("email") ?? "");
-      if (!name) return setupPage("Enter your name.", 400);
-      if (!validEmail(email)) return setupPage("Enter a valid email.", 400);
+      if (!name)
+        return setupPage(
+          { message: "Enter your name.", fields: ["name"] },
+          400,
+        );
+      if (!validEmail(email))
+        return setupPage(
+          { message: "Enter a valid email.", fields: ["email"] },
+          400,
+        );
       const chosen = newPassword(form, email);
       if (!chosen.password) return setupPage(chosen.problem, 400);
       const created = await createAccount(db, {
@@ -277,9 +309,13 @@ export async function localAuthRoute(
       if (!result.ok)
         return signInPage(
           target,
-          result.reason === "locked"
-            ? `Too many failed attempts. Try again in ${LOCK_MINUTES} minutes.`
-            : "The email or password is incorrect.",
+          {
+            message:
+              result.reason === "locked"
+                ? `Too many failed attempts. Try again in ${LOCK_MINUTES} minutes.`
+                : "The email or password is incorrect.",
+            fields: ["email", "password"],
+          },
           401,
         );
       if (token) await endSession(db, token);
@@ -318,7 +354,13 @@ export async function localAuthRoute(
           { status: 404 },
         );
       const name = (form.get("name") ?? "").trim();
-      if (!name) return signUpPage(formToken, invite, "Enter your name.", 400);
+      if (!name)
+        return signUpPage(
+          formToken,
+          invite,
+          { message: "Enter your name.", fields: ["name"] },
+          400,
+        );
       const chosen = newPassword(form, invite.email);
       if (!chosen.password)
         return signUpPage(formToken, invite, chosen.problem, 400);
@@ -357,7 +399,13 @@ export async function localAuthRoute(
           current.password_hash,
         ))
       )
-        return passwordPage("The current password is incorrect.", 401);
+        return passwordPage(
+          {
+            message: "The current password is incorrect.",
+            fields: ["current"],
+          },
+          401,
+        );
       const chosen = newPassword(form, current.email);
       if (!chosen.password) return passwordPage(chosen.problem, 400);
       await changePassword(db, current.user_id, chosen.password, token);
