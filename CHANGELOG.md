@@ -2,9 +2,7 @@
 
 All notable changes to this repository, newest first within each group. The first version is `0.1.0`, the first public preview. Its section covers everything from the initial commit `74c6463` (5 Nov 2026) up to that version: the November 2026 roadmap cycle ([ROADMAP.md](ROADMAP.md)), the release-candidate verification, and the preparation of the public preview. Each entry is one merged pull request, with the issues it closed; dates are merge dates (UTC). Decisions taken along the way are in the [decision log](docs/product/decisions.md), and what the code now does is in the [capability matrix](docs/capabilities.md).
 
-## 0.1.0 (date to be set when v0.1.0 is tagged)
-
-> **Note for the owner:** `v0.1.0` is not tagged yet. When you tag it, replace "date to be set when v0.1.0 is tagged" in the heading above with the release date (UTC, for example `2026-11-20`), and delete this note.
+## 0.1.0 (2026-11-22)
 
 Highlights:
 
@@ -19,7 +17,7 @@ Highlights:
 
 Work in the [v0.1 Public preview milestone](https://github.com/ahed-jneed/ai-assurance/milestone/5); [#262](https://github.com/ahed-jneed/ai-assurance/issues/262) is its checklist.
 
-- **docs:** status text for the first public preview in the README, roadmap, capability matrix and this changelog (the `0.1.0` section); the README links the four self-hosting guides and `docker-compose.pull.yml`, and says that the self-hosted runtime is a preview and that no independent security assessment has been done ([#262](https://github.com/ahed-jneed/ai-assurance/issues/262), [#263](https://github.com/ahed-jneed/ai-assurance/issues/263) to [#266](https://github.com/ahed-jneed/ai-assurance/issues/266)). [PR #283](https://github.com/ahed-jneed/ai-assurance/pull/283), merge date to be added with the release date
+- **docs:** status text for the first public preview in the README, roadmap, capability matrix and this changelog (the `0.1.0` section); the README links the four self-hosting guides and `docker-compose.pull.yml`, and says that the self-hosted runtime is a preview and that no independent security assessment has been done ([#262](https://github.com/ahed-jneed/ai-assurance/issues/262), [#263](https://github.com/ahed-jneed/ai-assurance/issues/263) to [#266](https://github.com/ahed-jneed/ai-assurance/issues/266)). [PR #283](https://github.com/ahed-jneed/ai-assurance/pull/283), 2026-11-20
 - **docs (self-hosting):** upgrade guide, `docs/self-hosting/upgrading.md`: back up first, steps for Docker, for the published image and for Node.js, and what to do if an upgrade fails; `--rebuild` documented in the header comment of `site-app/scripts/self-host.mjs` ([#265](https://github.com/ahed-jneed/ai-assurance/issues/265)). [PR #282](https://github.com/ahed-jneed/ai-assurance/pull/282), 2026-11-19
 - **docs (self-hosting):** HTTPS guide, `docs/self-hosting/https-caddy.md`, with the compose overlay `docker-compose.caddy.yml` and a `Caddyfile`; in that variant the app's own port is not published ([#263](https://github.com/ahed-jneed/ai-assurance/issues/263)). [PR #281](https://github.com/ahed-jneed/ai-assurance/pull/281), 2026-11-19
 - **ci (docker):** the image is built, started and checked (the first-run set-up page is offered) before it is published, on every event; a `v*` tag also produces plain version tags (`v0.1.0` gives `0.1.0` and `0.1`); new `docker-compose.pull.yml` runs the published image `ghcr.io/ahed-jneed/ai-assurance` without building ([#262](https://github.com/ahed-jneed/ai-assurance/issues/262)). [PR #280](https://github.com/ahed-jneed/ai-assurance/pull/280), 2026-11-19
