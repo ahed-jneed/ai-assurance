@@ -16,6 +16,7 @@
     "sync": "node scripts/sync-generated.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:watch": "vitest",
     "check:sync": "node scripts/sync-generated.mjs --check",
     "check:build": "node scripts/strict-build.mjs",
     "check:harnesses": "node scripts/run-checks.mjs",

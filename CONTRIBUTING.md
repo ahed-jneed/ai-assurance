@@ -38,6 +38,8 @@ Milestones group issues by when we plan to do them: `v0.1 Public preview`, `v0.2
 - Python 3.12, the engine's one supported version.
 - Docker, optional. It is one way to try the self-hosted app (`docker compose up -d` builds `site-app/Dockerfile` through `docker-compose.yml`), and you need it to work on the compute image (`engine/Dockerfile`).
 
+The repository root has `.nvmrc` (Node 22) and `.python-version` (3.12), which version managers such as nvm, fnm, pyenv and uv read, and an `.editorconfig` that tells your editor the indentation and whitespace rules Prettier uses.
+
 ## Setup
 
 Web app:
@@ -79,6 +81,11 @@ Two documents help you find your way around:
 - `python -m unittest discover -s engine/tests -v`, when `engine/` changed.
 - The schema validators in `schemas/`, when schemas, templates or research data changed. `.github/workflows/ci.yml` has the full list.
 - `cd site-app && npm run test:e2e`, when the UI changed. Run `npx playwright install chromium` once first.
+
+For faster feedback while you work, in `site-app/`:
+
+- `npm run test:watch` runs the unit tests in watch mode (Vitest re-runs the affected tests each time you save). Press `q` to stop it.
+- `npm run check:harnesses -- identity` runs only the named check harness (one of the `scripts/*-check.mjs` scripts that test the built app). Name several to run them all, with or without the `-check.mjs` suffix. An unknown name prints the valid ones. Run `npm run build` first, because the harnesses load the built app.
 
 Fill in the [pull request template](.github/pull_request_template.md).
 
