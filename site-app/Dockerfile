@@ -2,14 +2,14 @@
 #   docker compose up        (from the repository root)
 # Data (database, evidence, secrets) lives in the /data volume; the first
 # visit to http://localhost:8787 asks for the owner account.
-FROM node:22-bookworm AS build
+FROM node:26-bookworm AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build && rm -rf data .wrangler
 
-FROM node:22-bookworm-slim
+FROM node:26-bookworm-slim
 # workerd loads the system CA certificates at start; the slim image has none.
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENV HOST=0.0.0.0 \
