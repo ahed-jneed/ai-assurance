@@ -38,6 +38,11 @@ class SupportedPythonVersionTest(unittest.TestCase):
         self.assertTrue(versions, "ci.yml sets no python-version")
         self.assertEqual(set(versions), {SUPPORTED})
 
+    def test_python_version_file_is_the_supported_version(self):
+        # .python-version tells pyenv, uv and similar tools which Python to use.
+        pinned = (ROOT / ".python-version").read_text(encoding="utf-8").strip()
+        self.assertEqual(pinned, SUPPORTED)
+
     def test_requirements_and_docs_name_the_supported_version(self):
         self.assertIn(f"CPython {SUPPORTED}", (ENGINE / "requirements.txt").read_text(encoding="utf-8"))
         for name in ("README.md", "RUNTIME_PACKAGE.md"):

@@ -1,0 +1,27 @@
+# Editor settings for the whole repository. See https://editorconfig.org.
+# They match Prettier's settings in site-app/.prettierrc (Prettier defaults
+# plus "endOfLine": "auto"). Prettier also reads this file, so keep the two in
+# step. end_of_line and max_line_length are left unset on purpose: Prettier
+# keeps each file's existing line endings and has its own line width.
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# The engine's Python code uses 4-space indentation (PEP 8).
+[*.py]
+indent_size = 4
+
+# Caddy's own formatter indents with tabs.
+[Caddyfile]
+indent_style = tab
+
+# Test fixtures and generated migration snapshots are kept byte-for-byte as
+# their tools wrote them, so editors must not add or strip whitespace.
+[{**/fixtures/**,site-app/drizzle/meta/**}]
+insert_final_newline = unset
+trim_trailing_whitespace = unset

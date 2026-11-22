@@ -16,6 +16,7 @@ venv/
 .pytest_cache/
 *.egg-info/
 *.log
+*.stackdump
 coverage/
 .idea/
 .vscode/
