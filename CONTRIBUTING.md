@@ -36,9 +36,9 @@ Milestones group issues by when we plan to do them: `v0.1 Public preview`, `v0.2
 
 - Node.js 22.13 or later. Use npm 11 when you change the lockfile, for example `npx npm@11 install <pkg>`.
 - Python 3.12, the engine's one supported version.
+- Docker, optional. It is one way to try the self-hosted app (`docker compose up -d` builds `site-app/Dockerfile` through `docker-compose.yml`), and you need it to work on the compute image (`engine/Dockerfile`).
 
 The repository root has `.nvmrc` (Node 22) and `.python-version` (3.12), which version managers such as nvm, fnm, pyenv and uv read, and an `.editorconfig` that tells your editor the indentation and whitespace rules Prettier uses.
-- Docker, optional. It is one way to try the self-hosted app (`docker compose up -d` builds `site-app/Dockerfile` through `docker-compose.yml`), and you need it to work on the compute image (`engine/Dockerfile`).
 
 ## Setup
 
