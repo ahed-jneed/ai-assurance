@@ -64,4 +64,8 @@ if (failed.length) {
   );
   process.exit(1);
 }
-console.log(`\nAll ${harnesses.length} harnesses passed.`);
+console.log(
+  harnesses.length === 1
+    ? `\n${harnesses[0]} passed.`
+    : `\nAll ${harnesses.length} harnesses passed.`,
+);
