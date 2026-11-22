@@ -20,793 +20,121 @@
 
 import { PythonRandom } from "./python-random";
 import library from "./threshold-library.json";
+import {
+  StatisticsError,
+  require_,
+  SPEC_VERSION,
+  Z_MAX,
+  FLOORS,
+  type Minimums,
+  EPS,
+  MAX_GROUPS,
+  POWER_SEARCH_LIMIT,
+  BINARY_METRICS,
+  BINARY_DESCRIPTIVE,
+  MULTICLASS_METRICS,
+  REGRESSION_METRICS,
+  REGRESSION_DESCRIPTIVE,
+  REGRESSION_MEMBERS,
+  PERFORMANCE_KINDS,
+  UNDECIDABLE,
+  BASELINE_TOLERANCE,
+  RATE_KEYS,
+  HEADLINE_NAMES,
+  get,
+} from "./statistics/core";
+import {
+  SQRT2,
+  erfc,
+  normalQuantile,
+  zcrit,
+  pFromZ,
+  codePointCompare,
+  byCodePoint,
+  phi,
+  sum,
+  fsum,
+  meanSd,
+  tupleMin,
+} from "./statistics/numerics";
+import {
+  type Interval,
+  wilson,
+  newcombe,
+  katz,
+  koopman,
+  ratioMethod,
+  moverMean,
+  f1FromJ,
+  jaccardF1,
+  perClassZ,
+  macroF1Interval,
+  meanBonferroniWilson,
+} from "./statistics/intervals";
+import {
+  type Band,
+  type Direction,
+  bound,
+  directionOf,
+  type CiAt,
+  invert,
+  wilsonZstar,
+  logZstar,
+  koopmanZstar,
+  normalZstar,
+  squareBand,
+  jaccardBand,
+  logBand,
+} from "./statistics/pvalues";
+import {
+  fisherTwoSided,
+  type Table,
+  chanceExactP,
+  type Chance,
+  chanceGated,
+  bonferroni,
+  benjaminiHochberg,
+} from "./statistics/exact-tests";
+import { jcs, planSha256 } from "./statistics/plan-hash";
 
-export class StatisticsError extends Error {}
-
-function require_(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new StatisticsError(message);
-}
-
-export const SPEC_VERSION = "1.0.0";
-const Z_MAX = 37.0;
-export const FLOORS = { sampleSize: 30, groupSize: 30, classCount: 10 };
-type Minimums = typeof FLOORS;
-export const EPS = 1e-12;
-const MAX_GROUPS: Record<string, number> = { all_pairs: 50, reference: 1000 };
-const POWER_SEARCH_LIMIT = 10_000_000;
-export const BINARY_METRICS = [
-  "accuracy",
-  "precision",
-  "recall",
-  "specificity",
-  "false_positive_rate",
-  "balanced_accuracy",
-  "f1",
-] as const;
-const BINARY_DESCRIPTIVE = [
-  "accuracy",
-  "precision",
-  "recall",
-  "specificity",
-  "balanced_accuracy",
-  "f1",
-];
-export const MULTICLASS_METRICS = [
-  "accuracy",
-  "balanced_accuracy",
-  "macro_precision",
-  "macro_f1",
-] as const;
-export const REGRESSION_METRICS = ["mae", "rmse"] as const;
-const REGRESSION_DESCRIPTIVE = ["mae", "rmse", "r2"];
-/** The optional "beats the mean baseline" member (#136): the MSE reduction over the mean-prediction baseline. */
-const REGRESSION_MEMBERS = [...REGRESSION_METRICS, "mse_reduction"] as const;
-export const PERFORMANCE_KINDS = [
-  "performance",
-  "multiclass_performance",
-  "regression_performance",
-];
-// Metrics that today's engine rule makes a pass depend on but that 1.0.0
-// cannot decide by an interval (section 4.8).
-const UNDECIDABLE: Record<string, string> = {
-  regression_performance: "r2",
-  calibration: "expected_calibration_error",
-};
-// Section 5.9: a regression pass also needs the model to beat the
-// mean-prediction baseline; an MSE reduction of at most this share of the
-// baseline MSE is floating-point rounding and never counts as beating it.
-const BASELINE_TOLERANCE = 1e-9;
-const RATE_KEYS: Record<string, "selection" | "tpr" | "fpr"> = {
-  selection_rate_difference: "selection",
-  selection_rate_ratio: "selection",
-  tpr_difference: "tpr",
-  fpr_difference: "fpr",
-};
-// Headline names keep each runner's existing metric names (section 11).
-export const HEADLINE_NAMES: Record<
-  string,
-  { engine: string; hosted: string | null }
-> = {
-  selection_rate_difference: {
-    engine: "demographic_parity_difference",
-    hosted: "maximum_selection_rate_gap",
-  },
-  selection_rate_ratio: {
-    engine: "disparate_impact_ratio",
-    hosted: "minimum_selection_rate_ratio",
-  },
-  equalized_odds: {
-    engine: "equalized_odds_difference",
-    hosted: "maximum_tpr_fpr_gap",
-  },
-  calibration: { engine: "maximum_calibration_gap", hosted: null },
-};
-
-// ------------------------------------------------------------ numerics
-const SQRT2 = Math.SQRT2;
-const SQRTPI = Math.sqrt(Math.PI);
-
-/** erfc for x >= 0: a positive series below 2, Lentz's continued fraction above (relative error below 1e-12 on [0, 27]). */
-function erfcPositive(x: number) {
-  if (x < 2) {
-    let term = x,
-      sum = x;
-    for (let n = 1; n < 200; n++) {
-      term *= (2 * x * x) / (2 * n + 1);
-      sum += term;
-      if (term < 1e-17 * sum) break;
-    }
-    return 1 - (2 / SQRTPI) * Math.exp(-x * x) * sum;
-  }
-  const tiny = 1e-300;
-  let f = x,
-    c = x,
-    d = 0;
-  for (let n = 1; n < 500; n++) {
-    const a = n / 2;
-    d = x + a * d;
-    if (d === 0) d = tiny;
-    d = 1 / d;
-    c = x + a / c;
-    if (c === 0) c = tiny;
-    const delta = c * d;
-    f *= delta;
-    if (Math.abs(delta - 1) < 1e-16) break;
-  }
-  return Math.exp(-x * x) / SQRTPI / f;
-}
-export function erfc(x: number) {
-  if (Number.isNaN(x)) return NaN;
-  if (x === Infinity) return 0;
-  if (x === -Infinity) return 2;
-  return x >= 0 ? erfcPositive(x) : 2 - erfcPositive(-x);
-}
-function erf(x: number) {
-  return x >= 0 ? 1 - erfcPositive(x) : erfcPositive(-x) - 1;
-}
-
-/** Wichura's AS241 (PPND16), as Python's statistics.NormalDist.inv_cdf implements it. */
-export function normalQuantile(p: number) {
-  const q = p - 0.5;
-  if (Math.abs(q) <= 0.425) {
-    const r = 0.180625 - q * q;
-    const num =
-      (((((((2.5090809287301226727e3 * r + 3.3430575583588128105e4) * r +
-        6.7265770927008700853e4) *
-        r +
-        4.5921953931549871457e4) *
-        r +
-        1.3731693765509461125e4) *
-        r +
-        1.9715909503065514427e3) *
-        r +
-        1.3314166789178437745e2) *
-        r +
-        3.387132872796366608) *
-      q;
-    const den =
-      ((((((5.226495278852854561e3 * r + 2.8729085735721942674e4) * r +
-        3.930789580009271061e4) *
-        r +
-        2.1213794301586595867e4) *
-        r +
-        5.3941960214247511077e3) *
-        r +
-        6.871870074920579083e2) *
-        r +
-        4.2313330701600911252e1) *
-        r +
-      1.0;
-    return num / den;
-  }
-  let r = q <= 0 ? p : 1 - p;
-  r = Math.sqrt(-Math.log(r));
-  let num: number, den: number;
-  if (r <= 5) {
-    r -= 1.6;
-    num =
-      ((((((7.7454501427834140764e-4 * r + 2.27238449892691845833e-2) * r +
-        2.4178072517745061177e-1) *
-        r +
-        1.27045825245236838258) *
-        r +
-        3.64784832476320460504) *
-        r +
-        5.7694972214606914055) *
-        r +
-        4.6303378461565452959) *
-        r +
-      1.42343711074968357734;
-    den =
-      ((((((1.05075007164441684324e-9 * r + 5.475938084995344946e-4) * r +
-        1.51986665636164571966e-2) *
-        r +
-        1.4810397642748007459e-1) *
-        r +
-        6.8976733498510000455e-1) *
-        r +
-        1.6763848301838038494) *
-        r +
-        2.05319162663775882187) *
-        r +
-      1.0;
-  } else {
-    r -= 5;
-    num =
-      ((((((2.01033439929228813265e-7 * r + 2.71155556874348757815e-5) * r +
-        1.2426609473880784386e-3) *
-        r +
-        2.6532189526576123093e-2) *
-        r +
-        2.9656057182850489123e-1) *
-        r +
-        1.7848265399172913358) *
-        r +
-        5.4637849111641143699) *
-        r +
-      6.6579046435011037772;
-    den =
-      ((((((2.04426310338993978564e-15 * r + 1.4215117583164458887e-7) * r +
-        1.8463183175100546818e-5) *
-        r +
-        7.868691311456132591e-4) *
-        r +
-        1.4875361290850614852e-2) *
-        r +
-        1.3692988092273580531e-1) *
-        r +
-        5.9983220655588793769e-1) *
-        r +
-      1.0;
-  }
-  const x = num / den;
-  return q < 0 ? -x : x;
-}
-
-export function zcrit(level: number) {
-  return normalQuantile(1.0 - (1.0 - level) / 2.0);
-}
-
-/** Decision p-value 2*(1 - Phi(z)) for z >= 0. */
-export function pFromZ(z: number) {
-  return erfc(Math.min(Math.max(z, 0), Z_MAX) / SQRT2);
-}
-
-function onBoundary(value: number, bound: number) {
-  return Math.abs(value - bound) <= EPS * Math.max(1.0, Math.abs(bound));
-}
-
-/** Unicode code-point order (section 5.10), not the UTF-16 order of the default sort. */
-export function codePointCompare(a: string, b: string) {
-  const x = [...a],
-    y = [...b];
-  for (let i = 0; i < Math.min(x.length, y.length); i++) {
-    const d = x[i].codePointAt(0)! - y[i].codePointAt(0)!;
-    if (d) return d;
-  }
-  return x.length - y.length;
-}
-const byCodePoint = (values: Iterable<string>) =>
-  [...values].sort(codePointCompare);
-
-/** Standard normal CDF, as NormalDist().cdf: 0.5 * (1 + erf(x / sqrt 2)). */
-export function phi(x: number) {
-  return 0.5 * (1.0 + erf(x / SQRT2));
-}
-
-// ------------------------------------------------------------ intervals at critical value z
-type Interval = [number, number];
-export function wilson(x: number, n: number, z: number): Interval {
-  const p = x / n;
-  const denominator = 1.0 + (z * z) / n;
-  const center = (p + (z * z) / (2.0 * n)) / denominator;
-  const half =
-    (z * Math.sqrt((p * (1.0 - p)) / n + (z * z) / (4.0 * n * n))) /
-    denominator;
-  const lower = x === 0 ? 0.0 : Math.max(0.0, center - half);
-  const upper = x === n ? 1.0 : Math.min(1.0, center + half);
-  return [lower, upper];
-}
-
-export function newcombe(
-  x1: number,
-  n1: number,
-  x2: number,
-  n2: number,
-  z: number,
-): Interval {
-  const p1 = x1 / n1,
-    p2 = x2 / n2;
-  const [l1, u1] = wilson(x1, n1, z);
-  const [l2, u2] = wilson(x2, n2, z);
-  const d = p1 - p2;
-  return [
-    d - Math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2),
-    d + Math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2),
-  ];
-}
-
-export function katz(
-  x1: number,
-  n1: number,
-  x2: number,
-  n2: number,
-  z: number,
-): Interval {
-  const r = x1 / n1 / (x2 / n2);
-  const se = Math.sqrt(1.0 / x1 - 1.0 / n1 + 1.0 / x2 - 1.0 / n2);
-  return [r * Math.exp(-z * se), r * Math.exp(z * se)];
-}
-
-/** Score statistic for H0: p1/p2 = phi (Koopman 1984; Farrington-Manning/Miettinen-Nurminen without n/(n-1)). */
-function koopmanZ(x1: number, n1: number, x2: number, n2: number, f: number) {
-  const a = (n1 + n2) * f;
-  const b = -(n1 * f + x1 + n2 + x2 * f);
-  const c = x1 + x2;
-  const p2 = (2.0 * c) / (-b + Math.sqrt(Math.max(b * b - 4.0 * a * c, 0.0)));
-  const p1 = f * p2;
-  const variance = (p1 * (1.0 - p1)) / n1 + (f * f * p2 * (1.0 - p2)) / n2;
-  const numerator = x1 / n1 - (f * x2) / n2;
-  if (variance <= 0.0)
-    return numerator === 0 ? 0.0 : Math.sign(numerator) * Infinity;
-  return numerator / Math.sqrt(variance);
-}
-
-function koopmanSolve(
-  x1: number,
-  n1: number,
-  x2: number,
-  n2: number,
-  target: number,
-  lo: number,
-  hi: number,
-) {
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2.0;
-    if (koopmanZ(x1, n1, x2, n2, Math.exp(mid)) > target) lo = mid;
-    else hi = mid;
-    if (hi - lo <= 1e-13) break;
-  }
-  return Math.exp((lo + hi) / 2.0);
-}
-
-export function koopman(
-  x1: number,
-  n1: number,
-  x2: number,
-  n2: number,
-  z: number,
-): Interval {
-  const estimate = x1 / n1 / (x2 / n2);
-  if (z === 0.0) return [estimate, estimate];
-  const anchor = x1 > 0 ? Math.log(estimate) : -60.0;
-  const lower =
-    x1 === 0 ? 0.0 : koopmanSolve(x1, n1, x2, n2, z, anchor - 60.0, anchor);
-  const upper = koopmanSolve(x1, n1, x2, n2, -z, anchor, anchor + 120.0);
-  return [lower, upper];
-}
-
-export function ratioMethod(x1: number, n1: number, x2: number, n2: number) {
-  if (x2 === 0) return null;
-  if (x1 >= 1 && !(x1 === n1 && x2 === n2)) return "katz_log";
-  return "koopman_score";
-}
-
-/** MOVER (Zou & Donner 2008) interval for the mean of independent proportions, Wilson limits. */
-function moverMean(parts: [number, number][], z: number): Interval {
-  const k = parts.length;
-  const estimates = parts.map(([x, n]) => x / n);
-  const limits = parts.map(([x, n]) => wilson(x, n, z));
-  const mean = sum(estimates) / k;
-  const lower =
-    mean - Math.sqrt(sum(estimates.map((p, i) => (p - limits[i][0]) ** 2))) / k;
-  const upper =
-    mean + Math.sqrt(sum(estimates.map((p, i) => (limits[i][1] - p) ** 2))) / k;
-  return [lower, upper];
-}
-
-const f1FromJ = (j: number) => (2.0 * j) / (1.0 + j);
-const jFromF1 = (f: number) => f / (2.0 - f);
-
-function jaccardF1(tp: number, m: number, z: number): Interval {
-  const [lo, hi] = wilson(tp, m, z);
-  return [f1FromJ(lo), f1FromJ(hi)];
-}
-
-/** Critical value for each of k per-class intervals when the macro interval uses Bonferroni at the level of z. */
-function perClassZ(z: number, k: number) {
-  const tail = erfc(z / SQRT2) / 2.0;
-  return tail / k > 0 ? Math.min(Z_MAX, -normalQuantile(tail / k)) : Z_MAX;
-}
-
-function macroF1Interval(classes: [number, number][], z: number): Interval {
-  const zk = z > 0 ? perClassZ(z, classes.length) : 0.0;
-  const bounds = classes.map(([tp, m]) => jaccardF1(tp, m, zk));
-  return [
-    sum(bounds.map((b) => b[0])) / bounds.length,
-    sum(bounds.map((b) => b[1])) / bounds.length,
-  ];
-}
-
-/** Macro precision: per-class Wilson intervals at the Bonferroni level, averaged (conservative, any dependence). */
-function meanBonferroniWilson(parts: [number, number][], z: number): Interval {
-  const zk = z > 0 ? perClassZ(z, parts.length) : 0.0;
-  const bounds = parts.map(([x, n]) => wilson(x, n, zk));
-  return [
-    sum(bounds.map((b) => b[0])) / bounds.length,
-    sum(bounds.map((b) => b[1])) / bounds.length,
-  ];
-}
-
-/** Plain left-to-right sum, as Python's sum(). */
-function sum(values: number[]) {
-  let total = 0;
-  for (const v of values) total += v;
-  return total;
-}
-
-/** Exactly rounded sum, as Python's math.fsum (Shewchuk's algorithm). */
-export function fsum(values: number[]) {
-  const partials: number[] = [];
-  for (let x of values) {
-    let i = 0;
-    for (let y of partials) {
-      if (Math.abs(x) < Math.abs(y)) [x, y] = [y, x];
-      const hi = x + y;
-      const lo = y - (hi - x);
-      if (lo) partials[i++] = lo;
-      x = hi;
-    }
-    partials.length = i;
-    partials.push(x);
-  }
-  let n = partials.length;
-  if (!n) return 0;
-  let hi = partials[--n],
-    lo = 0;
-  while (n > 0) {
-    const x = hi,
-      y = partials[--n];
-    hi = x + y;
-    const yr = hi - x;
-    lo = y - yr;
-    if (lo) break;
-  }
-  if (
-    n > 0 &&
-    ((lo < 0 && partials[n - 1] < 0) || (lo > 0 && partials[n - 1] > 0))
-  ) {
-    const y = lo * 2,
-      x = hi + y,
-      yr = x - hi;
-    if (y === yr) hi = x;
-  }
-  return hi;
-}
-
-function meanSd(values: number[]): [number, number] {
-  const n = values.length;
-  const mean = fsum(values) / n;
-  const sd = Math.sqrt(fsum(values.map((v) => (v - mean) ** 2)) / (n - 1));
-  return [mean, sd];
-}
-
-// ------------------------------------------------------------ decision p-values
-export type Band = { lower: number | null; upper: number | null };
-type Direction = "pass" | "fail" | "none";
-
-const bound = (band: Partial<Band> | null | undefined, key: keyof Band) =>
-  band?.[key] ?? null;
-
-function directionOf(estimate: number, band: Partial<Band>): Direction {
-  const lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  if (
-    (lower !== null && onBoundary(estimate, lower)) ||
-    (upper !== null && onBoundary(estimate, upper))
-  )
-    return "none";
-  if (
-    (lower !== null && estimate < lower) ||
-    (upper !== null && estimate > upper)
-  )
-    return "fail";
-  return "pass";
-}
-
-type CiAt = (z: number) => Interval;
-
-/** z* = sup{z >= 0 : the interval at z decides `direction`}; bisection, normative for composite methods. */
-export function invert(ciAt: CiAt, band: Partial<Band>, direction: Direction) {
-  const lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  const holds = (z: number) => {
-    const [lo, hi] = ciAt(z);
-    if (direction === "pass")
-      return (lower === null || lo >= lower) && (upper === null || hi <= upper);
-    return (lower !== null && hi < lower) || (upper !== null && lo > upper);
-  };
-  if (!holds(0.0)) return 0.0;
-  if (holds(Z_MAX)) return Z_MAX;
-  let lo = 0.0,
-    hi = Z_MAX;
-  while (hi - lo > 1e-12) {
-    const mid = (lo + hi) / 2.0;
-    if (holds(mid)) lo = mid;
-    else hi = mid;
-  }
-  return lo;
-}
-
-/** Closed form: the Wilson interval is the inversion of the score test, z(T) = (p - T)/sqrt(T(1-T)/n). */
-export function wilsonZstar(
-  x: number,
-  n: number,
-  band: Partial<Band>,
-  direction: Direction,
-) {
-  const p = x / n;
-  let lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  if (lower !== null && lower <= 0.0) lower = null;
-  if (upper !== null && upper >= 1.0) upper = null;
-  const score = (t: number) => (p - t) / Math.sqrt((t * (1.0 - t)) / n);
-  if (direction === "pass") {
-    const candidates = [
-      ...(lower !== null ? [score(lower)] : []),
-      ...(upper !== null ? [-score(upper)] : []),
-    ];
-    return candidates.length ? Math.min(...candidates) : Z_MAX;
-  }
-  if (lower !== null && p < lower) return -score(lower);
-  return score(upper as number);
-}
-
-function logZstar(
-  estimate: number,
-  se: number,
-  band: Partial<Band>,
-  direction: Direction,
-) {
-  const lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  const le = Math.log(estimate);
-  if (direction === "pass")
-    return Math.min(
-      ...(lower !== null ? [(le - Math.log(lower)) / se] : []),
-      ...(upper !== null ? [(Math.log(upper) - le) / se] : []),
-    );
-  if (lower !== null && estimate < lower) return (Math.log(lower) - le) / se;
-  return (le - Math.log(upper as number)) / se;
-}
-
-function koopmanZstar(
-  x1: number,
-  n1: number,
-  x2: number,
-  n2: number,
-  band: Partial<Band>,
-  direction: Direction,
-) {
-  const lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  if (direction === "pass")
-    return Math.min(
-      ...(lower !== null ? [koopmanZ(x1, n1, x2, n2, lower)] : []),
-      ...(upper !== null ? [-koopmanZ(x1, n1, x2, n2, upper)] : []),
-    );
-  const estimate = x1 / n1 / (x2 / n2);
-  if (lower !== null && estimate < lower)
-    return -koopmanZ(x1, n1, x2, n2, lower);
-  return koopmanZ(x1, n1, x2, n2, upper as number);
-}
-
-function normalZstar(
-  mean: number,
-  se: number,
-  band: Partial<Band>,
-  direction: Direction,
-) {
-  const lower = bound(band, "lower"),
-    upper = bound(band, "upper");
-  if (direction === "pass")
-    return Math.min(
-      ...(lower !== null ? [(mean - lower) / se] : []),
-      ...(upper !== null ? [(upper - mean) / se] : []),
-    );
-  if (lower !== null && mean < lower) return (lower - mean) / se;
-  return (mean - (upper as number)) / se;
-}
-
-const mapBand = (band: Partial<Band>, f: (v: number) => number): Band => ({
-  lower: bound(band, "lower") === null ? null : f(band.lower!),
-  upper: bound(band, "upper") === null ? null : f(band.upper!),
-});
-const squareBand = (band: Partial<Band>) => mapBand(band, (v) => v ** 2);
-const jaccardBand = (band: Partial<Band>) => mapBand(band, jFromF1);
-const logBand = (band: Partial<Band>) => mapBand(band, Math.log);
-
-// ------------------------------------------------------------ exact tests and multiplicity
-const LOG_FACTORIALS = [0];
-for (let i = 1, total = 0; i < 64; i++)
-  LOG_FACTORIALS.push((total += Math.log(i)));
-/** ln(n!): a table below 64, Stirling's series above (absolute error near the rounding of n ln n). */
-function logFactorial(n: number) {
-  if (n < 64) return LOG_FACTORIALS[n];
-  const n1 = n + 1,
-    inv = 1 / n1,
-    inv2 = inv * inv;
-  return (
-    (n1 - 0.5) * Math.log(n1) -
-    n1 +
-    0.5 * Math.log(2 * Math.PI) +
-    inv * (1 / 12 - inv2 * (1 / 360 - inv2 * (1 / 1260 - inv2 / 1680)))
-  );
-}
-const logChoose = (n: number, k: number) =>
-  logFactorial(n) - logFactorial(k) - logFactorial(n - k);
-
-/** Hypergeometric weights over the support, scaled by the largest (log space, section 5.12). */
-function hypergeometric(successes: number, draws: number, total: number) {
-  const lo = Math.max(0, draws - (total - successes)),
-    hi = Math.min(successes, draws);
-  const logs: number[] = [];
-  for (let k = lo; k <= hi; k++)
-    logs.push(
-      logChoose(successes, k) + logChoose(total - successes, draws - k),
-    );
-  const top = Math.max(...logs);
-  return { lo, weights: logs.map((v) => Math.exp(v - top)) };
-}
-
-/** Two-sided Fisher exact p: the tables with the same margins whose probability is at most the observed one's (within a relative 1e-7). */
-export function fisherTwoSided(x1: number, n1: number, x2: number, n2: number) {
-  const { lo, weights } = hypergeometric(n1, x1 + x2, n1 + n2);
-  const observed = weights[x1 - lo];
-  let below = 0,
-    all = 0;
-  for (const w of weights) {
-    all += w;
-    if (w <= observed * (1 + 1e-7)) below += w;
-  }
-  return Math.min(1.0, below / all);
-}
-
-/** One-sided Fisher exact p for positive association: P(X >= x) for X ~ Hypergeometric(total, successes, draws). */
-export function fisherGreater(
-  x: number,
-  successes: number,
-  draws: number,
-  total: number,
-) {
-  const { lo, weights } = hypergeometric(successes, draws, total);
-  if (x <= lo) return 1.0;
-  const tail = sum(weights.slice(x - lo));
-  return Math.min(1.0, tail / sum(weights));
-}
-
-type Table = [number, number, number, number];
-/** The chance gate of section 5.2: one-sided Fisher per one-vs-rest table (tp, support, predicted, n), Bonferroni over k >= 3 tables, on the two-sided scale. */
-function chanceExactP(tables: Table[]) {
-  const tests = tables.length <= 2 ? 1 : tables.length;
-  return Math.min(
-    1.0,
-    2.0 *
-      tests *
-      Math.min(...tables.map(([tp, s, p, n]) => fisherGreater(tp, s, p, n))),
-  );
-}
-
-type Chance = [number, Table[]];
-function chanceGated(band: Partial<Band> | null, chance: Chance | null) {
-  const lower = band ? bound(band, "lower") : null;
-  return (
-    chance !== null &&
-    lower !== null &&
-    (lower > chance[0] || onBoundary(lower, chance[0]))
-  );
-}
-
-export function bonferroni(pvalues: number[]) {
-  const m = pvalues.length;
-  return pvalues.map((p) => Math.min(1.0, m * p));
-}
-
-export function benjaminiHochberg(pvalues: number[]) {
-  const m = pvalues.length;
-  const order = [...pvalues.keys()].sort((a, b) => pvalues[a] - pvalues[b]);
-  const adjusted = new Array<number>(m).fill(1.0);
-  let running = 1.0;
-  for (let rank = m - 1; rank >= 0; rank--) {
-    const i = order[rank];
-    running = Math.min(running, (m * pvalues[i]) / (rank + 1));
-    adjusted[i] = Math.min(1.0, running);
-  }
-  return adjusted;
-}
-
-// ------------------------------------------------------------ canonical JSON (RFC 8785) and plan hash
-/** RFC 8785 canonical JSON: keys sorted by UTF-16 code units, ECMAScript number serialisation, no whitespace. */
-export function jcs(value: unknown): string {
-  if (value === null || value === undefined) return "null";
-  if (value === true) return "true";
-  if (value === false) return "false";
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("non-finite number");
-    return Object.is(value, -0) ? "0" : String(value);
-  }
-  if (typeof value === "string") return JSON.stringify(value);
-  if (Array.isArray(value)) return "[" + value.map(jcs).join(",") + "]";
-  if (typeof value === "object") {
-    const keys = Object.keys(value).sort();
-    return (
-      "{" +
-      keys
-        .map(
-          (key) =>
-            JSON.stringify(key) +
-            ":" +
-            jcs((value as Record<string, unknown>)[key]),
-        )
-        .join(",") +
-      "}"
-    );
-  }
-  throw new TypeError(typeof value);
-}
-
-const K256 = Uint32Array.from([
-  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
-  0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-  0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
-  0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
-  0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-  0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
-  0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
-  0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-  0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-]);
-/** SHA-256 of a string's UTF-8 bytes, synchronous so plan hashing needs no Web Crypto round trip. */
-export function sha256Hex(text: string) {
-  const bytes = new TextEncoder().encode(text);
-  const length = bytes.length;
-  const padded = new Uint8Array(((length + 72) >> 6) << 6);
-  padded.set(bytes);
-  padded[length] = 0x80;
-  const view = new DataView(padded.buffer);
-  view.setUint32(padded.length - 8, Math.floor(length / 0x20000000));
-  view.setUint32(padded.length - 4, (length << 3) >>> 0);
-  const h = Uint32Array.from([
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c,
-    0x1f83d9ab, 0x5be0cd19,
-  ]);
-  const w = new Uint32Array(64);
-  const rotr = (x: number, n: number) => (x >>> n) | (x << (32 - n));
-  for (let offset = 0; offset < padded.length; offset += 64) {
-    for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4);
-    for (let i = 16; i < 64; i++) {
-      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
-    }
-    let [a, b, c, d, e, f, g, hh] = h;
-    for (let i = 0; i < 64; i++) {
-      const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
-      const t1 = (hh + s1 + ((e & f) ^ (~e & g)) + K256[i] + w[i]) >>> 0;
-      const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
-      const t2 = (s0 + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
-      hh = g;
-      g = f;
-      f = e;
-      e = (d + t1) >>> 0;
-      d = c;
-      c = b;
-      b = a;
-      a = (t1 + t2) >>> 0;
-    }
-    h[0] += a;
-    h[1] += b;
-    h[2] += c;
-    h[3] += d;
-    h[4] += e;
-    h[5] += f;
-    h[6] += g;
-    h[7] += hh;
-  }
-  return [...h].map((x) => x.toString(16).padStart(8, "0")).join("");
-}
-
-export function planSha256(plan: unknown) {
-  return sha256Hex(jcs(plan));
-}
+export {
+  StatisticsError,
+  SPEC_VERSION,
+  FLOORS,
+  EPS,
+  BINARY_METRICS,
+  MULTICLASS_METRICS,
+  REGRESSION_METRICS,
+  PERFORMANCE_KINDS,
+  HEADLINE_NAMES,
+} from "./statistics/core";
+export {
+  erfc,
+  normalQuantile,
+  zcrit,
+  pFromZ,
+  codePointCompare,
+  phi,
+  fsum,
+} from "./statistics/numerics";
+export {
+  wilson,
+  newcombe,
+  katz,
+  koopman,
+  ratioMethod,
+} from "./statistics/intervals";
+export { invert, wilsonZstar } from "./statistics/pvalues";
+export type { Band } from "./statistics/pvalues";
+export {
+  fisherTwoSided,
+  fisherGreater,
+  bonferroni,
+  benjaminiHochberg,
+} from "./statistics/exact-tests";
+export { jcs, sha256Hex, planSha256 } from "./statistics/plan-hash";
 
 // ------------------------------------------------------------ plan normalisation, library and legacy derivation
-/** Python's dict.get: the value when the key is present (even null), else the default. */
-function get(o: any, key: string, fallback: any = null) {
-  return o !== null && typeof o === "object" && key in o ? o[key] : fallback;
-}
 
 type LibraryParameter = {
   default: any;
@@ -2762,13 +2090,6 @@ export type CriterionResult = {
   groups: GroupView[] | null;
   decision: Decision;
 };
-
-const tupleMin = <T>(items: T[], key: (item: T) => [number, string]) =>
-  items.reduce((best, item) => {
-    const [a, b] = key(item),
-      [c, d] = key(best);
-    return a < c || (a === c && codePointCompare(b, d) < 0) ? item : best;
-  });
 
 export function evaluateCriterion(
   spec: PlanCriterion,
